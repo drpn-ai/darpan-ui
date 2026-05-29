@@ -585,10 +585,23 @@ watch(
   { immediate: true },
 )
 
+// Multi-tab sync: when another tab clears the auth token (logout) or rotates it (login as a
+// different user), the in-memory authStore in this tab is stale until the next API call 401s.
+// React to localStorage events for AUTH_TOKEN_STORAGE_KEY: token gone -> log out here; token
+// changed -> force re-auth so we pick up the new user's session info.
+const AUTH_TOKEN_STORAGE_KEY = 'darpan.authToken'
+function handleAuthStorageEvent(event: StorageEvent) {
+  if (event.storageArea !== window.localStorage) return
+  if (event.key !== AUTH_TOKEN_STORAGE_KEY && event.key !== null) return
+  // event.key === null means localStorage was cleared entirely; treat as logout.
+  void authStore.handleExternalAuthChange()
+}
+
 onMounted(() => {
   commandPalette.loadRecentFromStorage()
   window.addEventListener('keydown', handleKeyboard)
   window.addEventListener('mousedown', handleWindowMouseDown)
+  window.addEventListener('storage', handleAuthStorageEvent)
   setAuthRequiredHandler(() => {
     void handleAuthRequired()
   })
@@ -603,6 +616,7 @@ onBeforeUnmount(() => {
   hideWorkflowEscapeHint()
   window.removeEventListener('keydown', handleKeyboard)
   window.removeEventListener('mousedown', handleWindowMouseDown)
+  window.removeEventListener('storage', handleAuthStorageEvent)
   setAuthRequiredHandler(null)
   document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, handleWorkflowHintRequest)
   if (typeof document !== 'undefined') {

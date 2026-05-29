@@ -27,7 +27,8 @@ export interface UiPermissionPolicy {
   canManageGlobalSettings: boolean
 }
 
-const authBypass = (import.meta.env.VITE_DARPAN_AUTH_BYPASS ?? '').toLowerCase() === 'true'
+const authBypass = !import.meta.env.PROD
+  && (import.meta.env.VITE_DARPAN_AUTH_BYPASS ?? '').toLowerCase() === 'true'
 
 function formatApiError(error: ApiCallError): string {
   const details = (error.details ?? {}) as {
@@ -130,6 +131,11 @@ export const useAuthStore = defineStore('auth', () => {
   const _error = ref<string | null>(null)
   const _status = ref<AuthStatus>('unauthenticated')
   const _sessionInfo = ref<SessionInfo | null>(null)
+  // Single in-flight ensureAuthenticated promise. Without this, concurrent 401 callbacks (e.g.
+  // every page-init API call fans out and all 401 at once) each schedule their own getSessionInfo
+  // call, stampeding the auth endpoint and producing flicker in the UI status. Mirror the
+  // _hydrationPromise pattern in referenceData store.
+  let _ensureAuthInFlight: Promise<boolean> | null = null
 
   const checked = computed(() => _checked.value)
   const error = computed(() => _error.value)
@@ -197,23 +203,55 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (_checked.value && !force) return _status.value === 'authenticated'
 
-    try {
-      const response = await authFacade.getSessionInfo()
-      const isAuthenticated = _applyAuthResponse(response, 'No active authenticated session detected.')
-      if (isAuthenticated) _hydrateReferenceData()
-      return isAuthenticated
-    } catch (err) {
-      if (err instanceof ApiCallError && err.status === 401) {
-        clearAuthToken()
-        clearApiResponseCache()
-        _applyAuthState({ status: 'unauthenticated', error: err.message })
-        return false
-      }
+    // Dedupe concurrent calls: while a getSessionInfo is in flight, return the same promise.
+    if (_ensureAuthInFlight) return _ensureAuthInFlight
 
-      const formattedError = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
-      _applyAuthState({ status: 'verification-failed', error: formattedError })
-      return false
+    const inFlight = (async () => {
+      try {
+        const response = await authFacade.getSessionInfo()
+        const isAuthenticated = _applyAuthResponse(response, 'No active authenticated session detected.')
+        if (isAuthenticated) _hydrateReferenceData()
+        return isAuthenticated
+      } catch (err) {
+        if (err instanceof ApiCallError && err.status === 401) {
+          clearAuthToken()
+          clearApiResponseCache()
+          _applyAuthState({ status: 'unauthenticated', error: err.message })
+          return false
+        }
+
+        const formattedError = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+        _applyAuthState({ status: 'verification-failed', error: formattedError })
+        return false
+      } finally {
+        _ensureAuthInFlight = null
+      }
+    })()
+    _ensureAuthInFlight = inFlight
+    return inFlight
+  }
+
+  // Called by App.vue when another tab mutates the auth-token localStorage key. If the token is
+  // gone we treat it as a peer-initiated logout (clear local state + caches, no server call —
+  // the other tab already called logoutSession). If the token rotated we force-revalidate so we
+  // pick up the new user's sessionInfo rather than continuing to render the previous user's UI.
+  function handleExternalAuthChange(): void {
+    let storedToken: string | null = null
+    try {
+      storedToken = window.localStorage.getItem('darpan.authToken')
+    } catch {
+      storedToken = null
     }
+    if (!storedToken) {
+      clearApiResponseCache()
+      _checked.value = true
+      _status.value = 'unauthenticated'
+      _sessionInfo.value = null
+      _error.value = null
+      return
+    }
+    // Token present but may belong to a different user — force a fresh server check.
+    void ensureAuthenticated(true)
   }
 
   async function loginWithCredentials(usernameArg: string, password: string): Promise<boolean> {
@@ -506,6 +544,7 @@ export const useAuthStore = defineStore('auth', () => {
     userId,
     username,
     ensureAuthenticated,
+    handleExternalAuthChange,
     loginWithCredentials,
     logoutSession,
     saveActiveTenant,
