@@ -402,6 +402,19 @@ router.beforeEach(async (to) => {
       return { name: 'hub' }
     }
 
+    // AI provider settings workflow is a global-admin surface; gate it on the destination route
+    // because the source routes (settings-ai-create / settings-ai-edit) are redirect-only and Vue
+    // Router skips beforeEnter on redirect routes. Without this check, the only gate was an
+    // in-page string check in TenantSettingsPage, which a redirect chain bypasses for a moment.
+    if (
+      to.name === 'settings-tenant' &&
+      typeof to.query.workflow === 'string' &&
+      (to.query.workflow === 'ai-create' || to.query.workflow === 'ai-edit') &&
+      !permissions.canManageGlobalSettings
+    ) {
+      return { name: 'settings-tenant' }
+    }
+
     if (to.meta.requiresReconciliationRun === true && !permissions.canRunActiveTenantReconciliation) {
       return { name: to.meta.reconciliationRunRedirectName ?? 'hub' }
     }

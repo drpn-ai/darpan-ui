@@ -102,6 +102,18 @@ export const useReconciliationDraftStore = defineStore('reconciliationDraft', ()
     _workflowOrigin.value = null
   }
 
+  // resetAll() clears every in-memory draft and the persisted sessionStorage payload. Called on
+  // logout / tenant switch via main.ts setApiCacheReset; without this, a draft created in tenant A
+  // (with its savedRun summary) is re-hydrated into tenant B's context. Cross-tenant data leak.
+  function resetAll(): void {
+    _automationDraftState.value = null
+    _ruleSetDraftState.value = null
+    _workflowOrigin.value = null
+    if (typeof window !== 'undefined') {
+      try { window.sessionStorage.removeItem(SESSION_KEY) } catch { /* storage unavailable */ }
+    }
+  }
+
   return {
     automationDraftState,
     ruleSetDraftState,
@@ -112,5 +124,6 @@ export const useReconciliationDraftStore = defineStore('reconciliationDraft', ()
     clearRuleSetDraft,
     setWorkflowOrigin,
     clearWorkflowOrigin,
+    resetAll,
   }
 })
