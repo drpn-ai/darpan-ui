@@ -368,23 +368,20 @@ describe('App shell logout', () => {
         },
       ],
     })
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 80, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [
-        {
-          fileName: 'Order-Match-diff-20260424.json',
-          sourceFormat: 'json',
-          availableFormats: ['json'],
-          savedRunId: 'RS_ORDER_MATCH',
-          savedRunName: 'Order Match',
-          file1Label: 'OMS',
-          file2Label: 'Shopify',
-          totalDifferences: 12,
-        },
-      ],
+    // The command palette now reads run results from the runResultsStore
+    // cache (populated at login by the global hydrate fan-out) instead of
+    // making an on-demand DB call. Seed it directly here to exercise the
+    // palette's render path.
+    const { useRunResultsStore } = await import('../stores/runResults')
+    useRunResultsStore().upsertOutput({
+      fileName: 'Order-Match-diff-20260424.json',
+      sourceFormat: 'json',
+      availableFormats: ['json'],
+      savedRunId: 'RS_ORDER_MATCH',
+      savedRunName: 'Order Match',
+      file1Label: 'OMS',
+      file2Label: 'Shopify',
+      totalDifferences: 12,
     })
 
     const wrapper = mountApp()
@@ -394,7 +391,7 @@ describe('App shell logout', () => {
     await flushPromises()
 
     expect(listSftpServers).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
-    expect(listGeneratedOutputs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 80, query: '' }, expect.any(AbortSignal))
+    expect(listGeneratedOutputs).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Edit SFTP: Warehouse Dropship')
     expect(wrapper.text()).toContain('Open Result: Order Match')
   })

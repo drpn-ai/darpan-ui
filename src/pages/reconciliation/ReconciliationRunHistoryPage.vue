@@ -200,6 +200,11 @@ const savingRunName = ref(false)
 const generatedOutputs = ref<GeneratedOutput[]>([])
 const pendingRuns = ref<PendingReconciliationRun[]>([])
 const lastLoadedPageIndex = ref(-1)
+// True after we prime from the run-results cache without making a server
+// fetch. Cached data covers the last 2 days; the user still needs a way to
+// reach older results, so we treat this as "more might exist server-side"
+// until the first server fetch tells us otherwise.
+const cachePrimedWithoutFetch = ref(false)
 const visibleOtherOutputCount = ref(OTHER_RESULTS_BATCH_SIZE)
 const pagination = ref<PaginationMeta>({
   pageIndex: 0,
@@ -252,7 +257,10 @@ const showHistorySection = computed(() =>
   otherGeneratedOutputs.value.length > 0
 )
 const hasMoreLoadedOtherOutputs = computed(() => otherGeneratedOutputs.value.length > visibleOtherOutputCount.value)
-const hasMoreHistoryPages = computed(() => lastLoadedPageIndex.value + 1 < pagination.value.pageCount)
+const hasMoreHistoryPages = computed(() => (
+  cachePrimedWithoutFetch.value
+  || lastLoadedPageIndex.value + 1 < pagination.value.pageCount
+))
 const hasMoreOtherOutputs = computed(() => hasMoreLoadedOtherOutputs.value || hasMoreHistoryPages.value)
 
 function buildResultRoute(outputFileName: string) {
@@ -337,6 +345,7 @@ function resetHistoryState(): void {
   pendingRuns.value = []
   loadingMore.value = false
   lastLoadedPageIndex.value = -1
+  cachePrimedWithoutFetch.value = false
   visibleOtherOutputCount.value = OTHER_RESULTS_BATCH_SIZE
   pagination.value = {
     pageIndex: 0,
@@ -439,6 +448,7 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
 
     pagination.value = response.pagination ?? pagination.value
     lastLoadedPageIndex.value = targetPageIndex
+    cachePrimedWithoutFetch.value = false
 
     // Seed the global run-results cache from this fetch so navigating away
     // and back doesn't need to re-fetch.
@@ -479,8 +489,7 @@ function primeFromCache(targetSavedRunId: string): boolean {
     targetSavedRunId,
     cached.filter(isCompletedGeneratedOutput),
   )
-  // We don't know the full pageCount from the cache alone; leave pagination
-  // at its reset default. The background refresh below will fill it in.
+  cachePrimedWithoutFetch.value = true
   return true
 }
 
@@ -488,13 +497,14 @@ watch(savedRunId, (nextSavedRunId) => {
   resetHistoryState()
   refreshPendingRuns()
 
-  // Render cached outputs immediately (no spinner) if hydration found any
-  // for this saved run, then refresh in the background.
-  // showLoadingState only flips the spinner when generatedOutputs is empty,
-  // so a primed cache + fresh fetch produces no spinner — the list silently
-  // updates when the server response replaces the cached snapshot.
-  primeFromCache(nextSavedRunId)
-  void loadGeneratedOutputs()
+  // Recent results (<= 2 days) are kept warm in the run-results cache —
+  // hydrated at login, refreshed on tenant switch, and updated locally
+  // when runs complete in this session. If the cache has anything for
+  // this saved run, render it directly and do NOT make an on-demand DB
+  // call. The user can still reach older results (> 2 days) via the
+  // "More..." button, which falls through to loadGeneratedOutputs().
+  const primed = primeFromCache(nextSavedRunId)
+  if (!primed) void loadGeneratedOutputs()
 }, { immediate: true })
 
 let unsubscribePendingRunsListener: (() => void) | null = null
