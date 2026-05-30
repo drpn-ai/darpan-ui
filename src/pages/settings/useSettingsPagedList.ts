@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { ApiCallError } from '../../lib/api/client'
+import { getApiErrorMessage, isAbortError } from '../../lib/api/errors'
 import type { PaginationMeta } from '../../lib/api/types'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 
@@ -28,15 +28,6 @@ function normalizePageCount(pageCount: number | undefined): number {
   const value = Number(pageCount)
   if (!Number.isFinite(value)) return 1
   return Math.max(1, Math.floor(value))
-}
-
-function normalizeError(error: unknown, fallbackMessage: string): string {
-  return error instanceof ApiCallError ? error.message : fallbackMessage
-}
-
-function isAbortError(error: unknown): boolean {
-  if (error instanceof DOMException) return error.name === 'AbortError'
-  return typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError'
 }
 
 export function useSettingsPagedList<T extends object, R extends PaginatedSettingsResponse>({
@@ -75,7 +66,7 @@ export function useSettingsPagedList<T extends object, R extends PaginatedSettin
       pageCount.value = normalizePageCount(response.pagination?.pageCount)
     } catch (loadError) {
       if (controller.signal.aborted || isAbortError(loadError)) return
-      error.value = normalizeError(loadError, fallbackErrorMessage)
+      error.value = getApiErrorMessage(loadError, fallbackErrorMessage)
     } finally {
       if (!controller.signal.aborted) {
         loading.value = false

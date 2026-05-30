@@ -398,10 +398,6 @@ router.beforeEach(async (to) => {
   const authenticated = await authStore.ensureAuthenticated(true)
   if (authenticated) {
     const permissions = usePermissionsStore()
-    if (to.meta.requiresGlobalSettings === true && !permissions.canManageGlobalSettings) {
-      return { name: 'hub' }
-    }
-
     // AI provider settings workflow is a global-admin surface; gate it on the destination route
     // because the source routes (settings-ai-create / settings-ai-edit) are redirect-only and Vue
     // Router skips beforeEnter on redirect routes. Without this check, the only gate was an

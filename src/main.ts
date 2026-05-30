@@ -4,6 +4,7 @@ import App from './App.vue'
 import router from './router'
 import { initTheme } from './composables/useTheme'
 import { setApiCacheReset } from './lib/api/facade'
+import { clearAllPendingReconciliationRuns } from './lib/reconciliationPendingRuns'
 import { useReferenceDataStore } from './stores/referenceData'
 import { useRunResultsStore } from './stores/runResults'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
@@ -24,6 +25,7 @@ setApiCacheReset(() => {
   useReferenceDataStore(pinia).reset()
   useRunResultsStore(pinia).reset()
   useReconciliationDraftStore(pinia).resetAll() // setup-style store: explicit reset; clears its sessionStorage too
+  clearAllPendingReconciliationRuns() // cross-tenant residue: run names/system labels in localStorage
   try {
     // resetAll already removes the draft sessionStorage key; clear it again defensively in case
     // the store has not been instantiated yet (no-op if absent).

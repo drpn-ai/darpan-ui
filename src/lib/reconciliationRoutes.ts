@@ -41,15 +41,6 @@ export function buildReconciliationDiffRoute(
   )
 }
 
-export function buildReconciliationAutomationCreateRoute(state?: HistoryState): RouteLocationRaw {
-  return withRouteState(
-    {
-      name: 'reconciliation-automation-create',
-    },
-    state,
-  )
-}
-
 export function buildReconciliationRunHistoryRoute(context: ReconciliationRunRouteContext): RouteLocationRaw {
   return {
     name: 'reconciliation-run-history',

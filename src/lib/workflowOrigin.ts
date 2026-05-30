@@ -51,12 +51,6 @@ export function readWorkflowOriginState(stateLike: unknown): WorkflowOriginState
   }
 }
 
-/** Read workflow-origin data from `window.history.state` (browser-only). */
-export function readWorkflowOriginFromHistoryState(): WorkflowOriginState | null {
-  if (typeof window === 'undefined') return null
-  return readWorkflowOriginState(window.history.state)
-}
-
 export function resolveStaticPageLabel(routeLike: { meta?: { surfaceMode?: unknown; staticPageLabel?: unknown } | null }): string | null {
   if (routeLike?.meta?.surfaceMode === 'workflow') return null
   const label = routeLike?.meta?.staticPageLabel

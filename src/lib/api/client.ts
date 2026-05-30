@@ -63,7 +63,7 @@ const UNEXPECTED_RESPONSE_MESSAGE = 'Darpan returned an unexpected response. Try
 const EMPTY_RESULT_MESSAGE = 'Darpan did not return any data.'
 const GENERIC_SERVICE_ERROR_MESSAGE = 'Darpan could not complete the request.'
 const AUTH_SESSION_INFO_METHOD = 'facade.AuthFacadeServices.get#SessionInfo'
-const AUTH_TOKEN_STORAGE_KEY = 'darpan.authToken'
+export const AUTH_TOKEN_STORAGE_KEY = 'darpan.authToken'
 const AUTH_TOKEN_HEADER_NAME = 'login_key'
 
 interface StoredAuthToken {

@@ -140,7 +140,3 @@ export async function resolveSavedRunEditorTarget(targetId: string): Promise<Sav
   return null
 }
 
-export async function resolveSavedRunEditorRoute(targetId: string): Promise<RouteLocationRaw | null> {
-  const savedRun = await resolveSavedRunEditorTarget(targetId)
-  return savedRun ? buildSavedRunEditorRoute(savedRun) : null
-}

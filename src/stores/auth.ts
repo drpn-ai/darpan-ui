@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { RouteLocationRaw } from 'vue-router'
-import { ApiCallError, clearAuthToken, setAuthTokenContract } from '../lib/api/client'
+import { ApiCallError, AUTH_TOKEN_STORAGE_KEY, clearAuthToken, setAuthTokenContract } from '../lib/api/client'
 import { authFacade, clearApiResponseCache, settingsFacade } from '../lib/api/facade'
 import { useReferenceDataStore } from './referenceData'
 import { useRunResultsStore } from './runResults'
@@ -238,7 +238,7 @@ export const useAuthStore = defineStore('auth', () => {
   function handleExternalAuthChange(): void {
     let storedToken: string | null = null
     try {
-      storedToken = window.localStorage.getItem('darpan.authToken')
+      storedToken = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
     } catch {
       storedToken = null
     }

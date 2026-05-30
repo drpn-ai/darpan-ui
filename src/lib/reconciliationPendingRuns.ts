@@ -132,6 +132,15 @@ export function recordPendingReconciliationRun(input: PendingReconciliationRunIn
   return pendingRun
 }
 
+/**
+ * Drop every pending-run entry. Called from the auth cache-reset on logout and
+ * tenant switch so the previous user/tenant's run names and system labels do
+ * not leak into the next session on a shared browser.
+ */
+export function clearAllPendingReconciliationRuns(): void {
+  writePendingRuns([])
+}
+
 export function clearPendingReconciliationRun(pendingRunId: string | undefined): void {
   const normalizedPendingRunId = normalizeStringOrEmpty(pendingRunId)
   if (!normalizedPendingRunId) return

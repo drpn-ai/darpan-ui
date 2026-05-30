@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ApiCallError } from '../lib/api/client'
+import { describeError, isAbortError } from '../lib/api/errors'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { GeneratedOutput } from '../lib/api/types'
 
@@ -20,16 +20,6 @@ interface LoadState {
 
 function emptyLoadState(): LoadState {
   return { loading: false, error: null, loadedAt: null }
-}
-
-function isAbortError(err: unknown): boolean {
-  return (err as { name?: string } | null)?.name === 'AbortError'
-}
-
-function describeError(err: unknown, fallback: string): string {
-  if (err instanceof ApiCallError) return err.message
-  if (err instanceof Error) return err.message
-  return fallback
 }
 
 function parseCreatedDate(value: string | undefined | null): number {

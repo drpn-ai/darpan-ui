@@ -125,7 +125,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 import { buildAuthRedirect, useAuthStore } from './stores/auth'
 import { usePermissionsStore } from './stores/permissions'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
-import { setAuthRequiredHandler } from './lib/api/client'
+import { AUTH_TOKEN_STORAGE_KEY, setAuthRequiredHandler } from './lib/api/client'
 import { shouldAbortWorkflowOnEscape } from './lib/keyboard'
 import { useTheme } from './composables/useTheme'
 import { useCommandPalette } from './composables/useCommandPalette'
@@ -589,7 +589,6 @@ watch(
 // different user), the in-memory authStore in this tab is stale until the next API call 401s.
 // React to localStorage events for AUTH_TOKEN_STORAGE_KEY: token gone -> log out here; token
 // changed -> force re-auth so we pick up the new user's session info.
-const AUTH_TOKEN_STORAGE_KEY = 'darpan.authToken'
 function handleAuthStorageEvent(event: StorageEvent) {
   if (event.storageArea !== window.localStorage) return
   if (event.key !== AUTH_TOKEN_STORAGE_KEY && event.key !== null) return
