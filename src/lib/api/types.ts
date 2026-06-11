@@ -743,6 +743,68 @@ export interface GetGeneratedOutputResponse extends ApiEnvelope {
   outputFile?: GetGeneratedOutputFile
 }
 
+export interface GeneratedOutputDifferencesMetadata {
+  file1Label?: string
+  file2Label?: string
+  timestamp?: string
+  savedRunId?: string
+  savedRunName?: string
+  savedRunType?: string
+  reconciliationMappingId?: string
+  reconciliationMappingName?: string
+  ruleSetId?: string
+  compareScopeId?: string
+}
+
+export interface GeneratedOutputDifferencesSummary {
+  totalDifferences?: number
+  onlyInFile1Count?: number
+  onlyInFile2Count?: number
+  ruleDifferenceCount?: number | null
+  missingObjectDifferenceCount?: number | null
+}
+
+export interface GeneratedOutputDifferenceRow {
+  rowKey: string
+  recordId: string
+  bucket: string
+  ruleFilterKey: string
+  ruleId: string
+  ruleLabel: string
+  record: Record<string, unknown>
+}
+
+export interface GeneratedOutputDifferencesRuleOption {
+  key: string
+  label: string
+  detail: string
+  count: number
+  bucketKeys: string[]
+}
+
+export interface GeneratedOutputDifferencesFile {
+  fileName: string
+  downloadFileName: string
+  sourceFormat: string
+  format: string
+  contentType: string
+  sourceDetails?: GeneratedOutputSourceDetails
+}
+
+export interface GetGeneratedOutputDifferencesResponse extends ApiEnvelope {
+  metadata?: GeneratedOutputDifferencesMetadata
+  summary?: GeneratedOutputDifferencesSummary
+  bucketCounts?: Record<string, number>
+  ruleOptions?: GeneratedOutputDifferencesRuleOption[]
+  differences?: GeneratedOutputDifferenceRow[]
+  pageIndex?: number
+  pageSize?: number
+  pageCount?: number
+  totalDifferences?: number
+  totalFiltered?: number
+  outputFile?: GeneratedOutputDifferencesFile
+}
+
 export interface DeleteGeneratedOutputResponse extends ApiEnvelope {
   deleted?: boolean
   deletedFileName?: string

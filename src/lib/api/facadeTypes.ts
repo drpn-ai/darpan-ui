@@ -322,6 +322,16 @@ export interface GetGeneratedOutputPayload {
   format: string
 }
 
+export interface GetGeneratedOutputDifferencesPayload {
+  fileName: string
+  pageIndex?: number
+  pageSize?: number
+  buckets?: string
+  ruleFilterKey?: string
+  search?: string
+  includeFacets?: boolean
+}
+
 export interface DeleteGeneratedOutputPayload {
   fileName: string
 }
