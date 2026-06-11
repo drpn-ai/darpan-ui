@@ -58,6 +58,10 @@ export const useRunResultsStore = defineStore('runResults', () => {
 
   let _hydrationPromise: Promise<void> | null = null
   let _abortController: AbortController | null = null
+  // Audit 2026-06-11 #11: background refresh so newly-raised sync-failure run results surface without
+  // a manual reload. Idempotent; owned by the viewing page via start/stopAutoRefresh lifecycle.
+  let _refreshTimer: ReturnType<typeof setInterval> | null = null
+  let _visibilityHandler: (() => void) | null = null
 
   const loading = computed(() => _loadState.value.loading)
   const error = computed(() => _loadState.value.error)
@@ -119,6 +123,43 @@ export const useRunResultsStore = defineStore('runResults', () => {
     return hydrate()
   }
 
+  // Force a fresh load, bypassing the one-shot hydrate() memoization.
+  function refresh(): Promise<void> {
+    _abortController?.abort()
+    _abortController = new AbortController()
+    _hydrationPromise = _loadRecent(_abortController.signal)
+    return _hydrationPromise
+  }
+
+  // Poll for new run results while the page is visible. Pauses when the tab is hidden and refreshes
+  // immediately when it becomes visible again, so a sync failure raised in the background is seen
+  // promptly without hammering the API. Idempotent.
+  function startAutoRefresh(intervalMs = 30000): void {
+    if (typeof window === 'undefined') return
+    stopAutoRefresh()
+    _refreshTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      void refresh()
+    }, Math.max(5000, intervalMs))
+    if (typeof document !== 'undefined') {
+      _visibilityHandler = () => {
+        if (!document.hidden) void refresh()
+      }
+      document.addEventListener('visibilitychange', _visibilityHandler)
+    }
+  }
+
+  function stopAutoRefresh(): void {
+    if (_refreshTimer) {
+      clearInterval(_refreshTimer)
+      _refreshTimer = null
+    }
+    if (_visibilityHandler && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', _visibilityHandler)
+      _visibilityHandler = null
+    }
+  }
+
   function upsertOutput(output: GeneratedOutput | null | undefined): void {
     if (!output) return
     const key = outputKey(output)
@@ -146,6 +187,7 @@ export const useRunResultsStore = defineStore('runResults', () => {
   }
 
   function reset(): void {
+    stopAutoRefresh()
     _abortController?.abort()
     _abortController = null
     _hydrationPromise = null
@@ -162,6 +204,9 @@ export const useRunResultsStore = defineStore('runResults', () => {
     getByFileName,
     hydrate,
     ensureLoaded,
+    refresh,
+    startAutoRefresh,
+    stopAutoRefresh,
     upsertOutput,
     upsertOutputs,
     removeOutput,

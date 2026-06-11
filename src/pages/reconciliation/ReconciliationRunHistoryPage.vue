@@ -507,15 +507,35 @@ watch(savedRunId, (nextSavedRunId) => {
   if (!primed) void loadGeneratedOutputs()
 }, { immediate: true })
 
+// Self-review #11: the background auto-refresh updates the run-results cache; re-render this page's
+// list from that cache when it changes so a newly-raised result surfaces without a manual reload —
+// but only while the page is still showing cached data (don't clobber a user who loaded older
+// results via "More...", which sets cachePrimedWithoutFetch=false). No fetch, so no loading flicker.
+watch(() => runResultsStore.recentOutputs, () => {
+  if (!cachePrimedWithoutFetch.value || !savedRunId.value) return
+  // Self-review-2: the background poll rebuilds recentOutputs (new array ref) every tick. Re-prime
+  // only when the cached slice for this saved run actually changed, so a no-op tick does not trigger
+  // primeFromCache's pending-runs storage write + listener fan-out.
+  const cached = runResultsStore.getOutputsForSavedRun(savedRunId.value)
+  const unchanged = cached.length === generatedOutputs.value.length &&
+    cached.every((output, index) => output.fileName === generatedOutputs.value[index]?.fileName)
+  if (unchanged) return
+  primeFromCache(savedRunId.value)
+})
+
 let unsubscribePendingRunsListener: (() => void) | null = null
 
 onMounted(() => {
   unsubscribePendingRunsListener = subscribeToPendingReconciliationRunsChange(refreshPendingRuns)
+  // Audit 2026-06-11 #11: keep recent run results fresh while this page is open so a sync failure
+  // raised in the background surfaces without a manual reload. Paused automatically when hidden.
+  runResultsStore.startAutoRefresh()
 })
 
 onUnmounted(() => {
   unsubscribePendingRunsListener?.()
   unsubscribePendingRunsListener = null
+  runResultsStore.stopAutoRefresh()
 })
 </script>
 

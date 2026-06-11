@@ -118,4 +118,29 @@ describe('runResults store (run-result cache)', () => {
     expect(store.error).toBe('Backend down')
     expect(store.loadedAt).toBeNull()
   })
+
+  it('refresh re-fetches even after hydrate, so new run results surface (audit #11)', async () => {
+    listGeneratedOutputs.mockResolvedValue({ generatedOutputs: [] })
+    const store = useRunResultsStore()
+    await store.hydrate()
+    expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
+    await store.refresh()
+    expect(listGeneratedOutputs).toHaveBeenCalledTimes(2)
+  })
+
+  it('startAutoRefresh polls on the interval and stopAutoRefresh halts it (audit #11)', async () => {
+    vi.useFakeTimers()
+    try {
+      listGeneratedOutputs.mockResolvedValue({ generatedOutputs: [] })
+      const store = useRunResultsStore()
+      store.startAutoRefresh(5000)
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
+      store.stopAutoRefresh()
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
