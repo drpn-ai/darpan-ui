@@ -81,7 +81,7 @@ describe('callService', () => {
 
     vi.stubGlobal('fetch', fetchMock)
 
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       'darpan.authToken',
       JSON.stringify({
         value: 'expired-token',
@@ -98,7 +98,7 @@ describe('callService', () => {
     const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit & { headers: Record<string, string> }
     expect(requestInit.headers.login_key).toBeUndefined()
     expect(getAuthToken()).toBeNull()
-    expect(window.localStorage.getItem('darpan.authToken')).toBeNull()
+    expect(window.sessionStorage.getItem('darpan.authToken')).toBeNull()
   })
 
   it('clears the stored auth token when the backend rejects it', async () => {
@@ -134,7 +134,33 @@ describe('callService', () => {
       status: 401,
     })
     expect(getAuthToken()).toBeNull()
+    expect(window.sessionStorage.getItem('darpan.authToken')).toBeNull()
+  })
+
+  it('persists the bearer token to sessionStorage and never localStorage (audit #10)', async () => {
+    const { setAuthToken, getAuthToken } = await import('../client')
+    setAuthToken('token-xyz')
+
+    expect(getAuthToken()).toBe('token-xyz')
+    // Survives a same-tab refresh (sessionStorage) but is never written to disk (localStorage).
+    expect(JSON.parse(window.sessionStorage.getItem('darpan.authToken') ?? 'null')).toMatchObject({
+      value: 'token-xyz',
+    })
     expect(window.localStorage.getItem('darpan.authToken')).toBeNull()
+  })
+
+  it('purges a legacy localStorage bearer token on load (audit #10)', async () => {
+    window.localStorage.setItem(
+      'darpan.authToken',
+      JSON.stringify({ value: 'legacy-token', headerName: 'login_key', tokenType: 'LOGIN_KEY', expiresAt: null }),
+    )
+
+    vi.resetModules()
+    const { getAuthToken } = await import('../client')
+
+    // The persistent on-disk token from an older build is removed; it is not adopted as the session.
+    expect(window.localStorage.getItem('darpan.authToken')).toBeNull()
+    expect(getAuthToken()).toBeNull()
   })
 
   it('returns a friendly unreachable message for a configured rpc endpoint', async () => {

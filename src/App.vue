@@ -585,15 +585,15 @@ watch(
   { immediate: true },
 )
 
-// Multi-tab sync: when another tab clears the auth token (logout) or rotates it (login as a
-// different user), the in-memory authStore in this tab is stale until the next API call 401s.
-// React to localStorage events for AUTH_TOKEN_STORAGE_KEY: token gone -> log out here; token
-// changed -> force re-auth so we pick up the new user's session info.
+// Audit #10: the bearer token now lives in this tab's sessionStorage, so sessions are per-tab and
+// cross-tab token sync via localStorage no longer applies. This listener is kept defensively: it
+// still fires for a full localStorage clear or the one-time legacy-token purge on upgrade.
+// handleExternalAuthChange re-checks this tab's own (sessionStorage) token authoritatively, so a
+// legacy localStorage event never logs out a tab that still holds a valid session.
 const AUTH_TOKEN_STORAGE_KEY = 'darpan.authToken'
 function handleAuthStorageEvent(event: StorageEvent) {
   if (event.storageArea !== window.localStorage) return
   if (event.key !== AUTH_TOKEN_STORAGE_KEY && event.key !== null) return
-  // event.key === null means localStorage was cleared entirely; treat as logout.
   void authStore.handleExternalAuthChange()
 }
 

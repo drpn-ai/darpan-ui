@@ -115,11 +115,13 @@ describe('auth state', () => {
 
     await expect(loginWithCredentials('backend', 'secret')).resolves.toBe(true)
     expect(getAuthToken()).toBe('login-token-123')
-    expect(JSON.parse(window.localStorage.getItem('darpan.authToken') ?? '{}')).toMatchObject({
+    // Audit #10: the bearer token is held in sessionStorage (per-tab, off-disk), never localStorage.
+    expect(JSON.parse(window.sessionStorage.getItem('darpan.authToken') ?? '{}')).toMatchObject({
       value: 'login-token-123',
       headerName: 'login_key',
       tokenType: 'LOGIN_KEY',
     })
+    expect(window.localStorage.getItem('darpan.authToken')).toBeNull()
 
     await expect(logoutSession()).resolves.toBe(true)
     expect(logoutSessionRpc).toHaveBeenCalledTimes(1)
@@ -393,7 +395,7 @@ describe('auth state', () => {
   })
 
   it('marks the state as unauthenticated when login key verification returns 401', async () => {
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       'darpan.authToken',
       JSON.stringify({
         value: 'expired-token',
