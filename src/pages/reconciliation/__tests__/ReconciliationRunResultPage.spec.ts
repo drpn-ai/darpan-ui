@@ -221,7 +221,8 @@ function sClassify(record: Rec, index: number, file1Label: string, file2Label: s
 function sBucketCounts(rows: ReturnType<typeof sClassify>[]) {
   const counts: Record<string, number> = { 'file-1': 0, 'file-2': 0, rule: 0 }
   rows.forEach((row) => {
-    if (counts[row.bucket] != null) counts[row.bucket] += 1
+    const current = counts[row.bucket]
+    if (current != null) counts[row.bucket] = current + 1
   })
   return counts
 }
