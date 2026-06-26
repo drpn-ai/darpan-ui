@@ -3,6 +3,25 @@ import { ApiCallError } from '../lib/api/client'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { GeneratedOutput, RunSavedRunDiffResponse, SavedRunSummary } from '../lib/api/types'
 import type { RunSavedRunDiffPayload } from '../lib/api/facadeTypes'
+import { useRunResultsStore } from '../stores/runResults'
+
+function cacheRunResult(output: GeneratedOutput | null | undefined): void {
+  if (!output) return
+  try {
+    useRunResultsStore().upsertOutput(output)
+  } catch {
+    // Pinia not active (e.g. some test setups); skip cache update.
+  }
+}
+
+function readLatestCachedOutputForSavedRun(savedRunId: string): GeneratedOutput | null {
+  try {
+    const cached = useRunResultsStore().getOutputsForSavedRun(savedRunId)
+    return cached[0] ?? null
+  } catch {
+    return null
+  }
+}
 
 interface FailedRunFeedback {
   validationErrors: string[]
@@ -103,9 +122,23 @@ export function useReconciliationDiff(): UseReconciliationDiff {
     latestOutputController = controller
     const unlink = linkExternalSignal(controller, signal)
 
-    latestSavedOutputLoading.value = true
     latestSavedOutputError.value = null
     latestSavedOutput.value = null
+
+    // Recent results (<= 2 days) live in the run-results cache. If we have
+    // any cached output for this saved run, it IS the latest — no DB call
+    // needed. Fall through to the server only on a cache miss (older or
+    // never-run saved runs).
+    const cachedLatest = readLatestCachedOutputForSavedRun(normalizedSavedRunId)
+    if (cachedLatest) {
+      latestSavedOutput.value = cachedLatest
+      latestSavedOutputLoading.value = false
+      unlink()
+      if (latestOutputController === controller) latestOutputController = null
+      return
+    }
+
+    latestSavedOutputLoading.value = true
 
     try {
       const response = await reconciliationFacade.listGeneratedOutputs({
@@ -115,7 +148,9 @@ export function useReconciliationDiff(): UseReconciliationDiff {
         query: '',
       }, controller.signal)
       if (controller.signal.aborted) return
-      latestSavedOutput.value = response.generatedOutputs?.[0] ?? null
+      const nextLatest = response.generatedOutputs?.[0] ?? null
+      latestSavedOutput.value = nextLatest
+      cacheRunResult(nextLatest)
     } catch (error) {
       if (controller.signal.aborted || isAbortError(error)) return
       latestSavedOutput.value = null
@@ -157,6 +192,7 @@ export function useReconciliationDiff(): UseReconciliationDiff {
       const response = await reconciliationFacade.runSavedRunDiff(payload, signal)
       validationErrors.value = response.runResult?.validationErrors ?? []
       processingWarnings.value = response.runResult?.processingWarnings ?? []
+      cacheRunResult(response.runResult?.generatedOutput)
       return response
     } catch (error) {
       if (isAbortError(error)) {

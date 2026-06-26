@@ -28,6 +28,7 @@ import type {
   GetAutomationResponse,
   GetMappingResponse,
   GetGeneratedOutputResponse,
+  GetGeneratedOutputDifferencesResponse,
   GetShopifyAuthConfigResponse,
   GetTenantSettingsResponse,
   GetTenantNotificationSettingsResponse,
@@ -87,6 +88,7 @@ import type {
   FlattenJsonSchemaPayload,
   GetAutomationPayload,
   GetGeneratedOutputPayload,
+  GetGeneratedOutputDifferencesPayload,
   GetJsonSchemaPayload,
   GetLlmSettingsPayload,
   GetMappingPayload,
@@ -188,6 +190,7 @@ const RECONCILIATION = {
   runSavedRunDiff: 'facade.ReconciliationFacadeServices.run#SavedRunDiff',
   listGeneratedOutputs: 'facade.ReconciliationFacadeServices.list#GeneratedOutputs',
   getGeneratedOutput: 'facade.ReconciliationFacadeServices.get#GeneratedOutput',
+  getGeneratedOutputDifferences: 'facade.ReconciliationFacadeServices.get#GeneratedOutputDifferences',
   deleteGeneratedOutput: 'facade.ReconciliationFacadeServices.delete#GeneratedOutput',
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
@@ -359,6 +362,12 @@ export const reconciliationFacade = {
   },
   getGeneratedOutput(payload: GetGeneratedOutputPayload, signal?: AbortSignal): Promise<GetGeneratedOutputResponse> {
     return callService<GetGeneratedOutputResponse>(RECONCILIATION.getGeneratedOutput, payload, signal)
+  },
+  getGeneratedOutputDifferences(
+    payload: GetGeneratedOutputDifferencesPayload,
+    signal?: AbortSignal,
+  ): Promise<GetGeneratedOutputDifferencesResponse> {
+    return callService<GetGeneratedOutputDifferencesResponse>(RECONCILIATION.getGeneratedOutputDifferences, payload, signal)
   },
   deleteGeneratedOutput(payload: DeleteGeneratedOutputPayload, signal?: AbortSignal): Promise<DeleteGeneratedOutputResponse> {
     return callService<DeleteGeneratedOutputResponse>(RECONCILIATION.deleteGeneratedOutput, payload, signal)

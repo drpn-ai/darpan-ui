@@ -186,13 +186,39 @@ function sanitizeStoredAuthToken(value: Partial<StoredAuthToken> | null | undefi
   }
 }
 
-function persistAuthTokenState(state: StoredAuthToken | null): void {
+// Audit #10: the bearer token lives in the in-memory `authTokenState` plus a sessionStorage backing
+// (per-tab, cleared on tab close, never written to disk) — NOT localStorage. This removes the
+// survives-browser-restart / persistent-on-disk property that let any XSS exfiltrate a durable
+// session token. Durable cross-tab/cross-restart login is the job of the backend's httpOnly
+// `darpan_login_key` cookie (cookie-migration follow-up), not JS-readable storage.
+function getAuthTokenStorage(): Storage | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
+// One-time cleanup: older builds persisted the token to localStorage, where it survived restarts and
+// sat on disk. Remove it on load so a previously stored durable token does not linger after upgrade.
+function purgeLegacyPersistentAuthToken(): void {
   if (typeof window === 'undefined') return
   try {
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function persistAuthTokenState(state: StoredAuthToken | null): void {
+  const storage = getAuthTokenStorage()
+  if (!storage) return
+  try {
     if (state) {
-      window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, JSON.stringify(state))
+      storage.setItem(AUTH_TOKEN_STORAGE_KEY, JSON.stringify(state))
     } else {
-      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
+      storage.removeItem(AUTH_TOKEN_STORAGE_KEY)
     }
   } catch {
     // ignore storage failures; the in-memory token state still works for the active session
@@ -200,11 +226,13 @@ function persistAuthTokenState(state: StoredAuthToken | null): void {
 }
 
 function loadStoredAuthTokenState(): StoredAuthToken | null {
-  if (typeof window === 'undefined') return null
+  purgeLegacyPersistentAuthToken()
+  const storage = getAuthTokenStorage()
+  if (!storage) return null
 
   let rawValue: string | null = null
   try {
-    rawValue = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
+    rawValue = storage.getItem(AUTH_TOKEN_STORAGE_KEY)
   } catch {
     return null
   }

@@ -200,6 +200,11 @@ const savingRunName = ref(false)
 const generatedOutputs = ref<GeneratedOutput[]>([])
 const pendingRuns = ref<PendingReconciliationRun[]>([])
 const lastLoadedPageIndex = ref(-1)
+// True after we prime from the run-results cache without making a server
+// fetch. Cached data covers the last 2 days; the user still needs a way to
+// reach older results, so we treat this as "more might exist server-side"
+// until the first server fetch tells us otherwise.
+const cachePrimedWithoutFetch = ref(false)
 const visibleOtherOutputCount = ref(OTHER_RESULTS_BATCH_SIZE)
 const pagination = ref<PaginationMeta>({
   pageIndex: 0,
@@ -252,7 +257,10 @@ const showHistorySection = computed(() =>
   otherGeneratedOutputs.value.length > 0
 )
 const hasMoreLoadedOtherOutputs = computed(() => otherGeneratedOutputs.value.length > visibleOtherOutputCount.value)
-const hasMoreHistoryPages = computed(() => lastLoadedPageIndex.value + 1 < pagination.value.pageCount)
+const hasMoreHistoryPages = computed(() => (
+  cachePrimedWithoutFetch.value
+  || lastLoadedPageIndex.value + 1 < pagination.value.pageCount
+))
 const hasMoreOtherOutputs = computed(() => hasMoreLoadedOtherOutputs.value || hasMoreHistoryPages.value)
 
 function buildResultRoute(outputFileName: string) {
@@ -337,6 +345,7 @@ function resetHistoryState(): void {
   pendingRuns.value = []
   loadingMore.value = false
   lastLoadedPageIndex.value = -1
+  cachePrimedWithoutFetch.value = false
   visibleOtherOutputCount.value = OTHER_RESULTS_BATCH_SIZE
   pagination.value = {
     pageIndex: 0,
@@ -439,6 +448,7 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
 
     pagination.value = response.pagination ?? pagination.value
     lastLoadedPageIndex.value = targetPageIndex
+    cachePrimedWithoutFetch.value = false
 
     // Seed the global run-results cache from this fetch so navigating away
     // and back doesn't need to re-fetch.
@@ -479,8 +489,7 @@ function primeFromCache(targetSavedRunId: string): boolean {
     targetSavedRunId,
     cached.filter(isCompletedGeneratedOutput),
   )
-  // We don't know the full pageCount from the cache alone; leave pagination
-  // at its reset default. The background refresh below will fill it in.
+  cachePrimedWithoutFetch.value = true
   return true
 }
 
@@ -488,24 +497,45 @@ watch(savedRunId, (nextSavedRunId) => {
   resetHistoryState()
   refreshPendingRuns()
 
-  // Render cached outputs immediately (no spinner) if hydration found any
-  // for this saved run, then refresh in the background.
-  // showLoadingState only flips the spinner when generatedOutputs is empty,
-  // so a primed cache + fresh fetch produces no spinner — the list silently
-  // updates when the server response replaces the cached snapshot.
-  primeFromCache(nextSavedRunId)
-  void loadGeneratedOutputs()
+  // Recent results (<= 2 days) are kept warm in the run-results cache —
+  // hydrated at login, refreshed on tenant switch, and updated locally
+  // when runs complete in this session. If the cache has anything for
+  // this saved run, render it directly and do NOT make an on-demand DB
+  // call. The user can still reach older results (> 2 days) via the
+  // "More..." button, which falls through to loadGeneratedOutputs().
+  const primed = primeFromCache(nextSavedRunId)
+  if (!primed) void loadGeneratedOutputs()
 }, { immediate: true })
+
+// Self-review #11: the background auto-refresh updates the run-results cache; re-render this page's
+// list from that cache when it changes so a newly-raised result surfaces without a manual reload —
+// but only while the page is still showing cached data (don't clobber a user who loaded older
+// results via "More...", which sets cachePrimedWithoutFetch=false). No fetch, so no loading flicker.
+watch(() => runResultsStore.recentOutputs, () => {
+  if (!cachePrimedWithoutFetch.value || !savedRunId.value) return
+  // Self-review-2: the background poll rebuilds recentOutputs (new array ref) every tick. Re-prime
+  // only when the cached slice for this saved run actually changed, so a no-op tick does not trigger
+  // primeFromCache's pending-runs storage write + listener fan-out.
+  const cached = runResultsStore.getOutputsForSavedRun(savedRunId.value)
+  const unchanged = cached.length === generatedOutputs.value.length &&
+    cached.every((output, index) => output.fileName === generatedOutputs.value[index]?.fileName)
+  if (unchanged) return
+  primeFromCache(savedRunId.value)
+})
 
 let unsubscribePendingRunsListener: (() => void) | null = null
 
 onMounted(() => {
   unsubscribePendingRunsListener = subscribeToPendingReconciliationRunsChange(refreshPendingRuns)
+  // Audit 2026-06-11 #11: keep recent run results fresh while this page is open so a sync failure
+  // raised in the background surfaces without a manual reload. Paused automatically when hidden.
+  runResultsStore.startAutoRefresh()
 })
 
 onUnmounted(() => {
   unsubscribePendingRunsListener?.()
   unsubscribePendingRunsListener = null
+  runResultsStore.stopAutoRefresh()
 })
 </script>
 

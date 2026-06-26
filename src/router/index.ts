@@ -390,12 +390,27 @@ const router = createRouter({
   },
 })
 
+// Audit 2026-06-11 #22: the guard previously forced a synchronous get#SessionInfo on EVERY
+// navigation, so a slow or briefly-unreachable auth endpoint stalled every route transition. Force a
+// re-verify only when the cached auth state is older than this TTL; within it, navigation uses the
+// cached state instantly. An expired session is still caught promptly by the 401 handler on the next
+// API call (which clears the token), so this does not weaken enforcement.
+const AUTH_REVALIDATE_TTL_MS = 60_000
+let lastAuthVerifiedAtMs = 0
+
 router.beforeEach(async (to) => {
   if (to.meta.public === true) return true
   if (to.meta.requiresAuth !== true) return true
 
   const authStore = useAuthStore()
-  const authenticated = await authStore.ensureAuthenticated(true)
+  const nowMs = Date.now()
+  const staleAuth = nowMs - lastAuthVerifiedAtMs >= AUTH_REVALIDATE_TTL_MS
+  const authenticated = await authStore.ensureAuthenticated(staleAuth)
+  // Self-review #22: advance the timestamp ONLY when an actual server verification ran (staleAuth was
+  // true → ensureAuthenticated(true) hit get#SessionInfo). A cache-hit navigation must not reset the
+  // clock, or an always-active user would never re-verify. Reset to 0 on an unauthenticated result.
+  if (!authenticated) lastAuthVerifiedAtMs = 0
+  else if (staleAuth) lastAuthVerifiedAtMs = nowMs
   if (authenticated) {
     const permissions = usePermissionsStore()
     if (to.meta.requiresGlobalSettings === true && !permissions.canManageGlobalSettings) {

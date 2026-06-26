@@ -11,6 +11,7 @@ vi.mock('../../lib/api/facade', () => ({
 import { useReconciliationDiff } from '../useReconciliationDiff'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
+import { useRunResultsStore } from '../../stores/runResults'
 
 const listSavedRuns = vi.mocked(reconciliationFacade.listSavedRuns)
 const listGeneratedOutputs = vi.mocked(reconciliationFacade.listGeneratedOutputs)
@@ -42,6 +43,34 @@ describe('useReconciliationDiff', () => {
     const diff = useReconciliationDiff()
     await diff.loadSavedRuns()
     expect(diff.loadError.value).toBe('Backend exploded')
+  })
+
+  it('loadLatestSavedOutput serves a cache hit without calling the backend', async () => {
+    useRunResultsStore().upsertOutput({
+      fileName: 'cached.json',
+      savedRunId: 'run-A',
+      createdDate: '2026-01-02',
+    } as never)
+
+    const diff = useReconciliationDiff()
+    await diff.loadLatestSavedOutput('run-A')
+
+    expect(diff.latestSavedOutput.value?.fileName).toBe('cached.json')
+    expect(diff.latestSavedOutputLoading.value).toBe(false)
+    expect(listGeneratedOutputs).not.toHaveBeenCalled()
+  })
+
+  it('loadLatestSavedOutput falls through to the backend on a cache miss and caches the result', async () => {
+    listGeneratedOutputs.mockResolvedValueOnce({
+      generatedOutputs: [{ fileName: 'fresh.json', savedRunId: 'run-B', createdDate: '2026-01-03' }],
+    } as never)
+
+    const diff = useReconciliationDiff()
+    await diff.loadLatestSavedOutput('run-B')
+
+    expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
+    expect(diff.latestSavedOutput.value?.fileName).toBe('fresh.json')
+    expect(useRunResultsStore().getByFileName('fresh.json')?.savedRunId).toBe('run-B')
   })
 
   it('loadLatestSavedOutput ignores stale responses', async () => {
@@ -88,6 +117,9 @@ describe('useReconciliationDiff', () => {
     expect(diff.processingWarnings.value).toEqual(['minor'])
     expect(diff.runError.value).toBeNull()
     expect(diff.running.value).toBe(false)
+    // A completed run seeds the cache so the run-history/diff surfaces can
+    // render the new result without an extra DB round-trip.
+    expect(useRunResultsStore().getByFileName('out.json')?.fileName).toBe('out.json')
   })
 
   it('submitDiff surfaces validation feedback on ApiCallError', async () => {

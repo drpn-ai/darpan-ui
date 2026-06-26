@@ -95,6 +95,7 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 }))
 
 import ReconciliationRunHistoryPage from '../ReconciliationRunHistoryPage.vue'
+import { useRunResultsStore } from '../../../stores/runResults'
 
 function formatCreatedDateForExpectation(createdDate: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -527,6 +528,38 @@ describe('ReconciliationRunHistoryPage', () => {
     expect(wrapper.findAll('[data-testid="run-history-result-tile"]')).toHaveLength(6)
     expect(wrapper.text()).toContain(formatCreatedDateForExpectation('2026-03-25T09:00:00.000Z'))
     expect(wrapper.find('[data-testid="run-history-more"]').exists()).toBe(false)
+  })
+
+  it('renders from the run-results cache without a server fetch, and reaches older results via More', async () => {
+    // Prime the warm cache (as login hydration / a completed run would), so the
+    // page should render immediately without an on-demand listGeneratedOutputs call.
+    useRunResultsStore().upsertOutputs([
+      buildGeneratedOutput(31),
+      buildGeneratedOutput(30),
+    ])
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    expect(listGeneratedOutputs).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="run-history-featured-tile"]').text()).toContain(
+      formatCreatedDateForExpectation('2026-03-31T09:00:00.000Z'),
+    )
+    expect(wrapper.findAll('[data-testid="run-history-result-tile"]')).toHaveLength(1)
+    // Cached data only covers recent results; "More" must still fall through to
+    // the server to reach older history.
+    const moreButton = wrapper.get('[data-testid="run-history-more"]')
+
+    await moreButton.trigger('click')
+    await flushPromises()
+
+    expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
+    expect(listGeneratedOutputs.mock.calls[0]?.[0]).toEqual({
+      savedRunId: 'RS_ORDER_CSV',
+      pageIndex: 0,
+      pageSize: 6,
+      query: '',
+    })
   })
 
   it('shows an inline error when the saved-result lookup fails', async () => {

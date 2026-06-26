@@ -17,6 +17,7 @@ const route = vi.hoisted(() => ({
     '/reconciliation/run-result/RS_ORDER_CSV/CSV-Order-Compare-diff-20260331-063304.json?runName=CSV%20Order%20Compare&file1SystemLabel=OMS&file2SystemLabel=SHOPIFY',
 }))
 const getGeneratedOutput = vi.hoisted(() => vi.fn())
+const getGeneratedOutputDifferences = vi.hoisted(() => vi.fn())
 const listSavedRuns = vi.hoisted(() => vi.fn())
 const saveSavedRunName = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
@@ -28,6 +29,9 @@ const authState = vi.hoisted(() => ({
     isSuperAdmin: false,
   },
 }))
+
+// Server search debounce on the page; tests wait slightly longer than this before asserting.
+const SEARCH_DEBOUNCE_WAIT = 360
 
 vi.mock('vue-router', () => ({
   RouterLink: {
@@ -43,6 +47,7 @@ vi.mock('vue-router', () => ({
 vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
     getGeneratedOutput,
+    getGeneratedOutputDifferences,
     listSavedRuns,
     saveSavedRunName,
   },
@@ -114,6 +119,237 @@ function buildGeneratedOutputFile(contentText: string, outputFileOverrides: Reco
   }
 }
 
+// ---------------------------------------------------------------------------
+// Server simulator: a faithful port of the backend DiffDetailClassifier so the
+// paginated get#GeneratedOutputDifferences mock reproduces real classification,
+// faceting, filtering, and paging from a full diff-document fixture (audit #21).
+// ---------------------------------------------------------------------------
+
+const BUCKET_ORDER = ['file-1', 'file-2', 'rule']
+const BASE_RULE_FILTER_KEY = 'base-diff'
+const ALL_RULE_FILTER_KEY = 'all'
+
+type Rec = Record<string, unknown>
+
+function sNormalizeText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+function sNormalizeToken(value: unknown): string {
+  return sNormalizeText(value).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+}
+function sResolveDiffType(record: Rec): string {
+  return sNormalizeText(record.diffType || record.type)
+}
+function sFirstRecordValue(record: unknown, keys: string[]): unknown {
+  if (!record || typeof record !== 'object') return undefined
+  const source = record as Rec
+  return keys.map((key) => source[key]).find((value) => value != null && String(value).trim())
+}
+function sParseDiffData(rawData: unknown): unknown {
+  if (typeof rawData !== 'string') return rawData
+  try {
+    return JSON.parse(rawData)
+  } catch {
+    return rawData
+  }
+}
+function sResolveDiffRecordId(record: Rec, rowIndex: number): string {
+  if (record.id != null && String(record.id).trim()) return String(record.id).trim()
+  if (record.primaryId != null && String(record.primaryId).trim()) return String(record.primaryId).trim()
+  const candidate = sFirstRecordValue(record.data, ['primaryId', 'record_id', 'recordId', 'compare_id', 'compareId', 'id'])
+  if (candidate != null) return String(candidate).trim()
+  return `row-${rowIndex + 1}`
+}
+function sResolveMissingBucket(record: Rec, file1Label: string, file2Label: string): string {
+  const missingToken = sNormalizeToken(record.missingIn)
+  const file1Token = sNormalizeToken(file1Label)
+  const file2Token = sNormalizeToken(file2Label)
+  const typeToken = sNormalizeToken(sResolveDiffType(record))
+  const presentToken = sNormalizeToken(record.presentIn)
+  if (missingToken && missingToken === file1Token) return 'file-1'
+  if (missingToken && missingToken === file2Token) return 'file-2'
+  if (file1Token && typeToken.includes(`missing_in_${file1Token}`)) return 'file-1'
+  if (file2Token && typeToken.includes(`missing_in_${file2Token}`)) return 'file-2'
+  if (presentToken && presentToken === file1Token) return 'file-2'
+  if (presentToken && presentToken === file2Token) return 'file-1'
+  return 'rule'
+}
+function sIsMissing(record: Rec): boolean {
+  const typeToken = sNormalizeToken(sResolveDiffType(record))
+  return Boolean(record.missingIn || record.presentIn || typeToken.startsWith('missing_in_'))
+}
+function sResolveBucket(record: Rec, file1Label: string, file2Label: string): string {
+  return sIsMissing(record) ? sResolveMissingBucket(record, file1Label, file2Label) : 'rule'
+}
+function sHumanize(ruleId: string): string {
+  const normalized = sNormalizeText(ruleId)
+  if (!normalized) return 'Rule difference'
+  return normalized.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+}
+function sRuleOptionLabel(ruleId: string, fallbackIndex: number): string {
+  const normalized = sNormalizeText(ruleId)
+  const numbered = normalized.match(/(?:^|[_\-\s])rule[_\-\s]*(\d+)$/i) ?? normalized.match(/(?:^|[_\-\s])(\d+)$/)
+  if (numbered?.[1]) return `Rule ${Number(numbered[1])}`
+  return `Rule ${fallbackIndex}`
+}
+function sRuleRowDetail(record: Rec, fallbackRuleId: string): string {
+  return (
+    sNormalizeText(record.ruleLabel) ||
+    sNormalizeText(record.ruleName) ||
+    sNormalizeText(record.ruleDescription) ||
+    sNormalizeText(record.field) ||
+    sNormalizeText(record.message) ||
+    sHumanize(fallbackRuleId)
+  )
+}
+function sRuleDescriptor(record: Rec, bucket: string, rowIndex: number) {
+  if (bucket !== 'rule') {
+    return { ruleFilterKey: BASE_RULE_FILTER_KEY, ruleId: BASE_RULE_FILTER_KEY, ruleLabel: 'Base comparison' }
+  }
+  const ruleId =
+    sNormalizeText(record.ruleId) || sNormalizeText(record.ruleName) || sResolveDiffType(record) || `rule-${rowIndex + 1}`
+  const ruleFilterKey = sNormalizeToken(ruleId) || `rule_${rowIndex + 1}`
+  return { ruleFilterKey, ruleId, ruleLabel: sRuleRowDetail(record, ruleId) }
+}
+function sClassify(record: Rec, index: number, file1Label: string, file2Label: string) {
+  const bucket = sResolveBucket(record, file1Label, file2Label)
+  const descriptor = sRuleDescriptor(record, bucket, index)
+  const withParsed = { ...record, data: sParseDiffData(record.data) }
+  const recordId = sResolveDiffRecordId(withParsed, index)
+  return { rowKey: `${bucket}-${recordId}-${index}`, recordId, bucket, ...descriptor, record }
+}
+function sBucketCounts(rows: ReturnType<typeof sClassify>[]) {
+  const counts: Record<string, number> = { 'file-1': 0, 'file-2': 0, rule: 0 }
+  rows.forEach((row) => {
+    const current = counts[row.bucket]
+    if (current != null) counts[row.bucket] = current + 1
+  })
+  return counts
+}
+function sRuleOptions(rows: ReturnType<typeof sClassify>[]) {
+  const baseRows = rows.filter((row) => row.ruleFilterKey === BASE_RULE_FILTER_KEY)
+  const ruleEntries = new Map<string, { key: string; ruleId: string; detail: string; count: number; bucketKeys: Set<string> }>()
+  rows.forEach((row) => {
+    if (row.ruleFilterKey === BASE_RULE_FILTER_KEY) return
+    const existing = ruleEntries.get(row.ruleFilterKey)
+    if (existing) {
+      existing.count += 1
+      existing.bucketKeys.add(row.bucket)
+      if (!existing.detail && row.ruleLabel) existing.detail = row.ruleLabel
+      return
+    }
+    ruleEntries.set(row.ruleFilterKey, {
+      key: row.ruleFilterKey,
+      ruleId: row.ruleId,
+      detail: row.ruleLabel,
+      count: 1,
+      bucketKeys: new Set([row.bucket]),
+    })
+  })
+  const options: Array<{ key: string; label: string; detail: string; count: number; bucketKeys: string[] }> = []
+  if (baseRows.length > 0) {
+    const baseBuckets = BUCKET_ORDER.filter((bucket) => baseRows.some((row) => row.bucket === bucket))
+    options.push({
+      key: BASE_RULE_FILTER_KEY,
+      label: 'Rule 0',
+      detail: 'Base comparison',
+      count: baseRows.length,
+      bucketKeys: baseBuckets.length > 0 ? baseBuckets : ['file-1', 'file-2'],
+    })
+  }
+  Array.from(ruleEntries.values()).forEach((entry, index) => {
+    options.push({
+      key: entry.key,
+      label: sRuleOptionLabel(entry.ruleId, index + 1),
+      detail: entry.detail || sHumanize(entry.ruleId),
+      count: entry.count,
+      bucketKeys: BUCKET_ORDER.filter((bucket) => entry.bucketKeys.has(bucket)),
+    })
+  })
+  return options
+}
+function sEffectiveSummary(document: Rec, file1Label: string, file2Label: string) {
+  const differences = (document.differences ?? []) as Rec[]
+  const fileSummary = (document.summary ?? {}) as Rec
+  let onlyInFile1Count = 0
+  let onlyInFile2Count = 0
+  differences.forEach((record) => {
+    const bucket = sResolveMissingBucket(record, file1Label, file2Label)
+    if (bucket === 'file-1') onlyInFile2Count += 1
+    else if (bucket === 'file-2') onlyInFile1Count += 1
+  })
+  return {
+    totalDifferences: fileSummary.totalDifferences != null ? fileSummary.totalDifferences : differences.length,
+    onlyInFile1Count: fileSummary.onlyInFile1Count != null ? fileSummary.onlyInFile1Count : onlyInFile1Count,
+    onlyInFile2Count: fileSummary.onlyInFile2Count != null ? fileSummary.onlyInFile2Count : onlyInFile2Count,
+    ruleDifferenceCount: fileSummary.ruleDifferenceCount ?? null,
+    missingObjectDifferenceCount: fileSummary.missingObjectDifferenceCount ?? null,
+  }
+}
+
+interface DifferencesQuery {
+  fileName: string
+  pageIndex?: number
+  pageSize?: number
+  buckets?: string
+  ruleFilterKey?: string
+  search?: string
+  includeFacets?: boolean
+}
+
+function simulateDifferences(document: Rec, outputFileOverrides: Record<string, unknown> = {}) {
+  return async (payload: DifferencesQuery) => {
+    const metadata = (document.metadata ?? {}) as Rec
+    const file1Label = sNormalizeText(metadata.file1Label) || 'File 1'
+    const file2Label = sNormalizeText(metadata.file2Label) || 'File 2'
+    const differences = (document.differences ?? []) as Rec[]
+    const classified = differences.map((record, index) => sClassify(record, index, file1Label, file2Label))
+
+    const requestedBuckets = (payload.buckets ?? '').split(',').map((token) => token.trim()).filter(Boolean)
+    const activeBuckets = requestedBuckets.length > 0 ? BUCKET_ORDER.filter((b) => requestedBuckets.includes(b)) : [...BUCKET_ORDER]
+    const ruleKey = sNormalizeText(payload.ruleFilterKey) || ALL_RULE_FILTER_KEY
+    const search = (payload.search ?? '').trim().toLowerCase()
+
+    const filtered = classified.filter((row) => {
+      if (!activeBuckets.includes(row.bucket)) return false
+      if (ruleKey !== ALL_RULE_FILTER_KEY && row.ruleFilterKey !== ruleKey) return false
+      if (search && !row.recordId.toLowerCase().includes(search)) return false
+      return true
+    })
+
+    const pageSize = Math.max(1, payload.pageSize ?? 50)
+    const totalFiltered = filtered.length
+    const pageCount = Math.max(1, Math.ceil(totalFiltered / pageSize))
+    const pageIndex = Math.min(Math.max(payload.pageIndex ?? 0, 0), pageCount - 1)
+    const start = pageIndex * pageSize
+    const pageRows = filtered.slice(start, start + pageSize)
+
+    const includeFacets = payload.includeFacets !== false
+    return {
+      ok: true,
+      messages: [],
+      errors: [],
+      metadata,
+      summary: sEffectiveSummary(document, file1Label, file2Label),
+      ...(includeFacets ? { bucketCounts: sBucketCounts(classified), ruleOptions: sRuleOptions(classified) } : {}),
+      differences: pageRows,
+      pageIndex,
+      pageSize,
+      pageCount,
+      totalDifferences: classified.length,
+      totalFiltered,
+      outputFile: {
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        downloadFileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        sourceFormat: 'json',
+        format: 'json',
+        contentType: 'application/json',
+        ...outputFileOverrides,
+      },
+    }
+  }
+}
+
 const defaultDiffDetails = {
   metadata: {
     timestamp: '2026-03-31 08:11:06.134',
@@ -144,6 +380,30 @@ const defaultDiffDetails = {
       presentIn: 'SHOPIFY',
       missingIn: 'OMS',
       data: '{"order_id":"1003"}',
+    },
+  ],
+}
+
+const defaultSourceDetails = {
+  mode: 'FILES',
+  files: [
+    {
+      side: 'file1',
+      label: 'OMS',
+      fileName: 'orders-1.csv',
+      filePath: 'reconciliation-runs/RS_ORDER_CSV/20260331-081106134/RS_ORDER_CSV_file1_orders-1.csv',
+      downloadFileName: 'orders-1.csv',
+      sourceFormat: 'csv',
+      canDownload: true,
+    },
+    {
+      side: 'file2',
+      label: 'SHOPIFY',
+      fileName: 'orders-2.csv',
+      filePath: 'reconciliation-runs/RS_ORDER_CSV/20260331-081106134/RS_ORDER_CSV_file2_orders-2.csv',
+      downloadFileName: 'orders-2.csv',
+      sourceFormat: 'csv',
+      canDownload: true,
     },
   ],
 }
@@ -204,31 +464,8 @@ describe('ReconciliationRunResultPage', () => {
       '/reconciliation/run-result/RS_ORDER_CSV/CSV-Order-Compare-diff-20260331-063304.json?runName=CSV%20Order%20Compare&file1SystemLabel=OMS&file2SystemLabel=SHOPIFY'
 
     getGeneratedOutput.mockReset()
-    getGeneratedOutput.mockResolvedValue(buildGeneratedOutputFile(JSON.stringify(defaultDiffDetails), {
-      sourceDetails: {
-        mode: 'FILES',
-        files: [
-          {
-            side: 'file1',
-            label: 'OMS',
-            fileName: 'orders-1.csv',
-            filePath: 'reconciliation-runs/RS_ORDER_CSV/20260331-081106134/RS_ORDER_CSV_file1_orders-1.csv',
-            downloadFileName: 'orders-1.csv',
-            sourceFormat: 'csv',
-            canDownload: true,
-          },
-          {
-            side: 'file2',
-            label: 'SHOPIFY',
-            fileName: 'orders-2.csv',
-            filePath: 'reconciliation-runs/RS_ORDER_CSV/20260331-081106134/RS_ORDER_CSV_file2_orders-2.csv',
-            downloadFileName: 'orders-2.csv',
-            sourceFormat: 'csv',
-            canDownload: true,
-          },
-        ],
-      },
-    }))
+    getGeneratedOutputDifferences.mockReset()
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences(defaultDiffDetails, { sourceDetails: defaultSourceDetails }))
     saveSavedRunName.mockReset()
     listSavedRuns.mockReset()
     listSavedRuns.mockResolvedValue({
@@ -262,10 +499,14 @@ describe('ReconciliationRunResultPage', () => {
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
 
-    expect(getGeneratedOutput).toHaveBeenCalledWith({
-      fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-      format: 'json',
-    }, expect.any(AbortSignal))
+    expect(getGeneratedOutputDifferences).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        pageIndex: 0,
+        includeFacets: true,
+      }),
+      expect.any(AbortSignal),
+    )
     expect(wrapper.find('.static-page-frame').exists()).toBe(true)
     expect(wrapper.find('.wizard-progress-track').exists()).toBe(false)
     expect(wrapper.text()).toContain('CSV Order Compare')
@@ -382,7 +623,7 @@ describe('ReconciliationRunResultPage', () => {
         revokeObjectURL: revokeObjectUrl,
       } as unknown as typeof URL,
     )
-    getGeneratedOutput.mockResolvedValueOnce(buildGeneratedOutputFile(JSON.stringify(defaultDiffDetails), {
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences(defaultDiffDetails, {
       sourceDetails: {
         mode: 'API',
         dateRange: {
@@ -452,7 +693,6 @@ describe('ReconciliationRunResultPage', () => {
         revokeObjectURL: revokeObjectUrl,
       } as unknown as typeof URL,
     )
-    getGeneratedOutput.mockResolvedValueOnce(buildGeneratedOutputFile(JSON.stringify(defaultDiffDetails)))
     getGeneratedOutput.mockResolvedValueOnce(buildGeneratedOutputFile('{"download":true}', {
       downloadFileName: 'downloaded-result.json',
     }))
@@ -463,7 +703,8 @@ describe('ReconciliationRunResultPage', () => {
     await wrapper.get('[data-testid="run-result-download"]').trigger('click')
     await flushPromises()
 
-    expect(getGeneratedOutput).toHaveBeenCalledTimes(2)
+    // The diff page is loaded via the paginated service; the full file is only fetched on explicit download.
+    expect(getGeneratedOutput).toHaveBeenCalledTimes(1)
     expect(getGeneratedOutput).toHaveBeenLastCalledWith({
       fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
       format: 'json',
@@ -475,8 +716,8 @@ describe('ReconciliationRunResultPage', () => {
     anchorClick.mockRestore()
   })
 
-  it('does not stringify every object detail while normalizing large saved results', async () => {
-    const contentText = JSON.stringify({
+  it('does not stringify every object detail while rendering a large saved result page', async () => {
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
       metadata: defaultDiffDetails.metadata,
       summary: {
         totalDifferences: 6,
@@ -490,8 +731,7 @@ describe('ReconciliationRunResultPage', () => {
         missingIn: 'SHOPIFY',
         data: JSON.stringify({ order_id: `30${index}` }),
       })),
-    })
-    getGeneratedOutput.mockResolvedValue(buildGeneratedOutputFile(contentText))
+    }))
     const stringifySpy = vi.spyOn(JSON, 'stringify')
 
     const wrapper = mount(ReconciliationRunResultPage)
@@ -510,27 +750,23 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('filters and paginates saved diff details', async () => {
-    getGeneratedOutput.mockResolvedValue(
-      buildGeneratedOutputFile(
-        JSON.stringify({
-          metadata: defaultDiffDetails.metadata,
-          summary: {
-            totalDifferences: 7,
-            onlyInFile1Count: 4,
-            onlyInFile2Count: 3,
-          },
-          differences: [
-            { type: 'missing_in_OMS', id: '2001', presentIn: 'SHOPIFY', missingIn: 'OMS', data: '{"order_id":"2001"}' },
-            { type: 'missing_in_OMS', id: '2002', presentIn: 'SHOPIFY', missingIn: 'OMS', data: '{"order_id":"2002"}' },
-            { type: 'missing_in_OMS', id: '2003', presentIn: 'SHOPIFY', missingIn: 'OMS', data: '{"order_id":"2003"}' },
-            { type: 'missing_in_SHOPIFY', id: '3001', presentIn: 'OMS', missingIn: 'SHOPIFY', data: '{"order_id":"3001"}' },
-            { type: 'missing_in_SHOPIFY', id: '3002', presentIn: 'OMS', missingIn: 'SHOPIFY', data: '{"order_id":"3002"}' },
-            { type: 'missing_in_SHOPIFY', id: '3003', presentIn: 'OMS', missingIn: 'SHOPIFY', data: '{"order_id":"3003"}' },
-            { type: 'missing_in_SHOPIFY', id: '3004', presentIn: 'OMS', missingIn: 'SHOPIFY', data: '{"order_id":"3004"}' },
-          ],
-        }),
-      ),
-    )
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
+      metadata: defaultDiffDetails.metadata,
+      summary: {
+        totalDifferences: 7,
+        onlyInFile1Count: 4,
+        onlyInFile2Count: 3,
+      },
+      differences: [
+        { type: 'missing_in_OMS', id: '2001', presentIn: 'SHOPIFY', missingIn: 'OMS', data: '{"order_id":"2001"}' },
+        { type: 'missing_in_OMS', id: '2002', presentIn: 'SHOPIFY', missingIn: 'OMS', data: '{"order_id":"2002"}' },
+        { type: 'missing_in_OMS', id: '2003', presentIn: 'SHOPIFY', missingIn: 'OMS', data: '{"order_id":"2003"}' },
+        { type: 'missing_in_SHOPIFY', id: '3001', presentIn: 'OMS', missingIn: 'SHOPIFY', data: '{"order_id":"3001"}' },
+        { type: 'missing_in_SHOPIFY', id: '3002', presentIn: 'OMS', missingIn: 'SHOPIFY', data: '{"order_id":"3002"}' },
+        { type: 'missing_in_SHOPIFY', id: '3003', presentIn: 'OMS', missingIn: 'SHOPIFY', data: '{"order_id":"3003"}' },
+        { type: 'missing_in_SHOPIFY', id: '3004', presentIn: 'OMS', missingIn: 'SHOPIFY', data: '{"order_id":"3004"}' },
+      ],
+    }))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
@@ -540,11 +776,13 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.text()).not.toContain('3004')
 
     await wrapper.get('[data-testid="diff-page-next"]').trigger('click')
+    await flushPromises()
 
     expect(wrapper.text()).toContain('Page 2 of 2')
     expect(wrapper.text()).toContain('3004')
 
     await wrapper.get('[data-testid="diff-details-search"]').setValue('2002')
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_WAIT))
     await flushPromises()
 
     expect(wrapper.findAll('[data-testid="diff-details-row"]')).toHaveLength(1)
@@ -553,6 +791,7 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.find('[data-testid="diff-details-search-clear"]').exists()).toBe(true)
 
     await wrapper.get('[data-testid="diff-details-search-clear"]').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_WAIT))
     await flushPromises()
 
     expect((wrapper.get('[data-testid="diff-details-search"]').element as HTMLInputElement).value).toBe('')
@@ -561,34 +800,30 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('renders rule difference rows with primary ids and diff metadata instead of empty JSON objects', async () => {
-    getGeneratedOutput.mockResolvedValue(
-      buildGeneratedOutputFile(
-        JSON.stringify({
-          metadata: defaultDiffDetails.metadata,
-          summary: {
-            totalDifferences: 3,
-            onlyInFile1Count: 1,
-            onlyInFile2Count: 1,
-            missingObjectDifferenceCount: 2,
-            ruleDifferenceCount: 1,
-          },
-          differences: [
-            defaultDiffDetails.differences[0],
-            defaultDiffDetails.differences[1],
-            {
-              diffType: 'FIELD_MISMATCH',
-              primaryId: '6678202450051',
-              field: 'grand_total = total_amount',
-              file1Value: '89.89',
-              file2Value: '90.32',
-              ruleId: 'FIELD_COMPARISON_1',
-              severity: 'WARN',
-              message: 'Field comparison failed: grand_total = total_amount',
-            },
-          ],
-        }),
-      ),
-    )
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
+      metadata: defaultDiffDetails.metadata,
+      summary: {
+        totalDifferences: 3,
+        onlyInFile1Count: 1,
+        onlyInFile2Count: 1,
+        missingObjectDifferenceCount: 2,
+        ruleDifferenceCount: 1,
+      },
+      differences: [
+        defaultDiffDetails.differences[0],
+        defaultDiffDetails.differences[1],
+        {
+          diffType: 'FIELD_MISMATCH',
+          primaryId: '6678202450051',
+          field: 'grand_total = total_amount',
+          file1Value: '89.89',
+          file2Value: '90.32',
+          ruleId: 'FIELD_COMPARISON_1',
+          severity: 'WARN',
+          message: 'Field comparison failed: grand_total = total_amount',
+        },
+      ],
+    }))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
@@ -613,39 +848,35 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('renders diff JSON collapsed by default with bracket-level expand controls', async () => {
-    getGeneratedOutput.mockResolvedValue(
-      buildGeneratedOutputFile(
-        JSON.stringify({
-          metadata: defaultDiffDetails.metadata,
-          summary: {
-            totalDifferences: 1,
-            onlyInFile1Count: 1,
-            onlyInFile2Count: 0,
-          },
-          differences: [
-            {
-              type: 'missing_in_SHOPIFY',
-              id: '6550852436099',
-              presentIn: 'OMS',
-              missingIn: 'SHOPIFY',
-              data: JSON.stringify({
-                _entity: 'org.apache.ofbiz.order.order.OrderHeader',
-                adjustments: [
-                  {
-                    orderAdjustmentId: 'M263327',
-                    amount: 7.5,
-                  },
-                  {
-                    orderAdjustmentId: 'M263328',
-                    amount: 0.31,
-                  },
-                ],
-              }),
-            },
-          ],
-        }),
-      ),
-    )
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
+      metadata: defaultDiffDetails.metadata,
+      summary: {
+        totalDifferences: 1,
+        onlyInFile1Count: 1,
+        onlyInFile2Count: 0,
+      },
+      differences: [
+        {
+          type: 'missing_in_SHOPIFY',
+          id: '6550852436099',
+          presentIn: 'OMS',
+          missingIn: 'SHOPIFY',
+          data: JSON.stringify({
+            _entity: 'org.apache.ofbiz.order.order.OrderHeader',
+            adjustments: [
+              {
+                orderAdjustmentId: 'M263327',
+                amount: 7.5,
+              },
+              {
+                orderAdjustmentId: 'M263328',
+                amount: 0.31,
+              },
+            ],
+          }),
+        },
+      ],
+    }))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
@@ -686,42 +917,38 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('shows a collapsible rule selector that filters result rows by rule', async () => {
-    getGeneratedOutput.mockResolvedValue(
-      buildGeneratedOutputFile(
-        JSON.stringify({
-          metadata: defaultDiffDetails.metadata,
-          summary: {
-            totalDifferences: 4,
-            onlyInFile1Count: 1,
-            onlyInFile2Count: 1,
-            missingObjectDifferenceCount: 2,
-            ruleDifferenceCount: 2,
-          },
-          differences: [
-            defaultDiffDetails.differences[0],
-            defaultDiffDetails.differences[1],
-            {
-              diffType: 'FIELD_MISMATCH',
-              primaryId: '1002',
-              field: 'OMS order id = Shopify order id',
-              file1Value: '1002',
-              file2Value: 'gid://shopify/Order/1002',
-              ruleId: 'ORDER_ID_MATCH',
-              severity: 'WARN',
-            },
-            {
-              diffType: 'FIELD_MISMATCH',
-              primaryId: '1004',
-              field: 'Payment total = Shopify total',
-              file1Value: '40.00',
-              file2Value: '42.00',
-              ruleId: 'PAYMENT_TOTAL_MATCH',
-              severity: 'WARN',
-            },
-          ],
-        }),
-      ),
-    )
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
+      metadata: defaultDiffDetails.metadata,
+      summary: {
+        totalDifferences: 4,
+        onlyInFile1Count: 1,
+        onlyInFile2Count: 1,
+        missingObjectDifferenceCount: 2,
+        ruleDifferenceCount: 2,
+      },
+      differences: [
+        defaultDiffDetails.differences[0],
+        defaultDiffDetails.differences[1],
+        {
+          diffType: 'FIELD_MISMATCH',
+          primaryId: '1002',
+          field: 'OMS order id = Shopify order id',
+          file1Value: '1002',
+          file2Value: 'gid://shopify/Order/1002',
+          ruleId: 'ORDER_ID_MATCH',
+          severity: 'WARN',
+        },
+        {
+          diffType: 'FIELD_MISMATCH',
+          primaryId: '1004',
+          field: 'Payment total = Shopify total',
+          file1Value: '40.00',
+          file2Value: '42.00',
+          ruleId: 'PAYMENT_TOTAL_MATCH',
+          severity: 'WARN',
+        },
+      ],
+    }))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
@@ -744,6 +971,7 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.findAll('[data-testid="diff-details-row"]')).toHaveLength(4)
 
     await selector.get('[data-rule-filter-key="order_id_match"]').trigger('click')
+    await flushPromises()
 
     const selectedRuleTotal = wrapper.get('[data-testid="diff-bucket-total-results"]')
     expect(selectedRuleTotal.element.tagName).toBe('DIV')
@@ -759,6 +987,7 @@ describe('ReconciliationRunResultPage', () => {
     expect(selector.get('[data-rule-filter-key="order_id_match"]').attributes('aria-pressed')).toBe('true')
 
     await selector.get('[data-rule-filter-key="base-diff"]').trigger('click')
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="diff-bucket-total-results"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="diff-bucket-file-1"]').exists()).toBe(true)
@@ -770,6 +999,7 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.text()).not.toContain('1002')
 
     await selector.get('[data-rule-filter-key="all"]').trigger('click')
+    await flushPromises()
 
     expect(wrapper.findAll('[data-testid="diff-details-row"]')).toHaveLength(4)
 
@@ -782,7 +1012,8 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('shows an inline error when the saved result cannot be loaded', async () => {
-    getGeneratedOutput.mockRejectedValue(new ApiCallError('Unable to load saved result.', 503))
+    getGeneratedOutputDifferences.mockReset()
+    getGeneratedOutputDifferences.mockRejectedValue(new ApiCallError('Unable to load saved result.', 503))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()

@@ -48,6 +48,7 @@ Use this file as the shared contract reference before migrating or creating sett
 ## Validation
 
 - Add or update page tests that assert the shared contract classes are used.
-- Run `npm run test -- <focused specs>` for the touched pages/components first.
-- Run `./plugins/darpan-workflows/scripts/check_repo_boundary.sh`.
-- Run `./plugins/darpan-workflows/scripts/run_ui_checks.sh`.
+- Run `npx vitest run <path>` for the touched pages/components first.
+- Run `npm run check` (lint + type-check + vitest with coverage) before handoff.
+- From the wrapper root, run `./plugins/darpan-workflows/scripts/check_repo_boundary.sh`.
+- From the wrapper root, run `./plugins/darpan-workflows/scripts/run_ui_checks.sh`.

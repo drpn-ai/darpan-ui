@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { RouteLocationRaw } from 'vue-router'
-import { ApiCallError, clearAuthToken, setAuthTokenContract } from '../lib/api/client'
+import { ApiCallError, clearAuthToken, getAuthToken, setAuthTokenContract } from '../lib/api/client'
 import { authFacade, clearApiResponseCache, settingsFacade } from '../lib/api/facade'
 import { useReferenceDataStore } from './referenceData'
 import { useRunResultsStore } from './runResults'
@@ -231,17 +231,13 @@ export const useAuthStore = defineStore('auth', () => {
     return inFlight
   }
 
-  // Called by App.vue when another tab mutates the auth-token localStorage key. If the token is
-  // gone we treat it as a peer-initiated logout (clear local state + caches, no server call —
-  // the other tab already called logoutSession). If the token rotated we force-revalidate so we
-  // pick up the new user's sessionInfo rather than continuing to render the previous user's UI.
+  // Called by App.vue on a storage event. The bearer token now lives in this tab's sessionStorage
+  // (audit #10), so cross-tab token sync no longer applies — sessions are per-tab. We still react
+  // defensively: if this tab's own token is gone we treat it as a logout (clear local state +
+  // caches, no server call); if a token is present we force-revalidate so a rotated user is picked
+  // up rather than rendering the previous user's UI.
   function handleExternalAuthChange(): void {
-    let storedToken: string | null = null
-    try {
-      storedToken = window.localStorage.getItem('darpan.authToken')
-    } catch {
-      storedToken = null
-    }
+    const storedToken = getAuthToken()
     if (!storedToken) {
       clearApiResponseCache()
       _checked.value = true

@@ -1,10 +1,11 @@
 import { ref, type Ref } from 'vue'
-import { reconciliationFacade, settingsFacade } from '../lib/api/facade'
+import { settingsFacade } from '../lib/api/facade'
 import type { GeneratedOutput, SftpServerRecord } from '../lib/api/types'
 import { buildDataCommandActions } from '../lib/commandDataSearch'
 import { listRecentCommandIds, recordRecentCommand } from '../lib/commandSearch'
 import type { CommandAction } from '../lib/types/ux'
 import { filterRecordsForActiveTenant } from '../lib/utils/tenantRecords'
+import { useRunResultsStore } from '../stores/runResults'
 
 export interface UseCommandPaletteOptions {
   getActiveTenantUserGroupId: () => string | null
@@ -44,9 +45,12 @@ export function useCommandPalette(options: UseCommandPaletteOptions): UseCommand
     )
   }
 
-  function readGeneratedOutputs(result: PromiseSettledResult<{ generatedOutputs?: GeneratedOutput[] } | undefined>): GeneratedOutput[] {
-    if (!isFulfilled(result)) return []
-    return result.value?.generatedOutputs ?? []
+  function readCachedGeneratedOutputs(): GeneratedOutput[] {
+    try {
+      return useRunResultsStore().recentOutputs
+    } catch {
+      return []
+    }
   }
 
   async function loadCommandData(): Promise<void> {
@@ -56,16 +60,20 @@ export function useCommandPalette(options: UseCommandPaletteOptions): UseCommand
     isLoadingCommandData.value = true
 
     try {
-      const [sftpResult, generatedOutputResult] = await Promise.allSettled([
+      // Generated outputs are read from the run-results cache (recent <= 2
+      // days, prefetched at login + kept in sync via upsertOutput). The
+      // palette only renders the top 6 anyway, which the cache fully
+      // covers for typical tenants. SFTP servers still come from the
+      // facade since they're not part of the prefetch graph.
+      const [sftpResult] = await Promise.allSettled([
         settingsFacade.listSftpServers({ pageIndex: 0, pageSize: 200 }, controller.signal),
-        reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 80, query: '' }, controller.signal),
       ])
 
       if (controller.signal.aborted) return
 
       dataCommandActions.value = buildDataCommandActions({
         sftpServers: readSftpServers(sftpResult),
-        generatedOutputs: readGeneratedOutputs(generatedOutputResult),
+        generatedOutputs: readCachedGeneratedOutputs(),
       })
     } finally {
       if (!controller.signal.aborted) {
