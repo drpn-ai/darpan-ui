@@ -1,4 +1,5 @@
 import type { ApiEnvelope, AuthTokenContract } from './types'
+import { isIdempotentReadMethod, retryRead } from './retry'
 
 interface JsonRpcRequest {
   jsonrpc: '2.0'
@@ -367,7 +368,7 @@ function withMethodDetails(method: string, details: Record<string, unknown>): Re
   }
 }
 
-export async function callService<T>(method: string, params: object = {}, signal?: AbortSignal): Promise<T> {
+async function dispatchService<T>(method: string, params: object, signal?: AbortSignal): Promise<T> {
   const request: JsonRpcRequest = {
     jsonrpc: '2.0',
     id: Date.now(),
@@ -541,6 +542,20 @@ export async function callService<T>(method: string, params: object = {}, signal
       failures: parseFailures,
     }),
   )
+}
+
+// Only retry on raw network/transport errors (TypeError, DOMException).
+// ApiCallError (including AuthRequiredError) means the server replied — no point retrying.
+function isTransientNetworkError(err: unknown): boolean {
+  if (err instanceof ApiCallError) return false
+  return true
+}
+
+export async function callService<T>(method: string, params: object = {}, signal?: AbortSignal): Promise<T> {
+  const doRequest = () => dispatchService<T>(method, params, signal)
+  return isIdempotentReadMethod(method)
+    ? retryRead(doRequest, { shouldRetry: isTransientNetworkError }) // reads: retry transient network errors only
+    : doRequest()                                                      // writes: exactly once, never retried
 }
 
 export function getRpcUrl(): string {
