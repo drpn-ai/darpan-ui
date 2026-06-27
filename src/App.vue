@@ -128,6 +128,7 @@ import { buildAuthRedirect, useAuthStore } from './stores/auth'
 import { usePermissionsStore } from './stores/permissions'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
 import { setAuthRequiredHandler } from './lib/api/client'
+import { handleAuthExpiry } from './lib/api/sessionExpiry'
 import { shouldAbortWorkflowOnEscape } from './lib/keyboard'
 import { useTheme } from './composables/useTheme'
 import { useCommandPalette } from './composables/useCommandPalette'
@@ -483,8 +484,7 @@ async function redirectToAuthBoundary(): Promise<void> {
 
   isCommandPaletteOpen.value = false
   isUserMenuOpen.value = false
-  await router.replace(buildAuthRedirect(route.fullPath))
-
+  handleAuthExpiry(route.fullPath, { push: (to) => router.replace(to as Parameters<typeof router.replace>[0]), build: buildAuthRedirect })
 }
 
 async function handleAuthRequired(): Promise<void> {
