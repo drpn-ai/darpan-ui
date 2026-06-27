@@ -381,6 +381,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: NotFoundPage,
+    meta: { requiresAuth: true },
   },
 ]
 

@@ -202,6 +202,25 @@ describe('router auth guard', () => {
     expect(router.currentRoute.value.name).toBe('settings-runs')
   })
 
+  it('redirects unauthenticated users to login when visiting an unknown path', async () => {
+    ensureAuthenticated.mockResolvedValue(false)
+    authState.status = 'unauthenticated'
+    authState.sessionInfo = null
+    await router.push('/totally/unknown/path')
+
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/totally/unknown/path')
+  })
+
+  it('allows authenticated users to reach the not-found route for unknown paths', async () => {
+    ensureAuthenticated.mockResolvedValue(true)
+    authState.status = 'authenticated'
+    authState.sessionInfo = { userId: '100000', username: 'test.customer' }
+    await router.push('/totally/unknown/path')
+
+    expect(router.currentRoute.value.name).toBe('not-found')
+  })
+
   it('redirects old AI settings routes into tenant settings for authenticated users', async () => {
     ensureAuthenticated.mockResolvedValue(true)
     authState.status = 'authenticated'
