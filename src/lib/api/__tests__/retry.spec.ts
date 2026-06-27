@@ -22,4 +22,10 @@ describe('retry policy', () => {
     await expect(retryRead(fn, { attempts: 2, baseDelayMs: 0 })).rejects.toThrow('down')
     expect(fn).toHaveBeenCalledTimes(2)
   })
+  it('fast-exit: calls fn exactly once and rethrows when shouldRetry always returns false', async () => {
+    const err = new Error('no-retry')
+    const fn = vi.fn().mockRejectedValue(err)
+    await expect(retryRead(fn, { shouldRetry: () => false, baseDelayMs: 0 })).rejects.toThrow('no-retry')
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
 })

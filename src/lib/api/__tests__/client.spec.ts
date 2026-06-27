@@ -236,6 +236,21 @@ describe('callService', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://customer.example.com/rpc/json')
   })
 
+  it('does not retry an aborted read — dispatches fn exactly once and propagates AbortError', async () => {
+    vi.stubEnv('VITE_DARPAN_API_BASE_URL', 'https://customer.example.com')
+    vi.stubEnv('VITE_DARPAN_RPC_URL', 'https://customer.example.com/rpc/json')
+
+    const abortError = new DOMException('The operation was aborted.', 'AbortError')
+    const fetchMock = vi.fn().mockRejectedValue(abortError)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { callService } = await import('../client')
+
+    await expect(callService('facade.AuthFacadeServices.get#SessionInfo')).rejects.toThrow('The operation was aborted.')
+    // fetch is called exactly once — no retry
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('does not invoke the auth-required handler for get#SessionInfo failures', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('<html><title>Login</title></html>', {

@@ -546,8 +546,10 @@ async function dispatchService<T>(method: string, params: object, signal?: Abort
 
 // Only retry on raw network/transport errors (TypeError, DOMException).
 // ApiCallError (including AuthRequiredError) means the server replied — no point retrying.
+// AbortError means the caller cancelled the request — propagate immediately, never retry.
 function isTransientNetworkError(err: unknown): boolean {
   if (err instanceof ApiCallError) return false
+  if (err instanceof DOMException && err.name === 'AbortError') return false
   return true
 }
 
