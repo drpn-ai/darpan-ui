@@ -78,3 +78,42 @@ browser restart requires re-login (until this migration restores durable login v
 The change is a small client diff (credentials + header) plus server wiring. Keep it behind a build/env
 flag (e.g. `VITE_DARPAN_COOKIE_AUTH`) defaulting off until the checklist passes in staging, so a bad
 deploy reverts by flipping the flag rather than redeploying.
+
+## Verified design & decisions (2026-06-27)
+
+Live-probed against a running stack (login `john.doe`). Decisions: **CSRF = Option 1 (defense-in-depth)**;
+**scope = A+B (security fix + durable login)**. Findings that pin the design:
+
+- **The backend already authenticates general `/rpc/json` via the JSESSIONID session cookie** (no
+  per-RPC wiring needed) **and already enforces CSRF** on cookie-authenticated calls: it requires
+  `X-CSRF-Token` (= `moquiSessionToken`) and rejects wrong/missing tokens (`401 Session token …`).
+  The token is returned as a CORS-exposed **response header** on login and on `get#SessionInfo`.
+- **The credential moves to the HttpOnly `darpan_login_key` cookie** (already minted at login); the
+  `moquiSessionToken`/`X-CSRF-Token` is an **anti-CSRF token, not the secret** — it is meant to be
+  JS-readable, so keeping it in JS (memory/sessionStorage) is correct and satisfies audit #10.
+- **CSRF is skipped when** the request is a GET (ScreenRenderImpl:429), or `moqui.request.authenticated`
+  is set (the login_key-header path), or the session token is still null (a brand-new session). This is
+  why first login and a post-restart `get#SessionInfo` succeed without a token.
+- **Bootstrap matrix (verified):** cold-start → login (CSRF-exempt, returns token); same-tab reload →
+  token in sessionStorage; **full restart** → `get#SessionInfo` with only `darpan_login_key` restores
+  the session + returns a fresh token (CSRF skipped, null session token) — *durable login, no backend
+  change*; **new tab while session alive** → token exists → CSRF enforced → the new tab can't read the
+  cross-origin cookie → needs the GET endpoint below. (Companion-cookie double-submit does NOT work
+  cross-origin: `app.drpn.ai` JS cannot read an `api.drpn.ai` cookie.)
+
+### Implementation (flag-gated by `VITE_DARPAN_COOKIE_AUTH`)
+
+1. **Backend (darpan component) — CSRF-exempt GET token endpoint.** Add a GET transition/service that
+   returns the current session `moquiSessionToken`, restoring the authenticated session from
+   `darpan_login_key` if no live session. GET ⇒ CSRF-exempt; CORS already echoes only allowlisted
+   origins, so only the SPA can read it; the token alone is useless without the HttpOnly cookie. This is
+   the uniform bootstrap for new-tab (and a clean path for restart/cold too).
+2. **Client (`client.ts`) — cookie mode.** When the flag is on: `fetch` `credentials:'include'`; on boot
+   fetch the CSRF token (GET endpoint, falling back through login for the unauthenticated case); send it
+   as `X-CSRF-Token` on every `/rpc/json` call; capture/refresh it from every response header; **do not
+   send the `login_key` header and do not store the JS-readable bearer** (the cookie is the credential).
+   Treat `401 Session token …` as auth-required (existing 401 path → session-expiry redirect).
+3. **Dev CORS.** Replace `MoquiDevConf` `allow-origins=*` with an explicit dev origin
+   (`http://localhost:5173`) — `*` is invalid with `Access-Control-Allow-Credentials: true`.
+4. **Verify** the checklist above against the live stack, including new-tab + restart durability and a
+   CSRF-rejection case.
