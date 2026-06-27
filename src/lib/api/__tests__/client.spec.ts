@@ -251,6 +251,183 @@ describe('callService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  describe('cookie-auth mode (VITE_DARPAN_COOKIE_AUTH=true)', () => {
+    it('sends credentials:include and X-CSRF-Token header, omits login_key bearer', async () => {
+      vi.stubEnv('VITE_DARPAN_COOKIE_AUTH', 'true')
+
+      // First fetch: bootstrap GET for CSRF token
+      // Second fetch: the RPC POST
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ moquiSessionToken: 'csrf-from-bootstrap', authenticated: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [], authenticated: true } }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      const { callService, setAuthTokenContract } = await import('../client')
+      // Simulate login response attempting to store a bearer — should be suppressed in cookie mode.
+      setAuthTokenContract({
+        authToken: 'should-not-be-sent',
+        authTokenHeaderName: 'login_key',
+        authTokenType: 'LOGIN_KEY',
+        authTokenExpiresInSeconds: 3600,
+      })
+
+      await callService<{ authenticated: boolean }>('facade.AuthFacadeServices.get#SessionInfo')
+
+      // First call must be the CSRF bootstrap GET.
+      expect(fetchMock.mock.calls[0]?.[0]).toContain('/apps/darpan/csrfToken')
+      expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe('GET')
+      expect((fetchMock.mock.calls[0]?.[1] as RequestInit).credentials).toBe('include')
+
+      // Second call is the actual RPC POST.
+      const postInit = fetchMock.mock.calls[1]?.[1] as RequestInit & { headers: Record<string, string> }
+      expect(postInit.credentials).toBe('include')
+      expect(postInit.headers['X-CSRF-Token']).toBe('csrf-from-bootstrap')
+      expect(postInit.headers['login_key']).toBeUndefined()
+    })
+
+    it('does not persist bearer to sessionStorage or memory when COOKIE_AUTH is on', async () => {
+      vi.stubEnv('VITE_DARPAN_COOKIE_AUTH', 'true')
+
+      const { setAuthToken, setAuthTokenContract, getAuthToken } = await import('../client')
+      setAuthToken('should-not-store')
+      setAuthTokenContract({ authToken: 'also-should-not-store', authTokenHeaderName: 'login_key' })
+
+      expect(window.sessionStorage.getItem('darpan.authToken')).toBeNull()
+      expect(getAuthToken()).toBeNull()
+    })
+
+    it('captures X-CSRF-Token from response header and keeps it fresh', async () => {
+      vi.stubEnv('VITE_DARPAN_COOKIE_AUTH', 'true')
+      // Seed a CSRF token so bootstrap is skipped.
+      window.sessionStorage.setItem('darpan.csrfToken', 'initial-csrf')
+
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [] } }),
+          { status: 200, headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': 'refreshed-csrf' } },
+        ),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+
+      const { callService } = await import('../client')
+      await callService('some.Service.method')
+
+      expect(window.sessionStorage.getItem('darpan.csrfToken')).toBe('refreshed-csrf')
+    })
+
+    it('falls back to moquiSessionToken header when X-CSRF-Token is absent', async () => {
+      vi.stubEnv('VITE_DARPAN_COOKIE_AUTH', 'true')
+      window.sessionStorage.setItem('darpan.csrfToken', 'initial-csrf')
+
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [] } }),
+          { status: 200, headers: { 'Content-Type': 'application/json', moquiSessionToken: 'session-token-header' } },
+        ),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+
+      const { callService } = await import('../client')
+      await callService('some.Service.method')
+
+      expect(window.sessionStorage.getItem('darpan.csrfToken')).toBe('session-token-header')
+    })
+
+    it('GETs csrfToken endpoint from JSON body when no header is present', async () => {
+      vi.stubEnv('VITE_DARPAN_COOKIE_AUTH', 'true')
+      // No pre-seeded token — bootstrap must fire.
+
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(
+          // Bootstrap: token only in body, not in headers.
+          new Response(JSON.stringify({ moquiSessionToken: 'body-bootstrap-token' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [] } }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      const { callService } = await import('../client')
+      await callService('some.Service.method')
+
+      // The POST should carry the bootstrapped token.
+      const postInit = fetchMock.mock.calls[1]?.[1] as RequestInit & { headers: Record<string, string> }
+      expect(postInit.headers['X-CSRF-Token']).toBe('body-bootstrap-token')
+      expect(window.sessionStorage.getItem('darpan.csrfToken')).toBe('body-bootstrap-token')
+    })
+
+    it('skips bootstrap when CSRF token is already in sessionStorage', async () => {
+      vi.stubEnv('VITE_DARPAN_COOKIE_AUTH', 'true')
+      window.sessionStorage.setItem('darpan.csrfToken', 'pre-seeded-token')
+
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [] } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+
+      const { callService } = await import('../client')
+      await callService('some.Service.method')
+
+      // Only one fetch — no bootstrap GET.
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const postInit = fetchMock.mock.calls[0]?.[1] as RequestInit & { headers: Record<string, string> }
+      expect(postInit.headers['X-CSRF-Token']).toBe('pre-seeded-token')
+    })
+  })
+
+  describe('bearer-token mode (VITE_DARPAN_COOKIE_AUTH=false or unset)', () => {
+    it('sends credentials:omit and login_key header, stores bearer when COOKIE_AUTH is off', async () => {
+      vi.stubEnv('VITE_DARPAN_COOKIE_AUTH', 'false')
+
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [], authenticated: true } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+
+      const { callService, setAuthTokenContract } = await import('../client')
+      setAuthTokenContract({
+        authToken: 'token-123',
+        authTokenHeaderName: 'login_key',
+        authTokenType: 'LOGIN_KEY',
+        authTokenExpiresInSeconds: 3600,
+      })
+
+      await callService<{ authenticated: boolean }>('facade.AuthFacadeServices.get#SessionInfo')
+
+      const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit & { headers: Record<string, string> }
+      expect(requestInit.credentials).toBe('omit')
+      expect(requestInit.headers['login_key']).toBe('token-123')
+      expect(requestInit.headers['X-CSRF-Token']).toBeUndefined()
+
+      // Bearer must be persisted to sessionStorage in non-cookie mode.
+      expect(window.sessionStorage.getItem('darpan.authToken')).not.toBeNull()
+    })
+  })
+
   it('does not invoke the auth-required handler for get#SessionInfo failures', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('<html><title>Login</title></html>', {

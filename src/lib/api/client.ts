@@ -66,6 +66,8 @@ const GENERIC_SERVICE_ERROR_MESSAGE = 'Darpan could not complete the request.'
 const AUTH_SESSION_INFO_METHOD = 'facade.AuthFacadeServices.get#SessionInfo'
 const AUTH_TOKEN_STORAGE_KEY = 'darpan.authToken'
 const AUTH_TOKEN_HEADER_NAME = 'login_key'
+const CSRF_TOKEN_STORAGE_KEY = 'darpan.csrfToken'
+const COOKIE_AUTH = import.meta.env.VITE_DARPAN_COOKIE_AUTH === 'true'
 
 interface StoredAuthToken {
   value: string
@@ -286,11 +288,13 @@ function getActiveAuthTokenState(): StoredAuthToken | null {
 let authTokenState: StoredAuthToken | null = loadStoredAuthTokenState()
 
 export function setAuthToken(token: string | null): void {
+  if (COOKIE_AUTH) return // no-op: the HttpOnly darpan_login_key cookie is the credential
   authTokenState = createAuthTokenState(token)
   persistAuthTokenState(authTokenState)
 }
 
 export function setAuthTokenContract(contract: Partial<AuthTokenContract> | null): void {
+  if (COOKIE_AUTH) return // no-op: the HttpOnly darpan_login_key cookie is the credential
   authTokenState = createAuthTokenState(contract?.authToken ?? null, contract ?? {})
   persistAuthTokenState(authTokenState)
 }
@@ -298,23 +302,117 @@ export function setAuthTokenContract(contract: Partial<AuthTokenContract> | null
 export function clearAuthToken(): void {
   authTokenState = null
   persistAuthTokenState(null)
+  if (COOKIE_AUTH) clearCsrfToken()
 }
 
 export function getAuthToken(): string | null {
   return getActiveAuthTokenState()?.value ?? null
 }
 
+// ---- CSRF token (cookie-auth mode) ----
+// Non-secret anti-CSRF token. Kept in memory + sessionStorage (per-tab, cleared on tab close).
+// The actual session credential is the HttpOnly darpan_login_key cookie, which is not JS-readable.
+function loadStoredCsrfToken(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.sessionStorage.getItem(CSRF_TOKEN_STORAGE_KEY) ?? null
+  } catch {
+    return null
+  }
+}
+
+let csrfTokenValue: string | null = loadStoredCsrfToken()
+
+function getCsrfToken(): string | null {
+  return csrfTokenValue
+}
+
+function setCsrfToken(value: string): void {
+  csrfTokenValue = value
+  try {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(CSRF_TOKEN_STORAGE_KEY, value)
+    }
+  } catch {
+    // ignore storage failures; the in-memory token still works for the active session
+  }
+}
+
+function clearCsrfToken(): void {
+  csrfTokenValue = null
+  try {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(CSRF_TOKEN_STORAGE_KEY)
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
 const rpcCandidates = buildRpcCandidates()
 const rpcUrl = rpcCandidates[0] ?? `${resolveApiOrigin(apiBase)}/rpc/json`
+
+function buildCsrfTokenUrl(): string {
+  const apiOrigin = resolveApiOrigin(apiBase)
+  const absoluteUrl = `${apiOrigin}/apps/darpan/csrfToken`
+  if (shouldPreferSameOriginProxy(absoluteUrl) && typeof window !== 'undefined') {
+    return `${window.location.origin.replace(/\/$/, '')}/apps/darpan/csrfToken`
+  }
+  return absoluteUrl
+}
+
+const csrfTokenUrl = buildCsrfTokenUrl()
+
+let csrfBootstrapInProgress = false
+
+// Fetches and caches the CSRF token from the backend's bootstrap endpoint.
+// Only used in cookie-auth mode; guards against concurrent bootstrap attempts and recursion.
+async function ensureCsrfToken(): Promise<void> {
+  if (csrfTokenValue != null || csrfBootstrapInProgress) return
+  csrfBootstrapInProgress = true
+  try {
+    const response = await fetch(csrfTokenUrl, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    // Prefer the response header; fall back to parsing the JSON body.
+    const headerToken = response.headers.get('X-CSRF-Token') ?? response.headers.get('moquiSessionToken')
+    if (headerToken) {
+      setCsrfToken(headerToken)
+    } else if (response.ok) {
+      try {
+        const data = (await response.json()) as { moquiSessionToken?: string }
+        if (data.moquiSessionToken) {
+          setCsrfToken(data.moquiSessionToken)
+        }
+      } catch {
+        // ignore JSON parse failures
+      }
+    }
+  } catch {
+    // ignore network failures; the request proceeds without a CSRF token and will fail
+    // with a 401 if the backend requires it, which is handled by the auth-required path
+  } finally {
+    csrfBootstrapInProgress = false
+  }
+}
 
 function buildHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
 
-  const tokenState = getActiveAuthTokenState()
-  if (tokenState) {
-    headers[tokenState.headerName] = tokenState.value
+  if (COOKIE_AUTH) {
+    // In cookie-auth mode: send the non-secret CSRF token; the HttpOnly cookie is the credential.
+    const csrf = getCsrfToken()
+    if (csrf) {
+      headers['X-CSRF-Token'] = csrf
+    }
+  } else {
+    const tokenState = getActiveAuthTokenState()
+    if (tokenState) {
+      headers[tokenState.headerName] = tokenState.value
+    }
   }
 
   return headers
@@ -337,7 +435,9 @@ function isAuthRequiredMessage(message: string | null | undefined): boolean {
     normalized.includes('no active authenticated session') ||
     normalized.includes('authentication required') ||
     normalized.includes('login key not valid') ||
-    normalized.includes('login key expired')
+    normalized.includes('login key expired') ||
+    normalized.includes('session token required') ||
+    normalized.includes('session token does not match')
   )
 }
 
@@ -376,6 +476,11 @@ async function dispatchService<T>(method: string, params: object, signal?: Abort
     params,
   }
 
+  // In cookie-auth mode, ensure we have a CSRF token before posting.
+  if (COOKIE_AUTH && !getCsrfToken()) {
+    await ensureCsrfToken()
+  }
+
   const parseFailures: Array<{ url: string; status?: number; raw?: string; error?: unknown }> = []
 
   for (const candidateUrl of rpcCandidates) {
@@ -388,7 +493,7 @@ async function dispatchService<T>(method: string, params: object, signal?: Abort
       response = await fetch(candidateUrl, {
         method: 'POST',
         headers: buildHeaders(),
-        credentials: 'omit',
+        credentials: COOKIE_AUTH ? 'include' : 'omit',
         body: JSON.stringify(request),
         signal,
       })
@@ -401,6 +506,12 @@ async function dispatchService<T>(method: string, params: object, signal?: Abort
         error,
       })
       continue
+    }
+
+    // Capture and refresh the CSRF token from the response header when in cookie-auth mode.
+    if (COOKIE_AUTH) {
+      const freshCsrf = response.headers.get('X-CSRF-Token') ?? response.headers.get('moquiSessionToken')
+      if (freshCsrf) setCsrfToken(freshCsrf)
     }
 
     const bodyText = await response.text()
