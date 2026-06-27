@@ -1,6 +1,8 @@
 <template>
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
+  <OfflineBanner />
+
   <div
     :class="[
       'app-shell',
@@ -144,6 +146,7 @@ import { useUserDisplayNamePreference } from './lib/userDisplayName'
 import { resolveStaticPageLabel } from './lib/workflowOrigin'
 
 import AppErrorBoundary from './components/shell/AppErrorBoundary.vue'
+import OfflineBanner from './components/shell/OfflineBanner.vue'
 
 const CommandPalette = defineAsyncComponent(() => import('./components/shell/CommandPalette.vue').then((module) => module.default))
 
