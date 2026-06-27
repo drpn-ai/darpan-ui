@@ -1,8 +1,9 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { buildAuthRedirect, useAuthStore } from '../stores/auth'
 import { usePermissionsStore } from '../stores/permissions'
+import NotFoundPage from '../pages/NotFoundPage.vue'
 
-const routes: RouteRecordRaw[] = [
+export const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'login',
@@ -378,7 +379,8 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: { name: 'hub' },
+    name: 'not-found',
+    component: NotFoundPage,
   },
 ]
 
