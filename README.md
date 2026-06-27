@@ -192,7 +192,7 @@ Notes:
 
 `.github/workflows/deploy-pages.yml` builds and deploys the app to GitHub Pages on every push to `main` (and on manual dispatch):
 
-- `https://toaditi.github.io/darpan-ui/`
+- `https://drpn-ai.github.io/darpan-ui/`
 
 The Pages build reads its backend target from GitHub Actions repository or environment variables:
 
