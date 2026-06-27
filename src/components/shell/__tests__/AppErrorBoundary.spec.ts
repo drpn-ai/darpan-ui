@@ -5,7 +5,7 @@ import { defineComponent, h, nextTick } from 'vue'
 import AppErrorBoundary from '../AppErrorBoundary.vue'
 import * as report from '../../../lib/errors/reportError'
 
-const Boom = defineComponent({ setup() { throw new Error('render boom') } })
+const Boom = defineComponent({ setup: () => () => { throw new Error('render boom') } })
 const Ok = defineComponent({ setup: () => () => h('div', { class: 'ok' }, 'fine') })
 
 describe('AppErrorBoundary', () => {

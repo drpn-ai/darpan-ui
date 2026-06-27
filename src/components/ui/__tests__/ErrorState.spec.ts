@@ -15,6 +15,16 @@ describe('ErrorState', () => {
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 
+  it('renders an <a> with the correct href when action.href is given', () => {
+    const wrapper = mount(ErrorState, {
+      props: { title: 'go home', action: { label: 'go', href: '/x' } },
+    })
+    const link = wrapper.find('a')
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('href')).toBe('/x')
+    expect(wrapper.find('button').exists()).toBe(false)
+  })
+
   it('omits the action button when no action is given', () => {
     const wrapper = mount(ErrorState, { props: { title: 'page not found' } })
     expect(wrapper.find('button').exists()).toBe(false)
