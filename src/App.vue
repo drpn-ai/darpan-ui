@@ -9,7 +9,9 @@
     ]"
   >
     <section id="main-content" :class="['content-shell', `content-shell--${surfaceMode}`]" tabindex="-1">
-      <RouterView :key="routerViewKey" />
+      <AppErrorBoundary>
+        <RouterView :key="routerViewKey" />
+      </AppErrorBoundary>
     </section>
   </div>
 
@@ -139,6 +141,8 @@ import {
 } from './lib/uiEvents'
 import { useUserDisplayNamePreference } from './lib/userDisplayName'
 import { resolveStaticPageLabel } from './lib/workflowOrigin'
+
+import AppErrorBoundary from './components/shell/AppErrorBoundary.vue'
 
 const CommandPalette = defineAsyncComponent(() => import('./components/shell/CommandPalette.vue').then((module) => module.default))
 

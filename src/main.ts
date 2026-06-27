@@ -7,6 +7,7 @@ import { setApiCacheReset } from './lib/api/facade'
 import { useReferenceDataStore } from './stores/referenceData'
 import { useRunResultsStore } from './stores/runResults'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
+import { reportError } from './lib/errors/reportError'
 import './style.css'
 
 const RECONCILIATION_DRAFT_SESSION_KEY = 'darpan.reconciliationDraftStore'
@@ -35,7 +36,12 @@ setApiCacheReset(() => {
   }
 })
 
-createApp(App)
+const app = createApp(App)
+
+app.config.errorHandler = (err, _instance, info) => reportError(err, { source: 'vue', info: String(info) })
+window.addEventListener('unhandledrejection', (e) => reportError(e.reason, { source: 'unhandledrejection' }))
+
+app
   .use(pinia)
   .use(router)
   .mount('#app')
