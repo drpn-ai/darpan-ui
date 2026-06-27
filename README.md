@@ -82,7 +82,7 @@ Notes:
 
 The current public Pages URL is:
 
-- `https://toaditi.github.io/darpan-ui/`
+- `https://drpn-ai.github.io/darpan-ui/`
 
 For release-week auth and cookie validation, the Pages build must be pointed at a real backend target through GitHub Actions repository or environment variables:
 
