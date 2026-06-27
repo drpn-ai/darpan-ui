@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { buildAuthRedirect, useAuthStore } from '../stores/auth'
 import { usePermissionsStore } from '../stores/permissions'
 import NotFoundPage from '../pages/NotFoundPage.vue'
+import AccessDeniedPage from '../pages/AccessDeniedPage.vue'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -376,6 +377,12 @@ export const routes: RouteRecordRaw[] = [
         jsonSchemaId: to.params.jsonSchemaId,
       },
     }),
+  },
+  {
+    path: '/access-denied',
+    name: 'access-denied',
+    component: AccessDeniedPage,
+    meta: { requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',
