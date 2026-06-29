@@ -1,0 +1,75 @@
+name: Security Gate
+
+# MACH Security & Secrets P1 — three gates:
+#   1. Secret scanning  (gitleaks)
+#   2. Dependency / SCA vuln audit  (npm audit --audit-level=high)
+#   3. Lockfile-drift enforcement  (npm ci — already fails on drift)
+#
+# Gate 3 is satisfied by the Install step itself: npm ci exits non-zero if
+# package-lock.json is absent or out of sync with package.json.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    # Weekly Sunday 02:00 UTC — catches newly-published CVEs between pushes
+    - cron: '0 2 * * 0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Gate 1: Secret scanning ─────────────────────────────────────────────────
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so gitleaks can scan every commit on the ref, not just HEAD
+          fetch-depth: 0
+
+      - name: Gitleaks — scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Fails the job (exit 1) on any verified secret detected.
+        # A .gitleaks.toml allowlist can be added to the repo root if a
+        # confirmed false-positive arises; any entry must include a comment
+        # explaining why it is safe to suppress.
+
+  # ── Gate 2: SCA / dependency vulnerability audit ────────────────────────────
+  sca-audit:
+    name: Dependency audit (npm audit, High+)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Gate 3 is embedded here: npm ci fails if package-lock.json is absent
+      # or does not match package.json, enforcing lockfile drift detection.
+      - name: Install (npm ci — Gate 3: lockfile-drift enforcement)
+        run: npm ci
+
+      # --audit-level=high: fails on High or Critical findings only.
+      # Low/Moderate findings are reported but do not fail the build to
+      # avoid noise from transitive dev-dependency advisories.
+      # --omit=dev: scopes to production dependencies only, reducing
+      # false-positive noise from dev/test tooling vulnerabilities.
+      - name: Audit production dependencies (High/Critical threshold)
+        run: npm audit --audit-level=high --omit=dev
