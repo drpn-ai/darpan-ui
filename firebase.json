@@ -20,17 +20,20 @@
         "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self';base-uri 'self';object-src 'none';font-src 'self' data: https://fonts.gstatic.com;script-src 'self' https://www.gstatic.com https://*.firebaseapp.com;img-src 'self' data: https:;style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;connect-src 'self' https://*.hotwax.io;frame-src https://linear.app;frame-ancestors https://admin.shopify.com https://*.myshopify.com;form-action 'self';"
+          "value": "default-src 'self';base-uri 'self';object-src 'none';font-src 'self' data: https://fonts.gstatic.com;script-src 'self' https://www.gstatic.com https://*.firebaseapp.com;img-src 'self' data: https:;style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;connect-src 'self' https://*.hotwax.io https://api-uat.drpn.ai;frame-src https://linear.app;frame-ancestors 'none';form-action 'self';"
         },
         {
           "key": "strict-transport-security",
           "value": "max-age=31536000; includeSubDomains; preload"
         },{
           "key": "Permissions-Policy",
-          "value": "camera=self"
+          "value": "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
         },{
           "key": "X-Content-Type-Options",
-          "value": "NoSniff"
+          "value": "nosniff"
+        },{
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
         } ]
       }]
     },
@@ -54,17 +57,20 @@
         "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self';base-uri 'self';object-src 'none';font-src 'self' data: https://fonts.gstatic.com;script-src 'self' https://www.gstatic.com https://*.firebaseapp.com;img-src 'self' data: https:;style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;connect-src 'self' https://*.hotwax.io;frame-src https://linear.app;frame-ancestors https://admin.shopify.com https://*.myshopify.com;form-action 'self';"
+          "value": "default-src 'self';base-uri 'self';object-src 'none';font-src 'self' data: https://fonts.gstatic.com;script-src 'self' https://www.gstatic.com https://*.firebaseapp.com;img-src 'self' data: https:;style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;connect-src 'self' https://*.hotwax.io https://api.drpn.ai;frame-src https://linear.app;frame-ancestors 'none';form-action 'self';"
         },
         {
           "key": "strict-transport-security",
           "value": "max-age=31536000; includeSubDomains; preload"
         },{
           "key": "Permissions-Policy",
-          "value": "camera=self"
+          "value": "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
         },{
           "key": "X-Content-Type-Options",
-          "value": "NoSniff"
+          "value": "nosniff"
+        },{
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
         } ]
       }]
     }
