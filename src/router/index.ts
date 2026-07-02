@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { buildAuthRedirect, useAuthStore } from '../stores/auth'
 import { usePermissionsStore } from '../stores/permissions'
+import { scheduleRoutePrefetch } from './prefetchRoutes'
 import NotFoundPage from '../pages/NotFoundPage.vue'
 import AccessDeniedPage from '../pages/AccessDeniedPage.vue'
 
@@ -405,8 +406,41 @@ const router = createRouter({
 // re-verify only when the cached auth state is older than this TTL; within it, navigation uses the
 // cached state instantly. An expired session is still caught promptly by the 401 handler on the next
 // API call (which clears the token), so this does not weaken enforcement.
+//
+// Perf 2026-07-02: a stale TTL no longer blocks the navigation either. Once the auth state has been
+// checked, navigation proceeds on the cached state immediately and the stale session is re-verified
+// in the background; if the server disagrees, the user is redirected to login from there. Only the
+// very first (unchecked) navigation still awaits the server check — permissions are unknown until it
+// resolves. Self-review #22 semantics kept: the clock advances only when a server verification ran.
 const AUTH_REVALIDATE_TTL_MS = 60_000
 let lastAuthVerifiedAtMs = 0
+let backgroundRevalidationInFlight = false
+// Set by the guard, consumed by afterEach: the background check must not start until the
+// triggering navigation has settled, or a fast (or failing-fast) session response could cancel
+// that very navigation and compute the login redirect from the pre-navigation route.
+let backgroundRevalidationRequested = false
+
+function runBackgroundSessionRevalidation(authStore: ReturnType<typeof useAuthStore>): void {
+  if (backgroundRevalidationInFlight) return
+  backgroundRevalidationInFlight = true
+  void authStore
+    .ensureAuthenticated(true)
+    .then((stillAuthenticated) => {
+      if (stillAuthenticated) {
+        lastAuthVerifiedAtMs = Date.now()
+        return
+      }
+      lastAuthVerifiedAtMs = 0
+      void router.push(buildAuthRedirect(router.currentRoute.value.fullPath))
+    })
+    .catch(() => {
+      // Transient verification failure (network blip): keep the optimistic session. The 401
+      // handling on the next data call remains the enforcement backstop.
+    })
+    .finally(() => {
+      backgroundRevalidationInFlight = false
+    })
+}
 
 router.beforeEach(async (to) => {
   if (to.meta.public === true) return true
@@ -415,13 +449,13 @@ router.beforeEach(async (to) => {
   const authStore = useAuthStore()
   const nowMs = Date.now()
   const staleAuth = nowMs - lastAuthVerifiedAtMs >= AUTH_REVALIDATE_TTL_MS
-  const authenticated = await authStore.ensureAuthenticated(staleAuth)
-  // Self-review #22: advance the timestamp ONLY when an actual server verification ran (staleAuth was
-  // true → ensureAuthenticated(true) hit get#SessionInfo). A cache-hit navigation must not reset the
-  // clock, or an always-active user would never re-verify. Reset to 0 on an unauthenticated result.
+  const hadCheckedAuthState = authStore.checked === true
+  const authenticated = await authStore.ensureAuthenticated(false)
   if (!authenticated) lastAuthVerifiedAtMs = 0
-  else if (staleAuth) lastAuthVerifiedAtMs = nowMs
+  else if (!hadCheckedAuthState) lastAuthVerifiedAtMs = nowMs
+  else if (staleAuth) backgroundRevalidationRequested = true
   if (authenticated) {
+    scheduleRoutePrefetch(router)
     const permissions = usePermissionsStore()
     if (to.meta.requiresGlobalSettings === true && !permissions.canManageGlobalSettings) {
       return { name: 'hub' }
@@ -451,6 +485,12 @@ router.beforeEach(async (to) => {
     return true
   }
   return buildAuthRedirect(to.fullPath)
+})
+
+router.afterEach(() => {
+  if (!backgroundRevalidationRequested) return
+  backgroundRevalidationRequested = false
+  runBackgroundSessionRevalidation(useAuthStore())
 })
 
 export default router
