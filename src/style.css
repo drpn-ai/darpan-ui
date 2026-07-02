@@ -884,7 +884,9 @@ button:disabled {
   min-width: 0;
 }
 
-.tenant-notification-status-field .app-select-trigger {
+/* Three classes to out-rank AppSelect's scoped base style (.app-select-trigger[data-v-*]),
+   which loads after this file via lazy page chunks and would win a specificity tie. */
+.tenant-notification-status-field .app-select .app-select-trigger {
   min-height: 2.35rem;
   padding-block: 0.52rem;
   padding-inline: 0.65rem;
@@ -929,7 +931,8 @@ button:disabled {
   align-self: start;
 }
 
-.workflow-form-grid--shopify-compact .app-select-trigger {
+/* Three classes for the same scoped-style tie-break as .tenant-notification-status-field above. */
+.workflow-form-grid--shopify-compact .app-select .app-select-trigger {
   min-height: 2.2rem;
   padding: 0.38rem 0.65rem;
   font-size: var(--workflow-form-answer-size);
