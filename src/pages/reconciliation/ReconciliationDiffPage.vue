@@ -4,8 +4,10 @@
 
     <EmptyState
       v-else-if="showEmptyState"
+      icon="inbox"
       title="No runs available"
-      description="Create at least one saved reconciliation run before executing the diff."
+      description="Create a saved reconciliation run first, then come back to execute the diff."
+      :action="createRunAction"
     />
 
     <template v-else>
@@ -266,6 +268,7 @@ import {
 } from '../../lib/utils/date'
 import { useCalendarWidget, type CalendarRange } from '../../composables/useCalendarWidget'
 import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
+import { usePermissionsStore } from '../../stores/permissions'
 
 interface UploadStep {
   id: 'run' | 'system-1' | 'api-window' | 'api-window-custom' | 'file-1' | 'system-2' | 'file-2'
@@ -297,6 +300,7 @@ const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 const route = useRoute()
 const router = useRouter()
+const permissionsStore = usePermissionsStore()
 
 const diff = useReconciliationDiff()
 const {
@@ -343,6 +347,11 @@ const requestedFile2SystemLabel = computed(() =>
   typeof route.query.file2SystemLabel === 'string' ? route.query.file2SystemLabel.trim() : '',
 )
 const showEmptyState = computed(() => !loadingMappings.value && savedRuns.value.length === 0 && !loadError.value)
+const createRunAction = computed(() =>
+  permissionsStore.canEditTenantSettings
+    ? { label: 'Create a run', to: { name: 'reconciliation-create' } as RouteLocationRaw }
+    : undefined,
+)
 const selectedSavedRun = computed(() => savedRuns.value.find((savedRun) => savedRun.savedRunId === selectedSavedRunId.value) ?? null)
 const savedRunOptions = computed(() =>
   savedRuns.value.map((savedRun) => ({ value: savedRun.savedRunId, label: savedRun.runName })),

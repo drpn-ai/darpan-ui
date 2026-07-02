@@ -11,6 +11,12 @@ const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const listSavedRuns = vi.hoisted(() => vi.fn())
 const listGeneratedOutputs = vi.hoisted(() => vi.fn())
 const runSavedRunDiff = vi.hoisted(() => vi.fn())
+const permissionState = vi.hoisted(() => ({
+  canRunActiveTenantReconciliation: true,
+  canEditTenantSettings: true,
+  canManageGlobalSettings: false,
+  canViewTenantSettings: true,
+}))
 
 vi.mock('vue-router', () => ({
   RouterLink: {
@@ -29,6 +35,10 @@ vi.mock('../../../lib/api/facade', () => ({
     listGeneratedOutputs,
     runSavedRunDiff,
   },
+}))
+
+vi.mock('../../../stores/permissions', () => ({
+  usePermissionsStore: () => permissionState,
 }))
 
 import ReconciliationDiffPage from '../ReconciliationDiffPage.vue'
@@ -195,6 +205,7 @@ describe('ReconciliationDiffPage', () => {
     listSavedRuns.mockReset()
     listGeneratedOutputs.mockReset()
     runSavedRunDiff.mockReset()
+    permissionState.canEditTenantSettings = true
     listSavedRuns.mockResolvedValue(savedRunResponse)
     listGeneratedOutputs.mockResolvedValue({
       ok: true,
@@ -254,6 +265,32 @@ describe('ReconciliationDiffPage', () => {
     expect(wrapper.text()).toContain('Unable to load saved runs.')
     expect(wrapper.find('.reconciliation-diff-layout').exists()).toBe(false)
     expect(wrapper.find('[data-testid="saved-run-select"]').exists()).toBe(false)
+  })
+
+  it('offers a create-run CTA in the empty state when there are no saved runs', async () => {
+    listSavedRuns.mockResolvedValue({ ...savedRunResponse, savedRuns: [] })
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    expect(wrapper.find('.empty-state').exists()).toBe(true)
+    expect(wrapper.text()).toContain('No runs available')
+    const cta = wrapper.findAll('.empty-state__action').find((link) => link.text().includes('Create a run'))
+    expect(cta).toBeTruthy()
+    expect(cta!.attributes('data-to')).toContain('reconciliation-create')
+    expect(wrapper.find('.reconciliation-diff-layout').exists()).toBe(false)
+  })
+
+  it('hides the create-run CTA when the user cannot edit tenant settings', async () => {
+    permissionState.canEditTenantSettings = false
+    listSavedRuns.mockResolvedValue({ ...savedRunResponse, savedRuns: [] })
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    expect(wrapper.find('.empty-state').exists()).toBe(true)
+    expect(wrapper.text()).toContain('No runs available')
+    expect(wrapper.find('.empty-state__action').exists()).toBe(false)
   })
 
   it('loads the latest saved result card with a static-result link and a separate history link', async () => {
