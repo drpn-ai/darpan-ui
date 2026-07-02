@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { OMS_ORDERS_ENDPOINT_DOC, OMS_SWAGGER_BASE_URL, OMS_SWAGGER_SOURCE } from '../omsSwagger'
+import { OMS_BASE_URL_PLACEHOLDER, OMS_HOST_PLACEHOLDER, OMS_ORDERS_ENDPOINT_DOC, OMS_SWAGGER_SOURCE } from '../omsSwagger'
 
 describe('HotWax Swagger metadata', () => {
-  it('captures the dev HotWax orders endpoint used for setup hints', () => {
-    expect(OMS_SWAGGER_BASE_URL).toBe('https://dev-maarg.hotwax.io')
+  it('captures the placeholder HotWax orders endpoint used for setup hints', () => {
+    expect(OMS_BASE_URL_PLACEHOLDER).toBe(`https://${OMS_HOST_PLACEHOLDER}`)
     expect(OMS_SWAGGER_SOURCE.title).toBe('HotWax API')
     expect(OMS_SWAGGER_SOURCE.basePath).toBe('/rest/s1/oms/orders')
     expect(OMS_ORDERS_ENDPOINT_DOC).toMatchObject({

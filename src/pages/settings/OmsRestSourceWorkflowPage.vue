@@ -250,7 +250,7 @@ import { settingsFacade } from '../../lib/api/facade'
 import type { OmsRestSourceConfigRecord } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
-import { OMS_SWAGGER_BASE_URL } from '../../lib/omsSwagger'
+import { OMS_BASE_URL_PLACEHOLDER } from '../../lib/omsSwagger'
 import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 import { CONFIG_ID_MAX_LENGTH, deriveConfigIdFromName, exceedsConfigIdMaxLength } from './configId'
@@ -344,7 +344,7 @@ const isBearerAuth = computed(() => form.authType === 'BEARER')
 const isApiKeyAuth = computed(() => form.authType === 'API_KEY')
 const isApiTokenAuth = computed(() => isBearerAuth.value || isApiKeyAuth.value)
 const apiTokenLabel = computed(() => (isApiKeyAuth.value ? 'API Key' : 'API Token'))
-const omsBaseUrlPlaceholder = OMS_SWAGGER_BASE_URL
+const omsBaseUrlPlaceholder = OMS_BASE_URL_PLACEHOLDER
 const createSteps = computed<OmsCreateStep[]>(() => {
   const steps: OmsCreateStep[] = [
     { id: 'baseUrl', title: 'What HotWax base URL should Darpan use?', kind: 'text' },
