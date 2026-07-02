@@ -32,6 +32,9 @@ export default [
       }
     },
     rules: {
+      // Hardening: keep the codebase explicitly typed and zero-TODO.
+      '@typescript-eslint/no-explicit-any': 'error',
+      'no-warning-comments': ['error', { terms: ['todo', 'fixme', 'hack'] }],
       'vue/multi-word-component-names': 'off',
       'vue/max-attributes-per-line': 'off',
       'vue/singleline-html-element-content-newline': 'off',
