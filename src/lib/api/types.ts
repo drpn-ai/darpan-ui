@@ -124,9 +124,7 @@ export interface LlmSettingsResponse extends ApiEnvelope {
   llmSettings?: LlmSettings
 }
 
-export interface SaveLlmSettingsResponse extends ApiEnvelope {
-  llmSettings?: LlmSettings
-}
+export type SaveLlmSettingsResponse = Schemas['SaveLlmSettingsResult']
 
 export interface TenantSettings {
   companyUserGroupId?: string | null
@@ -177,9 +175,7 @@ export interface SftpServerRecord {
   hasPrivateKey: boolean
 }
 
-export interface SaveSftpServerResponse extends ApiEnvelope {
-  savedServer?: SftpServerRecord
-}
+export type SaveSftpServerResponse = Schemas['SaveSftpServerResult']
 
 export interface NsAuthConfigRecord {
   nsAuthConfigId: string
@@ -198,9 +194,7 @@ export interface NsAuthConfigRecord {
   hasPrivateKeyPem: boolean
 }
 
-export interface SaveNsAuthConfigResponse extends ApiEnvelope {
-  savedAuthConfig?: NsAuthConfigRecord
-}
+export type SaveNsAuthConfigResponse = Schemas['SaveNsAuthConfigResult']
 
 export interface NsRestletConfigRecord {
   nsRestletConfigId: string
@@ -219,9 +213,7 @@ export interface NsRestletConfigRecord {
   isActive: string
 }
 
-export interface SaveNsRestletConfigResponse extends ApiEnvelope {
-  savedRestletConfig?: NsRestletConfigRecord
-}
+export type SaveNsRestletConfigResponse = Schemas['SaveNsRestletConfigResult']
 
 export interface ShopifyAuthConfigRecord {
   shopifyAuthConfigId: string
@@ -237,14 +229,9 @@ export interface ShopifyAuthConfigRecord {
   hasAccessToken: boolean
 }
 
-export interface SaveShopifyAuthConfigResponse extends ApiEnvelope {
-  savedShopifyAuthConfig?: ShopifyAuthConfigRecord
-}
+export type SaveShopifyAuthConfigResponse = Schemas['SaveShopifyAuthConfigResult']
 
-export interface DeleteShopifyAuthConfigResponse extends ApiEnvelope {
-  deleted?: boolean
-  deletedShopifyAuthConfigId?: string
-}
+export type DeleteShopifyAuthConfigResponse = Schemas['DeleteShopifyAuthConfigResult']
 
 export interface GetShopifyAuthConfigResponse extends ApiEnvelope {
   shopifyAuthConfig?: ShopifyAuthConfigRecord | null
@@ -275,10 +262,7 @@ export interface SaveOmsRestSourceConfigResponse extends ApiEnvelope {
   savedOmsRestSourceConfig?: OmsRestSourceConfigRecord
 }
 
-export interface DeleteOmsRestSourceConfigResponse extends ApiEnvelope {
-  deleted?: boolean
-  deletedOmsRestSourceConfigId?: string
-}
+export type DeleteOmsRestSourceConfigResponse = Schemas['DeleteHotWaxOmsRestSourceConfigResult']
 
 export interface PaginatedResponse extends ApiEnvelope {
   pagination: PaginationMeta
@@ -634,10 +618,7 @@ export interface ListOmsRestSourceConfigsResponse extends PaginatedResponse {
   omsRestSourceConfigs: OmsRestSourceConfigRecord[]
 }
 
-export interface ListMappingsResponse extends PaginatedResponse {
-  pinnedReconciliationMappingIds?: string[]
-  mappings: MappingSummary[]
-}
+export type ListMappingsResponse = Schemas['ListMappingsResult']
 
 export interface ListSavedRunsResponse extends PaginatedResponse {
   pinnedSavedRunIds?: string[]
@@ -652,16 +633,9 @@ export interface GetAutomationResponse extends ApiEnvelope {
   automation?: AutomationRecord | null
 }
 
-export interface SaveAutomationResponse extends ApiEnvelope {
-  automation?: AutomationRecord | null
-}
+export type SaveAutomationResponse = Schemas['SaveAutomationResult']
 
-export interface DeleteAutomationResponse extends ApiEnvelope {
-  deleted?: boolean
-  deletedAutomationId?: string
-  deletedSourceCount?: number
-  deletedExecutionCount?: number
-}
+export type DeleteAutomationResponse = Schemas['DeleteAutomationResult']
 
 export interface RunAutomationNowResponse extends ApiEnvelope {
   automation?: AutomationRecord | null
@@ -685,28 +659,15 @@ export interface ListAutomationSourceOptionsResponse extends ApiEnvelope {
   systemRemotes: AutomationSystemRemoteOption[]
 }
 
-export interface SaveDashboardPinnedMappingsResponse extends ApiEnvelope {
-  pinnedReconciliationMappingIds?: string[]
-}
+export type SaveDashboardPinnedMappingsResponse = Schemas['SaveDashboardPinnedMappingsResult']
 
 export interface SaveDashboardPinnedSavedRunsResponse extends ApiEnvelope {
   pinnedSavedRunIds?: string[]
 }
 
-export interface SaveSavedRunNameResponse extends ApiEnvelope {
-  savedRun?: SavedRunSummary
-}
+export type SaveSavedRunNameResponse = Schemas['SaveSavedRunNameResult']
 
-export interface DeleteSavedRunResponse extends ApiEnvelope {
-  deleted?: boolean
-  deletedSavedRunId?: string
-  deletedRunType?: string
-  deletedGeneratedOutputCount?: number
-  deletedRuleCount?: number
-  deletedCompareScopeCount?: number
-  deletedCompareSourceCount?: number
-  deletedMappingMemberCount?: number
-}
+export type DeleteSavedRunResponse = Schemas['DeleteSavedRunResult']
 
 export interface RunSavedRunDiffResponse extends ApiEnvelope {
   validationErrors?: string[]
@@ -714,37 +675,25 @@ export interface RunSavedRunDiffResponse extends ApiEnvelope {
   runResult?: RunSavedRunDiffResult
 }
 
-export interface CreateMappingResponse extends ApiEnvelope {
-  savedMapping?: SavedMapping
-}
+export type CreateMappingResponse = Schemas['CreateMappingResult']
 
 export interface CreateRuleSetRunResponse extends ApiEnvelope {
   savedRun?: SavedRunSummary
 }
 
-export interface SaveRuleSetRunResponse extends ApiEnvelope {
-  savedRun?: SavedRunSummary
-}
+export type SaveRuleSetRunResponse = Schemas['SaveRuleSetRunResult']
 
-export interface CreateCsvRunResponse extends ApiEnvelope {
-  savedRun?: SavedRunSummary
-}
+export type CreateCsvRunResponse = Schemas['CreateCsvRunResult']
 
-export interface GetMappingResponse extends ApiEnvelope {
-  mapping?: MappingDetail
-}
+export type GetMappingResponse = Schemas['GetMappingResult']
 
-export interface SaveMappingResponse extends ApiEnvelope {
-  savedMapping?: SavedMapping
-}
+export type SaveMappingResponse = Schemas['SaveMappingResult']
 
 export interface ListGeneratedOutputsResponse extends PaginatedResponse {
   generatedOutputs: GeneratedOutput[]
 }
 
-export interface GetGeneratedOutputResponse extends ApiEnvelope {
-  outputFile?: GetGeneratedOutputFile
-}
+export type GetGeneratedOutputResponse = Schemas['GetGeneratedOutputResult']
 
 export interface GeneratedOutputDifferencesMetadata {
   file1Label?: string
@@ -808,11 +757,7 @@ export interface GetGeneratedOutputDifferencesResponse extends ApiEnvelope {
   outputFile?: GeneratedOutputDifferencesFile
 }
 
-export interface DeleteGeneratedOutputResponse extends ApiEnvelope {
-  deleted?: boolean
-  deletedFileName?: string
-  statusMessage?: string
-}
+export type DeleteGeneratedOutputResponse = Schemas['DeleteGeneratedOutputResult']
 
 export interface JsonSchemaSummary {
   jsonSchemaId: string
@@ -836,9 +781,7 @@ export interface ListJsonSchemasResponse extends ApiEnvelope {
   schemas: JsonSchemaSummary[]
 }
 
-export interface SaveJsonSchemaTextResponse extends ApiEnvelope {
-  savedSchema?: JsonSchemaSummary
-}
+export type SaveJsonSchemaTextResponse = Schemas['SaveJsonSchemaTextResult']
 
 export interface GetJsonSchemaResponse extends ApiEnvelope {
   schemaData?: JsonSchemaData
@@ -849,28 +792,16 @@ export interface InferJsonSchemaResponse extends ApiEnvelope {
   fieldList?: JsonSchemaField[]
 }
 
-export interface ValidateJsonResponse extends ApiEnvelope {
-  valid?: boolean
-  errorCount?: number
-  errorMessages?: string[]
-}
+export type ValidateJsonResponse = Schemas['ValidateJsonTextAgainstSchemaResult']
 
 export interface FlattenJsonSchemaResponse extends ApiEnvelope {
   jsonSchemaString?: string
   fieldList?: JsonSchemaField[]
 }
 
-export interface SaveRefinedSchemaResponse extends ApiEnvelope {
-  savedSchema?: {
-    jsonSchemaId: string
-    schemaName: string
-    filename?: string
-  }
-}
+export type SaveRefinedSchemaResponse = Schemas['SaveRefinedSchemaResult']
 
-export interface DeleteJsonSchemaResponse extends ApiEnvelope {
-  deleted?: boolean
-}
+export type DeleteJsonSchemaResponse = Schemas['DeleteJsonSchemaResult']
 
 export interface JsonSchemaField {
   fieldPath: string

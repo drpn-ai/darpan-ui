@@ -754,10 +754,10 @@ async function load(): Promise<void> {
     }
 
     form.mappingName = mapping.mappingName ?? ''
-    form.source1.schemaId = mapping.members[0]?.jsonSchemaId ?? ''
-    form.source1.fieldPath = mapping.members[0]?.fieldPath ?? ''
-    form.source2.schemaId = mapping.members[1]?.jsonSchemaId ?? ''
-    form.source2.fieldPath = mapping.members[1]?.fieldPath ?? ''
+    form.source1.schemaId = mapping.members?.[0]?.jsonSchemaId ?? ''
+    form.source1.fieldPath = mapping.members?.[0]?.fieldPath ?? ''
+    form.source2.schemaId = mapping.members?.[1]?.jsonSchemaId ?? ''
+    form.source2.fieldPath = mapping.members?.[1]?.fieldPath ?? ''
 
     await Promise.all([
       syncFieldOptions('source1', signal),
