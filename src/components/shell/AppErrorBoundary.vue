@@ -7,7 +7,7 @@
 import { ref, onErrorCaptured } from 'vue'
 import ErrorState from '../ui/ErrorState.vue'
 import { errorVariants } from '../ui/errorVariants'
-import { reportError } from '../../lib/errors/reportError'
+import { reportError } from '../../lib/observability/report'
 
 const failed = ref(false)
 const serverProps = errorVariants.serverError(() => { window.location.reload() })

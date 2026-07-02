@@ -7,6 +7,8 @@ declare global {
     readonly VITE_DARPAN_LINEAR_ROADMAP_URL?: string
     readonly VITE_DARPAN_LINEAR_REQUEST_URL?: string
     readonly VITE_DARPAN_LINEAR_EMBED_ENABLED?: string
+    /** Optional build version stamped into error reports (see lib/observability/report.ts). */
+    readonly VITE_APP_VERSION?: string
   }
 
   interface ImportMeta {

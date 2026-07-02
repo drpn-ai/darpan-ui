@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h, nextTick } from 'vue'
 import AppErrorBoundary from '../AppErrorBoundary.vue'
-import * as report from '../../../lib/errors/reportError'
+import * as report from '../../../lib/observability/report'
 
 const Boom = defineComponent({ setup: () => () => { throw new Error('render boom') } })
 const Ok = defineComponent({ setup: () => () => h('div', { class: 'ok' }, 'fine') })
