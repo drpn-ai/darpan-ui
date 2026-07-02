@@ -60,6 +60,15 @@ export default defineConfig(({ mode }) => {
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html'],
+        // Ratchet floor, not a target: actuals on 2026-07-02 were lines/statements 90.66%,
+        // functions 82.8%, branches 73.8%. Set ~2 points below actuals so `npm run test`
+        // fails on a material coverage drop. Raise these as real coverage rises.
+        thresholds: {
+          lines: 88.5,
+          statements: 88.5,
+          functions: 80.5,
+          branches: 71.5,
+        },
       },
     },
   }
