@@ -385,7 +385,6 @@ async function submitPasswordChange(): Promise<void> {
 async function switchTenant(nextTenantUserGroupId: string): Promise<void> {
   if (isSwitchingTenant.value || !nextTenantUserGroupId || nextTenantUserGroupId === activeTenantUserGroupId.value) return
   isSwitchingTenant.value = true
-  tenantMessage.value = 'Switching tenant'
   try {
     const saved = await authStore.saveActiveTenant(nextTenantUserGroupId)
     tenantMessage.value = saved ? null : 'Unable to switch tenant.'
