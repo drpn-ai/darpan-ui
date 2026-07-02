@@ -1,3 +1,5 @@
+import type { Schemas } from './generated'
+
 export interface ApiEnvelope {
   ok: boolean
   messages: string[]
@@ -96,10 +98,11 @@ export interface LoginSessionResponse extends ApiEnvelope, AuthTokenContract {
   sessionInfo?: SessionInfo | null
 }
 
-export interface LogoutSessionResponse extends ApiEnvelope {
-  authenticated: boolean
-  authTokenRevoked?: boolean
-}
+// Migration template (MACH P1): sourced from the generated OpenAPI contract types
+// instead of a hand-written interface. Same exported name, so consumers are
+// unchanged; note every generated field is optional (the contract declares no
+// `required` fields on Result schemas). Retire other interfaces here the same way.
+export type LogoutSessionResponse = Schemas['LogoutSessionResult']
 
 export interface ListEnumOptionsResponse extends ApiEnvelope {
   options: EnumOption[]
