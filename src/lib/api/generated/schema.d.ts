@@ -89,7 +89,7 @@ export interface components {
                     userGroupId?: string;
                     label?: string;
                 }[];
-                activeTenantPermissionGroupIds?: unknown[];
+                activeTenantPermissionGroupIds?: string[];
                 canViewActiveTenantData?: boolean;
                 canRunActiveTenantReconciliation?: boolean;
                 canEditActiveTenantData?: boolean;
@@ -152,7 +152,7 @@ export interface components {
                     userGroupId?: string;
                     label?: string;
                 }[];
-                activeTenantPermissionGroupIds?: unknown[];
+                activeTenantPermissionGroupIds?: string[];
                 canViewActiveTenantData?: boolean;
                 canRunActiveTenantReconciliation?: boolean;
                 canEditActiveTenantData?: boolean;
@@ -228,7 +228,7 @@ export interface components {
                     userGroupId?: string;
                     label?: string;
                 }[];
-                activeTenantPermissionGroupIds?: unknown[];
+                activeTenantPermissionGroupIds?: string[];
                 canViewActiveTenantData?: boolean;
                 canRunActiveTenantReconciliation?: boolean;
                 canEditActiveTenantData?: boolean;
@@ -357,7 +357,7 @@ export interface components {
                     userGroupId?: string;
                     label?: string;
                 }[];
-                activeTenantPermissionGroupIds?: unknown[];
+                activeTenantPermissionGroupIds?: string[];
                 canViewActiveTenantData?: boolean;
                 canRunActiveTenantReconciliation?: boolean;
                 canEditActiveTenantData?: boolean;
@@ -423,7 +423,7 @@ export interface components {
                     userGroupId?: string;
                     label?: string;
                 }[];
-                activeTenantPermissionGroupIds?: unknown[];
+                activeTenantPermissionGroupIds?: string[];
                 canViewActiveTenantData?: boolean;
                 canRunActiveTenantReconciliation?: boolean;
                 canEditActiveTenantData?: boolean;
@@ -491,7 +491,7 @@ export interface components {
                     userGroupId?: string;
                     label?: string;
                 }[];
-                activeTenantPermissionGroupIds?: unknown[];
+                activeTenantPermissionGroupIds?: string[];
                 canViewActiveTenantData?: boolean;
                 canRunActiveTenantReconciliation?: boolean;
                 canEditActiveTenantData?: boolean;
@@ -668,7 +668,7 @@ export interface components {
             messages?: string[];
             errors?: string[];
             jsonSchemaString?: string;
-            fieldList?: unknown[];
+            fieldList?: string[];
         };
         /** @description JSON-RPC request envelope for facade.JsonSchemaFacadeServices.flatten#JsonSchema */
         FlattenJsonSchemaRequest: {
@@ -743,7 +743,7 @@ export interface components {
             messages?: string[];
             errors?: string[];
             jsonSchemaString?: string;
-            fieldList?: unknown[];
+            fieldList?: string[];
         };
         /** @description JSON-RPC request envelope for facade.JsonSchemaFacadeServices.infer#JsonSchemaFromText */
         InferJsonSchemaFromTextRequest: {
@@ -916,7 +916,7 @@ export interface components {
             errors?: string[];
             valid?: boolean;
             errorCount?: number;
-            errorMessages?: unknown[];
+            errorMessages?: string[];
         };
         /** @description JSON-RPC request envelope for facade.JsonSchemaFacadeServices.validate#JsonTextAgainstSchema */
         ValidateJsonTextAgainstSchemaRequest: {
@@ -1497,11 +1497,41 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            inputModes?: unknown[];
-            sourceTypes?: unknown[];
-            relativeWindows?: unknown[];
-            fileTypes?: unknown[];
-            systems?: unknown[];
+            inputModes?: {
+                enumId?: string;
+                enumCode?: string;
+                description?: string;
+                sequenceNum?: number;
+                label?: string;
+            }[];
+            sourceTypes?: {
+                enumId?: string;
+                enumCode?: string;
+                description?: string;
+                sequenceNum?: number;
+                label?: string;
+            }[];
+            relativeWindows?: {
+                enumId?: string;
+                enumCode?: string;
+                description?: string;
+                sequenceNum?: number;
+                label?: string;
+            }[];
+            fileTypes?: {
+                enumId?: string;
+                enumCode?: string;
+                description?: string;
+                sequenceNum?: number;
+                label?: string;
+            }[];
+            systems?: {
+                enumId?: string;
+                enumCode?: string;
+                description?: string;
+                sequenceNum?: number;
+                label?: string;
+            }[];
             savedRuns?: unknown[];
             sftpServers?: unknown[];
             sourceConfigs?: unknown[];
@@ -1623,7 +1653,7 @@ export interface components {
                 fileName?: string;
                 reconciliationRunResultId?: string;
                 sourceFormat?: string;
-                availableFormats?: unknown[];
+                availableFormats?: string[];
                 preferredDownloadFormat?: string;
                 companyUserGroupId?: string;
                 savedRunId?: string;
@@ -1688,7 +1718,7 @@ export interface components {
                 totalCount?: number;
                 pageCount?: number;
             };
-            pinnedReconciliationMappingIds?: unknown[];
+            pinnedReconciliationMappingIds?: string[];
             mappings?: {
                 reconciliationMappingId?: string;
                 mappingName?: string;
@@ -1745,7 +1775,7 @@ export interface components {
                 totalCount?: number;
                 pageCount?: number;
             };
-            pinnedSavedRunIds?: unknown[];
+            pinnedSavedRunIds?: string[];
             savedRuns?: {
                 savedRunId?: string;
                 runName?: string;
@@ -1974,13 +2004,13 @@ export interface components {
                 file1SystemLabel?: string;
                 file2SystemEnumId?: string;
                 file2SystemLabel?: string;
-                validationErrors?: unknown[];
-                processingWarnings?: unknown[];
+                validationErrors?: string[];
+                processingWarnings?: string[];
                 generatedOutput?: {
                     fileName?: string;
                     reconciliationRunResultId?: string;
                     sourceFormat?: string;
-                    availableFormats?: unknown[];
+                    availableFormats?: string[];
                     preferredDownloadFormat?: string;
                     companyUserGroupId?: string;
                     reconciliationMappingId?: string;
@@ -2062,13 +2092,13 @@ export interface components {
                 file1SystemLabel?: string;
                 file2SystemEnumId?: string;
                 file2SystemLabel?: string;
-                validationErrors?: unknown[];
-                processingWarnings?: unknown[];
+                validationErrors?: string[];
+                processingWarnings?: string[];
                 generatedOutput?: {
                     fileName?: string;
                     reconciliationRunResultId?: string;
                     sourceFormat?: string;
-                    availableFormats?: unknown[];
+                    availableFormats?: string[];
                     preferredDownloadFormat?: string;
                     companyUserGroupId?: string;
                     savedRunId?: string;
@@ -2196,13 +2226,13 @@ export interface components {
         };
         /** @description Persist dashboard pinned reconciliation mappings for the authenticated user. */
         SaveDashboardPinnedMappingsParams: {
-            pinnedReconciliationMappingIds?: unknown[];
+            pinnedReconciliationMappingIds?: string[];
         };
         SaveDashboardPinnedMappingsResult: {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            pinnedReconciliationMappingIds?: unknown[];
+            pinnedReconciliationMappingIds?: string[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#DashboardPinnedMappings */
         SaveDashboardPinnedMappingsRequest: {
@@ -2225,13 +2255,13 @@ export interface components {
         };
         /** @description Persist dashboard pinned saved runs for the authenticated user. */
         SaveDashboardPinnedSavedRunsParams: {
-            pinnedSavedRunIds?: unknown[];
+            pinnedSavedRunIds?: string[];
         };
         SaveDashboardPinnedSavedRunsResult: {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            pinnedSavedRunIds?: unknown[];
+            pinnedSavedRunIds?: string[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#DashboardPinnedSavedRuns */
         SaveDashboardPinnedSavedRunsRequest: {
@@ -2471,7 +2501,7 @@ export interface components {
         /** @description Search authorized Darpan records and return normalized navigation targets for Ask Darpan. */
         SearchNavigationTargetsParams: {
             query?: string;
-            types?: unknown[];
+            types?: string[];
             pageIndex?: number;
             pageSize?: number;
         };
