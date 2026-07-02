@@ -318,18 +318,21 @@ import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
 import type {
   GeneratedOutput,
-  GeneratedOutputSourceDetails,
-  GeneratedOutputSourceFile,
-  GetGeneratedOutputFile,
-  GetGeneratedOutputDifferencesResponse,
-  GeneratedOutputDifferenceRow,
   GeneratedOutputDifferencesMetadata,
   GeneratedOutputDifferencesSummary,
-  GeneratedOutputDifferencesRuleOption,
 } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
-import { DEFAULT_LIST_PAGE_SIZE } from '../../lib/listPagination'
-import { fileNameFromPath, normalizeDisplayText, normalizeDisplayToken } from '../../lib/reconciliationDisplay'
+import { normalizeDisplayText } from '../../lib/reconciliationDisplay'
+import {
+  ALL_RULE_FILTER_KEY,
+  BASE_RULE_FILTER_KEY,
+  DIFF_BUCKET_ORDER,
+  DIFF_DETAILS_PAGE_SIZE,
+  isJsonCollapseValue,
+  type DiffBucketKey,
+  type DiffDetailsMetadata,
+  type DiffDetailsSummary,
+} from '../../lib/runResultDiffDetails'
 import {
   buildReconciliationDiffRoute,
   buildReconciliationRunHistoryRoute,
@@ -338,69 +341,11 @@ import {
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { listIconPath, playIconPath, playIconTransform } from '../../lib/iconPaths'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
-import { downloadTextFile } from '../../lib/utils/download'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-
-type DiffBucketKey = 'file-1' | 'file-2' | 'rule'
-
-interface DiffDetailsMetadata {
-  file1Label?: string
-  file2Label?: string
-  timestamp?: string
-  savedRunId?: string
-  savedRunName?: string
-  savedRunType?: string
-  reconciliationMappingId?: string
-  reconciliationMappingName?: string
-  ruleSetId?: string
-  compareScopeId?: string
-}
-
-interface DiffDetailsSummary {
-  totalDifferences?: number
-  onlyInFile1Count?: number
-  onlyInFile2Count?: number
-  missingObjectDifferenceCount?: number
-  ruleDifferenceCount?: number
-}
-
-interface DiffDetailsRecord {
-  diffType?: string
-  type?: string
-  id?: string | number
-  primaryId?: string | number
-  presentIn?: string
-  missingIn?: string
-  data?: unknown
-  field?: string
-  file1Value?: unknown
-  file2Value?: unknown
-  ruleId?: string
-  ruleName?: string
-  ruleLabel?: string
-  ruleDescription?: string
-  severity?: string
-  message?: string
-}
-
-interface NormalizedDiffDetailRow {
-  rowKey: string
-  recordId: string
-  bucket: DiffBucketKey
-  detailValue: unknown
-  detailText?: string
-  ruleFilterKey: string
-  ruleId: string
-  ruleLabel: string
-}
-
-interface RuleSelectorOption {
-  key: string
-  label: string
-  detail: string
-  count: number
-  bucketKeys: DiffBucketKey[]
-}
+import { useRunResultDifferences } from '../../composables/useRunResultDifferences'
+import { useRunResultDownloads } from '../../composables/useRunResultDownloads'
+import { useRunResultName } from '../../composables/useRunResultName'
+import { useRunResultSourceDetails } from '../../composables/useRunResultSourceDetails'
 
 interface DiffDetailBucketCard {
   key: string
@@ -409,18 +354,6 @@ interface DiffDetailBucketCard {
   testId: string
   bucketKey?: DiffBucketKey
 }
-
-interface RunSourceFileView {
-  key: string
-  label: string
-  fileName: string
-  filePath: string
-  sourceFormat: string
-  downloadFileName: string
-  canDownload: boolean
-}
-
-type DownloadableOutputFile = Omit<GetGeneratedOutputFile, 'contentText'>
 
 const diffDetailColumns = [
   {
@@ -451,39 +384,8 @@ const loadError = ref<string | null>(null)
 const openingRunSettings = ref(false)
 const runSettingsError = ref<string | null>(null)
 const savedOutput = ref<GeneratedOutput | null>(null)
-const downloadableOutputFile = ref<DownloadableOutputFile | null>(null)
-const runSourceDetails = ref<GeneratedOutputSourceDetails | null>(null)
-const sourceDownloadError = ref<string | null>(null)
-const downloadingSourceFilePath = ref('')
-const resultDownloadError = ref<string | null>(null)
-const downloadingSavedResult = ref(false)
-const editableRunName = ref('')
-const persistedRunName = ref('')
-const savingRunName = ref(false)
 const diffDetailsMeta = ref<DiffDetailsMetadata>({})
 const diffDetailsSummary = ref<DiffDetailsSummary>({})
-// diffDetailRows now holds ONLY the current server-returned page; whole-document totals + facets come
-// from the paginated service so the browser never loads/parses the entire diff file (audit #21).
-const diffDetailRows = ref<NormalizedDiffDetailRow[]>([])
-const selectedDiffBuckets = ref<DiffBucketKey[]>(['file-1', 'file-2', 'rule'])
-const selectedRuleFilterKey = ref('all')
-const ruleSelectorCollapsed = ref(false)
-const diffDetailsSearch = ref('')
-const diffTotalCount = ref(0)
-const diffFilteredCount = ref(0)
-const serverBucketCounts = ref<Record<DiffBucketKey, number>>(createEmptyDiffBucketCounts())
-const serverRuleOptions = ref<RuleSelectorOption[]>([])
-const diffPageIndex = ref(0)
-const diffPageCount = ref(1)
-const diffControlsReady = ref(false)
-const differencesLoading = ref(false)
-
-const DIFF_DETAILS_PAGE_SIZE = DEFAULT_LIST_PAGE_SIZE
-const DIFF_BUCKET_ORDER: DiffBucketKey[] = ['file-1', 'file-2', 'rule']
-const ALL_RULE_FILTER_KEY = 'all'
-const BASE_RULE_FILTER_KEY = 'base-diff'
-const normalizeDiffLabel = normalizeDisplayText
-const normalizeDiffToken = normalizeDisplayToken
 
 const savedRunId = computed(() =>
   typeof route.params.savedRunId === 'string' ? route.params.savedRunId.trim() : '',
@@ -496,6 +398,22 @@ const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunA
 const settingsIconPath =
   'M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 0 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3 14H2.7a2 2 0 0 1 0-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6v-.3a2 2 0 0 1 4 0V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1A1.7 1.7 0 0 0 21 10h.3a2 2 0 0 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z'
 const routeRunName = computed(() => (typeof route.query.runName === 'string' && route.query.runName.trim() ? route.query.runName.trim() : 'Selected Run'))
+
+const {
+  editableRunName,
+  persistedRunName,
+  savingRunName,
+  saveRunName,
+  resetRunNameState,
+} = useRunResultName({
+  savedRunId,
+  fallbackRunName: routeRunName,
+  canEditTenantSettings,
+  setLoadError: (message) => {
+    loadError.value = message
+  },
+})
+
 const runName = computed(() => editableRunName.value || routeRunName.value)
 const file1SystemLabel = computed(() =>
   typeof route.query.file1SystemLabel === 'string' && route.query.file1SystemLabel.trim() ? route.query.file1SystemLabel.trim() : 'System 1',
@@ -505,6 +423,12 @@ const file2SystemLabel = computed(() =>
 )
 const heroDescription = computed(() =>
   savedOutput.value?.createdDate ? formatSavedResultDateTime(savedOutput.value.createdDate) : 'Review the saved reconciliation output for this run.',
+)
+const diffDetailsFile1Label = computed(
+  () => diffDetailsMeta.value.file1Label || savedOutput.value?.file1Label || file1SystemLabel.value || 'File 1',
+)
+const diffDetailsFile2Label = computed(
+  () => diffDetailsMeta.value.file2Label || savedOutput.value?.file2Label || file2SystemLabel.value || 'File 2',
 )
 const reconciliationRunRouteContext = computed<ReconciliationRunRouteContext>(() => ({
   savedRunId: savedRunId.value,
@@ -525,31 +449,66 @@ const runSettingsId = computed(() =>
   savedRunId.value,
 )
 const canOpenRunSettings = computed(() => canEditTenantSettings.value && Boolean(runSettingsId.value))
-const diffDetailsFile1Label = computed(
-  () => diffDetailsMeta.value.file1Label || savedOutput.value?.file1Label || file1SystemLabel.value || 'File 1',
-)
-const diffDetailsFile2Label = computed(
-  () => diffDetailsMeta.value.file2Label || savedOutput.value?.file2Label || file2SystemLabel.value || 'File 2',
-)
-const runSourceFiles = computed<RunSourceFileView[]>(() =>
-  (runSourceDetails.value?.files ?? [])
-    .map((sourceFile, index) => normalizeRunSourceFile(sourceFile, index))
-    .filter((sourceFile): sourceFile is RunSourceFileView => sourceFile !== null),
-)
-const isApiRunSource = computed(() => {
-  const mode = normalizeDiffToken(runSourceDetails.value?.mode)
-  return mode.includes('api') || Boolean(runSourceDetails.value?.dateRange?.start || runSourceDetails.value?.dateRange?.end)
+
+const {
+  runSourceDetails,
+  runSourceFiles,
+  isApiRunSource,
+  runSourceModeLabel,
+  runSourceDateRangeLabel,
+  runSourceFilesLabel,
+  showRunSourceDetails,
+  resetRunSourceDetails,
+} = useRunResultSourceDetails({
+  file1Label: diffDetailsFile1Label,
+  file2Label: diffDetailsFile2Label,
 })
-const runSourceModeLabel = computed(() => isApiRunSource.value ? 'API date range' : 'Source files')
-const runSourceDateRangeLabel = computed(() => formatRunSourceDateRange(runSourceDetails.value?.dateRange?.start, runSourceDetails.value?.dateRange?.end))
-const runSourceFilesLabel = computed(() => isApiRunSource.value ? 'Files compared' : 'Source files')
-const showRunSourceDetails = computed(() =>
-  runSourceFiles.value.length > 0 || Boolean(runSourceDateRangeLabel.value),
-)
-const activeDiffBuckets = computed<DiffBucketKey[]>(() =>
-  DIFF_BUCKET_ORDER.filter((bucket) => selectedDiffBuckets.value.includes(bucket)),
-)
-const diffDetailBucketCounts = computed<Record<DiffBucketKey, number>>(() => serverBucketCounts.value)
+
+const {
+  downloadableOutputFile,
+  sourceDownloadError,
+  downloadingSourceFilePath,
+  resultDownloadError,
+  downloadingSavedResult,
+  downloadRunSourceFile,
+  downloadSavedResult,
+  resetDownloadState,
+} = useRunResultDownloads({ outputFileName })
+
+const {
+  diffDetailRows,
+  selectedRuleFilterKey,
+  ruleSelectorCollapsed,
+  diffDetailsSearch,
+  diffTotalCount,
+  diffFilteredCount,
+  diffPageIndex,
+  diffPageCount,
+  diffControlsReady,
+  differencesLoading,
+  activeDiffBuckets,
+  diffDetailBucketCounts,
+  ruleSelectorOptions,
+  selectedRuleSelectorOption,
+  ruleSelectorAllDetail,
+  showRuleSelector,
+  showDiffDetailsToolbar,
+  diffDetailsEmptyMessage,
+  pagedDiffDetailRowsAsRows,
+  applyDifferencesResponse,
+  resetDifferencesState,
+  goToDiffDetailsPage,
+  clearDiffDetailsSearch,
+  toggleDiffBucket,
+  toggleRuleSelectorCollapsed,
+  selectRuleFilter,
+} = useRunResultDifferences({
+  outputFileName,
+  onLoadError: (message) => {
+    loadError.value = message
+  },
+})
+
 const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
   const ruleDifferenceCount =
     diffDetailsSummary.value.ruleDifferenceCount ??
@@ -585,10 +544,6 @@ const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
       : []),
   ]
 })
-const ruleSelectorOptions = computed<RuleSelectorOption[]>(() => serverRuleOptions.value)
-const selectedRuleSelectorOption = computed(() =>
-  ruleSelectorOptions.value.find((option) => option.key === selectedRuleFilterKey.value),
-)
 const diffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
   if (selectedRuleFilterKey.value === ALL_RULE_FILTER_KEY) return overviewDiffDetailBuckets.value
 
@@ -607,41 +562,6 @@ const diffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
     },
   ]
 })
-const showRuleSelector = computed(() =>
-  ruleSelectorOptions.value.length > 1 || ruleSelectorOptions.value.some((option) => option.key !== BASE_RULE_FILTER_KEY),
-)
-const ruleSelectorAllDetail = computed(() =>
-  `${diffTotalCount.value} ${diffTotalCount.value === 1 ? 'difference' : 'differences'}`,
-)
-// Active-bucket total comes from whole-document facets (the server's bucketCounts), not the loaded page.
-const activeBucketDiffCount = computed(() =>
-  activeDiffBuckets.value.reduce((total, bucket) => total + (serverBucketCounts.value[bucket] ?? 0), 0),
-)
-const showDiffDetailsToolbar = computed(
-  () => diffFilteredCount.value > 0 || diffDetailsSearch.value.trim().length > 0,
-)
-const diffDetailsEmptyMessage = computed(() => {
-  if (diffDetailsSearch.value.trim().length > 0) {
-    return 'No records match the current diff detail filters.'
-  }
-  if (activeDiffBuckets.value.length === 0 && diffTotalCount.value > 0) {
-    return 'Select a diff bucket to view matching records.'
-  }
-  if (activeBucketDiffCount.value === 0 && diffTotalCount.value > 0) {
-    return 'No records are available in the selected diff bucket.'
-  }
-  if (diffFilteredCount.value === 0 && selectedRuleFilterKey.value !== ALL_RULE_FILTER_KEY) {
-    return 'No records are available for the selected rule.'
-  }
-  return 'No diff detail records are available.'
-})
-// diffDetailRows already holds the current server page; map it straight to table rows.
-const pagedDiffDetailRowsAsRows = computed(() =>
-  diffDetailRows.value.map((row) => ({
-    ...row,
-    detailText: isJsonCollapseValue(row.detailValue) ? '' : stringifyDiffJson(row.detailValue),
-  })) as Array<Record<string, unknown>>,
-)
 
 async function openRunSettings(): Promise<void> {
   const targetId = runSettingsId.value
@@ -671,224 +591,14 @@ async function openRunSettings(): Promise<void> {
   }
 }
 
-function createEmptyDiffBucketCounts(): Record<DiffBucketKey, number> {
-  return {
-    'file-1': 0,
-    'file-2': 0,
-    rule: 0,
-  }
-}
-
-function normalizeRunSourceFile(sourceFile: GeneratedOutputSourceFile, index: number): RunSourceFileView | null {
-  const filePath = normalizeDiffLabel(sourceFile.filePath)
-  const fileName =
-    normalizeDiffLabel(sourceFile.fileName) ||
-    normalizeDiffLabel(sourceFile.downloadFileName) ||
-    fileNameFromPath(filePath)
-  if (!fileName && !filePath) return null
-
-  const label = normalizeDiffLabel(sourceFile.label) || (index === 0 ? diffDetailsFile1Label.value : diffDetailsFile2Label.value)
-  const sourceFormat = normalizeDiffLabel(sourceFile.sourceFormat) || fileNameFromPath(fileName).split('.').pop()?.toLowerCase() || 'json'
-  return {
-    key: `${sourceFile.side || index}-${filePath || fileName}`,
-    label,
-    fileName: fileName || filePath,
-    filePath,
-    sourceFormat,
-    downloadFileName: normalizeDiffLabel(sourceFile.downloadFileName) || fileName || filePath,
-    canDownload: sourceFile.canDownload !== false && Boolean(filePath),
-  }
-}
-
-function formatRunSourceDate(value: string | undefined): string {
-  const normalizedValue = normalizeDiffLabel(value)
-  const dateMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (!dateMatch) return normalizedValue
-
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const monthIndex = Number(dateMatch[2]) - 1
-  const monthName = monthNames[monthIndex] ?? dateMatch[2]
-  return `${monthName} ${Number(dateMatch[3])}, ${dateMatch[1]}`
-}
-
-function formatRunSourceDateRange(start: string | undefined, end: string | undefined): string {
-  const formattedStart = formatRunSourceDate(start)
-  const formattedEnd = formatRunSourceDate(end)
-  if (formattedStart && formattedEnd && formattedStart !== formattedEnd) return `${formattedStart} to ${formattedEnd}`
-  return formattedStart || formattedEnd
-}
-
-function normalizeDiffBucketSelection(buckets: DiffBucketKey[]): DiffBucketKey[] {
-  return DIFF_BUCKET_ORDER.filter((bucket) => buckets.includes(bucket))
-}
-
 function resetDiffDetailsState(): void {
   savedOutput.value = null
-  downloadableOutputFile.value = null
-  runSourceDetails.value = null
-  sourceDownloadError.value = null
-  downloadingSourceFilePath.value = ''
-  resultDownloadError.value = null
-  downloadingSavedResult.value = false
-  editableRunName.value = routeRunName.value
-  persistedRunName.value = routeRunName.value
-  savingRunName.value = false
+  resetRunSourceDetails()
+  resetDownloadState()
+  resetRunNameState()
   diffDetailsMeta.value = {}
   diffDetailsSummary.value = {}
-  diffDetailRows.value = []
-  selectedDiffBuckets.value = [...DIFF_BUCKET_ORDER]
-  selectedRuleFilterKey.value = ALL_RULE_FILTER_KEY
-  ruleSelectorCollapsed.value = false
-  diffDetailsSearch.value = ''
-  diffTotalCount.value = 0
-  diffFilteredCount.value = 0
-  serverBucketCounts.value = createEmptyDiffBucketCounts()
-  serverRuleOptions.value = []
-  diffPageIndex.value = 0
-  diffPageCount.value = 1
-  diffControlsReady.value = false
-  differencesLoading.value = false
-}
-
-async function saveRunName(nextRunName: string): Promise<void> {
-  const normalizedRunName = nextRunName.trim()
-  const previousRunName = persistedRunName.value || routeRunName.value
-  if (!canEditTenantSettings.value) {
-    editableRunName.value = previousRunName
-    return
-  }
-  if (!savedRunId.value) return
-  if (!normalizedRunName) {
-    editableRunName.value = previousRunName
-    return
-  }
-  if (normalizedRunName === previousRunName || savingRunName.value) return
-
-  savingRunName.value = true
-  loadError.value = null
-
-  try {
-    const response = await reconciliationFacade.saveSavedRunName({
-      savedRunId: savedRunId.value,
-      runName: normalizedRunName,
-    })
-    const savedRunName = response.savedRun?.runName || normalizedRunName
-    editableRunName.value = savedRunName
-    persistedRunName.value = savedRunName
-  } catch (error) {
-    editableRunName.value = previousRunName
-    loadError.value = error instanceof ApiCallError ? error.message : 'Unable to save run name.'
-  } finally {
-    savingRunName.value = false
-  }
-}
-
-function stringifyDiffJson(value: unknown): string {
-  if (value == null) return ''
-
-  if (typeof value === 'string') {
-    try {
-      return JSON.stringify(JSON.parse(value), null, 2)
-    } catch {
-      return value
-    }
-  }
-
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
-}
-
-function isJsonCollapseValue(value: unknown): boolean {
-  return value !== null && typeof value === 'object'
-}
-
-function resolveDiffType(record: DiffDetailsRecord): string {
-  return normalizeDiffLabel(record.diffType || record.type)
-}
-
-function parseDiffData(rawData: unknown): unknown {
-  if (typeof rawData !== 'string') return rawData
-
-  try {
-    return JSON.parse(rawData)
-  } catch {
-    return rawData
-  }
-}
-
-function buildDiffDetailPayload(record: DiffDetailsRecord, parsedData: unknown): unknown {
-  if (parsedData != null && !(typeof parsedData === 'string' && !parsedData.trim())) {
-    return parsedData
-  }
-
-  const diffDetail = {
-    diffType: resolveDiffType(record) || undefined,
-    primaryId:
-      record.primaryId != null && String(record.primaryId).trim() ? String(record.primaryId).trim() : undefined,
-    field: normalizeDiffLabel(record.field) || undefined,
-    file1Value: record.file1Value,
-    file2Value: record.file2Value,
-    severity: normalizeDiffLabel(record.severity) || undefined,
-    ruleId: normalizeDiffLabel(record.ruleId) || undefined,
-    message: normalizeDiffLabel(record.message) || undefined,
-  }
-
-  const normalizedDetail = Object.fromEntries(Object.entries(diffDetail).filter(([, value]) => value != null))
-  return Object.keys(normalizedDetail).length > 0 ? normalizedDetail : null
-}
-
-// The server already classified each page row (bucket / rule descriptor / record id); the client only
-// rebuilds the presentational detail payload it renders. See backend DiffDetailClassifier (audit #21).
-function buildPageRow(serverRow: GeneratedOutputDifferenceRow): NormalizedDiffDetailRow {
-  const record = (serverRow.record ?? {}) as DiffDetailsRecord
-  const parsedData = parseDiffData((record as Record<string, unknown>).data)
-  return {
-    rowKey: serverRow.rowKey,
-    recordId: serverRow.recordId,
-    bucket: serverRow.bucket as DiffBucketKey,
-    detailValue: buildDiffDetailPayload(record, parsedData),
-    ruleFilterKey: serverRow.ruleFilterKey,
-    ruleId: serverRow.ruleId,
-    ruleLabel: serverRow.ruleLabel,
-  }
-}
-
-function normalizeServerBucketCounts(raw: Record<string, number> | undefined): Record<DiffBucketKey, number> {
-  const counts = createEmptyDiffBucketCounts()
-  if (raw) {
-    DIFF_BUCKET_ORDER.forEach((bucket) => {
-      const value = Number(raw[bucket])
-      counts[bucket] = Number.isFinite(value) ? value : 0
-    })
-  }
-  return counts
-}
-
-function normalizeServerRuleOption(option: GeneratedOutputDifferencesRuleOption): RuleSelectorOption {
-  return {
-    key: option.key,
-    label: option.label,
-    detail: option.detail,
-    count: option.count,
-    bucketKeys: (option.bucketKeys ?? []).filter((bucket): bucket is DiffBucketKey =>
-      DIFF_BUCKET_ORDER.includes(bucket as DiffBucketKey),
-    ),
-  }
-}
-
-function applyDifferencesResponse(response: GetGeneratedOutputDifferencesResponse, includeFacets: boolean): void {
-  diffDetailRows.value = (response.differences ?? []).map(buildPageRow)
-  diffPageIndex.value = response.pageIndex ?? 0
-  diffPageCount.value = response.pageCount ?? 1
-  diffFilteredCount.value = response.totalFiltered ?? 0
-  diffTotalCount.value = response.totalDifferences ?? 0
-  if (includeFacets) {
-    serverBucketCounts.value = normalizeServerBucketCounts(response.bucketCounts)
-    serverRuleOptions.value = (response.ruleOptions ?? []).map(normalizeServerRuleOption)
-  }
+  resetDifferencesState()
 }
 
 function buildGeneratedOutputFromSummary(
@@ -896,8 +606,8 @@ function buildGeneratedOutputFromSummary(
   metadata: GeneratedOutputDifferencesMetadata,
   summary: GeneratedOutputDifferencesSummary,
 ): GeneratedOutput {
-  const file1LabelValue = normalizeDiffLabel(metadata.file1Label) || normalizeDiffLabel(file1SystemLabel.value) || 'File 1'
-  const file2LabelValue = normalizeDiffLabel(metadata.file2Label) || normalizeDiffLabel(file2SystemLabel.value) || 'File 2'
+  const file1LabelValue = normalizeDisplayText(metadata.file1Label) || normalizeDisplayText(file1SystemLabel.value) || 'File 1'
+  const file2LabelValue = normalizeDisplayText(metadata.file2Label) || normalizeDisplayText(file2SystemLabel.value) || 'File 2'
 
   return {
     fileName,
@@ -920,30 +630,13 @@ function buildGeneratedOutputFromSummary(
   }
 }
 
-const DIFF_SEARCH_DEBOUNCE_MS = 300
 const pageAbortController = new AbortController()
 let loadSavedResultController: AbortController | null = null
-let differencesController: AbortController | null = null
-let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 onBeforeUnmount(() => {
   pageAbortController.abort()
   loadSavedResultController?.abort()
-  differencesController?.abort()
-  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
 })
-
-function currentDifferencesQuery(pageIndex: number, includeFacets: boolean) {
-  return {
-    fileName: outputFileName.value,
-    pageIndex,
-    pageSize: DIFF_DETAILS_PAGE_SIZE,
-    buckets: activeDiffBuckets.value.join(','),
-    ruleFilterKey: selectedRuleFilterKey.value,
-    search: diffDetailsSearch.value.trim(),
-    includeFacets,
-  }
-}
 
 async function loadSavedResult(): Promise<void> {
   const requestedSavedRunId = savedRunId.value
@@ -1011,154 +704,6 @@ async function loadSavedResult(): Promise<void> {
     }
   }
 }
-
-// Fetch a single diff page for the active filters. Facets (whole-document bucket counts + rule
-// options) are constant for a file, so they are requested only on the initial load.
-async function loadDifferencesPage(pageIndex: number, includeFacets: boolean): Promise<void> {
-  const requestedFileName = outputFileName.value
-  if (!requestedFileName) return
-
-  differencesController?.abort()
-
-  // No active bucket selected: show an empty page (matches the "select a diff bucket" prompt) rather
-  // than fetching — an empty buckets filter would otherwise be treated as "all" by the server.
-  if (activeDiffBuckets.value.length === 0) {
-    diffDetailRows.value = []
-    diffFilteredCount.value = 0
-    diffPageIndex.value = 0
-    diffPageCount.value = 1
-    differencesLoading.value = false
-    return
-  }
-
-  differencesController = new AbortController()
-  const signal = differencesController.signal
-
-  differencesLoading.value = true
-  try {
-    const response = await reconciliationFacade.getGeneratedOutputDifferences(
-      currentDifferencesQuery(pageIndex, includeFacets),
-      signal,
-    )
-    if (outputFileName.value !== requestedFileName) return
-    applyDifferencesResponse(response, includeFacets)
-  } catch (error) {
-    if ((error as { name?: string })?.name === 'AbortError') return
-    if (outputFileName.value !== requestedFileName) return
-    loadError.value = error instanceof ApiCallError ? error.message : 'Unable to load differences.'
-  } finally {
-    if (outputFileName.value === requestedFileName) differencesLoading.value = false
-  }
-}
-
-async function goToDiffDetailsPage(pageIndex: number): Promise<void> {
-  const target = Math.min(Math.max(pageIndex, 0), Math.max(diffPageCount.value - 1, 0))
-  if (target === diffPageIndex.value || differencesLoading.value) return
-  await loadDifferencesPage(target, false)
-}
-
-function clearDiffDetailsSearch(): void {
-  diffDetailsSearch.value = ''
-}
-
-function toggleDiffBucket(bucket: DiffBucketKey): void {
-  const isActive = activeDiffBuckets.value.includes(bucket)
-  selectedDiffBuckets.value = isActive
-    ? normalizeDiffBucketSelection(activeDiffBuckets.value.filter((activeBucket) => activeBucket !== bucket))
-    : normalizeDiffBucketSelection([...activeDiffBuckets.value, bucket])
-}
-
-function toggleRuleSelectorCollapsed(): void {
-  ruleSelectorCollapsed.value = !ruleSelectorCollapsed.value
-}
-
-function selectRuleFilter(nextRuleFilterKey: string): void {
-  selectedRuleFilterKey.value = nextRuleFilterKey
-
-  if (nextRuleFilterKey === ALL_RULE_FILTER_KEY) {
-    selectedDiffBuckets.value = [...DIFF_BUCKET_ORDER]
-  } else {
-    const selectedOption = ruleSelectorOptions.value.find((option) => option.key === nextRuleFilterKey)
-    if (selectedOption) {
-      selectedDiffBuckets.value = normalizeDiffBucketSelection(selectedOption.bucketKeys)
-    }
-  }
-}
-
-async function downloadRunSourceFile(sourceFile: RunSourceFileView): Promise<void> {
-  if (!sourceFile.filePath || downloadingSourceFilePath.value) return
-
-  downloadingSourceFilePath.value = sourceFile.filePath
-  sourceDownloadError.value = null
-
-  try {
-    const response = await reconciliationFacade.getGeneratedOutput({
-      fileName: sourceFile.filePath,
-      format: sourceFile.sourceFormat || 'json',
-    })
-    const outputFile = response.outputFile
-    if (!outputFile?.contentText) throw new Error('Unable to download source file.')
-
-    downloadTextFile(
-      outputFile.downloadFileName || sourceFile.downloadFileName || sourceFile.fileName,
-      outputFile.contentText,
-      outputFile.contentType || (sourceFile.sourceFormat === 'csv' ? 'text/csv; charset=UTF-8' : 'application/json; charset=UTF-8'),
-    )
-  } catch (error) {
-    sourceDownloadError.value = error instanceof ApiCallError ? error.message : 'Unable to download source file.'
-  } finally {
-    downloadingSourceFilePath.value = ''
-  }
-}
-
-async function downloadSavedResult(): Promise<void> {
-  if (!downloadableOutputFile.value || downloadingSavedResult.value) return
-
-  downloadingSavedResult.value = true
-  resultDownloadError.value = null
-
-  try {
-    const response = await reconciliationFacade.getGeneratedOutput({
-      fileName: outputFileName.value,
-      format: 'json',
-    })
-    const outputFile = response.outputFile
-    if (!outputFile?.contentText) throw new Error('Unable to download saved result.')
-
-    downloadTextFile(
-      outputFile.downloadFileName || downloadableOutputFile.value.downloadFileName || outputFileName.value || 'saved-result.json',
-      outputFile.contentText,
-      outputFile.contentType || downloadableOutputFile.value.contentType || 'application/json',
-    )
-  } catch (error) {
-    resultDownloadError.value = error instanceof ApiCallError ? error.message : 'Unable to download saved result.'
-  } finally {
-    downloadingSavedResult.value = false
-  }
-}
-
-// Bucket / rule selection re-fetches page 0 from the server (facets are already loaded and constant).
-watch([selectedDiffBuckets, selectedRuleFilterKey], () => {
-  if (!diffControlsReady.value) return
-  void loadDifferencesPage(0, false)
-}, { deep: true })
-
-// Record-id search re-fetches page 0, debounced so typing does not issue a request per keystroke.
-watch(diffDetailsSearch, () => {
-  if (!diffControlsReady.value) return
-  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
-  searchDebounceTimer = setTimeout(() => {
-    searchDebounceTimer = null
-    void loadDifferencesPage(0, false)
-  }, DIFF_SEARCH_DEBOUNCE_MS)
-})
-
-watch(ruleSelectorOptions, (options) => {
-  if (selectedRuleFilterKey.value === ALL_RULE_FILTER_KEY) return
-  if (options.some((option) => option.key === selectedRuleFilterKey.value)) return
-
-  selectedRuleFilterKey.value = ALL_RULE_FILTER_KEY
-})
 
 watch([savedRunId, outputFileName], () => {
   void loadSavedResult()
