@@ -10,6 +10,9 @@
         ],
         "prod": [
           "hc-darpan"
+        ],
+        "sm-darpan": [
+          "sm-darpan"
         ]
       }
     }
