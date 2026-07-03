@@ -10,6 +10,7 @@
     "build": "npm run type-check && npm run build-only",
     "build-only": "vite build",
     "build:firebase": "vite build --mode firebase",
+    "build:sm-darpan": "vite build --mode sm-darpan",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "type-check": "vue-tsc --build --force",
     "lint": "eslint . --ext .ts,.vue --max-warnings=0",
