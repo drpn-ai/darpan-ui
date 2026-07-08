@@ -16,7 +16,7 @@
       :aria-expanded="isOpen ? 'true' : 'false'"
       aria-haspopup="listbox"
       :aria-controls="listboxId"
-      :data-testid="testId || undefined"
+      :data-testid="testId || 'workflow-select-trigger'"
       @mousedown.stop
       @click.stop="toggleMenu"
       @keydown.enter.prevent="handleTriggerEnter"
@@ -33,6 +33,24 @@
       </span>
     </button>
 
+    <div v-if="multiple && modelValueArray.length" class="workflow-select-chip-row">
+      <span
+        v-for="value in modelValueArray"
+        :key="value"
+        class="workflow-select-chip"
+        data-testid="workflow-select-chip"
+      >
+        {{ labelForValue(value) }}
+        <button
+          type="button"
+          data-testid="workflow-select-chip-remove"
+          class="workflow-select-chip-remove"
+          :aria-label="`Remove ${labelForValue(value)}`"
+          @click="removeChip(value)"
+        >&times;</button>
+      </span>
+    </div>
+
     <div
       v-if="isOpen"
       :id="listboxId"
@@ -46,17 +64,17 @@
         :ref="setOptionRef"
         type="button"
         class="workflow-select-option"
-        :class="{ 'workflow-select-option--selected': option.value === modelValue }"
+        :class="{ 'workflow-select-option--selected': isOptionSelected(option.value) }"
         role="option"
-        :aria-selected="option.value === modelValue ? 'true' : 'false'"
+        :aria-selected="isOptionSelected(option.value) ? 'true' : 'false'"
         data-testid="workflow-select-option"
         :data-option-value="option.value"
-        @click="selectOption(option.value)"
+        @click="selectOptionForMode(option.value)"
         @keydown.down.prevent="focusRelative(index, 1)"
         @keydown.up.prevent="focusRelative(index, -1)"
         @keydown.home.prevent="focusOption(0)"
         @keydown.end.prevent="focusOption(options.length - 1)"
-        @keydown.enter.prevent="selectOptionAndSubmit(option.value)"
+        @keydown.enter.prevent="selectOptionForModeAndMaybeSubmit(option.value)"
         @keydown.escape.prevent="closeAndFocusTrigger"
       >
         {{ option.label }}
@@ -66,27 +84,45 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useInlineSelect, type InlineSelectOption } from '../../lib/useInlineSelect'
 
 export type WorkflowSelectOption = InlineSelectOption
 
 const props = withDefaults(
   defineProps<{
-    modelValue: string
+    modelValue: string | string[]
     options: WorkflowSelectOption[]
     placeholder: string
     disabled?: boolean
     testId?: string
+    multiple?: boolean
   }>(),
   {
     disabled: false,
     testId: '',
+    multiple: false,
   },
 )
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
+  'update:modelValue': [value: string | string[]]
 }>()
+
+const modelValueArray = computed<string[]>(() => Array.isArray(props.modelValue) ? props.modelValue : [])
+const modelValueSingle = computed<string>(() => Array.isArray(props.modelValue) ? '' : props.modelValue)
+
+function isOptionSelected(value: string): boolean {
+  return props.multiple ? modelValueArray.value.includes(value) : value === modelValueSingle.value
+}
+
+function labelForValue(value: string): string {
+  return props.options.find((option) => option.value === value)?.label ?? value
+}
+
+function removeChip(value: string): void {
+  emit('update:modelValue', modelValueArray.value.filter((entry) => entry !== value))
+}
 
 const {
   root,
@@ -109,21 +145,45 @@ const {
 } = useInlineSelect({
   idPrefix: 'workflow-select',
   options: () => props.options,
-  modelValue: () => props.modelValue,
+  modelValue: () => modelValueSingle.value,
   disabled: () => props.disabled,
   emitValue: (value) => emit('update:modelValue', value),
 })
 
+function selectOptionForMode(value: string): void {
+  if (!props.multiple) {
+    selectOption(value)
+    return
+  }
+  const current = modelValueArray.value
+  const next = current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value]
+  emit('update:modelValue', next)
+}
+
+async function selectOptionForModeAndMaybeSubmit(value: string): Promise<void> {
+  if (!props.multiple) {
+    await selectOptionAndSubmit(value)
+    return
+  }
+  selectOptionForMode(value)
+}
+
 async function handleTriggerEnter(): Promise<void> {
   if (props.disabled || props.options.length === 0) return
 
-  if (!hasSelection.value) {
+  if (!hasSelection.value && !props.multiple) {
     await openMenuAndFocus('selected')
     return
   }
 
   if (isOpen.value) {
-    await selectOptionAndSubmit(props.modelValue)
+    if (props.multiple) {
+      closeMenu()
+      if (submitClosestForm()) return
+      trigger.value?.focus()
+      return
+    }
+    await selectOptionAndSubmit(modelValueSingle.value)
     return
   }
 
@@ -190,6 +250,37 @@ async function handleTriggerEnter(): Promise<void> {
 
 .workflow-select-trigger--open .workflow-select-trigger-icon {
   transform: rotate(180deg);
+}
+
+.workflow-select-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
+.workflow-select-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
+  border-radius: 999px;
+  padding: 0.3rem 0.55rem 0.3rem 0.7rem;
+  font-size: 0.85rem;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.workflow-select-chip-remove {
+  all: unset;
+  cursor: pointer;
+  opacity: 0.55;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.workflow-select-chip-remove:hover {
+  opacity: 1;
 }
 
 .workflow-select-menu {
