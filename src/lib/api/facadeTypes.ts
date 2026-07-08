@@ -215,6 +215,7 @@ export interface CreateRuleSetRunPayload {
   file1FileTypeEnumId?: string
   file1SchemaFileName?: string
   file1PrimaryIdExpression?: string
+  file1PrimaryIdExpressions?: string[]
   file2SourceTypeEnumId?: string
   file2SystemMessageRemoteId?: string
   file2NsRestletConfigId?: string
@@ -223,6 +224,7 @@ export interface CreateRuleSetRunPayload {
   file2FileTypeEnumId?: string
   file2SchemaFileName?: string
   file2PrimaryIdExpression?: string
+  file2PrimaryIdExpressions?: string[]
   rules?: RuleSetRulePayload[]
 }
 

@@ -4,6 +4,7 @@ import {
   buildCreateRuleSetRunPayload,
   buildRuleSetRulePayloads,
   readReconciliationRuleSetDraftState,
+  fieldSharesRecordRoot,
   type ReconciliationRuleSetDraft,
 } from '../reconciliationRuleSetDraft'
 
@@ -13,10 +14,10 @@ function createDraft(overrides: Partial<ReconciliationRuleSetDraft> = {}): Recon
     runName: 'JSON Order Compare',
     file1SystemEnumId: 'OMS',
     file1FileTypeEnumId: 'DftJson',
-    file1PrimaryIdExpression: '$.orders[*].order_id',
+    file1PrimaryIdExpression: ['$.orders[*].order_id'],
     file2SystemEnumId: 'SHOPIFY',
     file2FileTypeEnumId: 'DftJson',
-    file2PrimaryIdExpression: '$[*].shopify_order_id',
+    file2PrimaryIdExpression: ['$[*].shopify_order_id'],
     ...overrides,
   }
 }
@@ -115,7 +116,7 @@ describe('reconciliationRuleSetDraft', () => {
       file1SourceConfigId: 'KREWE_OMS',
       file1SourceConfigType: 'HOTWAX_OMS_REST',
       file1FileTypeEnumId: '',
-      file1PrimaryIdExpression: '$.records[*].orderId',
+      file1PrimaryIdExpression: ['$.records[*].orderId'],
     }))
 
     expect(payload).toMatchObject({
@@ -125,5 +126,47 @@ describe('reconciliationRuleSetDraft', () => {
       file1SourceConfigType: 'HOTWAX_OMS_REST',
       file1PrimaryIdExpression: '$.records[*].orderId',
     })
+  })
+
+  it('emits the plural field when the draft has more than one primary-id-expression entry', () => {
+    const draft: ReconciliationRuleSetDraft = {
+      runName: 'Composite key run',
+      file1SystemEnumId: 'SHOPIFY',
+      file1FileTypeEnumId: 'DftJson',
+      file1PrimaryIdExpression: ['return_id', 'product_id'],
+      file2SystemEnumId: 'OMS',
+      file2FileTypeEnumId: 'DftJson',
+      file2PrimaryIdExpression: ['return_id', 'product_id'],
+    }
+
+    const payload = buildCreateRuleSetRunPayload(draft)
+
+    expect(payload.file1PrimaryIdExpression).toBeUndefined()
+    expect(payload.file1PrimaryIdExpressions).toEqual(['return_id', 'product_id'])
+    expect(payload.file2PrimaryIdExpression).toBeUndefined()
+    expect(payload.file2PrimaryIdExpressions).toEqual(['return_id', 'product_id'])
+  })
+
+  it('emits the singular field, not the plural, when the draft has exactly one primary-id-expression entry', () => {
+    const draft: ReconciliationRuleSetDraft = {
+      runName: 'Single key run',
+      file1SystemEnumId: 'SHOPIFY',
+      file1FileTypeEnumId: 'DftJson',
+      file1PrimaryIdExpression: ['order_id'],
+      file2SystemEnumId: 'OMS',
+      file2FileTypeEnumId: 'DftJson',
+      file2PrimaryIdExpression: ['order_id'],
+    }
+
+    const payload = buildCreateRuleSetRunPayload(draft)
+
+    expect(payload.file1PrimaryIdExpression).toBe('order_id')
+    expect(payload.file1PrimaryIdExpressions).toBeUndefined()
+  })
+
+  it('fieldSharesRecordRoot: true for two fields under the same exploded array, false across different roots', () => {
+    expect(fieldSharesRecordRoot('$.returns[*].product_id', '$.returns[*].return_id')).toBe(true)
+    expect(fieldSharesRecordRoot('$.order_id', '$.returns[*].return_id')).toBe(false)
+    expect(fieldSharesRecordRoot('$.appeasements[*].product_id', '$.returns[*].return_id')).toBe(false)
   })
 })

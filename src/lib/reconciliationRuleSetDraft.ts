@@ -47,7 +47,7 @@ export interface ReconciliationRuleSetDraft {
   file1JsonSchemaId?: string
   file1SchemaLabel?: string
   file1SchemaFileName?: string
-  file1PrimaryIdExpression: string
+  file1PrimaryIdExpression: string[]
   file2SystemEnumId: string
   file2SystemLabel?: string
   file2SourceTypeEnumId?: string
@@ -61,7 +61,7 @@ export interface ReconciliationRuleSetDraft {
   file2JsonSchemaId?: string
   file2SchemaLabel?: string
   file2SchemaFileName?: string
-  file2PrimaryIdExpression: string
+  file2PrimaryIdExpression: string[]
   rules?: ReconciliationRuleSetDraftRule[]
 }
 
@@ -167,6 +167,7 @@ export function buildCreateRuleSetRunPayload(draft: ReconciliationRuleSetDraft):
 
 function buildSideSourceFields(side: 'file1' | 'file2', draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
   if (side === 'file1') {
+    const primaryIdFields = primaryIdExpressionPayloadFields(draft.file1PrimaryIdExpression)
     if (draft.file1SourceTypeEnumId === RULESET_SOURCE_TYPE_API) {
       return {
         file1SourceTypeEnumId: RULESET_SOURCE_TYPE_API,
@@ -174,15 +175,17 @@ function buildSideSourceFields(side: 'file1' | 'file2', draft: ReconciliationRul
         ...(draft.file1NsRestletConfigId?.trim() ? { file1NsRestletConfigId: draft.file1NsRestletConfigId.trim() } : {}),
         ...(draft.file1SourceConfigId?.trim() ? { file1SourceConfigId: draft.file1SourceConfigId.trim() } : {}),
         ...(draft.file1SourceConfigType?.trim() ? { file1SourceConfigType: draft.file1SourceConfigType.trim() } : {}),
-        ...(draft.file1PrimaryIdExpression?.trim() ? { file1PrimaryIdExpression: draft.file1PrimaryIdExpression.trim() } : {}),
+        ...(primaryIdFields.file1PrimaryIdExpression ? { file1PrimaryIdExpression: primaryIdFields.file1PrimaryIdExpression } : {}),
+        ...(primaryIdFields.file1PrimaryIdExpressions ? { file1PrimaryIdExpressions: primaryIdFields.file1PrimaryIdExpressions } : {}),
       }
     }
     return {
       file1FileTypeEnumId: draft.file1FileTypeEnumId,
       file1SchemaFileName: normalizeString(draft.file1SchemaFileName) ?? undefined,
-      file1PrimaryIdExpression: draft.file1PrimaryIdExpression.trim(),
+      ...primaryIdFields,
     }
   }
+  const primaryIdFields = primaryIdExpressionPayloadFields(draft.file2PrimaryIdExpression, 'file2')
   if (draft.file2SourceTypeEnumId === RULESET_SOURCE_TYPE_API) {
     return {
       file2SourceTypeEnumId: RULESET_SOURCE_TYPE_API,
@@ -190,14 +193,27 @@ function buildSideSourceFields(side: 'file1' | 'file2', draft: ReconciliationRul
       ...(draft.file2NsRestletConfigId?.trim() ? { file2NsRestletConfigId: draft.file2NsRestletConfigId.trim() } : {}),
       ...(draft.file2SourceConfigId?.trim() ? { file2SourceConfigId: draft.file2SourceConfigId.trim() } : {}),
       ...(draft.file2SourceConfigType?.trim() ? { file2SourceConfigType: draft.file2SourceConfigType.trim() } : {}),
-      ...(draft.file2PrimaryIdExpression?.trim() ? { file2PrimaryIdExpression: draft.file2PrimaryIdExpression.trim() } : {}),
+      ...(primaryIdFields.file2PrimaryIdExpression ? { file2PrimaryIdExpression: primaryIdFields.file2PrimaryIdExpression } : {}),
+      ...(primaryIdFields.file2PrimaryIdExpressions ? { file2PrimaryIdExpressions: primaryIdFields.file2PrimaryIdExpressions } : {}),
     }
   }
   return {
     file2FileTypeEnumId: draft.file2FileTypeEnumId,
     file2SchemaFileName: normalizeString(draft.file2SchemaFileName) ?? undefined,
-    file2PrimaryIdExpression: draft.file2PrimaryIdExpression.trim(),
+    ...primaryIdFields,
   }
+}
+
+function primaryIdExpressionPayloadFields(
+  values: string[],
+  side: 'file1' | 'file2' = 'file1',
+): Partial<CreateRuleSetRunPayload> {
+  const trimmed = values.map((value) => value.trim()).filter(Boolean)
+  if (trimmed.length > 1) {
+    return side === 'file1' ? { file1PrimaryIdExpressions: trimmed } : { file2PrimaryIdExpressions: trimmed }
+  }
+  const single = trimmed[0] ?? ''
+  return side === 'file1' ? { file1PrimaryIdExpression: single } : { file2PrimaryIdExpression: single }
 }
 
 export function buildSaveRuleSetRunPayload(draft: ReconciliationRuleSetDraft): SaveRuleSetRunPayload {
@@ -249,8 +265,8 @@ function buildFieldComparisonRuleLogic(
   index: number,
 ): string {
   const ruleName = rule.ruleId?.trim() || `FIELD_COMPARISON_${index + 1}`
-  const file1Path = fieldPathRelativeToPrimary(rule.file1FieldPath, draft.file1PrimaryIdExpression)
-  const file2Path = fieldPathRelativeToPrimary(rule.file2FieldPath, draft.file2PrimaryIdExpression)
+  const file1Path = fieldPathRelativeToPrimary(rule.file1FieldPath, draft.file1PrimaryIdExpression[0] ?? '')
+  const file2Path = fieldPathRelativeToPrimary(rule.file2FieldPath, draft.file2PrimaryIdExpression[0] ?? '')
   const file1RawValueExpression = buildDrlMapAccess('$m.get("file1")', file1Path)
   const file2RawValueExpression = buildDrlMapAccess('$m.get("file2")', file2Path)
   const file1ValueExpression = buildPreActionValueExpression(file1RawValueExpression, preActionNamesForSide(preActions, 'file1'))
@@ -344,6 +360,24 @@ function fieldPathRelativeToPrimary(fieldPath: string, primaryExpression: string
     if (normalizedField.startsWith(prefixWithDot)) return stripRootPrefix(normalizedField.slice(prefixWithDot.length))
   }
   return stripRootPrefix(normalizedField)
+}
+
+/**
+ * True when two JSON field paths resolve to the same exploded-array record level — i.e. they can
+ * safely be combined as fields of one composite compare key. Two non-array (no `[*]`) paths are
+ * always considered to share the (implicit top-level) root.
+ */
+export function fieldSharesRecordRoot(candidateFieldPath: string, referenceFieldPath: string): boolean {
+  const candidate = normalizeReconciliationFieldPath(candidateFieldPath)
+  const reference = normalizeReconciliationFieldPath(referenceFieldPath)
+  const candidateRoot = recordRootPrefix(candidate)
+  const referenceRoot = recordRootPrefix(reference)
+  return candidateRoot === referenceRoot
+}
+
+function recordRootPrefix(fieldPath: string): string {
+  const starIndex = fieldPath.indexOf('[*]')
+  return starIndex >= 0 ? fieldPath.slice(0, starIndex + 3) : ''
 }
 
 function stripRootPrefix(fieldPath: string): string {
