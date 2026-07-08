@@ -58,10 +58,11 @@
 
           <label class="wizard-input-shell">
             <span class="workflow-context-label">Source 1 Primary ID</span>
-            <AppSelect
-              v-model="form.source1.fieldPath"
-              :disabled="!canEditTenantSettings || loading || source1ApiFieldOptions.length === 0"
-              :options="source1ApiFieldOptions"
+            <WorkflowSelect
+              v-model="form.source1.fieldPaths"
+              multiple
+              :disabled="!canEditTenantSettings || loading || activeSource1ApiFieldOptions.length === 0"
+              :options="activeSource1ApiFieldOptions"
               :placeholder="source1ApiEndpointValue ? 'Select source 1 primary ID' : 'Choose an endpoint first'"
               test-id="run-api-field-1"
             />
@@ -82,10 +83,11 @@
 
           <label class="wizard-input-shell">
             <span class="workflow-context-label">Source 1 Field</span>
-            <AppSelect
-              v-model="form.source1.fieldPath"
-              :disabled="!canEditTenantSettings || loading || fieldOptions1.length === 0"
-              :options="fieldOptions1"
+            <WorkflowSelect
+              v-model="form.source1.fieldPaths"
+              multiple
+              :disabled="!canEditTenantSettings || loading || activeFieldOptions1.length === 0"
+              :options="activeFieldOptions1"
               :placeholder="form.source1.schemaId ? 'Select source 1 field' : 'Choose a schema first'"
               test-id="run-field-1"
             />
@@ -119,10 +121,11 @@
 
           <label class="wizard-input-shell">
             <span class="workflow-context-label">Source 2 Primary ID</span>
-            <AppSelect
-              v-model="form.source2.fieldPath"
-              :disabled="!canEditTenantSettings || loading || source2ApiFieldOptions.length === 0"
-              :options="source2ApiFieldOptions"
+            <WorkflowSelect
+              v-model="form.source2.fieldPaths"
+              multiple
+              :disabled="!canEditTenantSettings || loading || activeSource2ApiFieldOptions.length === 0"
+              :options="activeSource2ApiFieldOptions"
               :placeholder="source2ApiEndpointValue ? 'Select source 2 primary ID' : 'Choose an endpoint first'"
               test-id="run-api-field-2"
             />
@@ -143,10 +146,11 @@
 
           <label class="wizard-input-shell">
             <span class="workflow-context-label">Source 2 Field</span>
-            <AppSelect
-              v-model="form.source2.fieldPath"
-              :disabled="!canEditTenantSettings || loading || fieldOptions2.length === 0"
-              :options="fieldOptions2"
+            <WorkflowSelect
+              v-model="form.source2.fieldPaths"
+              multiple
+              :disabled="!canEditTenantSettings || loading || activeFieldOptions2.length === 0"
+              :options="activeFieldOptions2"
               :placeholder="form.source2.schemaId ? 'Select source 2 field' : 'Choose a schema first'"
               test-id="run-field-2"
             />
@@ -162,6 +166,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
+import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import { ApiCallError } from '../../lib/api/client'
@@ -178,6 +183,8 @@ import type { SaveRuleSetRunPayload } from '../../lib/api/facadeTypes'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import {
+  fieldSharesRecordRoot,
+  primaryIdExpressionPayloadFields,
   type ReconciliationRuleSetDraft,
 } from '../../lib/reconciliationRuleSetDraft'
 import { darpanSystemIdsMatch } from '../../lib/utils/darpanSystems'
@@ -186,7 +193,7 @@ import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
 
 interface RunSourceForm {
   schemaId: string
-  fieldPath: string
+  fieldPaths: string[]
   sourceConfigId: string
   sourceConfigType: string
   nsRestletConfigId: string
@@ -217,8 +224,8 @@ const success = ref<string | null>(null)
 
 const form = reactive<RunForm>({
   mappingName: '',
-  source1: { schemaId: '', fieldPath: '', sourceConfigId: '', sourceConfigType: '', nsRestletConfigId: '', systemMessageRemoteId: '' },
-  source2: { schemaId: '', fieldPath: '', sourceConfigId: '', sourceConfigType: '', nsRestletConfigId: '', systemMessageRemoteId: '' },
+  source1: { schemaId: '', fieldPaths: [], sourceConfigId: '', sourceConfigType: '', nsRestletConfigId: '', systemMessageRemoteId: '' },
+  source2: { schemaId: '', fieldPaths: [], sourceConfigId: '', sourceConfigType: '', nsRestletConfigId: '', systemMessageRemoteId: '' },
 })
 
 const activeMappingId = computed(() => String(route.params.reconciliationMappingId ?? '').trim())
@@ -241,6 +248,13 @@ const source1ApiEndpointOptions = computed<AppSelectOption[]>(() => apiEndpointO
 const source2ApiEndpointOptions = computed<AppSelectOption[]>(() => apiEndpointOptionsForSource('source2'))
 const source1ApiFieldOptions = computed<AppSelectOption[]>(() => apiPrimaryIdOptionsForSource('source1'))
 const source2ApiFieldOptions = computed<AppSelectOption[]>(() => apiPrimaryIdOptionsForSource('source2'))
+// Once at least one primary-ID field is chosen, further options are restricted to fields sharing the
+// same JSON record root — composite key fields must all resolve at the same array-explosion level so
+// the backend's shared-record-root validation (RuleSetCompareScopeAdapter) never rejects the save.
+const activeFieldOptions1 = computed<AppSelectOption[]>(() => restrictToSharedRecordRoot(fieldOptions1.value, form.source1.fieldPaths))
+const activeFieldOptions2 = computed<AppSelectOption[]>(() => restrictToSharedRecordRoot(fieldOptions2.value, form.source2.fieldPaths))
+const activeSource1ApiFieldOptions = computed<AppSelectOption[]>(() => restrictToSharedRecordRoot(source1ApiFieldOptions.value, form.source1.fieldPaths))
+const activeSource2ApiFieldOptions = computed<AppSelectOption[]>(() => restrictToSharedRecordRoot(source2ApiFieldOptions.value, form.source2.fieldPaths))
 const source1ApiConfigValue = computed({
   get: () => form.source1.sourceConfigId,
   set: (value: string) => updateApiSourceConfig('source1', value),
@@ -408,7 +422,7 @@ function updateApiSourceConfig(sourceKey: SourceKey, value: string): void {
 
 function updateApiEndpoint(sourceKey: SourceKey, value: string): void {
   const source = sourceForm(sourceKey)
-  source.fieldPath = ''
+  source.fieldPaths = []
 
   if (value.startsWith('ns:')) {
     source.nsRestletConfigId = value.slice(3)
@@ -430,7 +444,7 @@ function clearApiEndpoint(sourceKey: SourceKey): void {
   const source = sourceForm(sourceKey)
   source.nsRestletConfigId = ''
   source.systemMessageRemoteId = ''
-  source.fieldPath = ''
+  source.fieldPaths = []
 }
 
 function resolveSelectedSourceConfigType(sourceKey: SourceKey): string {
@@ -445,21 +459,23 @@ function validateSource(sourceKey: SourceKey): string | null {
     const sourceLabel = sourceKey === 'source1' ? 'Source 1' : 'Source 2'
     if (!source.sourceConfigId) return `${sourceLabel} needs an API config.`
     if (!selectedApiEndpointValue(sourceKey)) return `${sourceLabel} needs an API endpoint.`
-    if (!source.fieldPath) return `${sourceLabel} needs a primary ID field.`
+    if (!source.fieldPaths.length) return `${sourceLabel} needs a primary ID field.`
     return null
   }
 
   if (!source.schemaId) return 'Choose schemas for both sources.'
-  if (!source.fieldPath) return 'Choose an ID field for both sources.'
+  if (!source.fieldPaths.length) return 'Choose an ID field for both sources.'
   return null
 }
 
 function buildSourceKeyFields(sourceKey: SourceKey): Partial<SaveRuleSetRunPayload> {
   const source = sourceForm(sourceKey)
   const isSource1 = sourceKey === 'source1'
-  const originalPrimaryId = isSource1
-    ? ruleSetDraft.value?.file1PrimaryIdExpression?.[0]
-    : ruleSetDraft.value?.file2PrimaryIdExpression?.[0]
+  const originalPrimaryIdExpressions = isSource1
+    ? ruleSetDraft.value?.file1PrimaryIdExpression
+    : ruleSetDraft.value?.file2PrimaryIdExpression
+  const primaryIdValues = buildPrimaryIdExpressionValues(originalPrimaryIdExpressions, source.fieldPaths)
+  const primaryIdFields = primaryIdExpressionPayloadFields(primaryIdValues, isSource1 ? 'file1' : 'file2')
 
   if (sourceUsesApi(sourceKey)) {
     const sourceConfigType = resolveSelectedSourceConfigType(sourceKey)
@@ -470,7 +486,7 @@ function buildSourceKeyFields(sourceKey: SourceKey): Partial<SaveRuleSetRunPaylo
         ...(source.nsRestletConfigId.trim() ? { file1NsRestletConfigId: source.nsRestletConfigId.trim() } : {}),
         ...(source.sourceConfigId.trim() ? { file1SourceConfigId: source.sourceConfigId.trim() } : {}),
         ...(sourceConfigType ? { file1SourceConfigType: sourceConfigType } : {}),
-        file1PrimaryIdExpression: source.fieldPath.trim(),
+        ...primaryIdFields,
       }
     }
     return {
@@ -479,7 +495,7 @@ function buildSourceKeyFields(sourceKey: SourceKey): Partial<SaveRuleSetRunPaylo
       ...(source.nsRestletConfigId.trim() ? { file2NsRestletConfigId: source.nsRestletConfigId.trim() } : {}),
       ...(source.sourceConfigId.trim() ? { file2SourceConfigId: source.sourceConfigId.trim() } : {}),
       ...(sourceConfigType ? { file2SourceConfigType: sourceConfigType } : {}),
-      file2PrimaryIdExpression: source.fieldPath.trim(),
+      ...primaryIdFields,
     }
   }
 
@@ -488,13 +504,13 @@ function buildSourceKeyFields(sourceKey: SourceKey): Partial<SaveRuleSetRunPaylo
     return {
       file1FileTypeEnumId: 'DftJson',
       file1SchemaFileName: selectedSchema?.schemaName,
-      file1PrimaryIdExpression: preserveFieldExpressionSuffix(originalPrimaryId, source.fieldPath),
+      ...primaryIdFields,
     }
   }
   return {
     file2FileTypeEnumId: 'DftJson',
     file2SchemaFileName: selectedSchema?.schemaName,
-    file2PrimaryIdExpression: preserveFieldExpressionSuffix(originalPrimaryId, source.fieldPath),
+    ...primaryIdFields,
   }
 }
 
@@ -525,13 +541,13 @@ function resolveSchemaId(jsonSchemaId: string | undefined, schemaName: string | 
 function hydrateRuleSetDraftForm(draft: ReconciliationRuleSetDraft): void {
   form.mappingName = draft.runName
   form.source1.schemaId = sourceUsesApi('source1') ? '' : resolveSchemaId(draft.file1JsonSchemaId, draft.file1SchemaFileName)
-  form.source1.fieldPath = draft.file1PrimaryIdExpression?.[0] ?? ''
+  form.source1.fieldPaths = [...(draft.file1PrimaryIdExpression ?? [])]
   form.source1.sourceConfigId = draft.file1SourceConfigId ?? ''
   form.source1.sourceConfigType = draft.file1SourceConfigType ?? resolveSelectedSourceConfigType('source1')
   form.source1.nsRestletConfigId = draft.file1NsRestletConfigId ?? ''
   form.source1.systemMessageRemoteId = draft.file1SystemMessageRemoteId ?? ''
   form.source2.schemaId = sourceUsesApi('source2') ? '' : resolveSchemaId(draft.file2JsonSchemaId, draft.file2SchemaFileName)
-  form.source2.fieldPath = draft.file2PrimaryIdExpression?.[0] ?? ''
+  form.source2.fieldPaths = [...(draft.file2PrimaryIdExpression ?? [])]
   form.source2.sourceConfigId = draft.file2SourceConfigId ?? ''
   form.source2.sourceConfigType = draft.file2SourceConfigType ?? resolveSelectedSourceConfigType('source2')
   form.source2.nsRestletConfigId = draft.file2NsRestletConfigId ?? ''
@@ -541,14 +557,14 @@ function hydrateRuleSetDraftForm(draft: ReconciliationRuleSetDraft): void {
 function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetDraft {
   const source1 = source1Schema.value
   const source2 = source2Schema.value
-  const file1PrimaryIdExpression = preserveFieldExpressionSuffix(
-    ruleSetDraft.value?.file1PrimaryIdExpression?.[0],
-    form.source1.fieldPath,
-  )
-  const file2PrimaryIdExpression = preserveFieldExpressionSuffix(
-    ruleSetDraft.value?.file2PrimaryIdExpression?.[0],
-    form.source2.fieldPath,
-  )
+  const file1PrimaryIdExpression = buildPrimaryIdExpressionValues(
+    ruleSetDraft.value?.file1PrimaryIdExpression,
+    form.source1.fieldPaths,
+  ).map((value) => value.trim()).filter(Boolean)
+  const file2PrimaryIdExpression = buildPrimaryIdExpressionValues(
+    ruleSetDraft.value?.file2PrimaryIdExpression,
+    form.source2.fieldPaths,
+  ).map((value) => value.trim()).filter(Boolean)
 
   return {
     savedRunId: ruleSetDraft.value?.savedRunId ?? activeMappingId.value,
@@ -573,7 +589,7 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
           file1SchemaLabel: source1 ? resolveSchemaLabel(source1) : ruleSetDraft.value?.file1SchemaLabel,
           file1SchemaFileName: source1?.schemaName,
         }),
-    file1PrimaryIdExpression: file1PrimaryIdExpression ? [file1PrimaryIdExpression] : [],
+    file1PrimaryIdExpression,
     file2SystemEnumId: source2?.systemEnumId ?? ruleSetDraft.value?.file2SystemEnumId ?? '',
     file2SystemLabel: source2?.systemLabel ?? ruleSetDraft.value?.file2SystemLabel,
     ...(source2UsesApi.value
@@ -593,7 +609,7 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
           file2SchemaLabel: source2 ? resolveSchemaLabel(source2) : ruleSetDraft.value?.file2SchemaLabel,
           file2SchemaFileName: source2?.schemaName,
         }),
-    file2PrimaryIdExpression: file2PrimaryIdExpression ? [file2PrimaryIdExpression] : [],
+    file2PrimaryIdExpression,
     rules: ruleSetDraft.value?.rules,
   }
 }
@@ -644,11 +660,35 @@ function preserveFieldExpressionSuffix(originalFieldPath: string | undefined, se
   return sameBaseField ? `${selectedFieldPath}|${suffix}` : selectedFieldPath
 }
 
+/**
+ * Composite-key form of `preserveFieldExpressionSuffix`: for each currently selected field, find
+ * the originally saved expression (if any) that resolves to the same base field and preserve its
+ * `|suffix` annotation. Fields with no matching original (e.g. newly added composite members) pass
+ * through unchanged.
+ */
+function buildPrimaryIdExpressionValues(originalExpressions: string[] | undefined, selectedFieldPaths: string[]): string[] {
+  const originals = originalExpressions ?? []
+  return selectedFieldPaths.map((fieldPath) => {
+    const selectedAliases = buildFieldPathAliases(fieldPath)
+    const matchingOriginal = originals.find((original) => {
+      const originalAliases = buildFieldPathAliases(original)
+      return [...selectedAliases].some((alias) => originalAliases.has(alias))
+    })
+    return preserveFieldExpressionSuffix(matchingOriginal, fieldPath)
+  })
+}
+
 function buildFieldOptions(schemaId: string): AppSelectOption[] {
   return (flattenedFields.value[schemaId] ?? []).map((field) => ({
     value: field.fieldPath,
     label: field.fieldPath,
   }))
+}
+
+function restrictToSharedRecordRoot(options: AppSelectOption[], chosenFieldPaths: string[]): AppSelectOption[] {
+  const reference = chosenFieldPaths[0]
+  if (!reference) return options
+  return options.filter((option) => fieldSharesRecordRoot(option.value, reference))
 }
 
 function resolveOriginPath(): string {
@@ -679,14 +719,16 @@ async function syncFieldOptions(sourceKey: 'source1' | 'source2', signal?: Abort
 
   const source = form[sourceKey]
   if (!source.schemaId) {
-    source.fieldPath = ''
+    source.fieldPaths = []
     return
   }
 
   try {
     await ensureFieldsLoaded(source.schemaId, signal)
-    if (source.fieldPath) {
-      source.fieldPath = resolveSelectedFieldPath(source.schemaId, source.fieldPath) ?? ''
+    if (source.fieldPaths.length) {
+      source.fieldPaths = source.fieldPaths
+        .map((fieldPath) => resolveSelectedFieldPath(source.schemaId, fieldPath))
+        .filter((resolved): resolved is string => Boolean(resolved))
     }
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
@@ -755,9 +797,9 @@ async function load(): Promise<void> {
 
     form.mappingName = mapping.mappingName ?? ''
     form.source1.schemaId = mapping.members?.[0]?.jsonSchemaId ?? ''
-    form.source1.fieldPath = mapping.members?.[0]?.fieldPath ?? ''
+    form.source1.fieldPaths = mapping.members?.[0]?.fieldPath ? [mapping.members[0].fieldPath] : []
     form.source2.schemaId = mapping.members?.[1]?.jsonSchemaId ?? ''
-    form.source2.fieldPath = mapping.members?.[1]?.fieldPath ?? ''
+    form.source2.fieldPaths = mapping.members?.[1]?.fieldPath ? [mapping.members[1].fieldPath] : []
 
     await Promise.all([
       syncFieldOptions('source1', signal),
@@ -793,8 +835,8 @@ async function save(): Promise<void> {
       mappingName: form.mappingName.trim(),
       schema1Id: form.source1.schemaId,
       schema2Id: form.source2.schemaId,
-      schema1FieldPath: form.source1.fieldPath,
-      schema2FieldPath: form.source2.fieldPath,
+      schema1FieldPath: form.source1.fieldPaths[0] ?? '',
+      schema2FieldPath: form.source2.fieldPaths[0] ?? '',
     })
     success.value = response.messages?.[0] ?? 'Saved run.'
     await router.push(resolveOriginPath())

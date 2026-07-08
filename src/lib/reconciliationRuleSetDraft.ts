@@ -204,7 +204,13 @@ function buildSideSourceFields(side: 'file1' | 'file2', draft: ReconciliationRul
   }
 }
 
-function primaryIdExpressionPayloadFields(
+/**
+ * Split a primary-id-expression array into the singular or plural payload field the backend
+ * expects: `fileNPrimaryIdExpression` for a single field, `fileNPrimaryIdExpressions` for a
+ * composite (>1 field) key. Centralized here so every caller (create, save, settings-page edit)
+ * makes the same singular/plural decision.
+ */
+export function primaryIdExpressionPayloadFields(
   values: string[],
   side: 'file1' | 'file2' = 'file1',
 ): Partial<CreateRuleSetRunPayload> {

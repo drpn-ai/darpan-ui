@@ -103,6 +103,27 @@ async function chooseAppSelectOption(
   await wrapper.get(`[data-testid="app-select-option"][data-option-value="${value}"]`).trigger('click')
 }
 
+async function pickWorkflowSelectOption(
+  wrapper: ReturnType<typeof mount>,
+  testId: string,
+  value: string,
+): Promise<void> {
+  const trigger = wrapper.get(`[data-testid="${testId}"]`)
+  if (trigger.attributes('aria-expanded') !== 'true') {
+    await trigger.trigger('click')
+  }
+  await wrapper.get(`[data-testid="workflow-select-option"][data-option-value="${value}"]`).trigger('click')
+}
+
+async function removeWorkflowSelectChip(
+  wrapper: ReturnType<typeof mount>,
+  rowTestId: string,
+  chipIndex: number,
+): Promise<void> {
+  const chips = wrapper.get(`[data-testid="${rowTestId}"]`).findAll('[data-testid="workflow-select-chip"]')
+  await chips[chipIndex]!.get('[data-testid="workflow-select-chip-remove"]').trigger('click')
+}
+
 describe('RunsSettingsWorkflowPage', () => {
   beforeEach(() => {
     push.mockClear()
@@ -335,10 +356,11 @@ describe('RunsSettingsWorkflowPage', () => {
     expect(flatten).toHaveBeenCalledWith({ jsonSchemaId: '100409' }, expect.any(AbortSignal))
 
     await wrapper.find('input[name="mappingName"]').setValue('Order Returns')
-    await chooseAppSelectOption(wrapper, 'run-field-1', '$.return_ref')
+    await removeWorkflowSelectChip(wrapper, 'run-source-1-row', 0)
+    await pickWorkflowSelectOption(wrapper, 'run-field-1', '$.return_ref')
     await chooseAppSelectOption(wrapper, 'run-schema-2', '100411')
     await flushPromises()
-    await chooseAppSelectOption(wrapper, 'run-field-2', '$.return.externalId')
+    await pickWorkflowSelectOption(wrapper, 'run-field-2', '$.return.externalId')
     await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
     await flushPromises()
 
@@ -385,8 +407,12 @@ describe('RunsSettingsWorkflowPage', () => {
     const wrapper = mount(RunsSettingsWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="run-field-1"]').text()).toContain('$.return_id')
-    expect(wrapper.get('[data-testid="run-field-2"]').text()).toContain('$.id')
+    const source1Chips = wrapper.get('[data-testid="run-source-1-row"]').findAll('[data-testid="workflow-select-chip"]')
+    const source2Chips = wrapper.get('[data-testid="run-source-2-row"]').findAll('[data-testid="workflow-select-chip"]')
+    expect(source1Chips).toHaveLength(1)
+    expect(source1Chips[0]!.text()).toContain('$.return_id')
+    expect(source2Chips).toHaveLength(1)
+    expect(source2Chips[0]!.text()).toContain('$.id')
   })
 
   it('loads a ruleset run draft and saves non-rule settings back to the run details page', async () => {
@@ -422,7 +448,8 @@ describe('RunsSettingsWorkflowPage', () => {
     expect(wrapper.text()).not.toContain('Rules')
 
     await wrapper.find('input[name="mappingName"]').setValue('Order Sync Revised')
-    await chooseAppSelectOption(wrapper, 'run-field-1', '$.return_ref')
+    await removeWorkflowSelectChip(wrapper, 'run-source-1-row', 0)
+    await pickWorkflowSelectOption(wrapper, 'run-field-1', '$.return_ref')
     await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
     await flushPromises()
 
@@ -498,14 +525,14 @@ describe('RunsSettingsWorkflowPage', () => {
     expect(wrapper.find('[data-testid="run-schema-2"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="run-api-config-1"]').text()).toContain('Krewe OMS')
     expect(wrapper.get('[data-testid="run-api-endpoint-1"]').text()).toContain('Orders API')
-    expect(wrapper.get('[data-testid="run-api-field-1"]').text()).toContain('Order ID')
+    expect(wrapper.get('[data-testid="run-source-1-row"]').findAll('[data-testid="workflow-select-chip"]')[0]!.text()).toContain('Order ID')
     expect(wrapper.get('[data-testid="run-api-config-2"]').text()).toContain('Krewe Shopify')
     expect(wrapper.get('[data-testid="run-api-endpoint-2"]').text()).toContain('Orders')
-    expect(wrapper.get('[data-testid="run-api-field-2"]').text()).toContain('Order ID')
+    expect(wrapper.get('[data-testid="run-source-2-row"]').findAll('[data-testid="workflow-select-chip"]')[0]!.text()).toContain('Order ID')
 
     await chooseAppSelectOption(wrapper, 'run-api-endpoint-1', 'remote:HOTWAX_RETURNS_API:KREWE_OMS')
     await flushPromises()
-    await chooseAppSelectOption(wrapper, 'run-api-field-1', '$.records[*].returnId')
+    await pickWorkflowSelectOption(wrapper, 'run-api-field-1', '$.records[*].returnId')
     await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
     await flushPromises()
 
@@ -589,6 +616,92 @@ describe('RunsSettingsWorkflowPage', () => {
     expect(wrapper.get('[data-testid="run-schema-2"]').text()).not.toContain('gorjana_shopify_order')
     expect(wrapper.text()).not.toContain('100408')
     expect(wrapper.text()).not.toContain('100409')
+  })
+
+  it('edits a composite primary key as removable chips and round-trips the plural payload field', async () => {
+    route.params.reconciliationMappingId = 'RS_COMPOSITE_SYNC'
+    flatten.mockImplementation(({ jsonSchemaId }: { jsonSchemaId: string }) => {
+      if (jsonSchemaId === '100408') {
+        return Promise.resolve({
+          ok: true,
+          messages: [],
+          errors: [],
+          fieldList: [
+            { fieldPath: '$.return_id', type: 'string', required: true },
+            { fieldPath: '$.product_id', type: 'string', required: true },
+            { fieldPath: '$.return_ref', type: 'string', required: false },
+          ],
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        messages: [],
+        errors: [],
+        fieldList: [{ fieldPath: '$.id', type: 'string', required: true }],
+      })
+    })
+    saveRuleSetRun.mockResolvedValueOnce({
+      ok: true,
+      messages: ['Saved RuleSet run Composite Sync.'],
+      errors: [],
+      savedRun: {
+        savedRunId: 'RS_COMPOSITE_SYNC',
+        runName: 'Composite Sync',
+        description: 'Composite key run.',
+        runType: 'ruleset',
+      },
+    })
+    draftStoreState.workflowOrigin = { label: 'Run Details', path: '/reconciliation/ruleset-manager' }
+    draftStoreState.ruleSetDraftState = {
+      draft: {
+        savedRunId: 'RS_COMPOSITE_SYNC',
+        runName: 'Composite Sync',
+        description: 'Composite key run.',
+        file1SystemEnumId: 'DarSysOms',
+        file1SystemLabel: 'OMS',
+        file1FileTypeEnumId: 'DftJson',
+        file1JsonSchemaId: '100408',
+        file1SchemaFileName: 'Returns Feed',
+        file1PrimaryIdExpression: ['return_id', 'product_id'],
+        file2SystemEnumId: 'DarSysShopify',
+        file2SystemLabel: 'SHOPIFY',
+        file2FileTypeEnumId: 'DftJson',
+        file2JsonSchemaId: '100409',
+        file2SchemaFileName: 'Shopify Orders',
+        file2PrimaryIdExpression: ['$.id'],
+      },
+      resumeStepId: 'ruleset-manager',
+    }
+    window.history.replaceState({}, '', '/settings/runs/edit/RS_COMPOSITE_SYNC')
+
+    const wrapper = mount(RunsSettingsWorkflowPage)
+    await flushPromises()
+
+    const source1Chips = () => wrapper.get('[data-testid="run-source-1-row"]').findAll('[data-testid="workflow-select-chip"]')
+
+    expect(source1Chips()).toHaveLength(2)
+    expect(source1Chips()[0]!.text()).toContain('$.return_id')
+    expect(source1Chips()[1]!.text()).toContain('$.product_id')
+
+    await pickWorkflowSelectOption(wrapper, 'run-field-1', '$.return_ref')
+    expect(source1Chips()).toHaveLength(3)
+    expect(source1Chips()[2]!.text()).toContain('$.return_ref')
+
+    await removeWorkflowSelectChip(wrapper, 'run-source-1-row', 2)
+    expect(source1Chips()).toHaveLength(2)
+    expect(source1Chips()[0]!.text()).toContain('$.return_id')
+    expect(source1Chips()[1]!.text()).toContain('$.product_id')
+
+    await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+    await flushPromises()
+
+    expect(saveRuleSetRun).toHaveBeenCalledTimes(1)
+    const savedPayload = saveRuleSetRun.mock.calls[0]![0] as Record<string, unknown>
+    expect(savedPayload.file1PrimaryIdExpressions).toEqual(['$.return_id', '$.product_id'])
+    expect(savedPayload.file1PrimaryIdExpression).toBeUndefined()
+    expect(savedPayload.file2PrimaryIdExpression).toBe('$.id')
+    expect(savedPayload.file2PrimaryIdExpressions).toBeUndefined()
+    expect(push).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
   })
 
   it('uses the shared app select controls and no page-local scoped styles', () => {
