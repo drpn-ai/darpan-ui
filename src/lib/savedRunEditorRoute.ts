@@ -1,6 +1,6 @@
 import type { RouteLocationRaw } from 'vue-router'
 import { reconciliationFacade } from './api/facade'
-import type { SavedRunSummary } from './api/types'
+import type { SavedRunSummary, SavedRunSystemOption } from './api/types'
 import {
   normalizePreActions,
   readReconciliationRuleExpressionPreActions,
@@ -35,13 +35,22 @@ export function findSavedRunEditorTarget(rows: SavedRunSummary[], targetId: stri
 }
 
 
+function effectivePrimaryIdExpression(option: SavedRunSystemOption | undefined): string[] {
+  if (option?.idFieldExpressions?.length) return option.idFieldExpressions
+  if (option?.idFieldExpression) return [option.idFieldExpression]
+  return []
+}
+
 export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDraft | null {
   const file1Option = row.systemOptions.find((option) => option.fileSide === 'FILE_1')
     ?? row.systemOptions.find((option) => option.enumId === row.defaultFile1SystemEnumId)
   const file2Option = row.systemOptions.find((option) => option.fileSide === 'FILE_2')
     ?? row.systemOptions.find((option) => option.enumId === row.defaultFile2SystemEnumId)
 
-  if (!file1Option?.enumId || !file1Option.idFieldExpression || !file2Option?.enumId || !file2Option.idFieldExpression) {
+  const file1PrimaryIdExpression = effectivePrimaryIdExpression(file1Option)
+  const file2PrimaryIdExpression = effectivePrimaryIdExpression(file2Option)
+
+  if (!file1Option?.enumId || !file1PrimaryIdExpression.length || !file2Option?.enumId || !file2PrimaryIdExpression.length) {
     return null
   }
 
@@ -60,7 +69,7 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
     file1SourceConfigType: file1Option.sourceConfigType,
     file1FileTypeEnumId: file1Option.fileTypeEnumId || 'DftCsv',
     file1SchemaFileName: file1Option.schemaFileName,
-    file1PrimaryIdExpression: file1Option.idFieldExpression ? [file1Option.idFieldExpression] : [],
+    file1PrimaryIdExpression,
     file2SystemEnumId: file2Option.enumId,
     file2SystemLabel: file2Option.label || file2Option.enumCode || file2Option.description,
     file2SourceTypeEnumId: file2Option.sourceTypeEnumId,
@@ -72,7 +81,7 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
     file2SourceConfigType: file2Option.sourceConfigType,
     file2FileTypeEnumId: file2Option.fileTypeEnumId || 'DftCsv',
     file2SchemaFileName: file2Option.schemaFileName,
-    file2PrimaryIdExpression: file2Option.idFieldExpression ? [file2Option.idFieldExpression] : [],
+    file2PrimaryIdExpression,
     rules: row.rules?.map((rule, index) => {
       const directPreActions = normalizePreActions(rule.preActions)
       const preActions = directPreActions.length

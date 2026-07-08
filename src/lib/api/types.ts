@@ -276,6 +276,7 @@ export interface MappingSystemOption {
   fileTypeEnumId?: string
   fileTypeLabel?: string
   idFieldExpression?: string
+  idFieldExpressions?: string[]
   schemaFileName?: string
   sourceTypeEnumId?: string
   sourceTypeLabel?: string
