@@ -60,7 +60,7 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
     file1SourceConfigType: file1Option.sourceConfigType,
     file1FileTypeEnumId: file1Option.fileTypeEnumId || 'DftCsv',
     file1SchemaFileName: file1Option.schemaFileName,
-    file1PrimaryIdExpression: file1Option.idFieldExpression,
+    file1PrimaryIdExpression: file1Option.idFieldExpression ? [file1Option.idFieldExpression] : [],
     file2SystemEnumId: file2Option.enumId,
     file2SystemLabel: file2Option.label || file2Option.enumCode || file2Option.description,
     file2SourceTypeEnumId: file2Option.sourceTypeEnumId,
@@ -72,7 +72,7 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
     file2SourceConfigType: file2Option.sourceConfigType,
     file2FileTypeEnumId: file2Option.fileTypeEnumId || 'DftCsv',
     file2SchemaFileName: file2Option.schemaFileName,
-    file2PrimaryIdExpression: file2Option.idFieldExpression,
+    file2PrimaryIdExpression: file2Option.idFieldExpression ? [file2Option.idFieldExpression] : [],
     rules: row.rules?.map((rule, index) => {
       const directPreActions = normalizePreActions(rule.preActions)
       const preActions = directPreActions.length

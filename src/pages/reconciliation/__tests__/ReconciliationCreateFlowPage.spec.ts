@@ -123,6 +123,28 @@ async function advanceToFinalPrimaryIdStep(wrapper: ReturnType<typeof mount>): P
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 }
 
+async function advanceToFile1PrimaryIdStep(
+  wrapper: ReturnType<typeof mount>,
+  fileTypeEnumId: 'DftJson' | 'DftCsv',
+): Promise<void> {
+  await wrapper.get('input[name="runName"]').setValue('Composite key run')
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+  await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+  await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+  await chooseWorkflowChoice(wrapper, `file1-filetype-choice-${fileTypeEnumId}`)
+
+  if (fileTypeEnumId === 'DftJson') {
+    await chooseWorkflowOption(wrapper, 'file1-schema-select', 'schema-return-items')
+    await flushPromises()
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+  }
+}
+
 function createDraftState() {
   return buildReconciliationRuleSetDraftState(
     {
@@ -132,13 +154,13 @@ function createDraftState() {
       file1FileTypeEnumId: 'DftJson',
       file1JsonSchemaId: 'schema-oms-orders',
       file1SchemaFileName: 'test-oms-orders.schema.json',
-      file1PrimaryIdExpression: '$.orders[0].order_id',
+      file1PrimaryIdExpression: ['$.orders[0].order_id'],
       file2SystemEnumId: 'SHOPIFY',
       file2SystemLabel: 'SHOPIFY',
       file2FileTypeEnumId: 'DftJson',
       file2JsonSchemaId: 'schema-shopify-orders',
       file2SchemaFileName: 'test-shopify-orders.schema.json',
-      file2PrimaryIdExpression: '$.data.orders.edges[0].node.id',
+      file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
     },
     'ruleset-manager',
   )
@@ -212,10 +234,29 @@ describe('ReconciliationCreateFlowPage', () => {
           systemEnumId: 'SHOPIFY',
           systemLabel: 'SHOPIFY',
         },
+        {
+          jsonSchemaId: 'schema-return-items',
+          schemaName: 'test-return-items.schema.json',
+          description: 'Return items',
+          systemEnumId: 'SHOPIFY',
+          systemLabel: 'SHOPIFY',
+        },
       ],
     })
 
     flattenJsonSchema.mockImplementation(async ({ jsonSchemaId }: { jsonSchemaId: string }) => {
+      if (jsonSchemaId === 'schema-return-items') {
+        return {
+          ok: true,
+          messages: [],
+          errors: [],
+          fieldList: [
+            { fieldPath: '$.returns[0].return_id', type: 'string', required: true },
+            { fieldPath: '$.returns[0].product_id', type: 'string', required: true },
+          ],
+        }
+      }
+
       if (jsonSchemaId === 'schema-oms-orders') {
         return {
           ok: true,
@@ -425,7 +466,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
     await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
 
-    await wrapper.get('input[name="file2PrimaryIdExpression"]').setValue('order_id')
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
     await wrapper.get('[data-testid="create-run"]').trigger('click')
     await flushPromises()
 
@@ -921,7 +963,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
     await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
 
-    await wrapper.get('input[name="file1PrimaryIdExpression"]').setValue('order_id')
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
     await chooseWorkflowOption(wrapper, 'file2-system-select', 'OMS')
@@ -995,5 +1038,36 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(push).toHaveBeenCalledWith({ path: '/reconciliation/automation/create' })
     expect(draftStoreState.setAutomationDraft).toHaveBeenCalled()
     clearPendingReconciliationAutomationDraftState()
+  })
+
+  it('lets the user pick two fields for a composite primary key on a JSON source and submits both', async () => {
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+    await advanceToFile1PrimaryIdStep(wrapper, 'DftJson')
+
+    // First pick opens the menu via chooseWorkflowOption's trigger click. Task 6's multi-select
+    // path does not auto-close the menu after a pick (so multiple picks are possible), so the
+    // second pick clicks the option directly — re-using chooseWorkflowOption here would re-toggle
+    // the trigger and close the still-open menu instead of picking the second field.
+    await chooseWorkflowOption(wrapper, 'file1-field-select', '$.returns[0].return_id')
+    await wrapper.get('[data-testid="workflow-select-option"][data-option-value="$.returns[0].product_id"]').trigger('click')
+
+    const chipTexts = wrapper.findAll('[data-testid="workflow-select-chip"]').map((chip) => chip.text())
+    expect(chipTexts.some((text) => text.includes('$.returns[0].return_id'))).toBe(true)
+    expect(chipTexts.some((text) => text.includes('$.returns[0].product_id'))).toBe(true)
+  })
+
+  it('CSV primary-id step renders a chip-text-input and accepts multiple typed column names', async () => {
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+    await advanceToFile1PrimaryIdStep(wrapper, 'DftCsv')
+
+    const input = wrapper.get('[data-testid="workflow-chip-text-input"]')
+    await input.setValue('return_id')
+    await input.trigger('keydown.enter')
+    await input.setValue('product_id')
+    await input.trigger('keydown.enter')
+
+    expect(wrapper.findAll('[data-testid="workflow-chip-text-chip"]')).toHaveLength(2)
   })
 })

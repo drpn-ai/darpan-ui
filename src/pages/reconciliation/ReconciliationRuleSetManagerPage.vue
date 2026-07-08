@@ -323,8 +323,8 @@ const file1SourceLabel = computed(() => summarizeSource(draft.value, 'file1'))
 const file2SourceLabel = computed(() => summarizeSource(draft.value, 'file2'))
 const file1SystemConfig = computed<SourceConfigSummary | null>(() => buildSourceConfigSummary(draft.value, 'file1'))
 const file2SystemConfig = computed<SourceConfigSummary | null>(() => buildSourceConfigSummary(draft.value, 'file2'))
-const file1PrimaryId = computed(() => formatFieldKey(draft.value?.file1PrimaryIdExpression))
-const file2PrimaryId = computed(() => formatFieldKey(draft.value?.file2PrimaryIdExpression))
+const file1PrimaryId = computed(() => formatFieldKey(draft.value?.file1PrimaryIdExpression?.[0]))
+const file2PrimaryId = computed(() => formatFieldKey(draft.value?.file2PrimaryIdExpression?.[0]))
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const canViewRunHistory = computed(() => Boolean(savedRunId.value))
@@ -348,8 +348,8 @@ const basicDiffRule = computed<ReconciliationRuleSetDraftRule | null>(() => {
 
   return {
     ruleId: 'basic-diff',
-    file1FieldPath: draft.value.file1PrimaryIdExpression,
-    file2FieldPath: draft.value.file2PrimaryIdExpression,
+    file1FieldPath: draft.value.file1PrimaryIdExpression[0] ?? '',
+    file2FieldPath: draft.value.file2PrimaryIdExpression[0] ?? '',
     operator: '=',
     sequenceNum: 0,
   }

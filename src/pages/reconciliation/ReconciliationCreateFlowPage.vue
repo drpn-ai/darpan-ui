@@ -28,6 +28,16 @@
       <template v-else-if="isSelectStep">
         <label class="wizard-input-shell">
           <WorkflowSelect
+            v-if="isPrimaryIdSelectStep"
+            v-model="activeSelectValues"
+            multiple
+            :test-id="activeSelectTestId"
+            :disabled="loadingSelections"
+            :options="activePrimaryIdSelectOptions"
+            :placeholder="loadingSelections ? 'Loading...' : currentPlaceholder"
+          />
+          <WorkflowSelect
+            v-else
             v-model="activeSelectValue"
             :test-id="activeSelectTestId"
             :disabled="loadingSelections"
@@ -49,6 +59,14 @@
             Create New Schema
           </button>
         </div>
+      </template>
+
+      <template v-else-if="isChipTextStep">
+        <WorkflowChipTextInput
+          v-model="activeChipTextValue"
+          data-testid="workflow-chip-text"
+          :placeholder="currentPlaceholder"
+        />
       </template>
 
       <template v-else>
@@ -74,6 +92,7 @@ import WorkflowShortcutChoiceCards, {
 } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowSelect, { type WorkflowSelectOption } from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
+import WorkflowChipTextInput from '../../components/workflow/WorkflowChipTextInput.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade } from '../../lib/api/facade'
@@ -90,6 +109,7 @@ import {
 } from '../../lib/reconciliationAutomationDraft'
 import {
   buildCreateRuleSetRunPayload,
+  fieldSharesRecordRoot,
   type ReconciliationRuleSetDraft,
 } from '../../lib/reconciliationRuleSetDraft'
 import {
@@ -161,7 +181,7 @@ const file1SystemEnumId = ref('')
 const file1SourceMode = ref(SOURCE_MODE_FILE)
 const file1FileTypeEnumId = ref(FILE_TYPE_CSV)
 const file1JsonSchemaId = ref('')
-const file1PrimaryIdExpression = ref('')
+const file1PrimaryIdExpression = ref<string[]>([])
 const file1SourceConfigId = ref('')
 const file1SourceConfigType = ref('')
 const file1NsRestletConfigId = ref('')
@@ -170,7 +190,7 @@ const file2SystemEnumId = ref('')
 const file2SourceMode = ref(SOURCE_MODE_FILE)
 const file2FileTypeEnumId = ref(FILE_TYPE_CSV)
 const file2JsonSchemaId = ref('')
-const file2PrimaryIdExpression = ref('')
+const file2PrimaryIdExpression = ref<string[]>([])
 const file2SourceConfigId = ref('')
 const file2SourceConfigType = ref('')
 const file2NsRestletConfigId = ref('')
@@ -240,7 +260,7 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file1JsonSchemaId: !file1UsesApi.value ? file1JsonSchemaId.value || undefined : undefined,
   file1SchemaLabel: !file1UsesApi.value ? resolveSelectedSchemaLabel(file1JsonSchemaId.value) : undefined,
   file1SchemaFileName: !file1UsesApi.value ? resolveSchemaFileName(file1JsonSchemaId.value) : undefined,
-  file1PrimaryIdExpression: file1PrimaryIdExpression.value.trim(),
+  file1PrimaryIdExpression: file1PrimaryIdExpression.value,
   file2SystemEnumId: file2SystemEnumId.value,
   file2SystemLabel: file2SystemLabel.value || undefined,
   file2SourceTypeEnumId: file2UsesApi.value ? SOURCE_TYPE_API : undefined,
@@ -254,7 +274,7 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file2JsonSchemaId: !file2UsesApi.value ? file2JsonSchemaId.value || undefined : undefined,
   file2SchemaLabel: !file2UsesApi.value ? resolveSelectedSchemaLabel(file2JsonSchemaId.value) : undefined,
   file2SchemaFileName: !file2UsesApi.value ? resolveSchemaFileName(file2JsonSchemaId.value) : undefined,
-  file2PrimaryIdExpression: file2PrimaryIdExpression.value.trim(),
+  file2PrimaryIdExpression: file2PrimaryIdExpression.value,
 }))
 
 const currentQuestion = computed(() => {
@@ -326,6 +346,17 @@ const isSelectStep = computed(() => {
   }
 })
 
+const isChipTextStep = computed(() => {
+  switch (currentStep.value.id) {
+    case 'file1-primary-id':
+      return !file1UsesJson.value && !file1UsesApi.value
+    case 'file2-primary-id':
+      return !file2UsesJson.value && !file2UsesApi.value
+    default:
+      return false
+  }
+})
+
 const activeSelectValue = computed({
   get: () => {
     switch (currentStep.value.id) {
@@ -337,8 +368,6 @@ const activeSelectValue = computed({
         return file1FileTypeEnumId.value
       case 'file1-schema':
         return file1JsonSchemaId.value
-      case 'file1-primary-id':
-        return isSelectStep.value ? file1PrimaryIdExpression.value : ''
       case 'file1-api-config':
         return file1SourceConfigId.value
       case 'file1-api':
@@ -351,8 +380,6 @@ const activeSelectValue = computed({
         return file2FileTypeEnumId.value
       case 'file2-schema':
         return file2JsonSchemaId.value
-      case 'file2-primary-id':
-        return isSelectStep.value ? file2PrimaryIdExpression.value : ''
       case 'file2-api-config':
         return file2SourceConfigId.value
       case 'file2-api':
@@ -366,7 +393,7 @@ const activeSelectValue = computed({
       case 'file1-system':
         file1SystemEnumId.value = value
         file1JsonSchemaId.value = ''
-        file1PrimaryIdExpression.value = ''
+        file1PrimaryIdExpression.value = []
         clearApiSourceConfig('file1')
         break
       case 'file1-source':
@@ -375,14 +402,11 @@ const activeSelectValue = computed({
       case 'file1-filetype':
         file1FileTypeEnumId.value = value
         file1JsonSchemaId.value = ''
-        file1PrimaryIdExpression.value = ''
+        file1PrimaryIdExpression.value = []
         break
       case 'file1-schema':
         file1JsonSchemaId.value = value
-        file1PrimaryIdExpression.value = ''
-        break
-      case 'file1-primary-id':
-        file1PrimaryIdExpression.value = value
+        file1PrimaryIdExpression.value = []
         break
       case 'file1-api-config':
         updateApiSourceConfig('file1', value)
@@ -393,7 +417,7 @@ const activeSelectValue = computed({
       case 'file2-system':
         file2SystemEnumId.value = value
         file2JsonSchemaId.value = ''
-        file2PrimaryIdExpression.value = ''
+        file2PrimaryIdExpression.value = []
         clearApiSourceConfig('file2')
         break
       case 'file2-source':
@@ -402,14 +426,11 @@ const activeSelectValue = computed({
       case 'file2-filetype':
         file2FileTypeEnumId.value = value
         file2JsonSchemaId.value = ''
-        file2PrimaryIdExpression.value = ''
+        file2PrimaryIdExpression.value = []
         break
       case 'file2-schema':
         file2JsonSchemaId.value = value
-        file2PrimaryIdExpression.value = ''
-        break
-      case 'file2-primary-id':
-        file2PrimaryIdExpression.value = value
+        file2PrimaryIdExpression.value = []
         break
       case 'file2-api-config':
         updateApiSourceConfig('file2', value)
@@ -450,6 +471,44 @@ const activeSelectOptions = computed(() => {
   }
 })
 
+const isPrimaryIdSelectStep = computed(() =>
+  (currentStep.value.id === 'file1-primary-id' || currentStep.value.id === 'file2-primary-id') && isSelectStep.value,
+)
+
+const activeSelectValues = computed<string[]>({
+  get: () => {
+    if (currentStep.value.id === 'file1-primary-id') return file1PrimaryIdExpression.value
+    if (currentStep.value.id === 'file2-primary-id') return file2PrimaryIdExpression.value
+    return []
+  },
+  set: (values: string[]) => {
+    if (currentStep.value.id === 'file1-primary-id') file1PrimaryIdExpression.value = values
+    if (currentStep.value.id === 'file2-primary-id') file2PrimaryIdExpression.value = values
+  },
+})
+
+const activeChipTextValue = computed<string[]>({
+  get: () => {
+    if (currentStep.value.id === 'file1-primary-id') return file1PrimaryIdExpression.value
+    if (currentStep.value.id === 'file2-primary-id') return file2PrimaryIdExpression.value
+    return []
+  },
+  set: (values: string[]) => {
+    if (currentStep.value.id === 'file1-primary-id') file1PrimaryIdExpression.value = values
+    if (currentStep.value.id === 'file2-primary-id') file2PrimaryIdExpression.value = values
+  },
+})
+
+// Once at least one field is chosen, further options are restricted to fields sharing the same
+// JSON record root — composite key fields must all resolve at the same array-explosion level so
+// the backend's shared-record-root validation (RuleSetCompareScopeAdapter) never rejects the save.
+const activePrimaryIdSelectOptions = computed(() => {
+  const baseOptions = activeSelectOptions.value
+  const chosen = activeSelectValues.value
+  if (!chosen.length) return baseOptions
+  return baseOptions.filter((option) => fieldSharesRecordRoot(option.value, chosen[0]!))
+})
+
 const activeSelectTestId = computed(() => {
   switch (currentStep.value.id) {
     case 'file1-system':
@@ -488,10 +547,6 @@ const activeTextValue = computed({
         return runName.value
       case 'description':
         return description.value
-      case 'file1-primary-id':
-        return file1UsesJson.value || file1UsesApi.value ? '' : file1PrimaryIdExpression.value
-      case 'file2-primary-id':
-        return file2UsesJson.value || file2UsesApi.value ? '' : file2PrimaryIdExpression.value
       default:
         return ''
     }
@@ -503,12 +558,6 @@ const activeTextValue = computed({
         break
       case 'description':
         description.value = value
-        break
-      case 'file1-primary-id':
-        if (!file1UsesJson.value && !file1UsesApi.value) file1PrimaryIdExpression.value = value
-        break
-      case 'file2-primary-id':
-        if (!file2UsesJson.value && !file2UsesApi.value) file2PrimaryIdExpression.value = value
         break
     }
   },
@@ -693,7 +742,7 @@ const canProceed = computed(() => {
     case 'file1-schema':
       return file1JsonSchemaId.value.length > 0 && !schemaSelectionError.value
     case 'file1-primary-id':
-      return file1PrimaryIdExpression.value.trim().length > 0 && !schemaFieldSelectionError.value
+      return file1PrimaryIdExpression.value.length > 0 && !schemaFieldSelectionError.value
     case 'file1-api-config':
       return file1SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
     case 'file1-api':
@@ -707,7 +756,7 @@ const canProceed = computed(() => {
     case 'file2-schema':
       return file2JsonSchemaId.value.length > 0 && !schemaSelectionError.value
     case 'file2-primary-id':
-      return file2PrimaryIdExpression.value.trim().length > 0 && !schemaFieldSelectionError.value
+      return file2PrimaryIdExpression.value.length > 0 && !schemaFieldSelectionError.value
     case 'file2-api-config':
       return file2SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
     case 'file2-api':
@@ -722,16 +771,16 @@ const canCreateRun = computed(() => {
     trimmedRunName.value.length > 0 &&
     file1SystemEnumId.value.length > 0 &&
     (file1UsesApi.value
-      ? hasApiSourceConfig('file1') && hasApiEndpoint('file1') && file1PrimaryIdExpression.value.trim().length > 0
+      ? hasApiSourceConfig('file1') && hasApiEndpoint('file1') && file1PrimaryIdExpression.value.length > 0
       : file1FileTypeEnumId.value.length > 0 &&
         (!file1UsesJson.value || !!resolveSchemaFileName(file1JsonSchemaId.value)) &&
-        file1PrimaryIdExpression.value.trim().length > 0) &&
+        file1PrimaryIdExpression.value.length > 0) &&
     file2SystemEnumId.value.length > 0 &&
     (file2UsesApi.value
-      ? hasApiSourceConfig('file2') && hasApiEndpoint('file2') && file2PrimaryIdExpression.value.trim().length > 0
+      ? hasApiSourceConfig('file2') && hasApiEndpoint('file2') && file2PrimaryIdExpression.value.length > 0
       : file2FileTypeEnumId.value.length > 0 &&
         (!file2UsesJson.value || !!resolveSchemaFileName(file2JsonSchemaId.value)) &&
-        file2PrimaryIdExpression.value.trim().length > 0) &&
+        file2PrimaryIdExpression.value.length > 0) &&
     file1SystemEnumId.value !== file2SystemEnumId.value
   )
 })
@@ -910,22 +959,22 @@ function updateApiSourceConfig(side: SourceSide, value: string): void {
   if (side === 'file1') {
     file1SourceConfigId.value = selectedConfig?.sourceConfigId ?? ''
     file1SourceConfigType.value = selectedConfig?.sourceConfigType || expectedSourceConfigType(file1SystemEnumId.value)
-    file1PrimaryIdExpression.value = ''
+    file1PrimaryIdExpression.value = []
     clearApiEndpoint('file1')
     return
   }
 
   file2SourceConfigId.value = selectedConfig?.sourceConfigId ?? ''
   file2SourceConfigType.value = selectedConfig?.sourceConfigType || expectedSourceConfigType(file2SystemEnumId.value)
-  file2PrimaryIdExpression.value = ''
+  file2PrimaryIdExpression.value = []
   clearApiEndpoint('file2')
 }
 
 function updateApiSource(side: SourceSide, value: string): void {
   if (side === 'file1') {
-    file1PrimaryIdExpression.value = ''
+    file1PrimaryIdExpression.value = []
   } else {
-    file2PrimaryIdExpression.value = ''
+    file2PrimaryIdExpression.value = []
   }
 
   if (value.startsWith('ns:')) {
@@ -979,7 +1028,7 @@ function setSourceMode(side: SourceSide, value: string): void {
   const sourceMode = value === SOURCE_MODE_API ? SOURCE_MODE_API : SOURCE_MODE_FILE
   if (side === 'file1') {
     file1SourceMode.value = sourceMode
-    file1PrimaryIdExpression.value = ''
+    file1PrimaryIdExpression.value = []
     if (sourceMode === SOURCE_MODE_API) {
       file1JsonSchemaId.value = ''
     } else {
@@ -989,7 +1038,7 @@ function setSourceMode(side: SourceSide, value: string): void {
   }
 
   file2SourceMode.value = sourceMode
-  file2PrimaryIdExpression.value = ''
+  file2PrimaryIdExpression.value = []
   if (sourceMode === SOURCE_MODE_API) {
     file2JsonSchemaId.value = ''
   } else {

@@ -458,8 +458,8 @@ function buildSourceKeyFields(sourceKey: SourceKey): Partial<SaveRuleSetRunPaylo
   const source = sourceForm(sourceKey)
   const isSource1 = sourceKey === 'source1'
   const originalPrimaryId = isSource1
-    ? ruleSetDraft.value?.file1PrimaryIdExpression
-    : ruleSetDraft.value?.file2PrimaryIdExpression
+    ? ruleSetDraft.value?.file1PrimaryIdExpression?.[0]
+    : ruleSetDraft.value?.file2PrimaryIdExpression?.[0]
 
   if (sourceUsesApi(sourceKey)) {
     const sourceConfigType = resolveSelectedSourceConfigType(sourceKey)
@@ -525,13 +525,13 @@ function resolveSchemaId(jsonSchemaId: string | undefined, schemaName: string | 
 function hydrateRuleSetDraftForm(draft: ReconciliationRuleSetDraft): void {
   form.mappingName = draft.runName
   form.source1.schemaId = sourceUsesApi('source1') ? '' : resolveSchemaId(draft.file1JsonSchemaId, draft.file1SchemaFileName)
-  form.source1.fieldPath = draft.file1PrimaryIdExpression
+  form.source1.fieldPath = draft.file1PrimaryIdExpression?.[0] ?? ''
   form.source1.sourceConfigId = draft.file1SourceConfigId ?? ''
   form.source1.sourceConfigType = draft.file1SourceConfigType ?? resolveSelectedSourceConfigType('source1')
   form.source1.nsRestletConfigId = draft.file1NsRestletConfigId ?? ''
   form.source1.systemMessageRemoteId = draft.file1SystemMessageRemoteId ?? ''
   form.source2.schemaId = sourceUsesApi('source2') ? '' : resolveSchemaId(draft.file2JsonSchemaId, draft.file2SchemaFileName)
-  form.source2.fieldPath = draft.file2PrimaryIdExpression
+  form.source2.fieldPath = draft.file2PrimaryIdExpression?.[0] ?? ''
   form.source2.sourceConfigId = draft.file2SourceConfigId ?? ''
   form.source2.sourceConfigType = draft.file2SourceConfigType ?? resolveSelectedSourceConfigType('source2')
   form.source2.nsRestletConfigId = draft.file2NsRestletConfigId ?? ''
@@ -542,11 +542,11 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
   const source1 = source1Schema.value
   const source2 = source2Schema.value
   const file1PrimaryIdExpression = preserveFieldExpressionSuffix(
-    ruleSetDraft.value?.file1PrimaryIdExpression,
+    ruleSetDraft.value?.file1PrimaryIdExpression?.[0],
     form.source1.fieldPath,
   )
   const file2PrimaryIdExpression = preserveFieldExpressionSuffix(
-    ruleSetDraft.value?.file2PrimaryIdExpression,
+    ruleSetDraft.value?.file2PrimaryIdExpression?.[0],
     form.source2.fieldPath,
   )
 
@@ -573,7 +573,7 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
           file1SchemaLabel: source1 ? resolveSchemaLabel(source1) : ruleSetDraft.value?.file1SchemaLabel,
           file1SchemaFileName: source1?.schemaName,
         }),
-    file1PrimaryIdExpression,
+    file1PrimaryIdExpression: file1PrimaryIdExpression ? [file1PrimaryIdExpression] : [],
     file2SystemEnumId: source2?.systemEnumId ?? ruleSetDraft.value?.file2SystemEnumId ?? '',
     file2SystemLabel: source2?.systemLabel ?? ruleSetDraft.value?.file2SystemLabel,
     ...(source2UsesApi.value
@@ -593,7 +593,7 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
           file2SchemaLabel: source2 ? resolveSchemaLabel(source2) : ruleSetDraft.value?.file2SchemaLabel,
           file2SchemaFileName: source2?.schemaName,
         }),
-    file2PrimaryIdExpression,
+    file2PrimaryIdExpression: file2PrimaryIdExpression ? [file2PrimaryIdExpression] : [],
     rules: ruleSetDraft.value?.rules,
   }
 }
