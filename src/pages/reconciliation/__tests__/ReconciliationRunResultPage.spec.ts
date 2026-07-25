@@ -1099,7 +1099,17 @@ describe('ReconciliationRunResultPage', () => {
     await flushPromises()
 
     expect(getReconciliationRunStatus).toHaveBeenCalledWith({ reconciliationRunResultId: 'RR_TIMELINE' })
-    const timeline = wrapper.get('[data-testid="run-result-step-timeline"]')
+    // Collapsed by default: the header shows the step count, the rows stay hidden until expanded.
+    let timeline = wrapper.get('[data-testid="run-result-step-timeline"]')
+    expect(timeline.text()).toContain('Run steps')
+    expect(timeline.text()).toContain('3')
+    expect(timeline.text()).not.toContain('Preparing run')
+    const toggle = wrapper.get('[data-testid="run-result-step-timeline-toggle"]')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    await toggle.trigger('click')
+
+    timeline = wrapper.get('[data-testid="run-result-step-timeline"]')
+    expect(wrapper.get('[data-testid="run-result-step-timeline-toggle"]').attributes('aria-expanded')).toBe('true')
     expect(timeline.text()).toContain('Preparing run')
     expect(timeline.text()).toContain('Extracting SHOPIFY')
     expect(timeline.text()).toContain(`${(4965).toLocaleString()} records`)
@@ -1130,6 +1140,7 @@ describe('ReconciliationRunResultPage', () => {
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
 
+    await wrapper.get('[data-testid="run-result-step-timeline-toggle"]').trigger('click')
     expect(wrapper.get('[data-testid="run-result-step-timeline-empty"]').text()).toContain('No step detail (legacy run)')
   })
 })

@@ -125,15 +125,34 @@
             class="run-result-step-timeline"
             data-testid="run-result-step-timeline"
           >
-            <span class="run-result-step-timeline__label">Run steps</span>
+            <button
+              type="button"
+              class="run-result-step-timeline__toggle"
+              data-testid="run-result-step-timeline-toggle"
+              :aria-label="stepTimelineCollapsed ? 'Expand run steps' : 'Collapse run steps'"
+              :aria-expanded="stepTimelineCollapsed ? 'false' : 'true'"
+              @click="stepTimelineCollapsed = !stepTimelineCollapsed"
+            >
+              <span class="run-result-step-timeline__label">Run steps</span>
+              <span v-if="runStatusSteps.length > 0" class="run-result-step-timeline__count">{{ runStatusSteps.length }}</span>
+              <svg
+                class="run-result-step-timeline__toggle-icon"
+                :class="{ 'run-result-step-timeline__toggle-icon--collapsed': stepTimelineCollapsed }"
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M12.3 4.8 7.1 10l5.2 5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
             <p
-              v-if="runStatusSteps.length === 0"
+              v-if="!stepTimelineCollapsed && runStatusSteps.length === 0"
               class="section-note"
               data-testid="run-result-step-timeline-empty"
             >
               No step detail (legacy run).
             </p>
-            <ol v-else class="run-result-step-timeline__list">
+            <ol v-else-if="!stepTimelineCollapsed" class="run-result-step-timeline__list">
               <li
                 v-for="step in runStatusSteps"
                 :key="`${step.stageSequence ?? 0}-${step.stageCode ?? ''}`"
@@ -494,6 +513,8 @@ const runStatus = computed(() =>
 )
 const runStatusSteps = computed<ReconciliationRunStep[]>(() => runStatus.value?.steps ?? [])
 const showStepTimeline = computed(() => runStatus.value?.ok === true)
+// Collapsed by default: the timeline is a forensic view, not part of the primary read path.
+const stepTimelineCollapsed = ref(true)
 
 watch(timelineRunResultId, (runResultId) => {
   if (!runResultId || polledTimelineRunIds.has(runResultId)) return
@@ -940,11 +961,47 @@ watch([savedRunId, outputFileName], () => {
   background: color-mix(in oklab, var(--surface-2) 92%, white);
 }
 
+.run-result-step-timeline__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
 .run-result-step-timeline__label {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-soft);
+}
+
+.run-result-step-timeline__count {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.run-result-step-timeline__toggle-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--text-soft);
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.run-result-step-timeline__toggle-icon--collapsed {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-result-step-timeline__toggle-icon {
+    transition: none;
+  }
 }
 
 .run-result-step-timeline__list {
