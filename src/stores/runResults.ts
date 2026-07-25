@@ -2,9 +2,19 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ApiCallError } from '../lib/api/client'
 import { reconciliationFacade } from '../lib/api/facade'
-import type { GeneratedOutput } from '../lib/api/types'
+import type { GeneratedOutput, GetReconciliationRunStatusResponse } from '../lib/api/types'
 
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000
+
+// Mirrors RunObservability status constants: a run is live while PENDING/RUNNING;
+// every other status is terminal and ends the per-run poll.
+const ACTIVE_RUN_STATUS_IDS = new Set(['AUT_STAT_PENDING', 'AUT_STAT_RUNNING'])
+
+const RUN_STATUS_POLL_INTERVAL_MS = 10000
+
+export function isActiveRunStatus(statusEnumId: string | null | undefined): boolean {
+  return ACTIVE_RUN_STATUS_IDS.has(statusEnumId ?? '')
+}
 
 // Headroom over the expected ~5-6 outputs / 2 days for the active tenant.
 // If a tenant ever bursts past this, hydrate() simply returns the most
@@ -160,6 +170,60 @@ export const useRunResultsStore = defineStore('runResults', () => {
     }
   }
 
+  const _runStatusById = ref<Map<string, GetReconciliationRunStatusResponse>>(new Map())
+  const _runStatusTimers = new Map<string, ReturnType<typeof setInterval>>()
+
+  function getRunStatus(reconciliationRunResultId: string): GetReconciliationRunStatusResponse | null {
+    return _runStatusById.value.get(reconciliationRunResultId) ?? null
+  }
+
+  async function _fetchRunStatus(runId: string): Promise<void> {
+    try {
+      const response = await reconciliationFacade.getReconciliationRunStatus({ reconciliationRunResultId: runId })
+      const previous = _runStatusById.value.get(runId)
+      const next = new Map(_runStatusById.value)
+      next.set(runId, response)
+      _runStatusById.value = next
+      if (!isActiveRunStatus(response.statusEnumId)) {
+        stopRunStatusPoll(runId)
+        // Live→terminal transition: refresh the cache so the finished result replaces
+        // the running tile promptly instead of waiting for the next auto-refresh tick.
+        if (previous && isActiveRunStatus(previous.statusEnumId)) void refresh()
+      }
+    } catch (err) {
+      if (isAbortError(err)) return
+      // Poll errors are non-fatal: keep the last known status and try again next tick.
+    }
+  }
+
+  // Per-run live status poll for the observability timeline: runs only while the run
+  // is active (PENDING/RUNNING) and stops itself on any terminal status. Idempotent
+  // per run id; pauses while the tab is hidden, like startAutoRefresh.
+  function startRunStatusPoll(reconciliationRunResultId: string, intervalMs = RUN_STATUS_POLL_INTERVAL_MS): Promise<void> {
+    const runId = (reconciliationRunResultId ?? '').trim()
+    if (!runId || typeof window === 'undefined') return Promise.resolve()
+    if (_runStatusTimers.has(runId)) return Promise.resolve()
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      void _fetchRunStatus(runId)
+    }, Math.max(2000, intervalMs))
+    _runStatusTimers.set(runId, timer)
+    return _fetchRunStatus(runId)
+  }
+
+  function stopRunStatusPoll(reconciliationRunResultId: string): void {
+    const timer = _runStatusTimers.get(reconciliationRunResultId)
+    if (timer) {
+      clearInterval(timer)
+      _runStatusTimers.delete(reconciliationRunResultId)
+    }
+  }
+
+  function stopAllRunStatusPolls(): void {
+    for (const timer of _runStatusTimers.values()) clearInterval(timer)
+    _runStatusTimers.clear()
+  }
+
   function upsertOutput(output: GeneratedOutput | null | undefined): void {
     if (!output) return
     const key = outputKey(output)
@@ -188,10 +252,12 @@ export const useRunResultsStore = defineStore('runResults', () => {
 
   function reset(): void {
     stopAutoRefresh()
+    stopAllRunStatusPolls()
     _abortController?.abort()
     _abortController = null
     _hydrationPromise = null
     _byFileName.value = new Map()
+    _runStatusById.value = new Map()
     _loadState.value = emptyLoadState()
   }
 
@@ -207,6 +273,10 @@ export const useRunResultsStore = defineStore('runResults', () => {
     refresh,
     startAutoRefresh,
     stopAutoRefresh,
+    getRunStatus,
+    startRunStatusPoll,
+    stopRunStatusPoll,
+    stopAllRunStatusPolls,
     upsertOutput,
     upsertOutputs,
     removeOutput,

@@ -18,6 +18,7 @@ const route = vi.hoisted(() => ({
 const listGeneratedOutputs = vi.hoisted(() => vi.fn())
 const listSavedRuns = vi.hoisted(() => vi.fn())
 const saveSavedRunName = vi.hoisted(() => vi.fn())
+const getReconciliationRunStatus = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
@@ -44,6 +45,7 @@ vi.mock('../../../lib/api/facade', () => ({
     listGeneratedOutputs,
     listSavedRuns,
     saveSavedRunName,
+    getReconciliationRunStatus,
   },
 }))
 
@@ -217,6 +219,9 @@ describe('ReconciliationRunHistoryPage', () => {
         buildGeneratedOutput(26),
       ],
     })
+    getReconciliationRunStatus.mockReset()
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING' })
+    useRunResultsStore().stopAllRunStatusPolls()
     saveSavedRunName.mockReset()
     listSavedRuns.mockReset()
     listSavedRuns.mockResolvedValue({
@@ -458,6 +463,54 @@ describe('ReconciliationRunHistoryPage', () => {
       },
     })
     expect(wrapper.findAll('[data-testid="run-history-result-tile"]')).toHaveLength(5)
+  })
+
+  it('running tile shows live stage and progress from the status poll', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 2, pageCount: 1 },
+      generatedOutputs: [
+        { ...buildRunningGeneratedOutput(), reconciliationRunResultId: 'RUN_RESULT_LIVE_A', currentStage: 'EXTRACT_FILE2', progressPercent: 45 },
+        buildGeneratedOutput(31),
+      ],
+    })
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      currentStage: 'COMPARE',
+      progressPercent: 62,
+    })
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    expect(getReconciliationRunStatus).toHaveBeenCalledWith({ reconciliationRunResultId: 'RUN_RESULT_LIVE_A' })
+    const progress = wrapper.get('[data-testid="run-history-running-progress"]')
+    // The live poll status wins over the (older) descriptor snapshot.
+    expect(progress.text()).toContain('Comparing records')
+    expect(progress.text()).toContain('62%')
+  })
+
+  it('running tile falls back to the descriptor stage before live status carries one', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 2, pageCount: 1 },
+      generatedOutputs: [
+        { ...buildRunningGeneratedOutput(), reconciliationRunResultId: 'RUN_RESULT_LIVE_B', currentStage: 'EXTRACT_FILE2', progressPercent: 45 },
+        buildGeneratedOutput(31),
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    const progress = wrapper.get('[data-testid="run-history-running-progress"]')
+    expect(progress.text()).toContain('Extracting SHOPIFY')
+    expect(progress.text()).toContain('45%')
   })
 
   it('clears a pending history marker after a newer saved result is available', async () => {

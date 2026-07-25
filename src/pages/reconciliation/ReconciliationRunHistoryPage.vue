@@ -25,7 +25,7 @@
             <span class="static-page-tile-title">{{ formatSavedResultDateTime(runningRun.submittedAt) }}</span>
             <StatusBadge :label="runningRun.statusLabel" tone="warning" />
           </div>
-          <p class="section-note">Results will appear here when this reconciliation finishes.</p>
+          <p class="section-note" data-testid="run-history-running-progress">{{ runningProgressLine(runningRun) }}</p>
         </article>
       </div>
     </StaticPageSection>
@@ -164,7 +164,7 @@ import {
   subscribeToPendingReconciliationRunsChange,
   type PendingReconciliationRun,
 } from '../../lib/reconciliationPendingRuns'
-import { normalizeDisplayText } from '../../lib/reconciliationDisplay'
+import { normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconciliationDisplay'
 import {
   buildReconciliationDiffRoute,
   buildReconciliationRunResultRoute,
@@ -182,6 +182,8 @@ interface RunningRunView {
   runningRunId: string
   submittedAt: string
   statusLabel: string
+  currentStage: string
+  progressPercent: number | null
 }
 
 const route = useRoute()
@@ -316,10 +318,17 @@ function isCompletedGeneratedOutput(output: GeneratedOutput): boolean {
 function buildBackendRunningRunView(output: GeneratedOutput): RunningRunView {
   const submittedAt = firstText(output.startedDate, output.createdDate, output.lastUpdatedDate) || new Date().toISOString()
   const statusLabel = normalizeDisplayText(output.statusLabel) || 'Running'
+  // The per-run status poll is fresher than the list descriptor snapshot, so it wins.
+  const runResultId = normalizeDisplayText(output.reconciliationRunResultId)
+  const liveStatus = runResultId ? runResultsStore.getRunStatus(runResultId) : null
+  const currentStage = normalizeDisplayText(liveStatus?.currentStage) || normalizeDisplayText(output.currentStage)
+  const progressPercent = liveStatus?.progressPercent ?? output.progressPercent ?? null
   return {
     runningRunId: generatedOutputKey(output) || `${savedRunId.value}:${submittedAt}`,
     submittedAt,
     statusLabel,
+    currentStage,
+    progressPercent,
   }
 }
 
@@ -328,7 +337,15 @@ function buildLocalRunningRunView(pendingRun: PendingReconciliationRun): Running
     runningRunId: pendingRun.pendingRunId,
     submittedAt: pendingRun.submittedAt,
     statusLabel: 'Running',
+    currentStage: '',
+    progressPercent: null,
   }
+}
+
+function runningProgressLine(view: RunningRunView): string {
+  if (!view.currentStage) return 'Results will appear here when this reconciliation finishes.'
+  const label = reconciliationStageLabel(view.currentStage, file1SystemLabel.value, file2SystemLabel.value)
+  return view.progressPercent != null ? `${label} · ${view.progressPercent}%` : label
 }
 
 function refreshPendingRuns(): void {
@@ -523,6 +540,19 @@ watch(() => runResultsStore.recentOutputs, () => {
   primeFromCache(savedRunId.value)
 })
 
+// Live per-run status polls for the "In Progress" tiles. The store poll stops itself
+// on terminal status; this page only stops the ones it started when it unmounts.
+const polledRunResultIds = new Set<string>()
+
+watch(runningGeneratedOutputs, (outputs) => {
+  for (const output of outputs) {
+    const runResultId = normalizeDisplayText(output.reconciliationRunResultId)
+    if (!runResultId || polledRunResultIds.has(runResultId)) continue
+    polledRunResultIds.add(runResultId)
+    void runResultsStore.startRunStatusPoll(runResultId)
+  }
+}, { immediate: true })
+
 let unsubscribePendingRunsListener: (() => void) | null = null
 
 onMounted(() => {
@@ -536,6 +566,8 @@ onUnmounted(() => {
   unsubscribePendingRunsListener?.()
   unsubscribePendingRunsListener = null
   runResultsStore.stopAutoRefresh()
+  for (const runResultId of polledRunResultIds) runResultsStore.stopRunStatusPoll(runResultId)
+  polledRunResultIds.clear()
 })
 </script>
 

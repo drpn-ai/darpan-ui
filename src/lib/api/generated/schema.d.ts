@@ -971,6 +971,7 @@ export interface components {
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
+                    idFieldExpressions?: unknown[];
                     schemaFileName?: string;
                     sourceTypeEnumId?: string;
                     sourceTypeLabel?: string;
@@ -1060,6 +1061,7 @@ export interface components {
             file1SchemaFileName?: string;
             file1RecordRootExpression?: string;
             file1PrimaryIdExpression?: string;
+            file1PrimaryIdExpressions?: unknown[];
             file2SystemEnumId: string;
             file2SourceTypeEnumId?: string;
             file2SystemMessageRemoteId?: string;
@@ -1070,6 +1072,7 @@ export interface components {
             file2SchemaFileName?: string;
             file2RecordRootExpression?: string;
             file2PrimaryIdExpression?: string;
+            file2PrimaryIdExpressions?: unknown[];
             rules?: {
                 ruleId?: string;
                 sequenceNum?: number;
@@ -1106,6 +1109,7 @@ export interface components {
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
+                    idFieldExpressions?: unknown[];
                     schemaFileName?: string;
                     sourceTypeEnumId?: string;
                     sourceTypeLabel?: string;
@@ -1433,6 +1437,55 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetMappingResult"];
         };
+        /** @description Live status + per-stage timeline for one reconciliation run. Tenant-gated. */
+        GetReconciliationRunStatusParams: {
+            reconciliationRunResultId: string;
+        };
+        GetReconciliationRunStatusResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            statusEnumId?: string;
+            currentStage?: string;
+            progressPercent?: number;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            startedDate?: string | number;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            lastHeartbeatDate?: string | number;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            completedDate?: string | number;
+            errorMessage?: string;
+            steps?: {
+                stageCode?: string;
+                stageSequence?: number;
+                statusEnumId?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                startedDate?: string | number;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                completedDate?: string | number;
+                recordCount?: number;
+                errorMessage?: string;
+            }[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#ReconciliationRunStatus */
+        GetReconciliationRunStatusRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.get#ReconciliationRunStatus";
+            params?: components["schemas"]["GetReconciliationRunStatusParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.get#ReconciliationRunStatus. Check result.ok / result.errors for business failures. */
+        GetReconciliationRunStatusResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetReconciliationRunStatusResult"];
+        };
         /** @description List execution history for the active tenant, optionally filtered to one automation. */
         ListAutomationExecutionsParams: {
             automationId?: string;
@@ -1674,6 +1727,8 @@ export interface components {
                 sizeBytes?: number;
                 statusEnumId?: string;
                 statusLabel?: string;
+                currentStage?: string;
+                progressPercent?: number;
                 resultAvailable?: boolean;
                 /** @description Timestamp — ISO-8601 string or epoch milliseconds */
                 startedDate?: string | number;
@@ -1736,6 +1791,7 @@ export interface components {
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
+                    idFieldExpressions?: unknown[];
                     schemaFileName?: string;
                 }[];
             }[];
@@ -1798,6 +1854,7 @@ export interface components {
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
+                    idFieldExpressions?: unknown[];
                     schemaFileName?: string;
                     sourceTypeEnumId?: string;
                     sourceTypeLabel?: string;
@@ -2342,6 +2399,7 @@ export interface components {
             file1SchemaFileName?: string;
             file1RecordRootExpression?: string;
             file1PrimaryIdExpression?: string;
+            file1PrimaryIdExpressions?: unknown[];
             file2SystemEnumId: string;
             file2SourceTypeEnumId?: string;
             file2SystemMessageRemoteId?: string;
@@ -2352,6 +2410,7 @@ export interface components {
             file2SchemaFileName?: string;
             file2RecordRootExpression?: string;
             file2PrimaryIdExpression?: string;
+            file2PrimaryIdExpressions?: unknown[];
             rules?: {
                 ruleId?: string;
                 sequenceNum?: number;
@@ -2388,6 +2447,7 @@ export interface components {
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
+                    idFieldExpressions?: unknown[];
                     schemaFileName?: string;
                     sourceTypeEnumId?: string;
                     sourceTypeLabel?: string;
@@ -2467,6 +2527,7 @@ export interface components {
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
+                    idFieldExpressions?: unknown[];
                     schemaFileName?: string;
                     sourceTypeEnumId?: string;
                     sourceTypeLabel?: string;
@@ -3301,7 +3362,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantNotificationSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantNotificationSettingsRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"];
+                "application/json": components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantNotificationSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantNotificationSettingsRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"];
             };
         };
         responses: {
@@ -3311,7 +3372,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantNotificationSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantNotificationSettingsResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantNotificationSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantNotificationSettingsResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"];
                 };
             };
         };

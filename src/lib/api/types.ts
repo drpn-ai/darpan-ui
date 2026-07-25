@@ -546,6 +546,8 @@ export interface GeneratedOutput {
   sizeBytes?: number
   statusEnumId?: string
   statusLabel?: string
+  currentStage?: string
+  progressPercent?: number
   resultAvailable?: boolean
   startedDate?: string
   completedDate?: string
@@ -695,6 +697,14 @@ export interface ListGeneratedOutputsResponse extends PaginatedResponse {
 }
 
 export type GetGeneratedOutputResponse = Schemas['GetGeneratedOutputResult']
+
+export interface GetReconciliationRunStatusPayload {
+  reconciliationRunResultId: string
+}
+
+export type GetReconciliationRunStatusResponse = Schemas['GetReconciliationRunStatusResult']
+
+export type ReconciliationRunStep = NonNullable<GetReconciliationRunStatusResponse['steps']>[number]
 
 export interface GeneratedOutputDifferencesMetadata {
   file1Label?: string

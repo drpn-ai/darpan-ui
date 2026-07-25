@@ -120,6 +120,34 @@
             <InlineValidation v-if="sourceDownloadError" tone="error" :message="sourceDownloadError" />
           </section>
 
+          <section
+            v-if="showStepTimeline"
+            class="run-result-step-timeline"
+            data-testid="run-result-step-timeline"
+          >
+            <span class="run-result-step-timeline__label">Run steps</span>
+            <p
+              v-if="runStatusSteps.length === 0"
+              class="section-note"
+              data-testid="run-result-step-timeline-empty"
+            >
+              No step detail (legacy run).
+            </p>
+            <ol v-else class="run-result-step-timeline__list">
+              <li
+                v-for="step in runStatusSteps"
+                :key="`${step.stageSequence ?? 0}-${step.stageCode ?? ''}`"
+                class="run-result-step"
+              >
+                <StatusBadge :label="stepStatusLabel(step)" :tone="stepStatusTone(step)" />
+                <span class="run-result-step__stage">{{ stepStageLabel(step) }}</span>
+                <span v-if="stepDurationLabel(step)" class="run-result-step__meta">{{ stepDurationLabel(step) }}</span>
+                <span v-if="stepRecordsLabel(step)" class="run-result-step__meta">{{ stepRecordsLabel(step) }}</span>
+                <span v-if="step.errorMessage" class="run-result-step__error">{{ step.errorMessage }}</span>
+              </li>
+            </ol>
+          </section>
+
           <div class="reconciliation-diff-details__bucket-grid">
             <template
               v-for="bucket in diffDetailBuckets"
@@ -314,15 +342,18 @@ import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import StatusBadge from '../../components/ui/StatusBadge.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
 import type {
   GeneratedOutput,
   GeneratedOutputDifferencesMetadata,
   GeneratedOutputDifferencesSummary,
+  ReconciliationRunStep,
 } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
-import { normalizeDisplayText } from '../../lib/reconciliationDisplay'
+import { useRunResultsStore } from '../../stores/runResults'
+import { formatRunStepDuration, normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconciliationDisplay'
 import {
   ALL_RULE_FILTER_KEY,
   BASE_RULE_FILTER_KEY,
@@ -449,6 +480,62 @@ const runSettingsId = computed(() =>
   savedRunId.value,
 )
 const canOpenRunSettings = computed(() => canEditTenantSettings.value && Boolean(runSettingsId.value))
+
+// Step timeline (recon observability Phase 4). The differences payload does not carry the
+// run-result id, so it is resolved from the run-results cache descriptor for this file;
+// the store poll self-terminates once the run status is terminal.
+const runResultsStore = useRunResultsStore()
+const polledTimelineRunIds = new Set<string>()
+const timelineRunResultId = computed(() =>
+  normalizeDisplayText(runResultsStore.getByFileName(outputFileName.value)?.reconciliationRunResultId),
+)
+const runStatus = computed(() =>
+  timelineRunResultId.value ? runResultsStore.getRunStatus(timelineRunResultId.value) : null,
+)
+const runStatusSteps = computed<ReconciliationRunStep[]>(() => runStatus.value?.steps ?? [])
+const showStepTimeline = computed(() => runStatus.value?.ok === true)
+
+watch(timelineRunResultId, (runResultId) => {
+  if (!runResultId || polledTimelineRunIds.has(runResultId)) return
+  polledTimelineRunIds.add(runResultId)
+  void runResultsStore.startRunStatusPoll(runResultId)
+}, { immediate: true })
+
+// Warm the cache so a deep link into this page can still resolve the file's run id.
+void runResultsStore.ensureLoaded()
+
+const STEP_STATUS_LABELS: Record<string, string> = {
+  AUT_STAT_PENDING: 'Pending',
+  AUT_STAT_RUNNING: 'Running',
+  AUT_STAT_SUCCESS: 'Done',
+  AUT_STAT_FAILED: 'Failed',
+  AUT_STAT_NO_DATA: 'No data',
+}
+
+function stepStatusLabel(step: ReconciliationRunStep): string {
+  const statusEnumId = normalizeDisplayText(step.statusEnumId)
+  return STEP_STATUS_LABELS[statusEnumId] ?? (statusEnumId || 'Unknown')
+}
+
+function stepStatusTone(step: ReconciliationRunStep): 'neutral' | 'success' | 'warning' | 'danger' {
+  const statusEnumId = normalizeDisplayText(step.statusEnumId)
+  if (statusEnumId === 'AUT_STAT_SUCCESS') return 'success'
+  if (statusEnumId === 'AUT_STAT_FAILED') return 'danger'
+  if (statusEnumId === 'AUT_STAT_RUNNING') return 'warning'
+  return 'neutral'
+}
+
+function stepStageLabel(step: ReconciliationRunStep): string {
+  return reconciliationStageLabel(step.stageCode, diffDetailsFile1Label.value, diffDetailsFile2Label.value)
+}
+
+function stepDurationLabel(step: ReconciliationRunStep): string {
+  return formatRunStepDuration(step.startedDate, step.completedDate)
+}
+
+function stepRecordsLabel(step: ReconciliationRunStep): string {
+  return step.recordCount != null ? `${step.recordCount.toLocaleString()} records` : ''
+}
 
 const {
   runSourceDetails,
@@ -636,6 +723,8 @@ let loadSavedResultController: AbortController | null = null
 onBeforeUnmount(() => {
   pageAbortController.abort()
   loadSavedResultController?.abort()
+  for (const runResultId of polledTimelineRunIds) runResultsStore.stopRunStatusPoll(runResultId)
+  polledTimelineRunIds.clear()
 })
 
 async function loadSavedResult(): Promise<void> {
@@ -840,6 +929,52 @@ watch([savedRunId, outputFileName], () => {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface-2) 92%, white);
+}
+
+.run-result-step-timeline {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface-2) 92%, white);
+}
+
+.run-result-step-timeline__label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+.run-result-step-timeline__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-result-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.run-result-step__stage {
+  font-weight: 600;
+}
+
+.run-result-step__meta {
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.run-result-step__error {
+  flex-basis: 100%;
+  color: var(--danger, #b3261e);
+  font-size: 0.9rem;
 }
 
 .run-result-source-details__summary {

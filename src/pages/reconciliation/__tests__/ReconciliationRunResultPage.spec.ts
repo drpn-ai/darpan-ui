@@ -20,6 +20,8 @@ const getGeneratedOutput = vi.hoisted(() => vi.fn())
 const getGeneratedOutputDifferences = vi.hoisted(() => vi.fn())
 const listSavedRuns = vi.hoisted(() => vi.fn())
 const saveSavedRunName = vi.hoisted(() => vi.fn())
+const listGeneratedOutputs = vi.hoisted(() => vi.fn())
+const getReconciliationRunStatus = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
@@ -50,6 +52,8 @@ vi.mock('../../../lib/api/facade', () => ({
     getGeneratedOutputDifferences,
     listSavedRuns,
     saveSavedRunName,
+    listGeneratedOutputs,
+    getReconciliationRunStatus,
   },
 }))
 
@@ -101,6 +105,7 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 }))
 
 import ReconciliationRunResultPage from '../ReconciliationRunResultPage.vue'
+import { useRunResultsStore } from '../../../stores/runResults'
 
 function buildGeneratedOutputFile(contentText: string, outputFileOverrides: Record<string, unknown> = {}) {
   return {
@@ -463,6 +468,17 @@ describe('ReconciliationRunResultPage', () => {
     route.fullPath =
       '/reconciliation/run-result/RS_ORDER_CSV/CSV-Order-Compare-diff-20260331-063304.json?runName=CSV%20Order%20Compare&file1SystemLabel=OMS&file2SystemLabel=SHOPIFY'
 
+    useRunResultsStore().reset()
+    listGeneratedOutputs.mockReset()
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 0, pageCount: 0 },
+      generatedOutputs: [],
+    })
+    getReconciliationRunStatus.mockReset()
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', steps: [] })
     getGeneratedOutput.mockReset()
     getGeneratedOutputDifferences.mockReset()
     getGeneratedOutputDifferences.mockImplementation(simulateDifferences(defaultDiffDetails, { sourceDetails: defaultSourceDetails }))
@@ -664,7 +680,10 @@ describe('ReconciliationRunResultPage', () => {
 
     const sourceDetails = wrapper.get('[data-testid="run-result-source-details"]')
     expect(sourceDetails.text()).toContain('API date range')
-    expect(sourceDetails.text()).toContain('May 1, 2026 to May 2, 2026')
+    // Single-day API run: dateRange.end is an exclusive next-day boundary (start=May 1, end=May 2),
+    // so the label collapses to the one covered date instead of reading as a two-day range.
+    expect(sourceDetails.text()).toContain('May 1, 2026')
+    expect(sourceDetails.text()).not.toContain('May 1, 2026 to May 2, 2026')
     expect(sourceDetails.text()).toContain('Files compared')
     expect(sourceDetails.text()).toContain('HotWax')
     expect(sourceDetails.text()).toContain('HotWax-orders-api.json')
@@ -1047,5 +1066,70 @@ describe('ReconciliationRunResultPage', () => {
     expect(source).not.toContain('padding-left: clamp')
     expect(source).not.toContain('padding-left: 4rem')
     expect(source).not.toContain('class="reconciliation-diff-table"')
+  })
+
+  it('renders the step timeline for a run with recorded steps', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        reconciliationRunResultId: 'RR_TIMELINE',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_SUCCESS',
+        resultAvailable: true,
+        createdDate: new Date().toISOString(),
+      }],
+    })
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_SUCCESS',
+      steps: [
+        { stageCode: 'RESOLVE', stageSequence: 1, statusEnumId: 'AUT_STAT_SUCCESS', startedDate: 1784955159000, completedDate: 1784955160000 },
+        { stageCode: 'EXTRACT_FILE2', stageSequence: 3, statusEnumId: 'AUT_STAT_SUCCESS', startedDate: 1784955160000, completedDate: 1784955472000, recordCount: 4965 },
+        { stageCode: 'COMPARE', stageSequence: 4, statusEnumId: 'AUT_STAT_FAILED', startedDate: 1784955472000, completedDate: 1784955484000, errorMessage: 'Spark compare failed: boom' },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(getReconciliationRunStatus).toHaveBeenCalledWith({ reconciliationRunResultId: 'RR_TIMELINE' })
+    const timeline = wrapper.get('[data-testid="run-result-step-timeline"]')
+    expect(timeline.text()).toContain('Preparing run')
+    expect(timeline.text()).toContain('Extracting SHOPIFY')
+    expect(timeline.text()).toContain(`${(4965).toLocaleString()} records`)
+    expect(timeline.text()).toContain('5m 12s')
+    expect(timeline.text()).toContain('Comparing records')
+    expect(timeline.text()).toContain('Spark compare failed: boom')
+    expect(timeline.text()).toContain('Failed')
+  })
+
+  it('shows the legacy empty state when a run has no recorded steps', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        reconciliationRunResultId: 'RR_LEGACY',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_SUCCESS',
+        resultAvailable: true,
+        createdDate: new Date().toISOString(),
+      }],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-result-step-timeline-empty"]').text()).toContain('No step detail (legacy run)')
   })
 })

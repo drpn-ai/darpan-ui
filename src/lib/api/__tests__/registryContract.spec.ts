@@ -229,6 +229,7 @@ describe('registry contract — exported wrapper presence', () => {
     expect(typeof rf.getGeneratedOutput).toBe('function')
     expect(typeof rf.getGeneratedOutputDifferences).toBe('function')
     expect(typeof rf.deleteGeneratedOutput).toBe('function')
+    expect(typeof rf.getReconciliationRunStatus).toBe('function')
     // Automation operations
     expect(typeof rf.listAutomations).toBe('function')
     expect(typeof rf.getAutomation).toBe('function')

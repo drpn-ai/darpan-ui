@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listGeneratedOutputs = vi.hoisted(() => vi.fn())
+const getReconciliationRunStatus = vi.hoisted(() => vi.fn())
 
 vi.mock('../../lib/api/facade', () => ({
-  reconciliationFacade: { listGeneratedOutputs },
+  reconciliationFacade: { listGeneratedOutputs, getReconciliationRunStatus },
 }))
 
 import { ApiCallError } from '../../lib/api/client'
@@ -26,6 +27,7 @@ function isoDaysAgo(days: number): string {
 describe('runResults store (run-result cache)', () => {
   beforeEach(() => {
     listGeneratedOutputs.mockReset()
+    getReconciliationRunStatus.mockReset()
   })
 
   afterEach(() => {
@@ -139,6 +141,94 @@ describe('runResults store (run-result cache)', () => {
       store.stopAutoRefresh()
       await vi.advanceTimersByTimeAsync(15000)
       expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('startRunStatusPoll fetches immediately and exposes the live status', async () => {
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      currentStage: 'COMPARE',
+      progressPercent: 40,
+      steps: [],
+    })
+    const store = useRunResultsStore()
+    try {
+      await store.startRunStatusPoll('RR_LIVE', 5000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(1)
+      expect(getReconciliationRunStatus).toHaveBeenCalledWith({ reconciliationRunResultId: 'RR_LIVE' })
+      expect(store.getRunStatus('RR_LIVE')?.currentStage).toBe('COMPARE')
+      expect(store.getRunStatus('RR_LIVE')?.progressPercent).toBe(40)
+    } finally {
+      store.stopRunStatusPoll('RR_LIVE')
+    }
+  })
+
+  it('run status poll stops on terminal status and refreshes the cache once', async () => {
+    vi.useFakeTimers()
+    try {
+      getReconciliationRunStatus
+        .mockResolvedValueOnce({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', currentStage: 'EXTRACT_FILE1', progressPercent: 10 })
+        .mockResolvedValueOnce({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', currentStage: 'NOTIFY', progressPercent: 100 })
+      listGeneratedOutputs.mockResolvedValue({ generatedOutputs: [] })
+      const store = useRunResultsStore()
+      await store.startRunStatusPoll('RR_FINISHING', 5000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(2)
+      expect(store.getRunStatus('RR_FINISHING')?.statusEnumId).toBe('AUT_STAT_SUCCESS')
+      // Live→terminal transition refreshes the cache so the finished run replaces
+      // the running tile promptly instead of waiting for the next 30s tick.
+      expect(listGeneratedOutputs).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(20000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a run already terminal on first fetch never starts polling or refreshing', async () => {
+    vi.useFakeTimers()
+    try {
+      getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS' })
+      listGeneratedOutputs.mockResolvedValue({ generatedOutputs: [] })
+      const store = useRunResultsStore()
+      await store.startRunStatusPoll('RR_DONE', 5000)
+      await vi.advanceTimersByTimeAsync(20000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(1)
+      expect(listGeneratedOutputs).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('startRunStatusPoll is idempotent per run id', async () => {
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING' })
+    const store = useRunResultsStore()
+    try {
+      await store.startRunStatusPoll('RR_IDEMPOTENT', 5000)
+      await store.startRunStatusPoll('RR_IDEMPOTENT', 5000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(1)
+    } finally {
+      store.stopRunStatusPoll('RR_IDEMPOTENT')
+    }
+  })
+
+  it('reset stops run status polls and clears cached statuses', async () => {
+    vi.useFakeTimers()
+    try {
+      getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING' })
+      const store = useRunResultsStore()
+      await store.startRunStatusPoll('RR_RESET', 5000)
+      expect(store.getRunStatus('RR_RESET')?.statusEnumId).toBe('AUT_STAT_RUNNING')
+      store.reset()
+      expect(store.getRunStatus('RR_RESET')).toBeNull()
+      await vi.advanceTimersByTimeAsync(20000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(1)
     } finally {
       vi.useRealTimers()
     }
