@@ -542,16 +542,16 @@ export interface GeneratedOutput {
   totalDifferences?: number
   onlyInFile1Count?: number
   onlyInFile2Count?: number
-  createdDate?: string
+  createdDate?: string | number
   sizeBytes?: number
   statusEnumId?: string
   statusLabel?: string
   currentStage?: string
   progressPercent?: number
   resultAvailable?: boolean
-  startedDate?: string
-  completedDate?: string
-  lastUpdatedDate?: string
+  startedDate?: string | number
+  completedDate?: string | number
+  lastUpdatedDate?: string | number
 }
 
 export interface RunSavedRunDiffResult {

@@ -10,7 +10,9 @@ const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000
 // every other status is terminal and ends the per-run poll.
 const ACTIVE_RUN_STATUS_IDS = new Set(['AUT_STAT_PENDING', 'AUT_STAT_RUNNING'])
 
-const RUN_STATUS_POLL_INTERVAL_MS = 10000
+// Active runs refresh every 5s: get#ReconciliationRunStatus is a cheap single-row read
+// plus step rows, and the poll only exists while a run is PENDING/RUNNING.
+const RUN_STATUS_POLL_INTERVAL_MS = 5000
 
 export function isActiveRunStatus(statusEnumId: string | null | undefined): boolean {
   return ACTIVE_RUN_STATUS_IDS.has(statusEnumId ?? '')
@@ -42,7 +44,10 @@ function describeError(err: unknown, fallback: string): string {
   return fallback
 }
 
-function parseCreatedDate(value: string | undefined | null): number {
+// The wire delivers timestamps as epoch milliseconds (numbers); specs and some callers use
+// ISO strings. Both must parse or the recent-window filter silently discards every server row.
+function parseCreatedDate(value: string | number | undefined | null): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
   if (!value) return 0
   const parsed = Date.parse(value)
   return Number.isNaN(parsed) ? 0 : parsed

@@ -1020,7 +1020,7 @@ watch([savedRunId, outputFileName], () => {
 }
 
 .run-result-step__stage {
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .run-result-step__meta {

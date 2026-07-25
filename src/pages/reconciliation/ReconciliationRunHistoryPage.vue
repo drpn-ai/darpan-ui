@@ -160,6 +160,7 @@ import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { useRunResultsStore } from '../../stores/runResults'
 import {
   listPendingReconciliationRuns,
+  pruneAbandonedPendingReconciliationRuns,
   resolveCompletedPendingReconciliationRuns,
   subscribeToPendingReconciliationRunsChange,
   type PendingReconciliationRun,
@@ -458,6 +459,11 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
     const nextOutputs = response.generatedOutputs ?? []
     if (append) appendGeneratedOutputs(nextOutputs)
     else generatedOutputs.value = nextOutputs
+    // The server is the truth for running runs: no RUNNING row means an old-enough local
+    // marker belongs to a run that died server-side — drop it instead of ghosting a tile.
+    if (!generatedOutputs.value.some(isRunningGeneratedOutput)) {
+      pruneAbandonedPendingReconciliationRuns(requestedSavedRunId)
+    }
     pendingRuns.value = resolveCompletedPendingReconciliationRuns(
       requestedSavedRunId,
       generatedOutputs.value.filter(isCompletedGeneratedOutput),
@@ -529,11 +535,37 @@ watch(savedRunId, (nextSavedRunId) => {
 // but only while the page is still showing cached data (don't clobber a user who loaded older
 // results via "More...", which sets cachePrimedWithoutFetch=false). No fetch, so no loading flicker.
 watch(() => runResultsStore.recentOutputs, () => {
-  if (!cachePrimedWithoutFetch.value || !savedRunId.value) return
+  if (!savedRunId.value) return
+  const cached = runResultsStore.getOutputsForSavedRun(savedRunId.value)
+
+  if (!cachePrimedWithoutFetch.value) {
+    // Direct-fetch mode (initial load with a cold cache, or the user paged into older results):
+    // never clobber the loaded list, but DO surface outputs that appeared after load — a run
+    // completing in the background upserts its finished row into the cache via the status-poll
+    // refresh, and it must show here without a manual reload. A fresh row also replaces any
+    // stale in-progress row for the same run.
+    const knownKeys = new Set(generatedOutputs.value.map(generatedOutputKey))
+    const freshOutputs = cached.filter((output) => {
+      const outputKey = generatedOutputKey(output)
+      return outputKey && !knownKeys.has(outputKey)
+    })
+    if (freshOutputs.length === 0) return
+    const freshRunResultIds = new Set(
+      freshOutputs.map((output) => normalizeDisplayText(output.reconciliationRunResultId)).filter(Boolean),
+    )
+    generatedOutputs.value = [
+      ...freshOutputs,
+      ...generatedOutputs.value.filter((output) => {
+        const runResultId = normalizeDisplayText(output.reconciliationRunResultId)
+        return !runResultId || !freshRunResultIds.has(runResultId)
+      }),
+    ]
+    return
+  }
+
   // Self-review-2: the background poll rebuilds recentOutputs (new array ref) every tick. Re-prime
   // only when the cached slice for this saved run actually changed, so a no-op tick does not trigger
   // primeFromCache's pending-runs storage write + listener fan-out.
-  const cached = runResultsStore.getOutputsForSavedRun(savedRunId.value)
   const unchanged = cached.length === generatedOutputs.value.length &&
     cached.every((output, index) => output.fileName === generatedOutputs.value[index]?.fileName)
   if (unchanged) return

@@ -6,6 +6,7 @@ describe('reconciliationStageLabel', () => {
     expect(reconciliationStageLabel('RESOLVE')).toBe('Preparing run')
     expect(reconciliationStageLabel('COMPARE')).toBe('Comparing records')
     expect(reconciliationStageLabel('WRITE_OUTPUT')).toBe('Writing results')
+    expect(reconciliationStageLabel('VERIFY')).toBe('Verifying differences')
     expect(reconciliationStageLabel('NOTIFY')).toBe('Sending notifications')
   })
 

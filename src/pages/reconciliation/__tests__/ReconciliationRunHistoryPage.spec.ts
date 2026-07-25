@@ -465,6 +465,27 @@ describe('ReconciliationRunHistoryPage', () => {
     expect(wrapper.findAll('[data-testid="run-history-result-tile"]')).toHaveLength(5)
   })
 
+  it('surfaces a newly completed run without a page reload', async () => {
+    // Page loads via direct server fetch (cache empty), then a run completes in the background:
+    // the status-poll completion refresh upserts the finished output into the run-results cache,
+    // and the page must show it without a remount or manual reload.
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="run-history-result-tile"]').length).toBeGreaterThan(0)
+    const freshOutput = {
+      ...buildGeneratedOutput(31),
+      fileName: 'CSV-Order-Compare-diff-20260331-091500.json',
+      createdDate: '2026-03-31T09:15:00.000Z',
+      totalDifferences: 99,
+    }
+
+    useRunResultsStore().upsertOutput(freshOutput as never)
+    await flushPromises()
+
+    const featured = wrapper.get('[data-testid="run-history-featured-tile"]')
+    expect(featured.text()).toContain('99')
+  })
+
   it('running tile shows live stage and progress from the status poll', async () => {
     listGeneratedOutputs.mockResolvedValue({
       ok: true,
@@ -511,6 +532,36 @@ describe('ReconciliationRunHistoryPage', () => {
     const progress = wrapper.get('[data-testid="run-history-running-progress"]')
     expect(progress.text()).toContain('Extracting SHOPIFY')
     expect(progress.text()).toContain('45%')
+  })
+
+  it('prunes an abandoned pending marker when the backend shows no running run', async () => {
+    // A run that failed server-side leaves no RUNNING row in the history list — and no newer
+    // completed result to trigger the existing clearing — so the local pending marker would
+    // ghost an "In Progress" tile forever. Markers past the grace window with no backend
+    // running row are abandoned and must be dropped.
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 0, pageCount: 1 },
+      generatedOutputs: [],
+    })
+    window.localStorage.setItem('darpan.pendingReconciliationRuns', JSON.stringify([
+      {
+        pendingRunId: 'pending-RS_ORDER_CSV-stale',
+        savedRunId: 'RS_ORDER_CSV',
+        runName: 'CSV Order Compare',
+        file1SystemLabel: 'OMS',
+        file2SystemLabel: 'SHOPIFY',
+        submittedAt: '2026-03-31T08:40:00.000Z',
+      },
+    ]))
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="run-history-running-tile"]').exists()).toBe(false)
+    expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
   })
 
   it('clears a pending history marker after a newer saved result is available', async () => {

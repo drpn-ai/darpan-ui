@@ -146,6 +146,18 @@ describe('runResults store (run-result cache)', () => {
     }
   })
 
+  it('retains rows whose createdDate arrives as epoch milliseconds (the wire format)', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      generatedOutputs: [
+        { fileName: 'numeric-date.json', savedRunId: 'run-1', createdDate: Date.now() - 60_000 },
+      ],
+    })
+    const store = useRunResultsStore()
+    store.reset()
+    await store.hydrate()
+    expect(store.getByFileName('numeric-date.json')?.savedRunId).toBe('run-1')
+  })
+
   it('startRunStatusPoll fetches immediately and exposes the live status', async () => {
     getReconciliationRunStatus.mockResolvedValue({
       ok: true,
@@ -202,6 +214,23 @@ describe('runResults store (run-result cache)', () => {
       expect(getReconciliationRunStatus).toHaveBeenCalledTimes(1)
       expect(listGeneratedOutputs).not.toHaveBeenCalled()
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('polls an active run every 5 seconds by default', async () => {
+    vi.useFakeTimers()
+    try {
+      getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING' })
+      const store = useRunResultsStore()
+      await store.startRunStatusPoll('RR_DEFAULT_INTERVAL')
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(getReconciliationRunStatus).toHaveBeenCalledTimes(3)
+    } finally {
+      useRunResultsStore().stopRunStatusPoll('RR_DEFAULT_INTERVAL')
       vi.useRealTimers()
     }
   })

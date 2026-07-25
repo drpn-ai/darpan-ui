@@ -22,6 +22,7 @@ const RUN_STAGE_LABELS: Record<string, string> = {
   RESOLVE: 'Preparing run',
   COMPARE: 'Comparing records',
   WRITE_OUTPUT: 'Writing results',
+  VERIFY: 'Verifying differences',
   NOTIFY: 'Sending notifications',
 }
 

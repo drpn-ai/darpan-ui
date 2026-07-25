@@ -31,7 +31,7 @@ interface PendingReconciliationRunInput {
 }
 
 interface CompletedReconciliationRun {
-  createdDate?: string
+  createdDate?: string | number
 }
 
 function storage(): Storage | null {
@@ -53,8 +53,8 @@ function notifyPendingRunsChanged(): void {
   })
 }
 
-function parseTimestamp(value: string | undefined): number {
-  if (!value) return Number.NaN
+function parseTimestamp(value: string | number | undefined): number {
+  if (value == null || value === '') return Number.NaN
   const timestamp = new Date(value).getTime()
   return Number.isNaN(timestamp) ? Number.NaN : timestamp
 }
@@ -143,6 +143,23 @@ export function clearPendingReconciliationRun(pendingRunId: string | undefined):
 export function listPendingReconciliationRuns(savedRunId?: string): PendingReconciliationRun[] {
   const normalizedSavedRunId = normalizeStringOrEmpty(savedRunId)
   return currentPendingRuns().filter((run) => !normalizedSavedRunId || run.savedRunId === normalizedSavedRunId)
+}
+
+// A submitted run creates its backend RUNNING row within seconds; a marker well past this
+// grace with no backend running row belongs to a run that died server-side (FAILED rows are
+// not listed), and would otherwise ghost an "In Progress" tile until the next successful run.
+const ABANDONED_PENDING_RUN_GRACE_MS = 15 * 60 * 1000
+
+export function pruneAbandonedPendingReconciliationRuns(savedRunId: string, nowMs: number = Date.now()): void {
+  const normalizedSavedRunId = normalizeStringOrEmpty(savedRunId)
+  if (!normalizedSavedRunId) return
+
+  const nextRuns = currentPendingRuns().filter((run) => {
+    if (run.savedRunId !== normalizedSavedRunId) return true
+    const submittedMs = parseTimestamp(run.submittedAt)
+    return Number.isFinite(submittedMs) && nowMs - submittedMs <= ABANDONED_PENDING_RUN_GRACE_MS
+  })
+  if (nextRuns.length !== currentPendingRuns().length) writePendingRuns(nextRuns)
 }
 
 export function resolveCompletedPendingReconciliationRuns(
