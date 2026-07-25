@@ -1211,6 +1211,12 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+/* This form is board-width, so the default left-aligned wizard actions land at the
+   viewport edge; center them under the board like other pages' action rows. */
+.ruleset-editor-form :deep(.wizard-actions) {
+  justify-content: center;
+}
+
 .ruleset-field-column header span,
 .ruleset-rule-popover label > span,
 .ruleset-pre-action-header > span {
