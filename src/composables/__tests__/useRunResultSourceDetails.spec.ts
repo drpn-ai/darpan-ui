@@ -78,14 +78,14 @@ describe('useRunResultSourceDetails', () => {
     const source = buildSourceDetails()
     source.runSourceDetails.value = {
       mode: 'API',
-      dateRange: { start: '2026-05-01T04:00:00Z', end: '2026-05-02T04:00:00Z' },
+      dateRange: { start: '2026-05-01T04:00:00Z', end: '2026-05-03T04:00:00Z' },
       files: [],
     } as never
 
     expect(source.isApiRunSource.value).toBe(true)
     expect(source.runSourceModeLabel.value).toBe('API date range')
     expect(source.runSourceFilesLabel.value).toBe('Files compared')
-    expect(source.runSourceDateRangeLabel.value).toBe('May 1, 2026 to May 2, 2026')
+    expect(source.runSourceDateRangeLabel.value).toBe('May 1, 2026 to May 3, 2026')
     expect(source.showRunSourceDetails.value).toBe(true)
   })
 
@@ -106,6 +106,23 @@ describe('useRunResultSourceDetails', () => {
       files: [],
     } as never
     expect(source.runSourceDateRangeLabel.value).toBe('yesterday')
+  })
+
+  it('collapses an exclusive-end single-day window to one date but keeps genuine multi-day ranges', () => {
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-07-01', end: '2026-07-02T00:00:00Z' },
+      files: [],
+    } as never
+    expect(source.runSourceDateRangeLabel.value).toBe('Jul 1, 2026')
+
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-07-01', end: '2026-07-03' },
+      files: [],
+    } as never
+    expect(source.runSourceDateRangeLabel.value).toBe('Jul 1, 2026 to Jul 3, 2026')
   })
 
   it('resetRunSourceDetails clears the loaded details', () => {

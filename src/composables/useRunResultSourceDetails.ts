@@ -1,6 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { GeneratedOutputSourceDetails, GeneratedOutputSourceFile } from '../lib/api/types'
 import { fileNameFromPath, normalizeDisplayText, normalizeDisplayToken } from '../lib/reconciliationDisplay'
+import { addDays, startOfLocalDay } from '../lib/utils/date'
 
 export interface RunSourceFileView {
   key: string
@@ -39,10 +40,30 @@ function formatRunSourceDate(value: string | undefined): string {
   return `${monthName} ${Number(dateMatch[3])}, ${dateMatch[1]}`
 }
 
+function parseRunSourceDate(value: string | undefined): Date | null {
+  const normalizedValue = normalizeDisplayText(value)
+  const dateMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!dateMatch) return null
+  return new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]))
+}
+
+// A single-day API run window is sent as an exclusive end boundary (end = start + 1 day),
+// e.g. start=2026-07-01, end=2026-07-02, which covers only July 1. Detect that convention
+// here so the range collapses to one date instead of reading as a two-day span.
+function isExclusiveEndBoundary(start: string | undefined, end: string | undefined): boolean {
+  const startDate = parseRunSourceDate(start)
+  const endDate = parseRunSourceDate(end)
+  if (!startDate || !endDate) return false
+  return addDays(startOfLocalDay(startDate), 1).getTime() === startOfLocalDay(endDate).getTime()
+}
+
 function formatRunSourceDateRange(start: string | undefined, end: string | undefined): string {
   const formattedStart = formatRunSourceDate(start)
   const formattedEnd = formatRunSourceDate(end)
-  if (formattedStart && formattedEnd && formattedStart !== formattedEnd) return `${formattedStart} to ${formattedEnd}`
+  if (formattedStart && formattedEnd && formattedStart !== formattedEnd) {
+    if (isExclusiveEndBoundary(start, end)) return formattedStart
+    return `${formattedStart} to ${formattedEnd}`
+  }
   return formattedStart || formattedEnd
 }
 
