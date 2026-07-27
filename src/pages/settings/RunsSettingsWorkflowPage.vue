@@ -465,6 +465,11 @@ function validateSource(sourceKey: SourceKey): string | null {
 
   if (!source.schemaId) return 'Choose schemas for both sources.'
   if (!source.fieldPaths.length) return 'Choose an ID field for both sources.'
+  // Legacy mapping runs (no rule-set draft) save through saveMapping, which only
+  // carries one field per side — block extra chips instead of silently dropping them.
+  if (!ruleSetDraft.value && source.fieldPaths.length > 1) {
+    return `${sourceKey === 'source1' ? 'Source 1' : 'Source 2'} supports a single ID field.`
+  }
   return null
 }
 

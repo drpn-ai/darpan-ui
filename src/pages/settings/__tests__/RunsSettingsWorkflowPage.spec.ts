@@ -375,6 +375,36 @@ describe('RunsSettingsWorkflowPage', () => {
     expect(push).toHaveBeenCalledWith('/settings/runs')
   })
 
+  it('blocks saving a legacy mapping run with more than one primary ID field per source', async () => {
+    const wrapper = mount(RunsSettingsWorkflowPage)
+    await flushPromises()
+
+    await pickWorkflowSelectOption(wrapper, 'run-field-1', '$.return_ref')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-source-1-row"]').findAll('[data-testid="workflow-select-chip"]')).toHaveLength(2)
+    expect(wrapper.text()).toContain('Source 1 supports a single ID field.')
+
+    await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+    await flushPromises()
+    expect(saveMapping).not.toHaveBeenCalled()
+
+    await removeWorkflowSelectChip(wrapper, 'run-source-1-row', 1)
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Source 1 supports a single ID field.')
+
+    await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+    await flushPromises()
+    expect(saveMapping).toHaveBeenCalledWith({
+      reconciliationMappingId: 'OrderIdMap',
+      mappingName: 'Order ID',
+      schema1Id: '100408',
+      schema2Id: '100409',
+      schema1FieldPath: '$.return_id',
+      schema2FieldPath: '$.id',
+    })
+  })
+
   it('preselects stored source fields when the saved mapping uses legacy field expressions', async () => {
     getMapping.mockResolvedValueOnce({
       ok: true,
