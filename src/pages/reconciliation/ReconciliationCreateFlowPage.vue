@@ -1210,6 +1210,10 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   const targetStepIndex = steps.value.findIndex((step) => step.id === targetStepId)
   currentStepIndex.value = targetStepIndex >= 0 ? targetStepIndex : Math.max(0, steps.value.length - 1)
 
+  // One-shot seed: consume the draft immediately so exiting mid-creation never resumes it
+  // on a later visit — a fresh /reconciliation/create must always start clean.
+  draftStore.clearRuleSetDraft()
+
   await Promise.all([
     file1JsonSchemaId.value ? ensureFieldsLoaded(file1JsonSchemaId.value) : Promise.resolve(),
     file2JsonSchemaId.value ? ensureFieldsLoaded(file2JsonSchemaId.value) : Promise.resolve(),
@@ -1219,9 +1223,20 @@ async function restoreDraftFromHistoryState(): Promise<void> {
 const pageAbortController = new AbortController()
 let submitController: AbortController | null = null
 
+// Exiting the wizard discards all progress: any draft state left in the store would silently
+// resume on the next visit. Skipped only when the navigation IS the flow continuing elsewhere
+// (schema-create detour, automation new-run handoff), where the draft must survive the hop.
+let continuingFlowElsewhere = false
+
 onBeforeUnmount(() => {
   pageAbortController.abort()
   submitController?.abort()
+})
+
+onUnmounted(() => {
+  if (continuingFlowElsewhere) return
+  draftStore.clearRuleSetDraft()
+  draftStore.clearAutomationDraft()
 })
 
 async function loadOptions(): Promise<void> {
@@ -1269,6 +1284,7 @@ async function handlePrimarySubmit(): Promise<void> {
 }
 
 async function openSchemaCreateWorkflow(): Promise<void> {
+  continuingFlowElsewhere = true
   draftStore.setWorkflowOrigin('Reconciliation Setup', '/reconciliation/create')
   await router.push({ path: '/schemas/create' })
 }
@@ -1310,6 +1326,7 @@ async function createRun(): Promise<void> {
       }
       draftStore.setAutomationDraft(nextDraft, 'input-mode', response.savedRun)
       draftStore.setWorkflowOrigin(nextDraft.returnLabel, nextDraft.returnPath)
+      continuingFlowElsewhere = true
       await router.push({ path: '/reconciliation/automation/create' })
       draftStore.clearAutomationDraft()
       return

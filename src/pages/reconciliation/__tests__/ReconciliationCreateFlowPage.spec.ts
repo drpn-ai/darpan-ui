@@ -181,6 +181,8 @@ describe('ReconciliationCreateFlowPage', () => {
     draftStoreState.setWorkflowOrigin.mockClear()
     draftStoreState.setRuleSetDraft.mockClear()
     draftStoreState.setAutomationDraft.mockClear()
+    draftStoreState.clearRuleSetDraft.mockClear()
+    draftStoreState.clearAutomationDraft.mockClear()
     window.history.replaceState({}, '', '/')
     window.sessionStorage.clear()
 
@@ -993,6 +995,59 @@ describe('ReconciliationCreateFlowPage', () => {
     await flushPromises()
 
     expect(push).toHaveBeenCalledWith('/settings/runs')
+  })
+
+  it('consumes a seeded draft on mount so it cannot resume on a later visit', async () => {
+    draftStoreState.ruleSetDraftState = createDraftState()
+    window.history.replaceState({}, '', '/reconciliation/create')
+
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Which field identifies each record in Shopify orders')
+    expect(draftStoreState.clearRuleSetDraft).toHaveBeenCalled()
+  })
+
+  it('discards all draft state when the user exits mid-creation', async () => {
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+
+    await wrapper.get('input[name="runName"]').setValue('Half-finished run')
+    draftStoreState.clearRuleSetDraft.mockClear()
+    draftStoreState.clearAutomationDraft.mockClear()
+
+    wrapper.unmount()
+
+    expect(draftStoreState.clearRuleSetDraft).toHaveBeenCalled()
+    expect(draftStoreState.clearAutomationDraft).toHaveBeenCalled()
+  })
+
+  it('keeps the automation handoff draft alive across the schema-create detour', async () => {
+    route.query = { automationFlow: 'new-run' }
+    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
+      { intent: 'new-run' },
+      'input-mode',
+      null,
+    )
+
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+
+    await wrapper.get('input[name="runName"]').setValue('Automation run')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+    await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftJson')
+
+    await wrapper.get('[data-testid="create-schema-from-reconciliation"]').trigger('click')
+    await flushPromises()
+    expect(push).toHaveBeenCalledWith({ path: '/schemas/create' })
+
+    wrapper.unmount()
+
+    expect(draftStoreState.clearAutomationDraft).not.toHaveBeenCalled()
   })
 
   it('hands a newly created saved run back to automation setup when launched from automation workflow', async () => {
