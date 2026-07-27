@@ -420,6 +420,36 @@ describe('ReconciliationRuleSetManagerPage', () => {
     ])
   })
 
+  it('shows every composite key field in the Primary ID summary', async () => {
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
+      {
+        savedRunId: 'RS_COMPOSITE_SUMMARY',
+        runName: 'Composite Summary',
+        file1SystemEnumId: 'SHOPIFY',
+        file1SystemLabel: 'SHOPIFY',
+        file1FileTypeEnumId: 'DftJson',
+        file1SchemaFileName: 'shopify-returns',
+        file1PrimaryIdExpression: ['$.returns[*].return_id', '$.returns[*].product_id'],
+        file2SystemEnumId: 'OMS',
+        file2SystemLabel: 'OMS',
+        file2FileTypeEnumId: 'DftJson',
+        file2SchemaFileName: 'oms-returns',
+        file2PrimaryIdExpression: ['$.returns[*].return_id', '$.returns[*].product_id'],
+      },
+      'ruleset-manager',
+    )
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const schemaRows = wrapper.findAll('.ruleset-manager-schema-row')
+    expect(schemaRows).toHaveLength(2)
+    expect(schemaRows[0]?.text()).toContain('return_id + product_id')
+    expect(schemaRows[1]?.text()).toContain('return_id + product_id')
+  })
+
   it('labels API-backed sources by endpoint name in the run summary', async () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
       draftStoreState.ruleSetDraftState = createApiDraftState()

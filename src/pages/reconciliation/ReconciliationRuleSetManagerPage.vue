@@ -323,8 +323,8 @@ const file1SourceLabel = computed(() => summarizeSource(draft.value, 'file1'))
 const file2SourceLabel = computed(() => summarizeSource(draft.value, 'file2'))
 const file1SystemConfig = computed<SourceConfigSummary | null>(() => buildSourceConfigSummary(draft.value, 'file1'))
 const file2SystemConfig = computed<SourceConfigSummary | null>(() => buildSourceConfigSummary(draft.value, 'file2'))
-const file1PrimaryId = computed(() => formatFieldKey(draft.value?.file1PrimaryIdExpression?.[0]))
-const file2PrimaryId = computed(() => formatFieldKey(draft.value?.file2PrimaryIdExpression?.[0]))
+const file1PrimaryId = computed(() => formatFieldKeyList(draft.value?.file1PrimaryIdExpression))
+const file2PrimaryId = computed(() => formatFieldKeyList(draft.value?.file2PrimaryIdExpression))
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const canViewRunHistory = computed(() => Boolean(savedRunId.value))
@@ -360,6 +360,11 @@ const visibleRules = computed(() => [
 ].sort((left, right) => left.sequenceNum - right.sequenceNum))
 
 const formatFieldKey = formatReconciliationFieldKey
+
+function formatFieldKeyList(fieldPaths: string[] | undefined): string {
+  if (!fieldPaths?.length) return formatFieldKey(undefined)
+  return fieldPaths.map((fieldPath) => formatFieldKey(fieldPath)).join(' + ')
+}
 
 function formatRulePreview(rule: ReconciliationRuleSetDraftRule): string {
   return `${formatFieldKey(rule.file1FieldPath)} ${rule.operator?.trim() || '='} ${formatFieldKey(rule.file2FieldPath)}`
