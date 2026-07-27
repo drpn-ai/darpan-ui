@@ -252,6 +252,11 @@
               :disabled="saving || loadingOptions"
             />
           </label>
+
+          <div class="automation-schedule-field">
+            <span class="automation-schedule-label">Timezone</span>
+            <span class="automation-schedule-static" data-testid="automation-schedule-timezone">{{ windowTimeZone }}</span>
+          </div>
         </div>
       </template>
 
@@ -380,6 +385,11 @@
               type="time"
             />
           </label>
+
+          <div class="automation-schedule-field">
+            <span class="automation-schedule-label">Timezone</span>
+            <span class="automation-schedule-static" data-testid="automation-schedule-timezone">{{ windowTimeZone }}</span>
+          </div>
         </div>
       </template>
 
@@ -1408,6 +1418,17 @@ onUnmounted(() => {
   color: var(--text);
   font: inherit;
   font-size: clamp(1rem, 1.25vw, 1.2rem);
+}
+
+.automation-schedule-static {
+  display: block;
+  min-height: 2.75rem;
+  line-height: 2.75rem;
+  color: color-mix(in oklab, var(--text) 72%, transparent);
+  font-size: clamp(1rem, 1.25vw, 1.2rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .automation-schedule-control:focus {
