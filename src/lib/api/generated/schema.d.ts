@@ -285,7 +285,11 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["LogoutAllSessionsResult"];
         };
-        /** @description Revoke the explicit login-key token from the current request and terminate any active authenticated session. */
+        /**
+         * @description Revoke the login-key token from the current request (header or cookie) and end the caller's own session only.
+         *                 Other active sessions on the same UserAccount — including other people on a shared login — are not affected;
+         *                 use logout#AllSessions to revoke every session.
+         */
         LogoutSessionParams: Record<string, never>;
         LogoutSessionResult: {
             /** @description True when logout cleanup completed without facade errors. */
