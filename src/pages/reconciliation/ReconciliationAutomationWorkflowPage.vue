@@ -70,6 +70,18 @@
                 placeholder="Select date window..."
               />
             </label>
+            <label v-if="dateWindowNeedsCount" class="wizard-input-shell">
+              <span class="workflow-context-label">Count</span>
+              <input
+                v-model.number="relativeWindowCount"
+                name="relativeWindowCount"
+                class="wizard-answer-control"
+                data-testid="automation-window-count-input"
+                inputmode="numeric"
+                placeholder="1"
+                :disabled="saving || loadingOptions"
+              />
+            </label>
             <label
               class="wizard-input-shell automation-edit-active-field"
               data-testid="automation-edit-active-field"
@@ -83,19 +95,7 @@
                 placeholder="Select status..."
               />
             </label>
-            <label v-if="dateWindowNeedsCount" class="wizard-input-shell">
-              <span class="workflow-context-label">Count</span>
-              <input
-                v-model.number="relativeWindowCount"
-                name="relativeWindowCount"
-                class="wizard-answer-control"
-                data-testid="automation-window-count-input"
-                inputmode="numeric"
-                placeholder="1"
-                :disabled="saving || loadingOptions"
-              />
-            </label>
-            <template v-else-if="dateWindowUsesCustomRange">
+            <template v-if="dateWindowUsesCustomRange">
               <label class="wizard-input-shell">
                 <span class="workflow-context-label">Start Date</span>
                 <input
