@@ -858,4 +858,57 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.text()).toContain('Ops')
     expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(true)
   })
+
+  it('shows no inactive note when no chat space is linked, even if chatSpaceActive is false', async () => {
+    route.name = 'reconciliation-automation-edit'
+    route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+    route.params = { automationId: 'AUT_ORDER_SYNC' }
+    getAutomation.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        automationId: 'AUT_ORDER_SYNC',
+        automationName: 'Daily order sync',
+        savedRunId: 'RS_ORDER_SYNC',
+        savedRunName: 'Order Sync',
+        savedRunType: 'ruleset',
+        savedRun: optionsResponse().savedRuns[0],
+        inputModeEnumId: 'AUT_IN_API_RANGE',
+        scheduleExpr: '0 0 6 * * ?',
+        timezone: 'UTC',
+        relativeWindowTypeEnumId: 'AUT_WIN_PREV_DAY',
+        relativeWindowCount: 1,
+        active: true,
+        // No chatSpaceId at all -- the one combination the brief flags: chatSpaceActive is
+        // false simply because there is no linked space, not because a linked space went
+        // inactive. The guard must key off chatSpaceId presence first.
+        chatSpaceId: undefined,
+        chatSpaceActive: false,
+        sources: [
+          {
+            fileSide: 'FILE_1',
+            sourceTypeEnumId: 'AUT_SRC_API',
+            systemEnumId: 'OMS',
+            systemMessageRemoteId: 'OMS_REMOTE',
+            safeMetadataJson: '{"extractServiceName":"reconciliation.HotWaxOmsExtractionServices.extract#HotWaxOmsOrders","parameters":{"omsRestSourceConfigId":"OMS_REST_SOURCE"}}',
+          },
+          {
+            fileSide: 'FILE_2',
+            sourceTypeEnumId: 'AUT_SRC_API',
+            systemEnumId: 'SHOPIFY',
+            systemMessageRemoteId: 'SHOPIFY_REMOTE',
+            safeMetadataJson: '{"extractServiceName":"fixture.extractShopifyOrders"}',
+          },
+        ],
+      },
+    })
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="automation-chat-space-current"]').text()).toBe('None')
+    expect(wrapper.get('[data-testid="automation-chat-space-none"]').classes()).toContain('workflow-shortcut-choice-card--active')
+  })
 })
