@@ -474,4 +474,26 @@ describe('UserSettingsPage', () => {
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
+
+  it('surfaces a load error for the notification default and still shows the card fallback text', async () => {
+    getUserNotificationDefault.mockRejectedValue(new Error('network down'))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="user-notification-default-card"]').text()).toContain('No default space')
+    expect(wrapper.get('.section-note[role="status"]').text()).toContain('Unable to load notification settings.')
+  })
+
+  it('surfaces a load error when chat spaces fail to load and does not silently offer only the clear option', async () => {
+    listTenantChatSpaces.mockRejectedValue(new Error('network down'))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Unable to load chat spaces.')
+    expect(wrapper.find('[data-testid="user-chat-space-choice-clear"]').exists()).toBe(false)
+    expect(wrapper.find('.workflow-shortcut-choice-grid').exists()).toBe(false)
+  })
 })

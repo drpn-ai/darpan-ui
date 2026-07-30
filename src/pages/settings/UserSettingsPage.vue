@@ -154,6 +154,7 @@
           @cancel="closeNotificationDefaultWorkflow"
         >
           <p v-if="chatSpacesLoading" class="section-note">Loading chat spaces...</p>
+          <p v-else-if="chatSpacesLoadError" class="section-note" role="status">{{ settingsMessage }}</p>
           <WorkflowShortcutChoiceCards
             v-else
             :options="chatSpaceChoiceOptions"
@@ -199,6 +200,7 @@ const isNotificationDefaultWorkflowOpen = ref(false)
 const isSavingNotificationDefault = ref(false)
 const chatSpaces = ref<TenantChatSpace[]>([])
 const chatSpacesLoading = ref(false)
+const chatSpacesLoadError = ref(false)
 const passwordForm = ref({
   currentPassword: '',
   newPassword: '',
@@ -464,16 +466,21 @@ async function loadNotificationDefault(): Promise<void> {
     notificationDefault.value = response.userNotificationDefault ?? null
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
+    settingsMessage.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load notification settings.'
   }
 }
 
 async function loadChatSpacesForNotificationDefault(): Promise<void> {
   chatSpacesLoading.value = true
+  chatSpacesLoadError.value = false
   try {
     const response = await settingsFacade.listTenantChatSpaces(pageAbortController.signal)
     chatSpaces.value = response.chatSpaces ?? []
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
+    chatSpaces.value = []
+    chatSpacesLoadError.value = true
+    settingsMessage.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load chat spaces.'
   } finally {
     chatSpacesLoading.value = false
   }
@@ -481,6 +488,7 @@ async function loadChatSpacesForNotificationDefault(): Promise<void> {
 
 function openNotificationDefaultWorkflow(): void {
   settingsMessage.value = null
+  chatSpacesLoadError.value = false
   isNotificationDefaultWorkflowOpen.value = true
   void loadChatSpacesForNotificationDefault()
 }
