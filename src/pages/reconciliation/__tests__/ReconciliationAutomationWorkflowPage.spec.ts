@@ -799,10 +799,11 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Ops')
+    expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('Ops')
     expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
 
-    await chooseCard(wrapper, 'automation-chat-space-none')
+    await chooseWorkflowOption(wrapper, 'automation-chat-space-select', '')
+    expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('No notifications')
     await wrapper.get('[data-testid="save-automation"]').trigger('click')
     await flushPromises()
 
@@ -855,7 +856,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Ops')
+    expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('Ops')
     expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(true)
   })
 
@@ -908,7 +909,6 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="automation-chat-space-current"]').text()).toBe('None')
-    expect(wrapper.get('[data-testid="automation-chat-space-none"]').classes()).toContain('workflow-shortcut-choice-card--active')
+    expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('No notifications')
   })
 })

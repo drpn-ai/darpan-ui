@@ -191,53 +191,18 @@
           data-testid="automation-edit-chat-space-fields"
         >
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Notifications</span>
-            <span class="automation-schedule-static" data-testid="automation-chat-space-current">{{ automationChatSpaceName || 'None' }}</span>
+            <span class="workflow-context-label">Chat Space</span>
+            <WorkflowSelect
+              v-model="editChatSpaceValue"
+              test-id="automation-chat-space-select"
+              :disabled="saving || loadingOptions"
+              :options="editChatSpaceSelectOptions"
+              placeholder="Select chat space..."
+            />
           </label>
           <p v-if="automationChatSpaceInactive" class="section-note" data-testid="automation-chat-space-inactive-note">
             {{ automationChatSpaceName }} is no longer active.
           </p>
-          <WorkflowShortcutChoiceCards
-            :options="chatSpaceChoiceOptions"
-            :selected-value="chatSpaceChoice"
-            test-id-prefix="automation-chat-space"
-            @choose="setChatSpaceChoice"
-          />
-          <label v-if="chatSpaceChoice === 'existing'" class="wizard-input-shell">
-            <span class="workflow-context-label">Chat Space</span>
-            <WorkflowSelect
-              v-model="chatSpaceId"
-              test-id="automation-chat-space-select"
-              :disabled="saving || loadingOptions"
-              :options="chatSpaceSelectOptions"
-              placeholder="Select chat space..."
-            />
-          </label>
-          <template v-else-if="chatSpaceChoice === 'new'">
-            <label class="wizard-input-shell">
-              <span class="workflow-context-label">Space Name</span>
-              <input
-                v-model="newChatSpaceName"
-                name="newChatSpaceName"
-                class="wizard-answer-control"
-                data-testid="automation-chat-space-name"
-                placeholder="Ops Alerts"
-                :disabled="saving || loadingOptions"
-              />
-            </label>
-            <label class="wizard-input-shell">
-              <span class="workflow-context-label">Webhook URL</span>
-              <input
-                v-model="newChatSpaceUrl"
-                name="newChatSpaceUrl"
-                class="wizard-answer-control"
-                data-testid="automation-chat-space-url"
-                type="password"
-                placeholder="https://chat.googleapis.com/v1/spaces/..."
-                :disabled="saving || loadingOptions"
-              />
-            </label>
-          </template>
         </div>
 
         <div
@@ -667,6 +632,33 @@ const chatSpaceSelectOptions = computed<WorkflowSelectOption[]>(() => activeChat
   value: space.chatSpaceId,
   label: space.spaceName,
 })))
+
+// Edit surface only: one dropdown replaces the wizard's choice-card stack (per live-review
+// feedback -- the card stack read as bulky/redundant on the compact single-page edit form).
+// "Set up a new space" is out of scope here; users add spaces from Tenant Settings.
+const editChatSpaceSelectOptions = computed<WorkflowSelectOption[]>(() => {
+  const options = chatSpaceSelectOptions.value.slice()
+  // The currently-linked space won't be in the active list if it has since gone inactive.
+  // Inject it so the dropdown still shows its name as the selected value (with the note
+  // below) until the user picks something else -- it is never added as a *new*, generally
+  // choosable option; it only appears while it is still the live selection.
+  if (chatSpaceId.value && !options.some((option) => option.value === chatSpaceId.value)) {
+    options.push({ value: chatSpaceId.value, label: automationChatSpaceName.value || chatSpaceId.value })
+  }
+  options.push({ value: '', label: 'No notifications' })
+  return options
+})
+const editChatSpaceValue = computed({
+  get: () => chatSpaceId.value,
+  set: (value: string) => {
+    if (!value) {
+      setChatSpaceChoice('none')
+      return
+    }
+    chatSpaceChoice.value = 'existing'
+    chatSpaceId.value = value
+  },
+})
 
 const chatSpaceSteps = computed<WizardStep[]>(() => {
   const chatSpaceStepList: WizardStep[] = [{ id: 'chat-space' }]
