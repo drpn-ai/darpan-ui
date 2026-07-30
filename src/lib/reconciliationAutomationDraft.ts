@@ -39,6 +39,10 @@ export type ReconciliationAutomationStepId =
   | 'file2-api'
   | 'date-window'
   | 'schedule'
+  | 'chat-space'
+  | 'chat-space-select'
+  | 'chat-space-name'
+  | 'chat-space-url'
 
 export interface ReconciliationAutomationSourceDraft {
   sourceTypeEnumId?: string
@@ -55,6 +59,8 @@ export interface ReconciliationAutomationSourceDraft {
   optionKey?: string
   omsRestSourceConfigId?: string
 }
+
+export type ReconciliationAutomationChatSpaceChoice = '' | 'default' | 'existing' | 'new' | 'none'
 
 export interface ReconciliationAutomationDraft {
   automationId?: string
@@ -75,6 +81,10 @@ export interface ReconciliationAutomationDraft {
   isActive?: boolean
   returnLabel?: string
   returnPath?: string
+  chatSpaceChoice?: ReconciliationAutomationChatSpaceChoice
+  chatSpaceId?: string
+  newChatSpaceName?: string
+  newChatSpaceUrl?: string
   sources?: Partial<Record<ReconciliationAutomationFileSide, ReconciliationAutomationSourceDraft>>
 }
 
@@ -166,6 +176,13 @@ function normalizeBoolean(value: unknown): boolean | undefined {
   return undefined
 }
 
+function normalizeChatSpaceChoice(value: unknown): ReconciliationAutomationChatSpaceChoice | undefined {
+  const normalized = normalizeString(value)
+  return normalized === 'default' || normalized === 'existing' || normalized === 'new' || normalized === 'none'
+    ? normalized
+    : undefined
+}
+
 function readSourceDraft(value: unknown): ReconciliationAutomationSourceDraft {
   if (!isRecord(value)) return {}
   return removeEmpty({
@@ -217,6 +234,10 @@ function readDraft(value: unknown): ReconciliationAutomationDraft | null {
     isActive: normalizeBoolean(value.isActive),
     returnLabel: normalizeString(value.returnLabel),
     returnPath: normalizeString(value.returnPath),
+    chatSpaceChoice: normalizeChatSpaceChoice(value.chatSpaceChoice),
+    chatSpaceId: normalizeString(value.chatSpaceId),
+    newChatSpaceName: normalizeString(value.newChatSpaceName),
+    newChatSpaceUrl: normalizeString(value.newChatSpaceUrl),
     sources: readSources(value.sources),
   }) as ReconciliationAutomationDraft
   return Object.keys(draft).length ? draft : null
@@ -337,7 +358,7 @@ export function buildSaveAutomationPayload(
   draft: ReconciliationAutomationDraft,
   savedRun: SavedRunSummary,
 ): SaveAutomationPayload {
-  return removeEmpty({
+  const payload = removeEmpty({
     automationId: draft.automationId,
     automationName: draft.automationName,
     description: draft.description,
@@ -353,9 +374,15 @@ export function buildSaveAutomationPayload(
     maxWindowDays: draft.maxWindowDays ?? 28,
     splitWindowDays: draft.splitWindowDays ?? 28,
     isActive: draft.isActive ?? true,
+    chatSpaceId: draft.chatSpaceChoice === 'none' ? '' : draft.chatSpaceId,
     sources: [
       buildSourcePayload(draft, savedRun, 'FILE_1'),
       buildSourcePayload(draft, savedRun, 'FILE_2'),
     ],
   }) as SaveAutomationPayload
+  // removeEmpty strips '' values, but an explicit empty chatSpaceId is exactly how the
+  // backend clears the automation's chat-space link -- it must survive when the user
+  // chose 'none', so it is restored here after the generic empty-value scrub above.
+  if (draft.chatSpaceChoice === 'none') payload.chatSpaceId = ''
+  return payload
 }

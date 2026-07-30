@@ -187,6 +187,60 @@
         </template>
 
         <div
+          class="automation-edit-chat-space-fields"
+          data-testid="automation-edit-chat-space-fields"
+        >
+          <label class="wizard-input-shell">
+            <span class="workflow-context-label">Notifications</span>
+            <span class="automation-schedule-static" data-testid="automation-chat-space-current">{{ automationChatSpaceName || 'None' }}</span>
+          </label>
+          <p v-if="automationChatSpaceInactive" class="section-note" data-testid="automation-chat-space-inactive-note">
+            {{ automationChatSpaceName }} is no longer active.
+          </p>
+          <WorkflowShortcutChoiceCards
+            :options="chatSpaceChoiceOptions"
+            :selected-value="chatSpaceChoice"
+            test-id-prefix="automation-chat-space"
+            @choose="setChatSpaceChoice"
+          />
+          <label v-if="chatSpaceChoice === 'existing'" class="wizard-input-shell">
+            <span class="workflow-context-label">Chat Space</span>
+            <WorkflowSelect
+              v-model="chatSpaceId"
+              test-id="automation-chat-space-select"
+              :disabled="saving || loadingOptions"
+              :options="chatSpaceSelectOptions"
+              placeholder="Select chat space..."
+            />
+          </label>
+          <template v-else-if="chatSpaceChoice === 'new'">
+            <label class="wizard-input-shell">
+              <span class="workflow-context-label">Space Name</span>
+              <input
+                v-model="newChatSpaceName"
+                name="newChatSpaceName"
+                class="wizard-answer-control"
+                data-testid="automation-chat-space-name"
+                placeholder="Ops Alerts"
+                :disabled="saving || loadingOptions"
+              />
+            </label>
+            <label class="wizard-input-shell">
+              <span class="workflow-context-label">Webhook URL</span>
+              <input
+                v-model="newChatSpaceUrl"
+                name="newChatSpaceUrl"
+                class="wizard-answer-control"
+                data-testid="automation-chat-space-url"
+                type="password"
+                placeholder="https://chat.googleapis.com/v1/spaces/..."
+                :disabled="saving || loadingOptions"
+              />
+            </label>
+          </template>
+        </div>
+
+        <div
           class="automation-schedule-helper automation-edit-schedule-helper"
           data-testid="automation-edit-schedule-fields"
         >
@@ -393,6 +447,31 @@
         </div>
       </template>
 
+      <template v-else-if="currentStep.id === 'chat-space-name'">
+        <label class="wizard-input-shell">
+          <input
+            v-model="newChatSpaceName"
+            name="newChatSpaceName"
+            class="wizard-answer-control"
+            data-testid="automation-chat-space-name"
+            placeholder="Ops Alerts"
+          />
+        </label>
+      </template>
+
+      <template v-else-if="currentStep.id === 'chat-space-url'">
+        <label class="wizard-input-shell">
+          <input
+            v-model="newChatSpaceUrl"
+            name="newChatSpaceUrl"
+            class="wizard-answer-control"
+            data-testid="automation-chat-space-url"
+            type="password"
+            placeholder="https://chat.googleapis.com/v1/spaces/..."
+          />
+        </label>
+      </template>
+
       <template v-else>
         <label class="wizard-input-shell">
           <input
@@ -415,7 +494,7 @@ import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '
 import WorkflowSelect, { type WorkflowSelectOption } from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
-import { reconciliationFacade } from '../../lib/api/facade'
+import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type {
   AutomationNsRestletOption,
   AutomationRecord,
@@ -424,6 +503,8 @@ import type {
   AutomationSystemRemoteOption,
   EnumOption,
   SavedRunSummary,
+  TenantChatSpace,
+  UserNotificationDefault,
 } from '../../lib/api/types'
 import {
   AUTOMATION_WINDOW_CUSTOM,
@@ -439,6 +520,7 @@ import {
   automationWindowUsesCustomRange,
   buildDefaultAutomationName,
   buildSaveAutomationPayload,
+  type ReconciliationAutomationChatSpaceChoice,
   type ReconciliationAutomationDraft,
   type ReconciliationAutomationFileSide,
   type ReconciliationAutomationSourceDraft,
@@ -493,6 +575,16 @@ const windowTimeZone = ref('UTC')
 const isActive = ref(true)
 const returnLabel = ref('')
 const returnPath = ref('')
+const chatSpaceChoice = ref<ReconciliationAutomationChatSpaceChoice>('')
+const chatSpaceId = ref('')
+const newChatSpaceName = ref('')
+const newChatSpaceUrl = ref('')
+const userNotificationDefault = ref<UserNotificationDefault | null>(null)
+const tenantChatSpaces = ref<TenantChatSpace[]>([])
+// Snapshot of the automation's own linked chat space at load time, for the edit-surface
+// summary line -- independent of chatSpaceChoice/chatSpaceId, which change as the user edits.
+const automationChatSpaceName = ref('')
+const automationChatSpaceInactive = ref(false)
 const sourceOptions = ref<SourceOptions>({
   inputModes: [],
   relativeWindows: [],
@@ -557,6 +649,32 @@ const savePrimaryLabel = computed(() => (isEditMode.value ? 'Save Automation' : 
 const savePrimaryTestId = computed(() => (isEditMode.value ? 'save-automation' : 'create-automation'))
 const isNewRunAutomationSetup = computed(() => intent.value === 'new-run' && Boolean(selectedSavedRunId.value))
 
+const activeChatSpaces = computed(() => tenantChatSpaces.value.filter((space) => space.isActive !== 'N'))
+const otherActiveChatSpaces = computed(() => activeChatSpaces.value.filter((space) => space.chatSpaceId !== userNotificationDefault.value?.chatSpaceId))
+const chatSpaceChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
+  const options: Array<{ value: string; label: string }> = []
+  if (userNotificationDefault.value) {
+    options.push({ value: 'default', label: `My default space (${userNotificationDefault.value.spaceName})` })
+  }
+  if (otherActiveChatSpaces.value.length > 0) {
+    options.push({ value: 'existing', label: 'Choose another space' })
+  }
+  options.push({ value: 'new', label: 'Set up a new space' })
+  options.push({ value: 'none', label: 'No notifications' })
+  return options.map((option, index) => ({ ...option, shortcutKey: ['A', 'B', 'C', 'D'][index] ?? String(index + 1) }))
+})
+const chatSpaceSelectOptions = computed<WorkflowSelectOption[]>(() => activeChatSpaces.value.map((space) => ({
+  value: space.chatSpaceId,
+  label: space.spaceName,
+})))
+
+const chatSpaceSteps = computed<WizardStep[]>(() => {
+  const chatSpaceStepList: WizardStep[] = [{ id: 'chat-space' }]
+  if (chatSpaceChoice.value === 'existing') chatSpaceStepList.push({ id: 'chat-space-select' })
+  if (chatSpaceChoice.value === 'new') chatSpaceStepList.push({ id: 'chat-space-name' }, { id: 'chat-space-url' })
+  return chatSpaceStepList
+})
+
 const steps = computed<WizardStep[]>(() => {
   if (intent.value === 'new-run' && !selectedSavedRunId.value) return [{ id: 'purpose' }]
 
@@ -575,6 +693,7 @@ const steps = computed<WizardStep[]>(() => {
     ...(shouldAskInputMode.value ? [{ id: 'input-mode' } as WizardStep] : []),
     ...sourceSteps,
     { id: 'schedule' },
+    ...chatSpaceSteps.value,
     { id: 'automation-name' },
   ]
 
@@ -589,7 +708,7 @@ const steps = computed<WizardStep[]>(() => {
 
 const currentStep = computed<WizardStep>(() => steps.value[currentStepIndex.value] ?? steps.value[0]!)
 const isSaveStep = computed(() => currentStep.value.id === 'automation-name')
-const isChoiceStep = computed(() => ['purpose', 'input-mode'].includes(currentStep.value.id))
+const isChoiceStep = computed(() => ['purpose', 'input-mode', 'chat-space'].includes(currentStep.value.id))
 const isChoiceOnlyStep = computed(() => isChoiceStep.value && !isSaveStep.value)
 const showPrimaryAction = computed(() => isEditMode.value || !isChoiceOnlyStep.value)
 const progressPercent = computed(() => ((Math.max(1, currentStepIndex.value + 1) / steps.value.length) * 100).toFixed(2))
@@ -693,6 +812,8 @@ const activeChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
       return purposeOptions
     case 'input-mode':
       return inputModeOptions.value
+    case 'chat-space':
+      return chatSpaceChoiceOptions.value
     default:
       return []
   }
@@ -704,6 +825,8 @@ const activeChoiceValue = computed(() => {
       return intent.value
     case 'input-mode':
       return inputModeEnumId.value
+    case 'chat-space':
+      return chatSpaceChoice.value
     default:
       return ''
   }
@@ -715,6 +838,8 @@ const activeChoiceTestPrefix = computed(() => {
       return 'automation-purpose-choice'
     case 'input-mode':
       return 'automation-input-mode-choice'
+    case 'chat-space':
+      return 'automation-chat-space'
     default:
       return 'automation-choice'
   }
@@ -747,12 +872,20 @@ const currentQuestion = computed(() => {
       return 'How far back should each scheduled run reconcile?'
     case 'schedule':
       return 'When should Darpan run this automation?'
+    case 'chat-space':
+      return 'Where should Darpan send notifications for this automation?'
+    case 'chat-space-select':
+      return 'Which chat space should get notified?'
+    case 'chat-space-name':
+      return 'What should the new chat space be called?'
+    case 'chat-space-url':
+      return 'What is the Google Chat webhook URL for this space?'
     default:
       return ''
   }
 })
 
-const isSelectStep = computed(() => ['saved-run', 'file1-sftp', 'file2-sftp', 'file1-api', 'file2-api'].includes(currentStep.value.id))
+const isSelectStep = computed(() => ['saved-run', 'file1-sftp', 'file2-sftp', 'file1-api', 'file2-api', 'chat-space-select'].includes(currentStep.value.id))
 
 const activeSelectOptions = computed<WorkflowSelectOption[]>(() => {
   switch (currentStep.value.id) {
@@ -764,6 +897,8 @@ const activeSelectOptions = computed<WorkflowSelectOption[]>(() => {
     case 'file1-api':
     case 'file2-api':
       return apiSourceOptionsForCurrentStep.value
+    case 'chat-space-select':
+      return chatSpaceSelectOptions.value
     default:
       return []
   }
@@ -787,6 +922,8 @@ const activeSelectTestId = computed(() => {
       return 'automation-file1-api-select'
     case 'file2-api':
       return 'automation-file2-api-select'
+    case 'chat-space-select':
+      return 'automation-chat-space-select'
     default:
       return 'automation-select'
   }
@@ -810,6 +947,8 @@ const currentPlaceholder = computed(() => {
       return '/remote/source-1/orders'
     case 'file2-remote-path':
       return '/remote/source-2/orders'
+    case 'chat-space-select':
+      return 'Select chat space...'
     default:
       return ''
   }
@@ -828,6 +967,8 @@ const activeSelectValue = computed({
         return selectedApiSourceValue('FILE_1')
       case 'file2-api':
         return selectedApiSourceValue('FILE_2')
+      case 'chat-space-select':
+        return chatSpaceId.value
       default:
         return ''
     }
@@ -849,6 +990,9 @@ const activeSelectValue = computed({
         break
       case 'file2-api':
         updateApiSource('FILE_2', value)
+        break
+      case 'chat-space-select':
+        chatSpaceId.value = value
         break
     }
   },
@@ -943,13 +1087,26 @@ const canProceed = computed(() => {
       return true
     case 'schedule':
       return scheduleExpr.value.trim().length > 0
+    case 'chat-space-select':
+      return chatSpaceId.value.length > 0
+    case 'chat-space-name':
+      return newChatSpaceName.value.trim().length > 0
+    case 'chat-space-url':
+      return newChatSpaceUrl.value.trim().length > 0
     default:
       return false
   }
 })
 
+const chatSpaceChoiceReady = computed(() => {
+  if (chatSpaceChoice.value === 'existing') return Boolean(chatSpaceId.value)
+  if (chatSpaceChoice.value === 'new') return Boolean(newChatSpaceName.value.trim() && newChatSpaceUrl.value.trim())
+  return true
+})
+
 const canSave = computed(() => {
   if (!selectedSavedRun.value || !automationName.value.trim() || !effectiveInputModeEnumId.value || !scheduleExpr.value.trim()) return false
+  if (!chatSpaceChoiceReady.value) return false
   if (usesSftp.value) {
     return Boolean(
       sourceDrafts.value.FILE_1.sftpServerId &&
@@ -985,6 +1142,10 @@ const activeDraft = computed<ReconciliationAutomationDraft>(() => ({
   isActive: isActive.value,
   returnLabel: returnLabel.value || undefined,
   returnPath: returnPath.value || undefined,
+  chatSpaceChoice: chatSpaceChoice.value || undefined,
+  chatSpaceId: chatSpaceId.value || undefined,
+  newChatSpaceName: newChatSpaceName.value || undefined,
+  newChatSpaceUrl: newChatSpaceUrl.value || undefined,
   sources: {
     FILE_1: sourceDrafts.value.FILE_1,
     FILE_2: sourceDrafts.value.FILE_2,
@@ -1108,6 +1269,17 @@ function handleChoiceKeydown(event: KeyboardEvent): void {
   void handleChoice(matchedChoice)
 }
 
+function setChatSpaceChoice(value: string): void {
+  const choice: ReconciliationAutomationChatSpaceChoice =
+    value === 'default' || value === 'existing' || value === 'new' || value === 'none' ? value : ''
+  chatSpaceChoice.value = choice
+  if (choice === 'default') {
+    chatSpaceId.value = userNotificationDefault.value?.chatSpaceId ?? ''
+  } else if (choice === 'none' || choice === 'new') {
+    chatSpaceId.value = ''
+  }
+}
+
 async function handleChoice(value: string): Promise<void> {
   pageError.value = null
   if (currentStep.value.id === 'purpose') {
@@ -1129,6 +1301,11 @@ async function handleChoice(value: string): Promise<void> {
     return
   }
 
+  if (currentStep.value.id === 'chat-space') {
+    setChatSpaceChoice(value)
+    advance()
+    return
+  }
 }
 
 async function handlePrimarySubmit(): Promise<void> {
@@ -1175,6 +1352,19 @@ async function saveAutomationSetup(): Promise<void> {
   const submitSignal = submitController.signal
 
   try {
+    if (chatSpaceChoice.value === 'new') {
+      const spaceResponse = await settingsFacade.saveTenantChatSpace({
+        spaceName: newChatSpaceName.value,
+        googleChatWebhookUrl: newChatSpaceUrl.value,
+        isActive: true,
+      }, submitSignal)
+      if (!spaceResponse.ok || !spaceResponse.chatSpace?.chatSpaceId) {
+        pageError.value = spaceResponse.errors?.[0] ?? 'Unable to save chat space.'
+        return
+      }
+      chatSpaceId.value = spaceResponse.chatSpace.chatSpaceId
+    }
+
     const response = await reconciliationFacade.saveAutomation(buildSaveAutomationPayload(activeDraft.value, selectedSavedRun.value), submitSignal)
     const origin = draftStore.workflowOrigin
     const savedAutomationId = response.automation?.automationId || activeDraft.value.automationId
@@ -1255,6 +1445,12 @@ function hydrateAutomation(automation: AutomationRecord): void {
   isActive.value = automation.active !== false
   sourceDrafts.value = sourceDraftsFromAutomation(automation)
   handoffSavedRun.value = automation.savedRun ?? handoffSavedRun.value
+  chatSpaceId.value = automation.chatSpaceId ?? ''
+  chatSpaceChoice.value = automation.chatSpaceId ? 'existing' : 'none'
+  automationChatSpaceName.value = automation.chatSpaceName ?? ''
+  // chatSpaceActive is false BOTH when no space is linked and when the linked space is
+  // inactive -- only surface the inactive note when a chat space is actually linked.
+  automationChatSpaceInactive.value = Boolean(automation.chatSpaceId) && automation.chatSpaceActive === false
 }
 
 async function loadAutomationForEdit(): Promise<boolean> {
@@ -1297,6 +1493,10 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   isActive.value = draft.isActive ?? true
   returnLabel.value = draft.returnLabel ?? ''
   returnPath.value = draft.returnPath ?? ''
+  chatSpaceChoice.value = draft.chatSpaceChoice ?? ''
+  chatSpaceId.value = draft.chatSpaceId ?? ''
+  newChatSpaceName.value = draft.newChatSpaceName ?? ''
+  newChatSpaceUrl.value = draft.newChatSpaceUrl ?? ''
   sourceDrafts.value = {
     FILE_1: { ...(draft.sources?.FILE_1 ?? {}) },
     FILE_2: { ...(draft.sources?.FILE_2 ?? {}) },
@@ -1306,11 +1506,29 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   return draftState.resumeStepId
 }
 
+async function loadChatSpaceOptions(signal: AbortSignal): Promise<void> {
+  try {
+    const [notificationDefaultResponse, chatSpacesResponse] = await Promise.all([
+      settingsFacade.getUserNotificationDefault(signal),
+      settingsFacade.listTenantChatSpaces(signal),
+    ])
+    userNotificationDefault.value = notificationDefaultResponse.userNotificationDefault ?? null
+    tenantChatSpaces.value = chatSpacesResponse.chatSpaces ?? []
+  } catch (loadError) {
+    if ((loadError as { name?: string })?.name === 'AbortError') return
+    // Non-critical for the wizard: 'new' and 'none' remain available even without a
+    // resolved default or registry, so a load failure here does not block automation setup.
+    userNotificationDefault.value = null
+    tenantChatSpaces.value = []
+  }
+}
+
 async function loadOptions(): Promise<void> {
   loadingOptions.value = true
   pageError.value = null
 
   try {
+    const chatSpaceOptionsPromise = loadChatSpaceOptions(pageAbortController.signal)
     const response = await reconciliationFacade.listAutomationSourceOptions(pageAbortController.signal)
     sourceOptions.value = {
       inputModes: response.inputModes ?? [],
@@ -1320,6 +1538,7 @@ async function loadOptions(): Promise<void> {
       nsRestletConfigs: response.nsRestletConfigs ?? [],
       systemRemotes: response.systemRemotes ?? [],
     }
+    await chatSpaceOptionsPromise
     applyDeterministicDefaults()
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
@@ -1373,8 +1592,15 @@ onUnmounted(() => {
 }
 
 .automation-edit-date-window-fields,
-.automation-edit-schedule-helper {
+.automation-edit-schedule-helper,
+.automation-edit-chat-space-fields {
   margin-top: 0.2rem;
+}
+
+.automation-edit-chat-space-fields {
+  width: 100%;
+  display: grid;
+  gap: var(--space-3);
 }
 
 .automation-edit-date-window-fields {

@@ -428,6 +428,9 @@ export interface AutomationRecord {
   splitWindowDays?: number
   isActive?: string
   active?: boolean
+  chatSpaceId?: string
+  chatSpaceName?: string
+  chatSpaceActive?: boolean
   executionCount?: number
   lastExecution?: AutomationExecutionSummary | null
   permissions?: AutomationPermissions

@@ -13,6 +13,9 @@ const route = vi.hoisted(() => ({
 const listAutomationSourceOptions = vi.hoisted(() => vi.fn())
 const getAutomation = vi.hoisted(() => vi.fn())
 const saveAutomation = vi.hoisted(() => vi.fn())
+const getUserNotificationDefault = vi.hoisted(() => vi.fn())
+const listTenantChatSpaces = vi.hoisted(() => vi.fn())
+const saveTenantChatSpace = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
@@ -24,6 +27,11 @@ vi.mock('../../../lib/api/facade', () => ({
     listAutomationSourceOptions,
     getAutomation,
     saveAutomation,
+  },
+  settingsFacade: {
+    getUserNotificationDefault,
+    listTenantChatSpaces,
+    saveTenantChatSpace,
   },
 }))
 
@@ -200,6 +208,9 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     getAutomation.mockReset()
     saveAutomation.mockReset()
     listAutomationSourceOptions.mockReset()
+    getUserNotificationDefault.mockReset()
+    listTenantChatSpaces.mockReset()
+    saveTenantChatSpace.mockReset()
     draftStoreState.workflowOrigin = null
     draftStoreState.ruleSetDraftState = null
     draftStoreState.automationDraftState = null
@@ -217,6 +228,8 @@ describe('ReconciliationAutomationWorkflowPage', () => {
         automationName: 'Daily order sync',
       },
     })
+    getUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [] })
+    listTenantChatSpaces.mockResolvedValue({ ok: true, messages: [], errors: [], chatSpaces: [] })
   })
 
   it('starts with a single branch decision and routes new-reconciliation automation to the create flow', async () => {
@@ -282,7 +295,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.text()).toContain('How will Darpan get source data for Order Sync?')
     expect(wrapper.find('[data-testid="automation-saved-run-select"]').exists()).toBe(false)
     expect(wrapper.find('.wizard-back').exists()).toBe(false)
-    expect(wrapper.get('.wizard-progress').attributes('aria-valuenow')).toBe('14.29')
+    expect(wrapper.get('.wizard-progress').attributes('aria-valuenow')).toBe('12.5')
     expect(wrapper.text()).not.toContain('What should this automation be called?')
     expect(wrapper.find('[data-testid="automation-input-mode-choice-AUT_IN_SFTP_FILES"]').exists()).toBe(true)
   })
@@ -405,7 +418,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await flushPromises()
 
     await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
-    expect(wrapper.get('.wizard-progress').attributes('aria-valuenow')).toBe('22.22')
+    expect(wrapper.get('.wizard-progress').attributes('aria-valuenow')).toBe('20')
     await chooseWorkflowOption(wrapper, 'automation-saved-run-select', 'RS_ORDER_SYNC')
     expect(wrapper.find('[data-testid="automation-selected-run"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('SFTP scheduled file pickup')
@@ -439,6 +452,9 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.get('[data-testid="automation-schedule-weekday"]').element.tagName).toBe('BUTTON')
     await chooseWorkflowOption(wrapper, 'automation-schedule-weekday', 'TUE')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    expect(wrapper.find('[data-testid="automation-chat-space-default"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="automation-chat-space-existing"]').exists()).toBe(false)
+    await chooseCard(wrapper, 'automation-chat-space-none')
     await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
     await wrapper.get('[data-testid="create-automation"]').trigger('click')
     await flushPromises()
@@ -453,6 +469,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       isActive: true,
       maxWindowDays: 28,
       splitWindowDays: 28,
+      chatSpaceId: '',
       sources: [
         expect.objectContaining({
           fileSide: 'FILE_1',
@@ -515,6 +532,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await chooseWorkflowOption(wrapper, 'automation-schedule-preset', 'hourly')
     await wrapper.get('[data-testid="automation-schedule-minute"]').setValue('10')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseCard(wrapper, 'automation-chat-space-none')
     await wrapper.get('input[name="automationName"]').setValue('Daily API orders')
     await wrapper.get('[data-testid="create-automation"]').trigger('click')
     await flushPromises()
@@ -637,5 +655,207 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       name: 'reconciliation-automation-dashboard',
       params: { automationId: 'AUT_ORDER_SYNC' },
     })
+  })
+
+  it('walks the chat-space step using the user default', async () => {
+    getUserNotificationDefault.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      userNotificationDefault: { chatSpaceId: 'CS1', spaceName: 'Ops', isActive: 'Y' },
+    })
+    listTenantChatSpaces.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      chatSpaces: [
+        { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: true },
+        { chatSpaceId: 'CS2', spaceName: 'Backup', googleChatConfigured: true, isActive: 'Y', inUse: false },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
+    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    expect(wrapper.text()).toContain('My default space (Ops)')
+    expect(wrapper.text()).toContain('Choose another space')
+    expect(wrapper.text()).toContain('Set up a new space')
+    expect(wrapper.text()).toContain('No notifications')
+
+    await chooseCard(wrapper, 'automation-chat-space-default')
+    expect(wrapper.text()).toContain('What should this automation be called?')
+
+    await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
+    await wrapper.get('[data-testid="create-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS1' }), expect.any(AbortSignal))
+  })
+
+  it('creates a new space inline as two separate cards', async () => {
+    saveTenantChatSpace.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      chatSpace: { chatSpaceId: 'CS9', spaceName: 'Ops Alerts', googleChatConfigured: true, isActive: 'Y', inUse: true },
+    })
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
+    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseCard(wrapper, 'automation-chat-space-new')
+    expect(wrapper.find('[data-testid="automation-chat-space-name"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Alerts')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    expect(wrapper.find('[data-testid="automation-chat-space-name"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="automation-chat-space-url"]').attributes('type')).toBe('password')
+    await wrapper.get('[data-testid="automation-chat-space-url"]').setValue('https://chat.googleapis.com/v1/spaces/AAA')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
+    await wrapper.get('[data-testid="create-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenCalledWith({
+      spaceName: 'Ops Alerts',
+      googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA',
+      isActive: true,
+    }, expect.any(AbortSignal))
+    expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS9' }), expect.any(AbortSignal))
+    const chatSpaceCallOrder = saveTenantChatSpace.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    const automationCallOrder = saveAutomation.mock.invocationCallOrder[0] ?? Number.NEGATIVE_INFINITY
+    expect(chatSpaceCallOrder).toBeLessThan(automationCallOrder)
+  })
+
+  it('edit mode shows and clears the linked space', async () => {
+    route.name = 'reconciliation-automation-edit'
+    route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+    route.params = { automationId: 'AUT_ORDER_SYNC' }
+    getAutomation.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        automationId: 'AUT_ORDER_SYNC',
+        automationName: 'Daily order sync',
+        savedRunId: 'RS_ORDER_SYNC',
+        savedRunName: 'Order Sync',
+        savedRunType: 'ruleset',
+        savedRun: optionsResponse().savedRuns[0],
+        inputModeEnumId: 'AUT_IN_API_RANGE',
+        scheduleExpr: '0 0 6 * * ?',
+        timezone: 'UTC',
+        relativeWindowTypeEnumId: 'AUT_WIN_PREV_DAY',
+        relativeWindowCount: 1,
+        active: true,
+        chatSpaceId: 'CS1',
+        chatSpaceName: 'Ops',
+        chatSpaceActive: true,
+        sources: [
+          {
+            fileSide: 'FILE_1',
+            sourceTypeEnumId: 'AUT_SRC_API',
+            systemEnumId: 'OMS',
+            systemMessageRemoteId: 'OMS_REMOTE',
+            safeMetadataJson: '{"extractServiceName":"reconciliation.HotWaxOmsExtractionServices.extract#HotWaxOmsOrders","parameters":{"omsRestSourceConfigId":"OMS_REST_SOURCE"}}',
+          },
+          {
+            fileSide: 'FILE_2',
+            sourceTypeEnumId: 'AUT_SRC_API',
+            systemEnumId: 'SHOPIFY',
+            systemMessageRemoteId: 'SHOPIFY_REMOTE',
+            safeMetadataJson: '{"extractServiceName":"fixture.extractShopifyOrders"}',
+          },
+        ],
+      },
+    })
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Ops')
+    expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
+
+    await chooseCard(wrapper, 'automation-chat-space-none')
+    await wrapper.get('[data-testid="save-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: '' }), expect.any(AbortSignal))
+  })
+
+  it('shows an inactive note only when the linked chat space id is present and inactive', async () => {
+    route.name = 'reconciliation-automation-edit'
+    route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+    route.params = { automationId: 'AUT_ORDER_SYNC' }
+    getAutomation.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        automationId: 'AUT_ORDER_SYNC',
+        automationName: 'Daily order sync',
+        savedRunId: 'RS_ORDER_SYNC',
+        savedRunName: 'Order Sync',
+        savedRunType: 'ruleset',
+        savedRun: optionsResponse().savedRuns[0],
+        inputModeEnumId: 'AUT_IN_API_RANGE',
+        scheduleExpr: '0 0 6 * * ?',
+        timezone: 'UTC',
+        relativeWindowTypeEnumId: 'AUT_WIN_PREV_DAY',
+        relativeWindowCount: 1,
+        active: true,
+        chatSpaceId: 'CS1',
+        chatSpaceName: 'Ops',
+        chatSpaceActive: false,
+        sources: [
+          {
+            fileSide: 'FILE_1',
+            sourceTypeEnumId: 'AUT_SRC_API',
+            systemEnumId: 'OMS',
+            systemMessageRemoteId: 'OMS_REMOTE',
+            safeMetadataJson: '{"extractServiceName":"reconciliation.HotWaxOmsExtractionServices.extract#HotWaxOmsOrders","parameters":{"omsRestSourceConfigId":"OMS_REST_SOURCE"}}',
+          },
+          {
+            fileSide: 'FILE_2',
+            sourceTypeEnumId: 'AUT_SRC_API',
+            systemEnumId: 'SHOPIFY',
+            systemMessageRemoteId: 'SHOPIFY_REMOTE',
+            safeMetadataJson: '{"extractServiceName":"fixture.extractShopifyOrders"}',
+          },
+        ],
+      },
+    })
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Ops')
+    expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(true)
   })
 })

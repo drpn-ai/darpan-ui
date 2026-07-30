@@ -226,6 +226,42 @@ describe('reconciliationAutomationDraft', () => {
     })
   })
 
+  it('round-trips chat-space draft fields through history state', () => {
+    const state = buildReconciliationAutomationDraftState(
+      createDraft({ chatSpaceChoice: 'existing', chatSpaceId: 'CS1', newChatSpaceName: 'Ops', newChatSpaceUrl: 'https://chat.googleapis.com/v1/spaces/AAA' }),
+      'chat-space-select',
+      savedRun,
+    )
+
+    expect(readReconciliationAutomationDraftState(state)).toEqual({
+      draft: createDraft({ chatSpaceChoice: 'existing', chatSpaceId: 'CS1', newChatSpaceName: 'Ops', newChatSpaceUrl: 'https://chat.googleapis.com/v1/spaces/AAA' }),
+      resumeStepId: 'chat-space-select',
+      savedRun,
+    })
+  })
+
+  it('sends the selected chat space id on the save payload', () => {
+    expect(buildSaveAutomationPayload(createDraft({ chatSpaceChoice: 'existing', chatSpaceId: 'CS1' }), savedRun)).toMatchObject({
+      chatSpaceId: 'CS1',
+    })
+    expect(buildSaveAutomationPayload(createDraft({ chatSpaceChoice: 'new', chatSpaceId: 'CS9' }), savedRun)).toMatchObject({
+      chatSpaceId: 'CS9',
+    })
+  })
+
+  it('sends an explicit empty chatSpaceId to clear the link when the choice is none', () => {
+    const payload = buildSaveAutomationPayload(createDraft({ chatSpaceChoice: 'none', chatSpaceId: 'CS1' }), savedRun)
+
+    expect(payload.chatSpaceId).toBe('')
+    expect(payload).toHaveProperty('chatSpaceId')
+  })
+
+  it('omits chatSpaceId entirely when no chat-space choice has been made', () => {
+    const payload = buildSaveAutomationPayload(createDraft(), savedRun)
+
+    expect(payload).not.toHaveProperty('chatSpaceId')
+  })
+
   it('omits counts for previous windows and sends persisted dates for custom ranges', () => {
     const previousWeekPayload = buildSaveAutomationPayload(createDraft({
       inputModeEnumId: 'AUT_IN_API_RANGE',

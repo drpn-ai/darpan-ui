@@ -395,6 +395,7 @@ export interface SaveAutomationPayload {
   maxWindowDays?: number
   splitWindowDays?: number
   isActive?: boolean
+  chatSpaceId?: string
   sources?: AutomationSourcePayload[]
 }
 
