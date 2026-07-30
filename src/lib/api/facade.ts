@@ -24,6 +24,7 @@ import type {
   DeleteOmsRestSourceConfigResponse,
   DeleteSavedRunResponse,
   DeleteShopifyAuthConfigResponse,
+  DeleteTenantChatSpaceResponse,
   FlattenJsonSchemaResponse,
   GetAutomationResponse,
   GetMappingResponse,
@@ -33,7 +34,7 @@ import type {
   GetGeneratedOutputDifferencesResponse,
   GetShopifyAuthConfigResponse,
   GetTenantSettingsResponse,
-  GetTenantNotificationSettingsResponse,
+  GetUserNotificationDefaultResponse,
   GetJsonSchemaResponse,
   InferJsonSchemaResponse,
   ListAutomationExecutionsResponse,
@@ -49,6 +50,7 @@ import type {
   ListMappingsResponse,
   ListSavedRunsResponse,
   ListSftpServersResponse,
+  ListTenantChatSpacesResponse,
   LoginSessionResponse,
   LlmSettingsResponse,
   LogoutSessionResponse,
@@ -64,10 +66,13 @@ import type {
   SaveRuleSetRunResponse,
   SaveSavedRunNameResponse,
   SaveActiveTenantResponse,
+  SaveTenantChatSpaceResponse,
   SaveTenantSettingsResponse,
+  SaveUserNotificationDefaultResponse,
   SaveUserSettingsResponse,
   SaveShopifyAuthConfigResponse,
-  SaveTenantNotificationSettingsResponse,
+  SubscribeRunNotificationResponse,
+  UnsubscribeRunNotificationResponse,
   VerifyOwnPasswordResponse,
   SaveMappingResponse,
   SaveNsRestletConfigResponse,
@@ -87,6 +92,7 @@ import type {
   DeleteOmsRestSourceConfigPayload,
   DeleteSavedRunPayload,
   DeleteShopifyAuthConfigPayload,
+  DeleteTenantChatSpacePayload,
   FlattenJsonSchemaPayload,
   GetAutomationPayload,
   GetGeneratedOutputPayload,
@@ -125,9 +131,12 @@ import type {
   SaveSavedRunNamePayload,
   SaveSftpServerPayload,
   SaveShopifyAuthConfigPayload,
-  SaveTenantNotificationSettingsPayload,
+  SaveTenantChatSpacePayload,
   SaveTenantSettingsPayload,
+  SaveUserNotificationDefaultPayload,
   SaveUserSettingsPayload,
+  SubscribeRunNotificationPayload,
+  UnsubscribeRunNotificationPayload,
   ValidateJsonTextPayload,
   VerifyOwnPasswordPayload,
 } from './facadeTypes'
@@ -148,8 +157,11 @@ const SETTINGS = {
   saveLlmSettings: 'facade.SettingsFacadeServices.save#LlmSettings',
   getTenantSettings: 'facade.SettingsFacadeServices.get#TenantSettings',
   saveTenantSettings: 'facade.SettingsFacadeServices.save#TenantSettings',
-  getTenantNotificationSettings: 'facade.SettingsFacadeServices.get#TenantNotificationSettings',
-  saveTenantNotificationSettings: 'facade.SettingsFacadeServices.save#TenantNotificationSettings',
+  listTenantChatSpaces: 'facade.SettingsFacadeServices.list#TenantChatSpaces',
+  saveTenantChatSpace: 'facade.SettingsFacadeServices.save#TenantChatSpace',
+  deleteTenantChatSpace: 'facade.SettingsFacadeServices.delete#TenantChatSpace',
+  getUserNotificationDefault: 'facade.SettingsFacadeServices.get#UserNotificationDefault',
+  saveUserNotificationDefault: 'facade.SettingsFacadeServices.save#UserNotificationDefault',
   listSftpServers: 'facade.SettingsFacadeServices.list#SftpServers',
   saveSftpServer: 'facade.SettingsFacadeServices.save#SftpServer',
   listNsAuthConfigs: 'facade.SettingsFacadeServices.list#NsAuthConfigs',
@@ -204,6 +216,8 @@ const RECONCILIATION = {
   runAutomationNow: 'facade.ReconciliationFacadeServices.run#AutomationNow',
   listAutomationExecutions: 'facade.ReconciliationFacadeServices.list#AutomationExecutions',
   listAutomationSourceOptions: 'facade.ReconciliationFacadeServices.list#AutomationSourceOptions',
+  subscribeRunNotification: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
+  unsubscribeRunNotification: 'facade.ReconciliationFacadeServices.unsubscribe#RunNotification',
 }
 
 export const authFacade = {
@@ -246,11 +260,20 @@ export const settingsFacade = {
   saveTenantSettings(payload: SaveTenantSettingsPayload, signal?: AbortSignal): Promise<SaveTenantSettingsResponse> {
     return callService<SaveTenantSettingsResponse>(SETTINGS.saveTenantSettings, payload, signal)
   },
-  getTenantNotificationSettings(signal?: AbortSignal): Promise<GetTenantNotificationSettingsResponse> {
-    return callService<GetTenantNotificationSettingsResponse>(SETTINGS.getTenantNotificationSettings, {}, signal)
+  listTenantChatSpaces(signal?: AbortSignal): Promise<ListTenantChatSpacesResponse> {
+    return callService<ListTenantChatSpacesResponse>(SETTINGS.listTenantChatSpaces, {}, signal)
   },
-  saveTenantNotificationSettings(payload: SaveTenantNotificationSettingsPayload, signal?: AbortSignal): Promise<SaveTenantNotificationSettingsResponse> {
-    return callService<SaveTenantNotificationSettingsResponse>(SETTINGS.saveTenantNotificationSettings, payload, signal)
+  saveTenantChatSpace(payload: SaveTenantChatSpacePayload, signal?: AbortSignal): Promise<SaveTenantChatSpaceResponse> {
+    return callService<SaveTenantChatSpaceResponse>(SETTINGS.saveTenantChatSpace, payload, signal)
+  },
+  deleteTenantChatSpace(payload: DeleteTenantChatSpacePayload, signal?: AbortSignal): Promise<DeleteTenantChatSpaceResponse> {
+    return callService<DeleteTenantChatSpaceResponse>(SETTINGS.deleteTenantChatSpace, payload, signal)
+  },
+  getUserNotificationDefault(signal?: AbortSignal): Promise<GetUserNotificationDefaultResponse> {
+    return callService<GetUserNotificationDefaultResponse>(SETTINGS.getUserNotificationDefault, {}, signal)
+  },
+  saveUserNotificationDefault(payload: SaveUserNotificationDefaultPayload, signal?: AbortSignal): Promise<SaveUserNotificationDefaultResponse> {
+    return callService<SaveUserNotificationDefaultResponse>(SETTINGS.saveUserNotificationDefault, payload, signal)
   },
   listSftpServers(payload: ListSftpServersPayload, signal?: AbortSignal): Promise<ListSftpServersResponse> {
     return callService<ListSftpServersResponse>(SETTINGS.listSftpServers, payload, signal)
@@ -407,5 +430,11 @@ export const reconciliationFacade = {
   },
   listAutomationSourceOptions(signal?: AbortSignal): Promise<ListAutomationSourceOptionsResponse> {
     return callService<ListAutomationSourceOptionsResponse>(RECONCILIATION.listAutomationSourceOptions, {}, signal)
+  },
+  subscribeRunNotification(payload: SubscribeRunNotificationPayload, signal?: AbortSignal): Promise<SubscribeRunNotificationResponse> {
+    return callService<SubscribeRunNotificationResponse>(RECONCILIATION.subscribeRunNotification, payload, signal)
+  },
+  unsubscribeRunNotification(payload: UnsubscribeRunNotificationPayload, signal?: AbortSignal): Promise<UnsubscribeRunNotificationResponse> {
+    return callService<UnsubscribeRunNotificationResponse>(RECONCILIATION.unsubscribeRunNotification, payload, signal)
   },
 }

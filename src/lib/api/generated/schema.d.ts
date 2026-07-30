@@ -44,6 +44,587 @@ export interface components {
             id?: string | number | null;
             error: components["schemas"]["JsonRpcError"];
         };
+        /**
+         * @description Add a user to a tenant with a tenant-scoped role. Writes UserGroupMember and
+         *                 TenantUserPermissionGroupMember atomically — never one without the other.
+         */
+        AddTenantMemberParams: {
+            /** @description User to add. */
+            userId: string;
+            /** @description Target tenant. */
+            tenantUserGroupId: string;
+            /**
+             * @description One of the assignable tenant roles
+             *                     (DARPAN_TENANT_ADMIN, DARPAN_TENANT_USER, DARPAN_COMPANY_EDITOR, DARPAN_COMPANY_VIEW_ONLY).
+             */
+            permissionUserGroupId: string;
+        };
+        AddTenantMemberResult: {
+            /** @description True when the member was added. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.MembershipAdminServices.add#TenantMember */
+        AddTenantMemberRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MembershipAdminServices.add#TenantMember";
+            params?: components["schemas"]["AddTenantMemberParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MembershipAdminServices.add#TenantMember. Check result.ok / result.errors for business failures. */
+        AddTenantMemberResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["AddTenantMemberResult"];
+        };
+        /**
+         * @description Remove a user from a tenant: thruDate both membership entities (no row deletes) and
+         *                 clear the user's active-tenant preference when it pointed at the removed tenant.
+         */
+        RemoveTenantMemberParams: {
+            /** @description Member to remove. */
+            userId: string;
+            /** @description Tenant to remove the member from. */
+            tenantUserGroupId: string;
+        };
+        RemoveTenantMemberResult: {
+            /** @description True when the member was removed. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.MembershipAdminServices.remove#TenantMember */
+        RemoveTenantMemberRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MembershipAdminServices.remove#TenantMember";
+            params?: components["schemas"]["RemoveTenantMemberParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MembershipAdminServices.remove#TenantMember. Check result.ok / result.errors for business failures. */
+        RemoveTenantMemberResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RemoveTenantMemberResult"];
+        };
+        /** @description Change a member's tenant role: thruDate the old permission row, create the new one. */
+        UpdateTenantMemberRoleParams: {
+            /** @description Member whose role changes. */
+            userId: string;
+            /** @description Tenant the membership belongs to. */
+            tenantUserGroupId: string;
+            /** @description New assignable tenant role. */
+            permissionUserGroupId: string;
+        };
+        UpdateTenantMemberRoleResult: {
+            /** @description True when the role was changed. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.MembershipAdminServices.update#TenantMemberRole */
+        UpdateTenantMemberRoleRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MembershipAdminServices.update#TenantMemberRole";
+            params?: components["schemas"]["UpdateTenantMemberRoleParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MembershipAdminServices.update#TenantMemberRole. Check result.ok / result.errors for business failures. */
+        UpdateTenantMemberRoleResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UpdateTenantMemberRoleResult"];
+        };
+        /**
+         * @description Fence probe + admin-app route guard: returns the operator identity when the caller
+         *                 passes the DARPAN_ADMIN_API artifact fence and the isSuperAdmin() content gate.
+         *                 A non-super-admin caller is denied at the artifact layer before this body runs.
+         */
+        GetAdminSessionInfoParams: Record<string, never>;
+        GetAdminSessionInfoResult: {
+            /** @description True when the caller is a super admin. */
+            ok?: boolean;
+            /** @description Operator identity for the admin app shell. */
+            adminSessionInfo?: {
+                userId?: string;
+                username?: string;
+                isSuperAdmin?: boolean;
+            };
+        };
+        /** @description JSON-RPC request envelope for admin.ObserveAdminServices.get#AdminSessionInfo */
+        GetAdminSessionInfoRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.ObserveAdminServices.get#AdminSessionInfo";
+            params?: components["schemas"]["GetAdminSessionInfoParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.ObserveAdminServices.get#AdminSessionInfo. Check result.ok / result.errors for business failures. */
+        GetAdminSessionInfoResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetAdminSessionInfoResult"];
+        };
+        /** @description Create a Darpan tenant: UserGroup (UgtDarpanCompany) + TenantSetting in one transaction. */
+        CreateTenantParams: {
+            /** @description Uppercase tenant id, e.g. KREWE. */
+            tenantUserGroupId: string;
+            /** @description Display label for tenant pickers. */
+            label: string;
+            /** @description Tenant display timezone; defaults to UTC. */
+            timeZone?: string;
+        };
+        CreateTenantResult: {
+            /** @description True when the tenant was created. */
+            ok?: boolean;
+            /** @description Id of the created tenant. */
+            tenantUserGroupId?: string;
+        };
+        /** @description JSON-RPC request envelope for admin.TenantAdminServices.create#Tenant */
+        CreateTenantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.TenantAdminServices.create#Tenant";
+            params?: components["schemas"]["CreateTenantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.TenantAdminServices.create#Tenant. Check result.ok / result.errors for business failures. */
+        CreateTenantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["CreateTenantResult"];
+        };
+        /** @description Hide the tenant from the tenant app (availableTenants + active-tenant selection). Flag, not delete. */
+        DeactivateTenantParams: {
+            /** @description Tenant to deactivate. */
+            tenantUserGroupId: string;
+        };
+        DeactivateTenantResult: {
+            /** @description True when deactivated. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.TenantAdminServices.deactivate#Tenant */
+        DeactivateTenantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.TenantAdminServices.deactivate#Tenant";
+            params?: components["schemas"]["DeactivateTenantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.TenantAdminServices.deactivate#Tenant. Check result.ok / result.errors for business failures. */
+        DeactivateTenantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DeactivateTenantResult"];
+        };
+        /** @description One tenant with settings and active members, for the admin tenant detail board. */
+        GetTenantDetailParams: {
+            /** @description Tenant to read. */
+            tenantUserGroupId: string;
+        };
+        GetTenantDetailResult: {
+            /** @description Tenant detail or null when not found. */
+            tenantDetail?: {
+                tenantUserGroupId?: string;
+                label?: string;
+                timeZone?: string;
+                disabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                createdDate?: string | number;
+                members?: {
+                    member?: {
+                        userId?: string;
+                        username?: string;
+                        permissionUserGroupId?: string;
+                        /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                        fromDate?: string | number;
+                    };
+                }[];
+            };
+        };
+        /** @description JSON-RPC request envelope for admin.TenantAdminServices.get#TenantDetail */
+        GetTenantDetailRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.TenantAdminServices.get#TenantDetail";
+            params?: components["schemas"]["GetTenantDetailParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.TenantAdminServices.get#TenantDetail. Check result.ok / result.errors for business failures. */
+        GetTenantDetailResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetTenantDetailResult"];
+        };
+        /** @description All tenants (including deactivated) with member counts, for the admin Tenants board. */
+        GetTenantListParams: Record<string, never>;
+        GetTenantListResult: {
+            /** @description All tenants sorted by label. */
+            tenantList?: {
+                tenant?: {
+                    tenantUserGroupId?: string;
+                    label?: string;
+                    disabled?: boolean;
+                    memberCount?: number;
+                };
+            }[];
+        };
+        /** @description JSON-RPC request envelope for admin.TenantAdminServices.get#TenantList */
+        GetTenantListRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.TenantAdminServices.get#TenantList";
+            params?: components["schemas"]["GetTenantListParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.TenantAdminServices.get#TenantList. Check result.ok / result.errors for business failures. */
+        GetTenantListResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetTenantListResult"];
+        };
+        /** @description Re-enable a deactivated tenant. */
+        ReactivateTenantParams: {
+            /** @description Tenant to reactivate. */
+            tenantUserGroupId: string;
+        };
+        ReactivateTenantResult: {
+            /** @description True when reactivated. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.TenantAdminServices.reactivate#Tenant */
+        ReactivateTenantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.TenantAdminServices.reactivate#Tenant";
+            params?: components["schemas"]["ReactivateTenantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.TenantAdminServices.reactivate#Tenant. Check result.ok / result.errors for business failures. */
+        ReactivateTenantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ReactivateTenantResult"];
+        };
+        /** @description Rename a tenant and/or change its timezone. */
+        UpdateTenantParams: {
+            /** @description Tenant to update. */
+            tenantUserGroupId: string;
+            /** @description New display label; unchanged when omitted. */
+            label?: string;
+            /** @description New timezone; unchanged when omitted. */
+            timeZone?: string;
+        };
+        UpdateTenantResult: {
+            /** @description True when updated. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.TenantAdminServices.update#Tenant */
+        UpdateTenantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.TenantAdminServices.update#Tenant";
+            params?: components["schemas"]["UpdateTenantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.TenantAdminServices.update#Tenant. Check result.ok / result.errors for business failures. */
+        UpdateTenantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UpdateTenantResult"];
+        };
+        /**
+         * @description Create a user with a temporary password (change forced at first login) and
+         *                 DARPAN_USER group membership. Credentials are shared out-of-band; there is no email invite.
+         */
+        CreateUserAccountParams: {
+            /** @description Login username. */
+            username: string;
+            /** @description Display name. */
+            userFullName?: string;
+            /** @description Contact email; must be unique when provided. */
+            emailAddress?: string;
+            /** @description Temporary password; user must change it at first login. */
+            tempPassword: string;
+        };
+        CreateUserAccountResult: {
+            /** @description True when the user was created. */
+            ok?: boolean;
+            /** @description Id of the created user. */
+            userId?: string;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.create#UserAccount */
+        CreateUserAccountRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.create#UserAccount";
+            params?: components["schemas"]["CreateUserAccountParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.create#UserAccount. Check result.ok / result.errors for business failures. */
+        CreateUserAccountResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["CreateUserAccountResult"];
+        };
+        /** @description Disable a user and revoke their live login keys. Self-disable is refused. */
+        DisableUserAccountParams: {
+            /** @description User to disable. */
+            userId: string;
+        };
+        DisableUserAccountResult: {
+            /** @description True when disabled. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.disable#UserAccount */
+        DisableUserAccountRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.disable#UserAccount";
+            params?: components["schemas"]["DisableUserAccountParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.disable#UserAccount. Check result.ok / result.errors for business failures. */
+        DisableUserAccountResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DisableUserAccountResult"];
+        };
+        /** @description Re-enable a disabled user. */
+        EnableUserAccountParams: {
+            /** @description User to enable. */
+            userId: string;
+        };
+        EnableUserAccountResult: {
+            /** @description True when enabled. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.enable#UserAccount */
+        EnableUserAccountRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.enable#UserAccount";
+            params?: components["schemas"]["EnableUserAccountParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.enable#UserAccount. Check result.ok / result.errors for business failures. */
+        EnableUserAccountResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["EnableUserAccountResult"];
+        };
+        /** @description One user with account state and active tenant memberships, for the admin user detail board. */
+        GetUserDetailParams: {
+            /** @description User to read. */
+            userId: string;
+        };
+        GetUserDetailResult: {
+            /** @description User detail or null when not found. */
+            userDetail?: {
+                userId?: string;
+                username?: string;
+                userFullName?: string;
+                emailAddress?: string;
+                disabled?: boolean;
+                requirePasswordChange?: boolean;
+                memberships?: {
+                    membership?: {
+                        tenantUserGroupId?: string;
+                        permissionUserGroupId?: string;
+                        /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                        fromDate?: string | number;
+                    };
+                }[];
+            };
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.get#UserDetail */
+        GetUserDetailRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.get#UserDetail";
+            params?: components["schemas"]["GetUserDetailParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.get#UserDetail. Check result.ok / result.errors for business failures. */
+        GetUserDetailResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetUserDetailResult"];
+        };
+        /** @description Paged user search over username, email, and display name for the admin Users board. */
+        GetUserListParams: {
+            /** @description Case-insensitive substring filter; all users when omitted. */
+            searchText?: string;
+            /** @description Zero-based page; defaults to 0. */
+            pageIndex?: number;
+            /** @description Rows per page; defaults to 25. */
+            pageSize?: number;
+        };
+        GetUserListResult: {
+            /** @description Users on the requested page, sorted by username. */
+            users?: {
+                user?: {
+                    userId?: string;
+                    username?: string;
+                    userFullName?: string;
+                    emailAddress?: string;
+                    disabled?: boolean;
+                };
+            }[];
+            /** @description Total matches across all pages. */
+            totalCount?: number;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.get#UserList */
+        GetUserListRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.get#UserList";
+            params?: components["schemas"]["GetUserListParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.get#UserList. Check result.ok / result.errors for business failures. */
+        GetUserListResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetUserListResult"];
+        };
+        /**
+         * @description Set a temporary password for a user (change forced at next login) and revoke
+         *                 their live login keys. The temp password is shared out-of-band.
+         */
+        ResetPasswordParams: {
+            /** @description User whose password resets. */
+            userId: string;
+            /** @description Temporary password. */
+            tempPassword: string;
+        };
+        ResetPasswordResult: {
+            /** @description True when reset. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.reset#Password */
+        ResetPasswordRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.reset#Password";
+            params?: components["schemas"]["ResetPasswordParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.reset#Password. Check result.ok / result.errors for business failures. */
+        ResetPasswordResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ResetPasswordResult"];
+        };
+        /** @description Update a user's display name and/or email. */
+        UpdateUserAccountParams: {
+            /** @description User to update. */
+            userId: string;
+            /** @description New display name; unchanged when omitted. */
+            userFullName?: string;
+            /** @description New email; unchanged when omitted. */
+            emailAddress?: string;
+        };
+        UpdateUserAccountResult: {
+            /** @description True when updated. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.update#UserAccount */
+        UpdateUserAccountRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.update#UserAccount";
+            params?: components["schemas"]["UpdateUserAccountParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.update#UserAccount. Check result.ok / result.errors for business failures. */
+        UpdateUserAccountResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UpdateUserAccountResult"];
+        };
         /** @description Change the authenticated user's own password using Moqui's standard password policy checks. */
         ChangeOwnPasswordParams: {
             /** @description The authenticated user's current password. */
@@ -1470,6 +2051,8 @@ export interface components {
                 recordCount?: number;
                 errorMessage?: string;
             }[];
+            mySubscription?: boolean;
+            mySubscriptionSpaceName?: string;
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#ReconciliationRunStatus */
         GetReconciliationRunStatusRequest: {
@@ -1664,6 +2247,9 @@ export interface components {
                 splitWindowDays?: number;
                 isActive?: string;
                 active?: boolean;
+                chatSpaceId?: string;
+                chatSpaceName?: string;
+                chatSpaceActive?: boolean;
                 executionCount?: number;
                 lastExecution?: Record<string, never>;
                 permissions?: Record<string, never>;
@@ -2234,6 +2820,7 @@ export interface components {
             splitWindowDays?: number;
             windowTimeZone?: string;
             safeConfigJson?: string;
+            chatSpaceId?: string;
             isActive?: boolean;
             sources?: {
                 fileSide?: string;
@@ -2563,6 +3150,66 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SaveSavedRunNameResult"];
         };
+        /** @description Subscribe the caller to completion notification for one active run, snapshotting their default chat space. */
+        SubscribeRunNotificationParams: {
+            reconciliationRunResultId: string;
+        };
+        SubscribeRunNotificationResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            subscribed?: boolean;
+            needsDefaultChatSpace?: boolean;
+            chatSpaceName?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.subscribe#RunNotification */
+        SubscribeRunNotificationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.subscribe#RunNotification";
+            params?: components["schemas"]["SubscribeRunNotificationParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.subscribe#RunNotification. Check result.ok / result.errors for business failures. */
+        SubscribeRunNotificationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SubscribeRunNotificationResult"];
+        };
+        /** @description Remove the caller's notify-me subscription for one run. */
+        UnsubscribeRunNotificationParams: {
+            reconciliationRunResultId: string;
+        };
+        UnsubscribeRunNotificationResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            subscribed?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.unsubscribe#RunNotification */
+        UnsubscribeRunNotificationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.unsubscribe#RunNotification";
+            params?: components["schemas"]["UnsubscribeRunNotificationParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.unsubscribe#RunNotification. Check result.ok / result.errors for business failures. */
+        UnsubscribeRunNotificationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UnsubscribeRunNotificationResult"];
+        };
         /** @description Search authorized Darpan records and return normalized navigation targets for Ask Darpan. */
         SearchNavigationTargetsParams: {
             query?: string;
@@ -2613,6 +3260,34 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SearchNavigationTargetsResult"];
         };
+        /** @description Hard-delete an unreferenced chat space; referenced spaces must be deactivated instead. */
+        DeleteTenantChatSpaceParams: {
+            chatSpaceId: string;
+        };
+        DeleteTenantChatSpaceResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.delete#TenantChatSpace */
+        DeleteTenantChatSpaceRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SettingsFacadeServices.delete#TenantChatSpace";
+            params?: components["schemas"]["DeleteTenantChatSpaceParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.delete#TenantChatSpace. Check result.ok / result.errors for business failures. */
+        DeleteTenantChatSpaceResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DeleteTenantChatSpaceResult"];
+        };
         /** @description Get LLM provider settings with stored-secret indicators. */
         GetLlmSettingsParams: {
             llmProvider?: string;
@@ -2652,44 +3327,6 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetLlmSettingsResult"];
         };
-        /** @description Get active-tenant notification settings with Google Chat webhook redaction. */
-        GetTenantNotificationSettingsParams: Record<string, never>;
-        GetTenantNotificationSettingsResult: {
-            ok?: boolean;
-            messages?: string[];
-            errors?: string[];
-            tenantNotificationSettings?: {
-                companyUserGroupId?: string;
-                companyLabel?: string;
-                googleChatConfigured?: boolean;
-                googleChatWebhookUrlMasked?: string;
-                isActive?: string;
-                createdByUserId?: string;
-                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
-                createdDate?: string | number;
-                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
-                lastUpdatedDate?: string | number;
-            };
-        };
-        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.get#TenantNotificationSettings */
-        GetTenantNotificationSettingsRequest: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id: string | number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            method: "facade.SettingsFacadeServices.get#TenantNotificationSettings";
-            params?: components["schemas"]["GetTenantNotificationSettingsParams"];
-        };
-        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.get#TenantNotificationSettings. Check result.ok / result.errors for business failures. */
-        GetTenantNotificationSettingsResponse: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id?: string | number;
-            result: components["schemas"]["GetTenantNotificationSettingsResult"];
-        };
         /** @description Get active-tenant settings shared by users in the tenant. */
         GetTenantSettingsParams: Record<string, never>;
         GetTenantSettingsResult: {
@@ -2725,6 +3362,37 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["GetTenantSettingsResult"];
+        };
+        /** @description Get the caller's default chat space for the active tenant; stale or inactive pointers read as not configured. */
+        GetUserNotificationDefaultParams: Record<string, never>;
+        GetUserNotificationDefaultResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            userNotificationDefault?: {
+                chatSpaceId?: string;
+                spaceName?: string;
+                isActive?: string;
+            };
+        };
+        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.get#UserNotificationDefault */
+        GetUserNotificationDefaultRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SettingsFacadeServices.get#UserNotificationDefault";
+            params?: components["schemas"]["GetUserNotificationDefaultParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.get#UserNotificationDefault. Check result.ok / result.errors for business failures. */
+        GetUserNotificationDefaultResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetUserNotificationDefaultResult"];
         };
         /** @description List enum options for frontend dropdowns using fallback-friendly labels. */
         ListEnumOptionsParams: {
@@ -2913,6 +3581,45 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListSftpServersResult"];
         };
+        /** @description List active-tenant Google Chat spaces with webhook redaction. */
+        ListTenantChatSpacesParams: Record<string, never>;
+        ListTenantChatSpacesResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            chatSpaces?: {
+                chatSpaceId?: string;
+                spaceName?: string;
+                googleChatConfigured?: boolean;
+                googleChatWebhookUrlMasked?: string;
+                isActive?: string;
+                inUse?: boolean;
+                createdByUserId?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                createdDate?: string | number;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                lastUpdatedDate?: string | number;
+            }[];
+        };
+        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.list#TenantChatSpaces */
+        ListTenantChatSpacesRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SettingsFacadeServices.list#TenantChatSpaces";
+            params?: components["schemas"]["ListTenantChatSpacesParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.list#TenantChatSpaces. Check result.ok / result.errors for business failures. */
+        ListTenantChatSpacesResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListTenantChatSpacesResult"];
+        };
         /** @description Save LLM provider settings while preserving existing key when blank. */
         SaveLlmSettingsParams: {
             llmProvider: string;
@@ -3100,30 +3807,21 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SaveSftpServerResult"];
         };
-        /** @description Save one Google Chat run-completion webhook for the active tenant. */
-        SaveTenantNotificationSettingsParams: {
+        /** @description Create or update one named Google Chat space for the active tenant. Webhook URL is write-only. */
+        SaveTenantChatSpaceParams: {
+            chatSpaceId?: string;
+            spaceName: string;
             googleChatWebhookUrl?: string;
             isActive?: boolean;
         };
-        SaveTenantNotificationSettingsResult: {
+        SaveTenantChatSpaceResult: {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            tenantNotificationSettings?: {
-                companyUserGroupId?: string;
-                companyLabel?: string;
-                googleChatConfigured?: boolean;
-                googleChatWebhookUrlMasked?: string;
-                isActive?: string;
-                createdByUserId?: string;
-                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
-                createdDate?: string | number;
-                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
-                lastUpdatedDate?: string | number;
-            };
+            chatSpace?: Record<string, never>;
         };
-        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.save#TenantNotificationSettings */
-        SaveTenantNotificationSettingsRequest: {
+        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.save#TenantChatSpace */
+        SaveTenantChatSpaceRequest: {
             /** @constant */
             jsonrpc: "2.0";
             id: string | number;
@@ -3131,15 +3829,15 @@ export interface components {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            method: "facade.SettingsFacadeServices.save#TenantNotificationSettings";
-            params?: components["schemas"]["SaveTenantNotificationSettingsParams"];
+            method: "facade.SettingsFacadeServices.save#TenantChatSpace";
+            params?: components["schemas"]["SaveTenantChatSpaceParams"];
         };
-        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.save#TenantNotificationSettings. Check result.ok / result.errors for business failures. */
-        SaveTenantNotificationSettingsResponse: {
+        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.save#TenantChatSpace. Check result.ok / result.errors for business failures. */
+        SaveTenantChatSpaceResponse: {
             /** @constant */
             jsonrpc: "2.0";
             id?: string | number;
-            result: components["schemas"]["SaveTenantNotificationSettingsResult"];
+            result: components["schemas"]["SaveTenantChatSpaceResult"];
         };
         /** @description Save active-tenant settings shared by users in the tenant. */
         SaveTenantSettingsParams: {
@@ -3179,6 +3877,39 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["SaveTenantSettingsResult"];
+        };
+        /** @description Set or clear the caller's default chat space for the active tenant. Personal preference — no tenant write access required. */
+        SaveUserNotificationDefaultParams: {
+            chatSpaceId?: string;
+        };
+        SaveUserNotificationDefaultResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            userNotificationDefault?: {
+                chatSpaceId?: string;
+                spaceName?: string;
+                isActive?: string;
+            };
+        };
+        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.save#UserNotificationDefault */
+        SaveUserNotificationDefaultRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SettingsFacadeServices.save#UserNotificationDefault";
+            params?: components["schemas"]["SaveUserNotificationDefaultParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.save#UserNotificationDefault. Check result.ok / result.errors for business failures. */
+        SaveUserNotificationDefaultResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveUserNotificationDefaultResult"];
         };
         /** @description Delete one tenant-owned Shopify auth config. */
         DeleteShopifyAuthConfigParams: {
@@ -3366,7 +4097,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantNotificationSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantNotificationSettingsRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"];
+                "application/json": components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"];
             };
         };
         responses: {
@@ -3376,7 +4107,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantNotificationSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantNotificationSettingsResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"];
                 };
             };
         };

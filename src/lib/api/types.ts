@@ -143,23 +143,39 @@ export interface SaveTenantSettingsResponse extends ApiEnvelope {
   tenantSettings?: TenantSettings
 }
 
-export interface TenantNotificationSettings {
-  companyUserGroupId?: string | null
-  companyLabel?: string | null
+export interface TenantChatSpace {
+  chatSpaceId: string
+  spaceName: string
   googleChatConfigured: boolean
   googleChatWebhookUrlMasked?: string | null
   isActive: string
-  createdByUserId?: string
+  inUse: boolean
   createdDate?: string
   lastUpdatedDate?: string
 }
 
-export interface GetTenantNotificationSettingsResponse extends ApiEnvelope {
-  tenantNotificationSettings?: TenantNotificationSettings
+export interface ListTenantChatSpacesResponse extends ApiEnvelope {
+  chatSpaces?: TenantChatSpace[]
 }
 
-export interface SaveTenantNotificationSettingsResponse extends ApiEnvelope {
-  tenantNotificationSettings?: TenantNotificationSettings
+export interface SaveTenantChatSpaceResponse extends ApiEnvelope {
+  chatSpace?: TenantChatSpace
+}
+
+export type DeleteTenantChatSpaceResponse = ApiEnvelope
+
+export interface UserNotificationDefault {
+  chatSpaceId: string
+  spaceName: string
+  isActive: string
+}
+
+export interface GetUserNotificationDefaultResponse extends ApiEnvelope {
+  userNotificationDefault?: UserNotificationDefault
+}
+
+export interface SaveUserNotificationDefaultResponse extends ApiEnvelope {
+  userNotificationDefault?: UserNotificationDefault
 }
 
 export interface SftpServerRecord {
@@ -705,6 +721,16 @@ export interface GetReconciliationRunStatusPayload {
 export type GetReconciliationRunStatusResponse = Schemas['GetReconciliationRunStatusResult']
 
 export type ReconciliationRunStep = NonNullable<GetReconciliationRunStatusResponse['steps']>[number]
+
+export interface SubscribeRunNotificationResponse extends ApiEnvelope {
+  subscribed?: boolean
+  needsDefaultChatSpace?: boolean
+  chatSpaceName?: string
+}
+
+export interface UnsubscribeRunNotificationResponse extends ApiEnvelope {
+  subscribed?: boolean
+}
 
 export interface GeneratedOutputDifferencesMetadata {
   file1Label?: string

@@ -36,9 +36,19 @@ export interface SaveTenantSettingsPayload {
   timeZone?: string
 }
 
-export interface SaveTenantNotificationSettingsPayload {
+export interface SaveTenantChatSpacePayload {
+  chatSpaceId?: string
+  spaceName: string
   googleChatWebhookUrl?: string
-  isActive: string
+  isActive?: boolean
+}
+
+export interface DeleteTenantChatSpacePayload {
+  chatSpaceId: string
+}
+
+export interface SaveUserNotificationDefaultPayload {
+  chatSpaceId?: string
 }
 
 export interface ListSftpServersPayload {
@@ -409,4 +419,12 @@ export interface ListAutomationExecutionsPayload {
   pageIndex: number
   pageSize: number
   query?: string
+}
+
+export interface SubscribeRunNotificationPayload {
+  reconciliationRunResultId: string
+}
+
+export interface UnsubscribeRunNotificationPayload {
+  reconciliationRunResultId: string
 }

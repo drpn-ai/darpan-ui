@@ -116,6 +116,10 @@ async function driveAllMethods(facade: Record<string, unknown>): Promise<void> {
           timeZone: 'UTC',
           omsRestSourceConfigId: 'oms-x',
           baseUrl: 'https://oms.example.com',
+          chatSpaceId: 'cs-x',
+          spaceName: 'Ops',
+          googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/x/messages?key=k&token=t',
+          reconciliationRunResultId: 'rr-x',
           mappingName: 'm',
           reconciliationMappingId: 'map-x',
           reconciliationMappingIds: [],
@@ -240,14 +244,19 @@ describe('registry contract — exported wrapper presence', () => {
     expect(typeof rf.runAutomationNow).toBe('function')
     expect(typeof rf.listAutomationExecutions).toBe('function')
     expect(typeof rf.listAutomationSourceOptions).toBe('function')
+    expect(typeof rf.subscribeRunNotification).toBe('function')
+    expect(typeof rf.unsubscribeRunNotification).toBe('function')
   })
 
   it('settingsFacade covers the tenant and LLM settings operations', () => {
     const sf = settingsFacade as Record<string, unknown>
     expect(typeof sf.getTenantSettings).toBe('function')
     expect(typeof sf.saveTenantSettings).toBe('function')
-    expect(typeof sf.getTenantNotificationSettings).toBe('function')
-    expect(typeof sf.saveTenantNotificationSettings).toBe('function')
+    expect(typeof sf.listTenantChatSpaces).toBe('function')
+    expect(typeof sf.saveTenantChatSpace).toBe('function')
+    expect(typeof sf.deleteTenantChatSpace).toBe('function')
+    expect(typeof sf.getUserNotificationDefault).toBe('function')
+    expect(typeof sf.saveUserNotificationDefault).toBe('function')
     expect(typeof sf.getLlmSettings).toBe('function')
     expect(typeof sf.saveLlmSettings).toBe('function')
     expect(typeof sf.listEnumOptions).toBe('function')
@@ -348,8 +357,11 @@ describe('registry contract — known method string values', () => {
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#LlmSettings')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.get#TenantSettings')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#TenantSettings')
-    expect(capturedMethods).toContain('facade.SettingsFacadeServices.get#TenantNotificationSettings')
-    expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#TenantNotificationSettings')
+    expect(capturedMethods).toContain('facade.SettingsFacadeServices.list#TenantChatSpaces')
+    expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#TenantChatSpace')
+    expect(capturedMethods).toContain('facade.SettingsFacadeServices.delete#TenantChatSpace')
+    expect(capturedMethods).toContain('facade.SettingsFacadeServices.get#UserNotificationDefault')
+    expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#UserNotificationDefault')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.list#SftpServers')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#SftpServer')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.list#NsAuthConfigs')
@@ -396,6 +408,8 @@ describe('registry contract — known method string values', () => {
     expect(capturedMethods).toContain('facade.ReconciliationFacadeServices.run#AutomationNow')
     expect(capturedMethods).toContain('facade.ReconciliationFacadeServices.list#AutomationExecutions')
     expect(capturedMethods).toContain('facade.ReconciliationFacadeServices.list#AutomationSourceOptions')
+    expect(capturedMethods).toContain('facade.ReconciliationFacadeServices.subscribe#RunNotification')
+    expect(capturedMethods).toContain('facade.ReconciliationFacadeServices.unsubscribe#RunNotification')
   })
 
   it('jsonSchemaFacade wires the documented JSON_SCHEMA method strings', async () => {

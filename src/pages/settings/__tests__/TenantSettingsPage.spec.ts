@@ -5,8 +5,9 @@ const getLlmSettings = vi.hoisted(() => vi.fn())
 const saveLlmSettings = vi.hoisted(() => vi.fn())
 const getTenantSettings = vi.hoisted(() => vi.fn())
 const saveTenantSettings = vi.hoisted(() => vi.fn())
-const getTenantNotificationSettings = vi.hoisted(() => vi.fn())
-const saveTenantNotificationSettings = vi.hoisted(() => vi.fn())
+const listTenantChatSpaces = vi.hoisted(() => vi.fn())
+const saveTenantChatSpace = vi.hoisted(() => vi.fn())
+const deleteTenantChatSpace = vi.hoisted(() => vi.fn())
 const listSftpServers = vi.hoisted(() => vi.fn())
 const listNsAuthConfigs = vi.hoisted(() => vi.fn())
 const listNsRestletConfigs = vi.hoisted(() => vi.fn())
@@ -47,8 +48,9 @@ vi.mock('../../../lib/api/facade', () => ({
     getLlmSettings,
     saveLlmSettings,
     getTenantSettings,
-    getTenantNotificationSettings,
-    saveTenantNotificationSettings,
+    listTenantChatSpaces,
+    saveTenantChatSpace,
+    deleteTenantChatSpace,
     listSftpServers,
     listNsAuthConfigs,
     listNsRestletConfigs,
@@ -135,8 +137,9 @@ describe('TenantSettingsPage', () => {
     saveLlmSettings.mockReset()
     getTenantSettings.mockReset()
     saveTenantSettings.mockReset()
-    getTenantNotificationSettings.mockReset()
-    saveTenantNotificationSettings.mockReset()
+    listTenantChatSpaces.mockReset()
+    saveTenantChatSpace.mockReset()
+    deleteTenantChatSpace.mockReset()
     listSftpServers.mockReset()
     listNsAuthConfigs.mockReset()
     listNsRestletConfigs.mockReset()
@@ -214,29 +217,46 @@ describe('TenantSettingsPage', () => {
       pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
       omsRestSourceConfigs: [{ omsRestSourceConfigId: 'OMS', companyUserGroupId: 'KREWE' }],
     })
-    getTenantNotificationSettings.mockResolvedValue({
+    listTenantChatSpaces.mockResolvedValue({
       ok: true,
       messages: [],
       errors: [],
-      tenantNotificationSettings: {
-        companyUserGroupId: 'KREWE',
-        companyLabel: 'Krewe',
+      chatSpaces: [
+        {
+          chatSpaceId: 'CS1',
+          spaceName: 'Ops',
+          googleChatConfigured: true,
+          googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
+          isActive: 'Y',
+          inUse: true,
+        },
+        {
+          chatSpaceId: 'CS2',
+          spaceName: 'Finance',
+          googleChatConfigured: false,
+          googleChatWebhookUrlMasked: null,
+          isActive: 'Y',
+          inUse: false,
+        },
+      ],
+    })
+    saveTenantChatSpace.mockResolvedValue({
+      ok: true,
+      messages: ['Saved chat space.'],
+      errors: [],
+      chatSpace: {
+        chatSpaceId: 'CS1',
+        spaceName: 'Ops',
         googleChatConfigured: true,
         googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
         isActive: 'Y',
+        inUse: true,
       },
     })
-    saveTenantNotificationSettings.mockResolvedValue({
+    deleteTenantChatSpace.mockResolvedValue({
       ok: true,
-      messages: ['Saved notification settings.'],
+      messages: ['Deleted chat space.'],
       errors: [],
-      tenantNotificationSettings: {
-        companyUserGroupId: 'KREWE',
-        companyLabel: 'Krewe',
-        googleChatConfigured: true,
-        googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
-        isActive: 'Y',
-      },
     })
   })
 
@@ -267,10 +287,12 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.find('[data-testid="tenant-module-runs"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Run Editor')
     expect(wrapper.text()).toContain('Notifications')
+    expect(wrapper.get('[data-testid="tenant-module-notifications"]').text()).toContain('2 spaces')
     expect(wrapper.find('.static-page-module-grid').exists()).toBe(false)
     expect(getLlmSettings).toHaveBeenNthCalledWith(1, { llmProvider: 'OPENAI' }, expect.any(AbortSignal))
     expect(getLlmSettings).toHaveBeenNthCalledWith(2, { llmProvider: 'GEMINI' }, expect.any(AbortSignal))
     expect(getTenantSettings).toHaveBeenCalledTimes(1)
+    expect(listTenantChatSpaces).toHaveBeenCalledTimes(1)
     expect(listSftpServers).not.toHaveBeenCalled()
     expect(listNsAuthConfigs).not.toHaveBeenCalled()
     expect(listNsRestletConfigs).not.toHaveBeenCalled()
@@ -359,66 +381,144 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.find('[data-testid="tenant-llm-provider"]').exists()).toBe(true)
   })
 
-  it('configures notifications through a popup workflow instead of routing to a page', async () => {
-    const webhookUrl = 'https://chat.googleapis.com/v1/spaces/KREWE_SPACE/messages?key=test-key&token=test-token'
+  it('lists chat spaces and adds one through the two-step popup', async () => {
+    const WEBHOOK = 'https://chat.googleapis.com/v1/spaces/KREWE_SPACE/messages?key=test-key&token=test-token'
+    listTenantChatSpaces.mockResolvedValue({ ok: true, chatSpaces: [
+      { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: true }] })
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
-
     await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
     await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('What do you want to do with Google Chat notifications?')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Edit Google Chat webhook')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Disable notifications')
-    await wrapper.get('[data-testid="tenant-notification-workflow-edit"]').trigger('click')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Ops')
+    await wrapper.get('[data-testid="tenant-chat-space-add"]').trigger('click')
+    await wrapper.get('input[name="chatSpaceName"]').setValue('Finance')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('input[name="googleChatWebhookUrl"]').setValue(WEBHOOK)
+    await wrapper.get('[data-testid="save-tenant-chat-space"]').trigger('click')
     await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Configure Google Chat notifications.')
-    expect(wrapper.get('[role="dialog"] form').classes()).toContain('workflow-form--dense-popup')
-    expect(wrapper.find('[role="dialog"] .workflow-form-grid--notification').exists()).toBe(true)
-    expect(wrapper.find('[role="dialog"] .wizard-enter-hint').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="google-chat-webhook-status"]').text()).toContain('Current webhook: https://chat.googleapis.com/***')
-    await wrapper.get('input[name="googleChatWebhookUrl"]').setValue(webhookUrl)
-    await wrapper.get('[data-testid="save-tenant-notification-settings"]').trigger('click')
-    await flushPromises()
-
-    expect(saveTenantNotificationSettings).toHaveBeenCalledWith({
-      googleChatWebhookUrl: webhookUrl,
-      isActive: 'Y',
-    })
+    expect(saveTenantChatSpace).toHaveBeenCalledWith(
+      { spaceName: 'Finance', googleChatWebhookUrl: WEBHOOK, isActive: true }, expect.anything())
     expect(push).not.toHaveBeenCalledWith('/settings/notifications')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Saved notification settings.')
-    expect(wrapper.text()).not.toContain(webhookUrl)
+    expect(wrapper.text()).toContain('Saved chat space.')
   })
 
-  it('disables notifications from the Tenant Settings popup without re-entering the webhook', async () => {
-    saveTenantNotificationSettings.mockResolvedValue({
+  it('blocks delete for in-use spaces and offers deactivate', async () => {
+    listTenantChatSpaces.mockResolvedValue({
       ok: true,
-      messages: ['Saved notification settings.'],
+      chatSpaces: [
+        {
+          chatSpaceId: 'CS1',
+          spaceName: 'Ops',
+          googleChatConfigured: true,
+          googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
+          isActive: 'Y',
+          inUse: true,
+        },
+      ],
+    })
+    saveTenantChatSpace.mockResolvedValue({
+      ok: true,
+      messages: ['Saved chat space.'],
       errors: [],
-      tenantNotificationSettings: {
-        companyUserGroupId: 'KREWE',
-        companyLabel: 'Krewe',
+      chatSpace: {
+        chatSpaceId: 'CS1',
+        spaceName: 'Ops',
         googleChatConfigured: true,
         googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
         isActive: 'N',
+        inUse: true,
       },
     })
+
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
     await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
     await flushPromises()
-    await wrapper.get('[data-testid="tenant-notification-workflow-disable"]').trigger('click')
+
+    // Tile menu for CS1 (inUse): offers deactivate, never delete.
+    await wrapper.get('[data-testid="tenant-chat-space-CS1"]').trigger('click')
     await flushPromises()
 
-    expect(saveTenantNotificationSettings).toHaveBeenCalledWith({
-      googleChatWebhookUrl: '',
-      isActive: 'N',
-    })
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Ops')
+    expect(wrapper.find('[data-testid="tenant-chat-space-menu-deactivate"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tenant-chat-space-menu-delete"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="tenant-chat-space-menu-deactivate"]').trigger('click')
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenCalledWith(
+      { chatSpaceId: 'CS1', spaceName: 'Ops', isActive: false },
+      expect.anything(),
+    )
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Configured, disabled')
+    expect(wrapper.text()).toContain('Saved chat space.')
+  })
+
+  it('edits an existing chat space and preserves its active state when the webhook is left blank', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-CS1"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-chat-space-menu-edit"]').trigger('click')
+    await flushPromises()
+
+    expect((wrapper.get('input[name="chatSpaceName"]').element as HTMLInputElement).value).toBe('Ops')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="google-chat-webhook-status"]').text()).toContain('Current webhook: https://chat.googleapis.com/***')
+    // Leave the webhook input blank and save — the backend keeps the existing webhook.
+    await wrapper.get('[data-testid="save-tenant-chat-space"]').trigger('click')
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenCalledWith(
+      { chatSpaceId: 'CS1', spaceName: 'Ops', isActive: true },
+      expect.anything(),
+    )
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('deletes a chat space that is not in use', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-CS2"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="tenant-chat-space-menu-delete"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="tenant-chat-space-menu-delete"]').trigger('click')
+    await flushPromises()
+
+    expect(deleteTenantChatSpace).toHaveBeenCalledWith({ chatSpaceId: 'CS2' }, expect.anything())
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Deleted chat space.')
+  })
+
+  it('surfaces the backend in-use error when a delete race loses to a new automation reference', async () => {
+    deleteTenantChatSpace.mockResolvedValue({
+      ok: false,
+      messages: [],
+      errors: ["Chat space 'Finance' is in use; deactivate it instead of deleting."],
+    })
+
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-CS2"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-menu-delete"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('is in use; deactivate it instead of deleting.')
   })
 
   it('opens the notifications popup when old notification routes redirect with workflow state', async () => {
@@ -427,7 +527,7 @@ describe('TenantSettingsPage', () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(wrapper.get('[role="dialog"]').text()).toContain('What do you want to do with Google Chat notifications?')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Ops')
   })
 
   it('keeps AI settings visible but locked for super-admins without Darpan-admin access', async () => {

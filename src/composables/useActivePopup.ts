@@ -1,11 +1,13 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 
 export type TenantSettingsAiWorkflowMode = 'create' | 'edit'
+export type TenantSettingsChatSpaceFormMode = 'create' | 'edit'
 
 export type TenantSettingsActivePopup =
   | { type: 'timezone' }
   | { type: 'notification-menu' }
-  | { type: 'notification-form' }
+  | { type: 'chat-space-menu'; chatSpaceId: string }
+  | { type: 'chat-space-form'; mode: TenantSettingsChatSpaceFormMode; chatSpaceId?: string }
   | { type: 'ai-menu' }
   | { type: 'ai'; mode: TenantSettingsAiWorkflowMode }
 
@@ -40,9 +42,12 @@ export interface TenantSettingsPopupActions {
   activePopup: Ref<TenantSettingsActivePopup | null>
   isPopupOpen: ComputedRef<boolean>
   isAiEditing: ComputedRef<boolean>
+  isChatSpaceEditing: ComputedRef<boolean>
   openTimezone: () => void
   openNotificationMenu: () => void
-  openNotificationForm: () => void
+  openChatSpaceMenu: (chatSpaceId: string) => void
+  openChatSpaceCreate: () => void
+  openChatSpaceEdit: (chatSpaceId: string) => void
   openAiMenu: () => void
   openAiCreate: () => void
   openAiEdit: () => void
@@ -54,14 +59,20 @@ export function useTenantSettingsPopup(): TenantSettingsPopupActions {
   const isAiEditing = computed(
     () => activePopup.value?.type === 'ai' && activePopup.value.mode === 'edit',
   )
+  const isChatSpaceEditing = computed(
+    () => activePopup.value?.type === 'chat-space-form' && activePopup.value.mode === 'edit',
+  )
 
   return {
     activePopup,
     isPopupOpen,
     isAiEditing,
+    isChatSpaceEditing,
     openTimezone: () => open({ type: 'timezone' }),
     openNotificationMenu: () => open({ type: 'notification-menu' }),
-    openNotificationForm: () => open({ type: 'notification-form' }),
+    openChatSpaceMenu: (chatSpaceId: string) => open({ type: 'chat-space-menu', chatSpaceId }),
+    openChatSpaceCreate: () => open({ type: 'chat-space-form', mode: 'create' }),
+    openChatSpaceEdit: (chatSpaceId: string) => open({ type: 'chat-space-form', mode: 'edit', chatSpaceId }),
     openAiMenu: () => open({ type: 'ai-menu' }),
     openAiCreate: () => open({ type: 'ai', mode: 'create' }),
     openAiEdit: () => open({ type: 'ai', mode: 'edit' }),

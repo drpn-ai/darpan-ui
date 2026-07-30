@@ -143,71 +143,94 @@
         <WorkflowStepForm
           v-else-if="activePopup?.type === 'notification-menu'"
           class="workflow-form--popup-compact"
-          question="What do you want to do with Google Chat notifications?"
+          question="Which Google Chat space?"
           :show-primary-action="false"
           show-cancel-action
           cancel-label="Close"
           cancel-test-id="tenant-notification-workflow-close"
           @cancel="closePopup"
         >
-          <InlineValidation v-if="notificationWorkflowError" tone="error" :message="notificationWorkflowError" />
+          <InlineValidation v-if="chatSpacesError" tone="error" :message="chatSpacesError" />
           <WorkflowShortcutChoiceCards
-            :options="notificationWorkflowOptions"
-            test-id-prefix="tenant-notification-workflow"
-            @choose="handleNotificationWorkflowChoice"
+            :options="chatSpaceListOptions"
+            test-id-prefix="tenant-chat-space"
+            @choose="handleChatSpaceListChoice"
           />
         </WorkflowStepForm>
 
         <WorkflowStepForm
-          v-else-if="activePopup?.type === 'notification-form'"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
-          question="Configure Google Chat notifications."
-          :primary-label="notificationPrimaryLabel"
-          primary-action-variant="save"
-          primary-test-id="save-tenant-notification-settings"
-          :submit-disabled="notificationSaveDisabled"
+          v-else-if="activePopup?.type === 'chat-space-menu'"
+          class="workflow-form--popup-compact"
+          :question="chatSpaceMenuQuestion"
+          :show-primary-action="false"
+          show-back
+          show-cancel-action
+          cancel-label="Close"
+          cancel-test-id="tenant-chat-space-menu-cancel"
+          @back="backToChatSpaceList"
+          @cancel="closePopup"
+        >
+          <InlineValidation v-if="notificationWorkflowError" tone="error" :message="notificationWorkflowError" />
+          <WorkflowShortcutChoiceCards
+            :options="chatSpaceActionOptions"
+            test-id-prefix="tenant-chat-space-menu"
+            @choose="handleChatSpaceMenuChoice"
+          />
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup?.type === 'chat-space-form'"
+          class="workflow-form--popup-compact workflow-form--dense-popup"
+          :question="chatSpaceFormQuestion"
+          :primary-label="chatSpaceFormPrimaryLabel"
+          :primary-action-variant="chatSpaceFormPrimaryVariant"
+          :primary-test-id="chatSpaceFormPrimaryTestId"
+          :submit-disabled="chatSpaceFormSubmitDisabled"
           :show-primary-action="canEditTenantSettings"
+          :show-back="chatSpaceFormStepIndex > 0"
           :show-enter-hint="false"
           show-cancel-action
-          cancel-test-id="tenant-notification-workflow-cancel"
+          cancel-test-id="tenant-chat-space-form-cancel"
+          @back="goBackChatSpaceFormStep"
           @cancel="closePopup"
-          @submit="saveNotificationSettings"
+          @submit="submitChatSpaceFormStep"
         >
           <InlineValidation v-if="notificationWorkflowError" tone="error" :message="notificationWorkflowError" />
 
-          <div class="workflow-form-grid workflow-form-grid--two workflow-form-grid--notification">
-            <label class="wizard-input-shell tenant-notification-webhook-field">
-              <span class="workflow-context-label">Webhook URL</span>
-              <input
-                v-model="notificationForm.googleChatWebhookUrl"
-                class="wizard-answer-control"
-                name="googleChatWebhookUrl"
-                type="password"
-                autocomplete="off"
-                autocapitalize="none"
-                spellcheck="false"
-                :placeholder="notificationWebhookPlaceholder"
-                :disabled="!canEditTenantSettings || notificationWorkflowSaving"
-              />
-            </label>
+          <label v-if="currentChatSpaceFormStep.id === 'name'" class="wizard-input-shell">
+            <span class="workflow-context-label">Space name</span>
+            <input
+              v-model="chatSpaceForm.spaceName"
+              class="wizard-answer-control"
+              name="chatSpaceName"
+              type="text"
+              autocomplete="off"
+              placeholder="Operations"
+              :disabled="!canEditTenantSettings || chatSpaceFormSaving"
+            />
+          </label>
 
-            <label class="wizard-input-shell tenant-notification-status-field">
-              <span class="workflow-context-label">Status</span>
-              <AppSelect
-                v-model="notificationForm.isActive"
-                :options="notificationEnabledOptions"
-                :disabled="!canEditTenantSettings || notificationWorkflowSaving"
-                test-id="tenant-notification-enabled"
-              />
-            </label>
-          </div>
+          <label v-else class="wizard-input-shell">
+            <span class="workflow-context-label">Webhook URL</span>
+            <input
+              v-model="chatSpaceForm.googleChatWebhookUrl"
+              class="wizard-answer-control"
+              name="googleChatWebhookUrl"
+              type="password"
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+              :placeholder="chatSpaceWebhookPlaceholder"
+              :disabled="!canEditTenantSettings || chatSpaceFormSaving"
+            />
+          </label>
 
           <p
-            v-if="notificationConfigured"
+            v-if="currentChatSpaceFormStep.id === 'webhook' && isChatSpaceEditing && activeChatSpace?.googleChatConfigured"
             class="tenant-notification-current-webhook"
             data-testid="google-chat-webhook-status"
           >
-            Current webhook: {{ notificationWebhookSummary }}
+            Current webhook: {{ activeChatSpace.googleChatWebhookUrlMasked || 'Configured' }}
           </p>
         </WorkflowStepForm>
 
@@ -403,7 +426,8 @@ import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
-import type { LlmSettings, TenantNotificationSettings, TenantSettings } from '../../lib/api/types'
+import type { LlmSettings, TenantChatSpace, TenantSettings } from '../../lib/api/types'
+import type { SaveTenantChatSpacePayload } from '../../lib/api/facadeTypes'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReferenceDataStore } from '../../stores/referenceData'
@@ -412,7 +436,6 @@ import { normalizeStringOrEmpty } from '../../lib/utils/strings'
 import { useTenantSettingsPopup } from '../../composables/useActivePopup'
 
 type LlmProvider = 'OPENAI' | 'GEMINI'
-type NotificationWorkflowChoice = 'configure' | 'edit' | 'disable' | 'enable'
 
 interface ProviderProfile extends LlmSettings {
   activeProvider: LlmProvider
@@ -427,6 +450,15 @@ interface CreateStep {
   title: string
   kind: 'select' | 'text' | 'password' | 'number'
 }
+
+type ChatSpaceFormStepId = 'name' | 'webhook'
+
+interface ChatSpaceFormStep {
+  id: ChatSpaceFormStepId
+  question: string
+}
+
+type ChatSpaceMenuChoice = 'edit' | 'activate' | 'deactivate' | 'delete'
 
 const route = useRoute()
 const router = useRouter()
@@ -467,6 +499,10 @@ const createSteps: CreateStep[] = [
   { id: 'llmTimeoutSeconds', title: 'What timeout should this provider use in seconds?', kind: 'number' },
   { id: 'llmApiKey', title: 'What API key should this provider use?', kind: 'password' },
 ]
+const chatSpaceFormSteps: ChatSpaceFormStep[] = [
+  { id: 'name', question: 'Name this Google Chat space.' },
+  { id: 'webhook', question: 'Paste the Google Chat webhook URL.' },
+]
 
 const providers = computed<ProviderProfile[]>(() => {
   if (!canManageGlobalSettings.value) return []
@@ -477,11 +513,14 @@ const providers = computed<ProviderProfile[]>(() => {
 const aiLoading = computed(() => referenceDataStore.llmProvidersLoading)
 const aiError = computed(() => referenceDataStore.llmProvidersError)
 const aiSuccess = ref<string | null>(null)
+const chatSpaces = ref<TenantChatSpace[]>([])
+const chatSpacesLoading = ref(false)
+const chatSpacesError = ref<string | null>(null)
 const summaryLoading = computed(() => (
-  referenceDataStore.tenantSettingsLoading || referenceDataStore.notificationSettingsLoading
+  referenceDataStore.tenantSettingsLoading || chatSpacesLoading.value
 ))
 const summaryError = computed(() => {
-  const errs = [referenceDataStore.tenantSettingsError, referenceDataStore.notificationSettingsError].filter(Boolean)
+  const errs = [referenceDataStore.tenantSettingsError, chatSpacesError.value].filter(Boolean)
   return errs.length > 0 ? 'Some tenant settings could not be loaded.' : null
 })
 const tenantSettings = computed<TenantSettings | null>(() => referenceDataStore.tenantSettings)
@@ -493,23 +532,23 @@ const tenantTimezoneSummary = computed(() => (
 const timezoneWorkflowError = ref<string | null>(null)
 const timezoneWorkflowSuccess = ref<string | null>(null)
 const timezoneWorkflowSaving = ref(false)
-const notificationSettings = computed<TenantNotificationSettings | null>(() => referenceDataStore.notificationSettings)
-const notificationSummary = computed(() => {
-  const settings = notificationSettings.value
-  if (!settings?.googleChatConfigured) return 'Not configured'
-  return settings.isActive === 'N' ? 'Configured, disabled' : 'Configured'
-})
+const notificationSummary = computed(() => (
+  chatSpaces.value.length > 0 ? `${chatSpaces.value.length} spaces` : 'Not configured'
+))
 const notificationWorkflowError = ref<string | null>(null)
 const notificationWorkflowSuccess = ref<string | null>(null)
-const notificationWorkflowSaving = ref(false)
+const chatSpaceMenuSaving = ref(false)
 const popup = useTenantSettingsPopup()
 const {
   activePopup,
   isPopupOpen,
   isAiEditing,
+  isChatSpaceEditing,
   openTimezone,
   openNotificationMenu,
-  openNotificationForm: openNotificationFormPopup,
+  openChatSpaceMenu,
+  openChatSpaceCreate,
+  openChatSpaceEdit,
   openAiMenu,
   openAiCreate: openAiCreatePopup,
   openAiEdit: openAiEditPopup,
@@ -530,9 +569,11 @@ const aiForm = reactive({
   llmEnabled: 'Y',
   llmApiKey: '',
 })
-const notificationForm = reactive({
+const chatSpaceFormStepIndex = ref(0)
+const chatSpaceFormSaving = ref(false)
+const chatSpaceForm = reactive({
+  spaceName: '',
   googleChatWebhookUrl: '',
-  isActive: 'Y',
 })
 const timezoneForm = reactive({
   timeZone: 'UTC',
@@ -560,53 +601,90 @@ const selectedAiProvider = computed(() => {
 })
 const popupTitle = computed(() => {
   if (activePopup.value?.type === 'timezone') return 'Timezone'
-  if (activePopup.value?.type === 'notification-menu' || activePopup.value?.type === 'notification-form') return 'Notifications'
+  if (
+    activePopup.value?.type === 'notification-menu'
+    || activePopup.value?.type === 'chat-space-menu'
+    || activePopup.value?.type === 'chat-space-form'
+  ) return 'Notifications'
   if (activePopup.value?.type === 'ai-menu') return 'AI Provider'
   if (activePopup.value?.type === 'ai') return isAiEditing.value ? 'Edit AI Provider' : 'Configure AI Provider'
   return tenantSettingsTitle.value
 })
-const notificationConfigured = computed(() => notificationSettings.value?.googleChatConfigured === true)
-const notificationActive = computed(() => (notificationSettings.value?.isActive ?? 'N') !== 'N')
-const notificationWebhookSummary = computed(() => (
-  notificationConfigured.value
-    ? (notificationSettings.value?.googleChatWebhookUrlMasked || 'Configured')
-    : 'Not configured'
+const activeChatSpaceId = computed<string | null>(() => {
+  if (activePopup.value?.type === 'chat-space-menu') return activePopup.value.chatSpaceId
+  if (activePopup.value?.type === 'chat-space-form') return activePopup.value.chatSpaceId ?? null
+  return null
+})
+const activeChatSpace = computed<TenantChatSpace | null>(() => (
+  chatSpaces.value.find((space) => space.chatSpaceId === activeChatSpaceId.value) ?? null
 ))
-const notificationWebhookPlaceholder = computed(() => (
-  notificationSettings.value?.googleChatWebhookUrlMasked
-  || 'https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=...'
-))
-const notificationWebhookInput = computed(() => normalizeStringOrEmpty(notificationForm.googleChatWebhookUrl))
-const hasWebhookForNotificationSave = computed(() => (
-  notificationForm.isActive === 'N' || notificationWebhookInput.value.length > 0 || notificationConfigured.value
-))
-const notificationSaveDisabled = computed(() => (
-  notificationWorkflowSaving.value || !canEditTenantSettings.value || !hasWebhookForNotificationSave.value
-))
-const notificationPrimaryLabel = computed(() => (
-  notificationWorkflowSaving.value ? 'Saving notifications' : 'Save Notifications'
-))
-const notificationEnabledOptions: AppSelectOption[] = [
-  { value: 'Y', label: 'Enabled' },
-  { value: 'N', label: 'Disabled' },
-]
-const notificationWorkflowOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
-  const options: Array<{ value: NotificationWorkflowChoice; label: string }> = []
-  if (notificationConfigured.value) {
-    options.push({ value: 'edit', label: 'Edit Google Chat webhook' })
-    options.push(
-      notificationActive.value
-        ? { value: 'disable', label: 'Disable notifications' }
-        : { value: 'enable', label: 'Enable notifications' },
-    )
-  } else {
-    options.push({ value: 'configure', label: 'Configure Google Chat webhook' })
-  }
+function chatSpaceStatusLabel(space: TenantChatSpace): string {
+  if (!space.googleChatConfigured) return 'Not configured'
+  return space.isActive === 'N' ? 'Configured, disabled' : 'Configured'
+}
+const chatSpaceListOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
+  const options: Array<{ value: string; label: string; description?: string }> = chatSpaces.value.map((space) => ({
+    value: space.chatSpaceId,
+    label: space.spaceName,
+    description: chatSpaceStatusLabel(space),
+  }))
+  options.push({ value: 'add', label: 'Add a chat space' })
 
   return options.map((option, index) => ({
     ...option,
     shortcutKey: String.fromCharCode(65 + index),
   }))
+})
+const chatSpaceMenuQuestion = computed(() => (
+  activeChatSpace.value ? `What do you want to do with ${activeChatSpace.value.spaceName}?` : 'What do you want to do with this chat space?'
+))
+const chatSpaceActionOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
+  const space = activeChatSpace.value
+  if (!space) return []
+
+  const options: Array<{ value: ChatSpaceMenuChoice; label: string }> = [
+    { value: 'edit', label: 'Edit chat space' },
+  ]
+  options.push(
+    space.isActive === 'N'
+      ? { value: 'activate', label: 'Activate space' }
+      : { value: 'deactivate', label: 'Deactivate space' },
+  )
+  if (!space.inUse) options.push({ value: 'delete', label: 'Delete space' })
+
+  return options.map((option, index) => ({
+    ...option,
+    shortcutKey: String.fromCharCode(65 + index),
+  }))
+})
+const currentChatSpaceFormStep = computed<ChatSpaceFormStep>(() => (
+  chatSpaceFormSteps[chatSpaceFormStepIndex.value] ?? chatSpaceFormSteps[0]!
+))
+const chatSpaceFormQuestion = computed(() => currentChatSpaceFormStep.value.question)
+const chatSpaceFormPrimaryVariant = computed<'default' | 'save'>(() => (
+  currentChatSpaceFormStep.value.id === 'name' ? 'default' : 'save'
+))
+const chatSpaceFormPrimaryTestId = computed(() => (
+  currentChatSpaceFormStep.value.id === 'name' ? 'chat-space-form-next' : 'save-tenant-chat-space'
+))
+const chatSpaceFormPrimaryLabel = computed(() => {
+  if (currentChatSpaceFormStep.value.id === 'name') return 'Next'
+  return chatSpaceFormSaving.value ? 'Saving' : 'Save'
+})
+const chatSpaceWebhookInput = computed(() => normalizeStringOrEmpty(chatSpaceForm.googleChatWebhookUrl))
+const chatSpaceFormHasWebhookForSave = computed(() => (
+  chatSpaceWebhookInput.value.length > 0 || (isChatSpaceEditing.value && !!activeChatSpace.value?.googleChatConfigured)
+))
+const chatSpaceWebhookPlaceholder = computed(() => (
+  activeChatSpace.value?.googleChatWebhookUrlMasked
+  || 'https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=...'
+))
+const chatSpaceFormSubmitDisabled = computed(() => {
+  if (chatSpaceFormSaving.value || !canEditTenantSettings.value) return true
+  if (currentChatSpaceFormStep.value.id === 'name') {
+    return normalizeStringOrEmpty(chatSpaceForm.spaceName).length === 0
+  }
+  return !chatSpaceFormHasWebhookForSave.value
 })
 const aiProviderWorkflowOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
   const selectedProvider = selectedAiProvider.value
@@ -741,10 +819,16 @@ function applyTenantSettings(nextSettings?: TenantSettings | null): void {
   timezoneForm.timeZone = nextTimeZone
 }
 
-function applyNotificationSettings(nextSettings?: TenantNotificationSettings | null): void {
-  referenceDataStore.setNotificationSettings(nextSettings)
-  notificationForm.googleChatWebhookUrl = ''
-  notificationForm.isActive = (nextSettings?.isActive ?? 'N') !== 'N' ? 'Y' : 'N'
+function applySavedChatSpace(space?: TenantChatSpace | null): void {
+  if (!space) return
+  const index = chatSpaces.value.findIndex((existing) => existing.chatSpaceId === space.chatSpaceId)
+  if (index === -1) {
+    chatSpaces.value = [...chatSpaces.value, space]
+  } else {
+    const next = [...chatSpaces.value]
+    next[index] = space
+    chatSpaces.value = next
+  }
 }
 
 function openTimezoneWorkflow(): void {
@@ -785,64 +869,142 @@ function openNotificationWorkflow(): void {
   openNotificationMenu()
 }
 
-function openNotificationForm(): void {
+function backToChatSpaceList(): void {
   notificationWorkflowError.value = null
-  notificationWorkflowSuccess.value = null
-  notificationForm.googleChatWebhookUrl = ''
-  notificationForm.isActive = notificationActive.value ? 'Y' : 'N'
-  openNotificationFormPopup()
+  openNotificationMenu()
 }
 
-function handleNotificationWorkflowChoice(value: string): void {
-  if (value === 'configure' || value === 'edit') {
-    openNotificationForm()
+function resetChatSpaceForm(): void {
+  chatSpaceFormStepIndex.value = 0
+  chatSpaceFormSaving.value = false
+  chatSpaceForm.spaceName = ''
+  chatSpaceForm.googleChatWebhookUrl = ''
+}
+
+function openChatSpaceCreateForm(): void {
+  notificationWorkflowError.value = null
+  resetChatSpaceForm()
+  openChatSpaceCreate()
+}
+
+function openChatSpaceEditForm(): void {
+  const space = activeChatSpace.value
+  if (!space) return
+
+  notificationWorkflowError.value = null
+  resetChatSpaceForm()
+  chatSpaceForm.spaceName = space.spaceName
+  openChatSpaceEdit(space.chatSpaceId)
+}
+
+function handleChatSpaceListChoice(value: string): void {
+  if (value === 'add') {
+    openChatSpaceCreateForm()
     return
   }
 
-  if (value === 'disable' || value === 'enable') {
-    void saveNotificationActiveState(value === 'enable')
+  notificationWorkflowError.value = null
+  openChatSpaceMenu(value)
+}
+
+function handleChatSpaceMenuChoice(value: string): void {
+  if (value === 'edit') {
+    openChatSpaceEditForm()
+    return
+  }
+
+  if (value === 'activate' || value === 'deactivate') {
+    void toggleChatSpaceActive(value === 'activate')
+    return
+  }
+
+  if (value === 'delete') {
+    void deleteChatSpace()
   }
 }
 
-async function saveNotificationActiveState(isActive: boolean): Promise<void> {
-  if (!canEditTenantSettings.value || notificationWorkflowSaving.value) return
+async function toggleChatSpaceActive(nextActive: boolean): Promise<void> {
+  const space = activeChatSpace.value
+  if (!space || !canEditTenantSettings.value || chatSpaceMenuSaving.value) return
 
-  notificationWorkflowSaving.value = true
+  chatSpaceMenuSaving.value = true
   notificationWorkflowError.value = null
-  notificationWorkflowSuccess.value = null
   try {
-    const response = await settingsFacade.saveTenantNotificationSettings({
-      googleChatWebhookUrl: '',
-      isActive: isActive ? 'Y' : 'N',
-    })
-    applyNotificationSettings(response.tenantNotificationSettings)
-    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Saved notification settings.'
-    closeActivePopup()
+    const response = await settingsFacade.saveTenantChatSpace({
+      chatSpaceId: space.chatSpaceId,
+      spaceName: space.spaceName,
+      isActive: nextActive,
+    }, pageAbortController.signal)
+    applySavedChatSpace(response.chatSpace)
+    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Saved chat space.'
+    closePopup()
   } catch (saveError) {
-    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save notification settings.'
+    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to update chat space.'
   } finally {
-    notificationWorkflowSaving.value = false
+    chatSpaceMenuSaving.value = false
   }
 }
 
-async function saveNotificationSettings(): Promise<void> {
-  if (notificationSaveDisabled.value) return
+async function deleteChatSpace(): Promise<void> {
+  const space = activeChatSpace.value
+  if (!space || !canEditTenantSettings.value || chatSpaceMenuSaving.value) return
 
-  notificationWorkflowSaving.value = true
+  chatSpaceMenuSaving.value = true
   notificationWorkflowError.value = null
-  notificationWorkflowSuccess.value = null
   try {
-    const response = await settingsFacade.saveTenantNotificationSettings({
-      googleChatWebhookUrl: notificationWebhookInput.value,
-      isActive: notificationForm.isActive,
-    })
-    applyNotificationSettings(response.tenantNotificationSettings)
-    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Saved notification settings.'
-    closeActivePopup()
-  } catch (saveError) {
-    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save notification settings.'
+    const response = await settingsFacade.deleteTenantChatSpace({ chatSpaceId: space.chatSpaceId }, pageAbortController.signal)
+    if (!response.ok) {
+      notificationWorkflowError.value = response.errors?.[0] ?? 'Unable to delete chat space.'
+      return
+    }
+
+    chatSpaces.value = chatSpaces.value.filter((existing) => existing.chatSpaceId !== space.chatSpaceId)
+    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Deleted chat space.'
+    closePopup()
+  } catch (deleteError) {
+    notificationWorkflowError.value = deleteError instanceof ApiCallError ? deleteError.message : 'Failed to delete chat space.'
   } finally {
-    notificationWorkflowSaving.value = false
+    chatSpaceMenuSaving.value = false
+  }
+}
+
+function goBackChatSpaceFormStep(): void {
+  notificationWorkflowError.value = null
+  chatSpaceFormStepIndex.value = Math.max(chatSpaceFormStepIndex.value - 1, 0)
+}
+
+async function submitChatSpaceFormStep(): Promise<void> {
+  if (chatSpaceFormSubmitDisabled.value) return
+
+  if (currentChatSpaceFormStep.value.id === 'name') {
+    chatSpaceFormStepIndex.value = 1
+    return
+  }
+
+  await saveChatSpaceForm()
+}
+
+async function saveChatSpaceForm(): Promise<void> {
+  if (chatSpaceFormSubmitDisabled.value) return
+
+  chatSpaceFormSaving.value = true
+  notificationWorkflowError.value = null
+  try {
+    const payload: SaveTenantChatSpacePayload = {
+      spaceName: normalizeStringOrEmpty(chatSpaceForm.spaceName),
+      isActive: isChatSpaceEditing.value ? (activeChatSpace.value?.isActive ?? 'Y') !== 'N' : true,
+    }
+    if (isChatSpaceEditing.value && activeChatSpaceId.value) payload.chatSpaceId = activeChatSpaceId.value
+    if (chatSpaceWebhookInput.value.length > 0) payload.googleChatWebhookUrl = chatSpaceWebhookInput.value
+
+    const response = await settingsFacade.saveTenantChatSpace(payload, pageAbortController.signal)
+    applySavedChatSpace(response.chatSpace)
+    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Saved chat space.'
+    closePopup()
+  } catch (saveError) {
+    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save chat space.'
+  } finally {
+    chatSpaceFormSaving.value = false
   }
 }
 
@@ -864,6 +1026,20 @@ const pageAbortController = new AbortController()
 onBeforeUnmount(() => {
   pageAbortController.abort()
 })
+
+async function loadChatSpaces(): Promise<void> {
+  chatSpacesLoading.value = true
+  chatSpacesError.value = null
+  try {
+    const response = await settingsFacade.listTenantChatSpaces(pageAbortController.signal)
+    chatSpaces.value = response.chatSpaces ?? []
+  } catch (loadError) {
+    if ((loadError as { name?: string })?.name === 'AbortError') return
+    chatSpacesError.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load chat spaces.'
+  } finally {
+    chatSpacesLoading.value = false
+  }
+}
 
 async function loadAiProvider(llmProvider: LlmProvider): Promise<void> {
   aiWorkflowLoading.value = true
@@ -933,6 +1109,7 @@ function openAiEdit(rawProvider: unknown): void {
 function closePopup(): void {
   closeActivePopup()
   resetAiForm()
+  resetChatSpaceForm()
   timezoneWorkflowError.value = null
   notificationWorkflowError.value = null
   if (route.query.workflow) {
@@ -1036,5 +1213,6 @@ onMounted(() => {
   // Reference data is prefetched at login; ensureLoaded() returns the
   // in-flight promise (or resolves immediately if hydration already finished).
   void referenceDataStore.ensureLoaded()
+  void loadChatSpaces()
 })
 </script>

@@ -23,8 +23,16 @@ describe('useTenantSettingsPopup', () => {
     popup.openNotificationMenu()
     expect(popup.activePopup.value).toEqual({ type: 'notification-menu' })
 
-    popup.openNotificationForm()
-    expect(popup.activePopup.value).toEqual({ type: 'notification-form' })
+    popup.openChatSpaceMenu('CS1')
+    expect(popup.activePopup.value).toEqual({ type: 'chat-space-menu', chatSpaceId: 'CS1' })
+
+    popup.openChatSpaceCreate()
+    expect(popup.activePopup.value).toEqual({ type: 'chat-space-form', mode: 'create' })
+    expect(popup.isChatSpaceEditing.value).toBe(false)
+
+    popup.openChatSpaceEdit('CS1')
+    expect(popup.activePopup.value).toEqual({ type: 'chat-space-form', mode: 'edit', chatSpaceId: 'CS1' })
+    expect(popup.isChatSpaceEditing.value).toBe(true)
 
     popup.openAiMenu()
     expect(popup.activePopup.value).toEqual({ type: 'ai-menu' })

@@ -4,7 +4,6 @@ import { ApiCallError } from '../lib/api/client'
 import { settingsFacade } from '../lib/api/facade'
 import type {
   LlmSettings,
-  TenantNotificationSettings,
   TenantSettings,
 } from '../lib/api/types'
 import { usePermissionsStore } from './permissions'
@@ -38,9 +37,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
   const _tenantSettings = ref<TenantSettings | null>(null)
   const _tenantSettingsState = ref<LoadState>(emptyLoadState())
 
-  const _notificationSettings = ref<TenantNotificationSettings | null>(null)
-  const _notificationSettingsState = ref<LoadState>(emptyLoadState())
-
   const _llmProviders = ref<Map<LlmProvider, LlmSettings | null>>(new Map())
   const _llmProvidersState = ref<LoadState>(emptyLoadState())
 
@@ -50,10 +46,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
   const tenantSettings = computed(() => _tenantSettings.value)
   const tenantSettingsLoading = computed(() => _tenantSettingsState.value.loading)
   const tenantSettingsError = computed(() => _tenantSettingsState.value.error)
-
-  const notificationSettings = computed(() => _notificationSettings.value)
-  const notificationSettingsLoading = computed(() => _notificationSettingsState.value.loading)
-  const notificationSettingsError = computed(() => _notificationSettingsState.value.error)
 
   const llmProviders = computed(() => _llmProviders.value)
   const llmProvidersLoading = computed(() => _llmProvidersState.value.loading)
@@ -74,22 +66,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
       _tenantSettingsState.value = {
         loading: false,
         error: describeError(err, 'Unable to load tenant settings.'),
-        loadedAt: null,
-      }
-    }
-  }
-
-  async function _loadNotificationSettings(signal: AbortSignal): Promise<void> {
-    _notificationSettingsState.value = { loading: true, error: null, loadedAt: _notificationSettingsState.value.loadedAt }
-    try {
-      const response = await settingsFacade.getTenantNotificationSettings(signal)
-      _notificationSettings.value = response.tenantNotificationSettings ?? null
-      _notificationSettingsState.value = { loading: false, error: null, loadedAt: Date.now() }
-    } catch (err) {
-      if (isAbortError(err)) return
-      _notificationSettingsState.value = {
-        loading: false,
-        error: describeError(err, 'Unable to load notification settings.'),
         loadedAt: null,
       }
     }
@@ -126,7 +102,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
 
     const tasks: Array<Promise<unknown>> = [
       _loadTenantSettings(signal),
-      _loadNotificationSettings(signal),
     ]
 
     // AI provider settings are only visible to global admins. Skip the fan-out
@@ -152,11 +127,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
     _tenantSettingsState.value = { loading: false, error: null, loadedAt: Date.now() }
   }
 
-  function setNotificationSettings(value: TenantNotificationSettings | null | undefined): void {
-    _notificationSettings.value = value ?? null
-    _notificationSettingsState.value = { loading: false, error: null, loadedAt: Date.now() }
-  }
-
   function setLlmProvider(provider: LlmProvider, value: LlmSettings | null | undefined): void {
     const next = new Map(_llmProviders.value)
     next.set(provider, value ?? null)
@@ -177,8 +147,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
     _hydrationPromise = null
     _tenantSettings.value = null
     _tenantSettingsState.value = emptyLoadState()
-    _notificationSettings.value = null
-    _notificationSettingsState.value = emptyLoadState()
     _llmProviders.value = new Map()
     _llmProvidersState.value = emptyLoadState()
   }
@@ -187,9 +155,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
     tenantSettings,
     tenantSettingsLoading,
     tenantSettingsError,
-    notificationSettings,
-    notificationSettingsLoading,
-    notificationSettingsError,
     llmProviders,
     llmProvidersLoading,
     llmProvidersError,
@@ -197,7 +162,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
     hydrate,
     ensureLoaded,
     setTenantSettings,
-    setNotificationSettings,
     setLlmProvider,
     refreshLlmProviders,
     reset,
