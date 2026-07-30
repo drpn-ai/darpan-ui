@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ApiCallError } from '../../../lib/api/client'
 
 const route = vi.hoisted(() => ({
   params: { automationId: 'AUT_ACTIVE_API' } as Record<string, string>,
@@ -410,6 +411,168 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(confirmSpy).toHaveBeenCalledWith('Delete automation "Daily API orders"?')
     expect(deleteAutomation).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
     expect(push).toHaveBeenCalledWith('/reconciliation/automations')
+  })
+
+  it('refetches automation and executions after a successful run-now, adding the new row immediately', async () => {
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    expect(getAutomation).toHaveBeenCalledTimes(1)
+    expect(listAutomationExecutions).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAll('[data-testid="automation-execution-row"]')).toHaveLength(2)
+
+    runAutomationNow.mockResolvedValueOnce({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+    getAutomation.mockResolvedValueOnce({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        ...mockAutomation(),
+        lastExecution: {
+          automationExecutionId: 'EXEC_NEW_RUN',
+          statusEnumId: 'AUT_STAT_PENDING',
+          statusLabel: 'Pending',
+          scheduledDate: '2026-05-03T06:00:00Z',
+        },
+      },
+    })
+    listAutomationExecutions.mockResolvedValueOnce({
+      ok: true,
+      messages: [],
+      errors: [],
+      executions: [
+        {
+          automationExecutionId: 'EXEC_NEW_RUN',
+          statusEnumId: 'AUT_STAT_PENDING',
+          statusLabel: 'Pending',
+          scheduledDate: '2026-05-03T06:00:00Z',
+        },
+        ...mockExecutions(),
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 3, pageCount: 1 },
+    })
+
+    await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+    await flushPromises()
+
+    expect(runAutomationNow).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
+    // Refetched (not just read off runAutomationNow's own response) -- Previous Run/Next
+    // Run and the table both need the same authoritative post-run state.
+    expect(getAutomation).toHaveBeenCalledTimes(2)
+    expect(listAutomationExecutions).toHaveBeenCalledTimes(2)
+    expect(wrapper.findAll('[data-testid="automation-execution-row"]')).toHaveLength(3)
+    expect(wrapper.text()).toContain('Pending')
+  })
+
+  it('polls while an execution is active and stops once it turns terminal', async () => {
+    vi.useFakeTimers()
+    try {
+      getAutomation.mockResolvedValueOnce({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+      listAutomationExecutions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        executions: [
+          {
+            automationExecutionId: 'EXEC_ACTIVE',
+            statusEnumId: 'AUT_STAT_RUNNING',
+            statusLabel: 'Running',
+            scheduledDate: '2026-05-03T06:00:00Z',
+          },
+        ],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+      })
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      expect(getAutomation).toHaveBeenCalledTimes(1)
+      expect(listAutomationExecutions).toHaveBeenCalledTimes(1)
+      expect(wrapper.text()).toContain('Running')
+
+      getAutomation.mockResolvedValueOnce({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+      listAutomationExecutions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        executions: [
+          {
+            automationExecutionId: 'EXEC_ACTIVE',
+            statusEnumId: 'AUT_STAT_SUCCESS',
+            statusLabel: 'Succeeded',
+            scheduledDate: '2026-05-03T06:00:00Z',
+            completedDate: '2026-05-03T06:03:00Z',
+          },
+        ],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+      })
+
+      await vi.advanceTimersByTimeAsync(5000)
+
+      expect(getAutomation).toHaveBeenCalledTimes(2)
+      expect(listAutomationExecutions).toHaveBeenCalledTimes(2)
+      expect(wrapper.text()).toContain('Succeeded')
+      expect(wrapper.text()).not.toContain('Running')
+
+      // Terminal now -- polling must have stopped itself, so later ticks fetch nothing more.
+      await vi.advanceTimersByTimeAsync(20000)
+      expect(getAutomation).toHaveBeenCalledTimes(2)
+      expect(listAutomationExecutions).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('surfaces a run-now failure through the page error affordance instead of the generic load error', async () => {
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    // callService throws on ok:false envelopes -- it never resolves with one -- so a
+    // faithful mock rejects, exercising the real catch path instead of an `if (!response.ok)`
+    // branch (there is none here, but the mock must still match production transport).
+    runAutomationNow.mockRejectedValueOnce(new ApiCallError('Automation is already running.', 409))
+
+    await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Automation is already running.')
+    // A failed run-now must not attempt the post-run refetch.
+    expect(getAutomation).toHaveBeenCalledTimes(1)
+    expect(listAutomationExecutions).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears the executions poll timer on unmount', async () => {
+    vi.useFakeTimers()
+    try {
+      getAutomation.mockResolvedValueOnce({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+      listAutomationExecutions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        executions: [
+          {
+            automationExecutionId: 'EXEC_ACTIVE',
+            statusEnumId: 'AUT_STAT_RUNNING',
+            statusLabel: 'Running',
+            scheduledDate: '2026-05-03T06:00:00Z',
+          },
+        ],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+      })
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+      expect(getAutomation).toHaveBeenCalledTimes(1)
+
+      wrapper.unmount()
+
+      await vi.advanceTimersByTimeAsync(20000)
+
+      expect(getAutomation).toHaveBeenCalledTimes(1)
+      expect(listAutomationExecutions).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('hides mutation actions for view-only users while keeping setup and run history readable', async () => {

@@ -200,6 +200,7 @@ import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunE
 import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { formatDateTime } from '../../lib/utils/date'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
+import { isActiveRunStatus } from '../../stores/runResults'
 
 const columns = [
   { key: 'status', label: 'Status', colStyle: { width: '16%' } },
@@ -285,6 +286,7 @@ const editRoute = computed<RouteLocationRaw>(() => ({
   params: { automationId: automationId.value },
 }))
 const sortedExecutions = computed(() => [...executions.value].sort((left, right) => executionTime(right) - executionTime(left)))
+const hasActiveExecution = computed(() => executions.value.some((execution) => isActiveRunStatus(execution.statusEnumId)))
 const {
   pageIndex: executionPageIndex,
   pageCount: executionPageCount,
@@ -465,9 +467,50 @@ function openExecutionResult(payload: { row: Record<string, unknown> }): void {
 const pageAbortController = new AbortController()
 let loadController: AbortController | null = null
 
+// Live-refresh for Previous Runs: a run-now click (or a schedule-fired run already in
+// flight when this page loads) leaves an execution PENDING/RUNNING for a stretch, and the
+// backend's list#AutomationExecutions row can lag a beat behind run#AutomationNow's own
+// response. Polls every 5s -- mirrors runResults.ts's RUN_STATUS_POLL_INTERVAL_MS / the
+// document.hidden guard / self-stopping on terminal -- kept page-local since the page needs
+// getAutomation (for Previous Run/Next Run, which read automation.lastExecution) alongside
+// listAutomationExecutions, not the single run-status shape runResults.ts's store polls.
+const EXECUTIONS_POLL_INTERVAL_MS = 5000
+let executionsPollTimer: ReturnType<typeof setInterval> | null = null
+
+function stopExecutionsPoll(): void {
+  if (executionsPollTimer) {
+    clearInterval(executionsPollTimer)
+    executionsPollTimer = null
+  }
+}
+
+function ensureExecutionsPoll(): void {
+  if (executionsPollTimer || typeof window === 'undefined') return
+  executionsPollTimer = setInterval(() => {
+    if (typeof document !== 'undefined' && document.hidden) return
+    void pollExecutionsTick()
+  }, EXECUTIONS_POLL_INTERVAL_MS)
+}
+
+async function pollExecutionsTick(): Promise<void> {
+  try {
+    const refreshedAutomation = await fetchAutomationAndExecutions(pageAbortController.signal)
+    if (refreshedAutomation) automation.value = refreshedAutomation
+  } catch (pollError) {
+    if ((pollError as { name?: string })?.name === 'AbortError') return
+    // Poll errors are non-fatal: keep the last known state and retry next tick, matching
+    // runResults.ts's _fetchRunStatus convention.
+  }
+  // Stops itself once nothing is active -- covers both a genuine terminal transition and
+  // the (bounded, at most one extra tick) case where run-now's own execution never actually
+  // shows up as active.
+  if (!hasActiveExecution.value) stopExecutionsPoll()
+}
+
 onBeforeUnmount(() => {
   pageAbortController.abort()
   loadController?.abort()
+  stopExecutionsPoll()
 })
 
 async function loadExecutions(signal?: AbortSignal): Promise<void> {
@@ -478,6 +521,14 @@ async function loadExecutions(signal?: AbortSignal): Promise<void> {
   }, signal)
   executions.value = response.executions ?? []
   resetExecutionsPage()
+}
+
+async function fetchAutomationAndExecutions(signal?: AbortSignal): Promise<AutomationRecord | null> {
+  const [automationResponse] = await Promise.all([
+    reconciliationFacade.getAutomation({ automationId: automationId.value }, signal),
+    loadExecutions(signal),
+  ])
+  return automationResponse.automation ?? null
 }
 
 async function load(): Promise<void> {
@@ -495,15 +546,13 @@ async function load(): Promise<void> {
   automation.value = null
   executions.value = []
   try {
-    const [automationResponse] = await Promise.all([
-      reconciliationFacade.getAutomation({ automationId: automationId.value }, signal),
-      loadExecutions(signal),
-    ])
-    if (!automationResponse.automation) {
+    const loadedAutomation = await fetchAutomationAndExecutions(signal)
+    if (!loadedAutomation) {
       error.value = `Unable to find automation "${automationId.value}".`
       return
     }
-    automation.value = automationResponse.automation
+    automation.value = loadedAutomation
+    if (hasActiveExecution.value) ensureExecutionsPoll()
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load automation.'
@@ -517,9 +566,18 @@ async function runNow(): Promise<void> {
   actionInFlight.value = true
   actionError.value = null
   try {
-    const response = await reconciliationFacade.runAutomationNow({ automationId: automation.value.automationId })
-    if (response.automation) automation.value = response.automation
-    await loadExecutions()
+    await reconciliationFacade.runAutomationNow({ automationId: automation.value.automationId })
+    // Refetch (not just the runAutomationNow response) so Previous Run/Next Run and the
+    // executions table all reflect the same, authoritative post-run state. Unsignaled, like
+    // the runAutomationNow call above and deleteAutomation() below -- this page's convention
+    // is that a user-initiated action, once started, runs to completion rather than being
+    // cancelled by unmount (only the passive load/poll reads are abortable).
+    const refreshedAutomation = await fetchAutomationAndExecutions()
+    if (refreshedAutomation) automation.value = refreshedAutomation
+    // Unconditional: even if the new PENDING row hasn't landed in list#AutomationExecutions
+    // yet (backend lag), start polling now so the next tick catches it instead of requiring
+    // the user to navigate away and back.
+    ensureExecutionsPoll()
   } catch (runError) {
     actionError.value = runError instanceof ApiCallError ? runError.message : 'Unable to run automation.'
   } finally {
