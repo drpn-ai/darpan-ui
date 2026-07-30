@@ -108,6 +108,23 @@ describe('useRunResultSourceDetails', () => {
     expect(source.runSourceDateRangeLabel.value).toBe('yesterday')
   })
 
+  it('resolves UTC instants to the local calendar day the window covers', () => {
+    const source = buildSourceDetails()
+    // The run wizard anchors API windows at local midnight and serializes with
+    // toISOString(), so a single-day July 29 window arrives as instants on the
+    // previous UTC date for viewers east of UTC (e.g. 2026-07-28T18:30:00Z in IST).
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: {
+        start: new Date(2026, 6, 29).toISOString(),
+        end: new Date(2026, 6, 30).toISOString(),
+      },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeLabel.value).toBe('Jul 29, 2026')
+  })
+
   it('collapses an exclusive-end single-day window to one date but keeps genuine multi-day ranges', () => {
     const source = buildSourceDetails()
     source.runSourceDetails.value = {
