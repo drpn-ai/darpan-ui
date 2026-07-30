@@ -126,6 +126,18 @@
             data-testid="run-result-step-timeline"
           >
             <button
+              v-if="showNotifyMe"
+              type="button"
+              class="run-result-notify-me"
+              :class="{ 'run-result-notify-me--active': notifySubscribed }"
+              data-testid="run-result-notify-me"
+              :disabled="notifyBusy"
+              @click="toggleNotifyMe"
+            >
+              {{ notifySubscribed ? `Notifying — ${runStatus?.mySubscriptionSpaceName ?? 'chat space'}` : 'Notify me' }}
+            </button>
+            <InlineValidation v-if="notifyError" tone="error" :message="notifyError" />
+            <button
               type="button"
               class="run-result-step-timeline__toggle"
               data-testid="run-result-step-timeline-toggle"
@@ -349,6 +361,49 @@
         </div>
       </template>
     </StaticPageFrame>
+
+    <div
+      v-if="notifyPickerOpen"
+      class="popup-workflow-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notify-space-workflow-title"
+      @click.self="closeNotifyPicker"
+    >
+      <section class="popup-workflow-modal workflow-panel">
+        <header class="workflow-panel-header">
+          <h2 id="notify-space-workflow-title">Notify me</h2>
+        </header>
+
+        <div class="workflow-step-wrapper">
+          <WorkflowStepForm
+            class="workflow-form--popup-compact"
+            question="Which chat space should get notifications for this run?"
+            :show-primary-action="false"
+            show-cancel-action
+            cancel-label="Cancel"
+            cancel-test-id="run-result-notify-picker-cancel"
+            @cancel="closeNotifyPicker"
+          >
+            <InlineValidation v-if="notifyError" tone="error" :message="notifyError" />
+            <p v-if="notifyPickerLoading" class="section-note">Loading chat spaces...</p>
+            <p
+              v-else-if="notifyPickerSpaces.length === 0"
+              class="section-note"
+              data-testid="run-result-notify-picker-empty"
+            >
+              No chat spaces yet — add one in Tenant Settings.
+            </p>
+            <WorkflowShortcutChoiceCards
+              v-else
+              :options="notifyPickerOptions"
+              test-id-prefix="notify-space-choice"
+              @choose="pickDefaultAndSubscribe"
+            />
+          </WorkflowStepForm>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -362,16 +417,19 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
+import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
+import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
-import { reconciliationFacade } from '../../lib/api/facade'
+import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type {
   GeneratedOutput,
   GeneratedOutputDifferencesMetadata,
   GeneratedOutputDifferencesSummary,
   ReconciliationRunStep,
+  TenantChatSpace,
 } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
-import { useRunResultsStore } from '../../stores/runResults'
+import { isActiveRunStatus, useRunResultsStore } from '../../stores/runResults'
 import { formatRunStepDuration, normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconciliationDisplay'
 import {
   ALL_RULE_FILTER_KEY,
@@ -515,6 +573,108 @@ const runStatusSteps = computed<ReconciliationRunStep[]>(() => runStatus.value?.
 const showStepTimeline = computed(() => runStatus.value?.ok === true)
 // Collapsed by default: the timeline is a forensic view, not part of the primary read path.
 const stepTimelineCollapsed = ref(true)
+
+// Notify-me (Task 12): subscribe/unsubscribe the current user to Google Chat notifications
+// for this run. Only offered while the run is still active (PENDING/RUNNING) — a terminal
+// run has already notified or never will. Mirrors the run-settings action's busy/error
+// conventions (boolean busy flag + dedicated error ref surfaced via InlineValidation), not
+// the page-load AbortController pattern used for the initial saved-result fetch.
+const notifyBusy = ref(false)
+const notifyError = ref<string | null>(null)
+const notifySubscribed = computed(() => runStatus.value?.mySubscription === true)
+const showNotifyMe = computed(() =>
+  Boolean(timelineRunResultId.value) && isActiveRunStatus(runStatus.value?.statusEnumId))
+
+const notifyPickerOpen = ref(false)
+const notifyPickerLoading = ref(false)
+const notifyPickerBusy = ref(false)
+const notifyPickerSpaces = ref<TenantChatSpace[]>([])
+const notifyPickerOptions = computed<WorkflowShortcutChoiceOption[]>(() =>
+  notifyPickerSpaces.value.map((space, index) => ({
+    value: space.chatSpaceId,
+    label: space.spaceName,
+    shortcutKey: String.fromCharCode(65 + index),
+  })),
+)
+
+// The actual subscribe/unsubscribe call, shared by the button handler and the
+// picker's "retry after saving a default" step. No busy guard here — callers own it.
+async function performNotifyToggle(runId: string): Promise<void> {
+  if (notifySubscribed.value) {
+    const response = await reconciliationFacade.unsubscribeRunNotification({ reconciliationRunResultId: runId })
+    if (!response.ok) {
+      notifyError.value = response.errors?.[0] ?? 'Unable to stop notifications for this run.'
+      return
+    }
+  } else {
+    const response = await reconciliationFacade.subscribeRunNotification({ reconciliationRunResultId: runId })
+    if (response.needsDefaultChatSpace) {
+      await openNotifyPicker()
+      return
+    }
+    if (!response.ok) {
+      notifyError.value = response.errors?.[0] ?? 'Unable to enable notifications for this run.'
+      return
+    }
+  }
+  await runResultsStore.refreshRunStatus(runId)
+}
+
+async function toggleNotifyMe(): Promise<void> {
+  const runId = timelineRunResultId.value
+  if (!runId || notifyBusy.value) return
+
+  notifyBusy.value = true
+  notifyError.value = null
+  try {
+    await performNotifyToggle(runId)
+  } catch (error) {
+    notifyError.value = error instanceof ApiCallError ? error.message : 'Unable to update notification subscription.'
+  } finally {
+    notifyBusy.value = false
+  }
+}
+
+async function openNotifyPicker(): Promise<void> {
+  notifyPickerOpen.value = true
+  notifyPickerSpaces.value = []
+  notifyPickerLoading.value = true
+  try {
+    const response = await settingsFacade.listTenantChatSpaces()
+    notifyPickerSpaces.value = (response.chatSpaces ?? []).filter((space) => space.isActive !== 'N')
+  } catch (error) {
+    notifyPickerOpen.value = false
+    notifyError.value = error instanceof ApiCallError ? error.message : 'Unable to load chat spaces.'
+  } finally {
+    notifyPickerLoading.value = false
+  }
+}
+
+function closeNotifyPicker(): void {
+  notifyPickerOpen.value = false
+  notifyPickerSpaces.value = []
+}
+
+async function pickDefaultAndSubscribe(chatSpaceId: string): Promise<void> {
+  const runId = timelineRunResultId.value
+  if (!runId || notifyPickerBusy.value) return
+
+  notifyPickerBusy.value = true
+  notifyError.value = null
+  try {
+    const response = await settingsFacade.saveUserNotificationDefault({ chatSpaceId })
+    if (!response.ok) {
+      notifyError.value = response.errors?.[0] ?? 'Unable to save notification default.'
+      return
+    }
+    closeNotifyPicker()
+    await performNotifyToggle(runId)
+  } catch (error) {
+    notifyError.value = error instanceof ApiCallError ? error.message : 'Unable to save notification default.'
+  } finally {
+    notifyPickerBusy.value = false
+  }
+}
 
 watch(timelineRunResultId, (runResultId) => {
   if (!runResultId || polledTimelineRunIds.has(runResultId)) return
@@ -959,6 +1119,38 @@ watch([savedRunId, outputFileName], () => {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface-2) 92%, white);
+}
+
+.run-result-notify-me {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.9rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.run-result-notify-me:hover {
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--border));
+  background: color-mix(in oklab, var(--surface-2) 84%, var(--accent));
+  color: var(--text);
+}
+
+.run-result-notify-me--active {
+  border-color: color-mix(in oklab, var(--accent) 58%, var(--border));
+  background: color-mix(in oklab, var(--surface-2) 80%, var(--accent));
+  color: var(--text);
+}
+
+.run-result-notify-me:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .run-result-step-timeline__toggle {

@@ -247,6 +247,20 @@ describe('runResults store (run-result cache)', () => {
     }
   })
 
+  it('refreshRunStatus re-fetches one run status on demand', async () => {
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: true, steps: [] })
+    const store = useRunResultsStore()
+    await store.refreshRunStatus('RUN1')
+    expect(getReconciliationRunStatus).toHaveBeenCalledWith({ reconciliationRunResultId: 'RUN1' })
+    expect(store.getRunStatus('RUN1')?.mySubscription).toBe(true)
+  })
+
+  it('refreshRunStatus is a no-op for a blank id (trim guard, like startRunStatusPoll)', async () => {
+    const store = useRunResultsStore()
+    await store.refreshRunStatus('   ')
+    expect(getReconciliationRunStatus).not.toHaveBeenCalled()
+  })
+
   it('reset stops run status polls and clears cached statuses', async () => {
     vi.useFakeTimers()
     try {

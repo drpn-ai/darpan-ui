@@ -22,6 +22,10 @@ const listSavedRuns = vi.hoisted(() => vi.fn())
 const saveSavedRunName = vi.hoisted(() => vi.fn())
 const listGeneratedOutputs = vi.hoisted(() => vi.fn())
 const getReconciliationRunStatus = vi.hoisted(() => vi.fn())
+const subscribeRunNotification = vi.hoisted(() => vi.fn())
+const unsubscribeRunNotification = vi.hoisted(() => vi.fn())
+const listTenantChatSpaces = vi.hoisted(() => vi.fn())
+const saveUserNotificationDefault = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
@@ -54,6 +58,12 @@ vi.mock('../../../lib/api/facade', () => ({
     saveSavedRunName,
     listGeneratedOutputs,
     getReconciliationRunStatus,
+    subscribeRunNotification,
+    unsubscribeRunNotification,
+  },
+  settingsFacade: {
+    listTenantChatSpaces,
+    saveUserNotificationDefault,
   },
 }))
 
@@ -479,6 +489,10 @@ describe('ReconciliationRunResultPage', () => {
     })
     getReconciliationRunStatus.mockReset()
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', steps: [] })
+    subscribeRunNotification.mockReset()
+    unsubscribeRunNotification.mockReset()
+    listTenantChatSpaces.mockReset()
+    saveUserNotificationDefault.mockReset()
     getGeneratedOutput.mockReset()
     getGeneratedOutputDifferences.mockReset()
     getGeneratedOutputDifferences.mockImplementation(simulateDifferences(defaultDiffDetails, { sourceDetails: defaultSourceDetails }))
@@ -1142,5 +1156,239 @@ describe('ReconciliationRunResultPage', () => {
 
     await wrapper.get('[data-testid="run-result-step-timeline-toggle"]').trigger('click')
     expect(wrapper.get('[data-testid="run-result-step-timeline-empty"]').text()).toContain('No step detail (legacy run)')
+  })
+
+  it('subscribes via notify-me while the run is active', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        reconciliationRunResultId: 'RR_NOTIFY',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_RUNNING',
+        resultAvailable: false,
+        createdDate: new Date().toISOString(),
+      }],
+    })
+    getReconciliationRunStatus
+      .mockResolvedValueOnce({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
+      .mockResolvedValueOnce({
+        ok: true,
+        statusEnumId: 'AUT_STAT_RUNNING',
+        mySubscription: true,
+        mySubscriptionSpaceName: 'Ops Room',
+        steps: [],
+      })
+    subscribeRunNotification.mockResolvedValue({ ok: true, messages: [], errors: [], subscribed: true })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    const notifyButton = wrapper.get('[data-testid="run-result-notify-me"]')
+    expect(notifyButton.text()).toBe('Notify me')
+
+    await notifyButton.trigger('click')
+    await flushPromises()
+
+    expect(subscribeRunNotification).toHaveBeenCalledTimes(1)
+    expect(subscribeRunNotification).toHaveBeenCalledWith({ reconciliationRunResultId: 'RR_NOTIFY' })
+    expect(getReconciliationRunStatus).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[data-testid="run-result-notify-me"]').text()).toBe('Notifying — Ops Room')
+  })
+
+  it('prompts for a default space when subscribe reports needsDefaultChatSpace, then retries after picking one', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        reconciliationRunResultId: 'RR_NEEDS_DEFAULT',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_RUNNING',
+        resultAvailable: false,
+        createdDate: new Date().toISOString(),
+      }],
+    })
+    getReconciliationRunStatus
+      .mockResolvedValueOnce({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
+      .mockResolvedValueOnce({
+        ok: true,
+        statusEnumId: 'AUT_STAT_RUNNING',
+        mySubscription: true,
+        mySubscriptionSpaceName: 'Ops Room',
+        steps: [],
+      })
+    subscribeRunNotification
+      .mockResolvedValueOnce({ ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true })
+      .mockResolvedValueOnce({ ok: true, messages: [], errors: [], subscribed: true })
+    listTenantChatSpaces.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      chatSpaces: [
+        { chatSpaceId: 'CS1', spaceName: 'Ops Room', googleChatConfigured: true, isActive: 'Y', inUse: true },
+        { chatSpaceId: 'CS2', spaceName: 'Archived Room', googleChatConfigured: true, isActive: 'N', inUse: false },
+      ],
+    })
+    saveUserNotificationDefault.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      userNotificationDefault: { chatSpaceId: 'CS1', spaceName: 'Ops Room' },
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="run-result-notify-me"]').trigger('click')
+    await flushPromises()
+
+    expect(subscribeRunNotification).toHaveBeenCalledTimes(1)
+    expect(listTenantChatSpaces).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="notify-space-choice-CS1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="notify-space-choice-CS2"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="notify-space-choice-CS1"]').trigger('click')
+    await flushPromises()
+
+    expect(saveUserNotificationDefault).toHaveBeenCalledWith({ chatSpaceId: 'CS1' })
+    expect(subscribeRunNotification).toHaveBeenCalledTimes(2)
+    expect(subscribeRunNotification).toHaveBeenLastCalledWith({ reconciliationRunResultId: 'RR_NEEDS_DEFAULT' })
+    expect(wrapper.find('[data-testid="notify-space-choice-CS1"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="run-result-notify-me"]').text()).toBe('Notifying — Ops Room')
+  })
+
+  it('shows an empty-state line when a tenant has no active chat spaces to pick from', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        reconciliationRunResultId: 'RR_NO_SPACES',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_RUNNING',
+        resultAvailable: false,
+        createdDate: new Date().toISOString(),
+      }],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
+    subscribeRunNotification.mockResolvedValue({ ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true })
+    listTenantChatSpaces.mockResolvedValue({ ok: true, messages: [], errors: [], chatSpaces: [] })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="run-result-notify-me"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No chat spaces yet — add one in Tenant Settings.')
+  })
+
+  it('surfaces a plain subscribe failure through the page error affordance instead of swallowing it', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        reconciliationRunResultId: 'RR_SUBSCRIBE_FAIL',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_RUNNING',
+        resultAvailable: false,
+        createdDate: new Date().toISOString(),
+      }],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
+    subscribeRunNotification.mockResolvedValue({ ok: false, messages: [], errors: ['Google Chat webhook rejected the request.'] })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="run-result-notify-me"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Google Chat webhook rejected the request.')
+    expect(wrapper.get('[data-testid="run-result-notify-me"]').text()).toBe('Notify me')
+  })
+
+  it('surfaces a save-default failure inside the picker instead of hiding it behind the popup', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        reconciliationRunResultId: 'RR_SAVE_DEFAULT_FAIL',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_RUNNING',
+        resultAvailable: false,
+        createdDate: new Date().toISOString(),
+      }],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
+    subscribeRunNotification.mockResolvedValue({ ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true })
+    listTenantChatSpaces.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      chatSpaces: [{ chatSpaceId: 'CS1', spaceName: 'Ops Room', googleChatConfigured: true, isActive: 'Y', inUse: true }],
+    })
+    saveUserNotificationDefault.mockResolvedValue({ ok: false, messages: [], errors: ['Chat space is no longer active.'] })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="run-result-notify-me"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="notify-space-choice-CS1"]').trigger('click')
+    await flushPromises()
+
+    expect(subscribeRunNotification).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="notify-space-choice-CS1"]').exists()).toBe(true)
+    expect(wrapper.get('.popup-workflow-overlay').text()).toContain('Chat space is no longer active.')
+  })
+
+  it('hides notify-me once the run is terminal', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        reconciliationRunResultId: 'RR_TERMINAL',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_SUCCESS',
+        resultAvailable: true,
+        createdDate: new Date().toISOString(),
+      }],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', mySubscription: false, steps: [] })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="run-result-notify-me"]').exists()).toBe(false)
   })
 })

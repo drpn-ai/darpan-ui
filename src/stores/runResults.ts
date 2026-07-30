@@ -216,6 +216,15 @@ export const useRunResultsStore = defineStore('runResults', () => {
     return _fetchRunStatus(runId)
   }
 
+  // On-demand refresh of a single run's status, outside the poll interval. Used by
+  // notify-me subscribe/unsubscribe actions so the button's label reflects the new
+  // subscription state immediately instead of waiting for the next poll tick.
+  async function refreshRunStatus(reconciliationRunResultId: string): Promise<void> {
+    const runId = (reconciliationRunResultId ?? '').trim()
+    if (!runId) return
+    await _fetchRunStatus(runId)
+  }
+
   function stopRunStatusPoll(reconciliationRunResultId: string): void {
     const timer = _runStatusTimers.get(reconciliationRunResultId)
     if (timer) {
@@ -280,6 +289,7 @@ export const useRunResultsStore = defineStore('runResults', () => {
     stopAutoRefresh,
     getRunStatus,
     startRunStatusPoll,
+    refreshRunStatus,
     stopRunStatusPoll,
     stopAllRunStatusPolls,
     upsertOutput,
