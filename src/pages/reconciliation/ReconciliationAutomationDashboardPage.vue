@@ -340,6 +340,15 @@ function scheduleDisplayLabel(row: AutomationRecord | null): string {
   return row.scheduleExpr ? 'Custom schedule' : '-'
 }
 
+// Display formatting only -- the schedule still renders in the automation's own timezone;
+// this just matches the AM/PM convention every other timestamp on the page already uses
+// (formatDateTime, via formatTenantDateTime).
+function formatHourMinuteAmPm(hour: number, minute: number): string {
+  const period = hour < 12 ? 'AM' : 'PM'
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12
+  return `${hour12}:${minute.toString().padStart(2, '0')} ${period}`
+}
+
 function scheduleLabelFromCron(expression: string | undefined): string | null {
   const parts = expression?.trim().split(/\s+/) ?? []
   if (parts.length !== 6 || parts[0] !== '0') return null
@@ -353,7 +362,7 @@ function scheduleLabelFromCron(expression: string | undefined): string | null {
   }
 
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null
-  const timeLabel = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+  const timeLabel = formatHourMinuteAmPm(hour, minute)
   if (parts[3] === '*' && parts[4] === '*' && parts[5] === '?') return `Daily at ${timeLabel}`
 
   const weekdayLabel = weekdayDisplayLabel(parts[5])

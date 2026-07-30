@@ -279,6 +279,38 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(push).toHaveBeenCalledTimes(1)
   })
 
+  it('formats the schedule summary time as AM/PM, matching every other timestamp on the page', async () => {
+    const scenarios: Array<{ scheduleExpr: string; expected: string; unexpected: string[] }> = [
+      { scheduleExpr: '0 0 9 * * ?', expected: 'Daily at 9:00 AM', unexpected: ['09:00', '9:00 PM'] },
+      { scheduleExpr: '0 30 14 * * ?', expected: 'Daily at 2:30 PM', unexpected: ['14:30', '2:30 AM'] },
+      { scheduleExpr: '0 0 0 * * ?', expected: 'Daily at 12:00 AM', unexpected: ['00:00', '0:00 AM', '12:00 PM'] },
+      { scheduleExpr: '0 0 12 * * ?', expected: 'Daily at 12:00 PM', unexpected: ['12:00 AM'] },
+      { scheduleExpr: '0 30 14 ? * MON', expected: 'Weekly on Monday at 2:30 PM', unexpected: ['14:30'] },
+      { scheduleExpr: '0 0 12 15 * ?', expected: 'Monthly on day 15 at 12:00 PM', unexpected: ['12:00 AM'] },
+    ]
+
+    for (const scenario of scenarios) {
+      getAutomation.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        automation: {
+          ...mockAutomation(),
+          scheduleExpr: scenario.scheduleExpr,
+          scheduleSummary: `Cron: ${scenario.scheduleExpr}`,
+        },
+      })
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain(scenario.expected)
+      scenario.unexpected.forEach((text) => expect(wrapper.text()).not.toContain(text))
+
+      wrapper.unmount()
+    }
+  })
+
   it('keeps setup row divider spacing compact', () => {
     const source = readFileSync('src/pages/reconciliation/ReconciliationAutomationDashboardPage.vue', 'utf8')
 
