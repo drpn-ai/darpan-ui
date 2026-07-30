@@ -1227,8 +1227,15 @@ describe('ReconciliationRunResultPage', () => {
         mySubscriptionSpaceName: 'Ops Room',
         steps: [],
       })
+    // callService throws on ok:false envelopes -- it never resolves with one -- so the
+    // backend's needsDefaultChatSpace signal only ever reaches the UI via a thrown
+    // ApiCallError whose details.result carries the raw envelope (see client.ts's
+    // withMethodDetails(method, { candidateUrl, result }) attached before throwing).
     subscribeRunNotification
-      .mockResolvedValueOnce({ ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true })
+      .mockRejectedValueOnce(new ApiCallError('Set a default chat space first.', 200, {
+        method: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
+        result: { ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true },
+      }))
       .mockResolvedValueOnce({ ok: true, messages: [], errors: [], subscribed: true })
     listTenantChatSpaces.mockResolvedValue({
       ok: true,
@@ -1285,7 +1292,10 @@ describe('ReconciliationRunResultPage', () => {
       }],
     })
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
-    subscribeRunNotification.mockResolvedValue({ ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true })
+    subscribeRunNotification.mockRejectedValue(new ApiCallError('Set a default chat space first.', 200, {
+      method: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
+      result: { ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true },
+    }))
     listTenantChatSpaces.mockResolvedValue({ ok: true, messages: [], errors: [], chatSpaces: [] })
 
     const wrapper = mount(ReconciliationRunResultPage)
@@ -1315,7 +1325,10 @@ describe('ReconciliationRunResultPage', () => {
       }],
     })
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
-    subscribeRunNotification.mockResolvedValue({ ok: false, messages: [], errors: ['Google Chat webhook rejected the request.'] })
+    subscribeRunNotification.mockRejectedValue(new ApiCallError('Google Chat webhook rejected the request.', 200, {
+      method: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
+      result: { ok: false, messages: [], errors: ['Google Chat webhook rejected the request.'] },
+    }))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
@@ -1345,14 +1358,20 @@ describe('ReconciliationRunResultPage', () => {
       }],
     })
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
-    subscribeRunNotification.mockResolvedValue({ ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true })
+    subscribeRunNotification.mockRejectedValue(new ApiCallError('Set a default chat space first.', 200, {
+      method: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
+      result: { ok: false, messages: [], errors: ['Set a default chat space first.'], needsDefaultChatSpace: true },
+    }))
     listTenantChatSpaces.mockResolvedValue({
       ok: true,
       messages: [],
       errors: [],
       chatSpaces: [{ chatSpaceId: 'CS1', spaceName: 'Ops Room', googleChatConfigured: true, isActive: 'Y', inUse: true }],
     })
-    saveUserNotificationDefault.mockResolvedValue({ ok: false, messages: [], errors: ['Chat space is no longer active.'] })
+    saveUserNotificationDefault.mockRejectedValue(new ApiCallError('Chat space is no longer active.', 200, {
+      method: 'facade.SettingsFacadeServices.save#UserNotificationDefault',
+      result: { ok: false, messages: [], errors: ['Chat space is no longer active.'] },
+    }))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()

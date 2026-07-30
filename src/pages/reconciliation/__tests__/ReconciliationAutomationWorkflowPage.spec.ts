@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ApiCallError } from '../../../lib/api/client'
 import {
   buildReconciliationAutomationDraftState,
 } from '../../../lib/reconciliationAutomationDraft'
@@ -807,6 +808,141 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const chatSpaceCallOrder = saveTenantChatSpace.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     const automationCallOrder = saveAutomation.mock.invocationCallOrder[0] ?? Number.NEGATIVE_INFINITY
     expect(chatSpaceCallOrder).toBeLessThan(automationCallOrder)
+  })
+
+  async function walkToNewChatSpaceSubmit(wrapper: ReturnType<typeof mount>): Promise<void> {
+    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
+    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseCard(wrapper, 'automation-chat-space-new')
+    await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Alerts')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="automation-chat-space-url"]').setValue('https://chat.googleapis.com/v1/spaces/AAA')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
+  }
+
+  it('does not re-create the chat space on retry after a failed automation save', async () => {
+    saveTenantChatSpace.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      chatSpace: { chatSpaceId: 'CS9', spaceName: 'Ops Alerts', googleChatConfigured: true, isActive: 'Y', inUse: true },
+    })
+    saveAutomation
+      .mockRejectedValueOnce(new Error('network blip'))
+      .mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        automation: { automationId: 'AUT_ORDER_SYNC', automationName: 'Daily order sync' },
+      })
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+    await walkToNewChatSpaceSubmit(wrapper)
+
+    await wrapper.get('[data-testid="create-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenCalledTimes(1)
+    expect(saveAutomation).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Unable to save automation setup.')
+
+    // Retry: the chat space already exists (chatSpaceId carried over from the first
+    // attempt) -- it must not be re-created a second time with the same name.
+    await wrapper.get('[data-testid="create-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenCalledTimes(1)
+    expect(saveAutomation).toHaveBeenCalledTimes(2)
+    expect(saveAutomation).toHaveBeenLastCalledWith(expect.objectContaining({ chatSpaceId: 'CS9' }), expect.any(AbortSignal))
+  })
+
+  it('surfaces the real chat-space creation error instead of the generic automation-failure message', async () => {
+    saveTenantChatSpace.mockRejectedValue(new ApiCallError("Chat space name 'Ops Alerts' already exists.", 400))
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+    await walkToNewChatSpaceSubmit(wrapper)
+
+    await wrapper.get('[data-testid="create-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Chat space name 'Ops Alerts' already exists.")
+    expect(wrapper.text()).not.toContain('Unable to save automation setup.')
+    expect(saveAutomation).not.toHaveBeenCalled()
+  })
+
+  it('shows a visible note when chat-space options fail to load, without blocking automation setup', async () => {
+    getUserNotificationDefault.mockRejectedValue(new Error('network down'))
+    listTenantChatSpaces.mockRejectedValue(new Error('network down'))
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to load chat space options.')
+    // Non-fatal: the very first (choice-only) step is still fully usable.
+    expect(wrapper.get('[data-testid="automation-purpose-choice-existing-run"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('shows the same chat-space load note on the edit surface', async () => {
+    route.name = 'reconciliation-automation-edit'
+    route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+    route.params = { automationId: 'AUT_ORDER_SYNC' }
+    getAutomation.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        automationId: 'AUT_ORDER_SYNC',
+        automationName: 'Daily order sync',
+        savedRunId: 'RS_ORDER_SYNC',
+        savedRunName: 'Order Sync',
+        savedRunType: 'ruleset',
+        savedRun: optionsResponse().savedRuns[0],
+        inputModeEnumId: 'AUT_IN_API_RANGE',
+        scheduleExpr: '0 0 6 * * ?',
+        timezone: 'UTC',
+        relativeWindowTypeEnumId: 'AUT_WIN_PREV_DAY',
+        relativeWindowCount: 1,
+        active: true,
+        sources: [
+          {
+            fileSide: 'FILE_1',
+            sourceTypeEnumId: 'AUT_SRC_API',
+            systemEnumId: 'OMS',
+            systemMessageRemoteId: 'OMS_REMOTE',
+            safeMetadataJson: '{"extractServiceName":"reconciliation.HotWaxOmsExtractionServices.extract#HotWaxOmsOrders","parameters":{"omsRestSourceConfigId":"OMS_REST_SOURCE"}}',
+          },
+          {
+            fileSide: 'FILE_2',
+            sourceTypeEnumId: 'AUT_SRC_API',
+            systemEnumId: 'SHOPIFY',
+            systemMessageRemoteId: 'SHOPIFY_REMOTE',
+            safeMetadataJson: '{"extractServiceName":"fixture.extractShopifyOrders"}',
+          },
+        ],
+      },
+    })
+    getUserNotificationDefault.mockRejectedValue(new Error('network down'))
+    listTenantChatSpaces.mockRejectedValue(new Error('network down'))
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to load chat space options.')
+    expect(wrapper.get('[data-testid="save-automation"]').attributes('disabled')).toBeUndefined()
   })
 
   it('edit mode shows and clears the linked space', async () => {

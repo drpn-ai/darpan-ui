@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ApiCallError } from '../../../lib/api/client'
 
 const getLlmSettings = vi.hoisted(() => vi.fn())
 const saveLlmSettings = vi.hoisted(() => vi.fn())
@@ -502,11 +503,12 @@ describe('TenantSettingsPage', () => {
   })
 
   it('surfaces the backend in-use error when a delete race loses to a new automation reference', async () => {
-    deleteTenantChatSpace.mockResolvedValue({
-      ok: false,
-      messages: [],
-      errors: ["Chat space 'Finance' is in use; deactivate it instead of deleting."],
-    })
+    // callService throws ApiCallError on ok:false envelopes -- it never resolves with one --
+    // so a faithful mock rejects, exercising the real catch path instead of the dead
+    // `if (!response.ok)` branch.
+    deleteTenantChatSpace.mockRejectedValue(
+      new ApiCallError("Chat space 'Finance' is in use; deactivate it instead of deleting.", 400),
+    )
 
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()

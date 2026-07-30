@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ApiCallError } from '../../../lib/api/client'
 import { WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
 
 type TestSessionInfo = {
@@ -420,12 +421,11 @@ describe('UserSettingsPage', () => {
     expect(wrapper.get('[data-testid="user-notification-default-card"]').text()).toContain('No default space')
   })
 
-  it('surfaces a save error and keeps the popup open', async () => {
-    saveUserNotificationDefault.mockResolvedValue({
-      ok: false,
-      messages: [],
-      errors: ['Unable to save notification default.'],
-    })
+  it('surfaces a save error inside the popup and keeps it open', async () => {
+    // callService throws ApiCallError on ok:false envelopes -- it never resolves with one --
+    // so a faithful mock rejects, exercising the real catch path instead of the dead
+    // `if (!response.ok)` branch.
+    saveUserNotificationDefault.mockRejectedValue(new ApiCallError('Unable to save notification default.', 500))
     listTenantChatSpaces.mockResolvedValue({
       ok: true,
       messages: [],
@@ -442,8 +442,11 @@ describe('UserSettingsPage', () => {
     await wrapper.get('[data-testid="user-chat-space-choice-CS1"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
-    expect(wrapper.get('.section-note[role="status"]').text()).toContain('Unable to save notification default.')
+    const dialog = wrapper.get('[role="dialog"]')
+    expect(dialog.text()).toContain('Unable to save notification default.')
+    // The choice cards must still be visible/interactable inside the dialog -- a save
+    // failure is not a load failure, so the picker itself should not disappear.
+    expect(dialog.find('[data-testid="user-chat-space-choice-CS1"]').exists()).toBe(true)
   })
 
   it('closes the notification default workflow through the shared workflow cancel request', async () => {

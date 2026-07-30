@@ -153,6 +153,7 @@
           cancel-test-id="user-notification-default-workflow-close"
           @cancel="closeNotificationDefaultWorkflow"
         >
+          <InlineValidation v-if="notificationDefaultSaveError" tone="error" :message="notificationDefaultSaveError" />
           <p v-if="chatSpacesLoading" class="section-note">Loading chat spaces...</p>
           <p v-else-if="chatSpacesLoadError" class="section-note" role="status">{{ settingsMessage }}</p>
           <WorkflowShortcutChoiceCards
@@ -172,6 +173,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppSaveAction from '../../components/ui/AppSaveAction.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
@@ -201,6 +203,10 @@ const isSavingNotificationDefault = ref(false)
 const chatSpaces = ref<TenantChatSpace[]>([])
 const chatSpacesLoading = ref(false)
 const chatSpacesLoadError = ref(false)
+// Dedicated, popup-scoped error (mirrors ReconciliationRunResultPage.vue's notifyError):
+// settingsMessage renders page-level, behind the popup's z-95 scrim, so a save failure
+// written there was invisible while the dialog stayed open.
+const notificationDefaultSaveError = ref<string | null>(null)
 const passwordForm = ref({
   currentPassword: '',
   newPassword: '',
@@ -488,6 +494,7 @@ async function loadChatSpacesForNotificationDefault(): Promise<void> {
 
 function openNotificationDefaultWorkflow(): void {
   settingsMessage.value = null
+  notificationDefaultSaveError.value = null
   chatSpacesLoadError.value = false
   isNotificationDefaultWorkflowOpen.value = true
   void loadChatSpacesForNotificationDefault()
@@ -501,18 +508,14 @@ async function handleChatSpaceChoice(value: string): Promise<void> {
   if (isSavingNotificationDefault.value) return
 
   isSavingNotificationDefault.value = true
+  notificationDefaultSaveError.value = null
   try {
     const chatSpaceId = value === 'clear' ? '' : value
     const response = await settingsFacade.saveUserNotificationDefault({ chatSpaceId }, pageAbortController.signal)
-    if (!response.ok) {
-      settingsMessage.value = response.errors?.[0] ?? 'Unable to save notification default.'
-      return
-    }
-
     notificationDefault.value = response.userNotificationDefault ?? null
     closeNotificationDefaultWorkflow()
   } catch (saveError) {
-    settingsMessage.value = saveError instanceof ApiCallError ? saveError.message : 'Unable to save notification default.'
+    notificationDefaultSaveError.value = saveError instanceof ApiCallError ? saveError.message : 'Unable to save notification default.'
   } finally {
     isSavingNotificationDefault.value = false
   }

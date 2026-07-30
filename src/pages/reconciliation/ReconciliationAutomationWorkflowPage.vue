@@ -459,6 +459,7 @@ import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '
 import WorkflowSelect, { type WorkflowSelectOption } from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type {
   AutomationNsRestletOption,
@@ -1344,17 +1345,37 @@ async function saveAutomationSetup(): Promise<void> {
   const submitSignal = submitController.signal
 
   try {
-    if (chatSpaceChoice.value === 'new') {
-      const spaceResponse = await settingsFacade.saveTenantChatSpace({
-        spaceName: newChatSpaceName.value,
-        googleChatWebhookUrl: newChatSpaceUrl.value,
-        isActive: true,
-      }, submitSignal)
-      if (!spaceResponse.ok || !spaceResponse.chatSpace?.chatSpaceId) {
-        pageError.value = spaceResponse.errors?.[0] ?? 'Unable to save chat space.'
+    // Guarded on !chatSpaceId.value so a retry after a saveAutomation failure below does not
+    // re-create the chat space (duplicate-name rejection) -- the first successful create
+    // already left chatSpaceId set, so a second submit attempt reuses it instead of creating
+    // a second space with the same name.
+    if (chatSpaceChoice.value === 'new' && !chatSpaceId.value) {
+      try {
+        const spaceResponse = await settingsFacade.saveTenantChatSpace({
+          spaceName: newChatSpaceName.value,
+          googleChatWebhookUrl: newChatSpaceUrl.value,
+          isActive: true,
+        }, submitSignal)
+        if (!spaceResponse.chatSpace?.chatSpaceId) {
+          pageError.value = 'Unable to save chat space.'
+          return
+        }
+        chatSpaceId.value = spaceResponse.chatSpace.chatSpaceId
+        chatSpaceChoice.value = 'existing'
+        tenantChatSpaces.value = [...tenantChatSpaces.value, spaceResponse.chatSpace]
+        // chatSpaceChoice flipping to 'existing' reshapes chatSpaceSteps (chat-space-name +
+        // chat-space-url collapse into a single chat-space-select step), which shortens the
+        // wizard's steps array out from under currentStepIndex -- re-clamp it so a failed
+        // saveAutomation below leaves the user looking at automation-name (the step they were
+        // actually on), not an out-of-range index that falls back to the first step.
+        settleOnCurrentIndex()
+      } catch (spaceError) {
+        if ((spaceError as { name?: string })?.name === 'AbortError') return
+        // Dedicated catch so a chat-space creation failure (e.g. a duplicate name) isn't
+        // misattributed to the generic automation-save failure message below.
+        pageError.value = spaceError instanceof ApiCallError ? spaceError.message : 'Unable to save chat space.'
         return
       }
-      chatSpaceId.value = spaceResponse.chatSpace.chatSpaceId
     }
 
     const response = await reconciliationFacade.saveAutomation(buildSaveAutomationPayload(activeDraft.value, selectedSavedRun.value), submitSignal)
@@ -1448,7 +1469,9 @@ function hydrateAutomation(automation: AutomationRecord): void {
 async function loadAutomationForEdit(): Promise<boolean> {
   const editAutomationId = routeAutomationId.value
   if (!editAutomationId) return false
-  pageError.value = null
+  // No pageError reset here: this always runs right after loadOptions() (which already
+  // reset pageError at its own start and may have set a non-fatal chat-space-load note) --
+  // clobbering it here would silently hide that note the instant this call succeeds.
   try {
     const response = await reconciliationFacade.getAutomation({ automationId: editAutomationId }, pageAbortController.signal)
     if (!response.automation) {
@@ -1509,9 +1532,12 @@ async function loadChatSpaceOptions(signal: AbortSignal): Promise<void> {
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     // Non-critical for the wizard: 'new' and 'none' remain available even without a
-    // resolved default or registry, so a load failure here does not block automation setup.
+    // resolved default or registry, so a load failure here does not block automation setup --
+    // but it must stay visible (pageError renders in both wizard and edit mode), otherwise
+    // "My default space" / "Choose another space" just quietly vanish with no explanation.
     userNotificationDefault.value = null
     tenantChatSpaces.value = []
+    pageError.value = 'Unable to load chat space options. You can still set up a new space or skip notifications.'
   }
 }
 

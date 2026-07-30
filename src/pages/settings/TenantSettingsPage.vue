@@ -953,11 +953,6 @@ async function deleteChatSpace(): Promise<void> {
   notificationWorkflowError.value = null
   try {
     const response = await settingsFacade.deleteTenantChatSpace({ chatSpaceId: space.chatSpaceId }, pageAbortController.signal)
-    if (!response.ok) {
-      notificationWorkflowError.value = response.errors?.[0] ?? 'Unable to delete chat space.'
-      return
-    }
-
     chatSpaces.value = chatSpaces.value.filter((existing) => existing.chatSpaceId !== space.chatSpaceId)
     notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Deleted chat space.'
     closePopup()

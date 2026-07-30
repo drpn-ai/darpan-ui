@@ -597,24 +597,31 @@ const notifyPickerOptions = computed<WorkflowShortcutChoiceOption[]>(() =>
   })),
 )
 
+// callService (client.ts) throws ApiCallError for ANY envelope with ok:false, before this
+// code ever sees the response -- so a resolved response here is always ok:true, and the
+// backend's needsDefaultChatSpace signal (sent alongside ok:false) can only be read off the
+// thrown error's details.result. Mirrors the existing per-callsite `error.details` cast
+// pattern (see useReconciliationDiff.ts readFailedRunFeedback, stores/auth.ts formatApiError).
+function readNeedsDefaultChatSpace(error: unknown): boolean {
+  if (!(error instanceof ApiCallError)) return false
+  const details = (error.details ?? {}) as { result?: { needsDefaultChatSpace?: unknown } }
+  return details.result?.needsDefaultChatSpace === true
+}
+
 // The actual subscribe/unsubscribe call, shared by the button handler and the
 // picker's "retry after saving a default" step. No busy guard here — callers own it.
 async function performNotifyToggle(runId: string): Promise<void> {
   if (notifySubscribed.value) {
-    const response = await reconciliationFacade.unsubscribeRunNotification({ reconciliationRunResultId: runId })
-    if (!response.ok) {
-      notifyError.value = response.errors?.[0] ?? 'Unable to stop notifications for this run.'
-      return
-    }
+    await reconciliationFacade.unsubscribeRunNotification({ reconciliationRunResultId: runId })
   } else {
-    const response = await reconciliationFacade.subscribeRunNotification({ reconciliationRunResultId: runId })
-    if (response.needsDefaultChatSpace) {
-      await openNotifyPicker()
-      return
-    }
-    if (!response.ok) {
-      notifyError.value = response.errors?.[0] ?? 'Unable to enable notifications for this run.'
-      return
+    try {
+      await reconciliationFacade.subscribeRunNotification({ reconciliationRunResultId: runId })
+    } catch (error) {
+      if (readNeedsDefaultChatSpace(error)) {
+        await openNotifyPicker()
+        return
+      }
+      throw error
     }
   }
   await runResultsStore.refreshRunStatus(runId)
@@ -662,11 +669,7 @@ async function pickDefaultAndSubscribe(chatSpaceId: string): Promise<void> {
   notifyPickerBusy.value = true
   notifyError.value = null
   try {
-    const response = await settingsFacade.saveUserNotificationDefault({ chatSpaceId })
-    if (!response.ok) {
-      notifyError.value = response.errors?.[0] ?? 'Unable to save notification default.'
-      return
-    }
+    await settingsFacade.saveUserNotificationDefault({ chatSpaceId })
     closeNotifyPicker()
     await performNotifyToggle(runId)
   } catch (error) {
