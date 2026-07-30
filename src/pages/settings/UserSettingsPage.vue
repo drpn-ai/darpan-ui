@@ -1,5 +1,5 @@
 <template>
-  <StaticPageFrame :class="{ 'user-settings-page--popup-open': isPasswordWorkflowOpen }">
+  <StaticPageFrame :class="{ 'user-settings-page--popup-open': isPasswordWorkflowOpen || isNotificationDefaultWorkflowOpen }">
     <template #hero>
       <h1>User Settings</h1>
     </template>
@@ -71,6 +71,15 @@
           <span class="static-page-summary-label">Permissions</span>
           <span>{{ permissionSummary }}</span>
         </article>
+        <button
+          type="button"
+          class="static-page-summary-card user-settings-preference-card user-settings-notification-default-card"
+          data-testid="user-notification-default-card"
+          @click="openNotificationDefaultWorkflow"
+        >
+          <span class="static-page-summary-label">Notifications</span>
+          <span>{{ notificationDefaultSummary }}</span>
+        </button>
       </div>
       <p v-if="settingsMessage" class="section-note" role="status">{{ settingsMessage }}</p>
     </StaticPageSection>
@@ -120,6 +129,41 @@
       </div>
     </section>
   </div>
+
+  <div
+    v-if="isNotificationDefaultWorkflowOpen"
+    class="popup-workflow-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="notification-default-workflow-title"
+    @click.self="closeNotificationDefaultWorkflow"
+  >
+    <section class="popup-workflow-modal workflow-panel">
+      <header class="workflow-panel-header">
+        <h2 id="notification-default-workflow-title">Notifications</h2>
+      </header>
+
+      <div class="workflow-step-wrapper">
+        <WorkflowStepForm
+          class="workflow-form--popup-compact"
+          question="Which Google Chat space should get your notifications?"
+          :show-primary-action="false"
+          show-cancel-action
+          cancel-label="Close"
+          cancel-test-id="user-notification-default-workflow-close"
+          @cancel="closeNotificationDefaultWorkflow"
+        >
+          <p v-if="chatSpacesLoading" class="section-note">Loading chat spaces...</p>
+          <WorkflowShortcutChoiceCards
+            v-else
+            :options="chatSpaceChoiceOptions"
+            test-id-prefix="user-chat-space-choice"
+            @choose="handleChatSpaceChoice"
+          />
+        </WorkflowStepForm>
+      </div>
+    </section>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -127,7 +171,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppSaveAction from '../../components/ui/AppSaveAction.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
+import { ApiCallError } from '../../lib/api/client'
+import { settingsFacade } from '../../lib/api/facade'
+import type { TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../../lib/uiEvents'
@@ -146,6 +194,11 @@ const isSavingUserSettings = ref(false)
 const isVerifyingCurrentPassword = ref(false)
 const isChangingPassword = ref(false)
 const isSwitchingTenant = ref(false)
+const notificationDefault = ref<UserNotificationDefault | null>(null)
+const isNotificationDefaultWorkflowOpen = ref(false)
+const isSavingNotificationDefault = ref(false)
+const chatSpaces = ref<TenantChatSpace[]>([])
+const chatSpacesLoading = ref(false)
 const passwordForm = ref({
   currentPassword: '',
   newPassword: '',
@@ -192,6 +245,18 @@ const permissionSummary = computed(() => {
   if (permissionsStore.canEditTenantSettings) return 'Tenant admin'
   if (permissionsStore.canRunActiveTenantReconciliation) return 'Tenant user'
   return 'View only membership'
+})
+const notificationDefaultSummary = computed(() => notificationDefault.value?.spaceName || 'No default space')
+const chatSpaceChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
+  const options: Array<{ value: string; label: string }> = chatSpaces.value
+    .filter((space) => space.isActive !== 'N')
+    .map((space) => ({ value: space.chatSpaceId, label: space.spaceName }))
+  options.push({ value: 'clear', label: 'No notifications' })
+
+  return options.map((option, index) => ({
+    ...option,
+    shortcutKey: String.fromCharCode(65 + index),
+  }))
 })
 const passwordStep = computed(() => passwordSteps[passwordStepIndex.value] ?? passwordSteps[0])
 const passwordStepQuestion = computed(() => passwordStep.value.question)
@@ -393,12 +458,68 @@ async function switchTenant(nextTenantUserGroupId: string): Promise<void> {
   }
 }
 
+async function loadNotificationDefault(): Promise<void> {
+  try {
+    const response = await settingsFacade.getUserNotificationDefault(pageAbortController.signal)
+    notificationDefault.value = response.userNotificationDefault ?? null
+  } catch (loadError) {
+    if ((loadError as { name?: string })?.name === 'AbortError') return
+  }
+}
+
+async function loadChatSpacesForNotificationDefault(): Promise<void> {
+  chatSpacesLoading.value = true
+  try {
+    const response = await settingsFacade.listTenantChatSpaces(pageAbortController.signal)
+    chatSpaces.value = response.chatSpaces ?? []
+  } catch (loadError) {
+    if ((loadError as { name?: string })?.name === 'AbortError') return
+  } finally {
+    chatSpacesLoading.value = false
+  }
+}
+
+function openNotificationDefaultWorkflow(): void {
+  settingsMessage.value = null
+  isNotificationDefaultWorkflowOpen.value = true
+  void loadChatSpacesForNotificationDefault()
+}
+
+function closeNotificationDefaultWorkflow(): void {
+  isNotificationDefaultWorkflowOpen.value = false
+}
+
+async function handleChatSpaceChoice(value: string): Promise<void> {
+  if (isSavingNotificationDefault.value) return
+
+  isSavingNotificationDefault.value = true
+  try {
+    const chatSpaceId = value === 'clear' ? '' : value
+    const response = await settingsFacade.saveUserNotificationDefault({ chatSpaceId }, pageAbortController.signal)
+    if (!response.ok) {
+      settingsMessage.value = response.errors?.[0] ?? 'Unable to save notification default.'
+      return
+    }
+
+    notificationDefault.value = response.userNotificationDefault ?? null
+    closeNotificationDefaultWorkflow()
+  } catch (saveError) {
+    settingsMessage.value = saveError instanceof ApiCallError ? saveError.message : 'Unable to save notification default.'
+  } finally {
+    isSavingNotificationDefault.value = false
+  }
+}
+
+const pageAbortController = new AbortController()
+
 onMounted(() => {
   document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handlePasswordWorkflowCancelRequest)
+  void loadNotificationDefault()
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handlePasswordWorkflowCancelRequest)
   clearDisplayNameSaveTimer()
+  pageAbortController.abort()
 })
 </script>

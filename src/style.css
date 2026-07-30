@@ -775,6 +775,12 @@ button:disabled {
   height: 100%;
 }
 
+.user-settings-notification-default-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
 .tenant-settings-list-grid {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: var(--space-2);
