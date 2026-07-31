@@ -5,6 +5,7 @@
 
 export interface SaveUserSettingsPayload {
   displayName?: string
+  timeZone?: string
 }
 
 export interface VerifyOwnPasswordPayload {

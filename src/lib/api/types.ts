@@ -44,6 +44,8 @@ export interface SessionInfo {
   displayName?: string
   locale?: string
   timeZone?: string
+  userTimeZone?: string
+  tenantTimeZone?: string
   lastLoginDate?: string
   lastRun?: SessionLastRun | null
   scopeType?: SessionScopeType

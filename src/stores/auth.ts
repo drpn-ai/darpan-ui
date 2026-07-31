@@ -17,6 +17,7 @@ import type {
   VerifyOwnPasswordResponse,
 } from '../lib/api/types'
 import { resolveInternalRedirectTarget } from '../lib/navigation'
+import { setDefaultDisplayTimeZone } from '../lib/utils/date'
 
 export type AuthStatus = 'authenticated' | 'unauthenticated' | 'verification-failed'
 
@@ -85,6 +86,8 @@ function normalizeSessionInfo(sessionInfo: SessionInfo | null | undefined): Sess
     username: sessionInfo?.username?.toString()?.trim() || normalizedUserId,
     displayName: sessionInfo?.displayName?.toString()?.trim() || sessionInfo?.username?.toString()?.trim() || normalizedUserId,
     timeZone: sessionInfo?.timeZone?.toString()?.trim() || undefined,
+    userTimeZone: sessionInfo?.userTimeZone?.toString()?.trim() || undefined,
+    tenantTimeZone: sessionInfo?.tenantTimeZone?.toString()?.trim() || undefined,
     customerScopeId: sessionInfo?.customerScopeId?.toString()?.trim() || null,
     activeTenantUserGroupId,
     activeTenantLabel:
@@ -93,6 +96,10 @@ function normalizeSessionInfo(sessionInfo: SessionInfo | null | undefined): Sess
       (activeTenantUserGroupId ? activeTenantUserGroupId : null),
     availableTenants,
   }
+}
+
+export function resolveEffectiveTimeZone(sessionInfo: SessionInfo | null | undefined): string | undefined {
+  return sessionInfo?.userTimeZone || sessionInfo?.tenantTimeZone || undefined
 }
 
 export function buildUiPermissionPolicy(sessionInfo: SessionInfo | null | undefined): UiPermissionPolicy {
@@ -154,6 +161,7 @@ export const useAuthStore = defineStore('auth', () => {
     _status.value = nextState.status
     _error.value = nextState.error ?? null
     _sessionInfo.value = nextState.sessionInfo ?? null
+    setDefaultDisplayTimeZone(resolveEffectiveTimeZone(_sessionInfo.value))
   }
 
   function _applyAuthenticatedSession(sessionInfoArg: SessionInfo | null | undefined, errorMsg: string | null = null): void {
@@ -357,17 +365,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function saveUserSettings(payload: { displayName?: string }): Promise<boolean> {
+  async function saveUserSettings(payload: { displayName?: string; timeZone?: string }): Promise<boolean> {
     if (authBypass) {
-      _applyAuthState({
-        status: 'authenticated',
-        sessionInfo: {
-          ..._sessionInfo.value,
-          userId: _sessionInfo.value?.userId ?? 'local-dev',
-          username: _sessionInfo.value?.username ?? 'local-dev',
-          displayName: payload.displayName?.toString()?.trim() || _sessionInfo.value?.username || 'local-dev',
-        },
-      })
+      const bypassSession: SessionInfo = {
+        ..._sessionInfo.value,
+        userId: _sessionInfo.value?.userId ?? 'local-dev',
+        username: _sessionInfo.value?.username ?? 'local-dev',
+      }
+      if (payload.displayName !== undefined) {
+        bypassSession.displayName = payload.displayName?.toString()?.trim() || bypassSession.username
+      }
+      if (payload.timeZone !== undefined) {
+        bypassSession.userTimeZone = payload.timeZone?.toString()?.trim() || undefined
+      }
+      _applyAuthState({ status: 'authenticated', sessionInfo: bypassSession })
       return true
     }
 
