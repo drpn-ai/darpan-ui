@@ -30,6 +30,23 @@
       </div>
     </StaticPageSection>
 
+    <StaticPageSection v-if="attentionFailedRuns.length > 0" title="Needs Attention">
+      <div class="static-page-tile-grid run-history-grid" data-testid="run-history-failed-results">
+        <article
+          v-for="failedRun in attentionFailedRuns"
+          :key="failedRun.failedRunId"
+          class="static-page-tile run-history-tile run-history-failed-tile"
+          data-testid="run-history-failed-tile"
+        >
+          <div class="run-history-tile__head run-history-tile__head--status">
+            <span class="static-page-tile-title">{{ formatSavedResultDateTime(failedRun.failedAt) }}</span>
+            <StatusBadge label="Failed" tone="danger" />
+          </div>
+          <p class="section-note" data-testid="run-history-failed-error">{{ failedRun.errorLine }}</p>
+        </article>
+      </div>
+    </StaticPageSection>
+
     <StaticPageSection v-if="featuredOutput" title="Most Recent">
       <RouterLink
         class="static-page-tile run-history-tile run-history-featured-tile"
@@ -179,6 +196,14 @@ const GENERATED_OUTPUT_FETCH_PAGE_SIZE = 6
 const OTHER_RESULTS_BATCH_SIZE = 5
 const RUNNING_STATUS_IDS = new Set(['AUT_STAT_PENDING', 'AUT_STAT_RUNNING'])
 
+const FAILED_RUN_STATUS_ID = 'AUT_STAT_FAILED'
+
+interface FailedRunView {
+  failedRunId: string
+  failedAt: string
+  errorLine: string
+}
+
 interface RunningRunView {
   runningRunId: string
   submittedAt: string
@@ -243,6 +268,15 @@ const workflowRoute = computed(() =>
 const canOpenRunSettings = computed(() => canEditTenantSettings.value && Boolean(savedRunId.value))
 const runningGeneratedOutputs = computed(() => generatedOutputs.value.filter(isRunningGeneratedOutput))
 const completedGeneratedOutputs = computed(() => generatedOutputs.value.filter(isCompletedGeneratedOutput))
+const failedGeneratedOutputs = computed(() => generatedOutputs.value.filter(isFailedGeneratedOutput))
+// Spotlight only failures newer than the newest completed result: once a newer successful run
+// exists, an old failure is history, not an alert.
+const attentionFailedRuns = computed<FailedRunView[]>(() => {
+  const newestCompletedMs = outputTimestampMs(completedGeneratedOutputs.value[0])
+  return failedGeneratedOutputs.value
+    .filter((output) => newestCompletedMs == null || (outputTimestampMs(output) ?? 0) > newestCompletedMs)
+    .map(buildFailedRunView)
+})
 const runningRuns = computed<RunningRunView[]>(() => {
   const backendRunningRuns = runningGeneratedOutputs.value.map(buildBackendRunningRunView)
   if (backendRunningRuns.length > 0) return backendRunningRuns
@@ -314,6 +348,37 @@ function isRunningGeneratedOutput(output: GeneratedOutput): boolean {
 
 function isCompletedGeneratedOutput(output: GeneratedOutput): boolean {
   return !isRunningGeneratedOutput(output) && output.resultAvailable !== false && Boolean(normalizeDisplayText(output.fileName))
+}
+
+function isFailedGeneratedOutput(output: GeneratedOutput): boolean {
+  return normalizeDisplayText(output.statusEnumId) === FAILED_RUN_STATUS_ID
+}
+
+function isResolvableGeneratedOutput(output: GeneratedOutput): boolean {
+  // Local pending markers clear against completed AND failed backend rows — a failure is a
+  // terminal outcome too, and only resolving against successes made failed runs ghost as Running.
+  return isCompletedGeneratedOutput(output) || isFailedGeneratedOutput(output)
+}
+
+function outputTimestampMs(output: GeneratedOutput | undefined): number | null {
+  const raw = output?.completedDate ?? output?.createdDate ?? output?.lastUpdatedDate
+  if (raw == null || raw === '') return null
+  const parsed = typeof raw === 'number' ? raw : new Date(raw).getTime()
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function buildFailedRunView(output: GeneratedOutput): FailedRunView {
+  const runResultId = normalizeDisplayText(output.reconciliationRunResultId)
+  // The per-run status poll carries errorMessage; the list descriptor does not.
+  const liveStatus = runResultId ? runResultsStore.getRunStatus(runResultId) : null
+  const errorMessage = normalizeDisplayText(liveStatus?.errorMessage)
+  const failingStage = normalizeDisplayText(liveStatus?.currentStage) || normalizeDisplayText(output.currentStage)
+  const stageLabel = failingStage ? reconciliationStageLabel(failingStage, file1SystemLabel.value, file2SystemLabel.value) : ''
+  return {
+    failedRunId: runResultId || generatedOutputKey(output),
+    failedAt: firstText(output.completedDate, output.createdDate, output.lastUpdatedDate) || new Date().toISOString(),
+    errorLine: errorMessage || (stageLabel ? `Failed during ${stageLabel}` : 'Run failed before any results were produced.'),
+  }
 }
 
 function buildBackendRunningRunView(output: GeneratedOutput): RunningRunView {
@@ -466,7 +531,7 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
     }
     pendingRuns.value = resolveCompletedPendingReconciliationRuns(
       requestedSavedRunId,
-      generatedOutputs.value.filter(isCompletedGeneratedOutput),
+      generatedOutputs.value.filter(isResolvableGeneratedOutput),
     )
 
     pagination.value = response.pagination ?? pagination.value
@@ -510,7 +575,7 @@ function primeFromCache(targetSavedRunId: string): boolean {
   generatedOutputs.value = cached
   pendingRuns.value = resolveCompletedPendingReconciliationRuns(
     targetSavedRunId,
-    cached.filter(isCompletedGeneratedOutput),
+    cached.filter(isResolvableGeneratedOutput),
   )
   cachePrimedWithoutFetch.value = true
   return true
@@ -576,8 +641,10 @@ watch(() => runResultsStore.recentOutputs, () => {
 // on terminal status; this page only stops the ones it started when it unmounts.
 const polledRunResultIds = new Set<string>()
 
-watch(runningGeneratedOutputs, (outputs) => {
-  for (const output of outputs) {
+watch([runningGeneratedOutputs, failedGeneratedOutputs], ([runningOutputs, failedOutputs]) => {
+  // Failed rows get the same poll: the store fetches once (errorMessage for the tile) and the
+  // poll stops itself on the terminal status.
+  for (const output of [...runningOutputs, ...failedOutputs]) {
     const runResultId = normalizeDisplayText(output.reconciliationRunResultId)
     if (!runResultId || polledRunResultIds.has(runResultId)) continue
     polledRunResultIds.add(runResultId)

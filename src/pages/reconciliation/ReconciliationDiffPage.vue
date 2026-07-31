@@ -969,7 +969,13 @@ async function runDiff(): Promise<void> {
 
     const generatedOutput = response.runResult?.generatedOutput ?? null
     if (!generatedOutput?.fileName?.trim()) {
-      if (!pendingRun) runError.value = response.errors?.[0] ?? 'Diff did not return a saved result.'
+      // A resolved response without an output is a synchronous failure (JSON-RPC error envelopes
+      // resolve rather than throw): surface it and clear the optimistic marker, or the run ghosts
+      // as "Running" with no error shown anywhere. Only the thrown 503 keep-alive path below may
+      // keep the marker.
+      runError.value = response.errors?.[0] ?? 'Diff did not return a saved result.'
+      clearPendingReconciliationRun(pendingRun?.pendingRunId)
+      pendingSubmittedRun.value = null
       return
     }
 

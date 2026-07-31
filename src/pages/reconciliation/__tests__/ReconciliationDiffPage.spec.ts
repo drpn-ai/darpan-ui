@@ -594,6 +594,50 @@ describe('ReconciliationDiffPage', () => {
     ])
   })
 
+  it('surfaces a synchronous run failure and clears the pending marker instead of ghosting', async () => {
+    // Ghost-card bug (2026-07-31): a JSON-RPC error envelope resolves (not throws) with errors and
+    // no generatedOutput. The old code returned silently when a pendingRun existed, leaving a
+    // localStorage marker that rendered as "Running" forever while showing no error at all.
+    stubFileReader()
+    route.query = {
+      savedRunId: 'RS_ORDER_CSV',
+      runName: 'CSV Order Compare',
+      file1SystemLabel: 'OMS',
+      file2SystemLabel: 'SHOPIFY',
+    }
+    runSavedRunDiff.mockResolvedValue({
+      ok: false,
+      messages: [],
+      errors: ['HotWax: OMS REST request failed: Read timed out'],
+      runResult: null,
+    })
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    const file1Input = wrapper.get('[data-testid="file1-input"]')
+    Object.defineProperty(file1Input.element, 'files', {
+      value: [new File(['order_id\n1001\n1002\n'], 'oms-orders.csv', { type: 'text/csv' })],
+      configurable: true,
+    })
+    await file1Input.trigger('change')
+    await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
+    await flushPromises()
+
+    const file2Input = wrapper.get('[data-testid="file2-input"]')
+    Object.defineProperty(file2Input.element, 'files', {
+      value: [new File(['order_id\n1002\n1003\n'], 'shopify-orders.csv', { type: 'text/csv' })],
+      configurable: true,
+    })
+    await file2Input.trigger('change')
+    await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('HotWax: OMS REST request failed: Read timed out')
+    expect(wrapper.find('[data-testid="run-submitted-hint"]').exists()).toBe(false)
+    expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
+  })
+
   it('asks for one API time period instead of file uploads when both saved-run sources are API-backed', async () => {
     route.query = {
       savedRunId: 'RS_API_ORDER_SYNC',

@@ -147,6 +147,25 @@ function buildRunningGeneratedOutput() {
   }
 }
 
+function buildFailedGeneratedOutput() {
+  return {
+    fileName: '',
+    reconciliationRunResultId: 'RUN_RESULT_FAILED',
+    sourceFormat: '',
+    availableFormats: [],
+    savedRunId: 'RS_ORDER_CSV',
+    savedRunName: 'CSV Order Compare',
+    savedRunType: 'ruleset',
+    ruleSetId: 'RS_ORDER_CSV',
+    compareScopeId: 'CS_ORDER_CSV',
+    statusEnumId: 'AUT_STAT_FAILED',
+    statusLabel: 'Failed',
+    currentStage: 'EXTRACT_FILE2',
+    resultAvailable: false,
+    createdDate: '2026-03-31T09:06:00.000Z',
+  }
+}
+
 function buildSavedRunSummary() {
   return {
     savedRunId: 'RS_ORDER_CSV',
@@ -580,6 +599,86 @@ describe('ReconciliationRunHistoryPage', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="run-history-running-tile"]').exists()).toBe(false)
+    expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
+  })
+
+  it('shows a failed run as a Needs Attention tile with the live error message', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 2, pageCount: 1 },
+      generatedOutputs: [buildFailedGeneratedOutput(), buildGeneratedOutput(31)],
+    })
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_FAILED',
+      currentStage: 'EXTRACT_FILE2',
+      errorMessage: 'HotWax: OMS REST request failed: Read timed out',
+    })
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    expect(getReconciliationRunStatus).toHaveBeenCalledWith({ reconciliationRunResultId: 'RUN_RESULT_FAILED' })
+    expect(wrapper.findAll('.static-page-section-heading').map((node) => node.text()))
+      .toContain('Needs Attention')
+    const failedTile = wrapper.get('[data-testid="run-history-failed-tile"]')
+    expect(failedTile.text()).toContain('Failed')
+    expect(failedTile.text()).toContain('HotWax: OMS REST request failed: Read timed out')
+    expect(failedTile.text()).toContain(formatCreatedDateForExpectation('2026-03-31T09:06:00.000Z'))
+    // A failed run must never masquerade as the featured result.
+    expect(wrapper.get('[data-testid="run-history-featured-tile"]').text()).not.toContain('Failed')
+  })
+
+  it('failed tile falls back to the failing stage when no error message is available', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [buildFailedGeneratedOutput()],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_FAILED' })
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    const failedTile = wrapper.get('[data-testid="run-history-failed-tile"]')
+    expect(failedTile.text()).toContain('Failed during Extracting SHOPIFY')
+  })
+
+  it('clears the local pending marker when the backend run failed', async () => {
+    // Ghost-card bug (2026-07-31): the pending marker only reconciled against completed outputs,
+    // so a failed run left a "Running" card ghosting until the abandonment prune deleted it.
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [buildFailedGeneratedOutput()],
+    })
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_FAILED',
+      errorMessage: 'HotWax: OMS REST request failed: Read timed out',
+    })
+    window.localStorage.setItem('darpan.pendingReconciliationRuns', JSON.stringify([
+      {
+        pendingRunId: 'pending-RS_ORDER_CSV',
+        savedRunId: 'RS_ORDER_CSV',
+        runName: 'CSV Order Compare',
+        file1SystemLabel: 'OMS',
+        file2SystemLabel: 'SHOPIFY',
+        submittedAt: '2026-03-31T09:05:00.000Z',
+      },
+    ]))
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="run-history-running-tile"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-history-failed-tile"]').exists()).toBe(true)
     expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
   })
 
