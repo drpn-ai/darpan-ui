@@ -1,7 +1,18 @@
 let defaultDisplayTimeZone: string | undefined
 
 export function setDefaultDisplayTimeZone(timeZone: string | undefined): void {
-  defaultDisplayTimeZone = timeZone?.trim() || undefined
+  let normalized = timeZone?.trim() || undefined
+
+  // Validate that the browser can format with this timezone
+  if (normalized) {
+    try {
+      new Intl.DateTimeFormat(undefined, { timeZone: normalized })
+    } catch {
+      normalized = undefined
+    }
+  }
+
+  defaultDisplayTimeZone = normalized
 }
 
 export function getDefaultDisplayTimeZone(): string | undefined {

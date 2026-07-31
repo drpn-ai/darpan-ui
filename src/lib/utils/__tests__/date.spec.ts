@@ -25,6 +25,12 @@ describe('display timezone default', () => {
     setDefaultDisplayTimeZone('  ')
     expect(getDefaultDisplayTimeZone()).toBeUndefined()
   })
+
+  it('ignores timezone ids the browser cannot format', () => {
+    setDefaultDisplayTimeZone('Not/AZone')
+    expect(getDefaultDisplayTimeZone()).toBeUndefined()
+    expect(() => formatDateTime('2026-07-28T18:30:00Z', { locale: 'en-US' })).not.toThrow()
+  })
 })
 
 describe('display day helpers', () => {
