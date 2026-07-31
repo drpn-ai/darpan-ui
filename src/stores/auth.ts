@@ -248,10 +248,7 @@ export const useAuthStore = defineStore('auth', () => {
     const storedToken = getAuthToken()
     if (!storedToken) {
       clearApiResponseCache()
-      _checked.value = true
-      _status.value = 'unauthenticated'
-      _sessionInfo.value = null
-      _error.value = null
+      _applyAuthState({ status: 'unauthenticated' })
       return
     }
     // Token present but may belong to a different user — force a fresh server check.
