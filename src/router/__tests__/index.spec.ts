@@ -42,6 +42,7 @@ describe('router release scope', () => {
     { name: 'reconciliation-automation-dashboard', path: '/reconciliation/automations/:automationId', surfaceMode: 'static', staticPageLabel: 'Automation' },
     { name: 'reconciliation-diff', path: '/reconciliation/diff', surfaceMode: 'workflow' },
     { name: 'reconciliation-run-result', path: '/reconciliation/run-result/:savedRunId/:outputFileName', surfaceMode: 'static' },
+    { name: 'reconciliation-run-live', path: '/reconciliation/run-live/:savedRunId/:runResultId', surfaceMode: 'static', staticPageLabel: 'Run Progress' },
     { name: 'reconciliation-run-history', path: '/reconciliation/run-history/:savedRunId', surfaceMode: 'static' },
     { name: 'hub', path: '/', surfaceMode: 'static' },
   ]

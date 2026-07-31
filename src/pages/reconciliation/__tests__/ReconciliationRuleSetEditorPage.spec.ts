@@ -40,7 +40,6 @@ const draftStoreState = vi.hoisted(() => ({
   ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
   automationDraftState: null,
   setWorkflowOrigin: vi.fn(),
-  clearWorkflowOrigin: vi.fn(),
   setRuleSetDraft: vi.fn(),
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),

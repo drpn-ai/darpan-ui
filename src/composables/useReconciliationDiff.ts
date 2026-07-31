@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { ApiCallError } from '../lib/api/client'
+import { ApiCallError, isAbortError } from '../lib/api/client'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { GeneratedOutput, RunSavedRunDiffResponse, SavedRunSummary } from '../lib/api/types'
 import type { RunSavedRunDiffPayload } from '../lib/api/facadeTypes'
@@ -26,11 +26,6 @@ function readLatestCachedOutputForSavedRun(savedRunId: string): GeneratedOutput 
 interface FailedRunFeedback {
   validationErrors: string[]
   processingWarnings: string[]
-}
-
-function isAbortError(error: unknown): boolean {
-  if (error instanceof DOMException) return error.name === 'AbortError'
-  return typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError'
 }
 
 function linkExternalSignal(internal: AbortController, external: AbortSignal | undefined): () => void {

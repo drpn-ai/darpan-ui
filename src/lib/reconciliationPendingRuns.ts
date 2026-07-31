@@ -1,6 +1,6 @@
 import { normalizeStringOrEmpty } from './utils/strings'
 
-export const PENDING_RECONCILIATION_RUNS_STORAGE_KEY = 'darpan.pendingReconciliationRuns'
+const PENDING_RECONCILIATION_RUNS_STORAGE_KEY = 'darpan.pendingReconciliationRuns'
 
 const PENDING_RUN_MAX_AGE_MS = 12 * 60 * 60 * 1000
 
@@ -55,8 +55,7 @@ function notifyPendingRunsChanged(): void {
 
 function parseTimestamp(value: string | number | undefined): number {
   if (value == null || value === '') return Number.NaN
-  const timestamp = new Date(value).getTime()
-  return Number.isNaN(timestamp) ? Number.NaN : timestamp
+  return new Date(value).getTime()
 }
 
 function isPendingRun(value: unknown): value is PendingReconciliationRun {

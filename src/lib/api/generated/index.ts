@@ -20,11 +20,3 @@ import type { components } from './schema'
 
 /** All 262 contract schemas keyed by name (e.g. Schemas['LoginSessionResult']). */
 export type Schemas = components['schemas']
-
-/**
- * Facade result payload for a contract schema name — sugar for Schemas[K] that
- * documents intent at call sites (use with the `...Result` schema names).
- */
-export type FacadeResult<K extends keyof Schemas & string> = Schemas[K]
-
-export type { components, paths, operations } from './schema'

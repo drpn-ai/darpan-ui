@@ -26,7 +26,9 @@ const subscribeRunNotification = vi.hoisted(() => vi.fn())
 const unsubscribeRunNotification = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
 const saveUserNotificationDefault = vi.hoisted(() => vi.fn())
+const cancelReconciliationRun = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
+const routerReplace = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     userId: 'editor',
@@ -39,16 +41,24 @@ const authState = vi.hoisted(() => ({
 // Server search debounce on the page; tests wait slightly longer than this before asserting.
 const SEARCH_DEBOUNCE_WAIT = 360
 
-vi.mock('vue-router', () => ({
-  RouterLink: {
-    props: ['to'],
-    template: '<a :data-to="typeof to === \'string\' ? to : JSON.stringify(to)"><slot /></a>',
-  },
-  useRoute: () => route,
-  useRouter: () => ({
-    push: routerPush,
-  }),
-}))
+// The page reacts to route changes (the live→result swap re-keys the same component), so the
+// mocked route must be reactive. Tests that set params before mount can keep writing to the
+// raw `route` object; mutating after mount must go through `liveRoute` to notify watchers.
+vi.mock('vue-router', async () => {
+  const { reactive } = await vi.importActual<typeof import('vue')>('vue')
+  const reactiveRoute = reactive(route)
+  return {
+    RouterLink: {
+      props: ['to'],
+      template: '<a :data-to="typeof to === \'string\' ? to : JSON.stringify(to)"><slot /></a>',
+    },
+    useRoute: () => reactiveRoute,
+    useRouter: () => ({
+      push: routerPush,
+      replace: routerReplace,
+    }),
+  }
+})
 
 vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
@@ -60,15 +70,12 @@ vi.mock('../../../lib/api/facade', () => ({
     getReconciliationRunStatus,
     subscribeRunNotification,
     unsubscribeRunNotification,
+    cancelReconciliationRun,
   },
   settingsFacade: {
     listTenantChatSpaces,
     saveUserNotificationDefault,
   },
-}))
-
-vi.mock('../../../lib/auth', () => ({
-  useUiPermissions: () => permissionsShape,
 }))
 
 const permissionsShape = {
@@ -106,7 +113,6 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
     ruleSetDraftState: null,
     automationDraftState: null,
     setWorkflowOrigin: vi.fn(),
-    clearWorkflowOrigin: vi.fn(),
     setRuleSetDraft: vi.fn(),
     clearRuleSetDraft: vi.fn(),
     setAutomationDraft: vi.fn(),
@@ -114,8 +120,12 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
   }),
 }))
 
+import { useRoute } from 'vue-router'
 import ReconciliationRunResultPage from '../ReconciliationRunResultPage.vue'
 import { useRunResultsStore } from '../../../stores/runResults'
+
+// The reactive proxy the mounted page reads; write through this to change the route mid-test.
+const liveRoute = useRoute()
 
 function buildGeneratedOutputFile(contentText: string, outputFileOverrides: Record<string, unknown> = {}) {
   return {
@@ -472,6 +482,7 @@ describe('ReconciliationRunResultPage', () => {
     }
     route.params.savedRunId = 'RS_ORDER_CSV'
     route.params.outputFileName = 'CSV-Order-Compare-diff-20260331-063304.json'
+    delete (route.params as Record<string, unknown>).runResultId
     route.query.runName = 'CSV Order Compare'
     route.query.file1SystemLabel = 'OMS'
     route.query.file2SystemLabel = 'SHOPIFY'
@@ -491,6 +502,7 @@ describe('ReconciliationRunResultPage', () => {
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', steps: [] })
     subscribeRunNotification.mockReset()
     unsubscribeRunNotification.mockReset()
+    cancelReconciliationRun.mockReset()
     listTenantChatSpaces.mockReset()
     saveUserNotificationDefault.mockReset()
     getGeneratedOutput.mockReset()
@@ -511,6 +523,7 @@ describe('ReconciliationRunResultPage', () => {
       savedRuns: [buildSavedRunSummary()],
     })
     routerPush.mockReset()
+    routerReplace.mockReset()
     saveSavedRunName.mockResolvedValue({
       ok: true,
       messages: ['Saved run CSV Order Compare Revised.'],
@@ -1384,6 +1397,213 @@ describe('ReconciliationRunResultPage', () => {
     expect(subscribeRunNotification).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="notify-space-choice-CS1"]').exists()).toBe(true)
     expect(wrapper.get('.popup-workflow-overlay').text()).toContain('Chat space is no longer active.')
+  })
+
+  // Live mode: opened from an In Progress tile, keyed by run id with no output file yet.
+  function enterLiveRunRoute(reconciliationRunResultId = 'RR_LIVE'): void {
+    route.params.outputFileName = ''
+    ;(route.params as Record<string, unknown>).runResultId = reconciliationRunResultId
+    route.fullPath = `/reconciliation/run-live/RS_ORDER_CSV/${reconciliationRunResultId}`
+  }
+
+  it('shows completed, running, and remaining steps for a run still in progress', async () => {
+    enterLiveRunRoute()
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      currentStage: 'EXTRACT_FILE2',
+      startedDate: 1784955159000,
+      steps: [
+        { stageCode: 'RESOLVE', stageSequence: 1, statusEnumId: 'AUT_STAT_SUCCESS', startedDate: 1784955159000, completedDate: 1784955160000 },
+        { stageCode: 'EXTRACT_FILE1', stageSequence: 2, statusEnumId: 'AUT_STAT_SUCCESS', startedDate: 1784955160000, completedDate: 1784955175000, recordCount: 4063 },
+        { stageCode: 'EXTRACT_FILE2', stageSequence: 3, statusEnumId: 'AUT_STAT_RUNNING', startedDate: 1784955175000 },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(getReconciliationRunStatus).toHaveBeenCalledWith({ reconciliationRunResultId: 'RR_LIVE' })
+    // No saved result exists yet, so the page must not try to fetch differences.
+    expect(getGeneratedOutputDifferences).not.toHaveBeenCalled()
+
+    // Expanded by default in live mode: step progress is the primary content here.
+    const timeline = wrapper.get('[data-testid="run-result-step-timeline"]')
+    expect(wrapper.get('[data-testid="run-result-step-timeline-toggle"]').attributes('aria-expanded')).toBe('true')
+    expect(timeline.text()).toContain('Preparing run')
+    expect(timeline.text()).toContain('Extracting OMS')
+    expect(timeline.text()).toContain(`${(4063).toLocaleString()} records`)
+    expect(timeline.text()).toContain('Extracting SHOPIFY')
+    expect(timeline.text()).toContain('Running')
+    // Remaining stages are synthesized from the canonical order so the operator sees what is left.
+    expect(timeline.text()).toContain('Comparing records')
+    expect(timeline.text()).toContain('Writing results')
+    expect(timeline.text()).toContain('Sending notifications')
+    expect(timeline.text()).toContain('Pending')
+    expect(wrapper.get('[data-testid="run-result-live-note"]').text())
+      .toContain('Results will appear here when this reconciliation finishes')
+  })
+
+  it('populates compared files mid-run as extract stages produce them', async () => {
+    enterLiveRunRoute()
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      steps: [{ stageCode: 'EXTRACT_FILE1', stageSequence: 2, statusEnumId: 'AUT_STAT_SUCCESS' }],
+      sourceDetails: {
+        mode: 'API',
+        dateRange: { start: '2026-07-30', end: '2026-07-31' },
+        files: [
+          {
+            side: 'file1',
+            label: 'OMS',
+            fileName: 'RS_LIVE_file1.json',
+            filePath: 'reconciliation/RS_LIVE_file1.json',
+            downloadFileName: 'RS_LIVE_file1.json',
+            sourceFormat: 'json',
+            canDownload: true,
+          },
+        ],
+      },
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    const sourceDetails = wrapper.get('[data-testid="run-result-source-details"]')
+    expect(sourceDetails.text()).toContain('RS_LIVE_file1.json')
+    expect(sourceDetails.text()).toContain('OMS')
+    expect(sourceDetails.text()).toContain('Jul 30, 2026')
+    expect(sourceDetails.text()).not.toContain('file2')
+  })
+
+  it('swaps to the saved result route once the run succeeds', async () => {
+    enterLiveRunRoute()
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      steps: [{ stageCode: 'COMPARE', stageSequence: 4, statusEnumId: 'AUT_STAT_RUNNING' }],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    expect(routerReplace).not.toHaveBeenCalled()
+
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_SUCCESS',
+      resultFileName: 'reconciliation/CSV-Order-Compare-diff-20260331-063304.json',
+      steps: [{ stageCode: 'NOTIFY', stageSequence: 7, statusEnumId: 'AUT_STAT_SUCCESS' }],
+    })
+    await useRunResultsStore().refreshRunStatus('RR_LIVE')
+    await flushPromises()
+
+    expect(routerReplace).toHaveBeenCalledWith({
+      name: 'reconciliation-run-result',
+      params: {
+        savedRunId: 'RS_ORDER_CSV',
+        outputFileName: 'reconciliation/CSV-Order-Compare-diff-20260331-063304.json',
+      },
+      query: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
+    })
+
+    // The route swap lands on the same component, so completing it here proves the page then
+    // loads and renders the saved differences rather than sitting on the live placeholder.
+    ;(liveRoute.params as Record<string, unknown>).runResultId = ''
+    liveRoute.params.outputFileName = 'CSV-Order-Compare-diff-20260331-063304.json'
+    await flushPromises()
+
+    expect(getGeneratedOutputDifferences).toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="run-result-live-note"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="diff-details-row"]').length).toBeGreaterThan(0)
+  })
+
+  it('cancels a running run and reports that it is stopping until the run ends', async () => {
+    enterLiveRunRoute('RR_LIVE_CANCEL')
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      steps: [{ stageCode: 'EXTRACT_FILE2', stageSequence: 3, statusEnumId: 'AUT_STAT_RUNNING' }],
+    })
+    cancelReconciliationRun.mockResolvedValue({ ok: true, messages: ['Stopping this run.'], errors: [], cancelRequested: true })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    // Destructive, so it confirms rather than firing on the first click.
+    await wrapper.get('[data-testid="run-result-cancel"]').trigger('click')
+    expect(cancelReconciliationRun).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="run-result-cancel-confirm-no"]').trigger('click')
+    expect(wrapper.find('[data-testid="run-result-cancel-confirm"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="run-result-cancel"]').trigger('click')
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      cancelRequestedDate: 1784955484000,
+      steps: [{ stageCode: 'EXTRACT_FILE2', stageSequence: 3, statusEnumId: 'AUT_STAT_RUNNING' }],
+    })
+    await wrapper.get('[data-testid="run-result-cancel-confirm-yes"]').trigger('click')
+    await flushPromises()
+
+    expect(cancelReconciliationRun).toHaveBeenCalledWith({ reconciliationRunResultId: 'RR_LIVE_CANCEL' })
+    // Cooperative cancel: still running, so the page says stopping instead of claiming it stopped.
+    expect(wrapper.get('[data-testid="run-result-cancel"]').text()).toContain('Stopping run')
+    expect(wrapper.get('[data-testid="run-result-live-note"]').text()).toContain('Stopping this run')
+
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_CANCELLED',
+      cancelRequestedDate: 1784955484000,
+      steps: [{ stageCode: 'EXTRACT_FILE2', stageSequence: 3, statusEnumId: 'AUT_STAT_CANCELLED' }],
+    })
+    await useRunResultsStore().refreshRunStatus('RR_LIVE_CANCEL')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-result-live-note"]').text()).toContain('Run cancelled')
+    expect(wrapper.get('[data-testid="run-result-step-timeline"]').text()).toContain('Cancelled')
+    expect(wrapper.find('[data-testid="run-result-cancel"]').exists()).toBe(false)
+    expect(routerReplace).not.toHaveBeenCalled()
+  })
+
+  it('hides cancel from a viewer who cannot run reconciliations', async () => {
+    authState.sessionInfo = {
+      userId: 'viewer',
+      canRunActiveTenantReconciliation: false,
+      canEditActiveTenantData: false,
+      isSuperAdmin: false,
+    }
+    enterLiveRunRoute('RR_LIVE_VIEWER')
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', steps: [] })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="run-result-cancel"]').exists()).toBe(false)
+  })
+
+  it('surfaces the failure and the failing step when a live run fails', async () => {
+    enterLiveRunRoute('RR_LIVE_FAIL')
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_FAILED',
+      errorMessage: 'Spark compare failed: boom',
+      steps: [
+        { stageCode: 'RESOLVE', stageSequence: 1, statusEnumId: 'AUT_STAT_SUCCESS' },
+        { stageCode: 'COMPARE', stageSequence: 4, statusEnumId: 'AUT_STAT_FAILED', errorMessage: 'Spark compare failed: boom' },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(routerReplace).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="run-result-live-failed"]').text()).toContain('Spark compare failed: boom')
+    // A failed run has no remaining work, so no pending remainder is synthesized.
+    const timeline = wrapper.get('[data-testid="run-result-step-timeline"]')
+    expect(timeline.text()).toContain('Failed')
+    expect(timeline.text()).not.toContain('Pending')
+    expect(wrapper.find('[data-testid="run-result-live-note"]').exists()).toBe(false)
   })
 
   it('hides notify-me once the run is terminal', async () => {

@@ -42,11 +42,6 @@ vi.mock('../../../lib/api/facade', () => ({
   },
 }))
 
-vi.mock('../../../lib/auth', () => ({
-  useAuthState: () => authState,
-  useUiPermissions: () => permissions,
-}))
-
 vi.mock('../../../stores/auth', () => ({
   buildAuthRedirect: (redirect: unknown) => ({ name: 'login', query: { redirect } }),
   useAuthStore: () => ({
@@ -65,7 +60,6 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
     ruleSetDraftState: null,
     automationDraftState: null,
     setWorkflowOrigin: vi.fn(),
-    clearWorkflowOrigin: vi.fn(),
     setRuleSetDraft: vi.fn(),
     clearRuleSetDraft: vi.fn(),
     setAutomationDraft: vi.fn(),
@@ -342,6 +336,36 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(source).toMatch(/\.automation-dashboard-run-link\s*\{[^}]*font-weight: 400;/)
     expect(source).toMatch(/\.automation-dashboard-detail-item dd\s*\{[^}]*font-weight: 400;/)
     expect(source).not.toContain('font-weight: 500;')
+  })
+
+  it('opens an in-flight execution on the live run view instead of leaving the row dead', async () => {
+    listAutomationExecutions.mockResolvedValueOnce({
+      ok: true,
+      messages: [],
+      errors: [],
+      executions: [
+        {
+          automationExecutionId: 'EXEC_RUNNING',
+          statusEnumId: 'AUT_STAT_RUNNING',
+          statusLabel: 'Running',
+          scheduledDate: '2026-05-03T06:00:00Z',
+          reconciliationRunResultId: 'RR_IN_FLIGHT',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="automation-execution-row"]')
+    expect(row.attributes('aria-label')).toBe('Open run progress')
+
+    await row.trigger('click')
+    expect(push.mock.calls[0]?.[0]).toMatchObject({
+      name: 'reconciliation-run-live',
+      params: { runResultId: 'RR_IN_FLIGHT' },
+    })
   })
 
   it('does not render an unlinked open-result label when no route target is available', async () => {

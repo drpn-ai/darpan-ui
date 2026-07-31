@@ -23,18 +23,6 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
-vi.mock('../../lib/auth', () => ({
-  buildAuthRedirect: vi.fn((redirect: unknown) => ({
-    name: 'login',
-    query: { redirect },
-  })),
-  ensureAuthenticated,
-  useAuthState: () => ({
-    username: 'john.doe',
-    userId: 'aditi',
-  }),
-}))
-
 vi.mock('../../stores/auth', () => ({
   buildAuthRedirect: (redirect: unknown) => ({ name: 'login', query: { redirect } }),
   useAuthStore: () => ({
@@ -51,7 +39,6 @@ vi.mock('../../stores/reconciliationDraft', () => ({
     ruleSetDraftState: null,
     automationDraftState: null,
     setWorkflowOrigin: vi.fn(),
-    clearWorkflowOrigin: vi.fn(),
     setRuleSetDraft: vi.fn(),
     clearRuleSetDraft: vi.fn(),
     setAutomationDraft: vi.fn(),

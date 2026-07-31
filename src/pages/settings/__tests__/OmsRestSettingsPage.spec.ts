@@ -44,11 +44,6 @@ const permissionsShape = {
   },
 }
 
-vi.mock('../../../lib/auth', () => ({
-  useAuthState: () => authState,
-  useUiPermissions: () => permissionsShape,
-}))
-
 vi.mock('../../../stores/auth', () => ({
   useAuthStore: () => ({ ...authState, sessionInfo: authState.sessionInfo }),
 }))
@@ -63,7 +58,6 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
     ruleSetDraftState: null,
     automationDraftState: null,
     setWorkflowOrigin: vi.fn(),
-    clearWorkflowOrigin: vi.fn(),
     setRuleSetDraft: vi.fn(),
     clearRuleSetDraft: vi.fn(),
     setAutomationDraft: vi.fn(),

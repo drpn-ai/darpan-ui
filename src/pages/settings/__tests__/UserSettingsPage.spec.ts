@@ -67,15 +67,6 @@ const authState = vi.hoisted<{ sessionInfo: TestSessionInfo; error: string | nul
   error: null,
 }))
 
-vi.mock('../../../lib/auth', () => ({
-  saveActiveTenant,
-  verifyOwnPassword,
-  changeOwnPassword,
-  saveUserSettings,
-  useAuthState: () => authState,
-  useUiPermissions: () => permissionsShape,
-}))
-
 vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: {
     getUserNotificationDefault,
@@ -116,7 +107,6 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
     ruleSetDraftState: null,
     automationDraftState: null,
     setWorkflowOrigin: vi.fn(),
-    clearWorkflowOrigin: vi.fn(),
     setRuleSetDraft: vi.fn(),
     clearRuleSetDraft: vi.fn(),
     setAutomationDraft: vi.fn(),

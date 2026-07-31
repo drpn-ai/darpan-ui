@@ -29,13 +29,6 @@ Object.defineProperty(window, 'scrollTo', {
   writable: true,
 })
 
-vi.mock('../../lib/auth', () => ({
-  buildAuthRedirect: (redirect: string) => ({ name: 'login', query: { redirect } }),
-  ensureAuthenticated,
-  useAuthState: () => authState,
-  useUiPermissions: () => permissionsShape,
-}))
-
 const permissionsShape = {
   get canRunActiveTenantReconciliation() {
     return authState.sessionInfo?.canRunActiveTenantReconciliation === true ||

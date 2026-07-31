@@ -504,46 +504,6 @@ export interface AutomationPrimaryIdOption {
   type?: string
 }
 
-export interface MappingSummary {
-  reconciliationMappingId: string
-  mappingName: string
-  description?: string
-  companyUserGroupId?: string
-  companyLabel?: string
-  requiresSystemSelection: boolean
-  defaultFile1SystemEnumId?: string
-  defaultFile2SystemEnumId?: string
-  systemOptions: MappingSystemOption[]
-}
-
-export interface MappingDetailMember {
-  mappingMemberId: string
-  systemEnumId?: string
-  systemLabel?: string
-  jsonSchemaId?: string
-  schemaName?: string
-  fieldPath?: string
-}
-
-export interface MappingDetail {
-  reconciliationMappingId: string
-  mappingName: string
-  members: MappingDetailMember[]
-}
-
-export interface SavedMapping {
-  reconciliationMappingId: string
-  mappingName: string
-  companyUserGroupId?: string
-  companyLabel?: string
-  file1SystemEnumId?: string
-  file2SystemEnumId?: string
-  file1SchemaName?: string
-  file2SchemaName?: string
-  file1FieldPath?: string
-  file2FieldPath?: string
-}
-
 export interface GeneratedOutput {
   fileName: string
   reconciliationRunResultId?: string
@@ -642,8 +602,6 @@ export interface ListOmsRestSourceConfigsResponse extends PaginatedResponse {
   omsRestSourceConfigs: OmsRestSourceConfigRecord[]
 }
 
-export type ListMappingsResponse = Schemas['ListMappingsResult']
-
 export interface ListSavedRunsResponse extends PaginatedResponse {
   pinnedSavedRunIds?: string[]
   savedRuns: SavedRunSummary[]
@@ -683,8 +641,6 @@ export interface ListAutomationSourceOptionsResponse extends ApiEnvelope {
   systemRemotes: AutomationSystemRemoteOption[]
 }
 
-export type SaveDashboardPinnedMappingsResponse = Schemas['SaveDashboardPinnedMappingsResult']
-
 export interface SaveDashboardPinnedSavedRunsResponse extends ApiEnvelope {
   pinnedSavedRunIds?: string[]
 }
@@ -699,15 +655,11 @@ export interface RunSavedRunDiffResponse extends ApiEnvelope {
   runResult?: RunSavedRunDiffResult
 }
 
-export type CreateMappingResponse = Schemas['CreateMappingResult']
-
 export interface CreateRuleSetRunResponse extends ApiEnvelope {
   savedRun?: SavedRunSummary
 }
 
 export type SaveRuleSetRunResponse = Schemas['SaveRuleSetRunResult']
-
-export type CreateCsvRunResponse = Schemas['CreateCsvRunResult']
 
 export type GetMappingResponse = Schemas['GetMappingResult']
 
@@ -735,6 +687,11 @@ export interface SubscribeRunNotificationResponse extends ApiEnvelope {
 
 export interface UnsubscribeRunNotificationResponse extends ApiEnvelope {
   subscribed?: boolean
+}
+
+export interface CancelReconciliationRunResponse extends ApiEnvelope {
+  cancelRequested?: boolean
+  statusEnumId?: string
 }
 
 export interface GeneratedOutputDifferencesMetadata {
@@ -798,8 +755,6 @@ export interface GetGeneratedOutputDifferencesResponse extends ApiEnvelope {
   totalFiltered?: number
   outputFile?: GeneratedOutputDifferencesFile
 }
-
-export type DeleteGeneratedOutputResponse = Schemas['DeleteGeneratedOutputResult']
 
 export interface JsonSchemaSummary {
   jsonSchemaId: string

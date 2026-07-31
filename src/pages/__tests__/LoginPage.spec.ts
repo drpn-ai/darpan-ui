@@ -29,11 +29,6 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
-vi.mock('../../lib/auth', () => ({
-  loginWithCredentials,
-  useAuthState: () => authState,
-}))
-
 vi.mock('../../stores/auth', () => ({
   buildAuthRedirect: (redirect: string) => ({ name: 'login', query: { redirect } }),
   useAuthStore: () => ({

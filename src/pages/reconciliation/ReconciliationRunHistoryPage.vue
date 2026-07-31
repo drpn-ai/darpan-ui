@@ -15,18 +15,20 @@
 
     <StaticPageSection v-if="runningRuns.length > 0" title="In Progress">
       <div class="static-page-tile-grid run-history-grid" data-testid="run-history-running-results">
-        <article
+        <component
+          :is="runningRun.runResultId ? RouterLink : 'article'"
           v-for="runningRun in runningRuns"
           :key="runningRun.runningRunId"
           class="static-page-tile run-history-tile run-history-running-tile"
           data-testid="run-history-running-tile"
+          :to="runningRun.runResultId ? buildLiveRunRoute(runningRun.runResultId) : undefined"
         >
           <div class="run-history-tile__head run-history-tile__head--status">
             <span class="static-page-tile-title">{{ formatSavedResultDateTime(runningRun.submittedAt) }}</span>
             <StatusBadge :label="runningRun.statusLabel" tone="warning" />
           </div>
           <p class="section-note" data-testid="run-history-running-progress">{{ runningProgressLine(runningRun) }}</p>
-        </article>
+        </component>
       </div>
     </StaticPageSection>
 
@@ -185,6 +187,7 @@ import {
 import { normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconciliationDisplay'
 import {
   buildReconciliationDiffRoute,
+  buildReconciliationRunLiveRoute,
   buildReconciliationRunResultRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
@@ -206,6 +209,9 @@ interface FailedRunView {
 
 interface RunningRunView {
   runningRunId: string
+  // Backend run id when the server row exists; empty for local pending markers,
+  // which have nothing to open yet so their tile stays a plain article.
+  runResultId: string
   submittedAt: string
   statusLabel: string
   currentStage: string
@@ -391,6 +397,7 @@ function buildBackendRunningRunView(output: GeneratedOutput): RunningRunView {
   const progressPercent = liveStatus?.progressPercent ?? output.progressPercent ?? null
   return {
     runningRunId: generatedOutputKey(output) || `${savedRunId.value}:${submittedAt}`,
+    runResultId,
     submittedAt,
     statusLabel,
     currentStage,
@@ -401,11 +408,16 @@ function buildBackendRunningRunView(output: GeneratedOutput): RunningRunView {
 function buildLocalRunningRunView(pendingRun: PendingReconciliationRun): RunningRunView {
   return {
     runningRunId: pendingRun.pendingRunId,
+    runResultId: '',
     submittedAt: pendingRun.submittedAt,
     statusLabel: 'Running',
     currentStage: '',
     progressPercent: null,
   }
+}
+
+function buildLiveRunRoute(reconciliationRunResultId: string) {
+  return buildReconciliationRunLiveRoute(reconciliationRunRouteContext.value, reconciliationRunResultId)
 }
 
 function runningProgressLine(view: RunningRunView): string {
@@ -628,6 +640,16 @@ watch(() => runResultsStore.recentOutputs, () => {
         return !runResultId || !freshRunResultIds.has(runResultId)
       }),
     ].sort((left, right) => (outputTimestampMs(right) ?? 0) - (outputTimestampMs(left) ?? 0))
+    // The merge above retires the backend RUNNING row, but runningRuns falls back to the LOCAL
+    // pending markers whenever no backend running row is left — so without re-resolving them the
+    // tile merely switches from backend-backed to marker-backed and never clears, and the run
+    // appears stuck in "In Progress" until a manual refresh (live bug, 2026-07-31). Both fetch
+    // paths already resolve here; this is the third path that changes the list and must too.
+    // Kept inside the freshOutputs guard so an unchanged tick writes nothing to storage.
+    pendingRuns.value = resolveCompletedPendingReconciliationRuns(
+      savedRunId.value,
+      generatedOutputs.value.filter(isResolvableGeneratedOutput),
+    )
     return
   }
 

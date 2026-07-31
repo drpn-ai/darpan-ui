@@ -15,12 +15,9 @@ export function clearApiResponseCache(): void {
 }
 import type {
   CreateRuleSetRunResponse,
-  CreateCsvRunResponse,
   ChangeOwnPasswordResponse,
-  CreateMappingResponse,
   DeleteJsonSchemaResponse,
   DeleteAutomationResponse,
-  DeleteGeneratedOutputResponse,
   DeleteOmsRestSourceConfigResponse,
   DeleteSavedRunResponse,
   DeleteShopifyAuthConfigResponse,
@@ -47,7 +44,6 @@ import type {
   ListNsRestletConfigsResponse,
   ListShopifyAuthConfigsResponse,
   ListGeneratedOutputsResponse,
-  ListMappingsResponse,
   ListSavedRunsResponse,
   ListSftpServersResponse,
   ListTenantChatSpacesResponse,
@@ -61,7 +57,6 @@ import type {
   SaveLlmSettingsResponse,
   SaveNsAuthConfigResponse,
   SaveOmsRestSourceConfigResponse,
-  SaveDashboardPinnedMappingsResponse,
   SaveDashboardPinnedSavedRunsResponse,
   SaveRuleSetRunResponse,
   SaveSavedRunNameResponse,
@@ -73,6 +68,7 @@ import type {
   SaveShopifyAuthConfigResponse,
   SubscribeRunNotificationResponse,
   UnsubscribeRunNotificationResponse,
+  CancelReconciliationRunResponse,
   VerifyOwnPasswordResponse,
   SaveMappingResponse,
   SaveNsRestletConfigResponse,
@@ -83,11 +79,8 @@ import type {
 } from './types'
 import type {
   ChangeOwnPasswordPayload,
-  CreateCsvRunPayload,
-  CreateMappingPayload,
   CreateRuleSetRunPayload,
   DeleteAutomationPayload,
-  DeleteGeneratedOutputPayload,
   DeleteJsonSchemaPayload,
   DeleteOmsRestSourceConfigPayload,
   DeleteSavedRunPayload,
@@ -106,19 +99,15 @@ import type {
   ListAutomationsPayload,
   ListGeneratedOutputsPayload,
   ListJsonSchemasPayload,
-  ListMappingsPayload,
   ListNsAuthConfigsPayload,
   ListNsRestletConfigsPayload,
   ListOmsRestSourceConfigsPayload,
   ListSavedRunsPayload,
   ListSftpServersPayload,
   ListShopifyAuthConfigsPayload,
-  PauseAutomationPayload,
-  ResumeAutomationPayload,
   RunAutomationNowPayload,
   RunSavedRunDiffPayload,
   SaveAutomationPayload,
-  SaveDashboardPinnedMappingsPayload,
   SaveDashboardPinnedSavedRunsPayload,
   SaveJsonSchemaTextPayload,
   SaveLlmSettingsPayload,
@@ -137,6 +126,7 @@ import type {
   SaveUserSettingsPayload,
   SubscribeRunNotificationPayload,
   UnsubscribeRunNotificationPayload,
+  CancelReconciliationRunPayload,
   ValidateJsonTextPayload,
   VerifyOwnPasswordPayload,
 } from './facadeTypes'
@@ -191,13 +181,9 @@ const JSON_SCHEMA = {
 const RECONCILIATION = {
   createRuleSetRun: 'facade.ReconciliationFacadeServices.create#RuleSetRun',
   saveRuleSetRun: 'facade.ReconciliationFacadeServices.save#RuleSetRun',
-  createCsvRun: 'facade.ReconciliationFacadeServices.create#CsvRun',
   listSavedRuns: 'facade.ReconciliationFacadeServices.list#SavedRuns',
-  createMapping: 'facade.ReconciliationFacadeServices.create#Mapping',
-  listMappings: 'facade.ReconciliationFacadeServices.list#Mappings',
   getMapping: 'facade.ReconciliationFacadeServices.get#Mapping',
   saveMapping: 'facade.ReconciliationFacadeServices.save#Mapping',
-  saveDashboardPinnedMappings: 'facade.ReconciliationFacadeServices.save#DashboardPinnedMappings',
   saveDashboardPinnedSavedRuns: 'facade.ReconciliationFacadeServices.save#DashboardPinnedSavedRuns',
   saveSavedRunName: 'facade.ReconciliationFacadeServices.save#SavedRunName',
   deleteSavedRun: 'facade.ReconciliationFacadeServices.delete#SavedRun',
@@ -205,19 +191,17 @@ const RECONCILIATION = {
   listGeneratedOutputs: 'facade.ReconciliationFacadeServices.list#GeneratedOutputs',
   getGeneratedOutput: 'facade.ReconciliationFacadeServices.get#GeneratedOutput',
   getGeneratedOutputDifferences: 'facade.ReconciliationFacadeServices.get#GeneratedOutputDifferences',
-  deleteGeneratedOutput: 'facade.ReconciliationFacadeServices.delete#GeneratedOutput',
   getReconciliationRunStatus: 'facade.ReconciliationFacadeServices.get#ReconciliationRunStatus',
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
   deleteAutomation: 'facade.ReconciliationFacadeServices.delete#Automation',
-  pauseAutomation: 'facade.ReconciliationFacadeServices.pause#Automation',
-  resumeAutomation: 'facade.ReconciliationFacadeServices.resume#Automation',
   runAutomationNow: 'facade.ReconciliationFacadeServices.run#AutomationNow',
   listAutomationExecutions: 'facade.ReconciliationFacadeServices.list#AutomationExecutions',
   listAutomationSourceOptions: 'facade.ReconciliationFacadeServices.list#AutomationSourceOptions',
   subscribeRunNotification: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
   unsubscribeRunNotification: 'facade.ReconciliationFacadeServices.unsubscribe#RunNotification',
+  cancelReconciliationRun: 'facade.ReconciliationFacadeServices.cancel#ReconciliationRun',
 }
 
 export const authFacade = {
@@ -350,26 +334,14 @@ export const reconciliationFacade = {
   saveRuleSetRun(payload: SaveRuleSetRunPayload, signal?: AbortSignal): Promise<SaveRuleSetRunResponse> {
     return callService<SaveRuleSetRunResponse>(RECONCILIATION.saveRuleSetRun, payload, signal)
   },
-  createCsvRun(payload: CreateCsvRunPayload, signal?: AbortSignal): Promise<CreateCsvRunResponse> {
-    return callService<CreateCsvRunResponse>(RECONCILIATION.createCsvRun, payload, signal)
-  },
   listSavedRuns(payload: ListSavedRunsPayload, signal?: AbortSignal): Promise<ListSavedRunsResponse> {
     return callService<ListSavedRunsResponse>(RECONCILIATION.listSavedRuns, payload, signal)
-  },
-  createMapping(payload: CreateMappingPayload, signal?: AbortSignal): Promise<CreateMappingResponse> {
-    return callService<CreateMappingResponse>(RECONCILIATION.createMapping, payload, signal)
-  },
-  listMappings(payload: ListMappingsPayload, signal?: AbortSignal): Promise<ListMappingsResponse> {
-    return callService<ListMappingsResponse>(RECONCILIATION.listMappings, payload, signal)
   },
   getMapping(payload: GetMappingPayload, signal?: AbortSignal): Promise<GetMappingResponse> {
     return callService<GetMappingResponse>(RECONCILIATION.getMapping, payload, signal)
   },
   saveMapping(payload: SaveMappingPayload, signal?: AbortSignal): Promise<SaveMappingResponse> {
     return callService<SaveMappingResponse>(RECONCILIATION.saveMapping, payload, signal)
-  },
-  saveDashboardPinnedMappings(payload: SaveDashboardPinnedMappingsPayload, signal?: AbortSignal): Promise<SaveDashboardPinnedMappingsResponse> {
-    return callService<SaveDashboardPinnedMappingsResponse>(RECONCILIATION.saveDashboardPinnedMappings, payload, signal)
   },
   saveDashboardPinnedSavedRuns(payload: SaveDashboardPinnedSavedRunsPayload, signal?: AbortSignal): Promise<SaveDashboardPinnedSavedRunsResponse> {
     return callService<SaveDashboardPinnedSavedRunsResponse>(RECONCILIATION.saveDashboardPinnedSavedRuns, payload, signal)
@@ -401,9 +373,6 @@ export const reconciliationFacade = {
   ): Promise<GetGeneratedOutputDifferencesResponse> {
     return callService<GetGeneratedOutputDifferencesResponse>(RECONCILIATION.getGeneratedOutputDifferences, payload, signal)
   },
-  deleteGeneratedOutput(payload: DeleteGeneratedOutputPayload, signal?: AbortSignal): Promise<DeleteGeneratedOutputResponse> {
-    return callService<DeleteGeneratedOutputResponse>(RECONCILIATION.deleteGeneratedOutput, payload, signal)
-  },
   listAutomations(payload: ListAutomationsPayload, signal?: AbortSignal): Promise<ListAutomationsResponse> {
     return callService<ListAutomationsResponse>(RECONCILIATION.listAutomations, payload, signal)
   },
@@ -415,12 +384,6 @@ export const reconciliationFacade = {
   },
   deleteAutomation(payload: DeleteAutomationPayload, signal?: AbortSignal): Promise<DeleteAutomationResponse> {
     return callService<DeleteAutomationResponse>(RECONCILIATION.deleteAutomation, payload, signal)
-  },
-  pauseAutomation(payload: PauseAutomationPayload, signal?: AbortSignal): Promise<SaveAutomationResponse> {
-    return callService<SaveAutomationResponse>(RECONCILIATION.pauseAutomation, payload, signal)
-  },
-  resumeAutomation(payload: ResumeAutomationPayload, signal?: AbortSignal): Promise<SaveAutomationResponse> {
-    return callService<SaveAutomationResponse>(RECONCILIATION.resumeAutomation, payload, signal)
   },
   runAutomationNow(payload: RunAutomationNowPayload, signal?: AbortSignal): Promise<RunAutomationNowResponse> {
     return callService<RunAutomationNowResponse>(RECONCILIATION.runAutomationNow, payload, signal)
@@ -436,5 +399,8 @@ export const reconciliationFacade = {
   },
   unsubscribeRunNotification(payload: UnsubscribeRunNotificationPayload, signal?: AbortSignal): Promise<UnsubscribeRunNotificationResponse> {
     return callService<UnsubscribeRunNotificationResponse>(RECONCILIATION.unsubscribeRunNotification, payload, signal)
+  },
+  cancelReconciliationRun(payload: CancelReconciliationRunPayload, signal?: AbortSignal): Promise<CancelReconciliationRunResponse> {
+    return callService<CancelReconciliationRunResponse>(RECONCILIATION.cancelReconciliationRun, payload, signal)
   },
 }

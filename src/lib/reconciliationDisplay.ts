@@ -18,6 +18,20 @@ export function fileNameFromPath(value: unknown): string {
 // Stage codes come from the backend RunObservability lifecycle
 // (darpan.reconciliation.ReconciliationRunStep.stageCode). Extract stages take the
 // run's own system labels so operators read "Extracting SHOPIFY", not a code.
+
+// Canonical stage order, mirroring RunObservability.STAGE_SEQUENCE. Step rows are created
+// lazily as stages start, so a live view synthesizes the not-yet-started remainder from this
+// list; conditional stages (VERIFY, file-mode extracts) simply drop out as real rows arrive.
+export const RUN_STAGE_SEQUENCE: readonly string[] = [
+  'RESOLVE',
+  'EXTRACT_FILE1',
+  'EXTRACT_FILE2',
+  'COMPARE',
+  'WRITE_OUTPUT',
+  'VERIFY',
+  'NOTIFY',
+]
+
 const RUN_STAGE_LABELS: Record<string, string> = {
   RESOLVE: 'Preparing run',
   COMPARE: 'Comparing records',

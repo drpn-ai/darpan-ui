@@ -76,14 +76,6 @@ describe('runResults store (run-result cache)', () => {
     expect(store.getOutputsForSavedRun('')).toEqual([])
   })
 
-  it('removeOutput invalidates a deleted result', () => {
-    const store = useRunResultsStore()
-    store.upsertOutput(output({ fileName: 'a.json', savedRunId: 'run-1', createdDate: isoDaysAgo(0) }))
-    store.removeOutput('a.json')
-    expect(store.getByFileName('a.json')).toBeNull()
-    expect(store.recentOutputs).toHaveLength(0)
-  })
-
   it('reset clears the cache (logout / tenant switch)', () => {
     const store = useRunResultsStore()
     store.upsertOutput(output({ fileName: 'a.json', savedRunId: 'run-1', createdDate: isoDaysAgo(0) }))

@@ -42,10 +42,6 @@ vi.mock('../../../lib/api/facade', () => ({
   },
 }))
 
-vi.mock('../../../lib/auth', () => ({
-  useUiPermissions: () => permissionsShape,
-}))
-
 const permissionsShape = {
     get canEditTenantSettings() {
       return authState.sessionInfo.canEditActiveTenantData === true || authState.sessionInfo.isSuperAdmin === true
@@ -81,7 +77,6 @@ const draftStoreState = vi.hoisted(() => ({
   ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
   automationDraftState: null,
   setWorkflowOrigin: vi.fn(),
-  clearWorkflowOrigin: vi.fn(),
   setRuleSetDraft: vi.fn(),
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),

@@ -142,6 +142,20 @@ function buildRunningGeneratedOutput() {
   }
 }
 
+// The finished form of buildRunningGeneratedOutput(): same run (RUN_RESULT_ACTIVE), now carrying a
+// fileName and a terminal status. This is the row the backend returns once the run completes.
+function buildCompletedActiveRunOutput() {
+  return {
+    ...buildGeneratedOutput(31),
+    fileName: 'CSV-Order-Compare-diff-20260331-090500.json',
+    reconciliationRunResultId: 'RUN_RESULT_ACTIVE',
+    statusEnumId: 'AUT_STAT_SUCCESS',
+    statusLabel: 'Completed',
+    resultAvailable: true,
+    createdDate: '2026-03-31T09:05:00.000Z',
+  }
+}
+
 function buildFailedGeneratedOutput() {
   return {
     fileName: '',
@@ -555,6 +569,54 @@ describe('ReconciliationRunHistoryPage', () => {
     expect(progress.text()).toContain('62%')
   })
 
+  it('links a backend running tile to the live run view and leaves local markers unlinked', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 2, pageCount: 1 },
+      generatedOutputs: [
+        { ...buildRunningGeneratedOutput(), reconciliationRunResultId: 'RUN_RESULT_OPENABLE' },
+        buildGeneratedOutput(31),
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    const runningTile = wrapper.get('[data-testid="run-history-running-tile"]')
+    expect(JSON.parse(runningTile.attributes('data-to') as string)).toEqual({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RUN_RESULT_OPENABLE' },
+      query: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
+    })
+
+    // A local pending marker has no backend run id yet, so its tile has nothing to open.
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 0, pageCount: 0 },
+      generatedOutputs: [],
+    })
+    window.localStorage.setItem('darpan.pendingReconciliationRuns', JSON.stringify([
+      {
+        pendingRunId: 'pending-RS_ORDER_CSV',
+        savedRunId: 'RS_ORDER_CSV',
+        runName: 'CSV Order Compare',
+        file1SystemLabel: 'OMS',
+        file2SystemLabel: 'SHOPIFY',
+        submittedAt: new Date().toISOString(),
+      },
+    ]))
+    const localWrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    const localTile = localWrapper.get('[data-testid="run-history-running-tile"]')
+    expect(localTile.element.tagName).toBe('ARTICLE')
+    expect(localTile.attributes('data-to')).toBeUndefined()
+  })
+
   it('running tile falls back to the descriptor stage before live status carries one', async () => {
     listGeneratedOutputs.mockResolvedValue({
       ok: true,
@@ -701,6 +763,54 @@ describe('ReconciliationRunHistoryPage', () => {
 
     expect(wrapper.find('[data-testid="run-history-running-tile"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-history-failed-tile"]').exists()).toBe(true)
+    expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
+  })
+
+  it('moves a run out of In Progress when it completes in the background, without a manual refresh', async () => {
+    // 2026-07-31: a run that finished while the page was open stayed in the In Progress block until
+    // the user manually refreshed. The background cache watch merged the finished row into the list
+    // (so the backend running row went away) but never re-resolved the LOCAL pending marker, and
+    // runningRuns falls back to those markers whenever there is no backend running row — so the tile
+    // simply switched from being backend-backed to marker-backed and never disappeared.
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 2, pageCount: 1 },
+      generatedOutputs: [buildRunningGeneratedOutput(), buildGeneratedOutput(30)],
+    })
+    // submittedAt is newer than every completed row above, so the marker legitimately survives the
+    // initial load — this is a genuinely in-flight run, not a stale marker.
+    window.localStorage.setItem('darpan.pendingReconciliationRuns', JSON.stringify([
+      {
+        pendingRunId: 'pending-RS_ORDER_CSV',
+        savedRunId: 'RS_ORDER_CSV',
+        runName: 'CSV Order Compare',
+        file1SystemLabel: 'OMS',
+        file2SystemLabel: 'SHOPIFY',
+        submittedAt: '2026-03-31T09:05:00.000Z',
+      },
+    ]))
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-history-running-tile"]').exists()).toBe(true)
+
+    // The run finishes. This is exactly what production does on the live→terminal transition:
+    // runResults.ts:192 calls refresh() so the finished result replaces the running tile.
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 2, pageCount: 1 },
+      generatedOutputs: [buildCompletedActiveRunOutput(), buildGeneratedOutput(30)],
+    })
+    await useRunResultsStore().refresh()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="run-history-running-tile"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="run-history-featured-tile"]').text())
+      .toContain(formatCreatedDateForExpectation('2026-03-31T09:05:00.000Z'))
     expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
   })
 

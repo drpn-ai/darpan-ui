@@ -31,6 +31,11 @@ export class ApiCallError extends Error {
   }
 }
 
+/** True for a fetch aborted via AbortController — callers treat these as "no-op", not failure. */
+export function isAbortError(error: unknown): boolean {
+  return (error as { name?: string } | null)?.name === 'AbortError'
+}
+
 export interface AuthRequiredDetail {
   message: string
   method: string
@@ -286,12 +291,6 @@ function getActiveAuthTokenState(): StoredAuthToken | null {
 }
 
 let authTokenState: StoredAuthToken | null = loadStoredAuthTokenState()
-
-export function setAuthToken(token: string | null): void {
-  if (COOKIE_AUTH) return // no-op: the HttpOnly darpan_login_key cookie is the credential
-  authTokenState = createAuthTokenState(token)
-  persistAuthTokenState(authTokenState)
-}
 
 export function setAuthTokenContract(contract: Partial<AuthTokenContract> | null): void {
   if (COOKIE_AUTH) return // no-op: the HttpOnly darpan_login_key cookie is the credential

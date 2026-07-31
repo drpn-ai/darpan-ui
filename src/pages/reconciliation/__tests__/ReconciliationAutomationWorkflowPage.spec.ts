@@ -43,7 +43,6 @@ const draftStoreState = vi.hoisted(() => ({
   setWorkflowOrigin: vi.fn(function (this: { workflowOrigin: { label: string, path: string } | null }, label: string, path: string) {
     this.workflowOrigin = { label, path }
   }),
-  clearWorkflowOrigin: vi.fn(),
   setRuleSetDraft: vi.fn(),
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),

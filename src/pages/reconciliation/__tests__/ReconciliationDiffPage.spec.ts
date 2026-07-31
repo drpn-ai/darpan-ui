@@ -551,6 +551,77 @@ describe('ReconciliationDiffPage', () => {
     expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
   })
 
+  it('redirects to the live run view as soon as the submitted run registers', async () => {
+    // setTimeout must be faked too so the registration poll can be advanced without real waiting.
+    // Reconfiguring requires tearing the beforeEach Date-only fakes down first.
+    vi.useRealTimers()
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(new Date(2026, 4, 17, 12, 0, 0))
+    stubFileReader()
+    route.query = {
+      savedRunId: 'RS_ORDER_CSV',
+      runName: 'CSV Order Compare',
+      file1SystemLabel: 'OMS',
+      file2SystemLabel: 'SHOPIFY',
+    }
+
+    // A run long enough to still be executing: the request never settles during this test.
+    runSavedRunDiff.mockReturnValue(new Promise(() => {}))
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 5, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: '',
+        reconciliationRunResultId: 'RR_SUBMITTED',
+        savedRunId: 'RS_ORDER_CSV',
+        statusEnumId: 'AUT_STAT_RUNNING',
+        resultAvailable: false,
+        startedDate: new Date(2026, 4, 17, 12, 0, 0).toISOString(),
+      }],
+    })
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    const file1Input = wrapper.get('[data-testid="file1-input"]')
+    Object.defineProperty(file1Input.element, 'files', {
+      value: [new File(['order_id\n1001\n1002\n'], 'oms-orders.csv', { type: 'text/csv' })],
+      configurable: true,
+    })
+    await file1Input.trigger('change')
+    await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
+    await flushPromises()
+
+    const file2Input = wrapper.get('[data-testid="file2-input"]')
+    Object.defineProperty(file2Input.element, 'files', {
+      value: [new File(['order_id\n1002\n1003\n'], 'shopify-orders.csv', { type: 'text/csv' })],
+      configurable: true,
+    })
+    await file2Input.trigger('change')
+    await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
+    await flushPromises()
+
+    // Nothing to show yet — the redirect waits until the backend has registered the run.
+    expect(push).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await flushPromises()
+
+    expect(push).toHaveBeenCalledWith({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RR_SUBMITTED' },
+      query: {
+        runName: 'CSV Order Compare',
+        file1SystemLabel: 'OMS',
+        file2SystemLabel: 'SHOPIFY',
+      },
+    })
+    // The marker stays until the run itself ends — the live view is now what reports progress.
+    expect(JSON.parse(window.localStorage.getItem('darpan.pendingReconciliationRuns') ?? '[]')).toHaveLength(1)
+  })
+
   it('keeps the pending run marker when the submitted request is interrupted after starting', async () => {
     stubFileReader()
     route.query = {

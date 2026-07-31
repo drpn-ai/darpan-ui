@@ -11,7 +11,7 @@ const changeOwnPasswordRpc = vi.hoisted(() => vi.fn())
 const logoutSessionRpc = vi.hoisted(() => vi.fn())
 const clearApiResponseCache = vi.hoisted(() => vi.fn())
 
-vi.mock('../api/facade', () => ({
+vi.mock('../../lib/api/facade', () => ({
   clearApiResponseCache,
   authFacade: {
     getSessionInfo,
@@ -43,12 +43,12 @@ describe('auth state', () => {
   })
 
   it('starts unchecked before backend verification runs', async () => {
-    const { useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    expect(useAuthState().checked).toBe(false)
-    expect(useAuthState().authenticated).toBe(false)
-    expect(useAuthState().userId).toBeNull()
-    expect(useAuthState().username).toBeNull()
+    expect(useAuthStore().checked).toBe(false)
+    expect(useAuthStore().authenticated).toBe(false)
+    expect(useAuthStore().userId).toBeNull()
+    expect(useAuthStore().username).toBeNull()
   })
 
   it('treats backend session info as the source of truth on the first auth check', async () => {
@@ -69,16 +69,16 @@ describe('auth state', () => {
       },
     })
 
-    const { ensureAuthenticated, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(ensureAuthenticated()).resolves.toBe(true)
+    await expect(useAuthStore().ensureAuthenticated()).resolves.toBe(true)
     expect(getSessionInfo).toHaveBeenCalledTimes(1)
-    expect(useAuthState().authenticated).toBe(true)
-    expect(useAuthState().status).toBe('authenticated')
-    expect(useAuthState().userId).toBe('backend-user')
-    expect(useAuthState().username).toBe('backend')
-    expect(useAuthState().sessionInfo?.scopeType).toBe('TENANT')
-    expect(useAuthState().sessionInfo?.activeTenantUserGroupId).toBe('KREWE')
+    expect(useAuthStore().authenticated).toBe(true)
+    expect(useAuthStore().status).toBe('authenticated')
+    expect(useAuthStore().userId).toBe('backend-user')
+    expect(useAuthStore().username).toBe('backend')
+    expect(useAuthStore().sessionInfo?.scopeType).toBe('TENANT')
+    expect(useAuthStore().sessionInfo?.activeTenantUserGroupId).toBe('KREWE')
   })
 
   it('stores the explicit auth token contract on login and clears it on logout', async () => {
@@ -110,10 +110,10 @@ describe('auth state', () => {
       authTokenRevoked: true,
     })
 
-    const { getAuthToken } = await import('../api/client')
-    const { loginWithCredentials, logoutSession, useAuthState } = await import('../auth')
+    const { getAuthToken } = await import('../../lib/api/client')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(loginWithCredentials('backend', 'secret')).resolves.toBe(true)
+    await expect(useAuthStore().loginWithCredentials('backend', 'secret')).resolves.toBe(true)
     expect(getAuthToken()).toBe('login-token-123')
     // Audit #10: the bearer token is held in sessionStorage (per-tab, off-disk), never localStorage.
     expect(JSON.parse(window.sessionStorage.getItem('darpan.authToken') ?? '{}')).toMatchObject({
@@ -123,12 +123,12 @@ describe('auth state', () => {
     })
     expect(window.localStorage.getItem('darpan.authToken')).toBeNull()
 
-    await expect(logoutSession()).resolves.toBe(true)
+    await expect(useAuthStore().logoutSession()).resolves.toBe(true)
     expect(logoutSessionRpc).toHaveBeenCalledTimes(1)
     expect(getAuthToken()).toBeNull()
-    expect(useAuthState().authenticated).toBe(false)
-    expect(useAuthState().status).toBe('unauthenticated')
-    expect(useAuthState().error).toBeNull()
+    expect(useAuthStore().authenticated).toBe(false)
+    expect(useAuthStore().status).toBe('unauthenticated')
+    expect(useAuthStore().error).toBeNull()
     expect(clearApiResponseCache).toHaveBeenCalledTimes(2)
   })
 
@@ -153,14 +153,14 @@ describe('auth state', () => {
       },
     })
 
-    const { saveActiveTenant, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(saveActiveTenant('GORJANA')).resolves.toBe(true)
+    await expect(useAuthStore().saveActiveTenant('GORJANA')).resolves.toBe(true)
     expect(saveActiveTenantRpc).toHaveBeenCalledWith('GORJANA')
-    expect(useAuthState().status).toBe('authenticated')
-    expect(useAuthState().sessionInfo?.activeTenantUserGroupId).toBe('GORJANA')
-    expect(useAuthState().sessionInfo?.activeTenantLabel).toBe('Gorjana')
-    expect(useAuthState().error).toBeNull()
+    expect(useAuthStore().status).toBe('authenticated')
+    expect(useAuthStore().sessionInfo?.activeTenantUserGroupId).toBe('GORJANA')
+    expect(useAuthStore().sessionInfo?.activeTenantLabel).toBe('Gorjana')
+    expect(useAuthStore().error).toBeNull()
     expect(clearApiResponseCache).toHaveBeenCalledTimes(1)
   })
 
@@ -184,14 +184,14 @@ describe('auth state', () => {
       },
     })
 
-    const { saveUserSettings, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(saveUserSettings({ displayName: 'Aditi' })).resolves.toBe(true)
+    await expect(useAuthStore().saveUserSettings({ displayName: 'Aditi' })).resolves.toBe(true)
     expect(saveUserSettingsRpc).toHaveBeenCalledWith({ displayName: 'Aditi' })
-    expect(useAuthState().status).toBe('authenticated')
-    expect(useAuthState().sessionInfo?.displayName).toBe('Aditi')
-    expect(useAuthState().sessionInfo?.timeZone).toBe('America/Los_Angeles')
-    expect(useAuthState().error).toBeNull()
+    expect(useAuthStore().status).toBe('authenticated')
+    expect(useAuthStore().sessionInfo?.displayName).toBe('Aditi')
+    expect(useAuthStore().sessionInfo?.timeZone).toBe('America/Los_Angeles')
+    expect(useAuthStore().error).toBeNull()
   })
 
   it('updates the authenticated session timezone when tenant settings change', async () => {
@@ -223,16 +223,16 @@ describe('auth state', () => {
       },
     })
 
-    const { ensureAuthenticated, saveTenantSettings, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(ensureAuthenticated()).resolves.toBe(true)
-    await expect(saveTenantSettings({ timeZone: 'Europe/London' })).resolves.toMatchObject({
+    await expect(useAuthStore().ensureAuthenticated()).resolves.toBe(true)
+    await expect(useAuthStore().saveTenantSettings({ timeZone: 'Europe/London' })).resolves.toMatchObject({
       ok: true,
       tenantSettings: { timeZone: 'Europe/London' },
     })
     expect(saveTenantSettingsRpc).toHaveBeenCalledWith({ timeZone: 'Europe/London' })
-    expect(useAuthState().status).toBe('authenticated')
-    expect(useAuthState().sessionInfo?.timeZone).toBe('Europe/London')
+    expect(useAuthStore().status).toBe('authenticated')
+    expect(useAuthStore().sessionInfo?.timeZone).toBe('Europe/London')
   })
 
   it('changes the current user password through the authenticated auth facade', async () => {
@@ -254,9 +254,9 @@ describe('auth state', () => {
       },
     })
 
-    const { changeOwnPassword, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(changeOwnPassword({
+    await expect(useAuthStore().changeOwnPassword({
       currentPassword: 'old-password',
       newPassword: 'new-password',
       newPasswordVerify: 'new-password',
@@ -266,8 +266,8 @@ describe('auth state', () => {
       newPassword: 'new-password',
       newPasswordVerify: 'new-password',
     })
-    expect(useAuthState().status).toBe('authenticated')
-    expect(useAuthState().error).toBeNull()
+    expect(useAuthStore().status).toBe('authenticated')
+    expect(useAuthStore().error).toBeNull()
   })
 
   it('verifies the current user password through the authenticated auth facade', async () => {
@@ -289,12 +289,12 @@ describe('auth state', () => {
       },
     })
 
-    const { verifyOwnPassword, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(verifyOwnPassword('old-password')).resolves.toBe(true)
+    await expect(useAuthStore().verifyOwnPassword('old-password')).resolves.toBe(true)
     expect(verifyOwnPasswordRpc).toHaveBeenCalledWith({ currentPassword: 'old-password' })
-    expect(useAuthState().status).toBe('authenticated')
-    expect(useAuthState().error).toBeNull()
+    expect(useAuthStore().status).toBe('authenticated')
+    expect(useAuthStore().error).toBeNull()
   })
 
   it('keeps the session authenticated when current password verification returns false', async () => {
@@ -316,11 +316,11 @@ describe('auth state', () => {
       },
     })
 
-    const { verifyOwnPassword, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(verifyOwnPassword('wrong-password')).resolves.toBe(false)
-    expect(useAuthState().status).toBe('authenticated')
-    expect(useAuthState().error).toBe('Password incorrect.')
+    await expect(useAuthStore().verifyOwnPassword('wrong-password')).resolves.toBe(false)
+    expect(useAuthStore().status).toBe('authenticated')
+    expect(useAuthStore().error).toBe('Password incorrect.')
   })
 
   it('derives UI permissions for tenant, super-admin, and Darpan-admin sessions', async () => {
@@ -404,27 +404,27 @@ describe('auth state', () => {
         expiresAt: null,
       }),
     )
-    const { ApiCallError, getAuthToken } = await import('../api/client')
+    const { ApiCallError, getAuthToken } = await import('../../lib/api/client')
     getSessionInfo.mockRejectedValue(new ApiCallError('Login key expired', 401))
 
-    const { ensureAuthenticated, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(ensureAuthenticated(true)).resolves.toBe(false)
+    await expect(useAuthStore().ensureAuthenticated(true)).resolves.toBe(false)
     expect(getAuthToken()).toBeNull()
-    expect(useAuthState().authenticated).toBe(false)
-    expect(useAuthState().status).toBe('unauthenticated')
-    expect(useAuthState().error).toBe('Login key expired')
+    expect(useAuthStore().authenticated).toBe(false)
+    expect(useAuthStore().status).toBe('unauthenticated')
+    expect(useAuthStore().error).toBe('Login key expired')
   })
 
   it('fails closed when a forced session refresh errors', async () => {
     getSessionInfo.mockRejectedValue(new Error('network failure'))
 
-    const { ensureAuthenticated, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(ensureAuthenticated(true)).resolves.toBe(false)
-    expect(useAuthState().authenticated).toBe(false)
-    expect(useAuthState().status).toBe('verification-failed')
-    expect(useAuthState().error).toBe('Unable to verify authentication. network failure')
+    await expect(useAuthStore().ensureAuthenticated(true)).resolves.toBe(false)
+    expect(useAuthStore().authenticated).toBe(false)
+    expect(useAuthStore().status).toBe('verification-failed')
+    expect(useAuthStore().error).toBe('Unable to verify authentication. network failure')
   })
 
   it('marks the state as unauthenticated when backend confirms there is no active session', async () => {
@@ -436,12 +436,12 @@ describe('auth state', () => {
       sessionInfo: null,
     })
 
-    const { ensureAuthenticated, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(ensureAuthenticated(true)).resolves.toBe(false)
-    expect(useAuthState().authenticated).toBe(false)
-    expect(useAuthState().status).toBe('unauthenticated')
-    expect(useAuthState().error).toBe('No active authenticated session detected.')
+    await expect(useAuthStore().ensureAuthenticated(true)).resolves.toBe(false)
+    expect(useAuthStore().authenticated).toBe(false)
+    expect(useAuthStore().status).toBe('unauthenticated')
+    expect(useAuthStore().error).toBe('No active authenticated session detected.')
   })
 
   it('fails verification when backend returns an authenticated response without sessionInfo.userId', async () => {
@@ -455,19 +455,19 @@ describe('auth state', () => {
       },
     })
 
-    const { ensureAuthenticated, useAuthState } = await import('../auth')
+    const { useAuthStore } = await import('../auth')
 
-    await expect(ensureAuthenticated(true)).resolves.toBe(false)
-    expect(useAuthState().status).toBe('verification-failed')
-    expect(useAuthState().error).toContain('Auth contract violation')
+    await expect(useAuthStore().ensureAuthenticated(true)).resolves.toBe(false)
+    expect(useAuthStore().status).toBe('verification-failed')
+    expect(useAuthStore().error).toContain('Auth contract violation')
   })
 
   it('builds the login redirect when the last auth check was a verification failure', async () => {
     getSessionInfo.mockRejectedValue(new Error('network failure'))
 
-    const { buildAuthRedirect, ensureAuthenticated } = await import('../auth')
+    const { buildAuthRedirect, useAuthStore } = await import('../auth')
 
-    await expect(ensureAuthenticated(true)).resolves.toBe(false)
+    await expect(useAuthStore().ensureAuthenticated(true)).resolves.toBe(false)
     expect(buildAuthRedirect('/connections/llm')).toEqual({
       name: 'login',
       query: { redirect: '/connections/llm' },

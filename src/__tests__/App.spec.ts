@@ -155,37 +155,10 @@ const draftStoreState = vi.hoisted(() => ({
   setWorkflowOrigin: vi.fn(function (this: { workflowOrigin: { label: string, path: string } | null }, label: string, path: string) {
     this.workflowOrigin = { label, path }
   }),
-  clearWorkflowOrigin: vi.fn(function (this: { workflowOrigin: unknown }) {
-    this.workflowOrigin = null
-  }),
   setRuleSetDraft: vi.fn(),
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),
   clearAutomationDraft: vi.fn(),
-}))
-
-vi.mock('../lib/auth', () => ({
-  buildAuthRedirect: buildAuthRedirectMock,
-  ensureAuthenticated,
-  logoutSession,
-  saveActiveTenant,
-  useAuthState: () => authState,
-  useUiPermissions: () => ({
-    get canRunActiveTenantReconciliation() {
-      return authState.sessionInfo?.canRunActiveTenantReconciliation === true ||
-        authState.sessionInfo?.canEditActiveTenantData === true ||
-        authState.sessionInfo?.isSuperAdmin === true
-    },
-    get canEditTenantSettings() {
-      return authState.sessionInfo?.canEditActiveTenantData === true || authState.sessionInfo?.isSuperAdmin === true
-    },
-    get canManageGlobalSettings() {
-      return authState.sessionInfo?.canManageDarpanCore === true
-    },
-    get canViewTenantSettings() {
-      return Boolean(authState.sessionInfo?.userId)
-    },
-  }),
 }))
 
 vi.mock('../stores/auth', () => ({
@@ -298,7 +271,6 @@ describe('App shell logout', () => {
     draftStoreState.ruleSetDraftState = null
     draftStoreState.automationDraftState = null
     draftStoreState.setWorkflowOrigin.mockClear()
-    draftStoreState.clearWorkflowOrigin.mockClear()
     draftStoreState.setRuleSetDraft.mockClear()
     draftStoreState.setAutomationDraft.mockClear()
   })
@@ -572,11 +544,13 @@ describe('App shell logout', () => {
     const shopifySource = readFileSync('src/pages/settings/ShopifyAuthWorkflowPage.vue', 'utf8')
     const omsSource = readFileSync('src/pages/settings/OmsRestSourceWorkflowPage.vue', 'utf8')
     const schemaEditorSource = readFileSync('src/pages/jsonschema/JsonSchemaEditorPage.vue', 'utf8')
+    const stepMachineSource = readFileSync('src/composables/useWorkflowStepMachine.ts', 'utf8')
 
     expect(saveActionSource).toContain('app-icon-action app-icon-action--large app-icon-action--primary')
     expect(saveActionSource).toContain('aria-label')
     expect(workflowStepFormSource).toContain('<AppSaveAction')
     expect(workflowStepFormSource).toContain("primaryActionVariant === 'save'")
+    expect(stepMachineSource).toContain("? 'Save'")
     expect(runsWorkflowSource).toContain('<WorkflowStepForm')
     expect(runsWorkflowSource).toContain('primary-action-variant="save"')
     expect(tenantSettingsSource).toContain('<WorkflowStepForm')
@@ -586,19 +560,19 @@ describe('App shell logout', () => {
     expect(authSource).toContain('<WorkflowStepForm')
     expect(authSource).toContain(':primary-label="primaryLabel"')
     expect(authSource).toContain(':primary-action-variant="primaryActionVariant"')
-    expect(authSource).toContain("? 'Save'")
+    expect(authSource).toContain('useWorkflowStepMachine')
     expect(endpointsSource).toContain('<WorkflowStepForm')
     expect(endpointsSource).toContain(':primary-label="primaryLabel"')
     expect(endpointsSource).toContain(':primary-action-variant="primaryActionVariant"')
-    expect(endpointsSource).toContain("? 'Save'")
+    expect(endpointsSource).toContain('useWorkflowStepMachine')
     expect(shopifySource).toContain('<WorkflowStepForm')
     expect(shopifySource).toContain(':primary-label="primaryLabel"')
     expect(shopifySource).toContain(':primary-action-variant="primaryActionVariant"')
-    expect(shopifySource).toContain("? 'Save'")
+    expect(shopifySource).toContain('useWorkflowStepMachine')
     expect(omsSource).toContain('<WorkflowStepForm')
     expect(omsSource).toContain(':primary-label="primaryLabel"')
     expect(omsSource).toContain(':primary-action-variant="primaryActionVariant"')
-    expect(omsSource).toContain("? 'Save'")
+    expect(omsSource).toContain('useWorkflowStepMachine')
     expect(schemaEditorSource).toContain('<AppSaveAction')
   })
 

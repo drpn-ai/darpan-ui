@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ApiCallError } from '../lib/api/client'
+import { ApiCallError, isAbortError } from '../lib/api/client'
 import { settingsFacade } from '../lib/api/facade'
 import type {
   LlmSettings,
@@ -23,14 +23,10 @@ function emptyLoadState(): LoadState {
 }
 
 function describeError(err: unknown, fallback: string): string {
-  if ((err as { name?: string } | null)?.name === 'AbortError') return fallback
+  if (isAbortError(err)) return fallback
   if (err instanceof ApiCallError) return err.message
   if (err instanceof Error) return err.message
   return fallback
-}
-
-function isAbortError(err: unknown): boolean {
-  return (err as { name?: string } | null)?.name === 'AbortError'
 }
 
 export const useReferenceDataStore = defineStore('referenceData', () => {
@@ -47,7 +43,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
   const tenantSettingsLoading = computed(() => _tenantSettingsState.value.loading)
   const tenantSettingsError = computed(() => _tenantSettingsState.value.error)
 
-  const llmProviders = computed(() => _llmProviders.value)
   const llmProvidersLoading = computed(() => _llmProvidersState.value.loading)
   const llmProvidersError = computed(() => _llmProvidersState.value.error)
 
@@ -155,7 +150,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
     tenantSettings,
     tenantSettingsLoading,
     tenantSettingsError,
-    llmProviders,
     llmProvidersLoading,
     llmProvidersError,
     getLlmProvider,

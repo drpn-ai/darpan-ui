@@ -132,6 +132,9 @@
                                         "$ref": "#/components/schemas/ValidateJsonTextAgainstSchemaRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/CancelReconciliationRunRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/CreateCsvRunRequest"
                                     },
                                     {
@@ -327,6 +330,7 @@
                                         "facade.JsonSchemaFacadeServices.save#JsonSchemaText": "#/components/schemas/SaveJsonSchemaTextRequest",
                                         "facade.JsonSchemaFacadeServices.save#RefinedSchema": "#/components/schemas/SaveRefinedSchemaRequest",
                                         "facade.JsonSchemaFacadeServices.validate#JsonTextAgainstSchema": "#/components/schemas/ValidateJsonTextAgainstSchemaRequest",
+                                        "facade.ReconciliationFacadeServices.cancel#ReconciliationRun": "#/components/schemas/CancelReconciliationRunRequest",
                                         "facade.ReconciliationFacadeServices.create#CsvRun": "#/components/schemas/CreateCsvRunRequest",
                                         "facade.ReconciliationFacadeServices.create#Mapping": "#/components/schemas/CreateMappingRequest",
                                         "facade.ReconciliationFacadeServices.create#RuleSetRun": "#/components/schemas/CreateRuleSetRunRequest",
@@ -502,6 +506,9 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/ValidateJsonTextAgainstSchemaResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/CancelReconciliationRunResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/CreateCsvRunResponse"
@@ -2437,6 +2444,12 @@
                             "timeZone": {
                                 "type": "string"
                             },
+                            "userTimeZone": {
+                                "type": "string"
+                            },
+                            "tenantTimeZone": {
+                                "type": "string"
+                            },
                             "lastLoginDate": {
                                 "oneOf": [
                                     {
@@ -2636,6 +2649,12 @@
                                 "type": "string"
                             },
                             "timeZone": {
+                                "type": "string"
+                            },
+                            "userTimeZone": {
+                                "type": "string"
+                            },
+                            "tenantTimeZone": {
                                 "type": "string"
                             },
                             "lastLoginDate": {
@@ -2864,6 +2883,12 @@
                                 "type": "string"
                             },
                             "timeZone": {
+                                "type": "string"
+                            },
+                            "userTimeZone": {
+                                "type": "string"
+                            },
+                            "tenantTimeZone": {
                                 "type": "string"
                             },
                             "lastLoginDate": {
@@ -3268,6 +3293,12 @@
                             "timeZone": {
                                 "type": "string"
                             },
+                            "userTimeZone": {
+                                "type": "string"
+                            },
+                            "tenantTimeZone": {
+                                "type": "string"
+                            },
                             "lastLoginDate": {
                                 "oneOf": [
                                     {
@@ -3425,6 +3456,10 @@
                     "displayName": {
                         "type": "string",
                         "description": "Optional user display name shown by darpan-ui instead of username."
+                    },
+                    "timeZone": {
+                        "type": "string",
+                        "description": "Optional preferred display timezone (IANA id). Empty string clears the preference; absent leaves it unchanged."
                     }
                 },
                 "description": "Persist authenticated user-level settings and return refreshed session metadata."
@@ -3470,6 +3505,12 @@
                                 "type": "string"
                             },
                             "timeZone": {
+                                "type": "string"
+                            },
+                            "userTimeZone": {
+                                "type": "string"
+                            },
+                            "tenantTimeZone": {
                                 "type": "string"
                             },
                             "lastLoginDate": {
@@ -3681,6 +3722,12 @@
                                 "type": "string"
                             },
                             "timeZone": {
+                                "type": "string"
+                            },
+                            "userTimeZone": {
+                                "type": "string"
+                            },
+                            "tenantTimeZone": {
                                 "type": "string"
                             },
                             "lastLoginDate": {
@@ -5198,6 +5245,104 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/ValidateJsonTextAgainstSchemaResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "CancelReconciliationRunParams": {
+                "type": "object",
+                "properties": {
+                    "reconciliationRunResultId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "reconciliationRunResultId"
+                ],
+                "description": "Ask a running reconciliation to stop. Tenant-gated. Cancellation is cooperative: this\n            records the request and the run ends itself AUT_STAT_CANCELLED at its next checkpoint\n            (a stage boundary, or an extract progress tick during a long paged extract), so the\n            run may still report RUNNING for a few seconds after this returns."
+            },
+            "CancelReconciliationRunResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "cancelRequested": {
+                        "type": "boolean"
+                    },
+                    "statusEnumId": {
+                        "type": "string"
+                    }
+                }
+            },
+            "CancelReconciliationRunRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ReconciliationFacadeServices.cancel#ReconciliationRun",
+                "x-darpan-method": "facade.ReconciliationFacadeServices.cancel#ReconciliationRun",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ReconciliationFacadeServices.cancel#ReconciliationRun"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/CancelReconciliationRunParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "CancelReconciliationRunResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ReconciliationFacadeServices.cancel#ReconciliationRun. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/CancelReconciliationRunResult"
                     }
                 },
                 "required": [
@@ -6910,6 +7055,9 @@
                                 },
                                 "errorMessage": {
                                     "type": "string"
+                                },
+                                "metricsJson": {
+                                    "type": "string"
                                 }
                             }
                         }
@@ -6919,6 +7067,69 @@
                     },
                     "mySubscriptionSpaceName": {
                         "type": "string"
+                    },
+                    "cancelRequestedDate": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ],
+                        "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds. Set once an operator asked to stop the run; it stays RUNNING until the next cancel checkpoint."
+                    },
+                    "resultFileName": {
+                        "type": "string",
+                        "description": "Normalized result path once WRITE_OUTPUT lands; lets the live view swap to the saved result on completion."
+                    },
+                    "sourceDetails": {
+                        "type": "object",
+                        "properties": {
+                            "mode": {
+                                "type": "string"
+                            },
+                            "dateRange": {
+                                "type": "object",
+                                "properties": {
+                                    "start": {
+                                        "type": "string"
+                                    },
+                                    "end": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "files": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "side": {
+                                            "type": "string"
+                                        },
+                                        "label": {
+                                            "type": "string"
+                                        },
+                                        "fileName": {
+                                            "type": "string"
+                                        },
+                                        "filePath": {
+                                            "type": "string"
+                                        },
+                                        "downloadFileName": {
+                                            "type": "string"
+                                        },
+                                        "sourceFormat": {
+                                            "type": "string"
+                                        },
+                                        "canDownload": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -13612,6 +13823,7 @@
         "facade.JsonSchemaFacadeServices.save#JsonSchemaText": "SaveJsonSchemaText",
         "facade.JsonSchemaFacadeServices.save#RefinedSchema": "SaveRefinedSchema",
         "facade.JsonSchemaFacadeServices.validate#JsonTextAgainstSchema": "ValidateJsonTextAgainstSchema",
+        "facade.ReconciliationFacadeServices.cancel#ReconciliationRun": "CancelReconciliationRun",
         "facade.ReconciliationFacadeServices.create#CsvRun": "CreateCsvRun",
         "facade.ReconciliationFacadeServices.create#Mapping": "CreateMapping",
         "facade.ReconciliationFacadeServices.create#RuleSetRun": "CreateRuleSetRun",

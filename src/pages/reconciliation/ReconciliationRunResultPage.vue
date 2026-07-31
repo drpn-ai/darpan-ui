@@ -84,7 +84,7 @@
         <p v-if="loading" class="section-note" data-testid="run-result-loading">Loading saved result…</p>
         <InlineValidation v-else-if="loadError" tone="error" :message="loadError" />
 
-        <section v-else-if="savedOutput" class="reconciliation-diff-details">
+        <section v-else-if="savedOutput || liveRunResultId" class="reconciliation-diff-details">
           <section v-if="showRunSourceDetails" class="run-result-source-details" data-testid="run-result-source-details">
             <div class="run-result-source-details__summary">
               <span class="run-result-source-details__eyebrow">{{ runSourceModeLabel }}</span>
@@ -146,7 +146,7 @@
               @click="stepTimelineCollapsed = !stepTimelineCollapsed"
             >
               <span class="run-result-step-timeline__label">Run steps</span>
-              <span v-if="runStatusSteps.length > 0" class="run-result-step-timeline__count">{{ runStatusSteps.length }}</span>
+              <span v-if="displayedRunSteps.length > 0" class="run-result-step-timeline__count">{{ displayedRunSteps.length }}</span>
               <svg
                 class="run-result-step-timeline__toggle-icon"
                 :class="{ 'run-result-step-timeline__toggle-icon--collapsed': stepTimelineCollapsed }"
@@ -158,7 +158,7 @@
               </svg>
             </button>
             <p
-              v-if="!stepTimelineCollapsed && runStatusSteps.length === 0"
+              v-if="!stepTimelineCollapsed && displayedRunSteps.length === 0"
               class="section-note"
               data-testid="run-result-step-timeline-empty"
             >
@@ -166,7 +166,7 @@
             </p>
             <ol v-else-if="!stepTimelineCollapsed" class="run-result-step-timeline__list">
               <li
-                v-for="step in runStatusSteps"
+                v-for="step in displayedRunSteps"
                 :key="`${step.stageSequence ?? 0}-${step.stageCode ?? ''}`"
                 class="run-result-step"
               >
@@ -179,7 +179,56 @@
             </ol>
           </section>
 
-          <div class="reconciliation-diff-details__bucket-grid">
+          <InlineValidation
+            v-if="liveRunFailed"
+            tone="error"
+            data-testid="run-result-live-failed"
+            :message="runStatus?.errorMessage || 'Run failed before any results were produced.'"
+          />
+          <p
+            v-else-if="!savedOutput && liveRunNote"
+            class="section-note"
+            data-testid="run-result-live-note"
+          >
+            {{ liveRunNote }}
+          </p>
+
+          <div v-if="showCancelRun" class="run-result-cancel">
+            <InlineValidation v-if="cancelError" tone="error" :message="cancelError" />
+            <button
+              v-if="!cancelConfirming"
+              type="button"
+              class="run-result-cancel__button"
+              data-testid="run-result-cancel"
+              :disabled="cancelBusy || cancelRequested"
+              @click="cancelConfirming = true"
+            >
+              {{ cancelRequested ? 'Stopping run…' : 'Cancel run' }}
+            </button>
+            <div v-else class="run-result-cancel__confirm" data-testid="run-result-cancel-confirm">
+              <span class="section-note">Stop this run? Any work completed so far is discarded.</span>
+              <button
+                type="button"
+                class="run-result-cancel__button run-result-cancel__button--danger"
+                data-testid="run-result-cancel-confirm-yes"
+                :disabled="cancelBusy"
+                @click="void cancelRun()"
+              >
+                Stop run
+              </button>
+              <button
+                type="button"
+                class="run-result-cancel__button"
+                data-testid="run-result-cancel-confirm-no"
+                :disabled="cancelBusy"
+                @click="cancelConfirming = false"
+              >
+                Keep running
+              </button>
+            </div>
+          </div>
+
+          <div v-if="savedOutput" class="reconciliation-diff-details__bucket-grid">
             <template
               v-for="bucket in diffDetailBuckets"
               :key="bucket.key"
@@ -260,7 +309,7 @@
 
           <InlineValidation v-if="resultDownloadError" tone="error" :message="resultDownloadError" />
           <AppTableFrame
-            v-if="diffDetailRows.length > 0"
+            v-if="savedOutput && diffDetailRows.length > 0"
             :columns="diffDetailColumns"
             :rows="pagedDiffDetailRowsAsRows"
             row-key="rowKey"
@@ -302,13 +351,13 @@
               <span aria-hidden="true"></span>
             </template>
           </AppTableFrame>
-          <p v-else data-testid="diff-details-empty" class="section-note">
+          <p v-else-if="savedOutput" data-testid="diff-details-empty" class="section-note">
             {{ diffDetailsEmptyMessage }}
           </p>
         </section>
       </StaticPageSection>
 
-      <template v-if="savedOutput" #actions>
+      <template v-if="savedOutput || liveRunResultId" #actions>
         <div class="action-row">
           <RouterLink
             v-if="canRunActiveTenantReconciliation"
@@ -430,7 +479,7 @@ import type {
 } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { isActiveRunStatus, useRunResultsStore } from '../../stores/runResults'
-import { formatRunStepDuration, normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconciliationDisplay'
+import { RUN_STAGE_SEQUENCE, formatRunStepDuration, normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconciliationDisplay'
 import {
   ALL_RULE_FILTER_KEY,
   BASE_RULE_FILTER_KEY,
@@ -444,6 +493,7 @@ import {
 import {
   buildReconciliationDiffRoute,
   buildReconciliationRunHistoryRoute,
+  buildReconciliationRunResultRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
@@ -501,6 +551,12 @@ const savedRunId = computed(() =>
 const outputFileName = computed(() =>
   typeof route.params.outputFileName === 'string' ? route.params.outputFileName.trim() : '',
 )
+// Live mode (reconciliation-run-live route): the run is still executing, so there is no output
+// file to load — the page renders off the run-status poll instead, then swaps itself to the
+// canonical run-result route once the run succeeds and names its result file.
+const liveRunResultId = computed(() =>
+  typeof route.params.runResultId === 'string' ? route.params.runResultId.trim() : '',
+)
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const settingsIconPath =
@@ -529,9 +585,13 @@ const file1SystemLabel = computed(() =>
 const file2SystemLabel = computed(() =>
   typeof route.query.file2SystemLabel === 'string' && route.query.file2SystemLabel.trim() ? route.query.file2SystemLabel.trim() : 'System 2',
 )
-const heroDescription = computed(() =>
-  savedOutput.value?.createdDate ? formatSavedResultDateTime(savedOutput.value.createdDate) : 'Review the saved reconciliation output for this run.',
-)
+const heroDescription = computed(() => {
+  if (liveRunResultId.value) {
+    const startedDate = runStatus.value?.startedDate
+    return startedDate ? formatSavedResultDateTime(startedDate) : 'Run in progress.'
+  }
+  return savedOutput.value?.createdDate ? formatSavedResultDateTime(savedOutput.value.createdDate) : 'Review the saved reconciliation output for this run.'
+})
 const diffDetailsFile1Label = computed(
   () => diffDetailsMeta.value.file1Label || savedOutput.value?.file1Label || file1SystemLabel.value || 'File 1',
 )
@@ -558,12 +618,14 @@ const runSettingsId = computed(() =>
 )
 const canOpenRunSettings = computed(() => canEditTenantSettings.value && Boolean(runSettingsId.value))
 
-// Step timeline (recon observability Phase 4). The differences payload does not carry the
-// run-result id, so it is resolved from the run-results cache descriptor for this file;
-// the store poll self-terminates once the run status is terminal.
+// Step timeline (recon observability Phase 4). In live mode the run id comes straight from
+// the route; on the saved-result route the differences payload does not carry the run-result
+// id, so it is resolved from the run-results cache descriptor for this file. The store poll
+// self-terminates once the run status is terminal.
 const runResultsStore = useRunResultsStore()
 const polledTimelineRunIds = new Set<string>()
 const timelineRunResultId = computed(() =>
+  liveRunResultId.value ||
   normalizeDisplayText(runResultsStore.getByFileName(outputFileName.value)?.reconciliationRunResultId),
 )
 const runStatus = computed(() =>
@@ -571,8 +633,86 @@ const runStatus = computed(() =>
 )
 const runStatusSteps = computed<ReconciliationRunStep[]>(() => runStatus.value?.steps ?? [])
 const showStepTimeline = computed(() => runStatus.value?.ok === true)
-// Collapsed by default: the timeline is a forensic view, not part of the primary read path.
-const stepTimelineCollapsed = ref(true)
+// Collapsed by default on the saved-result view (a forensic detail there); expanded when the
+// page opens on a live run, where step progress IS the primary content.
+const stepTimelineCollapsed = ref(!liveRunResultId.value)
+
+const liveRunStatusEnumId = computed(() => normalizeDisplayText(runStatus.value?.statusEnumId))
+const liveRunFailed = computed(() => Boolean(liveRunResultId.value) && liveRunStatusEnumId.value === 'AUT_STAT_FAILED')
+// Active until the first poll response proves otherwise — synthesized pending steps only make
+// sense while the run can still reach them.
+const liveRunActive = computed(() =>
+  Boolean(liveRunResultId.value) && (runStatus.value == null || isActiveRunStatus(liveRunStatusEnumId.value)))
+const liveRunNote = computed(() => {
+  if (!liveRunResultId.value || liveRunFailed.value) return ''
+  if (liveRunStatusEnumId.value === 'AUT_STAT_CANCELLED') return 'Run cancelled.'
+  if (liveRunStatusEnumId.value === 'AUT_STAT_NO_DATA') return 'Run finished with no data to compare.'
+  if (liveRunStatusEnumId.value === 'AUT_STAT_SKIP_DUP') return 'Run skipped — this window was already processed.'
+  if (!liveRunActive.value) return 'Run finished. Open run history to view the saved result.'
+  if (cancelRequested.value) return 'Stopping this run — it ends at the next step boundary.'
+  return 'Results will appear here when this reconciliation finishes.'
+})
+
+// Cancelling is cooperative on the backend: the request is recorded and the run ends itself at
+// its next checkpoint, so the button reports "Stopping" until the poll shows a terminal status
+// rather than pretending the run stopped the instant the call returned.
+const cancelBusy = ref(false)
+const cancelConfirming = ref(false)
+const cancelError = ref<string | null>(null)
+const cancelRequested = computed(() => Boolean(runStatus.value?.cancelRequestedDate))
+const showCancelRun = computed(() =>
+  Boolean(liveRunResultId.value) && canRunActiveTenantReconciliation.value && liveRunActive.value)
+
+async function cancelRun(): Promise<void> {
+  const runId = liveRunResultId.value
+  if (!runId || cancelBusy.value) return
+
+  cancelBusy.value = true
+  cancelError.value = null
+  try {
+    await reconciliationFacade.cancelReconciliationRun({ reconciliationRunResultId: runId })
+    cancelConfirming.value = false
+    await runResultsStore.refreshRunStatus(runId)
+  } catch (error) {
+    cancelError.value = error instanceof ApiCallError ? error.message : 'Unable to cancel this run.'
+  } finally {
+    cancelBusy.value = false
+  }
+}
+
+// Timeline rows for display: the actual step rows, plus — while the run is live — a synthesized
+// "Pending" row for each canonical stage the run has not reached yet, so the operator sees
+// completed / running / remaining in one list. Conditional stages that never start simply drop
+// out once a later real stage begins (they only render while their sequence is ahead of the
+// furthest real row).
+const displayedRunSteps = computed<ReconciliationRunStep[]>(() => {
+  const actualSteps = runStatusSteps.value
+  if (!liveRunActive.value) return actualSteps
+  const maxSeenSequence = actualSteps.reduce((max, step) => Math.max(max, step.stageSequence ?? 0), 0)
+  const seenStageCodes = new Set(actualSteps.map((step) => normalizeDisplayText(step.stageCode)))
+  const pendingRemainder = RUN_STAGE_SEQUENCE
+    .map((stageCode, index) => ({ stageCode, stageSequence: index + 1, statusEnumId: 'AUT_STAT_PENDING' }))
+    .filter((step) => step.stageSequence > maxSeenSequence && !seenStageCodes.has(step.stageCode))
+  return [...actualSteps, ...pendingRemainder]
+})
+
+// Files populate as extract stages land them on the run row; the poll carries the same
+// sourceDetails shape the saved-result payload uses, so the existing section renders both.
+watch(runStatus, (status) => {
+  if (!liveRunResultId.value) return
+  runSourceDetails.value = status?.sourceDetails ?? null
+})
+
+// Live→terminal handoff: a successful run names its result file, so the page swaps itself to
+// the canonical saved-result route and loads the differences. Failure and no-data terminals
+// stay on the live view, which renders their message and the failing step.
+watch([liveRunStatusEnumId, liveRunResultId], ([statusEnumId]) => {
+  if (!liveRunResultId.value || runStatus.value?.ok !== true) return
+  if (statusEnumId !== 'AUT_STAT_SUCCESS') return
+  const resultFileName = normalizeDisplayText(runStatus.value?.resultFileName)
+  if (!resultFileName) return
+  void router.replace(buildReconciliationRunResultRoute(reconciliationRunRouteContext.value, resultFileName))
+}, { immediate: true })
 
 // Notify-me (Task 12): subscribe/unsubscribe the current user to Google Chat notifications
 // for this run. Only offered while the run is still active (PENDING/RUNNING) — a terminal
@@ -694,6 +834,7 @@ const STEP_STATUS_LABELS: Record<string, string> = {
   AUT_STAT_SUCCESS: 'Done',
   AUT_STAT_FAILED: 'Failed',
   AUT_STAT_NO_DATA: 'No data',
+  AUT_STAT_CANCELLED: 'Cancelled',
 }
 
 function stepStatusLabel(step: ReconciliationRunStep): string {
@@ -705,7 +846,7 @@ function stepStatusTone(step: ReconciliationRunStep): 'neutral' | 'success' | 'w
   const statusEnumId = normalizeDisplayText(step.statusEnumId)
   if (statusEnumId === 'AUT_STAT_SUCCESS') return 'success'
   if (statusEnumId === 'AUT_STAT_FAILED') return 'danger'
-  if (statusEnumId === 'AUT_STAT_RUNNING') return 'warning'
+  if (statusEnumId === 'AUT_STAT_RUNNING' || statusEnumId === 'AUT_STAT_CANCELLED') return 'warning'
   return 'neutral'
 }
 
@@ -979,6 +1120,9 @@ async function loadSavedResult(): Promise<void> {
 }
 
 watch([savedRunId, outputFileName], () => {
+  // Live mode has no output file yet — the run-status poll drives the page until the
+  // completion swap lands this component on the saved-result route.
+  if (liveRunResultId.value && !outputFileName.value) return
   void loadSavedResult()
 }, { immediate: true })
 </script>
@@ -1113,6 +1257,51 @@ watch([savedRunId, outputFileName], () => {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface-2) 92%, white);
+}
+
+.run-result-cancel {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.run-result-cancel__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.run-result-cancel__button {
+  min-height: 2.15rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 400;
+}
+
+.run-result-cancel__button:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--border));
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.run-result-cancel__button--danger {
+  color: var(--danger, #b3261e);
+}
+
+.run-result-cancel__button--danger:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--danger, #b3261e) 48%, var(--border));
+  background: color-mix(in oklab, var(--surface-2) 88%, var(--danger, #b3261e));
+  color: var(--danger, #b3261e);
+}
+
+.run-result-cancel__button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .run-result-step-timeline {
@@ -1459,10 +1648,6 @@ watch([savedRunId, outputFileName], () => {
 
   .reconciliation-diff-details__bucket-grid {
     grid-template-columns: 1fr;
-  }
-
-  .run-result-table__id-cell {
-    width: auto;
   }
 }
 </style>

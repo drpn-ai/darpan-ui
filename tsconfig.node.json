@@ -8,8 +8,7 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "types": [
-      "node",
-      "vitest/globals"
+      "node"
     ],
     "noEmit": true
   },

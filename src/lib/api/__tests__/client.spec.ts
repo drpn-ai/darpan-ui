@@ -125,8 +125,8 @@ describe('callService', () => {
 
     vi.stubGlobal('fetch', fetchMock)
 
-    const { callService, getAuthToken, setAuthToken } = await import('../client')
-    setAuthToken('expired-token')
+    const { callService, getAuthToken, setAuthTokenContract } = await import('../client')
+    setAuthTokenContract({ authToken: 'expired-token' })
 
     await expect(callService('facade.AuthFacadeServices.get#SessionInfo')).rejects.toMatchObject({
       name: 'ApiCallError',
@@ -138,8 +138,8 @@ describe('callService', () => {
   })
 
   it('persists the bearer token to sessionStorage and never localStorage (audit #10)', async () => {
-    const { setAuthToken, getAuthToken } = await import('../client')
-    setAuthToken('token-xyz')
+    const { setAuthTokenContract, getAuthToken } = await import('../client')
+    setAuthTokenContract({ authToken: 'token-xyz' })
 
     expect(getAuthToken()).toBe('token-xyz')
     // Survives a same-tab refresh (sessionStorage) but is never written to disk (localStorage).
@@ -299,8 +299,7 @@ describe('callService', () => {
     it('does not persist bearer to sessionStorage or memory when COOKIE_AUTH is on', async () => {
       vi.stubEnv('VITE_DARPAN_COOKIE_AUTH', 'true')
 
-      const { setAuthToken, setAuthTokenContract, getAuthToken } = await import('../client')
-      setAuthToken('should-not-store')
+      const { setAuthTokenContract, getAuthToken } = await import('../client')
       setAuthTokenContract({ authToken: 'also-should-not-store', authTokenHeaderName: 'login_key' })
 
       expect(window.sessionStorage.getItem('darpan.authToken')).toBeNull()

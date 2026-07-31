@@ -190,6 +190,7 @@ import {
   AUTOMATION_WINDOW_PREVIOUS_WEEK,
 } from '../../lib/reconciliationAutomationDraft'
 import {
+  buildReconciliationRunLiveRoute,
   buildReconciliationRunResultRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
@@ -441,14 +442,24 @@ function executionResultLabel(execution: AutomationExecutionSummary): string {
 
 function executionResultRoute(execution: AutomationExecutionSummary): RouteLocationRaw | null {
   const routeContext = reconciliationRunRouteContext.value
+  if (!routeContext) return null
+
+  // A still-running execution has no result file yet, but it does have a run id — open the
+  // live progress view instead of leaving the row dead until the run finishes.
+  const runResultId = normalizeDisplayText(execution.reconciliationRunResultId)
+  if (isActiveRunStatus(execution.statusEnumId) && runResultId) {
+    return buildReconciliationRunLiveRoute(routeContext, runResultId)
+  }
+
   const outputFileName = executionResultPath(execution)
-  if (!routeContext || !outputFileName) return null
+  if (!outputFileName) return null
   return buildReconciliationRunResultRoute(routeContext, outputFileName)
 }
 
 function executionRowActionLabel(row: Record<string, unknown>): string | null {
   const execution = executionRow(row)
   if (!executionResultRoute(execution)) return null
+  if (isActiveRunStatus(execution.statusEnumId)) return 'Open run progress'
   return `Open result ${executionResultLabel(execution)}`
 }
 
@@ -684,10 +695,6 @@ onMounted(() => {
   border-bottom: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
 }
 
-.automation-dashboard-detail-item--wide {
-  grid-column: span 2;
-}
-
 .automation-dashboard-detail-item--date {
   grid-column: span 3;
 }
@@ -733,7 +740,6 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .automation-dashboard-detail-item--wide,
   .automation-dashboard-detail-item--date {
     grid-column: auto;
   }

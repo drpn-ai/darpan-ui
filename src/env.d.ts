@@ -20,14 +20,11 @@ declare module 'vue-router' {
   interface RouteMeta {
     public?: boolean
     requiresAuth?: boolean
-    requiresGlobalSettings?: boolean
     requiresReconciliationRun?: boolean
     requiresTenantEdit?: boolean
     reconciliationRunRedirectName?: RouteRecordName
     tenantEditRedirectName?: RouteRecordName
-    tenantSwitchRedirectName?: RouteRecordName
     surfaceMode?: 'static' | 'workflow'
     staticPageLabel?: string
-    section?: 'roadmap' | 'reconciliation' | 'connections' | 'schemas'
   }
 }

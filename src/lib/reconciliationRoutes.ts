@@ -41,15 +41,6 @@ export function buildReconciliationDiffRoute(
   )
 }
 
-export function buildReconciliationAutomationCreateRoute(state?: HistoryState): RouteLocationRaw {
-  return withRouteState(
-    {
-      name: 'reconciliation-automation-create',
-    },
-    state,
-  )
-}
-
 export function buildReconciliationRunHistoryRoute(context: ReconciliationRunRouteContext): RouteLocationRaw {
   return {
     name: 'reconciliation-run-history',
@@ -73,6 +64,24 @@ export function buildReconciliationRunResultRoute(
     params: {
       savedRunId: context.savedRunId,
       outputFileName,
+    },
+    query: {
+      runName: context.runName,
+      file1SystemLabel: context.file1SystemLabel,
+      file2SystemLabel: context.file2SystemLabel,
+    },
+  }
+}
+
+export function buildReconciliationRunLiveRoute(
+  context: ReconciliationRunRouteContext,
+  reconciliationRunResultId: string,
+): RouteLocationRaw {
+  return {
+    name: 'reconciliation-run-live',
+    params: {
+      savedRunId: context.savedRunId,
+      runResultId: reconciliationRunResultId,
     },
     query: {
       runName: context.runName,

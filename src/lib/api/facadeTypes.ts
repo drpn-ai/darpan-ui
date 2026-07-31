@@ -243,38 +243,9 @@ export interface SaveRuleSetRunPayload extends CreateRuleSetRunPayload {
   savedRunId?: string
 }
 
-export interface CreateCsvRunPayload {
-  runName: string
-  description?: string
-  file1SystemEnumId: string
-  file2SystemEnumId: string
-  hasHeader?: boolean
-  file1Name?: string
-  file1Text?: string
-  file2Name?: string
-  file2Text?: string
-}
-
 export interface ListSavedRunsPayload {
   pageIndex: number
   pageSize: number
-  query?: string
-}
-
-export interface CreateMappingPayload {
-  mappingName: string
-  description?: string
-  file1SystemEnumId?: string
-  file2SystemEnumId?: string
-  schema1Id?: string
-  schema2Id?: string
-  schema1FieldPath?: string
-  schema2FieldPath?: string
-}
-
-export interface ListMappingsPayload {
-  pageIndex?: number
-  pageSize?: number
   query?: string
 }
 
@@ -289,10 +260,6 @@ export interface SaveMappingPayload {
   schema2Id?: string
   schema1FieldPath?: string
   schema2FieldPath?: string
-}
-
-export interface SaveDashboardPinnedMappingsPayload {
-  reconciliationMappingIds: string[]
 }
 
 export interface SaveDashboardPinnedSavedRunsPayload {
@@ -343,10 +310,6 @@ export interface GetGeneratedOutputDifferencesPayload {
   ruleFilterKey?: string
   search?: string
   includeFacets?: boolean
-}
-
-export interface DeleteGeneratedOutputPayload {
-  fileName: string
 }
 
 export interface ListAutomationsPayload {
@@ -404,14 +367,6 @@ export interface DeleteAutomationPayload {
   automationId: string
 }
 
-export interface PauseAutomationPayload {
-  automationId: string
-}
-
-export interface ResumeAutomationPayload {
-  automationId: string
-}
-
 export interface RunAutomationNowPayload {
   automationId: string
 }
@@ -428,5 +383,9 @@ export interface SubscribeRunNotificationPayload {
 }
 
 export interface UnsubscribeRunNotificationPayload {
+  reconciliationRunResultId: string
+}
+
+export interface CancelReconciliationRunPayload {
   reconciliationRunResultId: string
 }

@@ -51,11 +51,6 @@ vi.mock('../../../lib/api/facade', () => ({
   },
 }))
 
-vi.mock('../../../lib/auth', () => ({
-  useAuthState: () => authState,
-  useUiPermissions: () => permissionState,
-}))
-
 vi.mock('../../../stores/auth', () => ({
   buildAuthRedirect: (redirect: unknown) => ({ name: 'login', query: { redirect } }),
   useAuthStore: () => ({
@@ -73,7 +68,6 @@ const draftStoreState = vi.hoisted(() => ({
   ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
   automationDraftState: null,
   setWorkflowOrigin: vi.fn(),
-  clearWorkflowOrigin: vi.fn(),
   setRuleSetDraft: vi.fn(),
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),

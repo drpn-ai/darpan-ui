@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { ApiCallError } from '../../lib/api/client'
+import { ApiCallError, isAbortError } from '../../lib/api/client'
 import type { PaginationMeta } from '../../lib/api/types'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 
@@ -32,11 +32,6 @@ function normalizePageCount(pageCount: number | undefined): number {
 
 function normalizeError(error: unknown, fallbackMessage: string): string {
   return error instanceof ApiCallError ? error.message : fallbackMessage
-}
-
-function isAbortError(error: unknown): boolean {
-  if (error instanceof DOMException) return error.name === 'AbortError'
-  return typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError'
 }
 
 export function useSettingsPagedList<T extends object, R extends PaginatedSettingsResponse>({

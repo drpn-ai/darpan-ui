@@ -19,7 +19,7 @@ export function savedRunName(row: SavedRunSummary): string {
   })
 }
 
-export function savedRunMatchesEditorTarget(row: SavedRunSummary, targetId: string): boolean {
+function savedRunMatchesEditorTarget(row: SavedRunSummary, targetId: string): boolean {
   const normalizedTargetId = normalizeStringOrEmpty(targetId)
   if (!normalizedTargetId) return false
 
@@ -30,7 +30,7 @@ export function savedRunMatchesEditorTarget(row: SavedRunSummary, targetId: stri
   ].some((value) => normalizeStringOrEmpty(value) === normalizedTargetId)
 }
 
-export function findSavedRunEditorTarget(rows: SavedRunSummary[], targetId: string): SavedRunSummary | null {
+function findSavedRunEditorTarget(rows: SavedRunSummary[], targetId: string): SavedRunSummary | null {
   return rows.find((row) => savedRunMatchesEditorTarget(row, targetId)) ?? null
 }
 
@@ -147,9 +147,4 @@ export async function resolveSavedRunEditorTarget(targetId: string): Promise<Sav
   }
 
   return null
-}
-
-export async function resolveSavedRunEditorRoute(targetId: string): Promise<RouteLocationRaw | null> {
-  const savedRun = await resolveSavedRunEditorTarget(targetId)
-  return savedRun ? buildSavedRunEditorRoute(savedRun) : null
 }

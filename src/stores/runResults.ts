@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ApiCallError } from '../lib/api/client'
+import { ApiCallError, isAbortError } from '../lib/api/client'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { GeneratedOutput, GetReconciliationRunStatusResponse } from '../lib/api/types'
 
@@ -32,10 +32,6 @@ interface LoadState {
 
 function emptyLoadState(): LoadState {
   return { loading: false, error: null, loadedAt: null }
-}
-
-function isAbortError(err: unknown): boolean {
-  return (err as { name?: string } | null)?.name === 'AbortError'
 }
 
 function describeError(err: unknown, fallback: string): string {
@@ -205,7 +201,7 @@ export const useRunResultsStore = defineStore('runResults', () => {
   // is active (PENDING/RUNNING) and stops itself on any terminal status. Idempotent
   // per run id; pauses while the tab is hidden, like startAutoRefresh.
   function startRunStatusPoll(reconciliationRunResultId: string, intervalMs = RUN_STATUS_POLL_INTERVAL_MS): Promise<void> {
-    const runId = (reconciliationRunResultId ?? '').trim()
+    const runId = reconciliationRunResultId.trim()
     if (!runId || typeof window === 'undefined') return Promise.resolve()
     if (_runStatusTimers.has(runId)) return Promise.resolve()
     const timer = setInterval(() => {
@@ -220,7 +216,7 @@ export const useRunResultsStore = defineStore('runResults', () => {
   // notify-me subscribe/unsubscribe actions so the button's label reflects the new
   // subscription state immediately instead of waiting for the next poll tick.
   async function refreshRunStatus(reconciliationRunResultId: string): Promise<void> {
-    const runId = (reconciliationRunResultId ?? '').trim()
+    const runId = reconciliationRunResultId.trim()
     if (!runId) return
     await _fetchRunStatus(runId)
   }
@@ -257,13 +253,6 @@ export const useRunResultsStore = defineStore('runResults', () => {
     _byFileName.value = next
   }
 
-  function removeOutput(fileName: string): void {
-    if (!fileName || !_byFileName.value.has(fileName)) return
-    const next = new Map(_byFileName.value)
-    next.delete(fileName)
-    _byFileName.value = next
-  }
-
   function reset(): void {
     stopAutoRefresh()
     stopAllRunStatusPolls()
@@ -294,7 +283,6 @@ export const useRunResultsStore = defineStore('runResults', () => {
     stopAllRunStatusPolls,
     upsertOutput,
     upsertOutputs,
-    removeOutput,
     reset,
   }
 })

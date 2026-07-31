@@ -7,8 +7,6 @@ describe('useActivePopup', () => {
     expect(popup.isPopupOpen.value).toBe(false)
     popup.open({ type: 'b', mode: 'edit' })
     expect(popup.isPopupOpen.value).toBe(true)
-    expect(popup.is('b')).toBe(true)
-    expect(popup.is('a')).toBe(false)
     popup.close()
     expect(popup.activePopup.value).toBeNull()
   })

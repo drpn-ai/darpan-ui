@@ -75,6 +75,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from 'vue'
+import { isRecord } from '../../lib/utils/objects'
 
 defineOptions({
   name: 'JsonCollapseNode',
@@ -103,7 +104,7 @@ const props = withDefaults(defineProps<{
 const collapsed = ref(true)
 
 const isArrayValue = computed(() => Array.isArray(props.value))
-const isObjectValue = computed(() => isJsonObject(props.value))
+const isObjectValue = computed(() => isRecord(props.value))
 const isContainer = computed(() => isArrayValue.value || isObjectValue.value)
 const containerEntries = computed<JsonEntry[]>(() => buildContainerEntries(props.value))
 const isEmptyContainer = computed(() => isContainer.value && containerEntries.value.length === 0)
@@ -134,10 +135,6 @@ const primitiveClass = computed(() => {
   return `json-collapse-viewer__primitive--${typeof props.value}`
 })
 
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
 function buildContainerEntries(value: unknown): JsonEntry[] {
   if (Array.isArray(value)) {
     return value.map((entryValue, index) => ({
@@ -149,7 +146,7 @@ function buildContainerEntries(value: unknown): JsonEntry[] {
     }))
   }
 
-  if (!isJsonObject(value)) return []
+  if (!isRecord(value)) return []
 
   const entries = Object.entries(value)
   return entries.map(([entryKey, entryValue], index) => ({

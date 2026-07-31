@@ -16,7 +16,6 @@ export interface UseActivePopup<TPopup> {
   isPopupOpen: ComputedRef<boolean>
   open: (popup: TPopup) => void
   close: () => void
-  is: <K extends TPopup extends { type: infer T } ? T : never>(type: K) => boolean
 }
 
 export function useActivePopup<TPopup extends { type: string }>(): UseActivePopup<TPopup> {
@@ -31,11 +30,7 @@ export function useActivePopup<TPopup extends { type: string }>(): UseActivePopu
     activePopup.value = null
   }
 
-  function is<K extends TPopup extends { type: infer T } ? T : never>(type: K): boolean {
-    return activePopup.value?.type === type
-  }
-
-  return { activePopup, isPopupOpen, open, close, is }
+  return { activePopup, isPopupOpen, open, close }
 }
 
 export interface TenantSettingsPopupActions {

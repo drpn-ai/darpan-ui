@@ -338,8 +338,6 @@ function buildViolationExpression(file1ValueExpression: string, file2ValueExpres
   switch (operator) {
     case '!=':
       return `java.util.Objects.equals(${file1ValueExpression}, ${file2ValueExpression})`
-    case '=':
-    case '==':
     default:
       return `!java.util.Objects.equals(${file1ValueExpression}, ${file2ValueExpression})`
   }
