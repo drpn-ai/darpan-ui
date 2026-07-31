@@ -1,5 +1,5 @@
 <template>
-  <StaticPageFrame :class="{ 'user-settings-page--popup-open': isPasswordWorkflowOpen || isNotificationDefaultWorkflowOpen }">
+  <StaticPageFrame :class="{ 'user-settings-page--popup-open': isPasswordWorkflowOpen || isNotificationDefaultWorkflowOpen || isTimezoneWorkflowOpen }">
     <template #hero>
       <h1>User Settings</h1>
     </template>
@@ -71,6 +71,15 @@
           <span class="static-page-summary-label">Permissions</span>
           <span>{{ permissionSummary }}</span>
         </article>
+        <button
+          type="button"
+          class="static-page-summary-card user-settings-preference-card user-settings-notification-default-card"
+          data-testid="user-timezone-card"
+          @click="openTimezoneWorkflow"
+        >
+          <span class="static-page-summary-label">Timezone</span>
+          <span>{{ userTimezoneSummary }}</span>
+        </button>
         <button
           type="button"
           class="static-page-summary-card user-settings-preference-card user-settings-notification-default-card"
@@ -166,11 +175,56 @@
       </div>
     </section>
   </div>
+
+  <div
+    v-if="isTimezoneWorkflowOpen"
+    class="popup-workflow-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="user-timezone-workflow-title"
+    @click.self="closeTimezoneWorkflow"
+  >
+    <section class="popup-workflow-modal workflow-panel">
+      <header class="workflow-panel-header">
+        <h2 id="user-timezone-workflow-title">Timezone</h2>
+      </header>
+
+      <div class="workflow-step-wrapper">
+        <WorkflowStepForm
+          class="workflow-form--popup-compact"
+          question="Which timezone should times display in?"
+          :primary-label="timezonePrimaryLabel"
+          primary-action-variant="save"
+          :submit-disabled="isSavingUserTimezone"
+          primary-test-id="save-user-timezone"
+          show-cancel-action
+          cancel-label="Close"
+          cancel-test-id="user-timezone-workflow-close"
+          @cancel="closeTimezoneWorkflow"
+          @submit="saveUserTimezone"
+        >
+          <InlineValidation v-if="userTimezoneSaveError" tone="error" :message="userTimezoneSaveError" />
+          <label class="wizard-input-shell">
+            <span class="workflow-context-label">Timezone</span>
+            <AppSelect
+              v-model="timezoneForm.timeZone"
+              :options="userTimezoneOptions"
+              :disabled="isSavingUserTimezone"
+              searchable
+              search-placeholder="Search timezones"
+              test-id="user-timezone-select"
+            />
+          </label>
+        </WorkflowStepForm>
+      </div>
+    </section>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppSaveAction from '../../components/ui/AppSaveAction.vue'
+import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -179,6 +233,7 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import type { TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
+import { buildTimezoneOptions } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../../lib/uiEvents'
@@ -207,6 +262,14 @@ const chatSpacesLoadError = ref(false)
 // settingsMessage renders page-level, behind the popup's z-95 scrim, so a save failure
 // written there was invisible while the dialog stayed open.
 const notificationDefaultSaveError = ref<string | null>(null)
+const isTimezoneWorkflowOpen = ref(false)
+const isSavingUserTimezone = ref(false)
+const userTimezoneSaveError = ref<string | null>(null)
+const timezoneForm = ref({ timeZone: '' })
+// Confirmed/displayed value, updated directly on a successful save (mirrors
+// savedDisplayNameInput below) rather than re-derived from sessionInfo -- keeps the summary
+// in lockstep with what was actually persisted without depending on session refresh timing.
+const savedUserTimeZone = ref('')
 const passwordForm = ref({
   currentPassword: '',
   newPassword: '',
@@ -255,6 +318,13 @@ const permissionSummary = computed(() => {
   return 'View only membership'
 })
 const notificationDefaultSummary = computed(() => notificationDefault.value?.spaceName || 'No default space')
+const userTimeZone = computed(() => sessionInfo.value?.userTimeZone?.toString().trim() || '')
+const userTimezoneSummary = computed(() => savedUserTimeZone.value || 'Tenant default')
+const userTimezoneOptions = computed<AppSelectOption[]>(() => [
+  { value: '', label: 'Tenant default' },
+  ...buildTimezoneOptions(timezoneForm.value.timeZone),
+])
+const timezonePrimaryLabel = computed(() => (isSavingUserTimezone.value ? 'Saving timezone' : 'Save Timezone'))
 const chatSpaceChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
   const options: Array<{ value: string; label: string }> = chatSpaces.value
     .filter((space) => space.isActive !== 'N')
@@ -307,6 +377,14 @@ watch(displayNameInput, (nextDisplayNameInput) => {
   settingsMessage.value = null
   scheduleDisplayNameSave()
 })
+
+watch(
+  userTimeZone,
+  (nextUserTimeZone) => {
+    savedUserTimeZone.value = nextUserTimeZone
+  },
+  { immediate: true },
+)
 
 async function saveUserSettingsForm(): Promise<void> {
   if (isSavingUserSettings.value) return
@@ -518,6 +596,35 @@ async function handleChatSpaceChoice(value: string): Promise<void> {
     notificationDefaultSaveError.value = saveError instanceof ApiCallError ? saveError.message : 'Unable to save notification default.'
   } finally {
     isSavingNotificationDefault.value = false
+  }
+}
+
+function openTimezoneWorkflow(): void {
+  userTimezoneSaveError.value = null
+  timezoneForm.value.timeZone = savedUserTimeZone.value
+  isTimezoneWorkflowOpen.value = true
+}
+
+function closeTimezoneWorkflow(): void {
+  isTimezoneWorkflowOpen.value = false
+}
+
+async function saveUserTimezone(): Promise<void> {
+  if (isSavingUserTimezone.value) return
+  isSavingUserTimezone.value = true
+  userTimezoneSaveError.value = null
+  try {
+    const submittedTimeZone = timezoneForm.value.timeZone
+    const saved = await authStore.saveUserSettings({ timeZone: submittedTimeZone })
+    if (!saved) {
+      userTimezoneSaveError.value = authStore.error ?? 'Unable to save timezone.'
+      return
+    }
+
+    savedUserTimeZone.value = submittedTimeZone
+    closeTimezoneWorkflow()
+  } finally {
+    isSavingUserTimezone.value = false
   }
 }
 

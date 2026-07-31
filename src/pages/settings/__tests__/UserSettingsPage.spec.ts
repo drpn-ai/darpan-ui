@@ -9,6 +9,7 @@ type TestSessionInfo = {
   username: string
   displayName: string
   timeZone: string
+  userTimeZone?: string
   lastLoginDate?: string
   lastRun?: {
     savedRunId?: string
@@ -31,14 +32,19 @@ const changeOwnPassword = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const getUserNotificationDefault = vi.hoisted(() => vi.fn())
 const saveUserNotificationDefault = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
-const saveUserSettings = vi.hoisted(() => vi.fn(async ({ displayName }: { displayName?: string }) => {
+const saveUserSettings = vi.hoisted(() => vi.fn(async ({ displayName, timeZone }: { displayName?: string; timeZone?: string }) => {
   authState.sessionInfo = {
     ...authState.sessionInfo,
-    displayName: displayName?.toString().trim() || authState.sessionInfo.username,
+    ...(displayName !== undefined ? { displayName: displayName?.toString().trim() || authState.sessionInfo.username } : {}),
+    ...(timeZone !== undefined ? { userTimeZone: timeZone?.toString().trim() || undefined } : {}),
   }
   return true
 }))
-const authState = vi.hoisted<{ sessionInfo: TestSessionInfo }>(() => ({
+// authState.error mirrors authStore.error: the store's saveUserSettings always resolves to a
+// boolean and reports failure via this side-channel rather than throwing (see stores/auth.ts).
+// The useAuthStore mock below exposes it through a getter so a mid-test mutation (e.g. inside a
+// mockImplementationOnce) is visible to the page without needing to remount.
+const authState = vi.hoisted<{ sessionInfo: TestSessionInfo; error: string | null }>(() => ({
   sessionInfo: {
     userId: 'M100000',
     username: 'john.doe',
@@ -58,6 +64,7 @@ const authState = vi.hoisted<{ sessionInfo: TestSessionInfo }>(() => ({
     canEditActiveTenantData: true,
     isSuperAdmin: false,
   },
+  error: null,
 }))
 
 vi.mock('../../../lib/auth', () => ({
@@ -91,6 +98,7 @@ vi.mock('../../../stores/auth', () => ({
   useAuthStore: () => ({
     ...authState,
     sessionInfo: authState.sessionInfo,
+    get error() { return authState.error },
     saveActiveTenant,
     saveUserSettings,
     changeOwnPassword,
@@ -135,6 +143,7 @@ describe('UserSettingsPage', () => {
     listTenantChatSpaces.mockResolvedValue({ ok: true, messages: [], errors: [], chatSpaces: [] })
     saveUserNotificationDefault.mockReset()
     saveUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [], userNotificationDefault: undefined })
+    authState.error = null
     authState.sessionInfo = {
       userId: 'M100000',
       username: 'john.doe',
@@ -173,7 +182,7 @@ describe('UserSettingsPage', () => {
       'Tenant Context',
       'Preferences',
     ])
-    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(7)
+    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(8)
     expect(wrapper.findAll('.static-page-record-tile').map((node) => node.text())).toEqual(['Krewe', 'Gorjana'])
     expect(wrapper.findAll('.static-page-list-tile')).toHaveLength(0)
     expect(wrapper.find('.static-page-section-head .user-settings-password-trigger').exists()).toBe(false)
@@ -187,7 +196,7 @@ describe('UserSettingsPage', () => {
     expect(passwordTrigger.classes()).not.toContain('static-page-summary-card')
     expect(wrapper.find('.static-page-actions [aria-label="Save user settings"]').exists()).toBe(true)
     expect(wrapper.get('.user-settings-preferences-grid').classes()).toContain('static-page-summary-grid')
-    expect(wrapper.findAll('.user-settings-preference-card')).toHaveLength(4)
+    expect(wrapper.findAll('.user-settings-preference-card')).toHaveLength(5)
     expect(styleSource).toMatch(/\.static-page-summary-grid\s*\{[^}]*align-items: start;/)
     expect(styleSource).toMatch(/\.user-settings-preferences-grid\s*\{[^}]*align-items: stretch;/)
     expect(styleSource).toMatch(/\.user-settings-preference-card\s*\{[^}]*height: 100%;/)
@@ -498,5 +507,59 @@ describe('UserSettingsPage', () => {
     expect(wrapper.get('[role="dialog"]').text()).toContain('Unable to load chat spaces.')
     expect(wrapper.find('[data-testid="user-chat-space-choice-clear"]').exists()).toBe(false)
     expect(wrapper.find('.workflow-shortcut-choice-grid').exists()).toBe(false)
+  })
+
+  it('shows the preferred timezone card with the tenant-default fallback summary', () => {
+    const wrapper = mountPage()
+    const card = wrapper.get('[data-testid="user-timezone-card"]')
+
+    expect(card.text()).toContain('Timezone')
+    expect(card.text()).toContain('Tenant default')
+  })
+
+  it('saves a preferred timezone via the popup picker', async () => {
+    const wrapper = mountPage()
+
+    await wrapper.get('[data-testid="user-timezone-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-timezone-select"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-search"]').setValue('America/New_York')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value="America/New_York"]').trigger('click')
+    await wrapper.get('[data-testid="save-user-timezone"]').trigger('click')
+    await flushPromises()
+
+    expect(saveUserSettings).toHaveBeenCalledWith({ timeZone: 'America/New_York' })
+    expect(wrapper.get('[data-testid="user-timezone-card"]').text()).toContain('America/New_York')
+  })
+
+  it('clears the preference by choosing Tenant default', async () => {
+    authState.sessionInfo = { ...authState.sessionInfo, userTimeZone: 'America/New_York' }
+    const wrapper = mountPage()
+
+    await wrapper.get('[data-testid="user-timezone-card"]').trigger('click')
+    expect(wrapper.get('[data-testid="user-timezone-select"]').text()).toContain('America/New_York')
+    await wrapper.get('[data-testid="user-timezone-select"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value=""]').trigger('click')
+    await wrapper.get('[data-testid="save-user-timezone"]').trigger('click')
+    await flushPromises()
+
+    expect(saveUserSettings).toHaveBeenCalledWith({ timeZone: '' })
+  })
+
+  it('surfaces a timezone save error inside the popup and keeps it open', async () => {
+    // authStore.saveUserSettings never rejects (stores/auth.ts catches internally) -- it
+    // resolves false and reports the message via authStore.error. A faithful mock mirrors that
+    // contract instead of rejecting, exercising the real `if (!saved)` branch on the page.
+    saveUserSettings.mockImplementationOnce(async () => {
+      authState.error = 'Timezone is invalid.'
+      return false
+    })
+    const wrapper = mountPage()
+
+    await wrapper.get('[data-testid="user-timezone-card"]').trigger('click')
+    await wrapper.get('[data-testid="save-user-timezone"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Timezone is invalid.')
+    expect(wrapper.find('[data-testid="user-timezone-select"]').exists()).toBe(true)
   })
 })
