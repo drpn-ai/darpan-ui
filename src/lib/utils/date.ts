@@ -1,3 +1,13 @@
+let defaultDisplayTimeZone: string | undefined
+
+export function setDefaultDisplayTimeZone(timeZone: string | undefined): void {
+  defaultDisplayTimeZone = timeZone?.trim() || undefined
+}
+
+export function getDefaultDisplayTimeZone(): string | undefined {
+  return defaultDisplayTimeZone
+}
+
 export interface FormatDateTimeOptions {
   fallback?: string
   locale?: Intl.LocalesArgument
@@ -26,7 +36,7 @@ export function formatDateTime(value: unknown, options: FormatDateTimeOptions = 
   return new Intl.DateTimeFormat(options.locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: options.timeZone?.trim() || undefined,
+    timeZone: options.timeZone?.trim() || defaultDisplayTimeZone,
   }).format(parsedDate)
 }
 
@@ -49,6 +59,57 @@ export interface CalendarMonth {
 
 export function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+// Calendar days travel as local-midnight carrier Dates (same convention as
+// startOfLocalDay/parseDateInput); these helpers translate between instants
+// and calendar days in the app's display timezone.
+export function displayCalendarDayOf(instant: Date, timeZone: string | undefined = defaultDisplayTimeZone): Date {
+  if (!timeZone) return startOfLocalDay(instant)
+  const formatted = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(instant)
+  const [year, month, day] = formatted.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+export function displayDayStart(day: Date, timeZone: string | undefined = defaultDisplayTimeZone): Date {
+  if (!timeZone) return startOfLocalDay(day)
+  const utcGuess = Date.UTC(day.getFullYear(), day.getMonth(), day.getDate())
+  const offsetAtGuess = wallClockOffsetMs(new Date(utcGuess), timeZone)
+  const candidate = new Date(utcGuess - offsetAtGuess)
+  const offsetAtCandidate = wallClockOffsetMs(candidate, timeZone)
+  return offsetAtCandidate === offsetAtGuess ? candidate : new Date(utcGuess - offsetAtCandidate)
+}
+
+export function todayInDisplayTimeZone(timeZone: string | undefined = defaultDisplayTimeZone): Date {
+  return displayCalendarDayOf(new Date(), timeZone)
+}
+
+function wallClockOffsetMs(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant)
+  const partValue = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0)
+  const wallClockAsUtc = Date.UTC(
+    partValue('year'),
+    partValue('month') - 1,
+    partValue('day'),
+    partValue('hour') % 24,
+    partValue('minute'),
+    partValue('second'),
+  )
+  return wallClockAsUtc - Math.floor(instant.getTime() / 1000) * 1000
 }
 
 export function startOfMonth(date: Date): Date {
