@@ -72,8 +72,8 @@ export function displayCalendarDayOf(instant: Date, timeZone: string | undefined
     month: '2-digit',
     day: '2-digit',
   }).format(instant)
-  const [year, month, day] = formatted.split('-').map(Number)
-  return new Date(year, month - 1, day)
+  const parts = formatted.split('-')
+  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
 }
 
 export function displayDayStart(day: Date, timeZone: string | undefined = defaultDisplayTimeZone): Date {
