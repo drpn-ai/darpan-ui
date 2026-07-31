@@ -49,10 +49,6 @@ vi.mock('../../../lib/api/facade', () => ({
   },
 }))
 
-vi.mock('../../../lib/auth', () => ({
-  useUiPermissions: () => permissionsShape,
-}))
-
 const permissionsShape = {
     get canRunActiveTenantReconciliation() {
       return authState.sessionInfo.canRunActiveTenantReconciliation === true ||
@@ -88,7 +84,6 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
     ruleSetDraftState: null,
     automationDraftState: null,
     setWorkflowOrigin: vi.fn(),
-    clearWorkflowOrigin: vi.fn(),
     setRuleSetDraft: vi.fn(),
     clearRuleSetDraft: vi.fn(),
     setAutomationDraft: vi.fn(),
@@ -482,6 +477,33 @@ describe('ReconciliationRunHistoryPage', () => {
       },
     })
     expect(wrapper.findAll('[data-testid="run-history-result-tile"]')).toHaveLength(5)
+  })
+
+  it('older cache-hydrated rows never displace the newest result from the featured tile', async () => {
+    // Live bug (2026-07-31, gorjana): the page's scoped fetch renders newest-first, then the
+    // store's GLOBAL hydration completes a beat later carrying OLDER rows the page has not seen
+    // (beyond page 1). The surface-fresh watch treated "unseen" as "newer" and prepended them,
+    // putting a superseded run (the 37-diff artifact) in the Most Recent tile.
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+    const featuredBefore = wrapper.get('[data-testid="run-history-featured-tile"]').text()
+
+    const olderHydratedOutput = {
+      ...buildGeneratedOutput(20),   // Mar 20 — older than every fetched row (Mar 26-31)
+      fileName: 'CSV-Order-Compare-diff-20260320-090000.json',
+      totalDifferences: 37,
+    }
+    useRunResultsStore().upsertOutput(olderHydratedOutput as never)
+    await flushPromises()
+
+    const featuredAfter = wrapper.get('[data-testid="run-history-featured-tile"]').text()
+    expect(featuredAfter).toBe(featuredBefore)
+    expect(featuredAfter).not.toContain('37')
+    // The older row lands in its chronological slot at the tail (behind "More..."), so the
+    // visible previous-results batch is also unchanged — newest five, in order.
+    const previousDates = wrapper.findAll('[data-testid="run-history-result-tile"]').map((tile) => tile.text())
+    expect(previousDates[0]).toContain(formatCreatedDateForExpectation('2026-03-30T09:00:00.000Z'))
+    expect(previousDates.join()).not.toContain(formatCreatedDateForExpectation('2026-03-20T09:00:00.000Z'))
   })
 
   it('surfaces a newly completed run without a page reload', async () => {

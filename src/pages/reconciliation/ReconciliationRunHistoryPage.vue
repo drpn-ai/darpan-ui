@@ -618,13 +618,16 @@ watch(() => runResultsStore.recentOutputs, () => {
     const freshRunResultIds = new Set(
       freshOutputs.map((output) => normalizeDisplayText(output.reconciliationRunResultId)).filter(Boolean),
     )
+    // Merge then SORT — never blind-prepend. "Unseen" is not "newer": the store's global hydration
+    // can land after the scoped fetch carrying OLDER rows (beyond page 1), and prepending those
+    // put a superseded run in the Most Recent tile (live bug, 2026-07-31).
     generatedOutputs.value = [
       ...freshOutputs,
       ...generatedOutputs.value.filter((output) => {
         const runResultId = normalizeDisplayText(output.reconciliationRunResultId)
         return !runResultId || !freshRunResultIds.has(runResultId)
       }),
-    ]
+    ].sort((left, right) => (outputTimestampMs(right) ?? 0) - (outputTimestampMs(left) ?? 0))
     return
   }
 
