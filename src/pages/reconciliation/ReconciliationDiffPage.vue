@@ -261,10 +261,11 @@ import {
 } from '../../lib/reconciliationRoutes'
 import {
   addDays,
+  displayDayStart,
   formatDateInputValue,
   formatMonthLabel,
   formatSavedResultDateTime,
-  startOfLocalDay,
+  todayInDisplayTimeZone,
 } from '../../lib/utils/date'
 import { useCalendarWidget, type CalendarRange } from '../../composables/useCalendarWidget'
 import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
@@ -586,7 +587,7 @@ function chooseApiWindowPreset(preset: ApiWindowPreset): void {
 }
 
 function buildPresetApiWindowRange(preset: Exclude<ApiWindowPreset, 'custom'>): ApiWindowRange {
-  const today = startOfLocalDay(new Date())
+  const today = todayInDisplayTimeZone()
   if (preset === 'previous-day') {
     const previousDay = addDays(today, -1)
     return {
@@ -642,7 +643,7 @@ const selectCustomCalendarDate = calendar.selectCell
 const customCalendarCellClasses = calendar.cellClasses
 
 function formatDateForPayload(date: Date): string {
-  return date.toISOString()
+  return displayDayStart(date).toISOString()
 }
 
 function formatDateLabel(date: Date): string {

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
 import { installLocalStorageStub } from '../../../test/localStorage'
+import { addDays, formatDateInputValue, setDefaultDisplayTimeZone, todayInDisplayTimeZone } from '../../../lib/utils/date'
 
 const route = vi.hoisted(() => ({
   query: {},
@@ -224,6 +225,7 @@ describe('ReconciliationDiffPage', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+    setDefaultDisplayTimeZone(undefined)
   })
 
   it('loads saved runs and keeps the summary hidden before selection', async () => {
@@ -708,6 +710,57 @@ describe('ReconciliationDiffPage', () => {
       windowEndLocalDate: '2026-05-17',
       hasHeader: true,
     })
+  })
+
+  it('anchors the API window payload at display-timezone midnight when a preferred timezone is set', async () => {
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    route.query = {
+      savedRunId: 'RS_API_ORDER_SYNC',
+      runName: 'API Order Sync',
+      file1SystemLabel: 'HotWax',
+      file2SystemLabel: 'SHOPIFY',
+    }
+    listSavedRuns.mockResolvedValue(apiSavedRunResponse)
+    runSavedRunDiff.mockResolvedValue({
+      ok: true,
+      messages: ['Generated API-Order-Sync-result.json.'],
+      errors: [],
+      runResult: {
+        savedRunId: 'RS_API_ORDER_SYNC',
+        runName: 'API Order Sync',
+        runType: 'ruleset',
+        ruleSetId: 'RS_API_ORDER_SYNC',
+        compareScopeId: 'CS_API_ORDER_SYNC',
+        file1SystemEnumId: 'OMS',
+        file2SystemEnumId: 'SHOPIFY',
+        validationErrors: [],
+        processingWarnings: [],
+        generatedOutput: {
+          fileName: 'API-Order-Sync-result.json',
+          savedRunId: 'RS_API_ORDER_SYNC',
+          savedRunType: 'ruleset',
+          totalDifferences: 0,
+          onlyInFile1Count: 0,
+          onlyInFile2Count: 0,
+        },
+      },
+    })
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="api-window-preset-previous-day"]').trigger('click')
+    await wrapper.get('[data-testid="reconciliation-step-primary"]').trigger('click')
+    await flushPromises()
+
+    const submittedPayload = runSavedRunDiff.mock.calls[0]?.[0]
+    const startInstant = new Date(submittedPayload.windowStartDate)
+    // Midnight America/Los_Angeles == 07:00Z (PDT) or 08:00Z (PST) — never runner-local midnight drift.
+    expect(startInstant.toISOString()).toMatch(/T0[78]:00:00\.000Z$/)
+    // The local-date fields carry the picked calendar day in the display timezone.
+    expect(submittedPayload.windowStartLocalDate).toBe(
+      formatDateInputValue(addDays(todayInDisplayTimeZone('America/Los_Angeles'), -1)),
+    )
   })
 
   it('uses the previous calendar month for API previous-month presets', async () => {
