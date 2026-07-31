@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { computed } from 'vue'
+import { setDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { useRunResultSourceDetails } from '../useRunResultSourceDetails'
+
+afterEach(() => setDefaultDisplayTimeZone(undefined))
 
 function buildSourceDetails() {
   return useRunResultSourceDetails({
@@ -149,5 +152,27 @@ describe('useRunResultSourceDetails', () => {
     source.resetRunSourceDetails()
 
     expect(source.runSourceDetails.value).toBeNull()
+  })
+
+  it('resolves instant windows in the preferred display timezone, not the runner timezone', () => {
+    setDefaultDisplayTimeZone('UTC')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-07-28T18:30:00Z', end: '2026-07-29T18:30:00Z' },
+      files: [],
+    } as never
+
+    // In UTC the start instant falls on Jul 28; the 24h window still collapses
+    // via the exclusive-end rule, but to the UTC day — not the runner-local day.
+    expect(source.runSourceDateRangeLabel.value).toBe('Jul 28, 2026')
+
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-07-28T18:30:00Z', end: '2026-07-29T18:30:00Z' },
+      files: [],
+    } as never
+    expect(source.runSourceDateRangeLabel.value).toBe('Jul 29, 2026')
   })
 })

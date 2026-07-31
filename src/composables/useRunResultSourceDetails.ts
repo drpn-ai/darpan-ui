@@ -1,7 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { GeneratedOutputSourceDetails, GeneratedOutputSourceFile } from '../lib/api/types'
 import { fileNameFromPath, normalizeDisplayText, normalizeDisplayToken } from '../lib/reconciliationDisplay'
-import { addDays, startOfLocalDay } from '../lib/utils/date'
+import { addDays, displayCalendarDayOf, startOfLocalDay } from '../lib/utils/date'
 
 export interface RunSourceFileView {
   key: string
@@ -38,14 +38,14 @@ function formatRunSourceDate(value: string | undefined): string {
 }
 
 // Full ISO timestamps are instants (the run wizard anchors windows at local midnight
-// and serializes with toISOString()), so they must resolve to the viewer's local
+// and serializes with toISOString()), so they must resolve to the viewer's display-timezone
 // calendar day — slicing the UTC date portion reads a day early east of UTC.
 // Bare YYYY-MM-DD values stay calendar dates.
 function parseRunSourceDate(value: string | undefined): Date | null {
   const normalizedValue = normalizeDisplayText(value)
   if (/^\d{4}-\d{2}-\d{2}T/.test(normalizedValue)) {
     const instant = new Date(normalizedValue)
-    if (!Number.isNaN(instant.getTime())) return startOfLocalDay(instant)
+    if (!Number.isNaN(instant.getTime())) return displayCalendarDayOf(instant)
   }
   const dateMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (!dateMatch) return null
