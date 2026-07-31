@@ -237,6 +237,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, {
@@ -373,36 +374,25 @@ const createSteps = computed<OmsCreateStep[]>(() => {
 
   return steps
 })
-const currentCreateStep = computed<OmsCreateStep>(() => {
-  const lastStepIndex = Math.max(0, createSteps.value.length - 1)
-  return createSteps.value[Math.min(currentStepIndex.value, lastStepIndex)] ?? createSteps.value[0]!
+const {
+  currentCreateStep,
+  progressPercent,
+  currentQuestion,
+  primaryLabel,
+  primaryTestId,
+  primaryActionVariant,
+  showBack,
+  goNext,
+  goBack,
+} = useWorkflowStepMachine<OmsCreateStep>({
+  steps: createSteps,
+  currentStepIndex,
+  isEditing,
+  editQuestion: 'Update the HotWax source config.',
+  finalStepId: 'description',
+  saveTestId: 'save-oms-rest-source',
+  error,
 })
-const progressPercent = computed(() => (
-  isEditing.value
-    ? '100'
-    : ((Math.max(1, currentStepIndex.value + 1) / createSteps.value.length) * 100).toFixed(2)
-))
-const currentQuestion = computed(() => (
-  isEditing.value
-    ? 'Update the HotWax source config.'
-    : currentCreateStep.value.title
-))
-const primaryLabel = computed(() => (
-  isEditing.value || currentCreateStep.value.id === 'description'
-    ? 'Save'
-    : 'OK'
-))
-const primaryTestId = computed(() => (
-  isEditing.value || currentCreateStep.value.id === 'description'
-    ? 'save-oms-rest-source'
-    : 'wizard-next'
-))
-const primaryActionVariant = computed<'default' | 'save'>(() => (
-  isEditing.value || currentCreateStep.value.id === 'description'
-    ? 'save'
-    : 'default'
-))
-const showBack = computed(() => !isEditing.value && currentStepIndex.value > 0)
 const isCreateChoiceStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'choice')
 const selectedTimeZone = computed(() => normalizeTimezoneId(form.timeZone) || 'UTC')
 const timezoneOptions = computed<AppSelectOption[]>(() => buildTimezoneOptions(selectedTimeZone.value))
@@ -508,15 +498,6 @@ async function load(): Promise<void> {
   } finally {
     loading.value = false
   }
-}
-
-function goNext(): void {
-  currentStepIndex.value = Math.min(currentStepIndex.value + 1, createSteps.value.length - 1)
-}
-
-function goBack(): void {
-  error.value = null
-  currentStepIndex.value = Math.max(currentStepIndex.value - 1, 0)
 }
 
 function advanceFromAuthTypeChoice(value: string): void {

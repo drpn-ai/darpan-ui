@@ -195,6 +195,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
 import { useRoute, useRouter } from 'vue-router'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
@@ -273,36 +274,25 @@ const createSteps: ShopifyCreateStep[] = [
   { id: 'description', title: 'What label should Darpan show for this Shopify config?', kind: 'text' },
 ]
 
-const currentCreateStep = computed<ShopifyCreateStep>(() => {
-  const lastStepIndex = Math.max(0, createSteps.length - 1)
-  return createSteps[Math.min(currentStepIndex.value, lastStepIndex)] ?? createSteps[0]!
+const {
+  currentCreateStep,
+  progressPercent,
+  currentQuestion,
+  primaryLabel,
+  primaryTestId,
+  primaryActionVariant,
+  showBack,
+  goNext,
+  goBack,
+} = useWorkflowStepMachine<ShopifyCreateStep>({
+  steps: createSteps,
+  currentStepIndex,
+  isEditing,
+  editQuestion: 'Update the Shopify config.',
+  finalStepId: 'description',
+  saveTestId: 'save-shopify-auth',
+  error,
 })
-const progressPercent = computed(() => (
-  isEditing.value
-    ? '100'
-    : ((Math.max(1, currentStepIndex.value + 1) / createSteps.length) * 100).toFixed(2)
-))
-const currentQuestion = computed(() => (
-  isEditing.value
-    ? 'Update the Shopify config.'
-    : currentCreateStep.value.title
-))
-const primaryLabel = computed(() => (
-  isEditing.value || currentCreateStep.value.id === 'description'
-    ? 'Save'
-    : 'OK'
-))
-const primaryTestId = computed(() => (
-  isEditing.value || currentCreateStep.value.id === 'description'
-    ? 'save-shopify-auth'
-    : 'wizard-next'
-))
-const primaryActionVariant = computed<'default' | 'save'>(() => (
-  isEditing.value || currentCreateStep.value.id === 'description'
-    ? 'save'
-    : 'default'
-))
-const showBack = computed(() => !isEditing.value && currentStepIndex.value > 0)
 const selectedTimeZone = computed(() => normalizeTimezoneId(form.timeZone) || 'UTC')
 const timezoneOptions = computed<AppSelectOption[]>(() => buildTimezoneOptions(selectedTimeZone.value))
 const submitDisabled = computed(() => {
@@ -398,15 +388,6 @@ async function load(): Promise<void> {
   } finally {
     loading.value = false
   }
-}
-
-function goNext(): void {
-  currentStepIndex.value = Math.min(currentStepIndex.value + 1, createSteps.length - 1)
-}
-
-function goBack(): void {
-  error.value = null
-  currentStepIndex.value = Math.max(currentStepIndex.value - 1, 0)
 }
 
 async function handlePrimarySubmit(): Promise<void> {

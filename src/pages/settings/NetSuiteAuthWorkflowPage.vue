@@ -362,6 +362,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
@@ -516,36 +517,25 @@ function buildCreateSteps(authType: AuthType): AuthCreateStep[] {
 }
 
 const createSteps = computed<AuthCreateStep[]>(() => buildCreateSteps(form.authType))
-const currentCreateStep = computed<AuthCreateStep>(() => {
-  const lastStepIndex = Math.max(0, createSteps.value.length - 1)
-  return createSteps.value[Math.min(currentStepIndex.value, lastStepIndex)] ?? createSteps.value[0]!
+const {
+  currentCreateStep,
+  progressPercent,
+  currentQuestion,
+  primaryLabel,
+  primaryTestId,
+  primaryActionVariant,
+  showBack,
+  goNext,
+  goBack,
+} = useWorkflowStepMachine<AuthCreateStep>({
+  steps: createSteps,
+  currentStepIndex,
+  isEditing,
+  editQuestion: 'Update the NetSuite auth profile.',
+  finalStepId: 'nsAuthConfigId',
+  saveTestId: 'save-netsuite-auth',
+  error,
 })
-const progressPercent = computed(() => (
-  isEditing.value
-    ? '100'
-    : ((Math.max(1, currentStepIndex.value + 1) / createSteps.value.length) * 100).toFixed(2)
-))
-const currentQuestion = computed(() => (
-  isEditing.value
-    ? 'Update the NetSuite auth profile.'
-    : currentCreateStep.value.title
-))
-const primaryLabel = computed(() => (
-  isEditing.value || currentCreateStep.value.id === 'nsAuthConfigId'
-    ? 'Save'
-    : 'OK'
-))
-const primaryTestId = computed(() => (
-  isEditing.value || currentCreateStep.value.id === 'nsAuthConfigId'
-    ? 'save-netsuite-auth'
-    : 'wizard-next'
-))
-const primaryActionVariant = computed<'default' | 'save'>(() => (
-  isEditing.value || currentCreateStep.value.id === 'nsAuthConfigId'
-    ? 'save'
-    : 'default'
-))
-const showBack = computed(() => !isEditing.value && currentStepIndex.value > 0)
 const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
 const submitDisabled = computed(() => {
   if (!canEditTenantSettings.value) return true
@@ -716,15 +706,6 @@ function buildPayloadForAuthType(): SaveNsAuthConfigPayload {
     scope: '',
     privateKeyPem: '',
   }
-}
-
-function goNext(): void {
-  currentStepIndex.value = Math.min(currentStepIndex.value + 1, createSteps.value.length - 1)
-}
-
-function goBack(): void {
-  error.value = null
-  currentStepIndex.value = Math.max(currentStepIndex.value - 1, 0)
 }
 
 async function handlePrimarySubmit(): Promise<void> {

@@ -1,7 +1,5 @@
 <template>
   <form class="wizard-question-shell" @submit.prevent="emit('submit')" @keydown.enter="handleEnter" @change="handleFileChange">
-    <slot name="context"></slot>
-
     <div class="wizard-prompt-row">
       <p class="wizard-question">
         <slot name="question">{{ question }}</slot>
@@ -43,13 +41,12 @@
       />
 
       <span v-if="showPrimaryAction && showEnterHint" class="wizard-enter-hint">press <strong>Enter</strong> ↵</span>
-      <slot name="actions-after"></slot>
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, useSlots } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { requestSubmitOnEnter } from '../../lib/keyboard'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import AppCancelAction from '../ui/AppCancelAction.vue'
@@ -95,15 +92,12 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const slots = useSlots()
 let pendingPrimaryFocusTimer: number | null = null
 
 const hasActions = computed(() => (
   props.showBack
   || props.showCancelAction
   || props.showPrimaryAction
-  || (props.showPrimaryAction && props.showEnterHint)
-  || Boolean(slots['actions-after'])
 ))
 
 function handleEnter(event: KeyboardEvent): void {

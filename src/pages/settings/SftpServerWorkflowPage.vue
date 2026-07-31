@@ -214,6 +214,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
@@ -296,36 +297,25 @@ const createSteps: SftpCreateStep[] = [
 const activeServerId = computed(() => String(route.params.sftpServerId ?? '').trim())
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const isEditing = computed(() => activeServerId.value.length > 0)
-const currentCreateStep = computed<SftpCreateStep>(() => {
-  const lastStepIndex = Math.max(0, createSteps.length - 1)
-  return createSteps[Math.min(currentStepIndex.value, lastStepIndex)] ?? createSteps[0]!
+const {
+  currentCreateStep,
+  progressPercent,
+  currentQuestion,
+  primaryLabel,
+  primaryTestId,
+  primaryActionVariant,
+  showBack,
+  goNext,
+  goBack,
+} = useWorkflowStepMachine<SftpCreateStep>({
+  steps: createSteps,
+  currentStepIndex,
+  isEditing,
+  editQuestion: 'Update the SFTP server details.',
+  finalStepId: 'sftpServerId',
+  saveTestId: 'save-sftp-server',
+  error,
 })
-const progressPercent = computed(() => (
-  isEditing.value
-    ? '100'
-    : ((Math.max(1, currentStepIndex.value + 1) / createSteps.length) * 100).toFixed(2)
-))
-const currentQuestion = computed(() => (
-  isEditing.value
-    ? 'Update the SFTP server details.'
-    : currentCreateStep.value.title
-))
-const primaryLabel = computed(() => (
-  isEditing.value || currentCreateStep.value.id === 'sftpServerId'
-    ? 'Save'
-    : 'OK'
-))
-const primaryTestId = computed(() => (
-  isEditing.value || currentCreateStep.value.id === 'sftpServerId'
-    ? 'save-sftp-server'
-    : 'wizard-next'
-))
-const primaryActionVariant = computed<'default' | 'save'>(() => (
-  isEditing.value || currentCreateStep.value.id === 'sftpServerId'
-    ? 'save'
-    : 'default'
-))
-const showBack = computed(() => !isEditing.value && currentStepIndex.value > 0)
 const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
 const submitDisabled = computed(() => {
   if (!canEditTenantSettings.value) return true
@@ -398,15 +388,6 @@ async function loadServer(): Promise<void> {
   } finally {
     loading.value = false
   }
-}
-
-function goNext(): void {
-  currentStepIndex.value = Math.min(currentStepIndex.value + 1, createSteps.length - 1)
-}
-
-function goBack(): void {
-  error.value = null
-  currentStepIndex.value = Math.max(currentStepIndex.value - 1, 0)
 }
 
 async function handlePrimarySubmit(): Promise<void> {
