@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
+import { setDefaultDisplayTimeZone } from '../../../lib/utils/date'
 
 const route = vi.hoisted(() => ({
   params: { automationId: 'AUT_ACTIVE_API' } as Record<string, string>,
@@ -170,6 +171,7 @@ function mockExecutions() {
 
 describe('ReconciliationAutomationDashboardPage', () => {
   beforeEach(() => {
+    setDefaultDisplayTimeZone('America/Los_Angeles')
     route.params = { automationId: 'AUT_ACTIVE_API' }
     route.fullPath = '/reconciliation/automations/AUT_ACTIVE_API'
     permissions.canEditTenantSettings = true
@@ -196,6 +198,10 @@ describe('ReconciliationAutomationDashboardPage', () => {
     })
     runAutomationNow.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation() })
     deleteAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], deleted: true, deletedAutomationId: 'AUT_ACTIVE_API' })
+  })
+
+  afterEach(() => {
+    setDefaultDisplayTimeZone(undefined)
   })
 
   it('renders setup details and previous runs on the selected automation dashboard', async () => {
@@ -278,6 +284,16 @@ describe('ReconciliationAutomationDashboardPage', () => {
 
     await rows.at(1)?.trigger('click')
     expect(push).toHaveBeenCalledTimes(1)
+  })
+
+  it('formats timestamps using the app display timezone instead of sessionInfo.timeZone', async () => {
+    setDefaultDisplayTimeZone('America/New_York')
+    // sessionInfo.timeZone stays at 'America/Los_Angeles' (set in beforeEach)
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    // The same UTC time 2026-05-02T06:00:00Z should render in NY time (EDT, UTC-4) as 2:00 AM, not LA time (PDT, UTC-7) as 11:00 PM
+    expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 2, 2026, 2:00 AM')
   })
 
   it('formats the schedule summary time as AM/PM, matching every other timestamp on the page', async () => {

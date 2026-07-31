@@ -179,7 +179,6 @@ import StatusBadge from '../../components/ui/StatusBadge.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
 import type { AutomationExecutionSummary, AutomationRecord } from '../../lib/api/types'
-import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import {
   AUTOMATION_WINDOW_CUSTOM,
@@ -215,7 +214,6 @@ type AutomationExecutionTableRow = Record<string, unknown> & {
 
 const route = useRoute()
 const router = useRouter()
-const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 const automation = ref<AutomationRecord | null>(null)
@@ -252,7 +250,6 @@ const windowLabel = computed(() => {
   }
   return windowDisplayLabel(row)
 })
-const tenantTimeZone = computed(() => normalizeDisplayText(authStore.sessionInfo?.timeZone))
 const previousRunTime = computed(() => (
   automation.value?.lastExecution?.scheduledDate ||
   automation.value?.lastExecution?.completedDate ||
@@ -314,10 +311,7 @@ function executionRow(row: Record<string, unknown>): AutomationExecutionSummary 
 }
 
 function formatTenantDateTime(value: unknown, fallback = '-'): string {
-  return formatDateTime(value, {
-    fallback,
-    timeZone: tenantTimeZone.value || undefined,
-  })
+  return formatDateTime(value, { fallback })
 }
 
 function automationSystemLabel(fileSide: string, fallback: string): string {
