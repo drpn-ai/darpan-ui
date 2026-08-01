@@ -171,6 +171,7 @@ describe('UserSettingsPage', () => {
       'Account',
       'Tenant Context',
       'Preferences',
+      'Activity',
     ])
     expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(8)
     expect(wrapper.findAll('.static-page-record-tile').map((node) => node.text())).toEqual(['Krewe', 'Gorjana'])
@@ -185,11 +186,11 @@ describe('UserSettingsPage', () => {
     expect(passwordTrigger.find('svg').exists()).toBe(false)
     expect(passwordTrigger.classes()).not.toContain('static-page-summary-card')
     expect(wrapper.find('.static-page-actions [aria-label="Save user settings"]').exists()).toBe(true)
-    expect(wrapper.get('.user-settings-preferences-grid').classes()).toContain('static-page-summary-grid')
-    expect(wrapper.findAll('.user-settings-preference-card')).toHaveLength(5)
+    expect(wrapper.get('.user-settings-card-grid').classes()).toContain('static-page-summary-grid')
+    expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(4)
     expect(styleSource).toMatch(/\.static-page-summary-grid\s*\{[^}]*align-items: start;/)
-    expect(styleSource).toMatch(/\.user-settings-preferences-grid\s*\{[^}]*align-items: stretch;/)
-    expect(styleSource).toMatch(/\.user-settings-preference-card\s*\{[^}]*height: 100%;/)
+    expect(styleSource).toMatch(/\.user-settings-card-grid\s*\{[^}]*align-items: stretch;/)
+    expect(styleSource).toMatch(/\.user-settings-stretch-card\s*\{[^}]*height: 100%;/)
     expect(wrapper.text()).toContain('ORDER_SYNC')
     expect(wrapper.get('[data-testid="user-notification-default-card"]').text()).toContain('No default space')
   })
@@ -551,5 +552,31 @@ describe('UserSettingsPage', () => {
 
     expect(wrapper.text()).toContain('Timezone is invalid.')
     expect(wrapper.find('[data-testid="user-timezone-select"]').exists()).toBe(true)
+  })
+  it('keeps Preferences to things the user can change, and reports the rest elsewhere', async () => {
+    // "Preference" on this page means settable. Last Login, Last Run and Permissions are facts the
+    // system reports back, so filing them under Preferences made the heading untrue.
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const sectionFor = (heading: string) => {
+      const section = wrapper.findAll('.static-page-section')
+        .find((node) => node.find('.static-page-section-heading').text() === heading)
+      expect(section, `no section titled ${heading}`).toBeTruthy()
+      return section!
+    }
+
+    const preferences = sectionFor('Preferences')
+    expect(preferences.findAll('.static-page-summary-label').map((n) => n.text()))
+      .toEqual(['Timezone', 'Notifications'])
+    // Every card in Preferences opens something; none is inert.
+    expect(preferences.findAll('button.static-page-summary-card')).toHaveLength(2)
+    expect(preferences.text()).not.toContain('Last Login')
+    expect(preferences.text()).not.toContain('Permissions')
+
+    expect(sectionFor('Activity').findAll('.static-page-summary-label').map((n) => n.text()))
+      .toEqual(['Last Login', 'Last Run'])
+    // Permissions is an access fact, so it sits with User ID and Username.
+    expect(sectionFor('Account').text()).toContain('Permissions')
   })
 })

@@ -767,11 +767,11 @@ button:disabled {
   opacity: var(--popup-background-opacity);
 }
 
-.user-settings-preferences-grid {
+.user-settings-card-grid {
   align-items: stretch;
 }
 
-.user-settings-preference-card {
+.user-settings-stretch-card {
   height: 100%;
 }
 

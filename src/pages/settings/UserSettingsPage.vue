@@ -35,6 +35,10 @@
             maxlength="80"
           />
         </label>
+        <article class="static-page-summary-card">
+          <span class="static-page-summary-label">Permissions</span>
+          <span>{{ permissionSummary }}</span>
+        </article>
       </div>
 
       <p v-if="passwordMessage" class="section-note">{{ passwordMessage }}</p>
@@ -58,22 +62,10 @@
     </StaticPageSection>
 
     <StaticPageSection title="Preferences">
-      <div class="static-page-summary-grid user-settings-preferences-grid">
-        <article v-if="lastLoginLabel" class="static-page-summary-card user-settings-preference-card">
-          <span class="static-page-summary-label">Last Login</span>
-          <span>{{ lastLoginLabel }}</span>
-        </article>
-        <article v-if="lastRunLabel" class="static-page-summary-card user-settings-preference-card">
-          <span class="static-page-summary-label">Last Run</span>
-          <span>{{ lastRunLabel }}</span>
-        </article>
-        <article class="static-page-summary-card user-settings-preference-card">
-          <span class="static-page-summary-label">Permissions</span>
-          <span>{{ permissionSummary }}</span>
-        </article>
+      <div class="static-page-summary-grid user-settings-card-grid">
         <button
           type="button"
-          class="static-page-summary-card user-settings-preference-card user-settings-notification-default-card"
+          class="static-page-summary-card user-settings-stretch-card user-settings-notification-default-card"
           data-testid="user-timezone-card"
           @click="openTimezoneWorkflow"
         >
@@ -82,7 +74,7 @@
         </button>
         <button
           type="button"
-          class="static-page-summary-card user-settings-preference-card user-settings-notification-default-card"
+          class="static-page-summary-card user-settings-stretch-card user-settings-notification-default-card"
           data-testid="user-notification-default-card"
           @click="openNotificationDefaultWorkflow"
         >
@@ -91,6 +83,19 @@
         </button>
       </div>
       <p v-if="settingsMessage" class="section-note" role="status">{{ settingsMessage }}</p>
+    </StaticPageSection>
+
+    <StaticPageSection v-if="lastLoginLabel || lastRunLabel" title="Activity">
+      <div class="static-page-summary-grid user-settings-card-grid">
+        <article v-if="lastLoginLabel" class="static-page-summary-card user-settings-stretch-card">
+          <span class="static-page-summary-label">Last Login</span>
+          <span>{{ lastLoginLabel }}</span>
+        </article>
+        <article v-if="lastRunLabel" class="static-page-summary-card user-settings-stretch-card">
+          <span class="static-page-summary-label">Last Run</span>
+          <span>{{ lastRunLabel }}</span>
+        </article>
+      </div>
     </StaticPageSection>
 
     <template #actions>
