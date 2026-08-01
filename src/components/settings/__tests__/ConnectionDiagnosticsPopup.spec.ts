@@ -3,11 +3,16 @@ import { mount } from '@vue/test-utils'
 import ConnectionDiagnosticsPopup from '../ConnectionDiagnosticsPopup.vue'
 import type { ConnectionCheck } from '../../../lib/api/types'
 
+/*
+ * Mirrors what the live Shopify probe actually returns, including rows that carry a detail AND a
+ * duration together. An earlier fixture had those on separate rows, so it never exercised the
+ * combination that broke the row layout in the browser.
+ */
 const passingChecks: ConnectionCheck[] = [
   { key: 'credential', label: 'Credential readable', status: 'PASS' },
-  { key: 'reachable', label: 'Shop reachable', status: 'PASS', durationMillis: 84 },
-  { key: 'apiVersion', label: 'API version supported', status: 'PASS', detail: '2026-01' },
-  { key: 'ordersRead', label: 'Orders readable', status: 'PASS', durationMillis: 412 },
+  { key: 'reachable', label: 'Shop reachable', status: 'PASS', detail: 'gorjana.myshopify.com', durationMillis: 84 },
+  { key: 'apiVersion', label: 'API version supported', status: 'PASS', detail: '2024-10' },
+  { key: 'ordersRead', label: 'Orders readable', status: 'PASS', detail: '1 order returned', durationMillis: 412 },
 ]
 
 const failingChecks: ConnectionCheck[] = [
@@ -52,6 +57,23 @@ describe('ConnectionDiagnosticsPopup', () => {
     expect(credential.text()).toContain('Passed')
     expect(wrapper.get('[data-check-key="reachable"]').text()).toContain('84ms')
     expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is valid.')
+  })
+
+  it('keeps the badge and duration on the main line, with the detail below it', () => {
+    // Regression: the detail used to span the row grid to its last column, which pushed the badge
+    // and duration onto a new implicit row starting at column 1 — they rendered outside the card's
+    // padding and overlapped its border. Only rows carrying a detail were affected, so the shape
+    // to pin is that the detail is NOT a sibling of the badge.
+    const wrapper = mountPopup()
+    const withDetail = wrapper.get('[data-check-key="reachable"]')
+    const mainLine = withDetail.get('.connection-diagnostics-main')
+
+    expect(mainLine.find('.status-badge').exists()).toBe(true)
+    expect(mainLine.find('.connection-diagnostics-duration').exists()).toBe(true)
+    expect(mainLine.find('.connection-diagnostics-detail').exists()).toBe(false)
+
+    const detail = withDetail.get('.connection-diagnostics-detail')
+    expect(detail.element.parentElement).toBe(withDetail.element)
   })
 
   it('marks failed and skipped rows distinctly', () => {

@@ -53,13 +53,15 @@
               :data-check-key="check.key"
               :data-check-status="check.status"
             >
-              <span class="connection-diagnostics-glyph" aria-hidden="true">{{ glyphFor(check.status) }}</span>
-              <span class="connection-diagnostics-label">{{ check.label }}</span>
-              <span v-if="check.detail" class="connection-diagnostics-detail">{{ check.detail }}</span>
-              <StatusBadge :label="statusLabel(check.status)" :tone="toneFor(check.status)" />
-              <span v-if="check.durationMillis != null" class="connection-diagnostics-duration">
-                {{ check.durationMillis }}ms
-              </span>
+              <div class="connection-diagnostics-main">
+                <span class="connection-diagnostics-glyph" aria-hidden="true">{{ glyphFor(check.status) }}</span>
+                <span class="connection-diagnostics-label">{{ check.label }}</span>
+                <span v-if="check.durationMillis != null" class="connection-diagnostics-duration">
+                  {{ check.durationMillis }}ms
+                </span>
+                <StatusBadge :label="statusLabel(check.status)" :tone="toneFor(check.status)" />
+              </div>
+              <p v-if="check.detail" class="connection-diagnostics-detail">{{ check.detail }}</p>
             </li>
           </ul>
 
@@ -189,29 +191,48 @@ function toneFor(status: ConnectionCheckStatus): 'success' | 'danger' | 'neutral
   gap: var(--space-2);
 }
 
+/*
+ * Two stacked lines rather than one grid. An earlier single-grid version placed the detail with
+ * `grid-column: 2 / -1`, which pushed the badge and duration into a new implicit row at column 1 —
+ * they escaped the card's padding and collided. Keeping the detail out of the main line's
+ * formatting context removes that class of bug entirely.
+ */
 .connection-diagnostics-row {
   display: grid;
-  grid-template-columns: 1.25rem minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   padding: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   font-size: 0.84rem;
 }
 
+.connection-diagnostics-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .connection-diagnostics-glyph {
+  flex: 0 0 1.25rem;
   text-align: center;
   color: var(--text-soft);
 }
 
+.connection-diagnostics-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Indented to sit under the label, clear of the glyph column. */
 .connection-diagnostics-detail {
-  grid-column: 2 / -1;
+  margin: 0 0 0 calc(1.25rem + var(--space-2));
   color: var(--text-muted);
   font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 
 .connection-diagnostics-duration {
+  flex: 0 0 auto;
   color: var(--text-muted);
   font-size: 0.76rem;
   font-variant-numeric: tabular-nums;
@@ -221,15 +242,5 @@ function toneFor(status: ConnectionCheckStatus): 'success' | 'danger' | 'neutral
   margin: var(--space-3) 0 0;
   font-size: 0.84rem;
   font-weight: 400;
-}
-
-@media (max-width: 40rem) {
-  .connection-diagnostics-row {
-    grid-template-columns: 1.25rem minmax(0, 1fr) auto;
-  }
-
-  .connection-diagnostics-duration {
-    grid-column: 2 / -1;
-  }
 }
 </style>
