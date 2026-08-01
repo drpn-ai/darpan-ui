@@ -134,11 +134,21 @@ describe('ConnectionDiagnosticsPopup', () => {
     expect(byBackdrop.emitted('close')).toHaveLength(1)
   })
 
-  it('shows a running state instead of rows while the probe is in flight', () => {
-    const wrapper = mountPopup({ running: true, checks: [] })
+  it('shows completed rows alongside a pending row while the walk is still going', () => {
+    // Stages stream in, so rows already decided must stay on screen while the next one runs.
+    const wrapper = mountPopup({ running: true, checks: passingChecks.slice(0, 2) })
 
+    expect(wrapper.findAll('[data-testid="connection-diagnostics-check"]')).toHaveLength(2)
     expect(wrapper.find('[data-testid="connection-diagnostics-running"]').exists()).toBe(true)
-    expect(wrapper.findAll('[data-testid="connection-diagnostics-check"]')).toHaveLength(0)
+    // No verdict until the walk finishes — an interim "not usable" would be a lie.
+    expect(wrapper.find('[data-testid="connection-diagnostics-verdict"]').exists()).toBe(false)
+  })
+
+  it('drops the pending row and states the verdict once the walk finishes', () => {
+    const wrapper = mountPopup()
+
+    expect(wrapper.find('[data-testid="connection-diagnostics-running"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is valid.')
   })
 
   it('renders a service failure as an error rather than a stuck spinner', () => {

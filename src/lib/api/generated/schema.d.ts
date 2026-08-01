@@ -3989,6 +3989,16 @@ export interface components {
         TestSourceConnectionParams: {
             systemEnumId: string;
             configId: string;
+            /**
+             * @description Run only this stage, as reported by a previous call's nextStage. Lets a
+             *                         caller render each check the moment the server finishes it.
+             */
+            stage?: string;
+            /**
+             * @description Start a staged run: with no stage, runs only the connector's first stage.
+             *                         Leave false (and stage blank) to run the whole probe in one call.
+             */
+            staged?: boolean;
         };
         TestSourceConnectionResult: {
             ok?: boolean;
@@ -3996,6 +4006,11 @@ export interface components {
             errors?: string[];
             available?: boolean;
             connectionOk?: boolean;
+            /**
+             * @description Stage to pass back to continue a staged run, or blank when finished —
+             *                         either the probe completed or a failure made the remaining stages meaningless.
+             */
+            nextStage?: string;
             durationMillis?: number;
             checks?: {
                 check?: {

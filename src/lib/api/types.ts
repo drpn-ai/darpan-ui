@@ -277,6 +277,8 @@ export interface ConnectionCheck {
 export interface TestSourceConnectionResponse extends ApiEnvelope {
   available?: boolean
   connectionOk?: boolean
+  /** Stage to pass back to continue a staged run; blank/absent ends the walk. */
+  nextStage?: string | null
   durationMillis?: number
   checks?: ConnectionCheck[]
 }

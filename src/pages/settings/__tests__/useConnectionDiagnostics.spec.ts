@@ -9,6 +9,14 @@ vi.mock('../../../lib/api/facade', () => ({
 import { ApiCallError } from '../../../lib/api/client'
 import { useConnectionDiagnostics } from '../useConnectionDiagnostics'
 
+function row(key: string, status: 'PASS' | 'FAIL' | 'SKIP') {
+  return { key, label: key, status }
+}
+
+function stageResponse(checks: ReturnType<typeof row>[], nextStage: string | null) {
+  return { ok: true, messages: [], errors: [], available: true, connectionOk: true, nextStage, checks }
+}
+
 describe('useConnectionDiagnostics', () => {
   beforeEach(() => {
     testSourceConnection.mockReset()
@@ -25,33 +33,71 @@ describe('useConnectionDiagnostics', () => {
     expect(diagnostics.open.value).toBe(true)
     expect(diagnostics.running.value).toBe(true)
 
-    resolveProbe({ ok: true, messages: [], errors: [], available: true, connectionOk: true, checks: [] })
+    resolveProbe(stageResponse([], null))
     await pending
 
     expect(diagnostics.running.value).toBe(false)
   })
 
-  it('carries the verdict and rows through from a successful call', async () => {
-    testSourceConnection.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      available: true,
-      connectionOk: false,
-      checks: [{ key: 'auth', label: 'Credentials accepted', status: 'FAIL', detail: '401' }],
-    })
+  it('walks the stages the server names and accumulates their rows', async () => {
+    // The server owns the sequence; this must not hardcode any connector's stage names.
+    testSourceConnection
+      .mockResolvedValueOnce(stageResponse([row('credential', 'PASS')], 'connect'))
+      .mockResolvedValueOnce(stageResponse([row('reachable', 'PASS'), row('apiVersion', 'PASS')], 'orders'))
+      .mockResolvedValueOnce(stageResponse([row('ordersRead', 'PASS')], null))
 
-    const diagnostics = useConnectionDiagnostics('OMS')
+    const diagnostics = useConnectionDiagnostics('SHOPIFY')
     await diagnostics.run('cfg-2')
 
-    expect(testSourceConnection).toHaveBeenCalledWith(
-      { systemEnumId: 'OMS', configId: 'cfg-2' },
-      expect.any(AbortSignal),
-    )
-    expect(diagnostics.available.value).toBe(true)
-    expect(diagnostics.connectionOk.value).toBe(false)
-    expect(diagnostics.checks.value).toHaveLength(1)
+    expect(testSourceConnection).toHaveBeenCalledTimes(3)
+    // First call opts into staging; later calls pass the stage the server asked for.
+    const payloads = testSourceConnection.mock.calls.map((call: unknown[]) => call[0])
+    expect(payloads).toEqual([
+      { systemEnumId: 'SHOPIFY', configId: 'cfg-2', staged: true },
+      { systemEnumId: 'SHOPIFY', configId: 'cfg-2', stage: 'connect' },
+      { systemEnumId: 'SHOPIFY', configId: 'cfg-2', stage: 'orders' },
+    ])
+
+    expect(diagnostics.checks.value.map((c) => c.key)).toEqual([
+      'credential', 'reachable', 'apiVersion', 'ordersRead',
+    ])
+    expect(diagnostics.connectionOk.value).toBe(true)
     expect(diagnostics.error.value).toBeNull()
+  })
+
+  it('stops walking when the server ends the run early', async () => {
+    // A terminal failure returns its skip rows and no next stage — asking again would be wrong.
+    testSourceConnection.mockResolvedValueOnce(
+      stageResponse([row('credential', 'FAIL'), row('reachable', 'SKIP')], null),
+    )
+
+    const diagnostics = useConnectionDiagnostics('OMS')
+    await diagnostics.run('cfg-3')
+
+    expect(testSourceConnection).toHaveBeenCalledTimes(1)
+    expect(diagnostics.connectionOk.value).toBe(false)
+    expect(diagnostics.checks.value).toHaveLength(2)
+  })
+
+  it('exposes rows from finished stages while later ones are still running', async () => {
+    let releaseSecond: (value: unknown) => void = () => {}
+    testSourceConnection
+      .mockResolvedValueOnce(stageResponse([row('credential', 'PASS')], 'connect'))
+      .mockReturnValueOnce(new Promise((resolve) => { releaseSecond = resolve }))
+
+    const diagnostics = useConnectionDiagnostics('SHOPIFY')
+    const pending = diagnostics.run('cfg-4')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // The point of staging: stage one is on screen before stage two answers.
+    expect(diagnostics.checks.value.map((c) => c.key)).toEqual(['credential'])
+    expect(diagnostics.running.value).toBe(true)
+
+    releaseSecond(stageResponse([row('reachable', 'PASS')], null))
+    await pending
+    expect(diagnostics.checks.value).toHaveLength(2)
+    expect(diagnostics.running.value).toBe(false)
   })
 
   it('reports a connector without diagnostics as unavailable', async () => {
@@ -61,6 +107,7 @@ describe('useConnectionDiagnostics', () => {
       errors: [],
       available: false,
       connectionOk: false,
+      nextStage: null,
       checks: [],
     })
 

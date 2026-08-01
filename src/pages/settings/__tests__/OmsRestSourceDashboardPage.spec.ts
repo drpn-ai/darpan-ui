@@ -327,6 +327,7 @@ describe('OmsRestSourceDashboardPage', () => {
       errors: [],
       available: true,
       connectionOk: true,
+      nextStage: null,
       checks: [
         { key: 'credential', label: 'Credential readable', status: 'PASS' },
         { key: 'reachable', label: 'Base URL reachable', status: 'PASS', durationMillis: 63 },
@@ -341,8 +342,9 @@ describe('OmsRestSourceDashboardPage', () => {
     await wrapper.get('[data-testid="diagnose-oms-rest-source"]').trigger('click')
     await flushPromises()
 
+    // Staged run: the first call opts in, and this response ends the walk (nextStage null).
     expect(testSourceConnection).toHaveBeenCalledWith(
-      { systemEnumId: 'OMS', configId: 'krewe-oms' },
+      { systemEnumId: 'OMS', configId: 'krewe-oms', staged: true },
       expect.any(AbortSignal),
     )
     expect(wrapper.findAll('[data-testid="connection-diagnostics-check"]')).toHaveLength(4)
@@ -358,6 +360,7 @@ describe('OmsRestSourceDashboardPage', () => {
       errors: [],
       available: true,
       connectionOk: false,
+      nextStage: null,
       checks: [
         { key: 'credential', label: 'Credential readable', status: 'FAIL', detail: 'The stored credentials could not be decrypted.' },
         { key: 'reachable', label: 'Base URL reachable', status: 'SKIP', detail: 'Not attempted.' },

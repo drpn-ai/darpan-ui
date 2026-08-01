@@ -292,6 +292,7 @@ describe('ShopifyAuthDashboardPage', () => {
       errors: [],
       available: true,
       connectionOk: true,
+      nextStage: null,
       durationMillis: 496,
       checks: [
         { key: 'credential', label: 'Credential readable', status: 'PASS' },
@@ -309,8 +310,9 @@ describe('ShopifyAuthDashboardPage', () => {
     await wrapper.get('[data-testid="diagnose-shopify-auth"]').trigger('click')
     await flushPromises()
 
+    // Staged run: the first call opts in, and this response ends the walk (nextStage null).
     expect(testSourceConnection).toHaveBeenCalledWith(
-      { systemEnumId: 'SHOPIFY', configId: 'krewe-shopify' },
+      { systemEnumId: 'SHOPIFY', configId: 'krewe-shopify', staged: true },
       expect.any(AbortSignal),
     )
     expect(wrapper.find('[data-testid="connection-diagnostics-popup"]').exists()).toBe(true)
@@ -328,6 +330,7 @@ describe('ShopifyAuthDashboardPage', () => {
       errors: [],
       available: true,
       connectionOk: false,
+      nextStage: null,
       checks: [
         { key: 'credential', label: 'Credential readable', status: 'PASS' },
         { key: 'reachable', label: 'Shop reachable', status: 'FAIL', detail: 'The access token was rejected (HTTP 401).' },

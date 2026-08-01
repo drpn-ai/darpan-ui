@@ -818,7 +818,17 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: var(--space-4);
-  background: color-mix(in oklab, var(--bg) 38%, transparent);
+  /*
+   * A scrim must darken in BOTH themes, so it cannot be derived from --bg: that token inverts with
+   * the theme, and in light mode (--bg: #ffffff) a 38% tint of it is white-on-white — no visible
+   * fade at all. Anchored to a fixed dark instead, slightly stronger in light mode where the page
+   * beneath it is bright.
+   */
+  background: color-mix(in oklab, #090909 55%, transparent);
+}
+
+:root[data-theme='light'] .popup-workflow-overlay {
+  background: color-mix(in oklab, #090909 32%, transparent);
 }
 
 .popup-workflow-modal.workflow-panel {

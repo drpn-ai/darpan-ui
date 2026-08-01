@@ -132,6 +132,10 @@ export interface DeleteShopifyAuthConfigPayload {
 export interface TestSourceConnectionPayload {
   systemEnumId: string
   configId: string
+  /** Run only this stage, as reported by a previous call's nextStage. */
+  stage?: string
+  /** Start a staged run: with no stage, runs only the connector's first stage. */
+  staged?: boolean
 }
 
 export interface ListOmsRestSourceConfigsPayload {

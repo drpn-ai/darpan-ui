@@ -24,11 +24,7 @@
       </header>
 
       <div aria-live="polite" data-testid="connection-diagnostics-body">
-        <p v-if="running" class="section-note" data-testid="connection-diagnostics-running">
-          Running diagnostics...
-        </p>
-
-        <InlineValidation v-else-if="error" tone="error" :message="error" />
+        <InlineValidation v-if="error" tone="error" :message="error" />
 
         <p
           v-else-if="!available"
@@ -58,9 +54,24 @@
               </div>
               <p v-if="check.detail" class="connection-diagnostics-detail">{{ check.detail }}</p>
             </li>
+
+            <li
+              v-if="running"
+              class="connection-diagnostics-row connection-diagnostics-row--running"
+              data-testid="connection-diagnostics-running"
+            >
+              <div class="connection-diagnostics-main">
+                <span class="connection-diagnostics-glyph" aria-hidden="true">·</span>
+                <span class="connection-diagnostics-label">Running diagnostics...</span>
+              </div>
+            </li>
           </ul>
 
-          <p class="connection-diagnostics-verdict" data-testid="connection-diagnostics-verdict">
+          <p
+            v-if="!running"
+            class="connection-diagnostics-verdict"
+            data-testid="connection-diagnostics-verdict"
+          >
             {{ connectionOk ? 'Connection is valid.' : 'Connection is not usable.' }}
           </p>
         </template>
@@ -189,6 +200,12 @@ function toneFor(status: ConnectionCheckStatus): 'success' | 'danger' | 'neutral
   color: var(--text-muted);
   font-size: 0.76rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* Pending, not a result: dashed and muted so it never reads as an outcome. */
+.connection-diagnostics-row--running {
+  border-style: dashed;
+  color: var(--text-muted);
 }
 
 .connection-diagnostics-verdict {
