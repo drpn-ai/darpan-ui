@@ -35,42 +35,44 @@
         </p>
 
         <template v-else>
-          <ul class="connection-diagnostics-list" data-testid="connection-diagnostics-checks">
+          <!-- The answer first; the checks below are the evidence for it. -->
+          <p class="connection-diagnostics-verdict" data-testid="connection-diagnostics-verdict">
+            {{ headline }}
+          </p>
+          <p class="connection-diagnostics-summary" data-testid="connection-diagnostics-summary">
+            {{ summary }}
+          </p>
+
+          <ul class="connection-diagnostics-rail" data-testid="connection-diagnostics-checks">
             <li
               v-for="check in checks"
               :key="check.key"
-              class="connection-diagnostics-row"
+              class="connection-diagnostics-step"
               data-testid="connection-diagnostics-check"
               :data-check-key="check.key"
               :data-check-status="check.status"
             >
-              <div class="connection-diagnostics-main">
-                <span class="connection-diagnostics-glyph" aria-hidden="true">{{ glyphFor(check.status) }}</span>
+              <span class="connection-diagnostics-node" aria-hidden="true">{{ glyphFor(check.status) }}</span>
+              <div class="connection-diagnostics-step-body">
                 <span class="connection-diagnostics-label">{{ check.label }}</span>
-                <StatusBadge :label="statusLabel(check.status)" :tone="toneFor(check.status)" />
+                <!-- The glyph is decorative and the palette is monochrome, so the status has to
+                     reach a screen reader as words. -->
+                <span class="sr-only">{{ statusLabel(check.status) }}</span>
+                <p v-if="check.detail" class="connection-diagnostics-detail">{{ check.detail }}</p>
               </div>
-              <p v-if="check.detail" class="connection-diagnostics-detail">{{ check.detail }}</p>
             </li>
 
             <li
               v-if="running"
-              class="connection-diagnostics-row connection-diagnostics-row--running"
+              class="connection-diagnostics-step connection-diagnostics-step--running"
               data-testid="connection-diagnostics-running"
             >
-              <div class="connection-diagnostics-main">
-                <span class="connection-diagnostics-glyph" aria-hidden="true">·</span>
-                <span class="connection-diagnostics-label">Running diagnostics...</span>
+              <span class="connection-diagnostics-node" aria-hidden="true">·</span>
+              <div class="connection-diagnostics-step-body">
+                <span class="connection-diagnostics-label">Checking...</span>
               </div>
             </li>
           </ul>
-
-          <p
-            v-if="!running"
-            class="connection-diagnostics-verdict"
-            data-testid="connection-diagnostics-verdict"
-          >
-            {{ connectionOk ? 'Connection is valid.' : 'Connection is not usable.' }}
-          </p>
         </template>
       </div>
     </section>
@@ -78,12 +80,11 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
-import StatusBadge from '../ui/StatusBadge.vue'
 import type { ConnectionCheck, ConnectionCheckStatus } from '../../lib/api/types'
 
-defineProps<{
+const props = defineProps<{
   running: boolean
   available: boolean
   connectionOk: boolean
@@ -97,7 +98,7 @@ const closeIconPath =
   'M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z'
 
 // The popup never dismisses itself, on any outcome. A passing result is still something an
-// operator reads — timings, the shop domain, whether orders came back — so it waits to be closed.
+// operator reads, so it waits to be closed.
 function requestClose(): void {
   emit('close')
 }
@@ -115,8 +116,38 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
 })
 
-// The glyph and the badge label both carry the meaning, so a viewer who cannot separate the
-// tones still reads the result.
+const headline = computed(() => {
+  if (props.running) return 'Running diagnostics...'
+  return props.connectionOk ? 'Connection is valid.' : 'Connection is not usable.'
+})
+
+function plural(count: number): string {
+  return count === 1 ? 'check' : 'checks'
+}
+
+/**
+ * Deliberately gives no total while the run is in flight. Checks arrive stage by stage and the
+ * server does not announce how many are coming, so "2 of 4" would mean hardcoding a per-connector
+ * stage count here — the exact connector knowledge this component is built to avoid.
+ */
+const summary = computed(() => {
+  const counted = props.checks.length
+  if (props.running) {
+    return counted === 0 ? 'Starting...' : `${counted} ${plural(counted)} complete`
+  }
+
+  const passed = props.checks.filter((check) => check.status === 'PASS').length
+  const skipped = props.checks.filter((check) => check.status === 'SKIP').length
+  const firstFailed = props.checks.find((check) => check.status === 'FAIL')
+
+  if (!firstFailed) return `${passed} ${plural(passed)} passed`
+
+  // Name what broke: it is the one thing the operator has to act on.
+  const tallies = [`${passed} passed`]
+  if (skipped > 0) tallies.push(`${skipped} skipped`)
+  return `${firstFailed.label} failed · ${tallies.join(', ')}`
+})
+
 function glyphFor(status: ConnectionCheckStatus): string {
   if (status === 'PASS') return '✓'
   if (status === 'FAIL') return '✗'
@@ -128,12 +159,6 @@ function statusLabel(status: ConnectionCheckStatus): string {
   if (status === 'FAIL') return 'Failed'
   return 'Skipped'
 }
-
-function toneFor(status: ConnectionCheckStatus): 'success' | 'danger' | 'neutral' {
-  if (status === 'PASS') return 'success'
-  if (status === 'FAIL') return 'danger'
-  return 'neutral'
-}
 </script>
 
 <style scoped>
@@ -144,63 +169,90 @@ function toneFor(status: ConnectionCheckStatus): 'success' | 'danger' | 'neutral
   gap: var(--space-2);
 }
 
-.connection-diagnostics-list {
-  list-style: none;
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-2);
+.connection-diagnostics-verdict {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 400;
+}
+
+.connection-diagnostics-summary {
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.76rem;
 }
 
 /*
- * Two stacked lines rather than one grid. An earlier single-grid version placed the detail with
- * `grid-column: 2 / -1`, which pushed the badge and duration into a new implicit row at column 1 —
- * they escaped the card's padding and collided. Keeping the detail out of the main line's
- * formatting context removes that class of bug entirely.
+ * A rail rather than a stack of cards: the checks arrive in sequence, and a connecting line says
+ * "sequence" where separate tiles say "collection". The line is drawn once on the list, not per
+ * step, so it cannot fragment as rows stream in.
  */
-.connection-diagnostics-row {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+.connection-diagnostics-rail {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 26px;
+}
+
+.connection-diagnostics-rail::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 9px;
+  bottom: 12px;
+  width: 1px;
+  background: var(--border);
+}
+
+.connection-diagnostics-step {
+  position: relative;
+  padding-bottom: var(--space-3);
   font-size: 0.84rem;
 }
 
-.connection-diagnostics-main {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.connection-diagnostics-step:last-child {
+  padding-bottom: 0;
 }
 
-.connection-diagnostics-glyph {
-  flex: 0 0 1.25rem;
+.connection-diagnostics-node {
+  position: absolute;
+  left: -26px;
+  top: -1px;
+  width: 19px;
+  height: 19px;
+  line-height: 17px;
   text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  /* Opaque, so the node sits on the rail rather than the rail crossing through it. */
+  background: var(--surface);
+  font-size: 0.72rem;
   color: var(--text-soft);
 }
 
-.connection-diagnostics-label {
-  flex: 1 1 auto;
-  min-width: 0;
+.connection-diagnostics-step[data-check-status='FAIL'] .connection-diagnostics-node {
+  border-color: var(--text-soft);
+  color: var(--text);
 }
 
-/* Indented to sit under the label, clear of the glyph column. */
-.connection-diagnostics-detail {
-  margin: 0 0 0 calc(1.25rem + var(--space-2));
+.connection-diagnostics-step--running {
   color: var(--text-muted);
-  font-size: 0.78rem;
-  overflow-wrap: anywhere;
 }
 
-/* Pending, not a result: dashed and muted so it never reads as an outcome. */
-.connection-diagnostics-row--running {
+.connection-diagnostics-step--running .connection-diagnostics-node {
   border-style: dashed;
   color: var(--text-muted);
 }
 
-.connection-diagnostics-verdict {
-  margin: var(--space-3) 0 0;
-  font-size: 0.84rem;
-  font-weight: 400;
+.connection-diagnostics-step-body {
+  min-width: 0;
+}
+
+.connection-diagnostics-detail {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 </style>
