@@ -55,25 +55,32 @@ describe('ConnectionDiagnosticsPopup', () => {
     expect(credential.text()).toContain('✓')
     // Status is carried by a text label too, never by colour alone.
     expect(credential.text()).toContain('Passed')
-    expect(wrapper.get('[data-check-key="reachable"]').text()).toContain('84ms')
     expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is valid.')
   })
 
-  it('keeps the badge and duration on the main line, with the detail below it', () => {
+  it('keeps the badge on the main line, with the detail below it', () => {
     // Regression: the detail used to span the row grid to its last column, which pushed the badge
-    // and duration onto a new implicit row starting at column 1 — they rendered outside the card's
-    // padding and overlapped its border. Only rows carrying a detail were affected, so the shape
-    // to pin is that the detail is NOT a sibling of the badge.
+    // onto a new implicit row starting at column 1 — it rendered outside the card's padding and
+    // overlapped its border. Only rows carrying a detail were affected, so the shape to pin is
+    // that the detail is NOT a sibling of the badge.
     const wrapper = mountPopup()
     const withDetail = wrapper.get('[data-check-key="reachable"]')
     const mainLine = withDetail.get('.connection-diagnostics-main')
 
     expect(mainLine.find('.status-badge').exists()).toBe(true)
-    expect(mainLine.find('.connection-diagnostics-duration').exists()).toBe(true)
     expect(mainLine.find('.connection-diagnostics-detail').exists()).toBe(false)
 
     const detail = withDetail.get('.connection-diagnostics-detail')
     expect(detail.element.parentElement).toBe(withDetail.element)
+  })
+
+  it('does not render per-check timings', () => {
+    // Timings stay in the API and the server log for troubleshooting, but an operator asking
+    // "does this connection work" is not asking how many milliseconds it took.
+    const wrapper = mountPopup()
+
+    expect(wrapper.text()).not.toContain('ms')
+    expect(wrapper.find('.connection-diagnostics-duration').exists()).toBe(false)
   })
 
   it('marks failed and skipped rows distinctly', () => {

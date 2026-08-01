@@ -47,9 +47,6 @@
               <div class="connection-diagnostics-main">
                 <span class="connection-diagnostics-glyph" aria-hidden="true">{{ glyphFor(check.status) }}</span>
                 <span class="connection-diagnostics-label">{{ check.label }}</span>
-                <span v-if="check.durationMillis != null" class="connection-diagnostics-duration">
-                  {{ check.durationMillis }}ms
-                </span>
                 <StatusBadge :label="statusLabel(check.status)" :tone="toneFor(check.status)" />
               </div>
               <p v-if="check.detail" class="connection-diagnostics-detail">{{ check.detail }}</p>
@@ -193,13 +190,6 @@ function toneFor(status: ConnectionCheckStatus): 'success' | 'danger' | 'neutral
   color: var(--text-muted);
   font-size: 0.78rem;
   overflow-wrap: anywhere;
-}
-
-.connection-diagnostics-duration {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-  font-size: 0.76rem;
-  font-variant-numeric: tabular-nums;
 }
 
 /* Pending, not a result: dashed and muted so it never reads as an outcome. */

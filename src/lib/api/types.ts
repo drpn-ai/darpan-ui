@@ -262,6 +262,11 @@ export interface ConnectionCheck {
   label: string
   status: ConnectionCheckStatus
   detail?: string | null
+  /**
+   * Per-check timing. Returned and logged for troubleshooting (it is how the orders stage was
+   * found to sit at ~4900ms against a 10s read timeout) but deliberately not rendered: an operator
+   * asking whether a connection works is not asking how many milliseconds it took.
+   */
   durationMillis?: number | null
 }
 
