@@ -255,6 +255,32 @@ export interface GetShopifyAuthConfigResponse extends ApiEnvelope {
   shopifyAuthConfig?: ShopifyAuthConfigRecord | null
 }
 
+export type ConnectionCheckStatus = 'PASS' | 'FAIL' | 'SKIP'
+
+export interface ConnectionCheck {
+  key: string
+  label: string
+  status: ConnectionCheckStatus
+  detail?: string | null
+  durationMillis?: number | null
+}
+
+/**
+ * Hand-authored rather than aliased to Schemas['TestSourceConnectionResult']: Moqui describes a
+ * List-of-Map out-parameter by naming its element (`<parameter name="check" type="Map">`), and the
+ * generator turns that into a `{ check?: ... }[]` wrapper that does not exist at runtime.
+ *
+ * `ok` keeps the envelope meaning (the diagnostic ran); `connectionOk` is the verdict. They are
+ * deliberately separate — the client throws on `ok: false`, so a failed connection has to come back
+ * as a successful call or the failure rows would never reach the UI.
+ */
+export interface TestSourceConnectionResponse extends ApiEnvelope {
+  available?: boolean
+  connectionOk?: boolean
+  durationMillis?: number
+  checks?: ConnectionCheck[]
+}
+
 export interface OmsRestSourceConfigRecord {
   omsRestSourceConfigId: string
   description?: string

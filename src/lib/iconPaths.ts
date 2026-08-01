@@ -16,3 +16,8 @@ export const playIconPath =
   'M6.75 4.2c0-.91.99-1.48 1.78-1.01l7.1 4.25a1.18 1.18 0 0 1 0 2.02l-7.1 4.25a1.18 1.18 0 0 1-1.78-1.01V4.2Z'
 
 export const playIconTransform = 'translate(0 1.5)'
+
+// Pulse line — connection diagnostics. Stroked rather than filled, so it renders with the same
+// weight as the other single-path glyphs in this set.
+export const diagnosticsIconPath =
+  'M2.75 10h2.9l1.7-4.6a.75.75 0 0 1 1.42.06l2.2 8 1.66-5.2a.75.75 0 0 1 1.4-.08l.9 1.82h2.32'

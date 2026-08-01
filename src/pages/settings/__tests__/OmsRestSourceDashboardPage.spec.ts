@@ -8,6 +8,7 @@ const route = vi.hoisted(() => ({
 
 const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
 const deleteOmsRestSourceConfig = vi.hoisted(() => vi.fn())
+const testSourceConnection = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const authState = vi.hoisted(() => ({
   sessionInfo: {
@@ -33,6 +34,7 @@ vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: {
     listOmsRestSourceConfigs,
     deleteOmsRestSourceConfig,
+    testSourceConnection,
   },
 }))
 
@@ -81,12 +83,40 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 
 import OmsRestSourceDashboardPage from '../OmsRestSourceDashboardPage.vue'
 
+function dashboardListResponse() {
+  return {
+    ok: true,
+    messages: [],
+    errors: [],
+    omsRestSourceConfigs: [
+      {
+        omsRestSourceConfigId: 'krewe-oms',
+        description: 'Krewe HotWax',
+        companyUserGroupId: 'KREWE',
+        baseUrl: 'https://oms.example.com',
+        ordersPath: '/rest/s1/oms/orders',
+        authType: 'BEARER',
+        timeZone: 'America/Chicago',
+        hasUsername: false,
+        hasPassword: false,
+        hasApiToken: true,
+        customHeaderNames: ['X-Tenant'],
+        connectTimeoutSeconds: 30,
+        readTimeoutSeconds: 60,
+        isActive: 'Y',
+      },
+    ],
+    pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+  }
+}
+
 describe('OmsRestSourceDashboardPage', () => {
   beforeEach(() => {
     route.params = { omsRestSourceConfigId: 'krewe-oms' }
     route.fullPath = '/settings/hotwax/auth/krewe-oms'
     listOmsRestSourceConfigs.mockReset()
     deleteOmsRestSourceConfig.mockReset()
+    testSourceConnection.mockReset()
     push.mockReset()
     authState.sessionInfo = {
       userId: 'john.doe',
@@ -185,6 +215,7 @@ describe('OmsRestSourceDashboardPage', () => {
     expect([...footerActionRow.element.children].map((child) => child.getAttribute('data-testid'))).toEqual([
       'back-oms-rest-source',
       'list-oms-rest-sources',
+      'diagnose-oms-rest-source',
       'delete-oms-rest-source',
     ])
   })
@@ -287,5 +318,78 @@ describe('OmsRestSourceDashboardPage', () => {
     expect(wrapper.find('[data-testid="delete-oms-rest-source"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="back-oms-rest-source"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="list-oms-rest-sources"]').exists()).toBe(true)
+  })
+  it('runs connection diagnostics from the footer against the OMS connector', async () => {
+    listOmsRestSourceConfigs.mockResolvedValue(dashboardListResponse())
+    testSourceConnection.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      available: true,
+      connectionOk: true,
+      checks: [
+        { key: 'credential', label: 'Credential readable', status: 'PASS' },
+        { key: 'reachable', label: 'Base URL reachable', status: 'PASS', durationMillis: 63 },
+        { key: 'auth', label: 'Credentials accepted', status: 'PASS' },
+        { key: 'ordersRead', label: 'Orders readable', status: 'PASS', detail: '1 order returned' },
+      ],
+    })
+
+    const wrapper = mount(OmsRestSourceDashboardPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="diagnose-oms-rest-source"]').trigger('click')
+    await flushPromises()
+
+    expect(testSourceConnection).toHaveBeenCalledWith(
+      { systemEnumId: 'OMS', configId: 'krewe-oms' },
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.findAll('[data-testid="connection-diagnostics-check"]')).toHaveLength(4)
+    expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is valid.')
+  })
+
+  it('reports an undecryptable stored credential as a credential fault', async () => {
+    // The live production failure: the apiToken cannot be decrypted, so nothing downstream ran.
+    listOmsRestSourceConfigs.mockResolvedValue(dashboardListResponse())
+    testSourceConnection.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      available: true,
+      connectionOk: false,
+      checks: [
+        { key: 'credential', label: 'Credential readable', status: 'FAIL', detail: 'The stored credentials could not be decrypted.' },
+        { key: 'reachable', label: 'Base URL reachable', status: 'SKIP', detail: 'Not attempted.' },
+        { key: 'auth', label: 'Credentials accepted', status: 'SKIP', detail: 'Not attempted.' },
+        { key: 'ordersRead', label: 'Orders readable', status: 'SKIP', detail: 'Not attempted.' },
+      ],
+    })
+
+    const wrapper = mount(OmsRestSourceDashboardPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="diagnose-oms-rest-source"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('The stored credentials could not be decrypted.')
+    expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is not usable.')
+    expect(wrapper.get('[data-check-key="credential"]').attributes('data-check-status')).toBe('FAIL')
+    // The network rows are untested, not broken.
+    expect(wrapper.get('[data-check-key="reachable"]').attributes('data-check-status')).toBe('SKIP')
+  })
+
+  it('hides the diagnostics action from a read-only tenant', async () => {
+    authState.sessionInfo = {
+      userId: 'john.doe',
+      isSuperAdmin: false,
+      canEditActiveTenantData: false,
+      activeTenantUserGroupId: 'KREWE',
+    }
+    listOmsRestSourceConfigs.mockResolvedValue(dashboardListResponse())
+
+    const wrapper = mount(OmsRestSourceDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="diagnose-oms-rest-source"]').exists()).toBe(false)
   })
 })

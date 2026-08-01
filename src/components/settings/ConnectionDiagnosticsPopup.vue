@@ -1,0 +1,235 @@
+<template>
+  <div
+    class="popup-workflow-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="connection-diagnostics-title"
+    data-testid="connection-diagnostics-popup"
+    @click.self="requestClose"
+  >
+    <section
+      class="popup-workflow-modal workflow-panel connection-diagnostics-popup"
+      @mouseenter="holdOpen"
+      @focusin="holdOpen"
+    >
+      <header class="workflow-panel-header connection-diagnostics-header">
+        <h2 id="connection-diagnostics-title">Diagnostics</h2>
+        <button
+          v-if="!autoClosing"
+          type="button"
+          class="app-icon-action connection-diagnostics-close"
+          data-testid="connection-diagnostics-close"
+          aria-label="Close diagnostics"
+          @click="requestClose"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path :d="closeIconPath" fill="currentColor" />
+          </svg>
+        </button>
+      </header>
+
+      <div aria-live="polite" data-testid="connection-diagnostics-body">
+        <p v-if="running" class="section-note" data-testid="connection-diagnostics-running">
+          Running diagnostics...
+        </p>
+
+        <InlineValidation v-else-if="error" tone="error" :message="error" />
+
+        <p
+          v-else-if="!available"
+          class="section-note"
+          data-testid="connection-diagnostics-unavailable"
+        >
+          Diagnostics are not available for this connector.
+        </p>
+
+        <template v-else>
+          <ul class="connection-diagnostics-list" data-testid="connection-diagnostics-checks">
+            <li
+              v-for="check in checks"
+              :key="check.key"
+              class="connection-diagnostics-row"
+              data-testid="connection-diagnostics-check"
+              :data-check-key="check.key"
+              :data-check-status="check.status"
+            >
+              <span class="connection-diagnostics-glyph" aria-hidden="true">{{ glyphFor(check.status) }}</span>
+              <span class="connection-diagnostics-label">{{ check.label }}</span>
+              <span v-if="check.detail" class="connection-diagnostics-detail">{{ check.detail }}</span>
+              <StatusBadge :label="statusLabel(check.status)" :tone="toneFor(check.status)" />
+              <span v-if="check.durationMillis != null" class="connection-diagnostics-duration">
+                {{ check.durationMillis }}ms
+              </span>
+            </li>
+          </ul>
+
+          <p class="connection-diagnostics-verdict" data-testid="connection-diagnostics-verdict">
+            {{ connectionOk ? 'Connection is valid.' : 'Connection is not usable.' }}
+          </p>
+        </template>
+      </div>
+    </section>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import InlineValidation from '../ui/InlineValidation.vue'
+import StatusBadge from '../ui/StatusBadge.vue'
+import type { ConnectionCheck, ConnectionCheckStatus } from '../../lib/api/types'
+
+const props = defineProps<{
+  running: boolean
+  available: boolean
+  connectionOk: boolean
+  checks: ConnectionCheck[]
+  error: string | null
+}>()
+
+const emit = defineEmits<{ (event: 'close'): void }>()
+
+/** Only a fully-successful run dismisses itself; a failure waits for the operator. */
+const AUTO_CLOSE_DELAY_MS = 2000
+
+const closeIconPath =
+  'M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z'
+
+let autoCloseTimer: ReturnType<typeof setTimeout> | null = null
+const autoClosing = ref(false)
+
+function clearAutoClose(): void {
+  if (autoCloseTimer !== null) {
+    clearTimeout(autoCloseTimer)
+    autoCloseTimer = null
+  }
+  autoClosing.value = false
+}
+
+/**
+ * Cancel the pending auto-close as soon as the operator engages with the popup. Without this a
+ * success popup can vanish mid-read; once cancelled it stays until dismissed, and the close
+ * control appears.
+ */
+function holdOpen(): void {
+  clearAutoClose()
+}
+
+function requestClose(): void {
+  clearAutoClose()
+  emit('close')
+}
+
+const shouldAutoClose = computed(
+  () => !props.running && !props.error && props.available && props.connectionOk,
+)
+
+watch(
+  shouldAutoClose,
+  (value) => {
+    clearAutoClose()
+    if (!value) return
+    autoClosing.value = true
+    autoCloseTimer = setTimeout(() => {
+      autoCloseTimer = null
+      autoClosing.value = false
+      emit('close')
+    }, AUTO_CLOSE_DELAY_MS)
+  },
+  { immediate: true },
+)
+
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    requestClose()
+  }
+}
+
+window.addEventListener('keydown', onKeydown)
+
+onBeforeUnmount(() => {
+  clearAutoClose()
+  window.removeEventListener('keydown', onKeydown)
+})
+
+// The glyph and the badge label both carry the meaning, so a viewer who cannot separate the
+// tones still reads the result.
+function glyphFor(status: ConnectionCheckStatus): string {
+  if (status === 'PASS') return '✓'
+  if (status === 'FAIL') return '✗'
+  return '–'
+}
+
+function statusLabel(status: ConnectionCheckStatus): string {
+  if (status === 'PASS') return 'Passed'
+  if (status === 'FAIL') return 'Failed'
+  return 'Skipped'
+}
+
+function toneFor(status: ConnectionCheckStatus): 'success' | 'danger' | 'neutral' {
+  if (status === 'PASS') return 'success'
+  if (status === 'FAIL') return 'danger'
+  return 'neutral'
+}
+</script>
+
+<style scoped>
+.connection-diagnostics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.connection-diagnostics-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.connection-diagnostics-row {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.84rem;
+}
+
+.connection-diagnostics-glyph {
+  text-align: center;
+  color: var(--text-soft);
+}
+
+.connection-diagnostics-detail {
+  grid-column: 2 / -1;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.connection-diagnostics-duration {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.connection-diagnostics-verdict {
+  margin: var(--space-3) 0 0;
+  font-size: 0.84rem;
+  font-weight: 400;
+}
+
+@media (max-width: 40rem) {
+  .connection-diagnostics-row {
+    grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  }
+
+  .connection-diagnostics-duration {
+    grid-column: 2 / -1;
+  }
+}
+</style>

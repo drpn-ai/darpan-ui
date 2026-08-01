@@ -93,6 +93,28 @@
         <button
           v-if="canEditTenantSettings"
           type="button"
+          class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
+          data-testid="diagnose-shopify-auth"
+          aria-label="Run connection diagnostics"
+          title="Run connection diagnostics"
+          :disabled="diagnostics.running.value"
+          @click="runDiagnostics"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path
+              :d="diagnosticsIconPath"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+
+        <button
+          v-if="canEditTenantSettings"
+          type="button"
           class="app-icon-action app-icon-action--large app-icon-action--danger settings-dashboard-footer-action"
           data-testid="delete-shopify-auth"
           aria-label="Delete Shopify config"
@@ -106,11 +128,22 @@
       </div>
     </template>
   </StaticPageFrame>
+
+  <ConnectionDiagnosticsPopup
+    v-if="diagnostics.open.value"
+    :running="diagnostics.running.value"
+    :available="diagnostics.available.value"
+    :connection-ok="diagnostics.connectionOk.value"
+    :checks="diagnostics.checks.value"
+    :error="diagnostics.error.value"
+    @close="diagnostics.close"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import ConnectionDiagnosticsPopup from '../../components/settings/ConnectionDiagnosticsPopup.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
@@ -121,9 +154,16 @@ import type { ShopifyAuthConfigRecord } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
+import {
+  backIconPath,
+  diagnosticsIconPath,
+  editIconPath,
+  trashIconPath,
+  trashIconTransform,
+} from '../../lib/iconPaths'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
+import { useConnectionDiagnostics } from './useConnectionDiagnostics'
 
 const route = useRoute()
 const router = useRouter()
@@ -165,9 +205,16 @@ const editRoute = computed(() => ({
 }))
 
 const pageAbortController = new AbortController()
+const diagnostics = useConnectionDiagnostics('SHOPIFY')
+
+function runDiagnostics(): void {
+  if (!config.value) return
+  void diagnostics.run(config.value.shopifyAuthConfigId)
+}
 
 onBeforeUnmount(() => {
   pageAbortController.abort()
+  diagnostics.dispose()
 })
 
 async function load(): Promise<void> {

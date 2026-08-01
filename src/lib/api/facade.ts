@@ -66,6 +66,7 @@ import type {
   SaveUserNotificationDefaultResponse,
   SaveUserSettingsResponse,
   SaveShopifyAuthConfigResponse,
+  TestSourceConnectionResponse,
   SubscribeRunNotificationResponse,
   UnsubscribeRunNotificationResponse,
   CancelReconciliationRunResponse,
@@ -120,6 +121,7 @@ import type {
   SaveSavedRunNamePayload,
   SaveSftpServerPayload,
   SaveShopifyAuthConfigPayload,
+  TestSourceConnectionPayload,
   SaveTenantChatSpacePayload,
   SaveTenantSettingsPayload,
   SaveUserNotificationDefaultPayload,
@@ -165,6 +167,7 @@ const SETTINGS = {
   listOmsRestSourceConfigs: 'facade.HotWaxOmsFacadeServices.list#HotWaxOmsRestSourceConfigs',
   saveOmsRestSourceConfig: 'facade.HotWaxOmsFacadeServices.save#HotWaxOmsRestSourceConfig',
   deleteOmsRestSourceConfig: 'facade.HotWaxOmsFacadeServices.delete#HotWaxOmsRestSourceConfig',
+  testSourceConnection: 'facade.SettingsFacadeServices.test#SourceConnection',
 }
 
 const JSON_SCHEMA = {
@@ -297,6 +300,9 @@ export const settingsFacade = {
   },
   deleteOmsRestSourceConfig(payload: DeleteOmsRestSourceConfigPayload, signal?: AbortSignal): Promise<DeleteOmsRestSourceConfigResponse> {
     return callService<DeleteOmsRestSourceConfigResponse>(SETTINGS.deleteOmsRestSourceConfig, payload, signal)
+  },
+  testSourceConnection(payload: TestSourceConnectionPayload, signal?: AbortSignal): Promise<TestSourceConnectionResponse> {
+    return callService<TestSourceConnectionResponse>(SETTINGS.testSourceConnection, payload, signal)
   },
 }
 

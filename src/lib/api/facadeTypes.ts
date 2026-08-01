@@ -129,6 +129,11 @@ export interface DeleteShopifyAuthConfigPayload {
   shopifyAuthConfigId: string
 }
 
+export interface TestSourceConnectionPayload {
+  systemEnumId: string
+  configId: string
+}
+
 export interface ListOmsRestSourceConfigsPayload {
   pageIndex: number
   pageSize: number

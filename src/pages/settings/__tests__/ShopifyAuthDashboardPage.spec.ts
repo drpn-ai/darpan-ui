@@ -9,6 +9,7 @@ const route = vi.hoisted(() => ({
 
 const getShopifyAuthConfig = vi.hoisted(() => vi.fn())
 const deleteShopifyAuthConfig = vi.hoisted(() => vi.fn())
+const testSourceConnection = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const authState = vi.hoisted(() => ({
   sessionInfo: {
@@ -34,6 +35,7 @@ vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: {
     getShopifyAuthConfig,
     deleteShopifyAuthConfig,
+    testSourceConnection,
   },
 }))
 
@@ -80,7 +82,27 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
   }),
 }))
 
+import { ApiCallError } from '../../../lib/api/client'
 import ShopifyAuthDashboardPage from '../ShopifyAuthDashboardPage.vue'
+
+function dashboardConfigResponse() {
+  return {
+    ok: true,
+    messages: [],
+    errors: [],
+    shopifyAuthConfig: {
+      shopifyAuthConfigId: 'krewe-shopify',
+      description: 'Krewe Shopify',
+      companyUserGroupId: 'KREWE',
+      shopApiUrl: 'https://krewe.myshopify.com',
+      apiVersion: '2026-01',
+      timeZone: 'America/Chicago',
+      isActive: 'Y',
+      canReadOrders: true,
+      hasAccessToken: true,
+    },
+  }
+}
 
 describe('ShopifyAuthDashboardPage', () => {
   beforeEach(() => {
@@ -88,6 +110,7 @@ describe('ShopifyAuthDashboardPage', () => {
     route.fullPath = '/settings/shopify/auth/krewe-shopify'
     getShopifyAuthConfig.mockReset()
     deleteShopifyAuthConfig.mockReset()
+    testSourceConnection.mockReset()
     push.mockReset()
     authState.sessionInfo = {
       userId: 'john.doe',
@@ -165,6 +188,7 @@ describe('ShopifyAuthDashboardPage', () => {
     const footerActionRow = wrapper.get('.settings-dashboard-footer-row')
     expect([...footerActionRow.element.children].map((child) => child.getAttribute('data-testid'))).toEqual([
       'back-shopify-auth',
+      'diagnose-shopify-auth',
       'delete-shopify-auth',
     ])
   })
@@ -259,5 +283,93 @@ describe('ShopifyAuthDashboardPage', () => {
     expect(wrapper.find('[data-testid="shopify-auth-edit-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="delete-shopify-auth"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="back-shopify-auth"]').exists()).toBe(true)
+  })
+  it('runs connection diagnostics from the footer and renders the check rows', async () => {
+    getShopifyAuthConfig.mockResolvedValue(dashboardConfigResponse())
+    testSourceConnection.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      available: true,
+      connectionOk: true,
+      durationMillis: 496,
+      checks: [
+        { key: 'credential', label: 'Credential readable', status: 'PASS' },
+        { key: 'reachable', label: 'Shop reachable', status: 'PASS', durationMillis: 84 },
+        { key: 'apiVersion', label: 'API version supported', status: 'PASS', detail: '2026-01' },
+        { key: 'ordersRead', label: 'Orders readable', status: 'PASS', durationMillis: 412 },
+      ],
+    })
+
+    const wrapper = mount(ShopifyAuthDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="connection-diagnostics-popup"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="diagnose-shopify-auth"]').trigger('click')
+    await flushPromises()
+
+    expect(testSourceConnection).toHaveBeenCalledWith(
+      { systemEnumId: 'SHOPIFY', configId: 'krewe-shopify' },
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.find('[data-testid="connection-diagnostics-popup"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="connection-diagnostics-check"]')).toHaveLength(4)
+    expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is valid.')
+  })
+
+  it('renders a failed connection as check rows rather than throwing away the result', async () => {
+    // The backend reports a bad credential as a SUCCESSFUL call with connectionOk false, because
+    // the client throws on ok:false — a regression there would lose the failure rows entirely.
+    getShopifyAuthConfig.mockResolvedValue(dashboardConfigResponse())
+    testSourceConnection.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      available: true,
+      connectionOk: false,
+      checks: [
+        { key: 'credential', label: 'Credential readable', status: 'PASS' },
+        { key: 'reachable', label: 'Shop reachable', status: 'FAIL', detail: 'The access token was rejected (HTTP 401).' },
+        { key: 'apiVersion', label: 'API version supported', status: 'SKIP', detail: 'Not attempted.' },
+        { key: 'ordersRead', label: 'Orders readable', status: 'SKIP', detail: 'Not attempted.' },
+      ],
+    })
+
+    const wrapper = mount(ShopifyAuthDashboardPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="diagnose-shopify-auth"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is not usable.')
+    expect(wrapper.text()).toContain('The access token was rejected (HTTP 401).')
+  })
+
+  it('surfaces a diagnostics service failure instead of hanging on the spinner', async () => {
+    getShopifyAuthConfig.mockResolvedValue(dashboardConfigResponse())
+    testSourceConnection.mockRejectedValue(new ApiCallError('Your active tenant is read-only for this action.', 200))
+
+    const wrapper = mount(ShopifyAuthDashboardPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="diagnose-shopify-auth"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="connection-diagnostics-running"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Your active tenant is read-only for this action.')
+  })
+
+  it('hides the diagnostics action from a read-only tenant', async () => {
+    authState.sessionInfo = {
+      userId: 'john.doe',
+      isSuperAdmin: false,
+      canEditActiveTenantData: false,
+      activeTenantUserGroupId: 'KREWE',
+    }
+    getShopifyAuthConfig.mockResolvedValue(dashboardConfigResponse())
+
+    const wrapper = mount(ShopifyAuthDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="diagnose-shopify-auth"]').exists()).toBe(false)
   })
 })
