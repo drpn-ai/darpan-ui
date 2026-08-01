@@ -375,4 +375,21 @@ describe('ShopifyAuthDashboardPage', () => {
 
     expect(wrapper.find('[data-testid="diagnose-shopify-auth"]').exists()).toBe(false)
   })
+  it('blurs the page behind the popup, matching every other popup in the app', async () => {
+    // The app never dims behind a popup — it blurs and fades the page itself via
+    // *--popup-open (style.css). A bespoke scrim here would make this popup the odd one out.
+    getShopifyAuthConfig.mockResolvedValue(dashboardConfigResponse())
+    testSourceConnection.mockResolvedValue({
+      ok: true, messages: [], errors: [], available: true, connectionOk: true, nextStage: null,
+      checks: [{ key: 'credential', label: 'Credential readable', status: 'PASS' }],
+    })
+
+    const wrapper = mount(ShopifyAuthDashboardPage)
+    await flushPromises()
+    expect(wrapper.find('.static-page-frame--popup-open').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="diagnose-shopify-auth"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.static-page-frame--popup-open').exists()).toBe(true)
+  })
 })

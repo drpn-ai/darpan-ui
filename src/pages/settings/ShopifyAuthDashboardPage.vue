@@ -1,5 +1,5 @@
 <template>
-  <StaticPageFrame>
+  <StaticPageFrame :class="{ 'static-page-frame--popup-open': diagnostics.open.value }">
     <template #hero>
       <h1>{{ heroTitle }}</h1>
     </template>

@@ -819,16 +819,11 @@ button:disabled {
   place-items: center;
   padding: var(--space-4);
   /*
-   * A scrim must darken in BOTH themes, so it cannot be derived from --bg: that token inverts with
-   * the theme, and in light mode (--bg: #ffffff) a 38% tint of it is white-on-white — no visible
-   * fade at all. Anchored to a fixed dark instead, slightly stronger in light mode where the page
-   * beneath it is bright.
+   * Only a faint wash. The visible separation comes from the page itself, which takes
+   * *--popup-open (blur + opacity) while a popup is open — see .static-page-frame--popup-open.
+   * A heavier scrim here would make this popup read differently from every other one.
    */
-  background: color-mix(in oklab, #090909 55%, transparent);
-}
-
-:root[data-theme='light'] .popup-workflow-overlay {
-  background: color-mix(in oklab, #090909 32%, transparent);
+  background: color-mix(in oklab, var(--bg) 38%, transparent);
 }
 
 .popup-workflow-modal.workflow-panel {

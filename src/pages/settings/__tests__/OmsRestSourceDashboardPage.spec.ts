@@ -395,4 +395,21 @@ describe('OmsRestSourceDashboardPage', () => {
 
     expect(wrapper.find('[data-testid="diagnose-oms-rest-source"]').exists()).toBe(false)
   })
+  it('blurs the page behind the popup, matching every other popup in the app', async () => {
+    // The app never dims behind a popup — it blurs and fades the page itself via
+    // *--popup-open (style.css). A bespoke scrim here would make this popup the odd one out.
+    listOmsRestSourceConfigs.mockResolvedValue(dashboardListResponse())
+    testSourceConnection.mockResolvedValue({
+      ok: true, messages: [], errors: [], available: true, connectionOk: true, nextStage: null,
+      checks: [{ key: 'credential', label: 'Credential readable', status: 'PASS' }],
+    })
+
+    const wrapper = mount(OmsRestSourceDashboardPage)
+    await flushPromises()
+    expect(wrapper.find('.static-page-frame--popup-open').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="diagnose-oms-rest-source"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.static-page-frame--popup-open').exists()).toBe(true)
+  })
 })
