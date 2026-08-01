@@ -85,18 +85,6 @@
           </svg>
         </RouterLink>
 
-        <RouterLink
-          to="/settings/hotwax"
-          class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
-          data-testid="list-oms-rest-sources"
-          aria-label="View HotWax sources"
-          title="View HotWax sources"
-        >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="listIconPath" fill="currentColor" />
-          </svg>
-        </RouterLink>
-
         <button
           v-if="canEditTenantSettings"
           type="button"
@@ -165,7 +153,6 @@ import {
   backIconPath,
   diagnosticsIconPath,
   editIconPath,
-  listIconPath,
   trashIconPath,
   trashIconTransform,
 } from '../../lib/iconPaths'

@@ -190,7 +190,6 @@ describe('OmsRestSourceDashboardPage', () => {
     const footerActions = wrapper.get('.static-page-actions')
     const deleteAction = wrapper.get('[data-testid="delete-oms-rest-source"]')
     const backAction = wrapper.get('[data-testid="back-oms-rest-source"]')
-    const listAction = wrapper.get('[data-testid="list-oms-rest-sources"]')
 
     expect(deleteAction.attributes('aria-label')).toBe('Delete HotWax source')
     expect(deleteAction.classes()).toContain('app-icon-action')
@@ -204,17 +203,9 @@ describe('OmsRestSourceDashboardPage', () => {
     expect(backAction.attributes('data-to')).toBe('/settings/hotwax')
     expect(backAction.element.closest('.static-page-actions')).toBe(footerActions.element)
     expect(backAction.element.closest('.static-page-board')).toBeNull()
-    expect(listAction.attributes('aria-label')).toBe('View HotWax sources')
-    expect(listAction.classes()).toContain('app-icon-action')
-    expect(listAction.classes()).toContain('app-icon-action--large')
-    expect(listAction.attributes('data-to')).toBe('/settings/hotwax')
-    expect(listAction.get('svg').attributes('viewBox')).toBe('0 0 20 20')
-    expect(listAction.element.closest('.static-page-actions')).toBe(footerActions.element)
-    expect(listAction.element.closest('.static-page-board')).toBeNull()
     const footerActionRow = wrapper.get('.settings-dashboard-footer-row')
     expect([...footerActionRow.element.children].map((child) => child.getAttribute('data-testid'))).toEqual([
       'back-oms-rest-source',
-      'list-oms-rest-sources',
       'diagnose-oms-rest-source',
       'delete-oms-rest-source',
     ])
@@ -317,7 +308,9 @@ describe('OmsRestSourceDashboardPage', () => {
     expect(wrapper.find('[data-testid="oms-auth-edit-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="delete-oms-rest-source"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="back-oms-rest-source"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="list-oms-rest-sources"]').exists()).toBe(true)
+    // No separate list action: back already returns to /settings/hotwax, and the Shopify
+    // dashboard has no such button — the two detail pages carry the same footer.
+    expect(wrapper.find('[data-testid="list-oms-rest-sources"]').exists()).toBe(false)
   })
   it('runs connection diagnostics from the footer against the OMS connector', async () => {
     listOmsRestSourceConfigs.mockResolvedValue(dashboardListResponse())
@@ -411,5 +404,24 @@ describe('OmsRestSourceDashboardPage', () => {
     await wrapper.get('[data-testid="diagnose-oms-rest-source"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('.static-page-frame--popup-open').exists()).toBe(true)
+  })
+  it('carries the same footer actions as the Shopify detail page', async () => {
+    // The two connector detail pages are the same surface and should feel the same. HotWax used
+    // to carry an extra list action that pointed at /settings/hotwax — the destination the back
+    // action beside it already had.
+    listOmsRestSourceConfigs.mockResolvedValue(dashboardListResponse())
+
+    const wrapper = mount(OmsRestSourceDashboardPage)
+    await flushPromises()
+
+    const footer = wrapper.get('.settings-dashboard-footer-row')
+    const actions = [...footer.element.children].map((child) => child.getAttribute('data-testid'))
+    expect(actions).toEqual([
+      'back-oms-rest-source',
+      'diagnose-oms-rest-source',
+      'delete-oms-rest-source',
+    ])
+    // Same shape as ShopifyAuthDashboardPage: back, diagnose, delete — nothing else.
+    expect(actions).toHaveLength(3)
   })
 })
