@@ -92,59 +92,44 @@ describe('ConnectionDiagnosticsPopup', () => {
     expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is not usable.')
   })
 
-  it('closes itself two seconds after a fully successful run', async () => {
-    const wrapper = mountPopup()
+  it('never dismisses itself, on any outcome', () => {
+    // The popup waits for the operator on every result. A pass is still something to read —
+    // timings, the shop domain, whether orders came back — so nothing is on a timer.
+    const passing = mountPopup()
+    const failing = mountPopup({ connectionOk: false, checks: failingChecks })
+    const unavailable = mountPopup({ available: false, connectionOk: false, checks: [] })
 
-    expect(wrapper.emitted('close')).toBeUndefined()
-    vi.advanceTimersByTime(1999)
-    expect(wrapper.emitted('close')).toBeUndefined()
-    vi.advanceTimersByTime(1)
-    expect(wrapper.emitted('close')).toHaveLength(1)
+    vi.advanceTimersByTime(600_000)
+
+    expect(passing.emitted('close')).toBeUndefined()
+    expect(failing.emitted('close')).toBeUndefined()
+    expect(unavailable.emitted('close')).toBeUndefined()
   })
 
-  it('stays open indefinitely when any check failed', () => {
-    const wrapper = mountPopup({ connectionOk: false, checks: failingChecks })
-
-    vi.advanceTimersByTime(60_000)
-    expect(wrapper.emitted('close')).toBeUndefined()
-  })
-
-  it('cancels the auto-close when the operator hovers it', async () => {
-    const wrapper = mountPopup()
-
-    await wrapper.get('.connection-diagnostics-popup').trigger('mouseenter')
-    vi.advanceTimersByTime(60_000)
-
-    expect(wrapper.emitted('close')).toBeUndefined()
-  })
-
-  it('cancels the auto-close when focus moves inside it', async () => {
-    const wrapper = mountPopup()
-
-    await wrapper.get('.connection-diagnostics-popup').trigger('focusin')
-    vi.advanceTimersByTime(60_000)
-
-    expect(wrapper.emitted('close')).toBeUndefined()
-  })
-
-  it('offers no close control while it is about to auto-close, and one once held open', async () => {
-    const wrapper = mountPopup()
-    expect(wrapper.find('[data-testid="connection-diagnostics-close"]').exists()).toBe(false)
-
-    await wrapper.get('.connection-diagnostics-popup').trigger('mouseenter')
-    expect(wrapper.find('[data-testid="connection-diagnostics-close"]').exists()).toBe(true)
+  it('always offers a close control', () => {
+    expect(mountPopup().find('[data-testid="connection-diagnostics-close"]').exists()).toBe(true)
+    expect(
+      mountPopup({ connectionOk: false, checks: failingChecks })
+        .find('[data-testid="connection-diagnostics-close"]')
+        .exists(),
+    ).toBe(true)
+    expect(
+      mountPopup({ running: true, checks: [] })
+        .find('[data-testid="connection-diagnostics-close"]')
+        .exists(),
+    ).toBe(true)
   })
 
   it('closes on the close button, on Escape and on a click outside', async () => {
-    const byButton = mountPopup({ connectionOk: false, checks: failingChecks })
+    const byButton = mountPopup()
     await byButton.get('[data-testid="connection-diagnostics-close"]').trigger('click')
     expect(byButton.emitted('close')).toHaveLength(1)
 
-    const byEscape = mountPopup({ connectionOk: false, checks: failingChecks })
+    const byEscape = mountPopup()
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(byEscape.emitted('close')).toHaveLength(1)
 
-    const byBackdrop = mountPopup({ connectionOk: false, checks: failingChecks })
+    const byBackdrop = mountPopup()
     await byBackdrop.get('[data-testid="connection-diagnostics-popup"]').trigger('click')
     expect(byBackdrop.emitted('close')).toHaveLength(1)
   })
@@ -154,9 +139,6 @@ describe('ConnectionDiagnosticsPopup', () => {
 
     expect(wrapper.find('[data-testid="connection-diagnostics-running"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="connection-diagnostics-check"]')).toHaveLength(0)
-    // A run still in flight must never trip the success timer.
-    vi.advanceTimersByTime(60_000)
-    expect(wrapper.emitted('close')).toBeUndefined()
   })
 
   it('renders a service failure as an error rather than a stuck spinner', () => {
@@ -164,16 +146,12 @@ describe('ConnectionDiagnosticsPopup', () => {
 
     expect(wrapper.text()).toContain('Failed to run diagnostics.')
     expect(wrapper.find('[data-testid="connection-diagnostics-running"]').exists()).toBe(false)
-    vi.advanceTimersByTime(60_000)
-    expect(wrapper.emitted('close')).toBeUndefined()
   })
 
   it('reports connectors that do not support diagnostics', () => {
     const wrapper = mountPopup({ available: false, connectionOk: false, checks: [] })
 
     expect(wrapper.find('[data-testid="connection-diagnostics-unavailable"]').exists()).toBe(true)
-    vi.advanceTimersByTime(60_000)
-    expect(wrapper.emitted('close')).toBeUndefined()
   })
 
   it('announces results politely and is a labelled modal dialog', () => {
@@ -183,7 +161,7 @@ describe('ConnectionDiagnosticsPopup', () => {
     expect(dialog.attributes('role')).toBe('dialog')
     expect(dialog.attributes('aria-modal')).toBe('true')
     expect(dialog.attributes('aria-labelledby')).toBe('connection-diagnostics-title')
-    // The verdict must be announced before a success popup disappears.
+    // The verdict is announced rather than only rendered.
     expect(wrapper.get('[data-testid="connection-diagnostics-body"]').attributes('aria-live')).toBe('polite')
   })
 })

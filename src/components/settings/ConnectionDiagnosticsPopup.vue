@@ -7,15 +7,10 @@
     data-testid="connection-diagnostics-popup"
     @click.self="requestClose"
   >
-    <section
-      class="popup-workflow-modal workflow-panel connection-diagnostics-popup"
-      @mouseenter="holdOpen"
-      @focusin="holdOpen"
-    >
+    <section class="popup-workflow-modal workflow-panel connection-diagnostics-popup">
       <header class="workflow-panel-header connection-diagnostics-header">
         <h2 id="connection-diagnostics-title">Diagnostics</h2>
         <button
-          v-if="!autoClosing"
           type="button"
           class="app-icon-action connection-diagnostics-close"
           data-testid="connection-diagnostics-close"
@@ -75,12 +70,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeUnmount } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import type { ConnectionCheck, ConnectionCheckStatus } from '../../lib/api/types'
 
-const props = defineProps<{
+defineProps<{
   running: boolean
   available: boolean
   connectionOk: boolean
@@ -90,55 +85,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (event: 'close'): void }>()
 
-/** Only a fully-successful run dismisses itself; a failure waits for the operator. */
-const AUTO_CLOSE_DELAY_MS = 2000
-
 const closeIconPath =
   'M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z'
 
-let autoCloseTimer: ReturnType<typeof setTimeout> | null = null
-const autoClosing = ref(false)
-
-function clearAutoClose(): void {
-  if (autoCloseTimer !== null) {
-    clearTimeout(autoCloseTimer)
-    autoCloseTimer = null
-  }
-  autoClosing.value = false
-}
-
-/**
- * Cancel the pending auto-close as soon as the operator engages with the popup. Without this a
- * success popup can vanish mid-read; once cancelled it stays until dismissed, and the close
- * control appears.
- */
-function holdOpen(): void {
-  clearAutoClose()
-}
-
+// The popup never dismisses itself, on any outcome. A passing result is still something an
+// operator reads — timings, the shop domain, whether orders came back — so it waits to be closed.
 function requestClose(): void {
-  clearAutoClose()
   emit('close')
 }
-
-const shouldAutoClose = computed(
-  () => !props.running && !props.error && props.available && props.connectionOk,
-)
-
-watch(
-  shouldAutoClose,
-  (value) => {
-    clearAutoClose()
-    if (!value) return
-    autoClosing.value = true
-    autoCloseTimer = setTimeout(() => {
-      autoCloseTimer = null
-      autoClosing.value = false
-      emit('close')
-    }, AUTO_CLOSE_DELAY_MS)
-  },
-  { immediate: true },
-)
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
@@ -150,7 +104,6 @@ function onKeydown(event: KeyboardEvent): void {
 window.addEventListener('keydown', onKeydown)
 
 onBeforeUnmount(() => {
-  clearAutoClose()
   window.removeEventListener('keydown', onKeydown)
 })
 
