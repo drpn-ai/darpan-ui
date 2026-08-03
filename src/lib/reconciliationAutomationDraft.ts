@@ -1,5 +1,6 @@
 import type { SavedRunSummary, SavedRunSystemOption } from './api/types'
 import type { AutomationSourcePayload, SaveAutomationPayload } from './api/facadeTypes'
+import { normalizeExcludeFilters, type SourceExcludeFilter } from './sourceExcludeFilters'
 import { isRecord, removeEmpty } from './utils/objects'
 import { normalizeString } from './utils/strings'
 
@@ -58,6 +59,7 @@ export interface ReconciliationAutomationSourceDraft {
   safeMetadataJson?: string
   optionKey?: string
   omsRestSourceConfigId?: string
+  excludeFilters?: SourceExcludeFilter[]
 }
 
 export type ReconciliationAutomationChatSpaceChoice = '' | 'default' | 'existing' | 'new' | 'none'
@@ -329,6 +331,11 @@ function buildSourcePayload(
     fileTypeEnumId: savedRunSide?.fileTypeEnumId,
     schemaFileName: savedRunSide?.schemaFileName,
     primaryIdExpression: savedRunSide?.idFieldExpression,
+    // Only stamp excludeFilters when the draft has an opinion -- omitting the key entirely
+    // preserves the "leave existing rules untouched" contract (see sourceExcludeFilters.ts).
+    ...(sourceDraft.excludeFilters !== undefined
+      ? { excludeFilters: normalizeExcludeFilters(sourceDraft.excludeFilters) }
+      : {}),
   })
 
   if (sourceTypeEnumId === AUTOMATION_SOURCE_TYPE_SFTP) {

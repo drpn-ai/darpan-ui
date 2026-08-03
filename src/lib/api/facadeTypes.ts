@@ -1,6 +1,8 @@
 // Request payload interfaces for facade methods.
 // Naming convention: <MethodName>Payload
 
+import type { SourceExcludeFilter } from '../sourceExcludeFilters'
+
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
 export interface SaveUserSettingsPayload {
@@ -245,6 +247,8 @@ export interface CreateRuleSetRunPayload {
   file2SchemaFileName?: string
   file2PrimaryIdExpression?: string
   file2PrimaryIdExpressions?: string[]
+  file1ExcludeFilters?: SourceExcludeFilter[]
+  file2ExcludeFilters?: SourceExcludeFilter[]
   rules?: RuleSetRulePayload[]
 }
 

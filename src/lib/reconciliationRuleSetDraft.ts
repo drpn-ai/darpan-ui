@@ -2,6 +2,7 @@
 // This file keeps types and pure utility functions for building API payloads.
 
 import type { CreateRuleSetRunPayload, RuleSetRulePayload, SaveRuleSetRunPayload } from './api/facadeTypes'
+import { excludeFilterPayloadFields, type SourceExcludeFilter } from './sourceExcludeFilters'
 import { normalizeString } from './utils/strings'
 
 const RULESET_SOURCE_TYPE_API = 'AUT_SRC_API'
@@ -62,6 +63,8 @@ export interface ReconciliationRuleSetDraft {
   file2SchemaLabel?: string
   file2SchemaFileName?: string
   file2PrimaryIdExpression: string[]
+  file1ExcludeFilters?: SourceExcludeFilter[]
+  file2ExcludeFilters?: SourceExcludeFilter[]
   rules?: ReconciliationRuleSetDraftRule[]
 }
 
@@ -157,6 +160,8 @@ export function buildCreateRuleSetRunPayload(draft: ReconciliationRuleSetDraft):
   return {
     ...buildSideSourceFields('file1', draft),
     ...buildSideSourceFields('file2', draft),
+    ...excludeFilterPayloadFields(draft.file1ExcludeFilters, 'file1'),
+    ...excludeFilterPayloadFields(draft.file2ExcludeFilters, 'file2'),
     ...(rules.length ? { rules } : {}),
     runName: draft.runName.trim(),
     description: draft.description?.trim() || undefined,
