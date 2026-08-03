@@ -5,6 +5,7 @@ import {
   buildReconciliationRuleSetDraftState,
   type ReconciliationRuleSetDraftRule,
 } from '../../../lib/reconciliationRuleSetDraft'
+import type { SourceExcludeFilter } from '../../../lib/sourceExcludeFilters'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../../lib/uiEvents'
 
 const getJsonSchema = vi.hoisted(() => vi.fn())
@@ -52,7 +53,10 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 
 import ReconciliationRuleSetEditorPage from '../ReconciliationRuleSetEditorPage.vue'
 
-function createDraftState(rules: ReconciliationRuleSetDraftRule[] = []) {
+function createDraftState(
+  rules: ReconciliationRuleSetDraftRule[] = [],
+  excludeFilters: { file1?: SourceExcludeFilter[], file2?: SourceExcludeFilter[] } = {},
+) {
   return buildReconciliationRuleSetDraftState(
     {
       savedRunId: 'RS_JSON_ORDER_COMPARE',
@@ -72,6 +76,8 @@ function createDraftState(rules: ReconciliationRuleSetDraftRule[] = []) {
       file2SchemaFileName: 'test-shopify-orders.schema.json',
       file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
       rules,
+      ...(excludeFilters.file1 ? { file1ExcludeFilters: excludeFilters.file1 } : {}),
+      ...(excludeFilters.file2 ? { file2ExcludeFilters: excludeFilters.file2 } : {}),
     },
     'ruleset-manager',
   )
@@ -722,5 +728,176 @@ describe('ReconciliationRuleSetEditorPage', () => {
 
     expect(wrapper.text()).toContain('No run basics defined yet')
     expect(wrapper.text()).toContain('Go to Run Setup')
+  })
+
+  describe('field exclusions', () => {
+    const EXCLUDED_FIELD_PATH = '$.data.orders.edges[0].node.displayFinancialStatus'
+
+    it('is a real button element on the pill, nested inside a non-button pill for a11y and valid HTML', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      const pill = wrapper.get('[data-testid="ruleset-field-file2-1"]')
+      expect(pill.element.tagName).toBe('DIV')
+      expect(pill.attributes('role')).toBe('button')
+      expect(pill.attributes('tabindex')).toBe('0')
+
+      const mark = wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]')
+      expect(mark.element.tagName).toBe('BUTTON')
+    })
+
+    it('leaves the mark unset on a field with no exclusion', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      const mark = wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]')
+      expect(mark.classes()).not.toContain('ruleset-field-exclude--set')
+    })
+
+    it('marks a field that has an exclusion', async () => {
+      draftStoreState.ruleSetDraftState = createDraftState([], {
+        file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      const mark = wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]')
+      expect(mark.classes()).toContain('ruleset-field-exclude--set')
+    })
+
+    it('opens the exclusion popover from the mark and blurs the board behind it', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="ruleset-editor-board"]').classes()).toContain('ruleset-editor-board--popup-open')
+    })
+
+    it('clicking the mark does not start a connection line', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('pointerdown', { pointerId: 1, button: 0 })
+      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="ruleset-rule-popover"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
+      expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(0)
+    })
+
+    it('adds typed values as chips and writes them to the draft on save', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
+      await input.setValue('POS_SALES_CHANNEL')
+      await input.trigger('keydown', { key: 'Enter' })
+      await input.setValue('DRAFT_SALES_CHANNEL')
+      await input.trigger('keydown', { key: 'Enter' })
+      await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
+      await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      expect(saveRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file2ExcludeFilters: [
+            {
+              fieldExpression: EXCLUDED_FIELD_PATH,
+              operator: 'EXCLUDE_IN',
+              values: ['POS_SALES_CHANNEL', 'DRAFT_SALES_CHANNEL'],
+            },
+          ],
+        }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    it('removes the exclusion when the last chip is deleted and saved, sending an empty array rather than leaving it unset', async () => {
+      draftStoreState.ruleSetDraftState = createDraftState([], {
+        file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      await wrapper.get('[data-testid="ruleset-exclusion-delete"]').trigger('click')
+      await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      expect(saveRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({ file2ExcludeFilters: [] }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    it('renders no number for an exclusion mark, unlike an ordered comparison rule', async () => {
+      draftStoreState.ruleSetDraftState = createDraftState([], {
+        file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL', 'DRAFT_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      const mark = wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]')
+      expect(mark.text()).not.toMatch(/\d/)
+    })
+
+    it('draws no connection line and creates no operator box for an exclusion', async () => {
+      draftStoreState.ruleSetDraftState = createDraftState([], {
+        file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.findAll('.ruleset-editor-line')).toHaveLength(0)
+      expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(0)
+    })
+
+    it('does not submit the form when a focused field pill receives Enter or Space', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      const pill = wrapper.get('[data-testid="ruleset-field-file2-1"]')
+      await pill.trigger('keydown', { key: 'Enter' })
+      await pill.trigger('keydown', { key: ' ' })
+      await flushPromises()
+
+      expect(saveRuleSetRun).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(false)
+    })
+
+    it('closes the exclusion popover on outside click without applying unsaved edits', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
+      await input.setValue('POS_SALES_CHANNEL')
+      await input.trigger('keydown', { key: 'Enter' })
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').classes()).not.toContain('ruleset-field-exclude--set')
+
+      await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      expect(saveRuleSetRun).toHaveBeenCalledWith(
+        expect.not.objectContaining({ file2ExcludeFilters: expect.anything() }),
+        expect.any(AbortSignal),
+      )
+    })
   })
 })

@@ -29,7 +29,7 @@
           'ruleset-editor-board',
           {
             'ruleset-editor-board--drawing': isDrawing,
-            'ruleset-editor-board--popup-open': editingRule,
+            'ruleset-editor-board--popup-open': editingRule || editingExclusion,
           },
         ]"
         :style="{ minHeight: `${boardMinHeight}px` }"
@@ -61,11 +61,12 @@
           <header>
             <span>{{ file1Title }}</span>
           </header>
-          <button
+          <div
             v-for="(field, index) in file1Fields"
             :key="field.fieldPath"
             :ref="(element) => setFieldNodeRef('file1', field.fieldPath, element)"
-            type="button"
+            role="button"
+            tabindex="0"
             :class="[
               'ruleset-field-item',
               {
@@ -78,6 +79,8 @@
             :data-field-path="field.fieldPath"
             @pointerdown="handleFieldPointerDown($event, 'file1', field.fieldPath, index)"
             @pointerup.stop="handleFieldPointerUp($event, 'file1', field.fieldPath)"
+            @keydown.enter.prevent.stop
+            @keydown.space.prevent.stop
           >
             <span class="ruleset-field-label">{{ field.label }}</span>
             <span class="ruleset-field-meta" :aria-label="fieldSubtitle(field)" :title="fieldSubtitle(field)">
@@ -87,18 +90,30 @@
                 class="ruleset-field-path-segment"
               >{{ segment }}</span>
             </span>
-          </button>
+            <button
+              type="button"
+              :class="['ruleset-field-exclude', { 'ruleset-field-exclude--set': hasExclusion('file1', field.fieldPath) }]"
+              :data-testid="`ruleset-field-exclude-file1-${index}`"
+              :aria-label="`${hasExclusion('file1', field.fieldPath) ? 'Edit' : 'Add'} exclusion on ${field.label}`"
+              @pointerdown.stop
+              @pointerup.stop
+              @click.stop="openExclusionEditor('file1', field.fieldPath)"
+            >
+              ⊘
+            </button>
+          </div>
         </section>
 
         <section class="ruleset-field-column ruleset-field-column--right" data-testid="ruleset-field-list-file2">
           <header>
             <span>{{ file2Title }}</span>
           </header>
-          <button
+          <div
             v-for="(field, index) in file2Fields"
             :key="field.fieldPath"
             :ref="(element) => setFieldNodeRef('file2', field.fieldPath, element)"
-            type="button"
+            role="button"
+            tabindex="0"
             :class="[
               'ruleset-field-item',
               {
@@ -111,6 +126,8 @@
             :data-field-path="field.fieldPath"
             @pointerdown="handleFieldPointerDown($event, 'file2', field.fieldPath, index)"
             @pointerup.stop="handleFieldPointerUp($event, 'file2', field.fieldPath)"
+            @keydown.enter.prevent.stop
+            @keydown.space.prevent.stop
           >
             <span class="ruleset-field-label">{{ field.label }}</span>
             <span class="ruleset-field-meta" :aria-label="fieldSubtitle(field)" :title="fieldSubtitle(field)">
@@ -120,7 +137,18 @@
                 class="ruleset-field-path-segment"
               >{{ segment }}</span>
             </span>
-          </button>
+            <button
+              type="button"
+              :class="['ruleset-field-exclude', { 'ruleset-field-exclude--set': hasExclusion('file2', field.fieldPath) }]"
+              :data-testid="`ruleset-field-exclude-file2-${index}`"
+              :aria-label="`${hasExclusion('file2', field.fieldPath) ? 'Edit' : 'Add'} exclusion on ${field.label}`"
+              @pointerdown.stop
+              @pointerup.stop
+              @click.stop="openExclusionEditor('file2', field.fieldPath)"
+            >
+              ⊘
+            </button>
+          </div>
         </section>
 
         <button
@@ -232,6 +260,57 @@
             </button>
           </div>
         </div>
+
+        <div
+          v-if="editingExclusion"
+          ref="exclusionPopoverRef"
+          class="ruleset-rule-popover"
+          role="dialog"
+          aria-label="Edit exclusion"
+          data-testid="ruleset-exclusion-popover"
+          :style="exclusionPopoverStyle(editingExclusion)"
+          @keydown.enter.stop.prevent="applyExclusionEdit"
+        >
+          <label>
+            <span>Exclude on</span>
+            <input :value="editingExclusion.fieldPath" readonly data-testid="ruleset-exclusion-field" />
+          </label>
+          <label>
+            <span>Values to exclude</span>
+            <input
+              v-model="pendingExclusionValue"
+              type="text"
+              placeholder="Type a value, press Enter"
+              data-testid="ruleset-exclusion-value-input"
+              @keydown.enter.prevent.stop="commitPendingExclusionValue"
+            />
+          </label>
+          <div v-if="editingExclusionValues.length" class="workflow-select-chip-row">
+            <span v-for="value in editingExclusionValues" :key="value" class="workflow-select-chip">
+              {{ value }}
+              <button
+                type="button"
+                class="workflow-select-chip-remove"
+                :aria-label="`Remove ${value}`"
+                @click="editingExclusionValues = editingExclusionValues.filter((entry) => entry !== value)"
+              >&times;</button>
+            </span>
+          </div>
+          <div class="ruleset-rule-popover-actions">
+            <AppSaveAction label="Save exclusion" test-id="ruleset-exclusion-apply" @click="applyExclusionEdit" />
+            <button
+              type="button"
+              class="app-icon-action app-icon-action--large app-icon-action--danger"
+              data-testid="ruleset-exclusion-delete"
+              aria-label="Delete exclusion"
+              @click="deleteEditingExclusion"
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </WorkflowStepForm>
 
@@ -269,6 +348,7 @@ import type {
   SavedRunRule,
 } from '../../lib/api/types'
 import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
+import { normalizeExcludeFilters, parseExcludeFilterValues, type SourceExcludeFilter } from '../../lib/sourceExcludeFilters'
 import {
   buildReconciliationFieldPathAliases,
   buildSaveRuleSetRunPayload,
@@ -343,6 +423,7 @@ const FALLBACK_BOARD_WIDTH = 1000
 const FIELD_ROW_PITCH = 52
 const FIELD_ROW_TOP = 70
 const SOURCE_TYPE_API = 'AUT_SRC_API'
+const EXCLUSION_POPOVER_WIDTH = 260
 const operatorOptions: AppSelectOption[] = [
   { value: '=', label: '=' },
   { value: '!=', label: '!=' },
@@ -361,6 +442,7 @@ const router = useRouter()
 const draftStore = useReconciliationDraftStore()
 const boardRef = ref<HTMLElement | null>(null)
 const rulePopoverRef = ref<HTMLElement | null>(null)
+const exclusionPopoverRef = ref<HTMLElement | null>(null)
 const fieldNodeRefs = new Map<string, HTMLElement>()
 const pageError = ref<string | null>(null)
 const loadingFields = ref(false)
@@ -380,6 +462,9 @@ const editingRuleId = ref<string | null>(null)
 const editingOperator = ref<RuleOperator>('=')
 const editingPreActions = ref<EditablePreAction[]>([])
 const editingSequence = ref(1)
+const editingExclusion = ref<{ side: RuleSide; fieldPath: string } | null>(null)
+const editingExclusionValues = ref<string[]>([])
+const pendingExclusionValue = ref('')
 let longPressTimer: number | null = null
 let generatedRuleCounter = 0
 let generatedPreActionCounter = 0
@@ -792,6 +877,81 @@ function operatorPopoverStyle(rule: RuleConnection): Record<string, string> {
   }
 }
 
+function excludeFiltersFor(side: RuleSide): SourceExcludeFilter[] {
+  return (side === 'file1' ? draft.value?.file1ExcludeFilters : draft.value?.file2ExcludeFilters) ?? []
+}
+
+function hasExclusion(side: RuleSide, fieldPath: string): boolean {
+  return excludeFiltersFor(side).some((filter) => filter.fieldExpression === fieldPath && filter.values.length > 0)
+}
+
+function openExclusionEditor(side: RuleSide, fieldPath: string): void {
+  editingExclusion.value = { side, fieldPath }
+  editingExclusionValues.value = [...(excludeFiltersFor(side).find((filter) => filter.fieldExpression === fieldPath)?.values ?? [])]
+  pendingExclusionValue.value = ''
+}
+
+function commitPendingExclusionValue(): void {
+  const values = parseExcludeFilterValues(pendingExclusionValue.value)
+  for (const value of values) {
+    if (!editingExclusionValues.value.includes(value)) editingExclusionValues.value.push(value)
+  }
+  pendingExclusionValue.value = ''
+}
+
+function applyExclusionEdit(): void {
+  const editing = editingExclusion.value
+  if (!editing || !draft.value) return
+
+  const others = excludeFiltersFor(editing.side).filter((filter) => filter.fieldExpression !== editing.fieldPath)
+  const next = editingExclusionValues.value.length
+    ? [...others, { fieldExpression: editing.fieldPath, operator: 'EXCLUDE_IN', values: [...editingExclusionValues.value] }]
+    : others
+  // Always assign the side, never leave it undefined: undefined means "no opinion" to the backend
+  // and would leave stale rows in place after the operator cleared them here.
+  if (editing.side === 'file1') draft.value.file1ExcludeFilters = normalizeExcludeFilters(next)
+  else draft.value.file2ExcludeFilters = normalizeExcludeFilters(next)
+  editingExclusion.value = null
+}
+
+function deleteEditingExclusion(): void {
+  editingExclusionValues.value = []
+  applyExclusionEdit()
+}
+
+function exclusionPopoverFallbackStyle(): Record<string, string> {
+  return {
+    left: `${boardSize.value.width / 2}px`,
+    top: `${boardSize.value.height / 2}px`,
+    width: `${EXCLUSION_POPOVER_WIDTH}px`,
+  }
+}
+
+function exclusionPopoverStyle(editing: { side: RuleSide; fieldPath: string }): Record<string, string> {
+  const board = boardRef.value
+  const node = resolveFieldNode(editing.side, editing.fieldPath)
+  if (!board || !node) return exclusionPopoverFallbackStyle()
+
+  const boardRect = board.getBoundingClientRect()
+  const nodeRect = node.getBoundingClientRect()
+  if (boardRect.width <= 0 || nodeRect.width <= 0) return exclusionPopoverFallbackStyle()
+
+  const halfWidth = EXCLUSION_POPOVER_WIDTH / 2
+  const margin = 24
+  const rawLeft = editing.side === 'file1'
+    ? nodeRect.right - boardRect.left + margin + halfWidth
+    : nodeRect.left - boardRect.left - margin - halfWidth
+  const clampedLeft = Math.min(Math.max(rawLeft, halfWidth), Math.max(halfWidth, boardSize.value.width - halfWidth))
+  const rawTop = nodeRect.top - boardRect.top + (nodeRect.height / 2)
+  const clampedTop = Math.min(Math.max(rawTop, 40), Math.max(40, boardSize.value.height - 40))
+
+  return {
+    left: `${clampedLeft}px`,
+    top: `${clampedTop}px`,
+    width: `${EXCLUSION_POPOVER_WIDTH}px`,
+  }
+}
+
 function boardPointFromEvent(event: PointerEvent): Point {
   const board = boardRef.value
   const fallback = pendingConnection.value
@@ -1074,13 +1234,18 @@ function deleteEditingRule(): void {
 }
 
 function handleWindowPointerDown(event: Event): void {
-  if (!editingRuleId.value) return
+  if (!editingRuleId.value && !editingExclusion.value) return
 
   const target = event.target
   if (!(target instanceof Node)) return
-  if (rulePopoverRef.value?.contains(target)) return
 
-  closeRuleEditor()
+  if (editingRuleId.value && !rulePopoverRef.value?.contains(target)) {
+    closeRuleEditor()
+  }
+
+  if (editingExclusion.value && !exclusionPopoverRef.value?.contains(target)) {
+    editingExclusion.value = null
+  }
 }
 
 function buildDraftWithRules(): ReconciliationRuleSetDraft | null {
@@ -1301,13 +1466,17 @@ onBeforeUnmount(() => {
 }
 
 .ruleset-field-item {
+  position: relative;
   display: grid;
   gap: 0.12rem;
   min-height: 2.75rem;
   width: 100%;
   padding: 0.48rem 0.75rem;
   border-radius: 999px;
-  border-color: color-mix(in oklab, var(--border) 80%, var(--text) 20%);
+  /* The pill is a div (see the exclusion-mark comment below), not a <button>, so it no longer
+     picks up the global `button { border: 1px solid var(--border); }` reset — the border must be
+     spelled out in full here or it disappears. */
+  border: 1px solid color-mix(in oklab, var(--border) 80%, var(--text) 20%);
   background: color-mix(in oklab, var(--surface-2) 88%, var(--surface));
   text-align: center;
   cursor: var(--ruleset-pen-cursor) !important;
@@ -1319,6 +1488,11 @@ onBeforeUnmount(() => {
 .ruleset-field-item:hover,
 .ruleset-field-item:hover * {
   cursor: var(--ruleset-pen-cursor) !important;
+}
+
+.ruleset-field-item:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 68%, transparent);
+  outline-offset: 2px;
 }
 
 .ruleset-field-item:hover {
@@ -1358,6 +1532,52 @@ onBeforeUnmount(() => {
 
 .ruleset-field-path-segment {
   display: inline-block;
+}
+
+/* An exclusion acts on one source field only — it never leaves the pill, so it has no line and
+   no operator box. The pill instead carries this small mark; clicking it opens the same popover
+   chrome the operator boxes use. It has to be a real <button> nested inside the pill for keyboard
+   + a11y, which is why the pill itself became a <div role="button"> above (a button cannot
+   validly nest inside a button). */
+.ruleset-field-exclude {
+  position: absolute;
+  top: 50%;
+  width: 1.55rem;
+  height: 1.55rem;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border-color: color-mix(in oklab, var(--border) 80%, var(--text) 20%);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+/* Outer edge only, away from board centre: the connection-line anchor for each side is the
+   centre-facing pill edge (file1 anchors from its right edge, file2 from its left — see
+   resolveFieldAnchor), so the mark sits on the opposite edge to stay clear of where a line
+   is drawn from. */
+.ruleset-field-column--left .ruleset-field-exclude { left: -0.775rem; }
+.ruleset-field-column--right .ruleset-field-exclude { right: -0.775rem; }
+
+.ruleset-field-item:hover .ruleset-field-exclude,
+.ruleset-field-exclude:focus-visible { opacity: 1; }
+
+/* Set: always visible, because with no line and no box it is the only evidence the
+   exclusion exists. */
+.ruleset-field-exclude--set {
+  opacity: 1;
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
+  background: color-mix(in oklab, var(--surface-2) 70%, var(--accent) 30%);
+  color: var(--text);
+  box-shadow: 0 0 0 0.14rem color-mix(in oklab, var(--accent) 16%, transparent);
 }
 
 .ruleset-operator-box {
@@ -1458,6 +1678,41 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+}
+
+/* Same type-a-value-press-Enter chip interaction and markup as WorkflowChipTextInput /
+   WorkflowSelect's multi-select chips. Vue scoped styles don't cross component boundaries, so the
+   classes are inlined here rather than reused, keeping the visual identical without a shared
+   dependency. */
+.workflow-select-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
+.workflow-select-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
+  border-radius: 999px;
+  padding: 0.3rem 0.55rem 0.3rem 0.7rem;
+  font-size: 0.85rem;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.workflow-select-chip-remove {
+  all: unset;
+  cursor: pointer;
+  opacity: 0.55;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.workflow-select-chip-remove:hover {
+  opacity: 1;
 }
 
 @media (max-width: 900px) {
