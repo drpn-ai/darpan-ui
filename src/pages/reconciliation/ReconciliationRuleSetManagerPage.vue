@@ -55,6 +55,10 @@
             <span class="static-page-summary-label">Primary ID</span>
             <span>{{ file1PrimaryId }}</span>
           </article>
+          <article class="ruleset-manager-basic-card ruleset-manager-basic-card--wide">
+            <span class="static-page-summary-label">Exclusions</span>
+            <span data-testid="ruleset-exclusions-file1">{{ file1Exclusions }}</span>
+          </article>
         </div>
 
         <div class="ruleset-manager-schema-row" data-testid="ruleset-manager-schema-row-file2">
@@ -80,6 +84,10 @@
           <article class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">Primary ID</span>
             <span>{{ file2PrimaryId }}</span>
+          </article>
+          <article class="ruleset-manager-basic-card ruleset-manager-basic-card--wide">
+            <span class="static-page-summary-label">Exclusions</span>
+            <span data-testid="ruleset-exclusions-file2">{{ file2Exclusions }}</span>
           </article>
         </div>
       </div>
@@ -260,6 +268,7 @@ import {
   type ReconciliationRuleSetDraftRule,
 } from '../../lib/reconciliationRuleSetDraft'
 import { buildReconciliationDiffRoute, buildReconciliationRunHistoryRoute } from '../../lib/reconciliationRoutes'
+import type { SourceExcludeFilter } from '../../lib/sourceExcludeFilters'
 import { buildWorkflowOriginState } from '../../lib/workflowOrigin'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
@@ -325,6 +334,8 @@ const file1SystemConfig = computed<SourceConfigSummary | null>(() => buildSource
 const file2SystemConfig = computed<SourceConfigSummary | null>(() => buildSourceConfigSummary(draft.value, 'file2'))
 const file1PrimaryId = computed(() => formatFieldKeyList(draft.value?.file1PrimaryIdExpression))
 const file2PrimaryId = computed(() => formatFieldKeyList(draft.value?.file2PrimaryIdExpression))
+const file1Exclusions = computed(() => formatExclusions(draft.value?.file1ExcludeFilters))
+const file2Exclusions = computed(() => formatExclusions(draft.value?.file2ExcludeFilters))
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const canViewRunHistory = computed(() => Boolean(savedRunId.value))
@@ -364,6 +375,11 @@ const formatFieldKey = formatReconciliationFieldKey
 function formatFieldKeyList(fieldPaths: string[] | undefined): string {
   if (!fieldPaths?.length) return formatFieldKey(undefined)
   return fieldPaths.map((fieldPath) => formatFieldKey(fieldPath)).join(' + ')
+}
+
+function formatExclusions(filters: SourceExcludeFilter[] | undefined): string {
+  if (!filters?.length) return '—'
+  return filters.map((filter) => `${filter.fieldExpression}: ${filter.values.join(', ')}`).join(' · ')
 }
 
 function formatRulePreview(rule: ReconciliationRuleSetDraftRule): string {
@@ -826,6 +842,10 @@ onMounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--static-surface-radius);
   background: var(--surface-2);
+}
+
+.ruleset-manager-basic-card--wide {
+  grid-column: 1 / -1;
 }
 
 .ruleset-manager-basic-card strong,

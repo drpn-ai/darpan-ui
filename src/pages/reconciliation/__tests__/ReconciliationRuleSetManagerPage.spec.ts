@@ -354,7 +354,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(schemaRows[1]?.text()).not.toContain('$.data.orders.edges[0].node.id')
     expect(schemaRows[1]?.text()).not.toContain('OMS orders')
     const basicCards = wrapper.findAll('.ruleset-manager-basic-card')
-    expect(basicCards).toHaveLength(6)
+    expect(basicCards).toHaveLength(8)
     expect(wrapper.find('[data-testid="ruleset-manager-system-config-file1"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="ruleset-manager-system-config-file2"]').exists()).toBe(false)
     expect(basicCards[0]?.text()).toContain('System')
@@ -368,13 +368,17 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(basicCards[2]?.text()).not.toContain('File 2')
     expect(basicCards[2]?.text()).toContain('order_id')
     expect(basicCards[2]?.text()).not.toContain('$.orders[0].order_id')
-    expect(basicCards[3]?.text()).toContain('System')
-    expect(basicCards[3]?.text()).toContain('SHOPIFY')
-    expect(basicCards[4]?.text()).toContain('Schema')
-    expect(basicCards[4]?.text()).toContain('Shopify orders')
-    expect(basicCards[5]?.text()).toContain('Primary ID')
-    expect(basicCards[5]?.text()).toContain('id')
-    expect(basicCards[5]?.text()).not.toContain('$.data.orders.edges[0].node.id')
+    expect(basicCards[3]?.text()).toContain('Exclusions')
+    expect(basicCards[3]?.text()).toContain('—')
+    expect(basicCards[4]?.text()).toContain('System')
+    expect(basicCards[4]?.text()).toContain('SHOPIFY')
+    expect(basicCards[5]?.text()).toContain('Schema')
+    expect(basicCards[5]?.text()).toContain('Shopify orders')
+    expect(basicCards[6]?.text()).toContain('Primary ID')
+    expect(basicCards[6]?.text()).toContain('id')
+    expect(basicCards[6]?.text()).not.toContain('$.data.orders.edges[0].node.id')
+    expect(basicCards[7]?.text()).toContain('Exclusions')
+    expect(basicCards[7]?.text()).toContain('—')
     expect(wrapper.text()).not.toContain('Run Basics')
     expect(wrapper.find('.ruleset-manager-basics-grid').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('test-oms-orders.schema.json')
@@ -562,7 +566,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).not.toContain('$[*].shopify_order_id')
     expect(wrapper.find('.ruleset-manager-basics-grid').exists()).toBe(true)
     expect(wrapper.findAll('.ruleset-manager-schema-row')).toHaveLength(2)
-    expect(wrapper.findAll('.ruleset-manager-basic-card')).toHaveLength(6)
+    expect(wrapper.findAll('.ruleset-manager-basic-card')).toHaveLength(8)
     expect(wrapper.find('.ruleset-manager-comparison-side').exists()).toBe(false)
     expect(wrapper.find('.ruleset-manager-operator').exists()).toBe(false)
     expect(wrapper.text()).toContain('Shopify Orders')
@@ -762,5 +766,49 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(wrapper.text()).toContain('No run basics defined yet')
     expect(wrapper.text()).toContain('Go to Run Setup')
     expect(wrapper.find('[data-testid="ruleset-manager-create"]').exists()).toBe(false)
+  })
+
+  it('summarizes configured exclusions for each side', async () => {
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    const draftState = createDraftState()
+    draftState.draft.file2ExcludeFilters = [
+      { fieldExpression: 'salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL', 'DRAFT_SALES_CHANNEL'] },
+    ]
+    draftStoreState.ruleSetDraftState = draftState
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const card = wrapper.get('[data-testid="ruleset-exclusions-file2"]')
+    expect(card.text()).toContain('salesChannelEnumId')
+    expect(card.text()).toContain('POS_SALES_CHANNEL')
+  })
+
+  it('shows a dash when a side has no exclusions', async () => {
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = createDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ruleset-exclusions-file2"]').text()).toContain('—')
+  })
+
+  it('never renders an excluded record count', async () => {
+    // Counts are metadata-only by product decision (2026-08-03).
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    const draftState = createDraftState()
+    draftState.draft.file2ExcludeFilters = [
+      { fieldExpression: 'salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
+    ]
+    draftStoreState.ruleSetDraftState = draftState
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toMatch(/excluded\s+\d/i)
   })
 })
