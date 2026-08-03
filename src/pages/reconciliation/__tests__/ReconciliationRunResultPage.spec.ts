@@ -1444,6 +1444,83 @@ describe('ReconciliationRunResultPage', () => {
       .toContain('Results will appear here when this reconciliation finishes')
   })
 
+  // A live run has no saved output to carry the persisted name, so the title has to fall back to
+  // the run name the submitting page put on the route rather than the generic placeholder.
+  it('titles a live run with the run name from the route', async () => {
+    enterLiveRunRoute()
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      currentStage: 'EXTRACT_FILE1',
+      startedDate: 1784955159000,
+      steps: [
+        { stageCode: 'RESOLVE', stageSequence: 1, statusEnumId: 'AUT_STAT_SUCCESS', startedDate: 1784955159000, completedDate: 1784955160000 },
+        { stageCode: 'EXTRACT_FILE1', stageSequence: 2, statusEnumId: 'AUT_STAT_RUNNING', startedDate: 1784955160000 },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-result-title"]').text()).toBe('CSV Order Compare')
+  })
+
+  // Regression guard, not new behavior: the timeline already renders a count whenever the step
+  // carries one. Pinning it because the backend's mid-extract heartbeat now depends on it — a
+  // change that showed counts only for completed steps would silently kill live progress again.
+  it('shows the record count on a step that is still running', async () => {
+    enterLiveRunRoute()
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      currentStage: 'EXTRACT_FILE1',
+      startedDate: 1784955159000,
+      steps: [
+        { stageCode: 'RESOLVE', stageSequence: 1, statusEnumId: 'AUT_STAT_SUCCESS', startedDate: 1784955159000, completedDate: 1784955160000 },
+        // Mid-extract heartbeat: a count so far, and no completedDate because it is still going.
+        { stageCode: 'EXTRACT_FILE1', stageSequence: 2, statusEnumId: 'AUT_STAT_RUNNING', startedDate: 1784955160000, recordCount: 8450 },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-result-step-timeline"]').text())
+      .toContain(`${(8450).toLocaleString()} records`)
+  })
+
+  // The longest stage of a run (a paged API extract) reports no record count until it ends, so
+  // elapsed time is the only thing that can prove to an operator that the run is still moving.
+  it('ticks elapsed time on the running step while the run is live', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1784955190000)
+    try {
+      enterLiveRunRoute()
+      getReconciliationRunStatus.mockResolvedValue({
+        ok: true,
+        statusEnumId: 'AUT_STAT_RUNNING',
+        currentStage: 'EXTRACT_FILE1',
+        startedDate: 1784955159000,
+        steps: [
+          { stageCode: 'RESOLVE', stageSequence: 1, statusEnumId: 'AUT_STAT_SUCCESS', startedDate: 1784955159000, completedDate: 1784955160000 },
+          // Running for 30s as of the mocked "now", and no completedDate to measure against.
+          { stageCode: 'EXTRACT_FILE1', stageSequence: 2, statusEnumId: 'AUT_STAT_RUNNING', startedDate: 1784955160000 },
+        ],
+      })
+
+      const wrapper = mount(ReconciliationRunResultPage)
+      await vi.advanceTimersByTimeAsync(0)
+
+      const timeline = () => wrapper.get('[data-testid="run-result-step-timeline"]').text()
+      expect(timeline()).toContain('30s')
+
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(timeline()).toContain('35s')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('populates compared files mid-run as extract stages produce them', async () => {
     enterLiveRunRoute()
     getReconciliationRunStatus.mockResolvedValue({

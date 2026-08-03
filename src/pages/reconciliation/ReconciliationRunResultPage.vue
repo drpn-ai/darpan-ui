@@ -643,6 +643,32 @@ const liveRunFailed = computed(() => Boolean(liveRunResultId.value) && liveRunSt
 // sense while the run can still reach them.
 const liveRunActive = computed(() =>
   Boolean(liveRunResultId.value) && (runStatus.value == null || isActiveRunStatus(liveRunStatusEnumId.value)))
+
+// Clock for the running step's elapsed time. A paged API extract is the longest stage of a run
+// and reports no record count until it ends, so without this the whole timeline sits visually
+// frozen for minutes even though the status poll is landing responses on schedule. Ticks only
+// while the run is live, and the poll interval is unrelated — this is purely a display clock.
+const liveNowMs = ref(Date.now())
+let liveClockTimer: ReturnType<typeof setInterval> | null = null
+
+function stopLiveClock(): void {
+  if (liveClockTimer == null) return
+  clearInterval(liveClockTimer)
+  liveClockTimer = null
+}
+
+watch(liveRunActive, (active) => {
+  if (!active) {
+    stopLiveClock()
+    return
+  }
+  if (liveClockTimer != null) return
+  liveNowMs.value = Date.now()
+  liveClockTimer = setInterval(() => {
+    liveNowMs.value = Date.now()
+  }, 1000)
+}, { immediate: true })
+
 const liveRunNote = computed(() => {
   if (!liveRunResultId.value || liveRunFailed.value) return ''
   if (liveRunStatusEnumId.value === 'AUT_STAT_CANCELLED') return 'Run cancelled.'
@@ -855,6 +881,11 @@ function stepStageLabel(step: ReconciliationRunStep): string {
 }
 
 function stepDurationLabel(step: ReconciliationRunStep): string {
+  // A running step has no completedDate to measure against, so it is timed against the live
+  // clock and advances every second until the stage lands its real completion timestamp.
+  if (step.completedDate == null && normalizeDisplayText(step.statusEnumId) === 'AUT_STAT_RUNNING') {
+    return formatRunStepDuration(step.startedDate, liveNowMs.value)
+  }
   return formatRunStepDuration(step.startedDate, step.completedDate)
 }
 
@@ -1048,6 +1079,7 @@ let loadSavedResultController: AbortController | null = null
 onBeforeUnmount(() => {
   pageAbortController.abort()
   loadSavedResultController?.abort()
+  stopLiveClock()
   for (const runResultId of polledTimelineRunIds) runResultsStore.stopRunStatusPoll(runResultId)
   polledTimelineRunIds.clear()
 })
@@ -1121,8 +1153,14 @@ async function loadSavedResult(): Promise<void> {
 
 watch([savedRunId, outputFileName], () => {
   // Live mode has no output file yet — the run-status poll drives the page until the
-  // completion swap lands this component on the saved-result route.
-  if (liveRunResultId.value && !outputFileName.value) return
+  // completion swap lands this component on the saved-result route. There is no saved output
+  // to carry the persisted run name either, so seed the title from the route: the submitting
+  // page put the run name there, and without this the hero shows its generic placeholder for
+  // the whole run.
+  if (liveRunResultId.value && !outputFileName.value) {
+    resetRunNameState()
+    return
+  }
   void loadSavedResult()
 }, { immediate: true })
 </script>
