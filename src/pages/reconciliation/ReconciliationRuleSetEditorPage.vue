@@ -885,7 +885,19 @@ function hasExclusion(side: RuleSide, fieldPath: string): boolean {
   return excludeFiltersFor(side).some((filter) => filter.fieldExpression === fieldPath && filter.values.length > 0)
 }
 
+function closeExclusionEditor(): void {
+  editingExclusion.value = null
+  editingExclusionValues.value = []
+  pendingExclusionValue.value = ''
+}
+
 function openExclusionEditor(side: RuleSide, fieldPath: string): void {
+  // The two popovers share the `.ruleset-rule-popover` blur-exemption class, so if both were
+  // open at once they would render fully sharp, overlapping each other. The mark's own
+  // pointerdown.stop (needed so it never starts a connection line — see the mark's handlers)
+  // also means the rule popover's outside-click-to-close listener on `window` never sees this
+  // click. Closing the other editor explicitly here is what keeps them mutually exclusive.
+  closeRuleEditor()
   editingExclusion.value = { side, fieldPath }
   editingExclusionValues.value = [...(excludeFiltersFor(side).find((filter) => filter.fieldExpression === fieldPath)?.values ?? [])]
   pendingExclusionValue.value = ''
@@ -911,7 +923,7 @@ function applyExclusionEdit(): void {
   // and would leave stale rows in place after the operator cleared them here.
   if (editing.side === 'file1') draft.value.file1ExcludeFilters = normalizeExcludeFilters(next)
   else draft.value.file2ExcludeFilters = normalizeExcludeFilters(next)
-  editingExclusion.value = null
+  closeExclusionEditor()
 }
 
 function deleteEditingExclusion(): void {
@@ -1161,6 +1173,9 @@ function openRuleEditor(ruleId: string): void {
   const rule = rules.value.find((candidate) => candidate.id === ruleId)
   if (!rule) return
 
+  // Mutually exclusive with the exclusion popover — see the matching comment in
+  // openExclusionEditor for why this can't rely on the outside-click listener alone.
+  closeExclusionEditor()
   editingRuleId.value = rule.id
   editingOperator.value = rule.operator
   editingPreActions.value = rule.preActions.map(toEditablePreAction)
@@ -1244,7 +1259,7 @@ function handleWindowPointerDown(event: Event): void {
   }
 
   if (editingExclusion.value && !exclusionPopoverRef.value?.contains(target)) {
-    editingExclusion.value = null
+    closeExclusionEditor()
   }
 }
 
@@ -1569,6 +1584,15 @@ onBeforeUnmount(() => {
 
 .ruleset-field-item:hover .ruleset-field-exclude,
 .ruleset-field-exclude:focus-visible { opacity: 1; }
+
+/* The mark opens a popover, it does not draw a line — override the pill's pen/crosshair cursor,
+   which otherwise wins via `.ruleset-field-item * { cursor: ... !important; }` (and its :hover
+   variant). Both selectors below out-specificity their respective pen-cursor rule outright, so
+   this doesn't depend on source order. */
+.ruleset-field-item .ruleset-field-exclude,
+.ruleset-field-item:hover .ruleset-field-exclude {
+  cursor: pointer !important;
+}
 
 /* Set: always visible, because with no line and no box it is the only evidence the
    exclusion exists. */

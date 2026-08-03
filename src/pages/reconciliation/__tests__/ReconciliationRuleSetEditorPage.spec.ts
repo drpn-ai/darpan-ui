@@ -777,17 +777,64 @@ describe('ReconciliationRuleSetEditorPage', () => {
       expect(wrapper.get('[data-testid="ruleset-editor-board"]').classes()).toContain('ruleset-editor-board--popup-open')
     })
 
-    it('clicking the mark does not start a connection line', async () => {
+    it('a full pointerdown-to-pointerup connect gesture started on the mark creates no rule', async () => {
+      // Unlike the pill, a pointerdown on the mark must never arm a connection: this drives the
+      // exact same long-press-then-release-on-the-opposite-side gesture the pill uses to draw a
+      // line (see "creates a default equals rule by long-press drawing..." above) but starting
+      // from the mark, and asserts the connection state never engages.
+      vi.useFakeTimers()
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
       await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('pointerdown', { pointerId: 1, button: 0 })
+      expect(wrapper.get('[data-testid="ruleset-field-file2-1"]').classes()).not.toContain('ruleset-field-item--connection-active')
+
+      await vi.advanceTimersByTimeAsync(340)
+      await wrapper.get('[data-testid="ruleset-field-file1-1"]').trigger('pointerup', { pointerId: 1, button: 0 })
+      await flushPromises()
+
+      expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(0)
+      expect(wrapper.find('[data-testid="ruleset-rule-popover"]').exists()).toBe(false)
+    })
+
+    it('opening a rule popover closes an already-open exclusion popover, and vice versa', async () => {
+      draftStoreState.ruleSetDraftState = createDraftState(
+        [
+          {
+            ruleId: 'rule-1',
+            file1FieldPath: '$.orders[0].order_id',
+            file2FieldPath: '$.data.orders.edges[0].node.id',
+            operator: '=',
+            sequenceNum: 1,
+          },
+        ],
+        { file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }] },
+      )
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      // Open the rule popover first — pointerdown on an operator box is not stopped, so this
+      // direction already worked before this fix round.
+      await wrapper.get('[data-testid="ruleset-rule-operator-rule-1"]').trigger('click')
+      expect(wrapper.find('[data-testid="ruleset-rule-popover"]').exists()).toBe(true)
+
+      // The mark's pointerdown.stop (needed so it never starts a connection line) means this
+      // click never reaches the window pointerdown listener the rule popover relies on to
+      // close itself on outside click — so without an explicit mutual-exclusion guard, both
+      // popovers would end up open and rendered on top of each other.
       await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
       await flushPromises()
 
-      expect(wrapper.find('[data-testid="ruleset-rule-popover"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
-      expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(0)
+      expect(wrapper.findAll('[data-testid="ruleset-rule-popover"]')).toHaveLength(0)
+      expect(wrapper.findAll('[data-testid="ruleset-exclusion-popover"]')).toHaveLength(1)
+
+      await wrapper.get('[data-testid="ruleset-rule-operator-rule-1"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.findAll('[data-testid="ruleset-exclusion-popover"]')).toHaveLength(0)
+      expect(wrapper.findAll('[data-testid="ruleset-rule-popover"]')).toHaveLength(1)
     })
 
     it('adds typed values as chips and writes them to the draft on save', async () => {
