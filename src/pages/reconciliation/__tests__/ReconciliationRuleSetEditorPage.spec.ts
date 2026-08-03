@@ -314,7 +314,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
   })
 
   it('uses a single theme-independent pen cursor with a black outline and white fill', () => {
-    const source = readFileSync('src/pages/reconciliation/ReconciliationRuleSetEditorPage.vue', 'utf8')
+    const source = readFileSync('src/components/reconciliation/RuleSetBoard.vue', 'utf8')
 
     const boardCursorIndex = source.indexOf('.ruleset-editor-board {')
     const cursorDefinitionIndex = source.indexOf('--ruleset-pen-cursor:')

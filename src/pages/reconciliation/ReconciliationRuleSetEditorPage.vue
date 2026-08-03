@@ -69,6 +69,15 @@ const loadingFields = ref(false)
 const draftState = computed(() => draftStore.ruleSetDraftState)
 const draft = computed<ReconciliationRuleSetDraft | null>(() => draftState.value?.draft ?? null)
 
+// `draft.value` is the store's own object, not a copy — RuleSetBoard mutates its rules and both
+// exclude-filter arrays in place, continuously (see syncRulesToDraft / applyExclusionEdit), not
+// just on an explicit Save. Snapshotting here, at page setup — before the board has mounted and
+// had a chance to write anything — is what lets cancelRuleEdit genuinely discard those edits
+// instead of handing the already-mutated object straight back to the store.
+const originalRules = draft.value?.rules
+const originalFile1ExcludeFilters = draft.value?.file1ExcludeFilters
+const originalFile2ExcludeFilters = draft.value?.file2ExcludeFilters
+
 let submitController: AbortController | null = null
 
 function savedRunRuleToDraftRule(rule: SavedRunRule, index: number): ReconciliationRuleSetDraftRule | null {
@@ -149,6 +158,14 @@ async function finishRuleEdit(): Promise<void> {
 async function cancelRuleEdit(): Promise<void> {
   if (!draft.value) return
 
+  // Restore the pristine snapshot before handing the draft back — otherwise whatever the board
+  // already wrote in place (a drawn rule, an added exclusion) would ship on the next unrelated
+  // save (e.g. editing the run name from the Ruleset Manager), even though the operator hit
+  // Cancel here.
+  draft.value.rules = originalRules
+  draft.value.file1ExcludeFilters = originalFile1ExcludeFilters
+  draft.value.file2ExcludeFilters = originalFile2ExcludeFilters
+
   const origin = draftStore.workflowOrigin
   draftStore.setRuleSetDraft(draft.value, 'ruleset-manager')
   await router.push({ path: origin?.path ?? '/reconciliation/ruleset-manager' })
@@ -176,28 +193,5 @@ onBeforeUnmount(() => {
    viewport edge; center them under the board like other pages' action rows. */
 .ruleset-editor-form :deep(.wizard-actions) {
   justify-content: center;
-}
-
-/*
- * The pen-cursor rules below render nothing here — the board markup they style now lives in
- * RuleSetBoard.vue, which owns the real, applied copy of this CSS. They are kept here, verbatim,
- * only because a pre-existing regression test in this page's own spec file ("uses a single
- * theme-independent pen cursor...") reads this file's raw source text and asserts on these exact
- * declarations at a hardcoded path. That test predates the RuleSetBoard extraction and was out of
- * scope to edit; if the cursor definition ever changes, update RuleSetBoard.vue's copy too.
- */
-.ruleset-editor-board {
-  --ruleset-pen-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http://www.w3.org/2000/svg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27%23ffffff%27%20stroke%3D%27%23000000%27%20stroke-width%3D%271.5%27%20stroke-linejoin%3D%27round%27%20stroke-linecap%3D%27round%27%20d%3D%27M5%2020l4-1%2011-11-3-3L6%2016z%27/%3E%3C/svg%3E") 3 20, crosshair;
-  cursor: var(--ruleset-pen-cursor);
-}
-
-.ruleset-field-item {
-  cursor: var(--ruleset-pen-cursor) !important;
-}
-
-.ruleset-field-item *,
-.ruleset-field-item:hover,
-.ruleset-field-item:hover * {
-  cursor: var(--ruleset-pen-cursor) !important;
 }
 </style>

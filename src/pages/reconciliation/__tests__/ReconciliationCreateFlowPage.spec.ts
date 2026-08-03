@@ -1058,7 +1058,16 @@ describe('ReconciliationCreateFlowPage', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(true)
-    expect(draftStoreState.clearRuleSetDraft).toHaveBeenCalled()
+    expect(draftStoreState.clearRuleSetDraft).toHaveBeenCalledTimes(1)
+    // The board needing something to read/write means the wizard immediately re-seeds a fresh
+    // draft (so ruleSetDraftState is non-null again right after mount) — asserting clear was
+    // "called" alone doesn't prove the original seed was actually consumed rather than merely
+    // overwritten in place. Proving the clear fired *before* that re-seed is what shows the
+    // original is genuinely gone, not just shadowed.
+    expect(draftStoreState.setRuleSetDraft).toHaveBeenCalled()
+    const clearOrder = draftStoreState.clearRuleSetDraft.mock.invocationCallOrder[0]!
+    const lastReseedOrder = draftStoreState.setRuleSetDraft.mock.invocationCallOrder.at(-1)!
+    expect(clearOrder).toBeLessThan(lastReseedOrder)
   })
 
   it('discards all draft state when the user exits mid-creation', async () => {
@@ -1124,6 +1133,12 @@ describe('ReconciliationCreateFlowPage', () => {
 
     expect(push).toHaveBeenCalledWith({ path: '/reconciliation/automation/create' })
     expect(draftStoreState.setAutomationDraft).toHaveBeenCalled()
+    // The board step seeded a ruleset draft into the store so RuleSetBoard had something to
+    // read/write (seedRuleSetBoardDraft). continuingFlowElsewhere protects the *automation*
+    // handoff draft from onUnmounted's cleanup here, but the ruleset draft is unrelated and must
+    // still be cleared — left in place, a later /reconciliation/create visit would resume
+    // straight onto the board with this just-created run's answers and a live "Save run".
+    expect(draftStoreState.clearRuleSetDraft).toHaveBeenCalled()
   })
 
   it('continues automation setup from the pending option-B handoff when history state is lost', async () => {

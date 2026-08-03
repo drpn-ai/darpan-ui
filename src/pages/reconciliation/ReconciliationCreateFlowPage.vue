@@ -1387,6 +1387,13 @@ async function createRun(): Promise<void> {
       draftStore.setAutomationDraft(nextDraft, 'input-mode', response.savedRun)
       draftStore.setWorkflowOrigin(nextDraft.returnLabel, nextDraft.returnPath)
       continuingFlowElsewhere = true
+      // continuingFlowElsewhere only protects the automation handoff draft from onUnmounted's
+      // cleanup — it says nothing about the ruleset draft seedRuleSetBoardDraft() published so
+      // the board had something to read/write. That one is unrelated and must not survive a
+      // completed create: left in place, a later /reconciliation/create visit would resume
+      // straight onto the board with this just-created run's answers and a live "Save run",
+      // one click away from creating a duplicate.
+      draftStore.clearRuleSetDraft()
       await router.push({ path: '/reconciliation/automation/create' })
       draftStore.clearAutomationDraft()
       return
