@@ -5,7 +5,7 @@ import {
   clearPendingReconciliationAutomationDraftState,
   savePendingReconciliationAutomationDraftState,
 } from '../../../lib/reconciliationAutomationDraft'
-import { buildReconciliationRuleSetDraftState } from '../../../lib/reconciliationRuleSetDraft'
+import { buildReconciliationRuleSetDraftState, type ReconciliationRuleSetDraft } from '../../../lib/reconciliationRuleSetDraft'
 
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const route = vi.hoisted(() => ({
@@ -90,6 +90,53 @@ async function chooseWorkflowChoice(
   testId: string,
 ): Promise<void> {
   await wrapper.get(`[data-testid="${testId}"]`).trigger('click')
+}
+
+// API on both sides so a seeded draft resolves straight to the rules board without needing any
+// schema/flatten mocking beyond what beforeEach already wires up for listAutomationSourceOptions.
+const apiToApiDraft: ReconciliationRuleSetDraft = {
+  runName: 'API Order Sync',
+  file1SystemEnumId: 'OMS',
+  file1SystemLabel: 'OMS',
+  file1SourceTypeEnumId: 'AUT_SRC_API',
+  file1SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+  file1SourceConfigId: 'KREWE_OMS',
+  file1SourceConfigType: 'HOTWAX_OMS_REST',
+  file1FileTypeEnumId: '',
+  file1PrimaryIdExpression: ['$.records[*].externalId'],
+  file2SystemEnumId: 'SHOPIFY',
+  file2SystemLabel: 'SHOPIFY',
+  file2SourceTypeEnumId: 'AUT_SRC_API',
+  file2SystemMessageRemoteId: 'SHOPIFY_REMOTE',
+  file2SourceConfigId: 'SHOPIFY_MAIN',
+  file2SourceConfigType: 'SHOPIFY_AUTH',
+  file2FileTypeEnumId: '',
+  file2PrimaryIdExpression: ['$.records[*].id'],
+}
+
+// Seeding ruleSetDraftState before mount makes restoreDraftFromHistoryState hydrate every wizard
+// answer and land currentStepIndex directly on the last step (steps.value.length - 1) — the same
+// resume path RunsSettingsWorkflowPage and the Ruleset Manager already rely on. Since 'ruleset-rules'
+// is now always that last entry, this is the fastest way to reach the board in a test.
+async function mountCreateFlow(options: { draft?: ReconciliationRuleSetDraft } = {}): Promise<ReturnType<typeof mount>> {
+  if (options.draft) {
+    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(options.draft, 'ruleset-manager')
+  }
+  const wrapper = mount(ReconciliationCreateFlowPage)
+  await flushPromises()
+  return wrapper
+}
+
+// A seeded draft already lands on the board (see mountCreateFlow above); this just guards that
+// and gives step-by-step callers a single place to land on the final step from wherever they are.
+async function advanceToLastStep(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await flushPromises()
+  while (!wrapper.find('[data-testid="ruleset-editor-board"]').exists()) {
+    const nextButton = wrapper.find('[data-testid="wizard-next"]')
+    if (!nextButton.exists() || nextButton.attributes('disabled') !== undefined) break
+    await nextButton.trigger('click')
+    await flushPromises()
+  }
 }
 
 async function advanceToFinalPrimaryIdStep(wrapper: ReturnType<typeof mount>): Promise<void> {
@@ -391,7 +438,8 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(wrapper.text()).not.toContain('Normalizers stay separate for now.')
     expect(wrapper.findAll('textarea')).toHaveLength(0)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
-    expect(wrapper.get('[data-testid="create-run"]').text()).toContain('Create')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    expect(wrapper.get('[data-testid="create-run-submit"]').text()).toBe('Save run')
   })
 
   it('creates a basic diff run from the final primary ID step', async () => {
@@ -400,7 +448,9 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await advanceToFinalPrimaryIdStep(wrapper)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
-    await wrapper.get('[data-testid="create-run"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
     expect(listEnumOptions).not.toHaveBeenCalled()
@@ -469,7 +519,8 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
     await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
-    await wrapper.get('[data-testid="create-run"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
     expect(listAutomationSourceOptions).toHaveBeenCalled()
@@ -606,7 +657,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowOption(wrapper, 'file2-api-select', 'remote:HOTWAX_ORDERS_API:gorjana_prod')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.records[*].externalId')
-    await wrapper.get('[data-testid="create-run"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
     expect(createRuleSetRun).toHaveBeenCalledWith({
@@ -983,14 +1035,16 @@ describe('ReconciliationCreateFlowPage', () => {
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Which field identifies each record in Shopify orders')
+    // A fully-answered seeded draft resumes directly onto the wizard's final step (the rules
+    // board) rather than re-asking the last question.
+    expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Create JSON Order Compare now, or open the Ruleset Manager first?')
     expect(wrapper.text()).not.toContain(RULESET_MANAGER_HELPER_COPY)
     expect(wrapper.text()).not.toContain('Open the Ruleset Manager')
     expect(wrapper.find('[data-testid="ruleset-manager-handoff"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="open-ruleset-manager"]').exists()).toBe(false)
 
-    await wrapper.get('[data-testid="create-run"]').trigger('click')
+    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
     expect(push).toHaveBeenCalledWith('/settings/runs')
@@ -1003,7 +1057,7 @@ describe('ReconciliationCreateFlowPage', () => {
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Which field identifies each record in Shopify orders')
+    expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(true)
     expect(draftStoreState.clearRuleSetDraft).toHaveBeenCalled()
   })
 
@@ -1064,7 +1118,8 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await advanceToFinalPrimaryIdStep(wrapper)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
-    await wrapper.get('[data-testid="create-run"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
     expect(push).toHaveBeenCalledWith({ path: '/reconciliation/automation/create' })
@@ -1086,7 +1141,8 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await advanceToFinalPrimaryIdStep(wrapper)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
-    await wrapper.get('[data-testid="create-run"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
     expect(push).toHaveBeenCalledWith({ path: '/reconciliation/automation/create' })
@@ -1123,5 +1179,69 @@ describe('ReconciliationCreateFlowPage', () => {
     await input.trigger('keydown.enter')
 
     expect(wrapper.findAll('[data-testid="workflow-chip-text-chip"]')).toHaveLength(2)
+  })
+
+  describe('rules board as the final step', () => {
+    it('ends the wizard on the rules board', async () => {
+      const wrapper = await mountCreateFlow({ draft: apiToApiDraft })
+
+      await advanceToLastStep(wrapper)
+
+      expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('How should Darpan compare these two systems?')
+      expect(wrapper.get('[data-testid="create-run-submit"]').text()).toBe('Save run')
+    })
+
+    it('saves a run with rules and exclusions drawn on the final step', async () => {
+      const wrapper = await mountCreateFlow({
+        draft: {
+          ...apiToApiDraft,
+          rules: [{ file1FieldPath: 'name', file2FieldPath: 'externalId', operator: '=', sequenceNum: 1 }],
+          file2ExcludeFilters: [{ fieldExpression: 'salesChannelEnumId', values: ['POS_SALES_CHANNEL'] }],
+        },
+      })
+
+      await advanceToLastStep(wrapper)
+      await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+      await flushPromises()
+
+      // buildRuleSetRulePayloads folds file1FieldPath/file2FieldPath into a JSON `expression`
+      // string rather than flat payload keys — assert against that real shape rather than a flat
+      // file1FieldPath key.
+      expect(createRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rules: expect.arrayContaining([
+            expect.objectContaining({ expression: expect.stringContaining('"file1FieldPath":"name"') }),
+          ]),
+          file2ExcludeFilters: [
+            { fieldExpression: 'salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
+          ],
+        }),
+        expect.anything(),
+      )
+    })
+
+    it('still saves when the board is left empty', async () => {
+      // A run with no comparison rules is legitimate; the final step must not become a gate.
+      const wrapper = await mountCreateFlow({ draft: apiToApiDraft })
+
+      await advanceToLastStep(wrapper)
+      await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+      await flushPromises()
+
+      expect(createRuleSetRun).toHaveBeenCalled()
+      expect((createRuleSetRun.mock.calls[0]?.[0] as { rules?: unknown })?.rules).toBeUndefined()
+    })
+
+    it('can go back from the board to the previous question', async () => {
+      const wrapper = await mountCreateFlow({ draft: apiToApiDraft })
+
+      await advanceToLastStep(wrapper)
+      // WorkflowStepForm's back button has no data-testid of its own — existing specs (e.g.
+      // ReconciliationAutomationWorkflowPage.spec.ts) already select it by class.
+      await wrapper.get('.wizard-back').trigger('click')
+
+      expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(false)
+    })
   })
 })

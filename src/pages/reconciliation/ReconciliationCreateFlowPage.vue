@@ -6,13 +6,13 @@
       ref="stepForm"
       class="workflow-step-shell"
       :question="currentQuestion"
-      :primary-label="isCreateStep ? 'Create' : 'OK'"
+      :primary-label="isCreateStep ? 'Save run' : 'OK'"
       :submit-disabled="isCreateStep ? !canCreateRun || loadingSelections : !canProceed || loadingSelections"
       :show-back="currentStepIndex > 0"
       :show-primary-action="!isShortcutChoiceStep"
-      :show-enter-hint="!isShortcutChoiceStep"
+      :show-enter-hint="!isShortcutChoiceStep && !isRuleSetRulesStep"
       :allow-select-enter="true"
-      :primary-test-id="isCreateStep ? 'create-run' : 'wizard-next'"
+      :primary-test-id="isCreateStep ? 'create-run-submit' : 'wizard-next'"
       @submit="handlePrimarySubmit"
       @back="goBack"
     >
@@ -69,6 +69,10 @@
         />
       </template>
 
+      <template v-else-if="isRuleSetRulesStep">
+        <RuleSetBoard />
+      </template>
+
       <template v-else>
         <label class="wizard-input-shell">
           <input
@@ -93,6 +97,7 @@ import WorkflowShortcutChoiceCards, {
 import WorkflowSelect, { type WorkflowSelectOption } from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowChipTextInput from '../../components/workflow/WorkflowChipTextInput.vue'
+import RuleSetBoard from '../../components/reconciliation/RuleSetBoard.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade } from '../../lib/api/facade'
@@ -137,6 +142,7 @@ type StepId =
   | 'file2-primary-id'
   | 'file2-api-config'
   | 'file2-api'
+  | 'ruleset-rules'
 
 interface WizardStep {
   id: StepId
@@ -196,6 +202,12 @@ const file2SourceConfigType = ref('')
 const file2NsRestletConfigId = ref('')
 const file2SystemMessageRemoteId = ref('')
 
+// The rules board (final step) reads and writes these directly off the shared draft store — it
+// takes no props and emits nothing, so this is the only channel back to the wizard's own payload
+// build. Not modeled as scalar refs like the rest of the draft above because the board owns their
+// entire editing UI; the wizard only ever needs to carry the latest known value forward.
+const ruleSetDraftExtras = ref<Pick<ReconciliationRuleSetDraft, 'rules' | 'file1ExcludeFilters' | 'file2ExcludeFilters'>>({})
+
 const loadingSelections = computed(() => loadingOptions.value || loadingSchemaFields.value)
 const file1UsesApi = computed(() => file1SourceMode.value === SOURCE_MODE_API)
 const file2UsesApi = computed(() => file2SourceMode.value === SOURCE_MODE_API)
@@ -234,6 +246,10 @@ const steps = computed<WizardStep[]>(() => {
       stepList.splice(stepList.findIndex((step) => step.id === 'file2-primary-id'), 0, { id: 'file2-schema' })
     }
   }
+
+  // Final step regardless of source shape: the rules board, so comparison rules and exclusions
+  // are set before the run is saved instead of in a second trip through the Ruleset Manager.
+  stepList.push({ id: 'ruleset-rules' })
 
   return stepList
 })
@@ -319,10 +335,14 @@ const currentQuestion = computed(() => {
       return `Which ${sourceSystemLabel('file2')} config should this source use?`
     case 'file2-api':
       return `Which API endpoint should ${sourceSystemLabel('file2')} use?`
+    case 'ruleset-rules':
+      return 'How should Darpan compare these two systems?'
     default:
       return ''
   }
 })
+
+const isRuleSetRulesStep = computed(() => currentStep.value.id === 'ruleset-rules')
 
 const isSelectStep = computed(() => {
   switch (currentStep.value.id) {
@@ -1181,6 +1201,31 @@ function goBack(): void {
   currentStepIndex.value = Math.max(currentStepIndex.value - 1, 0)
 }
 
+/**
+ * The rules board mutates the shared draft store's rules/exclusions directly (see
+ * RuleSetBoard's syncRulesToDraft and applyExclusionEdit) rather than emitting them back here.
+ * Prefer whatever the store currently holds — that reflects the board's latest edits — and fall
+ * back to the last known values (from a seeded/resumed draft) only before the board has written
+ * anything of its own.
+ */
+function boardDraftExtras(): Pick<ReconciliationRuleSetDraft, 'rules' | 'file1ExcludeFilters' | 'file2ExcludeFilters'> {
+  const existing = draftStore.ruleSetDraftState?.draft
+  return {
+    rules: existing?.rules ?? ruleSetDraftExtras.value.rules,
+    file1ExcludeFilters: existing?.file1ExcludeFilters ?? ruleSetDraftExtras.value.file1ExcludeFilters,
+    file2ExcludeFilters: existing?.file2ExcludeFilters ?? ruleSetDraftExtras.value.file2ExcludeFilters,
+  }
+}
+
+/**
+ * Publish the wizard's current answers into the shared draft store so the rules board — which
+ * takes no props and reads only that store — has something to render and edit. Called once when
+ * the wizard lands on the final step, whether by clicking through or by resuming a seeded draft.
+ */
+function seedRuleSetBoardDraft(): void {
+  draftStore.setRuleSetDraft({ ...activeDraft.value, ...boardDraftExtras() }, 'ruleset-manager')
+}
+
 async function restoreDraftFromHistoryState(): Promise<void> {
   const draftState = draftStore.ruleSetDraftState
   if (!draftState) return
@@ -1205,6 +1250,11 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   file2SourceConfigType.value = draftState.draft.file2SourceConfigType ?? ''
   file2NsRestletConfigId.value = draftState.draft.file2NsRestletConfigId ?? ''
   file2SystemMessageRemoteId.value = draftState.draft.file2SystemMessageRemoteId ?? ''
+  ruleSetDraftExtras.value = {
+    rules: draftState.draft.rules,
+    file1ExcludeFilters: draftState.draft.file1ExcludeFilters,
+    file2ExcludeFilters: draftState.draft.file2ExcludeFilters,
+  }
 
   const targetStepId = draftState.resumeStepId ?? steps.value[steps.value.length - 1]?.id
   const targetStepIndex = steps.value.findIndex((step) => step.id === targetStepId)
@@ -1213,6 +1263,10 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   // One-shot seed: consume the draft immediately so exiting mid-creation never resumes it
   // on a later visit — a fresh /reconciliation/create must always start clean.
   draftStore.clearRuleSetDraft()
+
+  if (currentStep.value.id === 'ruleset-rules') {
+    seedRuleSetBoardDraft()
+  }
 
   await Promise.all([
     file1JsonSchemaId.value ? ensureFieldsLoaded(file1JsonSchemaId.value) : Promise.resolve(),
@@ -1281,6 +1335,9 @@ async function handlePrimarySubmit(): Promise<void> {
 
   if (!canProceed.value) return
   currentStepIndex.value = Math.min(currentStepIndex.value + 1, steps.value.length - 1)
+  if (currentStep.value.id === 'ruleset-rules') {
+    seedRuleSetBoardDraft()
+  }
 }
 
 async function openSchemaCreateWorkflow(): Promise<void> {
@@ -1310,7 +1367,10 @@ async function createRun(): Promise<void> {
   const submitSignal = submitController.signal
 
   try {
-    const response = await reconciliationFacade.createRuleSetRun(buildCreateRuleSetRunPayload(activeDraft.value), submitSignal)
+    // rules/exclusions live only on the shared draft store by the time we get here — the board
+    // that drew them takes no props and emits nothing (see boardDraftExtras above).
+    const draftForPayload: ReconciliationRuleSetDraft = { ...activeDraft.value, ...boardDraftExtras() }
+    const response = await reconciliationFacade.createRuleSetRun(buildCreateRuleSetRunPayload(draftForPayload), submitSignal)
     if (!response.savedRun?.savedRunId) {
       throw new Error('Missing saved run identifier.')
     }
