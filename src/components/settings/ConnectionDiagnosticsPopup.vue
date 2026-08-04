@@ -171,6 +171,8 @@ function statusLabel(status: ConnectionCheckStatus): string {
 
 .connection-diagnostics-verdict {
   margin: 0 0 4px;
+  /* Display text. The nearest role (--type-tile-size) is 1.12px away, past the point where folding is invisible. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 1.05rem;
   font-weight: 400;
 }

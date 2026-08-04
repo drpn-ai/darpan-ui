@@ -207,7 +207,7 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: var(--workflow-form-question-size);
   line-height: 1.22;
-  letter-spacing: -0.015em;
+  letter-spacing: var(--tracking-tight);
   white-space: normal;
   font-weight: 400;
 }
@@ -242,7 +242,7 @@ onBeforeUnmount(() => {
   color: var(--text);
   font-size: var(--workflow-form-answer-size);
   line-height: 1.2;
-  letter-spacing: -0.015em;
+  letter-spacing: var(--tracking-tight);
   text-align: left;
   appearance: none;
   font-weight: 400;
@@ -253,7 +253,7 @@ onBeforeUnmount(() => {
   padding-bottom: var(--workflow-form-select-padding-bottom);
   font-size: var(--workflow-form-select-size);
   line-height: var(--workflow-form-select-line-height);
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-title);
   color-scheme: light dark;
 }
 
@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
   color: var(--text);
   text-decoration: none;
   font-size: var(--type-tile-size);
-  letter-spacing: -0.02em;
+  letter-spacing: var(--tracking-tight);
 }
 
 .wizard-question-shell :deep(.wizard-file-shell) {

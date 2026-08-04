@@ -155,7 +155,7 @@ function togglePreview(targetKey: LinearPortalTarget['key']): void {
 .roadmap-hero-copy h1,
 .portal-choice-card h2 {
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-title);
 }
 
 .roadmap-hero-copy {

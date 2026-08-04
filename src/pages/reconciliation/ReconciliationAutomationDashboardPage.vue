@@ -642,6 +642,8 @@ onMounted(() => {
   min-width: 0;
   max-width: 100%;
   color: var(--text);
+  /* Display text. The nearest role (--type-tile-size) is 1.6px away, past the point where folding is invisible. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 1.08rem;
   font-weight: 400;
   line-height: 1.35;

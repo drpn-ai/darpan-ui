@@ -50,6 +50,7 @@
   --type-eyebrow-tracking: 0.13em;
   --type-table-head-size: 0.76rem;
   --type-table-head-tracking: 0.08em;
+  --type-summary-label-tracking: 0.06em;
   --type-badge-size: 0.76rem;
   --type-summary-label-size: 0.78rem;
   --type-mono-copy-size: 0.79rem;
@@ -678,7 +679,7 @@ button:disabled {
   color: var(--text-soft);
   font-size: var(--type-summary-label-size);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--type-summary-label-tracking);
 }
 
 .static-page-section-header-row {
@@ -865,7 +866,7 @@ button:disabled {
 .login-panel h1 {
   margin: 0;
   font-size: clamp(1.6rem, 1.4vw + 1rem, 2.1rem);
-  letter-spacing: -0.02em;
+  letter-spacing: var(--tracking-tight);
   text-wrap: balance;
 }
 
@@ -1236,6 +1237,8 @@ label > span {
   padding: 0.1rem 0.62rem;
   border: 1px solid var(--border);
   font-size: var(--type-badge-size);
+  /* Near-zero tracking specific to badges. The nearest role tracking is 0.06em, which would visibly loosen every badge in the product. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   letter-spacing: 0.01em;
 }
 
@@ -1708,7 +1711,7 @@ label > span {
   margin: 0;
   font-size: var(--type-table-head-size);
   color: var(--text-dim);
-  letter-spacing: 0.1em;
+  letter-spacing: var(--type-table-head-tracking);
   text-transform: uppercase;
 }
 

@@ -1266,6 +1266,8 @@ onMounted(() => {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
+  /* Sizes an icon glyph, not text. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 1.45rem;
   line-height: 1;
   cursor: pointer;

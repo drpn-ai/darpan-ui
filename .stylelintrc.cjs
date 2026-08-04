@@ -19,17 +19,17 @@ module.exports = {
 
   rules: {
     /**
-     * Currently enforced: colour and radius. Both are clean across the codebase as of 2026-08-04,
-     * so this locks in discipline that already exists rather than demanding a migration.
+     * Colour, radius, and — since the type scale landed — size and tracking. Every value these
+     * properties take must name a role.
      *
-     * NOT yet enforced, and each is a phase-02 task rather than an oversight:
-     *   font-size      79 violations — several de-facto roles (0.82rem x7, 0.9rem x5) have no token
-     *                  at all. Blocked on deciding whether to add tokens or reduce the type palette.
-     *   letter-spacing 14 violations — same cluster, same decision.
-     * Add each to the property list below as its phase-02 slice lands.
+     * The eight remaining literals carry an inline disable WITH the reason, rather than being
+     * exempted by file or by turning a property off. Two kinds: sizes that set an icon glyph or a
+     * display figure (not type in the sense the scale describes), and values whose nearest role is
+     * far enough away that folding would be visible rather than sub-pixel. Marked exceptions can be
+     * counted and argued with; silent ones spread.
      */
     'scale-unlimited/declaration-strict-value': [
-      ['/color$/', 'fill', 'stroke', 'border-radius'],
+      ['/color$/', 'fill', 'stroke', 'border-radius', 'font-size', 'letter-spacing'],
       {
         ignoreValues: ['currentColor', 'inherit', 'initial', 'transparent', 'none', 'unset', 'normal', '0'],
         // color-mix(in oklab, var(--accent) 42%, var(--border)) is token-driven and legitimate;

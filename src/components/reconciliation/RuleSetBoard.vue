@@ -1438,7 +1438,7 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
   font-size: var(--type-table-head-size);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--type-table-head-tracking);
 }
 
 /* The term IS the affordance — a 1px dotted underline, no question-mark badges. This board already
@@ -1457,7 +1457,7 @@ onBeforeUnmount(() => {
   padding: 0;
   cursor: help;
   font-size: var(--type-table-head-size);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--type-table-head-tracking);
   text-transform: uppercase;
   color: var(--text-muted);
   text-decoration: underline dotted var(--text-muted);
@@ -1529,7 +1529,7 @@ onBeforeUnmount(() => {
 .ruleset-field-column header span {
   color: var(--text-muted);
   font-size: var(--type-table-head-size);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--type-table-head-tracking);
 }
 
 .ruleset-editor-board {
@@ -1697,6 +1697,8 @@ onBeforeUnmount(() => {
 
 .ruleset-field-meta {
   color: var(--text-muted);
+  /* A micro size deliberately below the scale. The nearest role is 0.7rem and folding up is a visible 9% jump on the board, not the sub-pixel shift the other folds were. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 0.64rem;
   line-height: 1.2;
   hyphens: none;
@@ -1817,6 +1819,8 @@ onBeforeUnmount(() => {
   min-width: 1.9rem;
   min-height: 1.9rem;
   padding: 0;
+  /* Sizes an icon glyph, not text. Type roles do not describe it. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 1.1rem;
   line-height: 1;
 }

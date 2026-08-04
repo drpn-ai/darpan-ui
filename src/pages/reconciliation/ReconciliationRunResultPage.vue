@@ -1569,6 +1569,8 @@ watch([savedRunId, outputFileName], () => {
 }
 
 .reconciliation-diff-bucket strong {
+  /* A display figure, sized for prominence rather than to a body role. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 1.9rem;
   line-height: 1;
 }
@@ -1614,6 +1616,8 @@ watch([savedRunId, outputFileName], () => {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
+  /* Sizes an icon glyph, not text. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 1.35rem;
   line-height: 1;
   transform: translateY(-50%);
