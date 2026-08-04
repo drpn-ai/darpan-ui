@@ -41,13 +41,23 @@
             @click="openAuthInfoPopupForSide('file1')"
           >
             <span class="static-page-summary-label">System</span>
-            <strong>{{ file1Title }}</strong>
-            <span v-if="file1SystemConfigName" class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file1">{{ file1SystemConfigName }}</span>
+            <span class="ruleset-manager-system-line">
+              <strong>{{ file1Title }}</strong>
+              <template v-if="file1SystemConfigName">
+                <span class="ruleset-manager-system-separator" aria-hidden="true">·</span>
+                <span class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file1">{{ file1SystemConfigName }}</span>
+              </template>
+            </span>
           </button>
           <article v-else class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">System</span>
-            <strong>{{ file1Title }}</strong>
-            <span v-if="file1SystemConfigName" class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file1">{{ file1SystemConfigName }}</span>
+            <span class="ruleset-manager-system-line">
+              <strong>{{ file1Title }}</strong>
+              <template v-if="file1SystemConfigName">
+                <span class="ruleset-manager-system-separator" aria-hidden="true">·</span>
+                <span class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file1">{{ file1SystemConfigName }}</span>
+              </template>
+            </span>
           </article>
           <article class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">Schema</span>
@@ -69,13 +79,23 @@
             @click="openAuthInfoPopupForSide('file2')"
           >
             <span class="static-page-summary-label">System</span>
-            <strong>{{ file2Title }}</strong>
-            <span v-if="file2SystemConfigName" class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file2">{{ file2SystemConfigName }}</span>
+            <span class="ruleset-manager-system-line">
+              <strong>{{ file2Title }}</strong>
+              <template v-if="file2SystemConfigName">
+                <span class="ruleset-manager-system-separator" aria-hidden="true">·</span>
+                <span class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file2">{{ file2SystemConfigName }}</span>
+              </template>
+            </span>
           </button>
           <article v-else class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">System</span>
-            <strong>{{ file2Title }}</strong>
-            <span v-if="file2SystemConfigName" class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file2">{{ file2SystemConfigName }}</span>
+            <span class="ruleset-manager-system-line">
+              <strong>{{ file2Title }}</strong>
+              <template v-if="file2SystemConfigName">
+                <span class="ruleset-manager-system-separator" aria-hidden="true">·</span>
+                <span class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file2">{{ file2SystemConfigName }}</span>
+              </template>
+            </span>
           </article>
           <article class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">Schema</span>
@@ -875,6 +895,17 @@ onMounted(() => {
   background: var(--surface-2);
 }
 
+/* System name and its connection sit on one line, dot-separated, so the card stays a single row
+   like its Schema and Primary ID neighbours. */
+.ruleset-manager-system-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.ruleset-manager-system-separator,
 .ruleset-manager-system-config {
   color: var(--text-muted);
   font-size: 0.78rem;
