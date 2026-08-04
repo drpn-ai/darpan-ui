@@ -354,6 +354,10 @@ export interface AutomationSourcePayload {
   safeMetadataJson?: string
   optionKey?: string
   omsRestSourceConfigId?: string
+  // Presence-sensitive, like the rule-set payload's file{1,2}ExcludeFilters: an omitted key leaves the
+  // automation's existing rows alone, an explicit [] clears them. Declared here so buildSourcePayload
+  // no longer has to write it through an `as` cast, which is what hid its absence.
+  excludeFilters?: SourceExcludeFilter[]
 }
 
 export interface SaveAutomationPayload {

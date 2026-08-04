@@ -5,6 +5,8 @@ import {
   buildReconciliationRuleSetDraftState,
   type ReconciliationRuleSetDraftRule,
 } from '../../../lib/reconciliationRuleSetDraft'
+import { buildRuleSetDraft } from '../../../lib/savedRunEditorRoute'
+import type { SavedRunSummary } from '../../../lib/api/types'
 import type { SourceExcludeFilter } from '../../../lib/sourceExcludeFilters'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../../lib/uiEvents'
 
@@ -83,7 +85,97 @@ function createDraftState(
   )
 }
 
-function createApiDraftState(rules: ReconciliationRuleSetDraftRule[] = []) {
+// Mirrors what AutomationFacadeSupport serves: OMS carries the wider board field list AND declares
+// the exclusion-filter parameter; Shopify does neither (its connector row has no filterParameterName
+// and no keepFieldsBase to derive a wider list from).
+const OMS_FIELD_OPTIONS = [
+  { fieldPath: '$.records[*].orderId', label: 'Order ID', type: 'string' },
+  { fieldPath: '$.records[*].orderName', label: 'Order name', type: 'string' },
+  { fieldPath: '$.records[*].externalId', label: 'External ID', type: 'string' },
+  { fieldPath: '$.records[*].grandTotal', label: 'Grand total', type: 'string' },
+  { fieldPath: '$.records[*].orderDate', label: 'Order date', type: 'string' },
+  { fieldPath: '$.records[*].statusId', label: 'Status', type: 'string' },
+  { fieldPath: '$.records[*].salesChannelEnumId', label: 'Sales channel', type: 'string' },
+]
+
+function apiSourceOptionsResponse() {
+  return {
+    ok: true,
+    messages: [],
+    errors: [],
+    sourceConfigs: [],
+    nsRestletConfigs: [],
+    systemRemotes: [
+      {
+        systemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        label: 'Orders API',
+        systemEnumId: 'OMS',
+        optionKey: 'KREWE_OMS',
+        sourceConfigId: 'KREWE_OMS',
+        sourceConfigType: 'HOTWAX_OMS_REST',
+        primaryIdOptions: OMS_FIELD_OPTIONS.slice(0, 3),
+        fieldOptions: OMS_FIELD_OPTIONS,
+        supportsExcludeFilters: true,
+      },
+      {
+        systemMessageRemoteId: 'SHOPIFY_REMOTE',
+        label: 'Admin GraphQL Orders',
+        systemEnumId: 'SHOPIFY',
+        optionKey: 'SHOPIFY_MAIN',
+        sourceConfigId: 'SHOPIFY_MAIN',
+        sourceConfigType: 'SHOPIFY_AUTH',
+        primaryIdOptions: [
+          { fieldPath: '$.records[*].id', label: 'Order ID', type: 'ID' },
+          { fieldPath: '$.records[*].name', label: 'Order name', type: 'String' },
+        ],
+        supportsExcludeFilters: false,
+      },
+    ],
+  }
+}
+
+/** The wire shape list#SavedRuns returns for a reopened OMS/Shopify run carrying two exclusions. */
+function savedRunWithTwoExclusions(): SavedRunSummary {
+  return {
+    savedRunId: 'RS_API_ORDER_SYNC',
+    runName: 'API Order Sync',
+    runType: 'ruleset',
+    ruleSetId: 'RS_API_ORDER_SYNC',
+    requiresSystemSelection: false,
+    systemOptions: [
+      {
+        fileSide: 'FILE_1',
+        enumId: 'OMS',
+        label: 'HotWax',
+        sourceTypeEnumId: 'AUT_SRC_API',
+        systemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        sourceConfigId: 'KREWE_OMS',
+        sourceConfigType: 'HOTWAX_OMS_REST',
+        idFieldExpressions: ['$.records[*].externalId'],
+      },
+      {
+        fileSide: 'FILE_2',
+        enumId: 'SHOPIFY',
+        label: 'SHOPIFY',
+        sourceTypeEnumId: 'AUT_SRC_API',
+        systemMessageRemoteId: 'SHOPIFY_REMOTE',
+        sourceConfigId: 'SHOPIFY_MAIN',
+        sourceConfigType: 'SHOPIFY_AUTH',
+        idFieldExpressions: ['$.records[*].id'],
+      },
+    ],
+    rules: [],
+    file1ExcludeFilters: [
+      { fieldExpression: '$.records[*].salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
+      { fieldExpression: '$.records[*].statusId', operator: 'EXCLUDE_IN', values: ['ORDER_CANCELLED'] },
+    ],
+  }
+}
+
+function createApiDraftState(
+  rules: ReconciliationRuleSetDraftRule[] = [],
+  excludeFilters: { file1?: SourceExcludeFilter[], file2?: SourceExcludeFilter[] } = {},
+) {
   return buildReconciliationRuleSetDraftState(
     {
       savedRunId: 'RS_API_ORDER_SYNC',
@@ -105,6 +197,8 @@ function createApiDraftState(rules: ReconciliationRuleSetDraftRule[] = []) {
       file2FileTypeEnumId: '',
       file2PrimaryIdExpression: ['$.records[*].id'],
       rules,
+      ...(excludeFilters.file1 ? { file1ExcludeFilters: excludeFilters.file1 } : {}),
+      ...(excludeFilters.file2 ? { file2ExcludeFilters: excludeFilters.file2 } : {}),
     },
     'ruleset-manager',
   )
@@ -731,47 +825,116 @@ describe('ReconciliationRuleSetEditorPage', () => {
   })
 
   describe('field exclusions', () => {
-    const EXCLUDED_FIELD_PATH = '$.data.orders.edges[0].node.displayFinancialStatus'
+    // FINAL-REVIEW IMPORTANT 3: exclusions only ever reach a getter whose SourceSystemConnector row
+    // declares filterParameterName. These specs previously ran against a JSON-schema-file draft, which
+    // has no getter at all — they exercised a control the backend could never honour. They now run on
+    // an API-backed draft whose FILE_1 side is OMS (declares the parameter) and whose FILE_2 side is
+    // Shopify (does not), so both the offered and the withheld case are covered by construction.
+    const EXCLUDED_FIELD_PATH = '$.records[*].salesChannelEnumId'
+    const EXCLUDE_MARK = '[data-testid="ruleset-field-exclude-file1-6"]'
+    const EXCLUDE_PILL = '[data-testid="ruleset-field-file1-6"]'
+
+    beforeEach(() => {
+      listAutomationSourceOptions.mockResolvedValue(apiSourceOptionsResponse())
+      draftStoreState.ruleSetDraftState = createApiDraftState()
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+    })
 
     it('is a real button element on the pill, nested inside a non-button pill for a11y and valid HTML', async () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      const pill = wrapper.get('[data-testid="ruleset-field-file2-1"]')
+      const pill = wrapper.get(EXCLUDE_PILL)
       expect(pill.element.tagName).toBe('DIV')
       expect(pill.attributes('role')).toBe('button')
       expect(pill.attributes('tabindex')).toBe('0')
 
-      const mark = wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]')
-      expect(mark.element.tagName).toBe('BUTTON')
+      expect(wrapper.get(EXCLUDE_MARK).element.tagName).toBe('BUTTON')
+    })
+
+    it('offers the connector wider field list so the field to exclude on is selectable at all', async () => {
+      // FINAL-REVIEW CRITICAL 1b. primaryIdOptions is only orderId/orderName/externalId, so the
+      // shipping use case (salesChannelEnumId) could not be picked. The board reads fieldOptions when
+      // the connector serves one; primary-ID pickers keep reading primaryIdOptions.
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      const file1Pills = wrapper.findAll('[data-testid^="ruleset-field-file1-"]')
+      expect(file1Pills).toHaveLength(7)
+      expect(wrapper.get(EXCLUDE_PILL).text()).toContain('Sales channel')
+      expect(wrapper.get(EXCLUDE_PILL).find('.ruleset-field-meta').text()).toBe(EXCLUDED_FIELD_PATH)
+    })
+
+    it('falls back to primaryIdOptions for a connector that serves no wider field list', async () => {
+      // Shopify serves no fieldOptions, so nothing about its column changes.
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.findAll('[data-testid^="ruleset-field-file2-"]')).toHaveLength(2)
+    })
+
+    it('withholds the mark entirely on a source whose connector declares no filter parameter', async () => {
+      // Shopify's SourceSystemConnector row has no filterParameterName, so runSavedRunDiff never
+      // passes it filters. Offering the mark there would validate, persist, and exclude nothing.
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.findAll('[data-testid^="ruleset-field-file1-"]').length).toBeGreaterThan(0)
+      expect(wrapper.findAll('[data-testid^="ruleset-field-exclude-file1-"]').length).toBeGreaterThan(0)
+      expect(wrapper.findAll('[data-testid^="ruleset-field-file2-"]').length).toBeGreaterThan(0)
+      expect(wrapper.findAll('[data-testid^="ruleset-field-exclude-file2-"]')).toHaveLength(0)
+    })
+
+    it('withholds the mark on a file-backed source, which has no getter to filter in', async () => {
+      draftStoreState.ruleSetDraftState = createDraftState()
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.findAll('[data-testid^="ruleset-field-file1-"]').length).toBeGreaterThan(0)
+      expect(wrapper.findAll('[data-testid^="ruleset-field-exclude-file1-"]')).toHaveLength(0)
+      expect(wrapper.findAll('[data-testid^="ruleset-field-exclude-file2-"]')).toHaveLength(0)
     })
 
     it('leaves the mark unset on a field with no exclusion', async () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      const mark = wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]')
-      expect(mark.classes()).not.toContain('ruleset-field-exclude--set')
+      expect(wrapper.get(EXCLUDE_MARK).classes()).not.toContain('ruleset-field-exclude--set')
     })
 
     it('marks a field that has an exclusion', async () => {
-      draftStoreState.ruleSetDraftState = createDraftState([], {
-        file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
       })
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
 
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      const mark = wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]')
-      expect(mark.classes()).toContain('ruleset-field-exclude--set')
+      expect(wrapper.get(EXCLUDE_MARK).classes()).toContain('ruleset-field-exclude--set')
+    })
+
+    it('matches a stored expression to its pill by alias, not by string identity', async () => {
+      // FINAL-REVIEW MINOR 6: every other field lookup on this board is alias-aware. A stored
+      // expression differing only by the `$.` root prefix still belongs to the same pill.
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: 'records[*].salesChannelEnumId', values: ['POS_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.get(EXCLUDE_MARK).classes()).toContain('ruleset-field-exclude--set')
     })
 
     it('opens the exclusion popover from the mark and blurs the board behind it', async () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      await wrapper.get(EXCLUDE_MARK).trigger('click')
 
       expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
       expect(wrapper.get('[data-testid="ruleset-editor-board"]').classes()).toContain('ruleset-editor-board--popup-open')
@@ -786,11 +949,11 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('pointerdown', { pointerId: 1, button: 0 })
-      expect(wrapper.get('[data-testid="ruleset-field-file2-1"]').classes()).not.toContain('ruleset-field-item--connection-active')
+      await wrapper.get(EXCLUDE_MARK).trigger('pointerdown', { pointerId: 1, button: 0 })
+      expect(wrapper.get(EXCLUDE_PILL).classes()).not.toContain('ruleset-field-item--connection-active')
 
       await vi.advanceTimersByTimeAsync(340)
-      await wrapper.get('[data-testid="ruleset-field-file1-1"]').trigger('pointerup', { pointerId: 1, button: 0 })
+      await wrapper.get('[data-testid="ruleset-field-file2-1"]').trigger('pointerup', { pointerId: 1, button: 0 })
       await flushPromises()
 
       expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(0)
@@ -798,17 +961,17 @@ describe('ReconciliationRuleSetEditorPage', () => {
     })
 
     it('opening a rule popover closes an already-open exclusion popover, and vice versa', async () => {
-      draftStoreState.ruleSetDraftState = createDraftState(
+      draftStoreState.ruleSetDraftState = createApiDraftState(
         [
           {
             ruleId: 'rule-1',
-            file1FieldPath: '$.orders[0].order_id',
-            file2FieldPath: '$.data.orders.edges[0].node.id',
+            file1FieldPath: '$.records[*].externalId',
+            file2FieldPath: '$.records[*].id',
             operator: '=',
             sequenceNum: 1,
           },
         ],
-        { file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }] },
+        { file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }] },
       )
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
 
@@ -824,7 +987,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       // click never reaches the window pointerdown listener the rule popover relies on to
       // close itself on outside click — so without an explicit mutual-exclusion guard, both
       // popovers would end up open and rendered on top of each other.
-      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      await wrapper.get(EXCLUDE_MARK).trigger('click')
       await flushPromises()
 
       expect(wrapper.findAll('[data-testid="ruleset-rule-popover"]')).toHaveLength(0)
@@ -841,7 +1004,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      await wrapper.get(EXCLUDE_MARK).trigger('click')
       const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
       await input.setValue('POS_SALES_CHANNEL')
       await input.trigger('keydown', { key: 'Enter' })
@@ -853,7 +1016,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
 
       expect(saveRuleSetRun).toHaveBeenCalledWith(
         expect.objectContaining({
-          file2ExcludeFilters: [
+          file1ExcludeFilters: [
             {
               fieldExpression: EXCLUDED_FIELD_PATH,
               operator: 'EXCLUDE_IN',
@@ -865,42 +1028,80 @@ describe('ReconciliationRuleSetEditorPage', () => {
       )
     })
 
+    it('preserves a run other exclusions when one of them is reopened and edited', async () => {
+      // FINAL-REVIEW CRITICAL 2. The draft here is built the way a real reopened run builds it —
+      // through buildRuleSetDraft, from the wire shape list#SavedRuns returns. Before the hydration
+      // fix, buildRuleSetDraft dropped both exclusion keys, so applyExclusionEdit computed `others`
+      // from an empty list and saving ONE edited exclusion silently deleted every other exclusion on
+      // that side. Editing statusId must leave salesChannelEnumId exactly as it was.
+      const savedRun = savedRunWithTwoExclusions()
+      const draft = buildRuleSetDraft(savedRun)
+      expect(draft).not.toBeNull()
+      draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(draft!, 'ruleset-manager')
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      // Both marks come back set — the load direction works at all.
+      expect(wrapper.get('[data-testid="ruleset-field-exclude-file1-5"]').classes()).toContain('ruleset-field-exclude--set')
+      expect(wrapper.get(EXCLUDE_MARK).classes()).toContain('ruleset-field-exclude--set')
+
+      // Edit the statusId exclusion only.
+      await wrapper.get('[data-testid="ruleset-field-exclude-file1-5"]').trigger('click')
+      const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
+      await input.setValue('ORDER_REJECTED')
+      await input.trigger('keydown', { key: 'Enter' })
+      await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
+      await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      const payload = saveRuleSetRun.mock.calls.at(-1)?.[0] as { file1ExcludeFilters?: SourceExcludeFilter[] }
+      expect(payload.file1ExcludeFilters).toEqual([
+        { fieldExpression: EXCLUDED_FIELD_PATH, operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
+        {
+          fieldExpression: '$.records[*].statusId',
+          operator: 'EXCLUDE_IN',
+          values: ['ORDER_CANCELLED', 'ORDER_REJECTED'],
+        },
+      ])
+    })
+
     it('removes the exclusion when the last chip is deleted and saved, sending an empty array rather than leaving it unset', async () => {
-      draftStoreState.ruleSetDraftState = createDraftState([], {
-        file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
       })
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
 
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      await wrapper.get(EXCLUDE_MARK).trigger('click')
       await wrapper.get('[data-testid="ruleset-exclusion-delete"]').trigger('click')
       await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
       await flushPromises()
 
       expect(saveRuleSetRun).toHaveBeenCalledWith(
-        expect.objectContaining({ file2ExcludeFilters: [] }),
+        expect.objectContaining({ file1ExcludeFilters: [] }),
         expect.any(AbortSignal),
       )
     })
 
     it('renders no number for an exclusion mark, unlike an ordered comparison rule', async () => {
-      draftStoreState.ruleSetDraftState = createDraftState([], {
-        file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL', 'DRAFT_SALES_CHANNEL'] }],
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL', 'DRAFT_SALES_CHANNEL'] }],
       })
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
 
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      const mark = wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]')
-      expect(mark.text()).not.toMatch(/\d/)
+      expect(wrapper.get(EXCLUDE_MARK).text()).not.toMatch(/\d/)
     })
 
     it('draws no connection line and creates no operator box for an exclusion', async () => {
-      draftStoreState.ruleSetDraftState = createDraftState([], {
-        file2: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
       })
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
 
@@ -915,7 +1116,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      const pill = wrapper.get('[data-testid="ruleset-field-file2-1"]')
+      const pill = wrapper.get(EXCLUDE_PILL)
       await pill.trigger('keydown', { key: 'Enter' })
       await pill.trigger('keydown', { key: ' ' })
       await flushPromises()
@@ -928,7 +1129,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+      await wrapper.get(EXCLUDE_MARK).trigger('click')
       const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
       await input.setValue('POS_SALES_CHANNEL')
       await input.trigger('keydown', { key: 'Enter' })
@@ -936,13 +1137,13 @@ describe('ReconciliationRuleSetEditorPage', () => {
       await flushPromises()
 
       expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(false)
-      expect(wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').classes()).not.toContain('ruleset-field-exclude--set')
+      expect(wrapper.get(EXCLUDE_MARK).classes()).not.toContain('ruleset-field-exclude--set')
 
       await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
       await flushPromises()
 
       expect(saveRuleSetRun).toHaveBeenCalledWith(
-        expect.not.objectContaining({ file2ExcludeFilters: expect.anything() }),
+        expect.not.objectContaining({ file1ExcludeFilters: expect.anything() }),
         expect.any(AbortSignal),
       )
     })

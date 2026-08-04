@@ -88,6 +88,66 @@ function createDraftState(
   )
 }
 
+// The exclusion mark is only rendered for a source whose connector declares filterParameterName
+// (FINAL-REVIEW IMPORTANT 3), so the exclusion-cancel case needs an API-backed OMS side rather than
+// the JSON-schema draft the rule-cancel case uses.
+function createApiDraftState() {
+  return buildReconciliationRuleSetDraftState(
+    {
+      savedRunId: 'RS_API_ORDER_SYNC',
+      runName: 'API Order Sync',
+      file1SystemEnumId: 'OMS',
+      file1SystemLabel: 'HotWax',
+      file1SourceTypeEnumId: 'AUT_SRC_API',
+      file1SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+      file1SourceConfigId: 'KREWE_OMS',
+      file1SourceConfigType: 'HOTWAX_OMS_REST',
+      file1FileTypeEnumId: '',
+      file1PrimaryIdExpression: ['$.records[*].externalId'],
+      file2SystemEnumId: 'SHOPIFY',
+      file2SystemLabel: 'SHOPIFY',
+      file2SourceTypeEnumId: 'AUT_SRC_API',
+      file2SystemMessageRemoteId: 'SHOPIFY_REMOTE',
+      file2SourceConfigId: 'SHOPIFY_MAIN',
+      file2SourceConfigType: 'SHOPIFY_AUTH',
+      file2FileTypeEnumId: '',
+      file2PrimaryIdExpression: ['$.records[*].id'],
+      rules: [],
+    },
+    'ruleset-manager',
+  )
+}
+
+function apiSourceOptionsResponse() {
+  return {
+    ok: true,
+    messages: [],
+    errors: [],
+    sourceConfigs: [],
+    nsRestletConfigs: [],
+    systemRemotes: [
+      {
+        systemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        label: 'Orders API',
+        systemEnumId: 'OMS',
+        optionKey: 'KREWE_OMS',
+        sourceConfigId: 'KREWE_OMS',
+        sourceConfigType: 'HOTWAX_OMS_REST',
+        primaryIdOptions: [
+          { fieldPath: '$.records[*].orderId', label: 'Order ID', type: 'string' },
+          { fieldPath: '$.records[*].externalId', label: 'External ID', type: 'string' },
+        ],
+        fieldOptions: [
+          { fieldPath: '$.records[*].orderId', label: 'Order ID', type: 'string' },
+          { fieldPath: '$.records[*].externalId', label: 'External ID', type: 'string' },
+          { fieldPath: '$.records[*].salesChannelEnumId', label: 'Sales channel', type: 'string' },
+        ],
+        supportsExcludeFilters: true,
+      },
+    ],
+  }
+}
+
 describe('ReconciliationRuleSetEditorPage cancel behavior', () => {
   beforeEach(() => {
     getJsonSchema.mockReset()
@@ -159,21 +219,25 @@ describe('ReconciliationRuleSetEditorPage cancel behavior', () => {
   })
 
   it('discards an exclusion added on the board when Cancel is clicked instead of Save', async () => {
+    listAutomationSourceOptions.mockResolvedValue(apiSourceOptionsResponse())
+    draftStoreState.ruleSetDraftState = createApiDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
     const wrapper = mount(ReconciliationRuleSetEditorPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').trigger('click')
+    await wrapper.get('[data-testid="ruleset-field-exclude-file1-2"]').trigger('click')
     const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
     await input.setValue('POS_SALES_CHANNEL')
     await input.trigger('keydown', { key: 'Enter' })
     await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
 
-    expect(wrapper.get('[data-testid="ruleset-field-exclude-file2-1"]').classes()).toContain('ruleset-field-exclude--set')
+    expect(wrapper.get('[data-testid="ruleset-field-exclude-file1-2"]').classes()).toContain('ruleset-field-exclude--set')
 
     await wrapper.get('[data-testid="cancel-ruleset-rules"]').trigger('click')
     await flushPromises()
 
-    const [persistedDraft] = draftStoreState.setRuleSetDraft.mock.calls.at(-1) as [{ file2ExcludeFilters?: unknown[] }, string]
-    expect(persistedDraft.file2ExcludeFilters ?? []).toEqual([])
+    const [persistedDraft] = draftStoreState.setRuleSetDraft.mock.calls.at(-1) as [{ file1ExcludeFilters?: unknown[] }, string]
+    expect(persistedDraft.file1ExcludeFilters ?? []).toEqual([])
   })
 })

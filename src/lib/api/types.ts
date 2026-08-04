@@ -1,4 +1,5 @@
 import type { Schemas } from './generated'
+import type { SourceExcludeFilter } from '../sourceExcludeFilters'
 
 export interface ApiEnvelope {
   ok: boolean
@@ -373,6 +374,12 @@ export interface SavedRunSummary {
   defaultFile2SystemEnumId?: string
   systemOptions: SavedRunSystemOption[]
   rules?: SavedRunRule[]
+  // Configured exclusion rules per side, as the backend's buildExcludeFilterResponse returns them
+  // (fieldExpression is the stored operator-facing path, values already split into an array).
+  // buildRuleSetDraft MUST map these: without them the board renders every exclusion as unset and
+  // editing one side's exclusion overwrites the rest of that side.
+  file1ExcludeFilters?: SourceExcludeFilter[]
+  file2ExcludeFilters?: SourceExcludeFilter[]
 }
 
 export interface AutomationPermissions {
@@ -499,6 +506,10 @@ export interface AutomationNsRestletOption {
   systemLabel?: string
   safeMetadataJson?: string
   primaryIdOptions?: AutomationPrimaryIdOption[]
+  /** Wider field list for the rules board; absent means "fall back to primaryIdOptions". */
+  fieldOptions?: AutomationPrimaryIdOption[]
+  /** True only when this system's connector declares a filterParameterName (see supportsExclusions). */
+  supportsExcludeFilters?: boolean
   label?: string
 }
 
@@ -516,6 +527,10 @@ export interface AutomationSystemRemoteOption {
   shopifyAuthConfigId?: string
   omsRestSourceConfigId?: string
   primaryIdOptions?: AutomationPrimaryIdOption[]
+  /** Wider field list for the rules board; absent means "fall back to primaryIdOptions". */
+  fieldOptions?: AutomationPrimaryIdOption[]
+  /** True only when this system's connector declares a filterParameterName (see supportsExclusions). */
+  supportsExcludeFilters?: boolean
   label?: string
 }
 

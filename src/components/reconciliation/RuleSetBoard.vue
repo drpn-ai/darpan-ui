@@ -69,6 +69,7 @@
           >{{ segment }}</span>
         </span>
         <button
+          v-if="supportsExclusions('file1')"
           type="button"
           :class="['ruleset-field-exclude', { 'ruleset-field-exclude--set': hasExclusion('file1', field.fieldPath) }]"
           :data-testid="`ruleset-field-exclude-file1-${index}`"
@@ -116,6 +117,7 @@
           >{{ segment }}</span>
         </span>
         <button
+          v-if="supportsExclusions('file2')"
           type="button"
           :class="['ruleset-field-exclude', { 'ruleset-field-exclude--set': hasExclusion('file2', field.fieldPath) }]"
           :data-testid="`ruleset-field-exclude-file2-${index}`"
@@ -577,8 +579,24 @@ async function ensureApiSourceOptionsLoaded(): Promise<void> {
   systemRemotes.value = response.systemRemotes ?? []
 }
 
+/**
+ * Whether this side can actually carry an exclusion. The backend only dispatches exclusion rules to a
+ * connector whose SourceSystemConnector row declares `filterParameterName`; anything else validates,
+ * persists and then excludes nothing. CSV/SFTP sides have no connector option at all (and no getter),
+ * so they fall out here too. Design principle: fail closed and loudly rather than offering a control
+ * that cannot work.
+ */
+function supportsExclusions(side: RuleSide): boolean {
+  if (!sourceUsesApi(side)) return false
+  return selectedApiSourceOption(side)?.supportsExcludeFilters === true
+}
+
 function loadApiSourceFields(side: RuleSide): void {
-  const apiFields = selectedApiSourceOption(side)?.primaryIdOptions ?? []
+  // The board offers the connector's WIDER field list when it declares one, because a field worth
+  // excluding on (salesChannelEnumId) is not necessarily a field worth keying on. Falling back to
+  // primaryIdOptions keeps every connector that declares no wider list exactly as it was.
+  const option = selectedApiSourceOption(side)
+  const apiFields = option?.fieldOptions ?? option?.primaryIdOptions ?? []
   loadedFields.value = {
     ...loadedFields.value,
     [side]: apiFields
@@ -839,8 +857,17 @@ function excludeFiltersFor(side: RuleSide): SourceExcludeFilter[] {
   return (side === 'file1' ? draft.value?.file1ExcludeFilters : draft.value?.file2ExcludeFilters) ?? []
 }
 
+// Alias-aware, like every other field lookup on this board (fieldRefKeys, fallbackFieldAnchor,
+// withPrimaryField). A strict === would orphan a stored exclusion the moment the pill's path and the
+// stored expression differ only by a `$.` prefix or an index-vs-`[*]` segment — which withPrimaryField
+// can introduce on its own.
+function excludeFilterFor(side: RuleSide, fieldPath: string): SourceExcludeFilter | undefined {
+  return excludeFiltersFor(side).find((filter) => sameField(filter.fieldExpression, fieldPath))
+}
+
 function hasExclusion(side: RuleSide, fieldPath: string): boolean {
-  return excludeFiltersFor(side).some((filter) => filter.fieldExpression === fieldPath && filter.values.length > 0)
+  const filter = excludeFilterFor(side, fieldPath)
+  return !!filter && filter.values.length > 0
 }
 
 function closeExclusionEditor(): void {
@@ -857,7 +884,7 @@ function openExclusionEditor(side: RuleSide, fieldPath: string): void {
   // click. Closing the other editor explicitly here is what keeps them mutually exclusive.
   closeRuleEditor()
   editingExclusion.value = { side, fieldPath }
-  editingExclusionValues.value = [...(excludeFiltersFor(side).find((filter) => filter.fieldExpression === fieldPath)?.values ?? [])]
+  editingExclusionValues.value = [...(excludeFilterFor(side, fieldPath)?.values ?? [])]
   pendingExclusionValue.value = ''
 }
 
@@ -873,7 +900,7 @@ function applyExclusionEdit(): void {
   const editing = editingExclusion.value
   if (!editing || !draft.value) return
 
-  const others = excludeFiltersFor(editing.side).filter((filter) => filter.fieldExpression !== editing.fieldPath)
+  const others = excludeFiltersFor(editing.side).filter((filter) => !sameField(filter.fieldExpression, editing.fieldPath))
   const next = editingExclusionValues.value.length
     ? [...others, { fieldExpression: editing.fieldPath, operator: 'EXCLUDE_IN', values: [...editingExclusionValues.value] }]
     : others

@@ -324,7 +324,10 @@ function buildSourcePayload(
   const sourceTypeEnumId = draft.inputModeEnumId === AUTOMATION_INPUT_MODE_SFTP_FILES
     ? AUTOMATION_SOURCE_TYPE_SFTP
     : AUTOMATION_SOURCE_TYPE_API
-  const basePayload = removeEmpty({
+  // Explicitly typed: AutomationSourcePayload now declares excludeFilters, so a value-shape mistake
+  // on it is a compile error here instead of being swallowed by the `as` casts below (which exist
+  // only to re-widen removeEmpty's Partial<>, not to paper over undeclared keys).
+  const basePayload: Partial<AutomationSourcePayload> = removeEmpty({
     fileSide,
     sourceTypeEnumId,
     systemEnumId: savedRunSide?.enumId ?? (fileSide === 'FILE_1' ? savedRun.defaultFile1SystemEnumId : savedRun.defaultFile2SystemEnumId),

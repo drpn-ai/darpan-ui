@@ -6,6 +6,7 @@ import {
   readReconciliationRuleExpressionPreActions,
   type ReconciliationRuleSetDraft,
 } from './reconciliationRuleSetDraft'
+import { normalizeExcludeFilters, type SourceExcludeFilter } from './sourceExcludeFilters'
 import { resolveRecordLabel } from './utils/recordLabel'
 import { normalizeStringOrEmpty } from './utils/strings'
 
@@ -34,6 +35,13 @@ function findSavedRunEditorTarget(rows: SavedRunSummary[], targetId: string): Sa
   return rows.find((row) => savedRunMatchesEditorTarget(row, targetId)) ?? null
 }
 
+
+function normalizeLoadedExcludeFilters(
+  filters: SourceExcludeFilter[] | undefined,
+): SourceExcludeFilter[] | undefined {
+  if (!filters) return undefined
+  return normalizeExcludeFilters(filters)
+}
 
 function effectivePrimaryIdExpression(option: SavedRunSystemOption | undefined): string[] {
   if (option?.idFieldExpressions?.length) return option.idFieldExpressions
@@ -102,6 +110,13 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
         severity: rule.severity,
       }
     }).filter((rule) => rule.file1FieldPath && rule.file2FieldPath),
+    // Hydrate persisted exclusions. `undefined` (key absent from the wire) must stay `undefined`
+    // rather than becoming `[]`: the save contract reads an explicit empty array as "clear this
+    // side", so defaulting here would let merely opening a run wipe its exclusions. Leaving these
+    // unmapped is what let RuleSetBoard.applyExclusionEdit compute `others` from an empty draft and
+    // delete every other exclusion on the side being edited.
+    file1ExcludeFilters: normalizeLoadedExcludeFilters(row.file1ExcludeFilters),
+    file2ExcludeFilters: normalizeLoadedExcludeFilters(row.file2ExcludeFilters),
   }
 }
 
