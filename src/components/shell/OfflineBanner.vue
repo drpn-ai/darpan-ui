@@ -51,7 +51,7 @@ onBeforeUnmount(() => {
   background: color-mix(in oklab, var(--surface-2, #f4f4f4) 90%, var(--text, #111) 10%);
   border-top: 1px solid var(--border, #d0d0d0);
   color: var(--text-soft, #555);
-  font-size: var(--type-muted-size, 0.88rem);
+  font-size: var(--type-muted-size);
   font-weight: 400;
 }
 

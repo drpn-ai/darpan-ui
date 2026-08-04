@@ -30,7 +30,7 @@ defineProps<{
 .error-state__icon { width: 1.7rem; height: 1.7rem; color: var(--text-dim); }
 .error-state__icon :deep(svg) { width: 100%; height: 100%; display: block; }
 .error-state__title { font-size: 1.02rem; font-weight: 400; color: var(--text); margin: 0; }
-.error-state__msg { font-size: var(--type-muted-size, 0.88rem); color: var(--text-soft); margin: 0; max-width: 40ch; line-height: 1.5; }
+.error-state__msg { font-size: var(--type-muted-size); color: var(--text-soft); margin: 0; max-width: 40ch; line-height: 1.5; }
 .btn-primary {
   min-width: 4.7rem; min-height: 2.6rem; padding-inline: 0.9rem; margin-top: var(--space-1);
   background: color-mix(in oklab, var(--surface-3) 82%, var(--text) 18%);

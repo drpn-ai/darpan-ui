@@ -1263,7 +1263,7 @@ onMounted(() => {
   display: inline-grid;
   place-items: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
   font-size: 1.45rem;
@@ -1365,7 +1365,7 @@ onMounted(() => {
   width: min(1.95rem, 100%);
   inline-size: min(1.95rem, 100%);
   height: 1.95rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   transform: translate(-50%, -50%);
   z-index: 1;

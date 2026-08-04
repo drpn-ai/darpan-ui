@@ -264,7 +264,7 @@ async function handleTriggerEnter(): Promise<void> {
   align-items: center;
   gap: 0.4rem;
   border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.3rem 0.55rem 0.3rem 0.7rem;
   font-size: 0.85rem;
   background: var(--surface-2);

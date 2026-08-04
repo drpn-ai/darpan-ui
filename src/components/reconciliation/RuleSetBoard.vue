@@ -1647,7 +1647,7 @@ onBeforeUnmount(() => {
   min-height: 2.75rem;
   width: 100%;
   padding: 0.48rem 0.75rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   /* The pill is a div (see the exclusion-mark comment below), not a <button>, so it no longer
      picks up the global `button { border: 1px solid var(--border); }` reset — the border must be
      spelled out in full here or it disappears. */
@@ -1724,7 +1724,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--border));
   background: color-mix(in oklab, var(--surface-2) 70%, var(--accent) 30%);
   color: var(--text);
@@ -1891,7 +1891,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.4rem;
   border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.3rem 0.55rem 0.3rem 0.7rem;
   font-size: 0.85rem;
   background: var(--surface-2);

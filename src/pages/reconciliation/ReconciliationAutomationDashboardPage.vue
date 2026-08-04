@@ -666,7 +666,7 @@ onMounted(() => {
   justify-content: center;
   padding: 0 0.8rem;
   border: 1px solid color-mix(in oklab, var(--accent) 36%, var(--border));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--text);
   background: color-mix(in oklab, var(--accent) 10%, transparent);
   font-size: 0.9rem;

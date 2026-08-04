@@ -224,7 +224,7 @@ function statusLabel(status: ConnectionCheckStatus): string {
   line-height: 17px;
   text-align: center;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   /* Opaque, so the node sits on the rail rather than the rail crossing through it. */
   background: var(--surface);
   font-size: 0.72rem;

@@ -758,7 +758,11 @@ describe('App shell logout', () => {
     expect(source).toMatch(
       /\.app-icon-action,\s*\.app-table__icon-action\s*\{[^}]*color: color-mix\(in oklab, var\(--danger\) 82%, var\(--text\)\);/,
     )
-    expect(source).toMatch(/\.user-fab,\s*\.home-fab\s*\{[^}]*border-radius: 999px;/)
+    // The FABs stay pill-shaped rather than taking the rectangular icon-container radius. That was
+    // pinned as a literal 999px; --radius-pill is the same value and names the intent, so the guard
+    // now reads as "pill, not icon-container" instead of "this magic number".
+    expect(source).toContain('--radius-pill: 999px;')
+    expect(source).toMatch(/\.user-fab,\s*\.home-fab\s*\{[^}]*border-radius: var\(--radius-pill\);/)
   })
 
   it('keeps the semantic primary save-action class without dedicated icon-action overrides', () => {

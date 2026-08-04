@@ -1616,7 +1616,7 @@ watch([savedRunId, outputFileName], () => {
   min-height: 1.9rem;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
   font-size: 1.35rem;

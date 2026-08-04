@@ -91,6 +91,22 @@
   --radius-sm: 0.48rem;
   --radius-md: 0.62rem;
   --radius-lg: 0.78rem;
+  --radius-pill: 999px;
+
+  /* Completes the --surface-* container/consumer contract. These nine were consumed with an inline
+     var(--token, fallback) but never defined anywhere, so the fallback silently WAS the value: the
+     app read as design-system-driven while running on hardcoded defaults, and a grep for the token
+     found the consumer but no source. Values here are exactly the fallbacks they replace, so nothing
+     moves on screen. The four that alias other tokens re-resolve per theme on their own. */
+  --surface-shell-bg: var(--surface);
+  --surface-intro-gap: var(--space-2);
+  --surface-intro-title-tracking: -0.01em;
+  --surface-section-head-margin: 0;
+  --surface-section-title-line-height: 1.4;
+  --surface-section-title-tracking: -0.01em;
+  --surface-section-description-color: var(--text-soft);
+  --surface-section-description-width: none;
+  --type-muted-size: 0.88rem;
   --bg: #090909;
   --bg-soft: #121212;
   --surface: #101010;
@@ -370,7 +386,7 @@ button:disabled {
   width: min(32rem, calc(100vw - (var(--space-4) * 2)));
   padding: 0.72rem 1rem;
   border: 1px solid color-mix(in oklab, var(--border) 74%, var(--text) 26%);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in oklab, var(--surface) 92%, var(--surface-2));
   color: var(--text-soft);
   text-align: center;
@@ -443,19 +459,19 @@ button:disabled {
 .static-page-board {
   border: 1px solid var(--surface-shell-border, var(--border));
   border-radius: var(--surface-shell-radius, var(--radius-lg));
-  background: var(--surface-shell-bg, var(--surface));
+  background: var(--surface-shell-bg);
   padding: var(--surface-shell-padding, var(--space-4));
 }
 
 .static-page-hero {
   display: grid;
-  gap: var(--surface-intro-gap, var(--space-2));
+  gap: var(--surface-intro-gap);
 }
 
 .static-page-hero h1 {
   margin: 0;
   font-size: var(--surface-intro-title-size, clamp(1.7rem, 1vw + 1rem, 2.2rem));
-  letter-spacing: var(--surface-intro-title-tracking, -0.01em);
+  letter-spacing: var(--surface-intro-title-tracking);
   text-wrap: balance;
   font-weight: 400;
 }
@@ -516,7 +532,7 @@ button:disabled {
 .static-page-section-head {
   display: grid;
   gap: var(--surface-section-head-gap, var(--space-1));
-  margin-bottom: var(--surface-section-head-margin, 0);
+  margin-bottom: var(--surface-section-head-margin);
 }
 
 .static-page-section-body {
@@ -527,8 +543,8 @@ button:disabled {
 .static-page-section-heading {
   margin: 0;
   font-size: var(--surface-section-title-size, 1.14rem);
-  line-height: var(--surface-section-title-line-height, 1.4);
-  letter-spacing: var(--surface-section-title-tracking, -0.01em);
+  line-height: var(--surface-section-title-line-height);
+  letter-spacing: var(--surface-section-title-tracking);
   font-weight: 400;
   color: var(--surface-section-title-color, var(--text));
   text-wrap: balance;
@@ -536,8 +552,8 @@ button:disabled {
 
 .static-page-section-description {
   margin: 0;
-  color: var(--surface-section-description-color, var(--text-soft));
-  max-width: var(--surface-section-description-width, none);
+  color: var(--surface-section-description-color);
+  max-width: var(--surface-section-description-width);
 }
 
 .static-page-tile-grid {
@@ -727,7 +743,7 @@ button:disabled {
 .user-settings-control {
   min-height: 2.35rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text);
   padding: 0 var(--space-3);
@@ -1241,7 +1257,7 @@ label > span {
   align-items: center;
   justify-content: center;
   min-height: 1.62rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.1rem 0.62rem;
   border: 1px solid var(--border);
   font-size: 0.76rem;
@@ -1564,7 +1580,7 @@ label > span {
   width: var(--floating-fab-size);
   min-height: 0;
   height: var(--floating-fab-size);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--border));
   background: color-mix(in oklab, var(--accent) 92%, var(--surface));
   color: color-mix(in oklab, var(--accent-ink) 82%, transparent);
@@ -1650,7 +1666,7 @@ label > span {
 
 .command-bubble {
   min-height: var(--floating-command-bubble-height);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--border));
   background: color-mix(in oklab, var(--accent) 92%, var(--surface));
   color: var(--accent-ink);
@@ -1669,7 +1685,7 @@ label > span {
 .command-bubble-dot {
   width: 0.52rem;
   height: 0.52rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in oklab, var(--accent-ink) 82%, transparent);
   opacity: 0.8;
 }
