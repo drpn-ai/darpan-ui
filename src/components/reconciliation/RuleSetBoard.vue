@@ -57,7 +57,8 @@
         :data-field-path="field.fieldPath"
         @pointerdown="handleFieldPointerDown($event, 'file1', field.fieldPath, index)"
         @pointerup.stop="handleFieldPointerUp($event, 'file1', field.fieldPath)"
-        @keydown.enter.prevent.stop
+        @dblclick="handleFieldDoubleClick('file1', field.fieldPath)"
+        @keydown.enter.prevent.stop="handleFieldEnterKey('file1', field.fieldPath)"
         @keydown.space.prevent.stop
       >
         <span class="ruleset-field-label">{{ field.label }}</span>
@@ -68,18 +69,12 @@
             class="ruleset-field-path-segment"
           >{{ segment }}</span>
         </span>
-        <button
-          v-if="supportsExclusions('file1')"
-          type="button"
-          :class="['ruleset-field-exclude', { 'ruleset-field-exclude--set': hasExclusion('file1', field.fieldPath) }]"
+        <span
+          v-if="supportsExclusions('file1') && hasExclusion('file1', field.fieldPath)"
+          class="ruleset-field-exclude"
           :data-testid="`ruleset-field-exclude-file1-${index}`"
-          :aria-label="`${hasExclusion('file1', field.fieldPath) ? 'Edit' : 'Add'} exclusion on ${field.label}`"
-          @pointerdown.stop
-          @pointerup.stop
-          @click.stop="openExclusionEditor('file1', field.fieldPath)"
-        >
-          ⊘
-        </button>
+          aria-hidden="true"
+        >⊘</span>
       </div>
     </section>
 
@@ -105,7 +100,8 @@
         :data-field-path="field.fieldPath"
         @pointerdown="handleFieldPointerDown($event, 'file2', field.fieldPath, index)"
         @pointerup.stop="handleFieldPointerUp($event, 'file2', field.fieldPath)"
-        @keydown.enter.prevent.stop
+        @dblclick="handleFieldDoubleClick('file2', field.fieldPath)"
+        @keydown.enter.prevent.stop="handleFieldEnterKey('file2', field.fieldPath)"
         @keydown.space.prevent.stop
       >
         <span class="ruleset-field-label">{{ field.label }}</span>
@@ -116,18 +112,12 @@
             class="ruleset-field-path-segment"
           >{{ segment }}</span>
         </span>
-        <button
-          v-if="supportsExclusions('file2')"
-          type="button"
-          :class="['ruleset-field-exclude', { 'ruleset-field-exclude--set': hasExclusion('file2', field.fieldPath) }]"
+        <span
+          v-if="supportsExclusions('file2') && hasExclusion('file2', field.fieldPath)"
+          class="ruleset-field-exclude"
           :data-testid="`ruleset-field-exclude-file2-${index}`"
-          :aria-label="`${hasExclusion('file2', field.fieldPath) ? 'Edit' : 'Add'} exclusion on ${field.label}`"
-          @pointerdown.stop
-          @pointerup.stop
-          @click.stop="openExclusionEditor('file2', field.fieldPath)"
-        >
-          ⊘
-        </button>
+          aria-hidden="true"
+        >⊘</span>
       </div>
     </section>
 
@@ -888,6 +878,34 @@ function openExclusionEditor(side: RuleSide, fieldPath: string): void {
   pendingExclusionValue.value = ''
 }
 
+/**
+ * Mouse gesture for the exclusion editor: double-click on the pill itself (the ⊘ mark is now a
+ * plain, non-interactive indicator — see the exclude-mark comment in the style block). A double
+ * click is really two independent pointerdown/pointerup pairs, each of which is well inside
+ * LONG_PRESS_MS and each of which already runs cancelPendingConnection() on pointerup — so by the
+ * time this fires there is no pending connection left to disturb. cancelPendingConnection() here
+ * is defense in depth, not load-bearing.
+ */
+function handleFieldDoubleClick(side: RuleSide, fieldPath: string): void {
+  if (!supportsExclusions(side)) return
+
+  cancelPendingConnection()
+  openExclusionEditor(side, fieldPath)
+}
+
+/**
+ * Keyboard equivalent of the double-click gesture above: the ⊘ mark used to be a nested <button>
+ * and was the only way to reach the exclusion editor from a keyboard. With it gone, Enter on the
+ * focused pill takes over that job on any side that supports exclusions. The .stop modifier on
+ * the template's @keydown.enter binding always fires regardless of what this function does, so
+ * Enter never falls through to WorkflowStepForm's submit-on-Enter handling either way.
+ */
+function handleFieldEnterKey(side: RuleSide, fieldPath: string): void {
+  if (!supportsExclusions(side)) return
+
+  openExclusionEditor(side, fieldPath)
+}
+
 function commitPendingExclusionValue(): void {
   const values = parseExcludeFilterValues(pendingExclusionValue.value)
   for (const value of values) {
@@ -1442,29 +1460,28 @@ onBeforeUnmount(() => {
 }
 
 /* An exclusion acts on one source field only — it never leaves the pill, so it has no line and
-   no operator box. The pill instead carries this small mark; clicking it opens the same popover
-   chrome the operator boxes use. It has to be a real <button> nested inside the pill for keyboard
-   + a11y, which is why the pill itself became a <div role="button"> above (a button cannot
-   validly nest inside a button). */
+   no operator box. Double-click on the pill (or Enter when it is focused) opens the same popover
+   chrome the operator boxes use, on a side whose connector supports exclusion filters. The mark
+   itself is a plain, non-interactive <span> — there is no nested control to worry about, which is
+   why the pill can stay a <div role="button"> above without any HTML-nesting concern — and it is
+   rendered only once a field actually has an exclusion, since with no line and no box it is the
+   only evidence one exists. */
 .ruleset-field-exclude {
   position: absolute;
   top: 50%;
   width: 1.55rem;
   height: 1.55rem;
-  min-height: 0;
-  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border-color: color-mix(in oklab, var(--border) 80%, var(--text) 20%);
-  background: var(--surface);
-  color: var(--text-muted);
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--border));
+  background: color-mix(in oklab, var(--surface-2) 70%, var(--accent) 30%);
+  color: var(--text);
   font-size: 0.78rem;
   line-height: 1;
   transform: translateY(-50%);
-  opacity: 0;
-  transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease;
+  box-shadow: 0 0 0 0.14rem color-mix(in oklab, var(--accent) 16%, transparent);
 }
 
 /* Outer edge only, away from board centre: the connection-line anchor for each side is the
@@ -1473,28 +1490,6 @@ onBeforeUnmount(() => {
    is drawn from. */
 .ruleset-field-column--left .ruleset-field-exclude { left: -0.775rem; }
 .ruleset-field-column--right .ruleset-field-exclude { right: -0.775rem; }
-
-.ruleset-field-item:hover .ruleset-field-exclude,
-.ruleset-field-exclude:focus-visible { opacity: 1; }
-
-/* The mark opens a popover, it does not draw a line — override the pill's pen/crosshair cursor,
-   which otherwise wins via `.ruleset-field-item * { cursor: ... !important; }` (and its :hover
-   variant). Both selectors below out-specificity their respective pen-cursor rule outright, so
-   this doesn't depend on source order. */
-.ruleset-field-item .ruleset-field-exclude,
-.ruleset-field-item:hover .ruleset-field-exclude {
-  cursor: pointer !important;
-}
-
-/* Set: always visible, because with no line and no box it is the only evidence the
-   exclusion exists. */
-.ruleset-field-exclude--set {
-  opacity: 1;
-  border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
-  background: color-mix(in oklab, var(--surface-2) 70%, var(--accent) 30%);
-  color: var(--text);
-  box-shadow: 0 0 0 0.14rem color-mix(in oklab, var(--accent) 16%, transparent);
-}
 
 .ruleset-operator-box {
   position: absolute;

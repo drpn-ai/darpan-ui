@@ -226,13 +226,17 @@ describe('ReconciliationRuleSetEditorPage cancel behavior', () => {
     const wrapper = mount(ReconciliationRuleSetEditorPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="ruleset-field-exclude-file1-2"]').trigger('click')
+    // The exclusion mark itself is a non-interactive indicator, rendered only once a field has an
+    // exclusion — the gesture to open the editor is a double-click on the pill (or Enter when
+    // focused), not a click on the mark.
+    await wrapper.get('[data-testid="ruleset-field-file1-2"]').trigger('dblclick')
     const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
     await input.setValue('POS_SALES_CHANNEL')
     await input.trigger('keydown', { key: 'Enter' })
     await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
+    await flushPromises()
 
-    expect(wrapper.get('[data-testid="ruleset-field-exclude-file1-2"]').classes()).toContain('ruleset-field-exclude--set')
+    expect(wrapper.find('[data-testid="ruleset-field-exclude-file1-2"]').exists()).toBe(true)
 
     await wrapper.get('[data-testid="cancel-ruleset-rules"]').trigger('click')
     await flushPromises()

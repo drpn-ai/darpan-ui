@@ -840,7 +840,12 @@ describe('ReconciliationRuleSetEditorPage', () => {
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
     })
 
-    it('is a real button element on the pill, nested inside a non-button pill for a11y and valid HTML', async () => {
+    it('renders the mark as a non-interactive span nested in a non-button pill, only once an exclusion exists', async () => {
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
@@ -849,7 +854,10 @@ describe('ReconciliationRuleSetEditorPage', () => {
       expect(pill.attributes('role')).toBe('button')
       expect(pill.attributes('tabindex')).toBe('0')
 
-      expect(wrapper.get(EXCLUDE_MARK).element.tagName).toBe('BUTTON')
+      const mark = wrapper.get(EXCLUDE_MARK)
+      expect(mark.element.tagName).toBe('SPAN')
+      expect(mark.attributes('role')).toBeUndefined()
+      expect(mark.attributes('tabindex')).toBeUndefined()
     })
 
     it('offers the connector wider field list so the field to exclude on is selectable at all', async () => {
@@ -876,6 +884,15 @@ describe('ReconciliationRuleSetEditorPage', () => {
     it('withholds the mark entirely on a source whose connector declares no filter parameter', async () => {
       // Shopify's SourceSystemConnector row has no filterParameterName, so runSavedRunDiff never
       // passes it filters. Offering the mark there would validate, persist, and exclude nothing.
+      // An exclusion is seeded on BOTH sides here (Shopify's is data that should never be
+      // reachable through the UI, but could exist from a stale save) to prove the capability gate
+      // withholds the mark even when there is data to show, not merely when there is none.
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+        file2: [{ fieldExpression: '$.records[*].id', values: ['SOME_VALUE'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
@@ -886,7 +903,12 @@ describe('ReconciliationRuleSetEditorPage', () => {
     })
 
     it('withholds the mark on a file-backed source, which has no getter to filter in', async () => {
-      draftStoreState.ruleSetDraftState = createDraftState()
+      // Same capability-gate proof as above, on a source type with no connector option at all:
+      // an exclusion is seeded so the withholding can only be explained by the missing getter,
+      // not by an empty draft.
+      draftStoreState.ruleSetDraftState = createDraftState([], {
+        file1: [{ fieldExpression: '$.orders[0].status', values: ['CANCELLED'] }],
+      })
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
 
       const wrapper = mount(ReconciliationRuleSetEditorPage)
@@ -897,11 +919,11 @@ describe('ReconciliationRuleSetEditorPage', () => {
       expect(wrapper.findAll('[data-testid^="ruleset-field-exclude-file2-"]')).toHaveLength(0)
     })
 
-    it('leaves the mark unset on a field with no exclusion', async () => {
+    it('shows no indicator at all on a field with no exclusion', async () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      expect(wrapper.get(EXCLUDE_MARK).classes()).not.toContain('ruleset-field-exclude--set')
+      expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(false)
     })
 
     it('marks a field that has an exclusion', async () => {
@@ -913,7 +935,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      expect(wrapper.get(EXCLUDE_MARK).classes()).toContain('ruleset-field-exclude--set')
+      expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(true)
     })
 
     it('matches a stored expression to its pill by alias, not by string identity', async () => {
@@ -927,37 +949,56 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      expect(wrapper.get(EXCLUDE_MARK).classes()).toContain('ruleset-field-exclude--set')
+      expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(true)
     })
 
-    it('opens the exclusion popover from the mark and blurs the board behind it', async () => {
+    it('opens the exclusion popover from a double-click on the pill and blurs the board behind it', async () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get(EXCLUDE_MARK).trigger('click')
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
 
       expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
       expect(wrapper.get('[data-testid="ruleset-editor-board"]').classes()).toContain('ruleset-editor-board--popup-open')
     })
 
-    it('a full pointerdown-to-pointerup connect gesture started on the mark creates no rule', async () => {
-      // Unlike the pill, a pointerdown on the mark must never arm a connection: this drives the
-      // exact same long-press-then-release-on-the-opposite-side gesture the pill uses to draw a
-      // line (see "creates a default equals rule by long-press drawing..." above) but starting
-      // from the mark, and asserts the connection state never engages.
+    it('does nothing on a double-click for a pill whose side does not support exclusions', async () => {
+      // Same capability gate as the mark itself: Shopify (file2) declares no filterParameterName,
+      // so double-click there must be a no-op rather than opening a popover the backend could
+      // never honour.
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-file2-0"]').trigger('dblclick')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(false)
+    })
+
+    it('a full double-click gesture on the pill creates no rule and leaves no connection-active state', async () => {
+      // A browser double-click is really two independent pointerdown/pointerup pairs (each well
+      // under LONG_PRESS_MS) followed by a dblclick event. This drives that exact sequence on the
+      // SAME pill and proves it can never arm or complete a connection: handleFieldPointerUp
+      // calls cancelPendingConnection() on every release, and neither click individually reaches
+      // the 320ms long-press threshold that would set pending.drawing. The gesture DOES do
+      // something on a side that supports exclusions (opens the editor) — asserted here too, so
+      // the "no connection" assertions can't pass by accident because nothing happened at all.
       vi.useFakeTimers()
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get(EXCLUDE_MARK).trigger('pointerdown', { pointerId: 1, button: 0 })
-      expect(wrapper.get(EXCLUDE_PILL).classes()).not.toContain('ruleset-field-item--connection-active')
-
-      await vi.advanceTimersByTimeAsync(340)
-      await wrapper.get('[data-testid="ruleset-field-file2-1"]').trigger('pointerup', { pointerId: 1, button: 0 })
+      const pill = wrapper.get(EXCLUDE_PILL)
+      await pill.trigger('pointerdown', { pointerId: 1, button: 0 })
+      await pill.trigger('pointerup', { pointerId: 1, button: 0 })
+      await pill.trigger('pointerdown', { pointerId: 1, button: 0 })
+      await pill.trigger('pointerup', { pointerId: 1, button: 0 })
+      await pill.trigger('dblclick')
       await flushPromises()
 
       expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(0)
       expect(wrapper.find('[data-testid="ruleset-rule-popover"]').exists()).toBe(false)
+      expect(pill.classes()).not.toContain('ruleset-field-item--connection-active')
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
     })
 
     it('opening a rule popover closes an already-open exclusion popover, and vice versa', async () => {
@@ -983,11 +1024,11 @@ describe('ReconciliationRuleSetEditorPage', () => {
       await wrapper.get('[data-testid="ruleset-rule-operator-rule-1"]').trigger('click')
       expect(wrapper.find('[data-testid="ruleset-rule-popover"]').exists()).toBe(true)
 
-      // The mark's pointerdown.stop (needed so it never starts a connection line) means this
-      // click never reaches the window pointerdown listener the rule popover relies on to
-      // close itself on outside click — so without an explicit mutual-exclusion guard, both
-      // popovers would end up open and rendered on top of each other.
-      await wrapper.get(EXCLUDE_MARK).trigger('click')
+      // openExclusionEditor explicitly calls closeRuleEditor() before opening (see the matching
+      // comment on the component) rather than relying solely on the window outside-click
+      // listener — without that explicit guard, both popovers could end up open and rendered on
+      // top of each other, since they share the same blur-exemption class.
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
       await flushPromises()
 
       expect(wrapper.findAll('[data-testid="ruleset-rule-popover"]')).toHaveLength(0)
@@ -1004,7 +1045,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get(EXCLUDE_MARK).trigger('click')
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
       const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
       await input.setValue('POS_SALES_CHANNEL')
       await input.trigger('keydown', { key: 'Enter' })
@@ -1043,12 +1084,12 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      // Both marks come back set — the load direction works at all.
-      expect(wrapper.get('[data-testid="ruleset-field-exclude-file1-5"]').classes()).toContain('ruleset-field-exclude--set')
-      expect(wrapper.get(EXCLUDE_MARK).classes()).toContain('ruleset-field-exclude--set')
+      // Both marks come back — the load direction works at all.
+      expect(wrapper.find('[data-testid="ruleset-field-exclude-file1-5"]').exists()).toBe(true)
+      expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(true)
 
       // Edit the statusId exclusion only.
-      await wrapper.get('[data-testid="ruleset-field-exclude-file1-5"]').trigger('click')
+      await wrapper.get('[data-testid="ruleset-field-file1-5"]').trigger('dblclick')
       const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
       await input.setValue('ORDER_REJECTED')
       await input.trigger('keydown', { key: 'Enter' })
@@ -1076,7 +1117,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get(EXCLUDE_MARK).trigger('click')
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
       await wrapper.get('[data-testid="ruleset-exclusion-delete"]').trigger('click')
       await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
       await flushPromises()
@@ -1112,13 +1153,33 @@ describe('ReconciliationRuleSetEditorPage', () => {
       expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(0)
     })
 
-    it('does not submit the form when a focused field pill receives Enter or Space', async () => {
+    it('opens the exclusion editor on Enter without submitting the form; Space does neither', async () => {
+      // Enter is the keyboard equivalent of the double-click gesture, now that the mark that used
+      // to be the only keyboard path (a nested <button>) is gone. Space stays a no-op, same as
+      // before — it is not the assigned gesture on either input device.
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
       const pill = wrapper.get(EXCLUDE_PILL)
-      await pill.trigger('keydown', { key: 'Enter' })
       await pill.trigger('keydown', { key: ' ' })
+      await flushPromises()
+
+      expect(saveRuleSetRun).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(false)
+
+      await pill.trigger('keydown', { key: 'Enter' })
+      await flushPromises()
+
+      expect(saveRuleSetRun).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
+    })
+
+    it('does nothing on Enter for a pill whose side does not support exclusions, and does not submit the form', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      const pill = wrapper.get('[data-testid="ruleset-field-file2-0"]')
+      await pill.trigger('keydown', { key: 'Enter' })
       await flushPromises()
 
       expect(saveRuleSetRun).not.toHaveBeenCalled()
@@ -1129,7 +1190,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      await wrapper.get(EXCLUDE_MARK).trigger('click')
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
       const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
       await input.setValue('POS_SALES_CHANNEL')
       await input.trigger('keydown', { key: 'Enter' })
@@ -1137,7 +1198,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       await flushPromises()
 
       expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(false)
-      expect(wrapper.get(EXCLUDE_MARK).classes()).not.toContain('ruleset-field-exclude--set')
+      expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(false)
 
       await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
       await flushPromises()

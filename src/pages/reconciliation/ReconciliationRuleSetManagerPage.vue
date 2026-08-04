@@ -55,10 +55,6 @@
             <span class="static-page-summary-label">Primary ID</span>
             <span>{{ file1PrimaryId }}</span>
           </article>
-          <article class="ruleset-manager-basic-card ruleset-manager-basic-card--wide">
-            <span class="static-page-summary-label">Exclusions</span>
-            <span data-testid="ruleset-exclusions-file1">{{ file1Exclusions }}</span>
-          </article>
         </div>
 
         <div class="ruleset-manager-schema-row" data-testid="ruleset-manager-schema-row-file2">
@@ -84,10 +80,6 @@
           <article class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">Primary ID</span>
             <span>{{ file2PrimaryId }}</span>
-          </article>
-          <article class="ruleset-manager-basic-card ruleset-manager-basic-card--wide">
-            <span class="static-page-summary-label">Exclusions</span>
-            <span data-testid="ruleset-exclusions-file2">{{ file2Exclusions }}</span>
           </article>
         </div>
       </div>
@@ -125,6 +117,14 @@
               </li>
             </ol>
             <p v-else class="ruleset-manager-preview-line">{{ comparisonPreview }}</p>
+          </section>
+
+          <section class="ruleset-manager-equation-panel" data-testid="ruleset-manager-exclusions" aria-label="Exclusions">
+            <span class="static-page-summary-label">Exclusions</span>
+            <ul class="ruleset-manager-exclusion-list" data-testid="ruleset-manager-exclusion-list">
+              <li data-testid="ruleset-exclusions-file1">{{ file1Exclusions }}</li>
+              <li data-testid="ruleset-exclusions-file2">{{ file2Exclusions }}</li>
+            </ul>
           </section>
         </div>
       </template>
@@ -334,8 +334,8 @@ const file1SystemConfig = computed<SourceConfigSummary | null>(() => buildSource
 const file2SystemConfig = computed<SourceConfigSummary | null>(() => buildSourceConfigSummary(draft.value, 'file2'))
 const file1PrimaryId = computed(() => formatFieldKeyList(draft.value?.file1PrimaryIdExpression))
 const file2PrimaryId = computed(() => formatFieldKeyList(draft.value?.file2PrimaryIdExpression))
-const file1Exclusions = computed(() => formatExclusions(draft.value?.file1ExcludeFilters))
-const file2Exclusions = computed(() => formatExclusions(draft.value?.file2ExcludeFilters))
+const file1Exclusions = computed(() => formatExclusionSummary(file1Title.value, draft.value?.file1ExcludeFilters))
+const file2Exclusions = computed(() => formatExclusionSummary(file2Title.value, draft.value?.file2ExcludeFilters))
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const canViewRunHistory = computed(() => Boolean(savedRunId.value))
@@ -379,7 +379,14 @@ function formatFieldKeyList(fieldPaths: string[] | undefined): string {
 
 function formatExclusions(filters: SourceExcludeFilter[] | undefined): string {
   if (!filters?.length) return '—'
-  return filters.map((filter) => `${filter.fieldExpression}: ${filter.values.join(', ')}`).join(' · ')
+  return filters.map((filter) => `${formatFieldKey(filter.fieldExpression)}: ${filter.values.join(', ')}`).join(' · ')
+}
+
+// The Rules section shows exclusions unordered and unnumbered (that decision is deliberate — see
+// the manager page's Rules section markup) alongside the numbered comparison rules, so each entry
+// names its own side rather than relying on row position the way the old Run-section cards did.
+function formatExclusionSummary(title: string, filters: SourceExcludeFilter[] | undefined): string {
+  return `${title} · ${formatExclusions(filters)}`
 }
 
 function formatRulePreview(rule: ReconciliationRuleSetDraftRule): string {
@@ -844,10 +851,6 @@ onMounted(() => {
   background: var(--surface-2);
 }
 
-.ruleset-manager-basic-card--wide {
-  grid-column: 1 / -1;
-}
-
 .ruleset-manager-basic-card strong,
 .ruleset-manager-summary-copy {
   min-width: 0;
@@ -860,6 +863,8 @@ onMounted(() => {
 }
 
 .ruleset-manager-equation-panel {
+  display: grid;
+  gap: 0.55rem;
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: var(--static-surface-radius);
@@ -873,7 +878,8 @@ onMounted(() => {
   line-height: 1.35;
 }
 
-.ruleset-manager-rule-list {
+.ruleset-manager-rule-list,
+.ruleset-manager-exclusion-list {
   display: grid;
   gap: 0.55rem;
   margin: 0;
@@ -881,7 +887,8 @@ onMounted(() => {
   list-style: none;
 }
 
-.ruleset-manager-rule-list li {
+.ruleset-manager-rule-list li,
+.ruleset-manager-exclusion-list li {
   display: flex;
   gap: 0.65rem;
   align-items: baseline;
