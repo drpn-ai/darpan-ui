@@ -194,11 +194,6 @@ async function handleTriggerEnter(): Promise<void> {
 </script>
 
 <style scoped>
-.workflow-select {
-  position: relative;
-  width: 100%;
-}
-
 .workflow-select--open {
   z-index: 60;
 }
@@ -212,44 +207,9 @@ async function handleTriggerEnter(): Promise<void> {
   user-select: none;
 }
 
-.workflow-select-trigger--disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
 .workflow-select-trigger:focus-visible {
   outline: none;
   border-bottom-color: var(--text);
-}
-
-.workflow-select-trigger-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workflow-select-trigger-icon {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: color-mix(in oklab, var(--text) 58%, transparent);
-  transition: transform 140ms ease;
-}
-
-.workflow-select-trigger-icon svg {
-  width: 0.7rem;
-  height: 0.46rem;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: none;
-}
-
-.workflow-select-trigger--open .workflow-select-trigger-icon {
-  transform: rotate(180deg);
 }
 
 /* Chip role lives in style.css - shared with the other component that renders chips. */
@@ -269,31 +229,5 @@ async function handleTriggerEnter(): Promise<void> {
   box-shadow: 0 18px 48px color-mix(in oklab, var(--bg) 56%, transparent);
   max-height: min(18rem, 48vh);
   overflow: auto;
-}
-
-.workflow-select-option {
-  border: 0;
-  border-radius: calc(var(--radius-sm) - 0.02rem);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  padding: 0.7rem 0.8rem;
-  cursor: pointer;
-  line-height: 1.15;
-}
-
-.workflow-select-option:hover {
-  background: color-mix(in oklab, var(--text) 8%, var(--surface-2));
-}
-
-.workflow-select-option--selected {
-  background: color-mix(in oklab, var(--text) 12%, var(--surface-2));
-}
-
-.workflow-select-option:focus-visible {
-  outline: none;
-  background: color-mix(in oklab, var(--text) 10%, var(--surface-2));
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--text) 18%, transparent);
 }
 </style>

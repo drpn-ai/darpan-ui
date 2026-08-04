@@ -1934,3 +1934,85 @@ label > span {
 .workflow-select-chip-remove:hover {
   opacity: 1;
 }
+
+/* Select internals, shared by AppSelect and WorkflowSelect. WorkflowSelect had 12 of its 14
+   rules duplicated from AppSelect - 10 of them byte for byte - because the two components look the
+   same everywhere except the trigger. Those ten now live here under both selectors; the two that
+   genuinely differ (the trigger and its focus ring) stay in their components, which is the actual
+   difference between the two surfaces. */
+.app-select,
+.workflow-select {
+  position: relative;
+  width: 100%;
+}
+
+.app-select-trigger--disabled,
+.workflow-select-trigger--disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.app-select-trigger-label,
+.workflow-select-trigger-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-select-trigger-icon,
+.workflow-select-trigger-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in oklab, var(--text) 58%, transparent);
+  transition: transform 140ms ease;
+}
+
+.app-select-trigger-icon svg,
+.workflow-select-trigger-icon svg {
+  width: 0.7rem;
+  height: 0.46rem;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.app-select-trigger--open .app-select-trigger-icon,
+.workflow-select-trigger--open .workflow-select-trigger-icon {
+  transform: rotate(180deg);
+}
+
+.app-select-option,
+.workflow-select-option {
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 0.02rem);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+  cursor: pointer;
+  line-height: 1.15;
+}
+
+.app-select-option:hover,
+.workflow-select-option:hover {
+  background: color-mix(in oklab, var(--text) 8%, var(--surface-2));
+}
+
+.app-select-option--selected,
+.workflow-select-option--selected {
+  background: color-mix(in oklab, var(--text) 12%, var(--surface-2));
+}
+
+.app-select-option:focus-visible,
+.workflow-select-option:focus-visible {
+  outline: none;
+  background: color-mix(in oklab, var(--text) 10%, var(--surface-2));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--text) 18%, transparent);
+}
+
