@@ -192,6 +192,21 @@ describe('ReconciliationRuleSetEditorPage help affordances', () => {
       setItem.mockRestore()
     })
 
+    it('keeps the caption clear of the line it captions', async () => {
+      const wrapper = await mountEditor()
+
+      // A caption centred on the midpoint sat on top of the ghost and hid it. It has to sit below.
+      const midY = Number(/M [\d.]+ ([\d.]+)/.exec(
+        wrapper.get('[data-testid="ruleset-ghost-rule"]').attributes('d') ?? '',
+      )?.[1])
+      const captionTop = Number(/top:\s*([\d.]+)px/.exec(
+        wrapper.get('[data-testid="ruleset-ghost-caption"]').attributes('style') ?? '',
+      )?.[1])
+
+      expect(Number.isFinite(midY)).toBe(true)
+      expect(captionTop).toBeGreaterThan(midY)
+    })
+
     it('costs zero clicks to dismiss - the ghost carries no control of its own', async () => {
       const wrapper = await mountEditor()
 
@@ -240,6 +255,30 @@ describe('ReconciliationRuleSetEditorPage help affordances', () => {
         expect(describedBy).toBeTruthy()
         expect(wrapper.get(`[data-testid="ruleset-term-definition-${key}"]`).attributes('id')).toBe(describedBy)
       }
+    })
+
+    it('caps the popover width so a wide board cannot stretch it across the screen', async () => {
+      // Pill centres 1100px apart: the uncapped span is wider than the form needs and leaves no
+      // room beside it for the definition shelf.
+      const rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function rect(this: Element) {
+        const element = this as HTMLElement
+        const box = (left: number, top: number, width: number, height: number) => ({
+          x: left, y: top, width, height, left, top, right: left + width, bottom: top + height, toJSON: () => ({}),
+        } as DOMRect)
+
+        if (element.getAttribute('data-testid') === 'ruleset-editor-board') return box(0, 0, 1400, 430)
+        if (element.dataset.ruleSide === 'file1') return box(0, 100, 280, 44)
+        if (element.dataset.ruleSide === 'file2') return box(1120, 100, 280, 44)
+        return box(0, 0, 0, 0)
+      })
+
+      const wrapper = await openRulePopover()
+      const width = Number(/width:\s*([\d.]+)px/.exec(
+        wrapper.get('[data-testid="ruleset-rule-popover"]').attributes('style') ?? '',
+      )?.[1])
+
+      expect(width).toBeLessThanOrEqual(544)
+      rectSpy.mockRestore()
     })
 
     it('adds no question-mark icons to carry the help', async () => {

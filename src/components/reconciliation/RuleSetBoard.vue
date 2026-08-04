@@ -925,10 +925,13 @@ const ghostRuleLayout = computed<LineLayout | null>(() => {
 
 const ghostRulePath = computed(() => (ghostRuleLayout.value ? curvePath(ghostRuleLayout.value) : ''))
 
+/** Clear of the line rather than centred on it — a caption that covers the ghost defeats the ghost. */
+const GHOST_CAPTION_DROP = 22
+
 const ghostCaptionStyle = computed((): Record<string, string> => {
   const layout = ghostRuleLayout.value
   if (!layout) return {}
-  return { left: `${layout.midX}px`, top: `${layout.midY}px` }
+  return { left: `${layout.midX}px`, top: `${layout.midY + GHOST_CAPTION_DROP}px` }
 })
 
 function pillCenterSpanForRule(rule: RuleConnection): { leftCenter: number, rightCenter: number } | null {
@@ -947,9 +950,18 @@ function pillCenterSpanForRule(rule: RuleConnection): { leftCenter: number, righ
   return rightCenter > leftCenter ? { leftCenter, rightCenter } : null
 }
 
+/**
+ * The popover spans the rule it edits, left pill centre to right pill centre. On a wide board with
+ * few fields that span runs past 1000px for a form of three short rows — it reads as a dialog that
+ * swallowed the board, and it leaves no room beside it for a term definition. Capping it keeps the
+ * spanning intent on the boards where the span is reasonable and stops it running away elsewhere.
+ */
+const MAX_RULE_POPOVER_WIDTH = 544
+
 function operatorPopoverWidth(rule: RuleConnection): number {
   const span = pillCenterSpanForRule(rule)
-  return Math.max(1, span ? span.rightCenter - span.leftCenter : boardSize.value.width / 2)
+  const spanWidth = span ? span.rightCenter - span.leftCenter : boardSize.value.width / 2
+  return Math.min(MAX_RULE_POPOVER_WIDTH, Math.max(1, spanWidth))
 }
 
 function curvePath(points: { x1: number, y1: number, x2: number, y2: number }): string {
@@ -1412,9 +1424,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* Field labels ("Operator", "Sequence", "Exclude on") take the small-caps label treatment. */
-.ruleset-rule-popover label > span,
+/* The :not() keeps the uppercase label treatment off the term definitions, which are sentences and
+   live in the same slot. Without it this rule wins on specificity — (0,1,2) against (0,1,0) — and
+   shouts a paragraph of help in capitals. */
+.ruleset-rule-popover label > span:not(.ruleset-term-definition),
 .ruleset-exclusion-popup label > span,
-.ruleset-pre-action-header > span {
+.ruleset-pre-action-header > span:not(.ruleset-term-definition) {
   color: var(--text-muted);
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -1426,10 +1441,16 @@ onBeforeUnmount(() => {
    copy problem it solves. */
 .ruleset-term {
   justify-self: start;
+  /* The global button rule sets a 2.55rem min-height and a corner radius. Left alone, the first
+     detaches the dotted rule from the word by ~14px and the second curves its ends, so what should
+     read as an underline reads as a broken input outline instead. */
+  min-height: 0;
   border: 0;
+  border-radius: 0;
   border-bottom: 1px dotted var(--text-muted);
   background: none;
-  padding: 0;
+  padding: 0 0 2px;
+  line-height: 1.2;
   cursor: help;
   font-family: inherit;
   font-weight: inherit;
@@ -1471,7 +1492,9 @@ onBeforeUnmount(() => {
   transition: opacity 140ms ease, visibility 140ms ease;
 }
 
-@media (min-width: 1100px) {
+/* 1200px, not 1100: the shelf needs (board/2 - popover/2) clear on the right, and below this the
+   popover's own capped width leaves too little for a 15rem panel to land without being cut off. */
+@media (min-width: 1200px) {
   .ruleset-rule-popover label,
   .ruleset-pre-action-header {
     position: relative;
@@ -1482,7 +1505,7 @@ onBeforeUnmount(() => {
   .ruleset-term-definition {
     top: 0;
     left: calc(100% + 1.4rem);
-    width: 17rem;
+    width: 15rem;
   }
 }
 
@@ -1563,20 +1586,20 @@ onBeforeUnmount(() => {
   to { stroke-dashoffset: -28; }
 }
 
+/* Bare text under the line, not a bordered box centred on it. A box with a background sat exactly
+   where the ghost runs, so it hid the line it was captioning; a box with a border and a radius on a
+   board of rounded pills read as a third field rather than as a hint. */
 .ruleset-ghost-caption {
   position: absolute;
   z-index: 2;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, 0);
   margin: 0;
-  padding: 0.3rem 0.55rem;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  padding: 0;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   line-height: 1.4;
   text-align: center;
-  max-width: min(22rem, 80%);
+  max-width: min(15rem, 90%);
   pointer-events: none;
 }
 
