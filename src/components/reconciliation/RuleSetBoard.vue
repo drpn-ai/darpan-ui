@@ -33,7 +33,29 @@
         class="ruleset-editor-line ruleset-editor-line--draft"
         :d="drawingLinePath"
       />
+      <!--
+        The board is useless without the drag gesture and nothing on screen teaches it. This ghost
+        draws the rule you are meant to draw, keyed to THIS rule set having no rules rather than to
+        a seen-it flag on the user: someone who learnt the board months ago and opens a fresh rule
+        set gets the reminder, and drawing one real rule retires it for good. An empty board has no
+        lines, so at rest it occupies space that was empty anyway.
+      -->
+      <path
+        v-if="ghostRulePath"
+        class="ruleset-editor-line ruleset-editor-line--ghost"
+        :d="ghostRulePath"
+        data-testid="ruleset-ghost-rule"
+      />
     </svg>
+
+    <p
+      v-if="ghostRulePath"
+      class="ruleset-ghost-caption"
+      :style="ghostCaptionStyle"
+      data-testid="ruleset-ghost-caption"
+    >
+      {{ GHOST_RULE_CAPTION }}
+    </p>
 
     <section class="ruleset-field-column ruleset-field-column--left" data-testid="ruleset-field-list-file1">
       <header>
@@ -160,7 +182,21 @@
     >
       <section class="ruleset-pre-action-section" aria-labelledby="ruleset-pre-action-title">
         <header class="ruleset-pre-action-header">
-          <span id="ruleset-pre-action-title">Pre Actions</span>
+          <button
+            id="ruleset-pre-action-title"
+            type="button"
+            class="ruleset-term"
+            data-testid="ruleset-term-pre-actions"
+            :aria-describedby="termDefinitionId('pre-actions')"
+            @click.prevent.stop
+          >
+            Pre Actions
+          </button>
+          <span
+            :id="termDefinitionId('pre-actions')"
+            class="ruleset-term-definition"
+            data-testid="ruleset-term-definition-pre-actions"
+          >{{ RULE_TERM_DEFINITIONS['pre-actions'] }}</span>
         </header>
         <div class="ruleset-pre-action-add-row">
           <button
@@ -208,7 +244,18 @@
         </div>
       </section>
       <label>
-        <span>Operator</span>
+        <button
+          type="button"
+          class="ruleset-term"
+          data-testid="ruleset-term-operator"
+          :aria-describedby="termDefinitionId('operator')"
+          @click.prevent.stop
+        >Operator</button>
+        <span
+          :id="termDefinitionId('operator')"
+          class="ruleset-term-definition"
+          data-testid="ruleset-term-definition-operator"
+        >{{ RULE_TERM_DEFINITIONS.operator }}</span>
         <AppSelect
           v-model="editingOperator"
           :options="operatorOptions"
@@ -216,7 +263,18 @@
         />
       </label>
       <label>
-        <span>Sequence</span>
+        <button
+          type="button"
+          class="ruleset-term"
+          data-testid="ruleset-term-sequence"
+          :aria-describedby="termDefinitionId('sequence')"
+          @click.prevent.stop
+        >Sequence</button>
+        <span
+          :id="termDefinitionId('sequence')"
+          class="ruleset-term-definition"
+          data-testid="ruleset-term-definition-sequence"
+        >{{ RULE_TERM_DEFINITIONS.sequence }}</span>
         <input
           v-model.number="editingSequence"
           data-testid="ruleset-rule-sequence-input"
@@ -397,6 +455,24 @@ const FALLBACK_BOARD_WIDTH = 1000
 const FIELD_ROW_PITCH = 52
 const FIELD_ROW_TOP = 70
 const SOURCE_TYPE_API = 'AUT_SRC_API'
+
+const GHOST_RULE_CAPTION = 'Drag a field onto one on the right to compare them'
+
+/**
+ * Written from the operator's side, not the schema's. "Sequence sets sequenceNum on the rule" is
+ * worthless here; "rule 1 should be the field that uniquely identifies a row" is the sentence that
+ * quietly prevents the most common misconfiguration on this board.
+ */
+const RULE_TERM_DEFINITIONS = {
+  'pre-actions': 'Change a value just for this comparison, before the two sides are matched. Nothing is written back to the source. Most common use: string to number, so "120.00" from one system matches 120 from the other.',
+  operator: 'How the two values are tested. = is an exact match once any pre-actions have run; the comparison operators are for numbers and dates.',
+  sequence: 'The order rules are evaluated in. Rule 1 should be the field that uniquely identifies a row — the order number, not the total — because that is what pairs the two sides up before the rest are checked.',
+} as const
+
+function termDefinitionId(term: keyof typeof RULE_TERM_DEFINITIONS): string {
+  return `ruleset-term-definition-${term}`
+}
+
 const operatorOptions: AppSelectOption[] = [
   { value: '=', label: '=' },
   { value: '!=', label: '!=' },
@@ -426,6 +502,7 @@ const loadedFields = ref<Record<RuleSide, RuleField[]>>({
 })
 const rules = ref<RuleConnection[]>([])
 const lineLayouts = ref<Record<string, LineLayout>>({})
+const measuredGhostLayout = ref<LineLayout | null>(null)
 const boardSize = ref({ width: FALLBACK_BOARD_WIDTH, height: 520 })
 const pendingConnection = ref<PendingConnection | null>(null)
 const hoveredDropTarget = ref<FieldDropTarget | null>(null)
@@ -782,20 +859,18 @@ function updateLineLayout(): void {
   }
 
   lineLayouts.value = orderedRules.value.reduce<Record<string, LineLayout>>((layouts, rule) => {
-    const start = resolveFieldAnchor('file1', rule.file1FieldPath)
-    const end = resolveFieldAnchor('file2', rule.file2FieldPath)
-    layouts[rule.id] = {
-      x: (start.x + end.x) / 2,
-      y: (start.y + end.y) / 2,
-      x1: start.x,
-      y1: start.y,
-      x2: end.x,
-      y2: end.y,
-      midX: (start.x + end.x) / 2,
-      midY: (start.y + end.y) / 2,
-    }
+    layouts[rule.id] = joinAnchors(
+      resolveFieldAnchor('file1', rule.file1FieldPath),
+      resolveFieldAnchor('file2', rule.file2FieldPath),
+    )
     return layouts
   }, {})
+
+  const ghostStart = file1Fields.value[0]
+  const ghostEnd = file2Fields.value[0]
+  measuredGhostLayout.value = ghostStart && ghostEnd
+    ? joinAnchors(resolveFieldAnchor('file1', ghostStart.fieldPath), resolveFieldAnchor('file2', ghostEnd.fieldPath))
+    : null
 }
 
 function fallbackRuleLayout(rule: RuleConnection): LineLayout {
@@ -816,6 +891,45 @@ function fallbackRuleLayout(rule: RuleConnection): LineLayout {
 function layoutForRule(rule: RuleConnection): LineLayout {
   return lineLayouts.value[rule.id] ?? fallbackRuleLayout(rule)
 }
+
+function joinAnchors(start: Point, end: Point): LineLayout {
+  return {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+    x1: start.x,
+    y1: start.y,
+    x2: end.x,
+    y2: end.y,
+    midX: (start.x + end.x) / 2,
+    midY: (start.y + end.y) / 2,
+  }
+}
+
+/** Zero VISIBLE rules — the hidden basic-diff row never reaches orderedRules, so it cannot suppress this. */
+const showGhostRule = computed(() => orderedRules.value.length === 0
+  && file1Fields.value.length > 0
+  && file2Fields.value.length > 0)
+
+const ghostRuleLayout = computed<LineLayout | null>(() => {
+  if (!showGhostRule.value) return null
+
+  const first1 = file1Fields.value[0]
+  const first2 = file2Fields.value[0]
+  if (!first1 || !first2) return null
+
+  // Same fallback ladder the real rules use: measured rects when the board has been laid out,
+  // computed row positions before that, so the ghost is never missing on first paint.
+  return measuredGhostLayout.value
+    ?? joinAnchors(fallbackFieldAnchor('file1', first1.fieldPath), fallbackFieldAnchor('file2', first2.fieldPath))
+})
+
+const ghostRulePath = computed(() => (ghostRuleLayout.value ? curvePath(ghostRuleLayout.value) : ''))
+
+const ghostCaptionStyle = computed((): Record<string, string> => {
+  const layout = ghostRuleLayout.value
+  if (!layout) return {}
+  return { left: `${layout.midX}px`, top: `${layout.midY}px` }
+})
 
 function pillCenterSpanForRule(rule: RuleConnection): { leftCenter: number, rightCenter: number } | null {
   const board = boardRef.value
@@ -1307,6 +1421,77 @@ onBeforeUnmount(() => {
   letter-spacing: 0.08em;
 }
 
+/* The term IS the affordance — a 1px dotted underline, no question-mark badges. This board already
+   carries every other hierarchy on 1px borders, so a row of icons would cost more surface than the
+   copy problem it solves. */
+.ruleset-term {
+  justify-self: start;
+  border: 0;
+  border-bottom: 1px dotted var(--text-muted);
+  background: none;
+  padding: 0;
+  cursor: help;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.ruleset-term:hover,
+.ruleset-term:focus-visible {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+/* Beside the card, level with the term — never over it. A definition that drops down covers the
+   exact control you opened it to fill in, which is the one thing help on this popover must not do.
+   Below the card is the fallback when there is no room for a side shelf. */
+.ruleset-term-definition {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 6;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 140ms ease, visibility 140ms ease;
+}
+
+@media (min-width: 1100px) {
+  .ruleset-rule-popover label,
+  .ruleset-pre-action-header {
+    position: relative;
+  }
+
+  /* 100% is now the row's right edge, which sits inside the popover's 0.9rem padding — hence the
+     1.4rem, to clear the card border and still leave a gap. */
+  .ruleset-term-definition {
+    top: 0;
+    left: calc(100% + 1.4rem);
+    width: 17rem;
+  }
+}
+
+.ruleset-term:hover + .ruleset-term-definition,
+.ruleset-term:focus-visible + .ruleset-term-definition {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* The column header is a system NAME, not a label — "Shopify", "HotWax", "NetSuite". Uppercasing
    it rendered SHOPIFY/HOTWAX here while every other surface showed the proper-cased name, so the
    same system read two different ways depending on where you looked. Same size and colour as the
@@ -1365,6 +1550,40 @@ onBeforeUnmount(() => {
 .ruleset-editor-line--draft {
   stroke-dasharray: 7 7;
   stroke: var(--text);
+}
+
+/* Fainter than a draft line: this one is not being drawn by anybody, it is showing what to draw. */
+.ruleset-editor-line--ghost {
+  stroke-dasharray: 7 7;
+  stroke: color-mix(in oklab, var(--text) 34%, transparent);
+  animation: ruleset-ghost-crawl 1.5s linear infinite;
+}
+
+@keyframes ruleset-ghost-crawl {
+  to { stroke-dashoffset: -28; }
+}
+
+.ruleset-ghost-caption {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 0.3rem 0.55rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  text-align: center;
+  max-width: min(22rem, 80%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ruleset-editor-line--ghost {
+    animation: none;
+  }
 }
 
 .ruleset-field-column {

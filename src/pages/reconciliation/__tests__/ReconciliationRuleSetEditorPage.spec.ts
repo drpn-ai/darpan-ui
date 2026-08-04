@@ -1190,7 +1190,11 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const wrapper = mount(ReconciliationRuleSetEditorPage)
       await flushPromises()
 
-      expect(wrapper.findAll('.ruleset-editor-line')).toHaveLength(0)
+      // An exclusion is not a rule, so it draws no rule line. The empty-state ghost is the one line
+      // on this board, and it is here precisely BECAUSE no rule exists — excluding it from the count
+      // keeps this assertion about exclusions rather than about the empty state.
+      expect(wrapper.findAll('.ruleset-editor-line:not(.ruleset-editor-line--ghost)')).toHaveLength(0)
+      expect(wrapper.find('[data-testid="ruleset-ghost-rule"]').exists()).toBe(true)
       expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(0)
     })
 
