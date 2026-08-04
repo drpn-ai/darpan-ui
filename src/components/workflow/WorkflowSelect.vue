@@ -252,36 +252,7 @@ async function handleTriggerEnter(): Promise<void> {
   transform: rotate(180deg);
 }
 
-.workflow-select-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.45rem;
-}
-
-.workflow-select-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
-  border-radius: var(--radius-pill);
-  padding: 0.3rem 0.55rem 0.3rem 0.7rem;
-  font-size: var(--type-meta-size);
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.workflow-select-chip-remove {
-  all: unset;
-  cursor: pointer;
-  opacity: 0.55;
-  font-size: var(--type-meta-size);
-  line-height: 1;
-}
-
-.workflow-select-chip-remove:hover {
-  opacity: 1;
-}
+/* Chip role lives in style.css - shared with the other component that renders chips. */
 
 .workflow-select-menu {
   position: absolute;
