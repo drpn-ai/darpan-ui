@@ -166,9 +166,6 @@ onBeforeUnmount(() => {
   margin-inline: auto;
 }
 
-.wizard-question-shell :deep(.inline-validation) {
-  margin: 0;
-}
 
 .wizard-question-shell.workflow-form--popup-compact {
   --workflow-form-question-size: var(--popup-workflow-prompt-size, 1.5rem);

@@ -168,7 +168,7 @@
               <li
                 v-for="step in displayedRunSteps"
                 :key="`${step.stageSequence ?? 0}-${step.stageCode ?? ''}`"
-                class="run-result-step"
+                class="run-result-step action-row"
               >
                 <StatusBadge :label="stepStatusLabel(step)" :tone="stepStatusTone(step)" />
                 <span class="run-result-step__stage">{{ stepStageLabel(step) }}</span>
@@ -205,7 +205,7 @@
             >
               {{ cancelRequested ? 'Stopping run…' : 'Cancel run' }}
             </button>
-            <div v-else class="run-result-cancel__confirm" data-testid="run-result-cancel-confirm">
+            <div v-else class="run-result-cancel__confirm action-row" data-testid="run-result-cancel-confirm">
               <span class="section-note">Stop this run? Any work completed so far is discarded.</span>
               <button
                 type="button"
@@ -1305,12 +1305,6 @@ watch([savedRunId, outputFileName], () => {
   gap: var(--space-2);
 }
 
-.run-result-cancel__confirm {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
 
 .run-result-cancel__button {
   min-height: 2.15rem;
@@ -1431,12 +1425,6 @@ watch([savedRunId, outputFileName], () => {
   list-style: none;
 }
 
-.run-result-step {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
 
 .run-result-step__stage {
   font-weight: 400;

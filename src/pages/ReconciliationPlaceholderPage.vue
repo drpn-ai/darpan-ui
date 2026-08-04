@@ -25,7 +25,7 @@
         </div>
 
         <div v-else class="stack-sm portal-choice-actions-shell">
-          <div class="portal-action-row">
+          <div class="portal-action-row action-row">
             <a class="primary-link" :href="target.url" target="_blank" rel="noreferrer">
               {{ target.linkLabel }}
             </a>
@@ -162,12 +162,6 @@ function togglePreview(targetKey: LinearPortalTarget['key']): void {
   gap: var(--space-3);
 }
 
-.portal-action-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-}
 
 .portal-preview-button {
   min-height: 0;
@@ -178,9 +172,6 @@ function togglePreview(targetKey: LinearPortalTarget['key']): void {
   margin: 0;
 }
 
-.portal-choice-status-shell :deep(.inline-validation) {
-  margin: 0;
-}
 
 .embed-shell {
   display: grid;
@@ -209,6 +200,8 @@ function togglePreview(targetKey: LinearPortalTarget['key']): void {
 }
 
 @media (max-width: 768px) {
+  /* Overrides the shared .action-row's align-items: center on narrow screens. Scoped styles carry
+     a data-v attribute, so this outranks the global role without needing !important. */
   .portal-action-row {
     align-items: stretch;
   }
