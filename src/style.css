@@ -797,7 +797,7 @@ button:disabled {
 
 .tenant-settings-list-status {
   color: var(--text-soft);
-  font-size: 0.82rem;
+  font-size: var(--type-label-size);
   text-align: right;
   overflow-wrap: anywhere;
 }
@@ -955,7 +955,7 @@ button:disabled {
   max-width: 100%;
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--type-summary-label-size);
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -1145,7 +1145,7 @@ label > span {
 .row-between h3,
 .static-page-list-toolbar h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--type-tile-size);
 }
 
 .static-page-pager {
@@ -1196,7 +1196,7 @@ label > span {
 
 .empty-state h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--type-tile-size);
 }
 
 .empty-state p {
@@ -1607,7 +1607,7 @@ label > span {
 
 .user-menu-name {
   margin: 0;
-  font-size: 1.02rem;
+  font-size: var(--type-tile-size);
   max-width: 14rem;
   overflow-wrap: anywhere;
 }
@@ -1615,7 +1615,7 @@ label > span {
 .user-menu-tenant {
   margin: calc(var(--space-1) * -0.35) 0 0;
   color: var(--text-soft);
-  font-size: 0.82rem;
+  font-size: var(--type-label-size);
   max-width: 14rem;
   overflow-wrap: anywhere;
 }
@@ -1666,7 +1666,7 @@ label > span {
 }
 
 .command-bubble-shortcut {
-  font-size: 0.72rem;
+  font-size: var(--type-table-head-size);
   opacity: 0.7;
 }
 
@@ -1706,7 +1706,7 @@ label > span {
 
 .command-group-label {
   margin: 0;
-  font-size: 0.76rem;
+  font-size: var(--type-table-head-size);
   color: var(--text-dim);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1747,7 +1747,7 @@ label > span {
 }
 
 .command-item .muted-copy {
-  font-size: 0.83rem;
+  font-size: var(--type-note-size);
 }
 
 .sr-only {

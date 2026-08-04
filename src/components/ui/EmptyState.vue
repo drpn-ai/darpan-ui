@@ -69,7 +69,7 @@ const isCentered = computed(() => Boolean(props.icon || props.action))
   border-radius: var(--radius-sm);
   color: var(--text);
   font: inherit;
-  font-size: 0.95rem;
+  font-size: var(--type-action-size);
   font-weight: 400;
   text-decoration: none;
   cursor: pointer;

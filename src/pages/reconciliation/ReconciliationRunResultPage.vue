@@ -1267,7 +1267,7 @@ watch([savedRunId, outputFileName], () => {
 .run-result-rule-selector__option-detail {
   grid-column: 1 / -1;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--type-summary-label-size);
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -1275,7 +1275,7 @@ watch([savedRunId, outputFileName], () => {
 .run-result-rule-selector__option-count {
   grid-column: 2;
   grid-row: 1;
-  font-size: 0.86rem;
+  font-size: var(--type-meta-size);
   font-weight: 400;
   color: var(--text-muted);
 }
@@ -1317,7 +1317,7 @@ watch([savedRunId, outputFileName], () => {
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-muted);
-  font-size: 0.86rem;
+  font-size: var(--type-meta-size);
   font-weight: 400;
 }
 
@@ -1362,7 +1362,7 @@ watch([savedRunId, outputFileName], () => {
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: var(--type-label-size);
   font-weight: 400;
 }
 
@@ -1398,7 +1398,7 @@ watch([savedRunId, outputFileName], () => {
 /* Type comes from .micro-label in style.css — see the template. */
 
 .run-result-step-timeline__count {
-  font-size: 0.78rem;
+  font-size: var(--type-summary-label-size);
   color: var(--text-soft);
   font-variant-numeric: tabular-nums;
 }
@@ -1448,7 +1448,7 @@ watch([savedRunId, outputFileName], () => {
 .run-result-step__error {
   flex-basis: 100%;
   color: var(--danger, #b3261e);
-  font-size: 0.9rem;
+  font-size: var(--type-muted-size);
 }
 
 .run-result-source-details__summary {
@@ -1461,12 +1461,12 @@ watch([savedRunId, outputFileName], () => {
 .run-result-source-details__files-label,
 .run-result-source-file__label {
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--type-summary-label-size);
   line-height: 1.3;
 }
 
 .run-result-source-details__summary strong {
-  font-size: 0.94rem;
+  font-size: var(--type-action-size);
   line-height: 1.35;
   font-weight: 400;
 }
@@ -1497,7 +1497,7 @@ watch([savedRunId, outputFileName], () => {
   min-width: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 0.86rem;
+  font-size: var(--type-meta-size);
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1628,7 +1628,7 @@ watch([savedRunId, outputFileName], () => {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  font-size: 0.82rem;
+  font-size: var(--type-label-size);
   line-height: 1.55;
   color: var(--text);
 }

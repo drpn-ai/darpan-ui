@@ -94,20 +94,20 @@ const emit = defineEmits<{
   /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   border-radius: 0.45rem;
   color: color-mix(in oklab, var(--text) 72%, transparent);
-  font-size: 0.82rem;
+  font-size: var(--type-label-size);
   font-weight: 400;
   line-height: 1;
 }
 
 .workflow-shortcut-choice-card__label {
-  font-size: 1rem;
+  font-size: var(--type-tile-size);
   font-weight: 400;
 }
 
 .workflow-shortcut-choice-card__description {
   padding-left: 2.4rem;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--type-muted-size);
   line-height: 1.25;
 }
 </style>

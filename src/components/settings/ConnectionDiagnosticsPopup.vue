@@ -180,7 +180,7 @@ function statusLabel(status: ConnectionCheckStatus): string {
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 0.76rem;
+  font-size: var(--type-table-head-size);
 }
 
 /*
@@ -208,7 +208,7 @@ function statusLabel(status: ConnectionCheckStatus): string {
 .connection-diagnostics-step {
   position: relative;
   padding-bottom: var(--space-3);
-  font-size: 0.84rem;
+  font-size: var(--type-note-size);
 }
 
 .connection-diagnostics-step:last-child {
@@ -227,7 +227,7 @@ function statusLabel(status: ConnectionCheckStatus): string {
   border-radius: var(--radius-pill);
   /* Opaque, so the node sits on the rail rather than the rail crossing through it. */
   background: var(--surface);
-  font-size: 0.72rem;
+  font-size: var(--type-table-head-size);
   color: var(--text-soft);
 }
 
@@ -252,7 +252,7 @@ function statusLabel(status: ConnectionCheckStatus): string {
 .connection-diagnostics-detail {
   margin: 3px 0 0;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--type-summary-label-size);
   overflow-wrap: anywhere;
 }
 </style>

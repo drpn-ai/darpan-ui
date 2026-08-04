@@ -1648,7 +1648,7 @@ onUnmounted(() => {
 
 .automation-schedule-label {
   color: color-mix(in oklab, var(--text) 58%, transparent);
-  font-size: 0.78rem;
+  font-size: var(--type-summary-label-size);
   line-height: 1;
 }
 

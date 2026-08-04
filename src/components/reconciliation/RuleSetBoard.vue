@@ -1436,7 +1436,7 @@ onBeforeUnmount(() => {
 .ruleset-exclusion-popup label > span,
 .ruleset-pre-action-header > span:not(.ruleset-term-definition) {
   color: var(--text-muted);
-  font-size: 0.76rem;
+  font-size: var(--type-table-head-size);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -1456,7 +1456,7 @@ onBeforeUnmount(() => {
   background: none;
   padding: 0;
   cursor: help;
-  font-size: 0.76rem;
+  font-size: var(--type-table-head-size);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1488,7 +1488,7 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
   /* Tracks the term it defines. Left at 0.72rem it would render smaller than its own label, which
      inverts the usual relationship between a micro label and the copy beneath it. */
-  font-size: 0.76rem;
+  font-size: var(--type-table-head-size);
   line-height: 1.5;
   letter-spacing: 0;
   text-transform: none;
@@ -1528,7 +1528,7 @@ onBeforeUnmount(() => {
    labels above, without the case transform. */
 .ruleset-field-column header span {
   color: var(--text-muted);
-  font-size: 0.76rem;
+  font-size: var(--type-table-head-size);
   letter-spacing: 0.08em;
 }
 
@@ -1603,7 +1603,7 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 0;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--type-eyebrow-size);
   line-height: 1.4;
   text-align: center;
   max-width: min(15rem, 90%);
@@ -1689,7 +1689,7 @@ onBeforeUnmount(() => {
 
 .ruleset-field-label {
   overflow: hidden;
-  font-size: 0.92rem;
+  font-size: var(--type-heading-size);
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.2;
@@ -1728,7 +1728,7 @@ onBeforeUnmount(() => {
   border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--border));
   background: color-mix(in oklab, var(--surface-2) 70%, var(--accent) 30%);
   color: var(--text);
-  font-size: 0.78rem;
+  font-size: var(--type-summary-label-size);
   line-height: 1;
   transform: translateY(-50%);
   box-shadow: 0 0 0 0.14rem color-mix(in oklab, var(--accent) 16%, transparent);
@@ -1766,7 +1766,7 @@ onBeforeUnmount(() => {
 
 .ruleset-operator-box span {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: var(--type-table-head-size);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1893,7 +1893,7 @@ onBeforeUnmount(() => {
   border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
   border-radius: var(--radius-pill);
   padding: 0.3rem 0.55rem 0.3rem 0.7rem;
-  font-size: 0.85rem;
+  font-size: var(--type-meta-size);
   background: var(--surface-2);
   color: var(--text);
 }
@@ -1902,7 +1902,7 @@ onBeforeUnmount(() => {
   all: unset;
   cursor: pointer;
   opacity: 0.55;
-  font-size: 0.85rem;
+  font-size: var(--type-meta-size);
   line-height: 1;
 }
 

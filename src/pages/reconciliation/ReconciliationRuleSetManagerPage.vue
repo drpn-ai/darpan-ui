@@ -908,7 +908,7 @@ onMounted(() => {
 .ruleset-manager-system-separator,
 .ruleset-manager-system-config {
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--type-summary-label-size);
   overflow-wrap: anywhere;
 }
 

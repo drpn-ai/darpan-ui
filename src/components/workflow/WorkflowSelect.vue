@@ -266,7 +266,7 @@ async function handleTriggerEnter(): Promise<void> {
   border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
   border-radius: var(--radius-pill);
   padding: 0.3rem 0.55rem 0.3rem 0.7rem;
-  font-size: 0.85rem;
+  font-size: var(--type-meta-size);
   background: var(--surface-2);
   color: var(--text);
 }
@@ -275,7 +275,7 @@ async function handleTriggerEnter(): Promise<void> {
   all: unset;
   cursor: pointer;
   opacity: 0.55;
-  font-size: 0.85rem;
+  font-size: var(--type-meta-size);
   line-height: 1;
 }
 

@@ -197,7 +197,7 @@ function togglePreview(targetKey: LinearPortalTarget['key']): void {
 
 .embed-banner p {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: var(--type-label-size);
   color: var(--text-soft);
 }
 

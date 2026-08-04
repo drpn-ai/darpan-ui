@@ -1245,7 +1245,7 @@ onMounted(() => {
   margin: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 1rem;
+  font-size: var(--type-tile-size);
   font-weight: 400;
   line-height: 1.2;
   text-align: center;
@@ -1289,7 +1289,7 @@ onMounted(() => {
 
 .wizard-api-calendar-weekdays {
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--type-eyebrow-size);
   font-weight: 400;
   line-height: 1.1;
   text-align: center;
@@ -1324,7 +1324,7 @@ onMounted(() => {
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--type-muted-size);
   line-height: 1;
   cursor: pointer;
   z-index: 0;
@@ -1476,7 +1476,7 @@ onMounted(() => {
 }
 
 .reconciliation-run-history-card__date {
-  font-size: 0.95rem;
+  font-size: var(--type-action-size);
 }
 
 .reconciliation-run-history-card__metrics {
@@ -1492,19 +1492,19 @@ onMounted(() => {
 
 .reconciliation-run-history-card__metrics dt {
   color: var(--text-muted);
-  font-size: 0.86rem;
+  font-size: var(--type-meta-size);
 }
 
 .reconciliation-run-history-card__metrics dd {
   margin: 0;
-  font-size: 0.98rem;
+  font-size: var(--type-tile-size);
 }
 
 .reconciliation-run-history-link {
   justify-self: start;
   color: var(--text-muted);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: var(--type-muted-size);
 }
 
 .reconciliation-run-history-link:hover {

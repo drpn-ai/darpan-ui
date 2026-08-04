@@ -337,6 +337,6 @@ async function handleTriggerEnter(): Promise<void> {
   margin: 0;
   padding: 0.75rem 0.8rem;
   color: var(--text-muted);
-  font-size: 0.88rem;
+  font-size: var(--type-muted-size);
 }
 </style>

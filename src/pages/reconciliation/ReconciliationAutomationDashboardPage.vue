@@ -664,7 +664,7 @@ onMounted(() => {
   border-radius: var(--radius-pill);
   color: var(--text);
   background: color-mix(in oklab, var(--accent) 10%, transparent);
-  font-size: 0.9rem;
+  font-size: var(--type-muted-size);
 }
 
 .automation-dashboard-status--inactive {

@@ -39,7 +39,7 @@ function parseRootJsonValue(value: unknown): unknown {
   max-width: 100%;
   overflow-x: auto;
   color: var(--text);
-  font-size: 0.82rem;
+  font-size: var(--type-label-size);
   line-height: 1.55;
 }
 </style>

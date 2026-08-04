@@ -273,13 +273,13 @@ onBeforeUnmount(() => {
 .wizard-question-shell :deep(.wizard-or) {
   margin: 0;
   color: color-mix(in oklab, var(--text) 55%, transparent);
-  font-size: 0.85rem;
+  font-size: var(--type-meta-size);
 }
 
 .wizard-question-shell :deep(.wizard-secondary-link) {
   color: var(--text);
   text-decoration: none;
-  font-size: 1rem;
+  font-size: var(--type-tile-size);
   letter-spacing: -0.02em;
 }
 
@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
   background: var(--workflow-action-bg);
   color: var(--text);
   border-color: var(--workflow-action-border);
-  font-size: 0.95rem;
+  font-size: var(--type-action-size);
   font-weight: 400;
   box-shadow: none;
 }
@@ -332,7 +332,7 @@ onBeforeUnmount(() => {
 
 .wizard-enter-hint {
   color: color-mix(in oklab, var(--text) 50%, transparent);
-  font-size: 0.76rem;
+  font-size: var(--type-table-head-size);
 }
 
 .wizard-enter-hint strong {
