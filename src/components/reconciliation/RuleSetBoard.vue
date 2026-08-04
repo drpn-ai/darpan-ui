@@ -1538,7 +1538,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(11rem, 18rem) minmax(7.5rem, 1fr) minmax(11rem, 18rem);
   column-gap: clamp(1rem, 2vw, 1.5rem);
-  row-gap: 0.55rem;
+  row-gap: var(--space-1-5);
   align-items: start;
   justify-content: center;
   padding: 1rem 0 3rem;
@@ -1620,7 +1620,7 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 0.55rem;
+  gap: var(--space-1-5);
   align-content: start;
 }
 
@@ -1794,7 +1794,7 @@ onBeforeUnmount(() => {
 
 .ruleset-pre-action-section {
   display: grid;
-  gap: 0.55rem;
+  gap: var(--space-1-5);
 }
 
 .ruleset-pre-action-header {

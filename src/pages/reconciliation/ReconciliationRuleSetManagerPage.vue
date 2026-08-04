@@ -919,7 +919,7 @@ onMounted(() => {
 
 .ruleset-manager-equation-panel {
   display: grid;
-  gap: 0.55rem;
+  gap: var(--space-1-5);
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: var(--static-surface-radius);
@@ -936,7 +936,7 @@ onMounted(() => {
 .ruleset-manager-rule-list,
 .ruleset-manager-exclusion-list {
   display: grid;
-  gap: 0.55rem;
+  gap: var(--space-1-5);
   margin: 0;
   padding: 0;
   list-style: none;

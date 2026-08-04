@@ -28,7 +28,15 @@
   font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1.55;
   font-weight: 400;
+  /* --space-0 and --space-1-5 are insertions, not renumberings. --space-1..7 keep their values so
+     no existing reference changes meaning; renumbering to make the names sequential would have
+     rewritten several hundred call sites to gain nothing but tidier digits.
+     They exist because the scale had a hole where the UI needed it most: --space-1 -> --space-2 was
+     a 1.88x jump in a scale whose every other step is 1.38-1.47x, and there was no step at all
+     below 0.4rem. 43 of the 52 off-scale spacing values sat in exactly those two regions. */
+  --space-0: 0.28rem;
   --space-1: 0.4rem;
+  --space-1-5: 0.55rem;
   --space-2: 0.75rem;
   --space-3: 1.1rem;
   --space-4: 1.6rem;
@@ -936,6 +944,9 @@ button:disabled {
   --workflow-form-answer-size: clamp(1.18rem, 1.4vw, 1.45rem);
   --workflow-form-select-size: var(--workflow-form-answer-size);
   --workflow-form-select-padding-top: 0.15rem;
+  /* An optical alignment constant, not a scale value: it exists to line this select's underline up
+     with the neighbouring input's. It equals --space-1-5 today by coincidence, and binding it to
+     the scale would let a future scale change silently break that alignment. */
   --workflow-form-select-padding-bottom: 0.55rem;
   --workflow-form-select-line-height: 1.2;
 }

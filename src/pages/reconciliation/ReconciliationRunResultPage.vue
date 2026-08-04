@@ -1477,7 +1477,7 @@ watch([savedRunId, outputFileName], () => {
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.55rem;
+  gap: var(--space-1-5);
 }
 
 .run-result-source-file {

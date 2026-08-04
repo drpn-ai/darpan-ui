@@ -1231,7 +1231,7 @@ onMounted(() => {
   min-width: 0;
   max-width: 100%;
   display: grid;
-  gap: 0.55rem;
+  gap: var(--space-1-5);
 }
 
 .wizard-api-calendar-month__head {
