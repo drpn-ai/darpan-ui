@@ -704,7 +704,7 @@ onMounted(() => {
   max-width: 100%;
   font-weight: 400;
   overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .automation-dashboard-detail-item--date dd {

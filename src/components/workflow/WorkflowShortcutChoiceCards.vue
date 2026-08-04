@@ -63,7 +63,7 @@ const emit = defineEmits<{
   gap: 0.45rem;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-card-1rem);
   background: var(--surface-2);
   color: var(--text);
   text-align: left;
@@ -88,6 +88,10 @@ const emit = defineEmits<{
   align-items: center;
   justify-content: center;
   border: 1px solid color-mix(in oklab, var(--text) 20%, transparent);
+  /* Off the radius scale (nearest is --radius-sm at 0.48rem). Snapping it is a real, if tiny,
+     visual change, so it waits for the phase-02 pass rather than riding along with a lint fix.
+     Marked rather than silently exempted so it cannot spread. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   border-radius: 0.45rem;
   color: color-mix(in oklab, var(--text) 72%, transparent);
   font-size: 0.82rem;

@@ -24,6 +24,15 @@ export default [
     }
   },
   {
+    // Tooling config that has to be CommonJS (stylelint resolves .cjs as such). Without this the
+    // flat config treats it as ESM and reports `module` as undefined.
+    files: ['**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { ...globals.node }
+    }
+  },
+  {
     files: ['**/*.{ts,vue}'],
     languageOptions: {
       globals: {

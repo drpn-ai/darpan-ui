@@ -1627,7 +1627,7 @@ watch([savedRunId, outputFileName], () => {
 .run-result-table__json {
   margin: 0;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
   font-size: 0.82rem;
   line-height: 1.55;
   color: var(--text);

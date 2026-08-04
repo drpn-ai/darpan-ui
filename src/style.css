@@ -92,6 +92,7 @@
   --radius-md: 0.62rem;
   --radius-lg: 0.78rem;
   --radius-pill: 999px;
+  --radius-card-1rem: 1rem;
 
   /* Completes the --surface-* container/consumer contract. These nine were consumed with an inline
      var(--token, fallback) but never defined anywhere, so the fallback silently WAS the value: the
@@ -684,7 +685,7 @@ button:disabled {
   gap: 0.4rem;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-card-1rem);
   background: var(--surface-2);
 }
 
@@ -696,7 +697,7 @@ button:disabled {
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* One micro-label role, one rule. This was written out three times — here, on the run-result step

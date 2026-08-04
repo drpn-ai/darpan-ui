@@ -172,7 +172,7 @@ function formatPrimitive(value: unknown): string {
   min-height: 1.45rem;
   padding-left: calc(var(--json-depth) * 1.2rem);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .json-collapse-viewer__toggle {
