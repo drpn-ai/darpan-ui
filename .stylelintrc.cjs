@@ -29,9 +29,9 @@ module.exports = {
      * counted and argued with; silent ones spread.
      */
     'scale-unlimited/declaration-strict-value': [
-      ['/color$/', 'fill', 'stroke', 'border-radius', 'font-size', 'letter-spacing'],
+      ['/color$/', 'fill', 'stroke', 'border-radius', 'font-size', 'letter-spacing', 'margin'],
       {
-        ignoreValues: ['currentColor', 'inherit', 'initial', 'transparent', 'none', 'unset', 'normal', '0'],
+        ignoreValues: ['currentColor', 'inherit', 'initial', 'transparent', 'none', 'unset', 'normal', 'auto', '0'],
         // color-mix(in oklab, var(--accent) 42%, var(--border)) is token-driven and legitimate;
         // without this the rule flags every derived colour in the product.
         ignoreFunctions: true,

@@ -211,7 +211,7 @@ async function handleTriggerEnter(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);

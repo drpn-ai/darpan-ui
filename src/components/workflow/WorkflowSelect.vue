@@ -202,7 +202,7 @@ async function handleTriggerEnter(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--space-2);
   cursor: pointer;
   user-select: none;
 }

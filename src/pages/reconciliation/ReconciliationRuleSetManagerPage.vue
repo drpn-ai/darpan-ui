@@ -895,7 +895,7 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: var(--space-1);
   min-width: 0;
 }
 

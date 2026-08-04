@@ -164,6 +164,8 @@ function statusLabel(status: ConnectionCheckStatus): string {
 <style scoped>
 
 .connection-diagnostics-verdict {
+  /* A 4px optical nudge. --space-1 is 6.4px, which is visibly looser at this density. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   margin: 0 0 4px;
   /* Display text. The nearest role (--type-tile-size) is 1.12px away, past the point where folding is invisible. */
   /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
@@ -246,6 +248,8 @@ function statusLabel(status: ConnectionCheckStatus): string {
 }
 
 .connection-diagnostics-detail {
+  /* A 3px optical nudge. --space-1 is 6.4px, more than double. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   margin: 3px 0 0;
   color: var(--text-muted);
   font-size: var(--type-summary-label-size);

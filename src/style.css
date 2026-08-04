@@ -651,7 +651,7 @@ button:disabled {
 
 .static-page-summary-card {
   display: grid;
-  gap: 0.4rem;
+  gap: var(--space-1);
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-card-1rem);
@@ -1341,7 +1341,7 @@ label > span {
 .app-table__action-header,
 .app-table__action-cell {
   padding-left: 0.5rem;
-  padding-right: 0.75rem;
+  padding-right: var(--space-2);
   text-align: right;
 }
 
@@ -1460,7 +1460,7 @@ label > span {
 .checkbox-inline {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-1);
 }
 
 .checkbox-inline input:not(.app-table__checkbox) {
@@ -1764,6 +1764,8 @@ label > span {
   width: 1px;
   height: 1px;
   padding: 0;
+  /* Part of the standard visually-hidden recipe, alongside clip. Not spacing - changing it would expose the element. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   margin: -1px;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
@@ -1920,7 +1922,7 @@ label > span {
 .workflow-select-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-1);
   border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
   border-radius: var(--radius-pill);
   padding: 0.3rem 0.55rem 0.3rem 0.7rem;

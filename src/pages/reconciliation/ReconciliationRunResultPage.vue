@@ -1238,7 +1238,7 @@ watch([savedRunId, outputFileName], () => {
 
 .run-result-rule-selector__options {
   display: grid;
-  gap: 0.4rem;
+  gap: var(--space-1);
 }
 
 .run-result-rule-selector__option {
@@ -1355,7 +1355,7 @@ watch([savedRunId, outputFileName], () => {
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-1);
   min-height: 1.9rem;
   padding: 0.35rem 0.7rem;
   border: 1px solid var(--border-soft);

@@ -181,6 +181,9 @@ function formatPrimitive(value: unknown): string {
   justify-content: center;
   width: 1rem;
   min-height: 1rem;
+  /* 0.2rem sits below --space-1 (0.4rem); the scale has no step under it, so folding would double
+     this gap on a control that sits inline with JSON text. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   margin: 0 0.2rem 0 0;
   padding: 0;
   border: 0;
