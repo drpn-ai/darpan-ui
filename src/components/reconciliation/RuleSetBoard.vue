@@ -1319,12 +1319,22 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.ruleset-field-column header span,
+/* Field labels ("Operator", "Sequence", "Exclude on") take the small-caps label treatment. */
 .ruleset-rule-popover label > span,
 .ruleset-pre-action-header > span {
   color: var(--text-muted);
   font-size: 0.72rem;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* The column header is a system NAME, not a label — "Shopify", "HotWax", "NetSuite". Uppercasing
+   it rendered SHOPIFY/HOTWAX here while every other surface showed the proper-cased name, so the
+   same system read two different ways depending on where you looked. Same size and colour as the
+   labels above, without the case transform. */
+.ruleset-field-column header span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
 }
 
