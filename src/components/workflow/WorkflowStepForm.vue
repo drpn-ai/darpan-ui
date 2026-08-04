@@ -213,7 +213,7 @@ onBeforeUnmount(() => {
 }
 
 .wizard-question :deep(strong) {
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .wizard-question-shell :deep(.wizard-input-shell),
@@ -321,7 +321,7 @@ onBeforeUnmount(() => {
   color: var(--text);
   border-color: var(--workflow-action-border);
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 400;
   box-shadow: none;
 }
 
@@ -337,7 +337,7 @@ onBeforeUnmount(() => {
 
 .wizard-enter-hint strong {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 400;
 }
 
 @media (max-width: 768px) {

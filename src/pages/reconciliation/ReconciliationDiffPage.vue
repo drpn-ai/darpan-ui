@@ -1246,7 +1246,7 @@ onMounted(() => {
   overflow: hidden;
   color: var(--text);
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.2;
   text-align: center;
   text-overflow: ellipsis;
@@ -1290,7 +1290,7 @@ onMounted(() => {
 .wizard-api-calendar-weekdays {
   color: var(--text-muted);
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.1;
   text-align: center;
 }
@@ -1392,7 +1392,7 @@ onMounted(() => {
 .wizard-api-calendar-day--range-start,
 .wizard-api-calendar-day--range-end {
   color: var(--surface);
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .wizard-api-calendar-day--range-start::after,

@@ -39,6 +39,17 @@ module.exports = {
       },
     ],
 
+    /**
+     * One weight axis. Darpan uses 400 everywhere and takes emphasis from size, never from bold —
+     * the design system says the same thing in tokens/typography.css ("Headings are 400 — emphasis
+     * comes from size, never bold"). Ten declarations had drifted to 500/600/700 before this rule
+     * existed. The @font-face block in style.css is exempted inline: it describes what the font
+     * files carry, which is not the same as using a weight.
+     */
+    'declaration-property-value-allowed-list': {
+      'font-weight': ['400', 'normal', 'inherit'],
+    },
+
     // Vue's SFC-scoped selectors. Not unknown, just not CSS.
     'selector-pseudo-class-no-unknown': [true, { ignorePseudoClasses: ['deep', 'slotted', 'global'] }],
     'selector-pseudo-element-no-unknown': [true, { ignorePseudoElements: ['v-deep', 'v-slotted', 'v-global'] }],

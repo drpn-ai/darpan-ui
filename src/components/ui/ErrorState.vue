@@ -35,7 +35,7 @@ defineProps<{
   min-width: 4.7rem; min-height: 2.6rem; padding-inline: 0.9rem; margin-top: var(--space-1);
   background: color-mix(in oklab, var(--surface-3) 82%, var(--text) 18%);
   border: 1px solid color-mix(in oklab, var(--border) 72%, var(--text) 28%);
-  border-radius: var(--radius-sm); color: var(--text); font: inherit; font-size: 0.95rem; font-weight: 500;
+  border-radius: var(--radius-sm); color: var(--text); font: inherit; font-size: 0.95rem; font-weight: 400;
   cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
 }
 .btn-primary:hover { border-color: color-mix(in oklab, var(--border) 60%, var(--accent)); }

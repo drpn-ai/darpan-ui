@@ -1468,7 +1468,7 @@ watch([savedRunId, outputFileName], () => {
 .run-result-source-details__summary strong {
   font-size: 0.94rem;
   line-height: 1.35;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .run-result-source-details__files {

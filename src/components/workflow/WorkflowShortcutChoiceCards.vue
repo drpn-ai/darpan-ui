@@ -95,7 +95,7 @@ const emit = defineEmits<{
   border-radius: 0.45rem;
   color: color-mix(in oklab, var(--text) 72%, transparent);
   font-size: 0.82rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1;
 }
 
