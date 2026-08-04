@@ -516,7 +516,7 @@ function handleNameInputEnter(event: KeyboardEvent): void {
 function toSystemOption(option: EnumOption): AppSelectOption {
   return {
     value: option.enumId,
-    label: option.label || option.enumCode || option.description || option.enumId,
+    label: option.label || option.description || option.enumCode || option.enumId,
   }
 }
 

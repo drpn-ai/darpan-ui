@@ -364,7 +364,7 @@ const selectedSystemOptions = computed<SavedRunSystemOption[]>(() => selectedSav
 const systemSelectOptions = computed(() =>
   selectedSystemOptions.value.map((option) => ({
     value: option.enumId,
-    label: option.label || option.enumCode || option.enumId,
+    label: option.label || option.description || option.enumCode || option.enumId,
   })),
 )
 const file1SystemOption = computed(() => resolveSystemOptionForFileSide('FILE_1', file1SystemEnumId.value))
@@ -429,11 +429,11 @@ const customApiWindowStartLabel = computed(() => formatDateInputLabel(customApiW
 const customApiWindowEndLabel = computed(() => formatDateInputLabel(customApiWindowEndDate.value))
 const file1SystemLabel = computed(() => {
   const option = selectedSystemOptions.value.find((systemOption) => systemOption.enumId === file1SystemEnumId.value)
-  return option?.label || option?.enumCode || option?.enumId || ''
+  return option?.label || option?.description || option?.enumCode || option?.enumId || ''
 })
 const file2SystemLabel = computed(() => {
   const option = selectedSystemOptions.value.find((systemOption) => systemOption.enumId === file2SystemEnumId.value)
-  return option?.label || option?.enumCode || option?.enumId || ''
+  return option?.label || option?.description || option?.enumCode || option?.enumId || ''
 })
 const activeRunName = computed(() => selectedSavedRun.value?.runName || requestedRunName.value || 'Selected Run')
 const file1PromptSystemName = computed(() => file1SystemLabel.value || requestedFile1SystemLabel.value || 'System 1')

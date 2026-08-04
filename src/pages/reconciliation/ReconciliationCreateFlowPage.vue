@@ -1313,7 +1313,7 @@ async function loadOptions(): Promise<void> {
     }))
     fileTypeOptions.value = (automationSourceOptionsResponse.fileTypes ?? []).map((option) => ({
       value: option.enumId,
-      label: option.label || option.enumCode || option.enumId,
+      label: option.label || option.description || option.enumCode || option.enumId,
     }))
     jsonSchemas.value = schemasResponse.schemas ?? []
     sourceConfigs.value = automationSourceOptionsResponse.sourceConfigs ?? []

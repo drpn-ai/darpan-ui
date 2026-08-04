@@ -124,7 +124,7 @@ function resolveSavedRunTitle(runName: string): string {
 function resolveSystemLabel(savedRun: SavedRunSummary, enumId?: string): string {
   if (!enumId) return ''
   const option = savedRun.systemOptions.find((systemOption) => systemOption.enumId === enumId)
-  return option?.label || option?.enumCode || option?.enumId || ''
+  return option?.label || option?.description || option?.enumCode || option?.enumId || ''
 }
 
 const route = useRoute()

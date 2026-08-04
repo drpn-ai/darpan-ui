@@ -317,7 +317,7 @@ function formatTenantDateTime(value: unknown, fallback = '-'): string {
 
 function automationSystemLabel(fileSide: string, fallback: string): string {
   const savedRunOption = automation.value?.savedRun?.systemOptions?.find((option) => option.fileSide === fileSide)
-  if (savedRunOption) return savedRunOption.label || savedRunOption.enumCode || savedRunOption.enumId || fallback
+  if (savedRunOption) return savedRunOption.label || savedRunOption.description || savedRunOption.enumCode || savedRunOption.enumId || fallback
 
   const source = automation.value?.sources?.find((option) => option.fileSide === fileSide)
   return source?.systemLabel || source?.systemEnumId || fallback
