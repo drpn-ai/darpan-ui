@@ -46,11 +46,11 @@ onBeforeUnmount(() => {
   z-index: 9999;
   display: flex;
   align-items: center;
-  gap: var(--space-2, 0.5rem);
-  padding: 0.55rem var(--space-4, 1rem);
-  background: color-mix(in oklab, var(--surface-2, #f4f4f4) 90%, var(--text, #111) 10%);
-  border-top: 1px solid var(--border, #d0d0d0);
-  color: var(--text-soft, #555);
+  gap: var(--space-2);
+  padding: 0.55rem var(--space-4);
+  background: color-mix(in oklab, var(--surface-2) 90%, var(--text) 10%);
+  border-top: 1px solid var(--border);
+  color: var(--text-soft);
   font-size: var(--type-muted-size);
   font-weight: 400;
 }
@@ -59,14 +59,9 @@ onBeforeUnmount(() => {
   width: 1.1rem;
   height: 1.1rem;
   flex-shrink: 0;
-  color: var(--text-dim, #888);
+  color: var(--text-dim);
 }
 
-.offline-banner__icon :deep(svg) {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
 
 .offline-banner__text {
   line-height: 1.4;

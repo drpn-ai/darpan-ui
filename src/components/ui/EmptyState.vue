@@ -44,38 +44,7 @@ const isCentered = computed(() => Boolean(props.icon || props.action))
   text-align: center;
 }
 
-.empty-state__icon {
-  width: 1.7rem;
-  height: 1.7rem;
-  color: var(--text-dim);
-}
 
-.empty-state__icon :deep(svg) {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
 
-.empty-state__action {
-  min-width: 4.7rem;
-  min-height: 2.6rem;
-  margin-top: var(--space-1);
-  padding-inline: 0.9rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in oklab, var(--surface-3) 82%, var(--text) 18%);
-  border: 1px solid color-mix(in oklab, var(--border) 72%, var(--text) 28%);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--type-action-size);
-  font-weight: 400;
-  text-decoration: none;
-  cursor: pointer;
-}
 
-.empty-state__action:hover {
-  border-color: color-mix(in oklab, var(--border) 60%, var(--accent));
-}
 </style>

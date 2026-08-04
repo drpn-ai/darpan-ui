@@ -2016,3 +2016,48 @@ label > span {
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--text) 18%, transparent);
 }
 
+
+/* State-surface roles, shared by ErrorState, EmptyState and OfflineBanner. All three drew the same
+   icon-fills-its-box rule, two drew the same icon box, and the error and empty surfaces drew the
+   same action button under different names. Written once here; the components keep only what is
+   genuinely theirs (the error border is solid where the empty one is dashed, and the offline icon
+   is smaller and does not shrink). */
+.error-state__icon,
+.empty-state__icon {
+  width: 1.7rem;
+  height: 1.7rem;
+  color: var(--text-dim);
+}
+
+.error-state__icon svg,
+.empty-state__icon svg,
+.offline-banner__icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.btn-primary,
+.empty-state__action {
+  min-width: 4.7rem;
+  min-height: 2.6rem;
+  margin-top: var(--space-1);
+  padding-inline: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--surface-3) 82%, var(--text) 18%);
+  border: 1px solid color-mix(in oklab, var(--border) 72%, var(--text) 28%);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-action-size);
+  font-weight: 400;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-primary:hover,
+.empty-state__action:hover {
+  border-color: color-mix(in oklab, var(--border) 60%, var(--accent));
+}
