@@ -47,7 +47,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0.55rem var(--space-4);
+  padding: var(--space-1-5) var(--space-4);
   background: color-mix(in oklab, var(--surface-2) 90%, var(--text) 10%);
   border-top: 1px solid var(--border);
   color: var(--text-soft);

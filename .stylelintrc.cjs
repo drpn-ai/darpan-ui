@@ -29,7 +29,7 @@ module.exports = {
      * counted and argued with; silent ones spread.
      */
     'scale-unlimited/declaration-strict-value': [
-      ['/color$/', 'fill', 'stroke', 'border-radius', 'font-size', 'letter-spacing', 'margin'],
+      ['/color$/', 'fill', 'stroke', 'border-radius', 'font-size', 'letter-spacing', 'margin', 'gap', 'padding'],
       {
         ignoreValues: ['currentColor', 'inherit', 'initial', 'transparent', 'none', 'unset', 'normal', 'auto', '0'],
         // color-mix(in oklab, var(--accent) 42%, var(--border)) is token-driven and legitimate;

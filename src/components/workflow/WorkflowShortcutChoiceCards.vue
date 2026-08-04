@@ -53,15 +53,15 @@ const emit = defineEmits<{
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.85rem;
+  gap: var(--space-2);
   max-width: 34rem;
 }
 
 .workflow-shortcut-choice-card {
   width: 100%;
   display: grid;
-  gap: 0.45rem;
-  padding: 1rem;
+  gap: var(--space-1);
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-card-1rem);
   background: var(--surface-2);
@@ -78,7 +78,7 @@ const emit = defineEmits<{
 .workflow-shortcut-choice-card__header {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: var(--space-1-5);
 }
 
 .workflow-shortcut-choice-card__key {
@@ -105,7 +105,7 @@ const emit = defineEmits<{
 }
 
 .workflow-shortcut-choice-card__description {
-  padding-left: 2.4rem;
+  padding-left: var(--space-5);
   color: var(--text-muted);
   font-size: var(--type-muted-size);
   line-height: 1.25;

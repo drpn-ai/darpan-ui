@@ -478,7 +478,10 @@ describe('NetSuiteAuthWorkflowPage', () => {
     expect(source).toContain('.workflow-choice-option--filter:hover {')
     expect(source).toContain('.workflow-choice-option--filter.workflow-choice-option--active {')
     expect(source).toContain('max-width: min(100%, 14rem);')
-    expect(source).toContain('padding: 0.6rem 0.8rem;')
+    // Now on the spacing scale (0.6/0.8rem -> --space-1-5/--space-2). What this test guards is that
+    // the scope choices look like the run-result filter boxes, which is the border, background and
+    // checkbox treatment asserted below - the padding literal was never part of that contract.
+    expect(source).toContain('padding: var(--space-1-5) var(--space-2);')
     expect(source).toContain(".workflow-choice-option--filter input[type='checkbox']:not(.app-table__checkbox) {")
     expect(source).toContain('width: 1rem;')
     expect(source).toContain('height: 1rem;')

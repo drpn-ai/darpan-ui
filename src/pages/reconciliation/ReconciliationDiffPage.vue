@@ -1188,7 +1188,9 @@ onMounted(() => {
 .wizard-api-window-field {
   min-width: 0;
   display: grid;
-  gap: 0.25rem;
+  gap: var(--space-0);
+  /* Sits between scale steps by more than the fold tolerance; snapping it would be a visible shift rather than a sub-pixel one. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding: 0.65rem var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1489,6 +1491,8 @@ onMounted(() => {
 
 .reconciliation-run-history-card__metrics div {
   display: grid;
+  /* Contains a value below --space-00 (0.2rem). Under 2.5px these are optical nudges rather than spacing, and the scale deliberately stops above them. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   gap: 0.15rem;
 }
 

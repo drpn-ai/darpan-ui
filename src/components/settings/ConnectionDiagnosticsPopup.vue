@@ -190,6 +190,8 @@ function statusLabel(status: ConnectionCheckStatus): string {
   position: relative;
   list-style: none;
   margin: 0;
+  /* A pixel value aligning this with an adjacent icon column, not scale spacing. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding: 0 0 0 26px;
 }
 

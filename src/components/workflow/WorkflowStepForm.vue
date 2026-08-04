@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
   --workflow-form-select-line-height: 1.15;
   width: min(var(--workflow-question-width), 100%);
   display: grid;
-  gap: 1rem;
+  gap: var(--space-3);
   justify-items: start;
   align-content: start;
   min-height: 0;
@@ -186,7 +186,7 @@ onBeforeUnmount(() => {
   --workflow-form-answer-size: 0.95rem;
   --workflow-form-select-size: var(--workflow-form-answer-size);
   --workflow-form-context-label-size: 0.68rem;
-  gap: 0.9rem;
+  gap: var(--space-2);
 }
 
 .wizard-question-shell.workflow-form--edit-single-page {
@@ -221,7 +221,7 @@ onBeforeUnmount(() => {
   width: 100%;
   margin-top: 0.35rem;
   display: grid;
-  gap: 0.45rem;
+  gap: var(--space-1);
 }
 
 .wizard-question-shell :deep(.workflow-context-label) {
@@ -233,7 +233,9 @@ onBeforeUnmount(() => {
 .wizard-question-shell :deep(.wizard-answer-control) {
   width: 100%;
   min-height: auto;
-  padding: 0.15rem 0 0.55rem;
+  /* Contains a value below --space-00 (0.2rem). Under 2.5px these are optical nudges rather than spacing, and the scale deliberately stops above them. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
+  padding: 0.15rem 0 var(--space-1-5);
   border: 0;
   border-bottom: 1px solid var(--workflow-underline);
   border-radius: 0;
@@ -316,7 +318,7 @@ onBeforeUnmount(() => {
 .wizard-next {
   min-width: var(--workflow-action-min-width);
   min-height: var(--workflow-action-min-height);
-  padding-inline: 0.9rem;
+  padding-inline: var(--space-2);
   background: var(--workflow-action-bg);
   color: var(--text);
   border-color: var(--workflow-action-border);

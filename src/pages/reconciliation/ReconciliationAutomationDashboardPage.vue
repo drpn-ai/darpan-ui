@@ -617,6 +617,9 @@ onMounted(() => {
 <style scoped>
 .automation-dashboard-setup {
   display: grid;
+  /* Pinned density, not scale spacing: a test locks these three so the setup rows stay compact.
+     They sit between scale steps on purpose. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   gap: 0.5rem;
 }
 
@@ -624,14 +627,15 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-3);
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
 }
 
 .automation-dashboard-heading-block {
   display: grid;
-  gap: 0.3rem;
+  gap: var(--space-0);
   min-width: 0;
 }
 
@@ -661,7 +665,7 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 0.8rem;
+  padding: 0 var(--space-2);
   border: 1px solid color-mix(in oklab, var(--accent) 36%, var(--border));
   border-radius: var(--radius-pill);
   color: var(--text);
@@ -686,8 +690,9 @@ onMounted(() => {
   grid-column: span 2;
   min-width: 0;
   display: grid;
-  gap: 0.35rem;
+  gap: var(--space-1);
   align-content: start;
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding: 0.45rem 1rem 0.45rem 0;
   border-bottom: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
 }

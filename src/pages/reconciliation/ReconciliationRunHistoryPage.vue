@@ -741,6 +741,8 @@ onUnmounted(() => {
 
 .run-history-metrics div {
   display: grid;
+  /* Contains a value below --space-00 (0.2rem). Under 2.5px these are optical nudges rather than spacing, and the scale deliberately stops above them. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   gap: 0.15rem;
 }
 

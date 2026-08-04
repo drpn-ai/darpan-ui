@@ -216,7 +216,7 @@ async function handleTriggerEnter(): Promise<void> {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
-  padding: 0.65rem 0.8rem;
+  padding: var(--space-1-5) var(--space-2);
   min-height: 2.55rem;
   font: inherit;
   text-align: left;
@@ -241,7 +241,7 @@ async function handleTriggerEnter(): Promise<void> {
   z-index: 70;
   display: grid;
   gap: var(--space-00);
-  padding: 0.35rem;
+  padding: var(--space-1);
   border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface-2) 94%, var(--surface));
@@ -251,7 +251,7 @@ async function handleTriggerEnter(): Promise<void> {
 
 .app-select-search {
   min-height: 2.35rem;
-  padding: 0.55rem 0.7rem;
+  padding: var(--space-1-5) var(--space-2);
   border-radius: calc(var(--radius-sm) - 0.02rem);
   background: var(--surface);
 }
@@ -269,7 +269,7 @@ async function handleTriggerEnter(): Promise<void> {
 
 .app-select-empty {
   margin: 0;
-  padding: 0.75rem 0.8rem;
+  padding: var(--space-2) var(--space-2);
   color: var(--text-muted);
   font-size: var(--type-muted-size);
 }

@@ -1186,7 +1186,7 @@ watch([savedRunId, outputFileName], () => {
   left: max(0.5rem, env(safe-area-inset-left));
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--space-1);
   transform: translateY(-50%);
 }
 
@@ -1196,9 +1196,9 @@ watch([savedRunId, outputFileName], () => {
 
 .run-result-rule-selector__panel {
   display: grid;
-  gap: 0.45rem;
+  gap: var(--space-1);
   width: min(13.5rem, calc(100vw - 4rem));
-  padding: 0.45rem;
+  padding: var(--space-1);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface) 94%, white);
@@ -1244,10 +1244,12 @@ watch([savedRunId, outputFileName], () => {
 .run-result-rule-selector__option {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  /* Contains a value below --space-00 (0.2rem). Under 2.5px these are optical nudges rather than spacing, and the scale deliberately stops above them. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   gap: 0.15rem 0.5rem;
   align-items: center;
   min-height: 3.35rem;
-  padding: 0.6rem;
+  padding: var(--space-1-5);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface-2) 92%, white);
@@ -1291,7 +1293,7 @@ watch([savedRunId, outputFileName], () => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: 0.85rem 0.95rem;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface-2) 92%, white);
@@ -1312,7 +1314,7 @@ watch([savedRunId, outputFileName], () => {
 
 .run-result-cancel__button {
   min-height: 2.15rem;
-  padding: 0.4rem 0.85rem;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -1345,7 +1347,7 @@ watch([savedRunId, outputFileName], () => {
 .run-result-step-timeline {
   display: grid;
   gap: var(--space-2);
-  padding: 0.85rem 0.95rem;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface-2) 92%, white);
@@ -1357,7 +1359,7 @@ watch([savedRunId, outputFileName], () => {
   align-items: center;
   gap: var(--space-1);
   min-height: 1.9rem;
-  padding: 0.35rem 0.7rem;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -1453,6 +1455,8 @@ watch([savedRunId, outputFileName], () => {
 
 .run-result-source-details__summary {
   display: grid;
+  /* Contains a value below --space-00 (0.2rem). Under 2.5px these are optical nudges rather than spacing, and the scale deliberately stops above them. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   gap: 0.15rem;
   min-width: min(100%, 11rem);
 }
@@ -1484,10 +1488,10 @@ watch([savedRunId, outputFileName], () => {
   display: inline-grid;
   grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--space-1);
   max-width: min(100%, 25rem);
   min-height: 2.15rem;
-  padding: 0.35rem 0.45rem 0.35rem 0.6rem;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1-5);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -1538,7 +1542,7 @@ watch([savedRunId, outputFileName], () => {
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  gap: 0.35rem;
+  gap: var(--space-1);
   min-height: 0;
   padding: var(--space-3);
   text-align: left;
@@ -1595,6 +1599,8 @@ watch([savedRunId, outputFileName], () => {
 .reconciliation-diff-details__search-input {
   width: 100%;
   min-height: 3rem;
+  /* Contains a large layout value with no step near it; the scale jumps 2.3rem -> 3.2rem here. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding: 0.8rem 2.9rem 0.8rem 0.95rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);

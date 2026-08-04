@@ -1682,7 +1682,9 @@ onUnmounted(() => {
 
 .automation-schedule-select :deep(.workflow-select-trigger) {
   min-height: 2.75rem;
-  padding: 0.15rem 0 0.55rem;
+  /* Contains a value below --space-00 (0.2rem). Under 2.5px these are optical nudges rather than spacing, and the scale deliberately stops above them. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
+  padding: 0.15rem 0 var(--space-1-5);
   font-size: clamp(1rem, 1.25vw, 1.2rem);
   line-height: 1.2;
   letter-spacing: 0;

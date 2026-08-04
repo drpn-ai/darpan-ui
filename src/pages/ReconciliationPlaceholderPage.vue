@@ -133,7 +133,7 @@ function togglePreview(targetKey: LinearPortalTarget['key']): void {
 .roadmap-kicker {
   display: inline-flex;
   width: fit-content;
-  padding: 0.35rem 0.55rem;
+  padding: var(--space-1) var(--space-1-5);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -171,7 +171,7 @@ function togglePreview(targetKey: LinearPortalTarget['key']): void {
 
 .portal-preview-button {
   min-height: 0;
-  padding: 0.62rem 0.96rem;
+  padding: var(--space-1-5) var(--space-3);
 }
 
 .portal-note {

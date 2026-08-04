@@ -233,7 +233,7 @@ b {
   top: var(--space-2);
   left: var(--space-2);
   z-index: 80;
-  padding: 0.6rem 0.85rem;
+  padding: var(--space-1-5) var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -269,7 +269,7 @@ select {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
-  padding: 0.65rem 0.8rem;
+  padding: var(--space-1-5) var(--space-2);
   min-height: 2.55rem;
 }
 
@@ -288,6 +288,10 @@ select:not([multiple]):not([size]) {
     calc(100% - 0.7rem) 50%;
   background-repeat: no-repeat;
   background-size: 0.36rem 0.36rem, 0.36rem 0.36rem;
+  /* Optical constant, not scale spacing: this has to clear the chevron drawn just above at
+     calc(100% - 1.03rem) / calc(100% - 0.7rem). It is paired with those offsets, so binding it to
+     --space-5 would let a scale change move the text into the arrow. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding-right: 2.2rem;
 }
 
@@ -329,7 +333,7 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   min-height: 2.55rem;
-  padding: 0.55rem 0.9rem;
+  padding: var(--space-1-5) var(--space-2);
   background: var(--surface-2);
   touch-action: manipulation;
   transition: border-color 160ms ease, background-color 160ms ease;
@@ -365,7 +369,7 @@ button:disabled {
   transform: translateX(-50%);
   z-index: 55;
   width: min(32rem, calc(100vw - (var(--space-4) * 2)));
-  padding: 0.72rem 1rem;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid color-mix(in oklab, var(--border) 74%, var(--text) 26%);
   border-radius: var(--radius-pill);
   background: color-mix(in oklab, var(--surface) 92%, var(--surface-2));
@@ -409,7 +413,7 @@ button:disabled {
 .ghost-link {
   display: inline-flex;
   align-items: center;
-  padding: 0.47rem 0.7rem;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   text-decoration: none;
@@ -656,14 +660,14 @@ button:disabled {
 .static-page-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.9rem;
+  gap: var(--space-2);
   align-items: start;
 }
 
 .static-page-summary-card {
   display: grid;
   gap: var(--space-1);
-  padding: 1rem;
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-card-1rem);
   background: var(--surface-2);
@@ -747,7 +751,7 @@ button:disabled {
 
 .user-settings-password-trigger {
   min-height: 2.2rem;
-  padding: 0 0.9rem;
+  padding: 0 var(--space-2);
   font-size: var(--type-note-size);
   white-space: nowrap;
 }
@@ -796,7 +800,7 @@ button:disabled {
 }
 
 .tenant-settings-list-grid .static-page-list-tile {
-  padding: 0.85rem 1rem;
+  padding: var(--space-2) var(--space-3);
 }
 
 .tenant-settings-list-row {
@@ -965,7 +969,7 @@ button:disabled {
 .workflow-form-grid {
   width: 100%;
   display: grid;
-  gap: 1rem;
+  gap: var(--space-3);
 }
 
 .workflow-form-grid--two {
@@ -1015,14 +1019,14 @@ button:disabled {
    loads after this file via lazy page chunks and would win a specificity tie. */
 .workflow-form-grid--shopify-compact .app-select .app-select-trigger {
   min-height: 2.2rem;
-  padding: 0.38rem 0.65rem;
+  padding: var(--space-1) var(--space-1-5);
   font-size: var(--workflow-form-answer-size);
   line-height: 1.2;
 }
 
 .workflow-form-grid--shopify-compact .wizard-input-shell .wizard-answer-control.shopify-inline-control {
   min-height: 2.2rem;
-  padding: 0.38rem 0.65rem;
+  padding: var(--space-1) var(--space-1-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -1040,7 +1044,7 @@ button:disabled {
   width: 100%;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: var(--space-1-5);
   align-items: flex-start;
 }
 
@@ -1049,7 +1053,7 @@ button:disabled {
   min-width: min(100%, 10.5rem);
   max-width: min(100%, 14rem);
   min-height: 2.35rem;
-  padding: 0.6rem 0.8rem;
+  padding: var(--space-1-5) var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-2);
@@ -1075,9 +1079,9 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.5rem;
+  gap: var(--space-1-5);
   min-height: 0;
-  padding: 0.6rem 0.8rem;
+  padding: var(--space-1-5) var(--space-2);
   text-align: left;
   border: 1px solid var(--border-soft);
   background: color-mix(in oklab, var(--surface-2) 95%, white);
@@ -1119,7 +1123,7 @@ button:disabled {
 
 .workflow-list {
   margin: 0;
-  padding-left: 1rem;
+  padding-left: var(--space-3);
 }
 
 .section-note {
@@ -1130,7 +1134,7 @@ button:disabled {
 
 label {
   display: grid;
-  gap: 0.42rem;
+  gap: var(--space-1);
 }
 
 label > span {
@@ -1227,7 +1231,7 @@ label > span {
 
 .inline-validation {
   margin: 0;
-  padding: 0.7rem 0.85rem;
+  padding: var(--space-2) var(--space-2);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -1254,6 +1258,8 @@ label > span {
   justify-content: center;
   min-height: 1.62rem;
   border-radius: var(--radius-pill);
+  /* Contains a value below --space-00 (0.2rem). Under 2.5px these are optical nudges rather than spacing, and the scale deliberately stops above them. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding: 0.1rem 0.62rem;
   border: 1px solid var(--border);
   font-size: var(--type-badge-size);
@@ -1301,7 +1307,7 @@ label > span {
 }
 
 .app-table th {
-  padding: 0 1rem;
+  padding: 0 var(--space-3);
   vertical-align: middle;
   color: var(--text-muted);
   font-size: var(--type-table-head-size);
@@ -1311,7 +1317,7 @@ label > span {
 }
 
 .app-table td {
-  padding: 0.95rem 1rem;
+  padding: var(--space-3) var(--space-3);
   vertical-align: top;
 }
 
@@ -1354,7 +1360,7 @@ label > span {
 
 .app-table__action-header,
 .app-table__action-cell {
-  padding-left: 0.5rem;
+  padding-left: var(--space-1-5);
   padding-right: var(--space-2);
   text-align: right;
 }
@@ -1384,7 +1390,7 @@ label > span {
 }
 
 .app-table__append-cell {
-  padding: 0.75rem 1rem;
+  padding: var(--space-2) var(--space-3);
   text-align: left;
   background: color-mix(in oklab, var(--surface-2) 94%, white);
 }
@@ -1459,12 +1465,12 @@ label > span {
 .app-table td input,
 .app-table td select {
   min-height: 2.2rem;
-  padding: 0.5rem 0.62rem;
+  padding: var(--space-1-5) var(--space-1-5);
 }
 
 .app-table td .app-select-trigger {
   min-height: 2.2rem;
-  padding: 0.5rem 0.62rem;
+  padding: var(--space-1-5) var(--space-1-5);
 }
 
 .app-table td select {
@@ -1647,7 +1653,7 @@ label > span {
   display: flex;
   justify-content: flex-start;
   gap: var(--space-2);
-  padding-top: 0.18rem;
+  padding-top: var(--space-00);
 }
 
 .user-menu-actions .app-icon-action {
@@ -1671,7 +1677,9 @@ label > span {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
   display: inline-flex;
   align-items: center;
-  gap: 0.48rem;
+  gap: var(--space-1-5);
+  /* Sits between scale steps by more than the fold tolerance; snapping it would be a visible shift rather than a sub-pixel one. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding: 0.68rem 0.92rem;
 }
 
@@ -1739,8 +1747,8 @@ label > span {
   appearance: none;
   text-align: left;
   display: grid;
-  gap: 0.22rem;
-  padding: 0.65rem 0.8rem;
+  gap: var(--space-00);
+  padding: var(--space-1-5) var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -1898,6 +1906,8 @@ label > span {
 
   .workflow-page {
     gap: var(--space-4);
+    /* Contains a large layout value with no step near it; the scale jumps 2.3rem -> 3.2rem here. */
+    /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
     padding: 1rem 1.25rem 3rem;
   }
 
@@ -1929,7 +1939,7 @@ label > span {
 .workflow-select-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-1-5);
   margin-top: 0.45rem;
 }
 
@@ -1939,7 +1949,7 @@ label > span {
   gap: var(--space-1);
   border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
   border-radius: var(--radius-pill);
-  padding: 0.3rem 0.55rem 0.3rem 0.7rem;
+  padding: var(--space-0) var(--space-1-5) var(--space-0) var(--space-2);
   font-size: var(--type-meta-size);
   background: var(--surface-2);
   color: var(--text);
@@ -2016,7 +2026,7 @@ label > span {
   color: var(--text);
   font: inherit;
   text-align: left;
-  padding: 0.7rem 0.8rem;
+  padding: var(--space-2) var(--space-2);
   cursor: pointer;
   line-height: 1.15;
 }
@@ -2064,7 +2074,7 @@ label > span {
   min-width: 4.7rem;
   min-height: 2.6rem;
   margin-top: var(--space-1);
-  padding-inline: 0.9rem;
+  padding-inline: var(--space-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;

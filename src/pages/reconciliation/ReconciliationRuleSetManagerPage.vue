@@ -821,7 +821,7 @@ onMounted(() => {
 <style scoped>
 .ruleset-manager-hero {
   display: grid;
-  gap: 0.45rem;
+  gap: var(--space-1);
 }
 
 .ruleset-manager-hero h1 {
@@ -840,7 +840,7 @@ onMounted(() => {
 }
 
 .ruleset-manager-footer-row {
-  gap: 0.7rem;
+  gap: var(--space-2);
   justify-content: center;
 }
 
@@ -870,20 +870,20 @@ onMounted(() => {
 
 .ruleset-manager-basics-grid {
   display: grid;
-  gap: 0.9rem;
+  gap: var(--space-2);
 }
 
 .ruleset-manager-schema-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.9rem;
+  gap: var(--space-2);
 }
 
 .ruleset-manager-basic-card {
   display: grid;
   min-width: 0;
-  gap: 0.45rem;
-  padding: 1rem;
+  gap: var(--space-1);
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--static-surface-radius);
   background: var(--surface-2);
@@ -920,7 +920,7 @@ onMounted(() => {
 .ruleset-manager-equation-panel {
   display: grid;
   gap: var(--space-1-5);
-  padding: 1rem;
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--static-surface-radius);
   background: var(--surface-2);
@@ -945,7 +945,7 @@ onMounted(() => {
 .ruleset-manager-rule-list li,
 .ruleset-manager-exclusion-list li {
   display: flex;
-  gap: 0.65rem;
+  gap: var(--space-1-5);
   align-items: baseline;
   min-width: 0;
   color: var(--text-soft);
@@ -984,7 +984,7 @@ onMounted(() => {
 .ruleset-manager-auth-popup-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.7rem;
+  gap: var(--space-2);
 }
 
 .ruleset-manager-auth-popup-grid .static-page-summary-card {

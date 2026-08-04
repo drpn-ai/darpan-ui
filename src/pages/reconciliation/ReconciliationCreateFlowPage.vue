@@ -1424,7 +1424,7 @@ onUnmounted(() => {
 <style scoped>
 .reconciliation-create-schema-choice {
   display: grid;
-  gap: 0.35rem;
+  gap: var(--space-1);
   justify-items: start;
 }
 

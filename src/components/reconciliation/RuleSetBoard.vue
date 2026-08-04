@@ -1481,7 +1481,7 @@ onBeforeUnmount(() => {
   z-index: 6;
   width: 100%;
   box-sizing: border-box;
-  padding: 0.5rem 0.6rem;
+  padding: var(--space-1-5) var(--space-1-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -1541,6 +1541,8 @@ onBeforeUnmount(() => {
   row-gap: var(--space-1-5);
   align-items: start;
   justify-content: center;
+  /* Contains a large layout value with no step near it; the scale jumps 2.3rem -> 3.2rem here. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   padding: 1rem 0 3rem;
   --ruleset-pen-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http://www.w3.org/2000/svg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20fill%3D%27%23ffffff%27%20stroke%3D%27%23000000%27%20stroke-width%3D%271.5%27%20stroke-linejoin%3D%27round%27%20stroke-linecap%3D%27round%27%20d%3D%27M5%2020l4-1%2011-11-3-3L6%2016z%27/%3E%3C/svg%3E") 3 20, crosshair;
   cursor: var(--ruleset-pen-cursor);
@@ -1634,19 +1636,21 @@ onBeforeUnmount(() => {
 
 .ruleset-field-column header {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--space-0);
   min-height: 3rem;
-  padding: 0.55rem 0.75rem;
+  padding: var(--space-1-5) var(--space-2);
   border: 1px solid transparent;
 }
 
 .ruleset-field-item {
   position: relative;
   display: grid;
+  /* Contains a value below --space-00 (0.2rem). Under 2.5px these are optical nudges rather than spacing, and the scale deliberately stops above them. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   gap: 0.12rem;
   min-height: 2.75rem;
   width: 100%;
-  padding: 0.48rem 0.75rem;
+  padding: var(--space-1-5) var(--space-2);
   border-radius: var(--radius-pill);
   /* The pill is a div (see the exclusion-mark comment below), not a <button>, so it no longer
      picks up the global `button { border: 1px solid var(--border); }` reset — the border must be
@@ -1751,7 +1755,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   min-width: 3.2rem;
   min-height: 2.15rem;
-  padding: 0.35rem 0.65rem;
+  padding: var(--space-1) var(--space-1-5);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
@@ -1789,7 +1793,7 @@ onBeforeUnmount(() => {
 }
 
 .ruleset-rule-popover label {
-  gap: 0.32rem;
+  gap: var(--space-0);
 }
 
 .ruleset-pre-action-section {
@@ -1809,7 +1813,7 @@ onBeforeUnmount(() => {
 .ruleset-pre-action-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 0.45rem;
+  gap: var(--space-1);
   align-items: end;
 }
 
@@ -1846,7 +1850,7 @@ onBeforeUnmount(() => {
 .ruleset-rule-popover input,
 .ruleset-rule-popover :deep(.app-select-trigger) {
   min-height: 2.6rem;
-  padding: 0.5rem 0.7rem;
+  padding: var(--space-1-5) var(--space-2);
 }
 
 /* The exclusion editor keeps the board's own label/chip/action treatment, but its frame, width and
@@ -1865,17 +1869,17 @@ onBeforeUnmount(() => {
 }
 
 .ruleset-exclusion-popup label {
-  gap: 0.32rem;
+  gap: var(--space-0);
 }
 
 .ruleset-exclusion-popup input {
   min-height: 2.6rem;
-  padding: 0.5rem 0.7rem;
+  padding: var(--space-1-5) var(--space-2);
 }
 
 .ruleset-rule-popover-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-1-5);
   align-items: center;
 }
 
@@ -1884,7 +1888,7 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .ruleset-editor-board {
     grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
+    gap: var(--space-3);
     padding-bottom: 6rem;
   }
 
