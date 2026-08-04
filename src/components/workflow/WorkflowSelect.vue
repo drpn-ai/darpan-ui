@@ -221,7 +221,7 @@ async function handleTriggerEnter(): Promise<void> {
   right: 0;
   z-index: 70;
   display: grid;
-  gap: 0.2rem;
+  gap: var(--space-00);
   padding: 0.35rem;
   border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
   border-radius: var(--radius-md);

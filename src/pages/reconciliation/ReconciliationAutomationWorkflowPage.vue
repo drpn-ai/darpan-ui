@@ -1612,7 +1612,7 @@ onUnmounted(() => {
 .automation-edit-date-window-fields,
 .automation-edit-schedule-helper,
 .automation-edit-chat-space-fields {
-  margin-top: 0.2rem;
+  margin-top: var(--space-00);
 }
 
 .automation-edit-chat-space-fields {

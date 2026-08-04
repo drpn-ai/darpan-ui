@@ -67,7 +67,7 @@ function removeChip(value: string): void {
 <style scoped>
 .workflow-chip-text {
   display: grid;
-  gap: 0.2rem;
+  gap: var(--space-00);
 }
 
 .workflow-chip-text-input {

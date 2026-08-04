@@ -28,12 +28,15 @@
   font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1.55;
   font-weight: 400;
-  /* --space-0 and --space-1-5 are insertions, not renumberings. --space-1..7 keep their values so
-     no existing reference changes meaning; renumbering to make the names sequential would have
-     rewritten several hundred call sites to gain nothing but tidier digits.
+  /* --space-00, --space-0 and --space-1-5 are insertions, not renumberings. --space-1..7 keep their
+     values so no existing reference changes meaning; renumbering to make the names sequential would
+     have rewritten several hundred call sites to gain nothing but tidier digits.
      They exist because the scale had a hole where the UI needed it most: --space-1 -> --space-2 was
-     a 1.88x jump in a scale whose every other step is 1.38-1.47x, and there was no step at all
-     below 0.4rem. 43 of the 52 off-scale spacing values sat in exactly those two regions. */
+     a 1.88x jump in a scale whose every other step is 1.36-1.47x, and there was nothing at all
+     below 0.4rem, where a whole micro tier was in use. Every step is now 1.36-1.47x.
+     What is left below --space-00 - 0.1, 0.12 and 0.15rem, all under 2.5px - is not spacing but
+     optical nudging, and should stay as marked exceptions rather than earn a step. */
+  --space-00: 0.2rem;
   --space-0: 0.28rem;
   --space-1: 0.4rem;
   --space-1-5: 0.55rem;
@@ -807,7 +810,7 @@ button:disabled {
 .tenant-settings-list-main {
   min-width: 0;
   display: grid;
-  gap: 0.2rem;
+  gap: var(--space-00);
 }
 
 .tenant-settings-list-status {
