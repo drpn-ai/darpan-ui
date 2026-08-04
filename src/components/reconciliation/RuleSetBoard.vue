@@ -956,6 +956,7 @@ function pillCenterSpanForRule(rule: RuleConnection): { leftCenter: number, righ
  * swallowed the board, and it leaves no room beside it for a term definition. Capping it keeps the
  * spanning intent on the boards where the span is reasonable and stops it running away elsewhere.
  */
+/** 34rem — the width .popup-workflow-modal gives the exclusion editor, so the two cards match. */
 const MAX_RULE_POPOVER_WIDTH = 544
 
 function operatorPopoverWidth(rule: RuleConnection): number {
@@ -1439,32 +1440,31 @@ onBeforeUnmount(() => {
 /* The term IS the affordance — a 1px dotted underline, no question-mark badges. This board already
    carries every other hierarchy on 1px borders, so a row of icons would cost more surface than the
    copy problem it solves. */
+/* Underline the WORD, not the button box. A border-bottom here inherits the global button rule's
+   2.55rem min-height and corner radius, so it needed a line-height override to sit near the text —
+   and that override made the term's line box 13.8px where every other label in the product is
+   17.9px. text-decoration needs none of that: the label metrics stay identical to the exclusion
+   popup's, and the term stops perturbing the popover's vertical rhythm. */
 .ruleset-term {
   justify-self: start;
-  /* The global button rule sets a 2.55rem min-height and a corner radius. Left alone, the first
-     detaches the dotted rule from the word by ~14px and the second curves its ends, so what should
-     read as an underline reads as a broken input outline instead. */
   min-height: 0;
   border: 0;
-  border-radius: 0;
-  border-bottom: 1px dotted var(--text-muted);
   background: none;
-  padding: 0 0 2px;
-  line-height: 1.2;
+  padding: 0;
   cursor: help;
-  font-family: inherit;
-  font-weight: inherit;
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
-  transition: color 120ms ease, border-color 120ms ease;
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 3px;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
 }
 
 .ruleset-term:hover,
 .ruleset-term:focus-visible {
   color: var(--text);
-  border-bottom-color: var(--text);
+  text-decoration-color: var(--text);
 }
 
 /* Beside the card, level with the term — never over it. A definition that drops down covers the
@@ -1500,11 +1500,12 @@ onBeforeUnmount(() => {
     position: relative;
   }
 
-  /* 100% is now the row's right edge, which sits inside the popover's 0.9rem padding — hence the
-     1.4rem, to clear the card border and still leave a gap. */
+  /* 100% is the row's right edge, which sits inside the card's --space-4 (1.6rem) padding — hence
+     2.1rem, to clear the card border and still leave a 0.5rem gap. Tracks the card padding: if
+     that changes, this must change with it. */
   .ruleset-term-definition {
     top: 0;
-    left: calc(100% + 1.4rem);
+    left: calc(100% + 2.1rem);
     width: 15rem;
   }
 }
@@ -1763,14 +1764,18 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 
+/* Frame matches .ruleset-exclusion-popup exactly: the two editors on this board are siblings and
+   were drifting — 0.9rem/0.8rem/--radius-sm here against --space-4/--space-3/--radius-md there.
+   The old padding and gap were on no scale at all; tokens/spacing.css is deliberately non-linear
+   and off-scale values quietly snap the rhythm back to a pixel grid it is designed to avoid. */
 .ruleset-rule-popover {
   position: absolute;
   z-index: 5;
   display: grid;
-  gap: 0.8rem;
-  padding: 0.9rem;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--surface);
   transform: translate(-50%, -50%);
 }
@@ -1823,9 +1828,15 @@ onBeforeUnmount(() => {
   height: 1.2rem;
 }
 
-.ruleset-rule-popover input {
-  min-height: 2.3rem;
-  padding: 0.45rem 0.62rem;
+/* 2.6rem is the workflow-surface control height (--workflow-action-min-height) and what the
+   exclusion editor's input already used. The old 2.3rem made this input shorter than the select
+   sitting directly above it — two control heights inside one card — and shorter again than the
+   identical-looking input in the sibling popup. The select trigger is a button, so it needs the
+   same treatment to land on the same height. */
+.ruleset-rule-popover input,
+.ruleset-rule-popover :deep(.app-select-trigger) {
+  min-height: 2.6rem;
+  padding: 0.5rem 0.7rem;
 }
 
 /* The exclusion editor keeps the board's own label/chip/action treatment, but its frame, width and
