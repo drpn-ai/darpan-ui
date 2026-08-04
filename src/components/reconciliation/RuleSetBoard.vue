@@ -241,55 +241,67 @@
       </div>
     </div>
 
-    <div
-      v-if="editingExclusion"
-      ref="exclusionPopoverRef"
-      class="ruleset-rule-popover"
-      role="dialog"
-      aria-label="Edit exclusion"
-      data-testid="ruleset-exclusion-popover"
-      :style="exclusionPopoverStyle(editingExclusion)"
-      @keydown.enter.stop.prevent="applyExclusionEdit"
-    >
-      <label>
-        <span>Exclude on</span>
-        <input :value="editingExclusion.fieldPath" readonly data-testid="ruleset-exclusion-field" />
-      </label>
-      <label>
-        <span>Values to exclude</span>
-        <input
-          v-model="pendingExclusionValue"
-          type="text"
-          placeholder="Type a value, press Enter"
-          data-testid="ruleset-exclusion-value-input"
-          @keydown.enter.prevent.stop="commitPendingExclusionValue"
-        />
-      </label>
-      <div v-if="editingExclusionValues.length" class="workflow-select-chip-row">
-        <span v-for="value in editingExclusionValues" :key="value" class="workflow-select-chip">
-          {{ value }}
+    <!--
+      The exclusion editor is a modal, not a pill-anchored popover. It reuses the app-wide
+      .popup-workflow-overlay / .popup-workflow-modal pair (settings popups, the run-result popup,
+      the ruleset-manager auth popup), so it lands viewport-centred at the same size as every other
+      popup in the product instead of being nudged beside its pill at a width that truncated both
+      the field expression and the value placeholder.
+
+      The overlay stays pointer-transparent (see .ruleset-exclusion-overlay in the style block): the
+      board underneath must keep receiving clicks so that one click on an operator box still closes
+      this editor AND opens the rule editor, which is the behaviour the mutual-exclusion spec pins.
+      Dismissal still comes from handleWindowPointerDown, unchanged.
+    -->
+    <div v-if="editingExclusion" class="popup-workflow-overlay ruleset-exclusion-overlay">
+      <section
+        ref="exclusionPopoverRef"
+        class="popup-workflow-modal workflow-panel ruleset-exclusion-popup"
+        role="dialog"
+        aria-label="Edit exclusion"
+        data-testid="ruleset-exclusion-popover"
+        @keydown.enter.stop.prevent="applyExclusionEdit"
+      >
+        <label>
+          <span>Exclude on</span>
+          <input :value="editingExclusion.fieldPath" readonly data-testid="ruleset-exclusion-field" />
+        </label>
+        <label>
+          <span>Values to exclude</span>
+          <input
+            v-model="pendingExclusionValue"
+            type="text"
+            placeholder="Type a value, press Enter"
+            data-testid="ruleset-exclusion-value-input"
+            @keydown.enter.prevent.stop="commitPendingExclusionValue"
+          />
+        </label>
+        <div v-if="editingExclusionValues.length" class="workflow-select-chip-row">
+          <span v-for="value in editingExclusionValues" :key="value" class="workflow-select-chip">
+            {{ value }}
+            <button
+              type="button"
+              class="workflow-select-chip-remove"
+              :aria-label="`Remove ${value}`"
+              @click="editingExclusionValues = editingExclusionValues.filter((entry) => entry !== value)"
+            >&times;</button>
+          </span>
+        </div>
+        <div class="ruleset-rule-popover-actions">
+          <AppSaveAction label="Save exclusion" test-id="ruleset-exclusion-apply" @click="applyExclusionEdit" />
           <button
             type="button"
-            class="workflow-select-chip-remove"
-            :aria-label="`Remove ${value}`"
-            @click="editingExclusionValues = editingExclusionValues.filter((entry) => entry !== value)"
-          >&times;</button>
-        </span>
-      </div>
-      <div class="ruleset-rule-popover-actions">
-        <AppSaveAction label="Save exclusion" test-id="ruleset-exclusion-apply" @click="applyExclusionEdit" />
-        <button
-          type="button"
-          class="app-icon-action app-icon-action--large app-icon-action--danger"
-          data-testid="ruleset-exclusion-delete"
-          aria-label="Delete exclusion"
-          @click="deleteEditingExclusion"
-        >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
-        </button>
-      </div>
+            class="app-icon-action app-icon-action--large app-icon-action--danger"
+            data-testid="ruleset-exclusion-delete"
+            aria-label="Delete exclusion"
+            @click="deleteEditingExclusion"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
+            </svg>
+          </button>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -385,7 +397,6 @@ const FALLBACK_BOARD_WIDTH = 1000
 const FIELD_ROW_PITCH = 52
 const FIELD_ROW_TOP = 70
 const SOURCE_TYPE_API = 'AUT_SRC_API'
-const EXCLUSION_POPOVER_WIDTH = 260
 const operatorOptions: AppSelectOption[] = [
   { value: '=', label: '=' },
   { value: '!=', label: '!=' },
@@ -946,39 +957,6 @@ function deleteEditingExclusion(): void {
   applyExclusionEdit()
 }
 
-function exclusionPopoverFallbackStyle(): Record<string, string> {
-  return {
-    left: `${boardSize.value.width / 2}px`,
-    top: `${boardSize.value.height / 2}px`,
-    width: `${EXCLUSION_POPOVER_WIDTH}px`,
-  }
-}
-
-function exclusionPopoverStyle(editing: { side: RuleSide; fieldPath: string }): Record<string, string> {
-  const board = boardRef.value
-  const node = resolveFieldNode(editing.side, editing.fieldPath)
-  if (!board || !node) return exclusionPopoverFallbackStyle()
-
-  const boardRect = board.getBoundingClientRect()
-  const nodeRect = node.getBoundingClientRect()
-  if (boardRect.width <= 0 || nodeRect.width <= 0) return exclusionPopoverFallbackStyle()
-
-  const halfWidth = EXCLUSION_POPOVER_WIDTH / 2
-  const margin = 24
-  const rawLeft = editing.side === 'file1'
-    ? nodeRect.right - boardRect.left + margin + halfWidth
-    : nodeRect.left - boardRect.left - margin - halfWidth
-  const clampedLeft = Math.min(Math.max(rawLeft, halfWidth), Math.max(halfWidth, boardSize.value.width - halfWidth))
-  const rawTop = nodeRect.top - boardRect.top + (nodeRect.height / 2)
-  const clampedTop = Math.min(Math.max(rawTop, 40), Math.max(40, boardSize.value.height - 40))
-
-  return {
-    left: `${clampedLeft}px`,
-    top: `${clampedTop}px`,
-    width: `${EXCLUSION_POPOVER_WIDTH}px`,
-  }
-}
-
 function boardPointFromEvent(event: PointerEvent): Point {
   const board = boardRef.value
   const fallback = pendingConnection.value
@@ -1321,6 +1299,7 @@ onBeforeUnmount(() => {
 <style scoped>
 /* Field labels ("Operator", "Sequence", "Exclude on") take the small-caps label treatment. */
 .ruleset-rule-popover label > span,
+.ruleset-exclusion-popup label > span,
 .ruleset-pre-action-header > span {
   color: var(--text-muted);
   font-size: 0.72rem;
@@ -1352,7 +1331,7 @@ onBeforeUnmount(() => {
   cursor: var(--ruleset-pen-cursor);
 }
 
-.ruleset-editor-board--popup-open > :not(.ruleset-rule-popover) {
+.ruleset-editor-board--popup-open > :not(.ruleset-rule-popover):not(.ruleset-exclusion-overlay) {
   filter: blur(var(--popup-background-blur));
   opacity: var(--popup-background-opacity);
 }
@@ -1605,6 +1584,30 @@ onBeforeUnmount(() => {
 .ruleset-rule-popover input {
   min-height: 2.3rem;
   padding: 0.45rem 0.62rem;
+}
+
+/* The exclusion editor keeps the board's own label/chip/action treatment, but its frame, width and
+   centring come from the shared popup pair in style.css — nothing here re-declares position,
+   background or border. The overlay is pointer-transparent so the blurred board behind it still
+   takes clicks (see the template comment); only the panel itself claims pointer events. */
+.ruleset-exclusion-overlay {
+  pointer-events: none;
+}
+
+.ruleset-exclusion-popup.popup-workflow-modal {
+  pointer-events: auto;
+  padding: var(--space-4);
+  max-height: calc(100vh - (var(--space-4) * 2));
+  overflow-y: auto;
+}
+
+.ruleset-exclusion-popup label {
+  gap: 0.32rem;
+}
+
+.ruleset-exclusion-popup input {
+  min-height: 2.6rem;
+  padding: 0.5rem 0.7rem;
 }
 
 .ruleset-rule-popover-actions {
