@@ -54,23 +54,23 @@
 
           <dl class="automation-dashboard-detail-grid">
             <div class="automation-dashboard-detail-item">
-              <dt>Automation ID</dt>
+              <dt class="micro-label">Automation ID</dt>
               <dd>{{ automation.automationId }}</dd>
             </div>
             <div class="automation-dashboard-detail-item">
-              <dt>Schedule</dt>
+              <dt class="micro-label">Schedule</dt>
               <dd>{{ scheduleLabel }}</dd>
             </div>
             <div class="automation-dashboard-detail-item">
-              <dt>Window</dt>
+              <dt class="micro-label">Window</dt>
               <dd>{{ windowLabel }}</dd>
             </div>
             <div class="automation-dashboard-detail-item automation-dashboard-detail-item--date">
-              <dt>Previous Run</dt>
+              <dt class="micro-label">Previous Run</dt>
               <dd data-testid="automation-previous-run">{{ formatTenantDateTime(previousRunTime) }}</dd>
             </div>
             <div class="automation-dashboard-detail-item automation-dashboard-detail-item--date">
-              <dt>Next Run</dt>
+              <dt class="micro-label">Next Run</dt>
               <dd data-testid="automation-next-run">{{ formatTenantDateTime(automation.nextScheduledFireTime) }}</dd>
             </div>
           </dl>
@@ -636,12 +636,7 @@ onMounted(() => {
 }
 
 .automation-dashboard-label,
-.automation-dashboard-detail-item dt {
-  color: var(--text-soft);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
+/* Type comes from .micro-label in style.css — see the dt elements in the template. */
 
 .automation-dashboard-run-link {
   min-width: 0;

@@ -145,7 +145,7 @@
               :aria-expanded="stepTimelineCollapsed ? 'false' : 'true'"
               @click="stepTimelineCollapsed = !stepTimelineCollapsed"
             >
-              <span class="run-result-step-timeline__label">Run steps</span>
+              <span class="run-result-step-timeline__label micro-label">Run steps</span>
               <span v-if="displayedRunSteps.length > 0" class="run-result-step-timeline__count">{{ displayedRunSteps.length }}</span>
               <svg
                 class="run-result-step-timeline__toggle-icon"
@@ -1395,12 +1395,7 @@ watch([savedRunId, outputFileName], () => {
   text-align: left;
 }
 
-.run-result-step-timeline__label {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-soft);
-}
+/* Type comes from .micro-label in style.css — see the template. */
 
 .run-result-step-timeline__count {
   font-size: 0.78rem;

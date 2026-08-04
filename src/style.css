@@ -699,6 +699,12 @@ button:disabled {
   word-break: break-word;
 }
 
+/* One micro-label role, one rule. This was written out three times — here, on the run-result step
+   timeline, and on the automation dashboard's definition terms — byte-identical in all three with
+   nothing holding them together. .static-page-summary-label keeps its name because settings and
+   static pages already use it; .micro-label is the neutral name for surfaces outside that family.
+   Same declaration block, so the copies cannot drift apart again. */
+.micro-label,
 .static-page-summary-label {
   color: var(--text-soft);
   font-size: 0.78rem;
