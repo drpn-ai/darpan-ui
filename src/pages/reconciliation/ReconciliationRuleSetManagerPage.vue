@@ -109,6 +109,17 @@
 
       <template v-if="draft">
         <div class="ruleset-manager-builder">
+          <!-- Exclusions are applied during extraction, before any comparison rule runs, so they are
+               listed first here to match execution order -- not because they take precedence over the
+               comparison rules, and not as a count of any kind. -->
+          <section class="ruleset-manager-equation-panel" data-testid="ruleset-manager-exclusions" aria-label="Exclusions">
+            <span class="static-page-summary-label">Exclusions</span>
+            <ul class="ruleset-manager-exclusion-list" data-testid="ruleset-manager-exclusion-list">
+              <li data-testid="ruleset-exclusions-file1">{{ file1Exclusions }}</li>
+              <li data-testid="ruleset-exclusions-file2">{{ file2Exclusions }}</li>
+            </ul>
+          </section>
+
           <section class="ruleset-manager-equation-panel" data-testid="ruleset-manager-preview" aria-label="Active comparison">
             <ol v-if="visibleRules.length" class="ruleset-manager-rule-list" data-testid="ruleset-manager-rule-list">
               <li v-for="rule in visibleRules" :key="rule.ruleId || `${rule.sequenceNum}-${rule.file1FieldPath}-${rule.file2FieldPath}`">
@@ -117,14 +128,6 @@
               </li>
             </ol>
             <p v-else class="ruleset-manager-preview-line">{{ comparisonPreview }}</p>
-          </section>
-
-          <section class="ruleset-manager-equation-panel" data-testid="ruleset-manager-exclusions" aria-label="Exclusions">
-            <span class="static-page-summary-label">Exclusions</span>
-            <ul class="ruleset-manager-exclusion-list" data-testid="ruleset-manager-exclusion-list">
-              <li data-testid="ruleset-exclusions-file1">{{ file1Exclusions }}</li>
-              <li data-testid="ruleset-exclusions-file2">{{ file2Exclusions }}</li>
-            </ul>
           </section>
         </div>
       </template>

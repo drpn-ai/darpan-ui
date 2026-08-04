@@ -810,4 +810,41 @@ describe('ReconciliationRuleSetManagerPage', () => {
 
     expect(wrapper.text()).not.toMatch(/excluded\s+\d/i)
   })
+
+  it('keeps exclusion entries out of the numbered comparison-rule list', async () => {
+    // Every other assertion in this file is a substring check against the exclusion text, which
+    // would pass identically whether the exclusion <li> sat inside or outside the numbered <ol>.
+    // This walks the DOM ancestry directly so the design-spec no-numbering property actually has
+    // a guard: it must fail if someone moves the exclusion entries into the rule list.
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    const draftState = createDraftState()
+    draftState.draft.file1ExcludeFilters = [
+      { fieldExpression: 'orderStatus', operator: 'EXCLUDE_IN', values: ['CANCELLED'] },
+    ]
+    draftState.draft.file2ExcludeFilters = [
+      { fieldExpression: 'salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
+    ]
+    draftStoreState.ruleSetDraftState = draftState
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const ruleList = wrapper.get('[data-testid="ruleset-manager-rule-list"]')
+    expect(ruleList.element.tagName).toBe('OL')
+
+    const exclusionsList = wrapper.get('[data-testid="ruleset-manager-exclusion-list"]')
+    expect(exclusionsList.element.tagName).toBe('UL')
+    expect(ruleList.element.contains(exclusionsList.element)).toBe(false)
+
+    const exclusionsFile1 = wrapper.get('[data-testid="ruleset-exclusions-file1"]')
+    const exclusionsFile2 = wrapper.get('[data-testid="ruleset-exclusions-file2"]')
+    expect(ruleList.element.contains(exclusionsFile1.element)).toBe(false)
+    expect(ruleList.element.contains(exclusionsFile2.element)).toBe(false)
+
+    // No sequence marker anywhere inside the exclusions list either -- exclusions stay
+    // deliberately unordered/unnumbered, unlike the numbered comparison rules.
+    expect(exclusionsList.findAll('.ruleset-manager-rule-sequence')).toHaveLength(0)
+    expect(exclusionsList.text()).not.toMatch(/#\d/)
+  })
 })

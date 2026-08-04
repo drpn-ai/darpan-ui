@@ -69,12 +69,19 @@
             class="ruleset-field-path-segment"
           >{{ segment }}</span>
         </span>
-        <span
-          v-if="supportsExclusions('file1') && hasExclusion('file1', field.fieldPath)"
-          class="ruleset-field-exclude"
-          :data-testid="`ruleset-field-exclude-file1-${index}`"
-          aria-hidden="true"
-        >⊘</span>
+        <template v-if="supportsExclusions('file1') && hasExclusion('file1', field.fieldPath)">
+          <span
+            class="ruleset-field-exclude"
+            :data-testid="`ruleset-field-exclude-file1-${index}`"
+            aria-hidden="true"
+          >⊘</span>
+          <!-- The mark above is decorative and aria-hidden, so a screen-reader user tabbing
+               through fields has no way to tell this one already carries an exclusion. This
+               sr-only span (same pattern as CommandPalette.vue's search label) restores that
+               signal by extending the pill's own accessible name, without touching the visible
+               capability gate. -->
+          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file1-${index}`">Has exclusion</span>
+        </template>
       </div>
     </section>
 
@@ -112,12 +119,15 @@
             class="ruleset-field-path-segment"
           >{{ segment }}</span>
         </span>
-        <span
-          v-if="supportsExclusions('file2') && hasExclusion('file2', field.fieldPath)"
-          class="ruleset-field-exclude"
-          :data-testid="`ruleset-field-exclude-file2-${index}`"
-          aria-hidden="true"
-        >⊘</span>
+        <template v-if="supportsExclusions('file2') && hasExclusion('file2', field.fieldPath)">
+          <span
+            class="ruleset-field-exclude"
+            :data-testid="`ruleset-field-exclude-file2-${index}`"
+            aria-hidden="true"
+          >⊘</span>
+          <!-- See the matching comment on the file1 column above. -->
+          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file2-${index}`">Has exclusion</span>
+        </template>
       </div>
     </section>
 
@@ -868,10 +878,12 @@ function closeExclusionEditor(): void {
 
 function openExclusionEditor(side: RuleSide, fieldPath: string): void {
   // The two popovers share the `.ruleset-rule-popover` blur-exemption class, so if both were
-  // open at once they would render fully sharp, overlapping each other. The mark's own
-  // pointerdown.stop (needed so it never starts a connection line — see the mark's handlers)
-  // also means the rule popover's outside-click-to-close listener on `window` never sees this
-  // click. Closing the other editor explicitly here is what keeps them mutually exclusive.
+  // open at once they would render fully sharp, overlapping each other. The ⊘ mark itself has no
+  // handlers at all now — it's a plain, non-interactive <span> (see the exclude-mark comment in
+  // the style block) — so it plays no part in this. What actually keeps the popovers mutually
+  // exclusive is this explicit closeRuleEditor() call: it runs on every entry path, including the
+  // Enter-key gesture, which fires no pointerdown for the window outside-click listener
+  // (handleWindowPointerDown) to react to.
   closeRuleEditor()
   editingExclusion.value = { side, fieldPath }
   editingExclusionValues.value = [...(excludeFilterFor(side, fieldPath)?.values ?? [])]

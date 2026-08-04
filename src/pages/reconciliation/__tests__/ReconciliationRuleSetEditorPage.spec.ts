@@ -938,6 +938,47 @@ describe('ReconciliationRuleSetEditorPage', () => {
       expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(true)
     })
 
+    it('extends the pill accessible name with a screen-reader-only "Has exclusion" signal', async () => {
+      // Before the double-click rework, the mark was a real <button> whose own accessible name
+      // ("Edit exclusion on X" vs "Add exclusion on X") let a screen-reader user tell which
+      // fields already carried an exclusion. The mark is now aria-hidden and the pill absorbed
+      // its gesture, so that signal has to live on the pill itself instead.
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      const status = wrapper.get('[data-testid="ruleset-field-exclude-status-file1-6"]')
+      expect(status.classes()).toContain('sr-only')
+      expect(status.text()).toBe('Has exclusion')
+      expect(wrapper.get(EXCLUDE_PILL).text()).toContain('Has exclusion')
+    })
+
+    it('adds no accessible-name signal on a field with no exclusion', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="ruleset-field-exclude-status-file1-6"]').exists()).toBe(false)
+    })
+
+    it('withholds the accessible-name signal on a side that does not support exclusions, even with stale data', async () => {
+      // Same capability gate as the mark itself (see the withholds-the-mark spec above): the
+      // signal must not leak through for Shopify (file2), which has no filterParameterName.
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, values: ['POS_SALES_CHANNEL'] }],
+        file2: [{ fieldExpression: '$.records[*].id', values: ['SOME_VALUE'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.findAll('[data-testid^="ruleset-field-exclude-status-file2-"]')).toHaveLength(0)
+    })
+
     it('matches a stored expression to its pill by alias, not by string identity', async () => {
       // FINAL-REVIEW MINOR 6: every other field lookup on this board is alias-aware. A stored
       // expression differing only by the `$.` root prefix still belongs to the same pill.
