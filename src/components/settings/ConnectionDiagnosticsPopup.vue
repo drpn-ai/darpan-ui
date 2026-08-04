@@ -8,7 +8,7 @@
     @click.self="requestClose"
   >
     <section class="popup-workflow-modal workflow-panel connection-diagnostics-popup">
-      <header class="workflow-panel-header connection-diagnostics-header">
+      <header class="workflow-panel-header connection-diagnostics-header section-header-row">
         <h2 id="connection-diagnostics-title">Diagnostics</h2>
         <button
           type="button"
@@ -162,12 +162,6 @@ function statusLabel(status: ConnectionCheckStatus): string {
 </script>
 
 <style scoped>
-.connection-diagnostics-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
 
 .connection-diagnostics-verdict {
   margin: 0 0 4px;

@@ -682,6 +682,12 @@ button:disabled {
   letter-spacing: var(--type-summary-label-tracking);
 }
 
+/* Header row: label left, action right, vertically centred. Three components had reimplemented this
+   exactly - connection diagnostics, the rule-set manager's section headers and its auth popup - each
+   differing from this rule only by not setting width, which is a no-op for all of them since every
+   one is a grid child and already stretches. .section-header-row is the neutral name; the
+   .static-page-* name stays because that family already uses it. */
+.section-header-row,
 .static-page-section-header-row {
   display: flex;
   align-items: center;

@@ -10,7 +10,7 @@
 
     <StaticPageSection v-if="draft">
       <template #header>
-        <div class="ruleset-manager-section-header">
+        <div class="ruleset-manager-section-header section-header-row">
           <h2 class="static-page-section-heading">Run</h2>
           <button
             v-if="canEditTenantSettings"
@@ -111,7 +111,7 @@
 
     <StaticPageSection>
       <template #header>
-        <div class="ruleset-manager-section-header">
+        <div class="ruleset-manager-section-header section-header-row">
           <h2 class="static-page-section-heading">Rules</h2>
           <button
             v-if="canEditTenantSettings"
@@ -225,7 +225,7 @@
     @click.self="closeAuthInfoPopup"
   >
     <section class="popup-workflow-modal workflow-panel ruleset-manager-auth-popup">
-      <header class="workflow-panel-header ruleset-manager-auth-popup-header">
+      <header class="workflow-panel-header ruleset-manager-auth-popup-header section-header-row">
         <h2 id="ruleset-manager-auth-popup-title" class="ruleset-manager-auth-popup-heading">{{ authInfoPopup.title }}</h2>
         <RouterLink
           class="app-icon-action ruleset-manager-auth-popup-dashboard"
@@ -828,12 +828,6 @@ onMounted(() => {
   margin: 0;
 }
 
-.ruleset-manager-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
 
 .ruleset-manager-section-edit {
   flex: 0 0 auto;
@@ -972,12 +966,6 @@ onMounted(() => {
   max-width: min(42rem, calc(100vw - 2rem));
 }
 
-.ruleset-manager-auth-popup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
 
 .ruleset-manager-auth-popup .ruleset-manager-auth-popup-heading {
   margin: 0;
