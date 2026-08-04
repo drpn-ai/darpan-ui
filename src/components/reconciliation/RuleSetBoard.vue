@@ -1428,11 +1428,15 @@ onBeforeUnmount(() => {
 /* The :not() keeps the uppercase label treatment off the term definitions, which are sentences and
    live in the same slot. Without it this rule wins on specificity — (0,1,2) against (0,1,0) — and
    shouts a paragraph of help in capitals. */
+/* The design system's table-head role: 0.76rem / 0.08em / --text-muted (--type-table-head-size,
+   --type-table-head-tracking). These are form labels rather than eyebrows, and the tracking and
+   colour already matched it — only the size was off, at 0.72rem, on no token at all. Both editors
+   share this rule so they cannot drift apart again. */
 .ruleset-rule-popover label > span:not(.ruleset-term-definition),
 .ruleset-exclusion-popup label > span,
 .ruleset-pre-action-header > span:not(.ruleset-term-definition) {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -1452,7 +1456,7 @@ onBeforeUnmount(() => {
   background: none;
   padding: 0;
   cursor: help;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1482,7 +1486,9 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text-muted);
-  font-size: 0.72rem;
+  /* Tracks the term it defines. Left at 0.72rem it would render smaller than its own label, which
+     inverts the usual relationship between a micro label and the copy beneath it. */
+  font-size: 0.76rem;
   line-height: 1.5;
   letter-spacing: 0;
   text-transform: none;
@@ -1522,7 +1528,7 @@ onBeforeUnmount(() => {
    labels above, without the case transform. */
 .ruleset-field-column header span {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   letter-spacing: 0.08em;
 }
 
