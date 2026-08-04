@@ -42,10 +42,12 @@
           >
             <span class="static-page-summary-label">System</span>
             <strong>{{ file1Title }}</strong>
+            <span v-if="file1SystemConfigName" class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file1">{{ file1SystemConfigName }}</span>
           </button>
           <article v-else class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">System</span>
             <strong>{{ file1Title }}</strong>
+            <span v-if="file1SystemConfigName" class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file1">{{ file1SystemConfigName }}</span>
           </article>
           <article class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">Schema</span>
@@ -68,10 +70,12 @@
           >
             <span class="static-page-summary-label">System</span>
             <strong>{{ file2Title }}</strong>
+            <span v-if="file2SystemConfigName" class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file2">{{ file2SystemConfigName }}</span>
           </button>
           <article v-else class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">System</span>
             <strong>{{ file2Title }}</strong>
+            <span v-if="file2SystemConfigName" class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file2">{{ file2SystemConfigName }}</span>
           </article>
           <article class="ruleset-manager-basic-card">
             <span class="static-page-summary-label">Schema</span>
@@ -331,6 +335,8 @@ const savedRunId = computed(() => draft.value?.savedRunId?.trim() ?? '')
 const heroTitle = computed(() => draft.value?.runName || 'Run')
 const file1Title = computed(() => systemTitle(draft.value, 'file1'))
 const file2Title = computed(() => systemTitle(draft.value, 'file2'))
+const file1SystemConfigName = computed(() => systemConfigName(draft.value, 'file1'))
+const file2SystemConfigName = computed(() => systemConfigName(draft.value, 'file2'))
 const file1SourceLabel = computed(() => summarizeSource(draft.value, 'file1'))
 const file2SourceLabel = computed(() => summarizeSource(draft.value, 'file2'))
 const file1SystemConfig = computed<SourceConfigSummary | null>(() => buildSourceConfigSummary(draft.value, 'file1'))
@@ -396,16 +402,31 @@ function formatRulePreview(rule: ReconciliationRuleSetDraftRule): string {
   return `${formatFieldKey(rule.file1FieldPath)} ${rule.operator?.trim() || '='} ${formatFieldKey(rule.file2FieldPath)}`
 }
 
+/**
+ * The card is labelled "System", so it names the system — Shopify, HotWax, NetSuite.
+ *
+ * This used to return the source CONFIG id for API sources, which read fine when the two sides used
+ * differently-named configs and became useless when they did not: a Shopify/HotWax run whose configs
+ * are both named e.g. `gorjana_prod` showed the same value on both rows and never named either
+ * system. The config id is still shown, as a secondary line — see systemConfigName.
+ */
 function systemTitle(draftValue: ReconciliationRuleSetDraft | null, side: 'file1' | 'file2'): string {
   if (!draftValue) return side === 'file1' ? 'System 1' : 'System 2'
-
-  const sourceTypeEnumId = side === 'file1' ? draftValue.file1SourceTypeEnumId : draftValue.file2SourceTypeEnumId
-  const sourceConfigId = side === 'file1' ? draftValue.file1SourceConfigId : draftValue.file2SourceConfigId
-  if (sourceTypeEnumId?.trim() === SOURCE_TYPE_API && sourceConfigId?.trim()) return sourceConfigId.trim()
 
   const systemLabel = side === 'file1' ? draftValue.file1SystemLabel : draftValue.file2SystemLabel
   const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId : draftValue.file2SystemEnumId
   return systemLabel || systemEnumId || (side === 'file1' ? 'System 1' : 'System 2')
+}
+
+/** The API source config backing this side, shown under the system name. Empty for non-API sources. */
+function systemConfigName(draftValue: ReconciliationRuleSetDraft | null, side: 'file1' | 'file2'): string {
+  if (!draftValue) return ''
+
+  const sourceTypeEnumId = side === 'file1' ? draftValue.file1SourceTypeEnumId : draftValue.file2SourceTypeEnumId
+  if (sourceTypeEnumId?.trim() !== SOURCE_TYPE_API) return ''
+
+  const sourceConfigId = side === 'file1' ? draftValue.file1SourceConfigId : draftValue.file2SourceConfigId
+  return sourceConfigId?.trim() ?? ''
 }
 
 function summarizeSource(draftValue: ReconciliationRuleSetDraft | null, side: 'file1' | 'file2'): string {
@@ -852,6 +873,12 @@ onMounted(() => {
   border: 1px solid var(--border);
   border-radius: var(--static-surface-radius);
   background: var(--surface-2);
+}
+
+.ruleset-manager-system-config {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 
 .ruleset-manager-basic-card strong,

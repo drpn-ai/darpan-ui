@@ -447,7 +447,12 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(schemaRows[1]?.text()).toContain('return_id + product_id')
   })
 
-  it('labels API-backed sources by endpoint name in the run summary', async () => {
+  // Originally this asserted the system name was NOT shown, on the reasoning that the config id
+// (dev_oms / dev_shopify) identifies an API source more precisely. That holds only while the two
+// sides use differently-named configs: a Shopify/HotWax run whose configs are both named
+// `gorjana_prod` rendered the same value on both rows and never named either system. Both are now
+// shown — the system name, with its config id beneath it.
+  it('labels API-backed sources by system name and config in the run summary', async () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
       draftStoreState.ruleSetDraftState = createApiDraftState()
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
@@ -459,7 +464,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
     const schemaRows = wrapper.findAll('.ruleset-manager-schema-row')
     expect(schemaRows).toHaveLength(2)
     expect(schemaRows[0]?.text()).toContain('dev_oms')
-    expect(schemaRows[0]?.text()).not.toContain('HotWax')
+    expect(schemaRows[0]?.text()).toContain('HotWax')
+    expect(schemaRows[1]?.text()).toContain('Shopify')
     expect(schemaRows[0]?.text()).toContain('Schema')
     expect(schemaRows[0]?.text()).toContain('Orders API')
     expect(schemaRows[0]?.text()).not.toContain('CSV source')
