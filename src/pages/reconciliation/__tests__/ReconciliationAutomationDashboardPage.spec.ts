@@ -227,6 +227,14 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 1, 2026, 11:00 PM')
     expect(wrapper.get('[data-testid="automation-next-run"]').text()).toBe('May 2, 2026, 9:49 AM')
 
+    // "Based On" must carry the shared micro-label role, like the dt elements in the detail grid.
+    // A v2.4.0 regression left a dangling `.automation-dashboard-label,` selector before a comment,
+    // which merged it into the run-link rule and rendered the label at display size instead.
+    const basedOnLabel = wrapper.findAll('span').find((s) => s.text() === 'Based On')
+    expect(basedOnLabel).toBeDefined()
+    expect(basedOnLabel?.classes()).toContain('micro-label')
+    expect(basedOnLabel?.classes()).not.toContain('automation-dashboard-run-link')
+
     const savedRunLink = wrapper.get('[data-testid="automation-saved-run-link"]')
     expect(savedRunLink.element.tagName).toBe('A')
     expect(savedRunLink.classes()).toContain('automation-dashboard-run-link')

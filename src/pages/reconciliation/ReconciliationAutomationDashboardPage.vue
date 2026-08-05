@@ -32,7 +32,7 @@
         <div class="automation-dashboard-setup" data-testid="automation-setup-summary">
           <div class="automation-dashboard-setup-head">
             <div class="automation-dashboard-heading-block">
-              <span class="automation-dashboard-label">Based On</span>
+              <span class="micro-label">Based On</span>
               <RouterLink
                 v-if="savedRunRoute"
                 :to="savedRunRoute"
@@ -639,9 +639,10 @@ onMounted(() => {
   min-width: 0;
 }
 
-.automation-dashboard-label,
-/* Type comes from .micro-label in style.css — see the dt elements in the template. */
-
+/* The "Based On" label uses .micro-label directly, like the dt elements below it — there is no
+   page-local label rule. Do not reintroduce one with a trailing comma: a comment between a dangling
+   selector and the next rule does not terminate the selector list, so the label silently inherits
+   the run-link's display type instead. */
 .automation-dashboard-run-link {
   min-width: 0;
   max-width: 100%;
