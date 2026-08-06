@@ -474,7 +474,12 @@ function buildSourceConfigSummary(draftValue: ReconciliationRuleSetDraft | null,
   const sourceConfigType = side === 'file1' ? draftValue.file1SourceConfigType?.trim() : draftValue.file2SourceConfigType?.trim()
   const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId?.trim() : draftValue.file2SystemEnumId?.trim()
 
-  if (sourceConfigType === 'HOTWAX_OMS_REST' || systemEnumId === 'OMS') {
+  if (
+    sourceConfigType === 'HOTWAX_OMS_REST' ||
+    sourceConfigType === 'HOTWAX_OMS_REST_TRANSFER' ||
+    systemEnumId === 'OMS' ||
+    systemEnumId === 'OMS_TRANSFER_ORDERS'
+  ) {
     return {
       kind: 'oms',
       side,

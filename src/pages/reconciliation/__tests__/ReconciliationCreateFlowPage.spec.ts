@@ -541,6 +541,91 @@ describe('ReconciliationCreateFlowPage', () => {
     }, expect.any(AbortSignal))
   })
 
+  it('treats a transfer-order source as an OMS-configured source', async () => {
+    listAutomationSourceOptions.mockResolvedValueOnce({
+      ok: true,
+      messages: [],
+      errors: [],
+      inputModes: [],
+      sourceTypes: [],
+      relativeWindows: [],
+      fileTypes: FILE_TYPE_OPTIONS,
+      systems: [...SYSTEM_OPTIONS, { enumId: 'OMS_TRANSFER_ORDERS', label: 'OMS_TRANSFER_ORDERS' }],
+      savedRuns: [],
+      sftpServers: [],
+      sourceConfigs: [
+        {
+          // No sourceConfigType here so the wizard falls back to expectedSourceConfigType(systemEnumId).
+          sourceConfigId: 'KREWE_TRANSFER_ORDERS',
+          label: 'Krewe Transfer Orders',
+          systemEnumId: 'OMS_TRANSFER_ORDERS',
+        },
+      ],
+      nsRestletConfigs: [],
+      systemRemotes: [
+        {
+          systemMessageRemoteId: 'HOTWAX_TRANSFER_ORDERS_API',
+          description: 'Transfer Orders API',
+          label: 'Transfer Orders API',
+          systemEnumId: 'OMS_TRANSFER_ORDERS',
+          optionKey: 'KREWE_TRANSFER_ORDERS',
+          sourceConfigId: 'KREWE_TRANSFER_ORDERS',
+          primaryIdOptions: [
+            { fieldPath: '$.records[*].transferOrderId', label: 'Transfer Order ID' },
+          ],
+        },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+
+    await wrapper.get('input[name="runName"]').setValue('Transfer Order Compare')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS_TRANSFER_ORDERS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+    expect(wrapper.find('[data-testid="file1-api-config-select"]').exists()).toBe(true)
+    await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'KREWE_TRANSFER_ORDERS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseWorkflowOption(wrapper, 'file1-api-select', 'remote:HOTWAX_TRANSFER_ORDERS_API:KREWE_TRANSFER_ORDERS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].transferOrderId')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
+    await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(createRuleSetRun).toHaveBeenCalledWith({
+      runName: 'Transfer Order Compare',
+      description: undefined,
+      file1SystemEnumId: 'OMS_TRANSFER_ORDERS',
+      file1SourceTypeEnumId: 'AUT_SRC_API',
+      file1SystemMessageRemoteId: 'HOTWAX_TRANSFER_ORDERS_API',
+      file1SourceConfigId: 'KREWE_TRANSFER_ORDERS',
+      file1SourceConfigType: 'HOTWAX_OMS_REST_TRANSFER',
+      file1PrimaryIdExpression: '$.records[*].transferOrderId',
+      file2SystemEnumId: 'SHOPIFY',
+      file2FileTypeEnumId: 'DftCsv',
+      file2SchemaFileName: undefined,
+      file2PrimaryIdExpression: 'order_id',
+    }, expect.any(AbortSignal))
+  })
+
   it('filters API endpoint choices to endpoints for the selected system', async () => {
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()

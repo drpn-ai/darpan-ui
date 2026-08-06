@@ -16,6 +16,9 @@ const CANONICAL_SYSTEM_IDS: Record<string, string> = {
   NETSUITE: 'NETSUITE',
   DARSYSSAPI: 'SAPI',
   SAPI: 'SAPI',
+  OMSTRANSFERORDERS: 'OMS_TRANSFER_ORDERS',
+  HOTWAXTRANSFERORDERS: 'OMS_TRANSFER_ORDERS',
+  DARSYSOMSTO: 'OMS_TRANSFER_ORDERS',
 }
 
 const CANONICAL_SYSTEM_LABELS: Record<string, string> = {
@@ -23,6 +26,7 @@ const CANONICAL_SYSTEM_LABELS: Record<string, string> = {
   SHOPIFY: 'Shopify',
   NETSUITE: 'NetSuite',
   SAPI: 'SAPI',
+  OMS_TRANSFER_ORDERS: 'HotWax Transfer Orders',
 }
 
 export function canonicalDarpanSystemEnumId(systemEnumId: string | null | undefined): string {
