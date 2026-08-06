@@ -623,6 +623,80 @@ describe('ReconciliationAutomationDashboardPage', () => {
     }
   })
 
+  it('redirects to the live progress view as soon as the run registers, without waiting for the submission', async () => {
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    // The submission stays pending for the whole test — this is the 60s-run case that used to
+    // leave the user staring at an unchanged screen until the gateway severed the connection.
+    let resolveSubmission: (value: unknown) => void = () => {}
+    runAutomationNow.mockReturnValueOnce(new Promise((resolve) => { resolveSubmission = resolve }))
+
+    // The detached backend commits the row while the submission is still in flight.
+    listAutomationExecutions.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      executions: [
+        {
+          automationExecutionId: 'EXEC_LIVE',
+          statusEnumId: 'AUT_STAT_RUNNING',
+          statusLabel: 'Running',
+          reconciliationRunResultId: 'RUNRES_LIVE',
+          startedDate: new Date().toISOString(),
+        },
+        ...mockExecutions(),
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 3, pageCount: 1 },
+    })
+
+    await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+    await vi.waitFor(() => expect(push).toHaveBeenCalled())
+
+    expect(runAutomationNow).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'reconciliation-run-live',
+        params: expect.objectContaining({ runResultId: 'RUNRES_LIVE' }),
+      }),
+    )
+
+    resolveSubmission({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+    await flushPromises()
+  })
+
+  it('falls back to the refetch path when no run registers before the submission resolves', async () => {
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    // No active row ever appears — a short run that finished before the poll caught it.
+    runAutomationNow.mockResolvedValueOnce({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+
+    await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+    await flushPromises()
+
+    expect(push).not.toHaveBeenCalled()
+    expect(getAutomation).toHaveBeenCalledTimes(2)
+    expect(listAutomationExecutions.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('shows an in-flight state while the run is being submitted', async () => {
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    let resolveSubmission: (value: unknown) => void = () => {}
+    runAutomationNow.mockReturnValueOnce(new Promise((resolve) => { resolveSubmission = resolve }))
+
+    await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="automation-run-now-status"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="automation-run-now-status"]').text()).toContain('Starting run')
+
+    resolveSubmission({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+    await flushPromises()
+  })
+
   it('hides mutation actions for view-only users while keeping setup and run history readable', async () => {
     permissions.canEditTenantSettings = false
     permissions.canRunActiveTenantReconciliation = false

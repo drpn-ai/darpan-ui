@@ -9,6 +9,9 @@
 
     <template v-else-if="automation">
       <InlineValidation v-if="actionError" tone="error" :message="actionError" />
+      <p v-if="actionInFlight" class="section-note" data-testid="automation-run-now-status">
+        Starting run...
+      </p>
 
       <StaticPageSection>
         <template #header>
@@ -482,6 +485,55 @@ let loadController: AbortController | null = null
 const EXECUTIONS_POLL_INTERVAL_MS = 5000
 let executionsPollTimer: ReturnType<typeof setInterval> | null = null
 
+// Mirrors ReconciliationDiffPage's run-registration poll. Task 2 detached the backend run from
+// the request transaction, so the PENDING/RUNNING row commits within moments of submission while
+// run#AutomationNow is still in flight -- long before the ~60s gateway timeout that used to kill
+// the request and leave the user with no feedback at all.
+const RUN_REGISTRATION_POLL_INTERVAL_MS = 900
+const RUN_REGISTRATION_POLL_ATTEMPTS = 12
+const RUN_REGISTRATION_MATCH_WINDOW_MS = 2 * 60 * 1000
+
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve()
+      return
+    }
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer)
+      resolve()
+    }, { once: true })
+  })
+}
+
+async function pollForRegisteredExecutionRunResultId(signal: AbortSignal): Promise<string> {
+  const submittedAtMs = Date.now()
+  for (let attempt = 0; attempt < RUN_REGISTRATION_POLL_ATTEMPTS; attempt += 1) {
+    await delay(RUN_REGISTRATION_POLL_INTERVAL_MS, signal)
+    if (signal.aborted) return ''
+
+    try {
+      const response = await reconciliationFacade.listAutomationExecutions(
+        { automationId: automationId.value, pageIndex: 0, pageSize: 5 },
+        signal,
+      )
+      const registered = (response.executions ?? []).find((execution) => {
+        if (!isActiveRunStatus(execution.statusEnumId) || !execution.reconciliationRunResultId) return false
+        // Ignore an older run of this automation that was already in flight before this click.
+        // A row without a usable start time is accepted: an unreadable timestamp should not cost
+        // the redirect, and any active run of this automation is worth showing.
+        const startedMs = new Date(execution.startedDate ?? execution.createdDate ?? '').getTime()
+        return !Number.isFinite(startedMs) || Math.abs(startedMs - submittedAtMs) <= RUN_REGISTRATION_MATCH_WINDOW_MS
+      })
+      if (registered?.reconciliationRunResultId) return registered.reconciliationRunResultId
+    } catch {
+      // Transient list failure -- try again on the next tick.
+    }
+  }
+  return ''
+}
+
 function stopExecutionsPoll(): void {
   if (executionsPollTimer) {
     clearInterval(executionsPollTimer)
@@ -570,13 +622,33 @@ async function runNow(): Promise<void> {
   if (!automation.value || !canRunAutomation.value || actionInFlight.value) return
   actionInFlight.value = true
   actionError.value = null
+  const registrationController = new AbortController()
   try {
-    await reconciliationFacade.runAutomationNow({ automationId: automation.value.automationId })
+    // The run executes detached from the request transaction, so its PENDING/RUNNING row is
+    // readable within moments of submission while this call is still in flight. Race the two:
+    // whichever resolves first decides where the user lands -- the live progress view for a run
+    // long enough to still be running, or the in-place refresh for one that finished first.
+    const submission = reconciliationFacade.runAutomationNow({ automationId: automation.value.automationId })
+    const liveRunResultId = await Promise.race([
+      pollForRegisteredExecutionRunResultId(registrationController.signal),
+      submission.then(() => '', () => ''),
+    ])
+
+    const routeContext = reconciliationRunRouteContext.value
+    if (liveRunResultId && routeContext) {
+      // The submission stays in flight and owns the run from here; this page unmounts on
+      // navigation, so nothing here may cancel it.
+      void submission.catch(() => {
+        // A submission failure after the redirect surfaces on the live progress view, which is
+        // now the authoritative screen for this run.
+      })
+      await router.push(buildReconciliationRunLiveRoute(routeContext, liveRunResultId))
+      return
+    }
+
+    await submission
     // Refetch (not just the runAutomationNow response) so Previous Run/Next Run and the
-    // executions table all reflect the same, authoritative post-run state. Unsignaled, like
-    // the runAutomationNow call above and deleteAutomation() below -- this page's convention
-    // is that a user-initiated action, once started, runs to completion rather than being
-    // cancelled by unmount (only the passive load/poll reads are abortable).
+    // executions table all reflect the same, authoritative post-run state.
     const refreshedAutomation = await fetchAutomationAndExecutions()
     if (refreshedAutomation) automation.value = refreshedAutomation
     // Unconditional: even if the new PENDING row hasn't landed in list#AutomationExecutions
@@ -586,6 +658,7 @@ async function runNow(): Promise<void> {
   } catch (runError) {
     actionError.value = runError instanceof ApiCallError ? runError.message : 'Unable to run automation.'
   } finally {
+    registrationController.abort()
     actionInFlight.value = false
   }
 }
