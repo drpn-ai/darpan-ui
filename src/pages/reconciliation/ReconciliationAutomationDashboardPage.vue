@@ -9,7 +9,14 @@
 
     <template v-else-if="automation">
       <InlineValidation v-if="actionError" tone="error" :message="actionError" />
-      <p v-if="actionInFlight" class="section-note" data-testid="automation-run-now-status">
+      <p
+        v-if="runNowInFlight"
+        class="section-note"
+        data-testid="automation-run-now-status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         Starting run...
       </p>
 
@@ -224,6 +231,9 @@ const automation = ref<AutomationRecord | null>(null)
 const executions = ref<AutomationExecutionSummary[]>([])
 const loading = ref(false)
 const actionInFlight = ref(false)
+// Separate from actionInFlight, which also covers deleteAutomation(): the "Starting run..."
+// status line must not appear while a delete is in flight.
+const runNowInFlight = ref(false)
 const error = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const weekdayLabels: Record<string, string> = {
@@ -491,7 +501,13 @@ let executionsPollTimer: ReturnType<typeof setInterval> | null = null
 // the request and leave the user with no feedback at all.
 const RUN_REGISTRATION_POLL_INTERVAL_MS = 900
 const RUN_REGISTRATION_POLL_ATTEMPTS = 12
-const RUN_REGISTRATION_MATCH_WINDOW_MS = 2 * 60 * 1000
+// One-sided on purpose: startedDate is the server's clock and submittedAtMs is the browser's, so a
+// row minted a moment before submittedAtMs (clock skew, not an older run) must still match -- hence
+// a small backward allowance. But there is no forward cap and no symmetry: a row that started
+// clearly BEFORE this click is a DIFFERENT, already-in-flight run of this automation (e.g. a
+// scheduled fire a few seconds ago) and must never win the redirect, no matter how long ago it
+// started -- accepting it sends the user to watch someone else's run believing it is theirs.
+const RUN_REGISTRATION_CLOCK_SKEW_MS = 5000
 
 function delay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -520,11 +536,12 @@ async function pollForRegisteredExecutionRunResultId(signal: AbortSignal): Promi
       )
       const registered = (response.executions ?? []).find((execution) => {
         if (!isActiveRunStatus(execution.statusEnumId) || !execution.reconciliationRunResultId) return false
-        // Ignore an older run of this automation that was already in flight before this click.
-        // A row without a usable start time is accepted: an unreadable timestamp should not cost
-        // the redirect, and any active run of this automation is worth showing.
+        // Ignore an older run of this automation that was already in flight before this click --
+        // see RUN_REGISTRATION_CLOCK_SKEW_MS above for why this is one-sided. A row without a
+        // usable start time is accepted: an unreadable timestamp should not cost the redirect, and
+        // at that point the active-status + run-result-id checks above are all there is to go on.
         const startedMs = new Date(execution.startedDate ?? execution.createdDate ?? '').getTime()
-        return !Number.isFinite(startedMs) || Math.abs(startedMs - submittedAtMs) <= RUN_REGISTRATION_MATCH_WINDOW_MS
+        return !Number.isFinite(startedMs) || startedMs >= submittedAtMs - RUN_REGISTRATION_CLOCK_SKEW_MS
       })
       if (registered?.reconciliationRunResultId) return registered.reconciliationRunResultId
     } catch {
@@ -621,6 +638,7 @@ async function load(): Promise<void> {
 async function runNow(): Promise<void> {
   if (!automation.value || !canRunAutomation.value || actionInFlight.value) return
   actionInFlight.value = true
+  runNowInFlight.value = true
   actionError.value = null
   const registrationController = new AbortController()
   try {
@@ -660,6 +678,7 @@ async function runNow(): Promise<void> {
   } finally {
     registrationController.abort()
     actionInFlight.value = false
+    runNowInFlight.value = false
   }
 }
 

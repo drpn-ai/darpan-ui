@@ -461,6 +461,26 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(push).toHaveBeenCalledWith('/reconciliation/automations')
   })
 
+  it('does not show the run-now status line while a delete is in flight', async () => {
+    // Fix round 1 (review finding, minor 1): the status line used to key off actionInFlight,
+    // which deleteAutomation() also sets — confirm + Delete showed "Starting run..." for the
+    // duration of the delete. It now keys off a run-specific flag instead.
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    let resolveDelete: (value: unknown) => void = () => {}
+    deleteAutomation.mockReturnValueOnce(new Promise((resolve) => { resolveDelete = resolve }))
+
+    await wrapper.get('[data-testid="automation-delete-action"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="automation-run-now-status"]').exists()).toBe(false)
+
+    resolveDelete({ ok: true, messages: [], errors: [], deleted: true, deletedAutomationId: 'AUT_ACTIVE_API' })
+    await flushPromises()
+  })
+
   it('refetches automation and executions after a successful run-now, adding the new row immediately', async () => {
     const wrapper = mount(ReconciliationAutomationDashboardPage)
     await flushPromises()
@@ -624,45 +644,150 @@ describe('ReconciliationAutomationDashboardPage', () => {
   })
 
   it('redirects to the live progress view as soon as the run registers, without waiting for the submission', async () => {
-    const wrapper = mount(ReconciliationAutomationDashboardPage)
-    await flushPromises()
+    // setTimeout must be faked too so the registration poll can be advanced without real
+    // waiting. Fix round 1 (review finding A): the poll's first attempt lands at 900ms and
+    // vi.waitFor's default budget is 1000ms with ~100ms of slack -- on a loaded CI box running
+    // the whole suite in parallel that drifts past the budget and fails a passing feature, so
+    // this test drives the poll deterministically with fake timers instead (mirrors
+    // ReconciliationDiffPage.spec.ts's 'redirects to the live run view...' test).
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    try {
+      vi.setSystemTime(new Date(2026, 4, 17, 12, 0, 0))
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
 
-    // The submission stays pending for the whole test — this is the 60s-run case that used to
-    // leave the user staring at an unchanged screen until the gateway severed the connection.
-    let resolveSubmission: (value: unknown) => void = () => {}
-    runAutomationNow.mockReturnValueOnce(new Promise((resolve) => { resolveSubmission = resolve }))
+      // The submission stays pending for the whole test — this is the 60s-run case that used to
+      // leave the user staring at an unchanged screen until the gateway severed the connection.
+      let resolveSubmission: (value: unknown) => void = () => {}
+      runAutomationNow.mockReturnValueOnce(new Promise((resolve) => { resolveSubmission = resolve }))
 
-    // The detached backend commits the row while the submission is still in flight.
-    listAutomationExecutions.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      executions: [
-        {
-          automationExecutionId: 'EXEC_LIVE',
-          statusEnumId: 'AUT_STAT_RUNNING',
-          statusLabel: 'Running',
-          reconciliationRunResultId: 'RUNRES_LIVE',
-          startedDate: new Date().toISOString(),
-        },
-        ...mockExecutions(),
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 3, pageCount: 1 },
-    })
+      // The detached backend commits the row while the submission is still in flight.
+      listAutomationExecutions.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        executions: [
+          {
+            automationExecutionId: 'EXEC_LIVE',
+            statusEnumId: 'AUT_STAT_RUNNING',
+            statusLabel: 'Running',
+            reconciliationRunResultId: 'RUNRES_LIVE',
+            startedDate: new Date(2026, 4, 17, 12, 0, 0).toISOString(),
+          },
+          ...mockExecutions(),
+        ],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 3, pageCount: 1 },
+      })
 
-    await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
-    await vi.waitFor(() => expect(push).toHaveBeenCalled())
+      await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
 
-    expect(runAutomationNow).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
-    expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'reconciliation-run-live',
-        params: expect.objectContaining({ runResultId: 'RUNRES_LIVE' }),
-      }),
-    )
+      // Nothing yet — the redirect waits until the registration poll's first look lands.
+      expect(push).not.toHaveBeenCalled()
 
-    resolveSubmission({ ok: true, messages: [], errors: [], automation: mockAutomation() })
-    await flushPromises()
+      await vi.advanceTimersByTimeAsync(1000)
+      await flushPromises()
+
+      expect(runAutomationNow).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'reconciliation-run-live',
+          params: expect.objectContaining({ runResultId: 'RUNRES_LIVE' }),
+        }),
+      )
+
+      resolveSubmission({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+      await flushPromises()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('redirects to the run this click started, not an older run of the same automation that is still active', async () => {
+    // Fix round 1 (review finding B): the match predicate used to be symmetric (±2 minutes),
+    // so a scheduled run that was already active before this click could win the redirect —
+    // the user would land on someone else's run believing it was theirs. It is now one-sided:
+    // only a row that started at (or a small clock-skew allowance before) this click's own
+    // submission time may match.
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    try {
+      vi.setSystemTime(new Date(2026, 4, 17, 12, 0, 30))
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      let resolveSubmission: (value: unknown) => void = () => {}
+      runAutomationNow.mockReturnValueOnce(new Promise((resolve) => { resolveSubmission = resolve }))
+
+      // A scheduled run of the same automation started 30s before this click and is still
+      // active — under the old symmetric ±2-minute window this alone would have won the
+      // redirect on the very first poll attempt.
+      listAutomationExecutions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        executions: [
+          {
+            automationExecutionId: 'EXEC_OLDER_ACTIVE',
+            statusEnumId: 'AUT_STAT_RUNNING',
+            statusLabel: 'Running',
+            reconciliationRunResultId: 'RUNRES_OLDER',
+            startedDate: new Date(2026, 4, 17, 12, 0, 0).toISOString(),
+          },
+          ...mockExecutions(),
+        ],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 3, pageCount: 1 },
+      })
+
+      await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+
+      // First poll attempt: only the older, already-active run is visible. It must not win.
+      await vi.advanceTimersByTimeAsync(1000)
+      await flushPromises()
+      expect(push).not.toHaveBeenCalled()
+
+      // This click's own row has now registered, alongside the still-active older one.
+      listAutomationExecutions.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        executions: [
+          {
+            automationExecutionId: 'EXEC_THIS_CLICK',
+            statusEnumId: 'AUT_STAT_RUNNING',
+            statusLabel: 'Running',
+            reconciliationRunResultId: 'RUNRES_THIS_CLICK',
+            startedDate: new Date(2026, 4, 17, 12, 0, 30).toISOString(),
+          },
+          {
+            automationExecutionId: 'EXEC_OLDER_ACTIVE',
+            statusEnumId: 'AUT_STAT_RUNNING',
+            statusLabel: 'Running',
+            reconciliationRunResultId: 'RUNRES_OLDER',
+            startedDate: new Date(2026, 4, 17, 12, 0, 0).toISOString(),
+          },
+          ...mockExecutions(),
+        ],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 4, pageCount: 1 },
+      })
+
+      await vi.advanceTimersByTimeAsync(1000)
+      await flushPromises()
+
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'reconciliation-run-live',
+          params: expect.objectContaining({ runResultId: 'RUNRES_THIS_CLICK' }),
+        }),
+      )
+      // Never won by the older run, at any point in the poll.
+      expect(push).not.toHaveBeenCalledWith(
+        expect.objectContaining({ params: expect.objectContaining({ runResultId: 'RUNRES_OLDER' }) }),
+      )
+
+      resolveSubmission({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+      await flushPromises()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('falls back to the refetch path when no run registers before the submission resolves', async () => {
@@ -690,8 +815,12 @@ describe('ReconciliationAutomationDashboardPage', () => {
     await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="automation-run-now-status"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="automation-run-now-status"]').text()).toContain('Starting run')
+    const status = wrapper.get('[data-testid="automation-run-now-status"]')
+    expect(status.text()).toContain('Starting run')
+    // A screen-reader user must hear this too — the whole premise of this task is that a run
+    // used to give no feedback at all. Fix round 1 (review finding, minor 2).
+    expect(status.attributes('role')).toBe('status')
+    expect(status.attributes('aria-live')).toBe('polite')
 
     resolveSubmission({ ok: true, messages: [], errors: [], automation: mockAutomation() })
     await flushPromises()
