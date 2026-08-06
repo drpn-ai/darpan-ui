@@ -537,11 +537,14 @@ async function pollForRegisteredExecutionRunResultId(signal: AbortSignal): Promi
       const registered = (response.executions ?? []).find((execution) => {
         if (!isActiveRunStatus(execution.statusEnumId) || !execution.reconciliationRunResultId) return false
         // Ignore an older run of this automation that was already in flight before this click --
-        // see RUN_REGISTRATION_CLOCK_SKEW_MS above for why this is one-sided. A row without a
-        // usable start time is accepted: an unreadable timestamp should not cost the redirect, and
-        // at that point the active-status + run-result-id checks above are all there is to go on.
+        // see RUN_REGISTRATION_CLOCK_SKEW_MS above for why this is one-sided. A row whose start
+        // time cannot be read is REJECTED, not accepted: the two risks are not symmetric.
+        // Rejecting costs, at worst, the early redirect for THIS row -- the poll just keeps
+        // looking, and if nothing else matches, falls back to the pre-existing await-then-refetch
+        // path. Accepting could send the user to watch a completely unrelated active run of this
+        // automation while their own submission's failure is silently swallowed behind it.
         const startedMs = new Date(execution.startedDate ?? execution.createdDate ?? '').getTime()
-        return !Number.isFinite(startedMs) || startedMs >= submittedAtMs - RUN_REGISTRATION_CLOCK_SKEW_MS
+        return Number.isFinite(startedMs) && startedMs >= submittedAtMs - RUN_REGISTRATION_CLOCK_SKEW_MS
       })
       if (registered?.reconciliationRunResultId) return registered.reconciliationRunResultId
     } catch {

@@ -790,6 +790,57 @@ describe('ReconciliationAutomationDashboardPage', () => {
     }
   })
 
+  it('does not redirect to an active run whose start time cannot be read', async () => {
+    // Fix round 2 (review finding: Important B's second door). !Number.isFinite(startedMs) used
+    // to ACCEPT the row when its timestamp was unreadable -- the same wrong-run redirect as the
+    // symmetric window, just through a different door. An active row with a run-result id but no
+    // readable startedDate/createdDate must now be rejected, same as an older row: the poll keeps
+    // looking rather than gambling on a row it cannot place in time.
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    try {
+      vi.setSystemTime(new Date(2026, 4, 17, 12, 0, 30))
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      let resolveSubmission: (value: unknown) => void = () => {}
+      runAutomationNow.mockReturnValueOnce(new Promise((resolve) => { resolveSubmission = resolve }))
+
+      // Clears the only two gates ahead of the startedMs check (active status + a run-result
+      // id) but carries neither startedDate nor createdDate -- nothing to compare against
+      // submittedAtMs at all.
+      listAutomationExecutions.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        executions: [
+          {
+            automationExecutionId: 'EXEC_UNREADABLE',
+            statusEnumId: 'AUT_STAT_RUNNING',
+            statusLabel: 'Running',
+            reconciliationRunResultId: 'RUNRES_UNREADABLE',
+          },
+          ...mockExecutions(),
+        ],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 3, pageCount: 1 },
+      })
+
+      await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+
+      // First poll attempt sees only the unreadable-timestamp row. It must not win.
+      await vi.advanceTimersByTimeAsync(1000)
+      await flushPromises()
+      expect(push).not.toHaveBeenCalled()
+
+      resolveSubmission({ ok: true, messages: [], errors: [], automation: mockAutomation() })
+      await flushPromises()
+
+      // Falls back to the pre-existing refetch path, same as a run that never registers.
+      expect(push).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('falls back to the refetch path when no run registers before the submission resolves', async () => {
     const wrapper = mount(ReconciliationAutomationDashboardPage)
     await flushPromises()
