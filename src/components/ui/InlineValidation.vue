@@ -5,9 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
-
-const ERROR_DISPLAY_MS = 10_000
+import { ref, watch } from 'vue'
 
 const props = defineProps<{
   message: string
@@ -15,25 +13,9 @@ const props = defineProps<{
 }>()
 
 const visible = ref(true)
-let hideTimer: ReturnType<typeof setTimeout> | null = null
 
-function clearHideTimer(): void {
-  if (!hideTimer) return
-  clearTimeout(hideTimer)
-  hideTimer = null
-}
-
-function resetVisibility(): void {
-  visible.value = true
-  clearHideTimer()
-  if (props.tone !== 'error') return
-
-  hideTimer = setTimeout(() => {
-    visible.value = false
-    hideTimer = null
-  }, ERROR_DISPLAY_MS)
-}
-
-watch([() => props.message, () => props.tone], resetVisibility, { immediate: true })
-onUnmounted(clearHideTimer)
+// Errors persist until something replaces them. They used to auto-hide after 10s, which was
+// survivable while errors arrived promptly -- but a run-now failure could surface a full minute
+// after the click (prod 2026-08-05), and the banner then erased itself before anyone read it.
+watch([() => props.message, () => props.tone], () => { visible.value = true }, { immediate: true })
 </script>
