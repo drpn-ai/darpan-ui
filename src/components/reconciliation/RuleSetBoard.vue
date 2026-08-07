@@ -104,6 +104,17 @@
                capability gate. -->
           <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file1-${index}`">Has exclusion</span>
         </template>
+
+        <!-- See the matching note on the file2 column below. -->
+        <p
+          v-if="exclusionUnavailable?.side === 'file1' && exclusionUnavailable.fieldPath === field.fieldPath"
+          class="ruleset-exclusion-unavailable"
+          role="status"
+          aria-live="polite"
+          data-testid="ruleset-exclusion-unavailable"
+        >
+          {{ exclusionUnavailable.message }}
+        </p>
       </div>
     </section>
 
@@ -150,6 +161,22 @@
           <!-- See the matching comment on the file1 column above. -->
           <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file2-${index}`">Has exclusion</span>
         </template>
+
+        <!--
+          Why exclusions are not on offer here, said at the moment the operator asks for them
+          rather than as standing copy on every board that will never use them. Sits OUTSIDE its
+          column (see the .ruleset-exclusion-unavailable rules) so it explains the pill beside it
+          instead of covering the pills below.
+        -->
+        <p
+          v-if="exclusionUnavailable?.side === 'file2' && exclusionUnavailable.fieldPath === field.fieldPath"
+          class="ruleset-exclusion-unavailable"
+          role="status"
+          aria-live="polite"
+          data-testid="ruleset-exclusion-unavailable"
+        >
+          {{ exclusionUnavailable.message }}
+        </p>
       </div>
     </section>
 
@@ -514,6 +541,7 @@ const editingSequence = ref(1)
 const editingExclusion = ref<{ side: RuleSide; fieldPath: string } | null>(null)
 const editingExclusionValues = ref<string[]>([])
 const pendingExclusionValue = ref('')
+const exclusionUnavailable = ref<{ side: RuleSide; fieldPath: string; message: string } | null>(null)
 let longPressTimer: number | null = null
 let generatedRuleCounter = 0
 let generatedPreActionCounter = 0
@@ -1014,7 +1042,37 @@ function closeExclusionEditor(): void {
   pendingExclusionValue.value = ''
 }
 
+/**
+ * supportsExclusions fails closed for two unrelated reasons, and the operator cannot tell them
+ * apart from the outside — so say which one it is. Both used to be a bare `return`: the gesture
+ * did nothing, drew nothing, and logged nothing, which is indistinguishable from a broken board
+ * (DAR-UI-013). The gate itself is unchanged; this only explains it.
+ */
+function explainExclusionsUnavailable(side: RuleSide, fieldPath: string): void {
+  closeRuleEditor()
+  closeExclusionEditor()
+  exclusionUnavailable.value = {
+    side,
+    fieldPath,
+    message: sourceUsesApi(side)
+      // The connector declares no filterParameterName, so the getter has no parameter to push a
+      // filter into. Name the system: "this side" alone leaves the operator guessing which.
+      ? `${sideTitle(side)} cannot filter records at the source, so exclusions do not apply to this side.`
+      // CSV/SFTP: there is no connector at all, and Darpan reads whatever the file contains.
+      : 'Exclusions apply only to API sources. This side reads a file.',
+  }
+}
+
+function closeExclusionUnavailable(): void {
+  exclusionUnavailable.value = null
+}
+
+function sideTitle(side: RuleSide): string {
+  return side === 'file1' ? file1Title.value : file2Title.value
+}
+
 function openExclusionEditor(side: RuleSide, fieldPath: string): void {
+  closeExclusionUnavailable()
   // The two popovers share the `.ruleset-rule-popover` blur-exemption class, so if both were
   // open at once they would render fully sharp, overlapping each other. The ⊘ mark itself has no
   // handlers at all now — it's a plain, non-interactive <span> (see the exclude-mark comment in
@@ -1037,7 +1095,11 @@ function openExclusionEditor(side: RuleSide, fieldPath: string): void {
  * is defense in depth, not load-bearing.
  */
 function handleFieldDoubleClick(side: RuleSide, fieldPath: string): void {
-  if (!supportsExclusions(side)) return
+  if (!supportsExclusions(side)) {
+    cancelPendingConnection()
+    explainExclusionsUnavailable(side, fieldPath)
+    return
+  }
 
   cancelPendingConnection()
   openExclusionEditor(side, fieldPath)
@@ -1051,7 +1113,10 @@ function handleFieldDoubleClick(side: RuleSide, fieldPath: string): void {
  * Enter never falls through to WorkflowStepForm's submit-on-Enter handling either way.
  */
 function handleFieldEnterKey(side: RuleSide, fieldPath: string): void {
-  if (!supportsExclusions(side)) return
+  if (!supportsExclusions(side)) {
+    explainExclusionsUnavailable(side, fieldPath)
+    return
+  }
 
   openExclusionEditor(side, fieldPath)
 }
@@ -1307,6 +1372,7 @@ function openRuleEditor(ruleId: string): void {
   // Mutually exclusive with the exclusion popover — see the matching comment in
   // openExclusionEditor for why this can't rely on the outside-click listener alone.
   closeExclusionEditor()
+  closeExclusionUnavailable()
   editingRuleId.value = rule.id
   editingOperator.value = rule.operator
   editingPreActions.value = rule.preActions.map(toEditablePreAction)
@@ -1380,6 +1446,10 @@ function deleteEditingRule(): void {
 }
 
 function handleWindowPointerDown(event: Event): void {
+  // The unavailable note is transient: any next pointerdown retires it, including one on the very
+  // pill that raised it, so re-trying the gesture cannot leave two notes or a stuck one.
+  closeExclusionUnavailable()
+
   if (!editingRuleId.value && !editingExclusion.value) return
 
   const target = event.target
@@ -1758,6 +1828,40 @@ onBeforeUnmount(() => {
 .ruleset-field-column--left .ruleset-field-exclude { left: -0.775rem; }
 .ruleset-field-column--right .ruleset-field-exclude { right: -0.775rem; }
 
+/* Borrows .ruleset-term-definition's surface, border and muted eyebrow type rather than inventing
+   a second explanatory voice on the same board. Positioned beside the pill, never over it: the
+   left column's note opens leftward and the right column's rightward, so it never lands on the
+   pills below or on the rule lines between the columns. */
+.ruleset-exclusion-unavailable {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  margin: 0;
+  width: max-content;
+  max-width: 13rem;
+  box-sizing: border-box;
+  padding: var(--space-1-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--type-eyebrow-size);
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+
+/* Beside the pill but INWARD, into the gutter the rule lines run through — not outward past the
+   column. Outward was measured off-viewport (left: -200px) on a 760px board: the margin outside a
+   column shrinks with the viewport, so an outward note is only safe on a very wide screen and
+   silently vanishes everywhere else, which is the exact silent no-op this whole affordance exists
+   to remove. The gutter is a fraction of the board, so it holds its width wherever the board does. */
+.ruleset-field-column--left .ruleset-exclusion-unavailable { left: calc(100% + var(--space-1-5)); }
+.ruleset-field-column--right .ruleset-exclusion-unavailable { right: calc(100% + var(--space-1-5)); }
+
 .ruleset-operator-box {
   position: absolute;
   z-index: 2;
@@ -1911,6 +2015,19 @@ onBeforeUnmount(() => {
   .ruleset-editor-lines,
   .ruleset-operator-box {
     display: none;
+  }
+
+  /* The columns stack here, so there is no gutter to open into and nothing beside the pill at all.
+     Fall back to below it — the placement .ruleset-term-definition already uses on this board, and
+     what the help-layer rule prescribes once beside stops fitting. */
+  .ruleset-field-column--left .ruleset-exclusion-unavailable,
+  .ruleset-field-column--right .ruleset-exclusion-unavailable {
+    top: calc(100% + var(--space-00));
+    right: auto;
+    left: 0;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
   }
 
   .ruleset-rule-popover {

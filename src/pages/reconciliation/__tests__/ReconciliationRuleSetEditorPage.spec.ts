@@ -1110,6 +1110,75 @@ describe('ReconciliationRuleSetEditorPage', () => {
       )
     })
 
+    // DAR-UI-013. supportsExclusions fails closed on any side whose connector declares no
+    // filterParameterName -- Shopify here -- and used to do it by returning silently, so the
+    // gesture produced nothing at all and the operator had no way to learn why.
+    const UNAVAILABLE_NOTE = '[data-testid="ruleset-exclusion-unavailable"]'
+    const SHOPIFY_PILL = '[data-testid="ruleset-field-file2-0"]'
+
+    it('explains, rather than doing nothing, when a side cannot carry exclusions', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(SHOPIFY_PILL).trigger('dblclick')
+      await flushPromises()
+
+      const note = wrapper.get(UNAVAILABLE_NOTE)
+      expect(note.text()).toContain('SHOPIFY')
+      expect(note.text()).toContain('cannot filter records at the source')
+      // It must not silently open an editor it cannot honour.
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(false)
+    })
+
+    it('explains on the keyboard path too', async () => {
+      // Enter on a focused pill is the only exclusion gesture available without a mouse, so a
+      // silent return left keyboard operators with literally no feedback.
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(SHOPIFY_PILL).trigger('keydown', { key: 'Enter' })
+      await flushPromises()
+
+      expect(wrapper.find(UNAVAILABLE_NOTE).exists()).toBe(true)
+    })
+
+    it('announces the explanation to assistive tech', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(SHOPIFY_PILL).trigger('dblclick')
+      await flushPromises()
+
+      const note = wrapper.get(UNAVAILABLE_NOTE)
+      expect(note.attributes('role')).toBe('status')
+      expect(note.attributes('aria-live')).toBe('polite')
+    })
+
+    it('dismisses the explanation on the next outside click', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(SHOPIFY_PILL).trigger('dblclick')
+      await flushPromises()
+      expect(wrapper.find(UNAVAILABLE_NOTE).exists()).toBe(true)
+
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+      await flushPromises()
+
+      expect(wrapper.find(UNAVAILABLE_NOTE).exists()).toBe(false)
+    })
+
+    it('leaves a supported side opening its editor with no explanation', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
+      expect(wrapper.find(UNAVAILABLE_NOTE).exists()).toBe(false)
+    })
+
     it('commits a typed value that was never Enter-ed when the operator clicks Save exclusion', async () => {
       // sm-darpan 2026-08-06 (DAR-CLIENT-003): the operator typed a value and clicked "Save
       // exclusion" without pressing Enter first. The input only committed on Enter, and
