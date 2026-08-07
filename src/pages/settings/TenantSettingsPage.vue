@@ -524,17 +524,30 @@ const summaryError = computed(() => {
   return errs.length > 0 ? 'Some tenant settings could not be loaded.' : null
 })
 const tenantSettings = computed<TenantSettings | null>(() => referenceDataStore.tenantSettings)
-const tenantTimezoneSummary = computed(() => (
+// The effective tenant timezone, resolved through the same fallback chain the save form seeds
+// from. Always a real zone id — never a placeholder — because the edit form writes this value.
+const resolvedTenantTimezone = computed(() => (
   normalizeStringOrEmpty(tenantSettings.value?.timeZone)
   || normalizeStringOrEmpty(authStore.sessionInfo?.timeZone)
   || 'UTC'
 ))
+// Display-only. Until the tenant settings land, the fallback chain reports the SESSION user's
+// zone (or UTC) as though it were the tenant's — a wrong answer stated confidently. Withhold it
+// rather than show a value that is about to change.
+const tenantTimezoneSummary = computed(() => (
+  referenceDataStore.tenantSettingsLoading ? '—' : resolvedTenantTimezone.value
+))
 const timezoneWorkflowError = ref<string | null>(null)
 const timezoneWorkflowSuccess = ref<string | null>(null)
 const timezoneWorkflowSaving = ref(false)
-const notificationSummary = computed(() => (
-  chatSpaces.value.length > 0 ? `${chatSpaces.value.length} spaces` : 'Not configured'
-))
+// An in-flight fetch leaves `chatSpaces` empty, which is indistinguishable from "loaded and
+// genuinely empty" unless the loading flag is consulted here. Asserting "Not configured" during
+// the load window renders a definitive claim that is simply wrong, then flips once the fetch
+// lands — so hold a neutral placeholder until there is an answer to report.
+const notificationSummary = computed(() => {
+  if (chatSpacesLoading.value) return '—'
+  return chatSpaces.value.length > 0 ? `${chatSpaces.value.length} spaces` : 'Not configured'
+})
 const notificationWorkflowError = ref<string | null>(null)
 const notificationWorkflowSuccess = ref<string | null>(null)
 const chatSpaceMenuSaving = ref(false)
@@ -834,7 +847,7 @@ function applySavedChatSpace(space?: TenantChatSpace | null): void {
 function openTimezoneWorkflow(): void {
   timezoneWorkflowError.value = null
   timezoneWorkflowSuccess.value = null
-  timezoneForm.timeZone = normalizeStringOrEmpty(tenantTimezoneSummary.value) || 'UTC'
+  timezoneForm.timeZone = normalizeStringOrEmpty(resolvedTenantTimezone.value) || 'UTC'
   openTimezone()
 }
 

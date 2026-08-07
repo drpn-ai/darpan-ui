@@ -254,6 +254,33 @@ describe('TenantSettingsPage', () => {
     })
   })
 
+  it('does not claim notifications are unconfigured while chat spaces are still loading', async () => {
+    // An unresolved chat-space fetch leaves `chatSpaces` empty, which is indistinguishable from
+    // "loaded and genuinely empty" unless the summary consults the loading flag. It used to render
+    // a definitive "Not configured" and then flip to "2 spaces" once the fetch landed.
+    let releaseChatSpaces: (value: unknown) => void = () => {}
+    listTenantChatSpaces.mockReturnValue(new Promise((resolve) => { releaseChatSpaces = resolve }))
+
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    const summaryWhileLoading = wrapper.get('[data-testid="tenant-module-notifications"]').text()
+    expect(summaryWhileLoading).not.toContain('Not configured')
+
+    releaseChatSpaces({
+      ok: true,
+      messages: [],
+      errors: [],
+      chatSpaces: [
+        { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: true },
+        { chatSpaceId: 'CS2', spaceName: 'Finance', googleChatConfigured: false, isActive: 'Y', inUse: false },
+      ],
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="tenant-module-notifications"]').text()).toContain('2 spaces')
+  })
+
   it('renders one tenant settings surface with AI moved into the page', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
