@@ -445,6 +445,10 @@ async function executeCommand(action: CommandAction): Promise<void> {
 }
 
 function handleKeyboard(event: KeyboardEvent): void {
+  // `key` is absent on some synthetic keydown events (extension-dispatched, certain IME and
+  // autofill paths). Reading it unguarded threw a TypeError out of this global listener and
+  // into the error reporter on every such event, so bail before touching it.
+  if (typeof event.key !== 'string') return
   const key = event.key.toLowerCase()
   const launcherPressed = (event.metaKey || event.ctrlKey) && key === 'k'
 

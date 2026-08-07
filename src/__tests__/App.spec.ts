@@ -955,6 +955,21 @@ describe('App shell logout', () => {
     expect(push).toHaveBeenCalledWith('/')
   })
 
+  it('ignores keydown events that carry no key instead of throwing', async () => {
+    mountApp()
+    await flushPromises()
+
+    // Browsers and extensions can dispatch keydown events with no `key` (synthetic events,
+    // some IME/autofill paths). The global handler must not blow up on them — it used to
+    // call event.key.toLowerCase() unguarded, which threw TypeError into the error reporter
+    // on every such event.
+    const keyless = new KeyboardEvent('keydown', { bubbles: true, cancelable: true })
+    Object.defineProperty(keyless, 'key', { value: undefined })
+
+    expect(() => window.dispatchEvent(keyless)).not.toThrow()
+    await flushPromises()
+  })
+
   it('uses Escape to abort workflow routes back to the hub when no static origin is available', async () => {
     route.name = 'reconciliation-create'
     route.path = '/reconciliation/create'
