@@ -208,7 +208,7 @@ import { useListPagination } from '../../lib/listPagination'
 import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
-import { formatDateTime } from '../../lib/utils/date'
+import { formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
 
@@ -336,14 +336,53 @@ function automationSystemLabel(fileSide: string, fallback: string): string {
   return source?.systemLabel || source?.systemEnumId || fallback
 }
 
+// What time is `utcMs` in `zone`, expressed as if it were UTC? Differencing that against the real
+// instant yields the zone's offset at that moment, which is the only DST-correct way to do this
+// with Intl alone.
+function zoneOffsetMs(utcMs: number, zone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(utcMs))
+  const at = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0')
+  // hour comes back as 24 rather than 0 for midnight under hour12:false in some engines.
+  const asUtc = Date.UTC(at('year'), at('month') - 1, at('day'), at('hour') % 24, at('minute'), at('second'))
+  return asUtc - utcMs
+}
+
+// The cron fires at a wall-clock time in the AUTOMATION's zone, but PREVIOUS/NEXT RUN and every
+// execution row on this page render in the VIEWER's zone. Left unconverted the card read
+// "Daily at 6:00 AM" directly above a table where each run said 1:00 PM, with nothing reconciling
+// the two. Convert so the schedule agrees with Next Run. A concrete reference date is required
+// because the offset between two zones is not constant — it moves with each zone's DST.
+function cronTimeInViewerZone(hour: number, minute: number, sourceZone: string): { hour: number, minute: number } {
+  const viewerZone = getDefaultDisplayTimeZone()
+  if (!viewerZone || !sourceZone || viewerZone === sourceZone) return { hour, minute }
+  try {
+    const today = new Date()
+    const naive = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), hour, minute)
+    // Resolve the offset at the naive guess, then again at the corrected instant — a second pass
+    // settles the case where the guess landed on the far side of a DST transition.
+    let instant = naive - zoneOffsetMs(naive, sourceZone)
+    instant = naive - zoneOffsetMs(instant, sourceZone)
+    const shifted = instant + zoneOffsetMs(instant, viewerZone)
+    const asDate = new Date(shifted)
+    return { hour: asDate.getUTCHours(), minute: asDate.getUTCMinutes() }
+  } catch {
+    return { hour, minute }
+  }
+}
+
 function scheduleDisplayLabel(row: AutomationRecord | null): string {
   if (!row) return '-'
-  const parsedExpression = scheduleLabelFromCron(row.scheduleExpr)
+  const zone = row.timezone?.trim() || 'UTC'
+  const parsedExpression = scheduleLabelFromCron(row.scheduleExpr, zone)
   if (parsedExpression) return parsedExpression
 
   const summary = row.scheduleSummary?.trim()
   const summaryExpression = summary?.match(/^Cron:\s*(.+)$/i)?.[1]
-  const parsedSummaryExpression = scheduleLabelFromCron(summaryExpression)
+  const parsedSummaryExpression = scheduleLabelFromCron(summaryExpression, zone)
   if (parsedSummaryExpression) return parsedSummaryExpression
   if (summary && !summary.match(/^Cron:/i)) return summary
 
@@ -359,7 +398,7 @@ function formatHourMinuteAmPm(hour: number, minute: number): string {
   return `${hour12}:${minute.toString().padStart(2, '0')} ${period}`
 }
 
-function scheduleLabelFromCron(expression: string | undefined): string | null {
+function scheduleLabelFromCron(expression: string | undefined, sourceZone = 'UTC'): string | null {
   const parts = expression?.trim().split(/\s+/) ?? []
   if (parts.length !== 6 || parts[0] !== '0') return null
 
@@ -368,11 +407,14 @@ function scheduleLabelFromCron(expression: string | undefined): string | null {
   if (!Number.isInteger(minute) || minute < 0 || minute > 59) return null
 
   if (parts[2] === '*' && parts[3] === '*' && parts[4] === '*' && parts[5] === '?') {
+    // Hourly fires every hour in every zone, so only the minute matters and it needs no conversion
+    // (no supported zone is offset by a fraction of a minute).
     return minute === 0 ? 'Hourly on the hour' : `Hourly at :${minute.toString().padStart(2, '0')}`
   }
 
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null
-  const timeLabel = formatHourMinuteAmPm(hour, minute)
+  const viewerTime = cronTimeInViewerZone(hour, minute, sourceZone)
+  const timeLabel = formatHourMinuteAmPm(viewerTime.hour, viewerTime.minute)
   if (parts[3] === '*' && parts[4] === '*' && parts[5] === '?') return `Daily at ${timeLabel}`
 
   const weekdayLabel = weekdayDisplayLabel(parts[5])

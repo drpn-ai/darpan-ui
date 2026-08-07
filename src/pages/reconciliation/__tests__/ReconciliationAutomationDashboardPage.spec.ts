@@ -298,7 +298,56 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 2, 2026, 2:00 AM')
   })
 
+  it('renders the schedule in the viewer zone so it agrees with Next Run', async () => {
+    // The cron fires at a wall-clock time in the AUTOMATION's zone, but every other timestamp on
+    // this card renders in the VIEWER's zone. Unconverted, the card read "Daily at 6:00 AM" above
+    // rows that all said 1:00 PM. 6:00 AM UTC is 1:00 PM in Indian/Christmas (UTC+7, no DST).
+    setDefaultDisplayTimeZone('Indian/Christmas')
+    getAutomation.mockResolvedValueOnce({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        ...mockAutomation(),
+        scheduleExpr: '0 0 6 * * ?',
+        scheduleSummary: 'Cron: 0 0 6 * * ?',
+        timezone: 'UTC',
+      },
+    })
+
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Daily at 1:00 PM')
+    expect(wrapper.text()).not.toContain('Daily at 6:00 AM')
+    // Still no raw zone identifier on the card -- the gap is removed, not annotated.
+    expect(wrapper.text()).not.toContain('UTC')
+  })
+
+  it('leaves the schedule untouched when the automation and viewer share a zone', async () => {
+    setDefaultDisplayTimeZone('UTC')
+    getAutomation.mockResolvedValueOnce({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        ...mockAutomation(),
+        scheduleExpr: '0 0 6 * * ?',
+        scheduleSummary: 'Cron: 0 0 6 * * ?',
+        timezone: 'UTC',
+      },
+    })
+
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Daily at 6:00 AM')
+  })
+
   it('formats the schedule summary time as AM/PM, matching every other timestamp on the page', async () => {
+    // Pin the viewer zone to the automation's own so these scenarios exercise ONLY the AM/PM
+    // formatting; the cross-zone conversion has its own tests above.
+    setDefaultDisplayTimeZone('America/New_York')
     const scenarios: Array<{ scheduleExpr: string; expected: string; unexpected: string[] }> = [
       { scheduleExpr: '0 0 9 * * ?', expected: 'Daily at 9:00 AM', unexpected: ['09:00', '9:00 PM'] },
       { scheduleExpr: '0 30 14 * * ?', expected: 'Daily at 2:30 PM', unexpected: ['14:30', '2:30 AM'] },
