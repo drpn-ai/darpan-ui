@@ -1717,6 +1717,28 @@ export interface components {
                 enabled?: string;
                 severity?: string;
             }[];
+            /**
+             * @description Record-exclusion rules for FILE_1, created alongside the compare source.
+             *                         Omitted or empty means no exclusion filters at creation.
+             */
+            file1ExcludeFilters?: {
+                excludeFilter?: {
+                    fieldExpression?: string;
+                    operator?: string;
+                    values?: string[];
+                };
+            }[];
+            /**
+             * @description Record-exclusion rules for FILE_2, created alongside the compare source.
+             *                         Omitted or empty means no exclusion filters at creation.
+             */
+            file2ExcludeFilters?: {
+                excludeFilter?: {
+                    fieldExpression?: string;
+                    operator?: string;
+                    values?: string[];
+                };
+            }[];
         };
         CreateRuleSetRunResult: {
             ok?: boolean;
@@ -1770,6 +1792,22 @@ export interface components {
                         fieldSide?: string;
                         action?: string;
                     }[];
+                }[];
+                file1ExcludeFilters?: {
+                    excludeFilter?: {
+                        sequenceNum?: number;
+                        fieldExpression?: string;
+                        operator?: string;
+                        values?: string[];
+                    };
+                }[];
+                file2ExcludeFilters?: {
+                    excludeFilter?: {
+                        sequenceNum?: number;
+                        fieldExpression?: string;
+                        operator?: string;
+                        values?: string[];
+                    };
                 }[];
             };
         };
@@ -2089,6 +2127,13 @@ export interface components {
             /** @description Timestamp — ISO-8601 string or epoch milliseconds */
             completedDate?: string | number;
             errorMessage?: string;
+            /**
+             * @description Full failure text. errorMessage is capped at 255 chars to fit a text-medium column,
+             *                         which truncates real Spark/service errors mid-sentence — routinely cutting off the
+             *                         part that names the fix (e.g. the "Did you mean [...]" column suggestion). This is
+             *                         the untruncated text-very-long copy the run row already stored.
+             */
+            errorDetail?: string;
             steps?: {
                 stageCode?: string;
                 stageSequence?: number;
@@ -2542,6 +2587,22 @@ export interface components {
                         action?: string;
                     }[];
                 }[];
+                file1ExcludeFilters?: {
+                    excludeFilter?: {
+                        sequenceNum?: number;
+                        fieldExpression?: string;
+                        operator?: string;
+                        values?: string[];
+                    };
+                }[];
+                file2ExcludeFilters?: {
+                    excludeFilter?: {
+                        sequenceNum?: number;
+                        fieldExpression?: string;
+                        operator?: string;
+                        values?: string[];
+                    };
+                }[];
             }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.list#SavedRuns */
@@ -2915,6 +2976,20 @@ export interface components {
                 sourceConfigId?: string;
                 shopifyAuthConfigId?: string;
                 omsRestSourceConfigId?: string;
+                /**
+                 * @description Record-exclusion rules for this source's fileSide, mirroring the rule
+                 *                             set's own filters. Omitted means leave the previously-saved rows unchanged (or, on
+                 *                             a first save, seed from the rule set); an explicit list (including an empty one)
+                 *                             replaces them. See save#Automation's source-recreate comment for why omission
+                 *                             cannot mean "no-op" here the way it does elsewhere.
+                 */
+                excludeFilters?: {
+                    excludeFilter?: {
+                        fieldExpression?: string;
+                        operator?: string;
+                        values?: string[];
+                    };
+                }[];
             }[];
         };
         SaveAutomationResult: {
@@ -3082,6 +3157,28 @@ export interface components {
                 enabled?: string;
                 severity?: string;
             }[];
+            /**
+             * @description Record-exclusion rules for FILE_1. Omit to leave existing rules unchanged;
+             *                         send an empty list to clear them.
+             */
+            file1ExcludeFilters?: {
+                excludeFilter?: {
+                    fieldExpression?: string;
+                    operator?: string;
+                    values?: string[];
+                };
+            }[];
+            /**
+             * @description Record-exclusion rules for FILE_2. Omit to leave existing rules unchanged;
+             *                         send an empty list to clear them.
+             */
+            file2ExcludeFilters?: {
+                excludeFilter?: {
+                    fieldExpression?: string;
+                    operator?: string;
+                    values?: string[];
+                };
+            }[];
         };
         SaveRuleSetRunResult: {
             ok?: boolean;
@@ -3135,6 +3232,22 @@ export interface components {
                         fieldSide?: string;
                         action?: string;
                     }[];
+                }[];
+                file1ExcludeFilters?: {
+                    excludeFilter?: {
+                        sequenceNum?: number;
+                        fieldExpression?: string;
+                        operator?: string;
+                        values?: string[];
+                    };
+                }[];
+                file2ExcludeFilters?: {
+                    excludeFilter?: {
+                        sequenceNum?: number;
+                        fieldExpression?: string;
+                        operator?: string;
+                        values?: string[];
+                    };
                 }[];
             };
         };
@@ -3251,7 +3364,13 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SubscribeRunNotificationResult"];
         };
-        /** @description Remove the caller's notify-me subscription for one run. */
+        /**
+         * @description Remove the caller's notify-me subscription for one run. Caller-scoped: only the caller's own
+         *                 row for that run is ever deleted. Reports an ERROR when there was nothing to remove instead of
+         *                 reporting success — a retried automation carries subscriptions forward onto the new attempt's
+         *                 run-result row, so a miss on an older id can mean the subscription is alive somewhere else and
+         *                 still due to fire.
+         */
         UnsubscribeRunNotificationParams: {
             reconciliationRunResultId: string;
         };

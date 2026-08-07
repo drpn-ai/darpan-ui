@@ -2,8 +2,8 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Darpan Facade API",
-        "version": "1.1.0",
-        "x-darpan-contract-version": 1,
+        "version": "1.3.0",
+        "x-darpan-contract-version": 2,
         "description": "GENERATED from the facade service XML \u2014 do not edit by hand. Regenerate with ./gradlew :runtime:component:darpan:generateApiContract.\n\nTransport: JSON-RPC 2.0 over POST /rpc/json. Auth channels: browser SPA uses the HttpOnly darpan_login_key cookie + CSRF token (canonical); integration callers and no-credentialed-CORS fallbacks use the login_key header (in-memory only, never query params). HTTP status is 200 for every dispatched call; distinguish outcomes by shape. JSON-RPC error object: protocol failures (-32700 parse, -32600 invalid request, -32601 method not found, -32602 invalid params), unhandled service errors (code 500), authorization denial (code 403). Facade business validation instead returns a success envelope with result.ok=false and result.errors[]."
     },
     "servers": [
@@ -5826,6 +5826,58 @@
                                 }
                             }
                         }
+                    },
+                    "file1ExcludeFilters": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "excludeFilter": {
+                                    "type": "object",
+                                    "properties": {
+                                        "fieldExpression": {
+                                            "type": "string"
+                                        },
+                                        "operator": {
+                                            "type": "string"
+                                        },
+                                        "values": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Record-exclusion rules for FILE_1, created alongside the compare source.\n                    Omitted or empty means no exclusion filters at creation."
+                    },
+                    "file2ExcludeFilters": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "excludeFilter": {
+                                    "type": "object",
+                                    "properties": {
+                                        "fieldExpression": {
+                                            "type": "string"
+                                        },
+                                        "operator": {
+                                            "type": "string"
+                                        },
+                                        "values": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Record-exclusion rules for FILE_2, created alongside the compare source.\n                    Omitted or empty means no exclusion filters at creation."
                     }
                 },
                 "required": [
@@ -6001,6 +6053,62 @@
                                                         "type": "string"
                                                     },
                                                     "action": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "file1ExcludeFilters": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "excludeFilter": {
+                                            "type": "object",
+                                            "properties": {
+                                                "sequenceNum": {
+                                                    "type": "integer"
+                                                },
+                                                "fieldExpression": {
+                                                    "type": "string"
+                                                },
+                                                "operator": {
+                                                    "type": "string"
+                                                },
+                                                "values": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "file2ExcludeFilters": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "excludeFilter": {
+                                            "type": "object",
+                                            "properties": {
+                                                "sequenceNum": {
+                                                    "type": "integer"
+                                                },
+                                                "fieldExpression": {
+                                                    "type": "string"
+                                                },
+                                                "operator": {
+                                                    "type": "string"
+                                                },
+                                                "values": {
+                                                    "type": "array",
+                                                    "items": {
                                                         "type": "string"
                                                     }
                                                 }
@@ -7020,6 +7128,10 @@
                     },
                     "errorMessage": {
                         "type": "string"
+                    },
+                    "errorDetail": {
+                        "type": "string",
+                        "description": "Full failure text. errorMessage is capped at 255 chars to fit a text-medium column,\n                    which truncates real Spark/service errors mid-sentence \u2014 routinely cutting off the\n                    part that names the fix (e.g. the \"Did you mean [...]\" column suggestion). This is\n                    the untruncated text-very-long copy the run row already stored."
                     },
                     "steps": {
                         "type": "array",
@@ -8536,6 +8648,62 @@
                                             }
                                         }
                                     }
+                                },
+                                "file1ExcludeFilters": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "excludeFilter": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "sequenceNum": {
+                                                        "type": "integer"
+                                                    },
+                                                    "fieldExpression": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    },
+                                                    "values": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "file2ExcludeFilters": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "excludeFilter": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "sequenceNum": {
+                                                        "type": "integer"
+                                                    },
+                                                    "fieldExpression": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    },
+                                                    "values": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -9801,6 +9969,32 @@
                                 },
                                 "omsRestSourceConfigId": {
                                     "type": "string"
+                                },
+                                "excludeFilters": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "excludeFilter": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "fieldExpression": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    },
+                                                    "values": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "description": "Record-exclusion rules for this source's fileSide, mirroring the rule\n                        set's own filters. Omitted means leave the previously-saved rows unchanged (or, on\n                        a first save, seed from the rule set); an explicit list (including an empty one)\n                        replaces them. See save#Automation's source-recreate comment for why omission\n                        cannot mean \"no-op\" here the way it does elsewhere."
                                 }
                             }
                         }
@@ -10353,6 +10547,58 @@
                                 }
                             }
                         }
+                    },
+                    "file1ExcludeFilters": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "excludeFilter": {
+                                    "type": "object",
+                                    "properties": {
+                                        "fieldExpression": {
+                                            "type": "string"
+                                        },
+                                        "operator": {
+                                            "type": "string"
+                                        },
+                                        "values": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Record-exclusion rules for FILE_1. Omit to leave existing rules unchanged;\n                    send an empty list to clear them."
+                    },
+                    "file2ExcludeFilters": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "excludeFilter": {
+                                    "type": "object",
+                                    "properties": {
+                                        "fieldExpression": {
+                                            "type": "string"
+                                        },
+                                        "operator": {
+                                            "type": "string"
+                                        },
+                                        "values": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Record-exclusion rules for FILE_2. Omit to leave existing rules unchanged;\n                    send an empty list to clear them."
                     }
                 },
                 "required": [
@@ -10529,6 +10775,62 @@
                                                         "type": "string"
                                                     },
                                                     "action": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "file1ExcludeFilters": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "excludeFilter": {
+                                            "type": "object",
+                                            "properties": {
+                                                "sequenceNum": {
+                                                    "type": "integer"
+                                                },
+                                                "fieldExpression": {
+                                                    "type": "string"
+                                                },
+                                                "operator": {
+                                                    "type": "string"
+                                                },
+                                                "values": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "file2ExcludeFilters": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "excludeFilter": {
+                                            "type": "object",
+                                            "properties": {
+                                                "sequenceNum": {
+                                                    "type": "integer"
+                                                },
+                                                "fieldExpression": {
+                                                    "type": "string"
+                                                },
+                                                "operator": {
+                                                    "type": "string"
+                                                },
+                                                "values": {
+                                                    "type": "array",
+                                                    "items": {
                                                         "type": "string"
                                                     }
                                                 }
@@ -10914,7 +11216,7 @@
                 "required": [
                     "reconciliationRunResultId"
                 ],
-                "description": "Remove the caller's notify-me subscription for one run."
+                "description": "Remove the caller's notify-me subscription for one run. Caller-scoped: only the caller's own\n            row for that run is ever deleted. Reports an ERROR when there was nothing to remove instead of\n            reporting success \u2014 a retried automation carries subscriptions forward onto the new attempt's\n            run-result row, so a miss on an older id can mean the subscription is alive somewhere else and\n            still due to fire."
             },
             "UnsubscribeRunNotificationResult": {
                 "type": "object",

@@ -182,8 +182,9 @@
           <InlineValidation
             v-if="liveRunFailed"
             tone="error"
+            class="run-result-failure"
             data-testid="run-result-live-failed"
-            :message="runStatus?.errorMessage || 'Run failed before any results were produced.'"
+            :message="liveRunFailureText"
           />
           <p
             v-else-if="!savedOutput && liveRunNote"
@@ -705,6 +706,16 @@ async function cancelRun(): Promise<void> {
     cancelBusy.value = false
   }
 }
+
+// `errorMessage` is capped at 255 chars server-side to fit a text-medium column, which cuts real
+// Spark/service errors off mid-sentence — routinely losing the half that names the fix (the
+// "Did you mean [...]" suggestion sat just past the cut). The run row already stores the full text
+// in `errorDetail`, so prefer it and keep the truncated copy only as a fallback for older rows.
+const liveRunFailureText = computed(() => (
+  normalizeDisplayText(runStatus.value?.errorDetail)
+  || normalizeDisplayText(runStatus.value?.errorMessage)
+  || 'Run failed before any results were produced.'
+))
 
 // Timeline rows for display: the actual step rows, plus — while the run is live — a synthesized
 // "Pending" row for each canonical stage the run has not reached yet, so the operator sees
@@ -1433,6 +1444,14 @@ watch([savedRunId, outputFileName], () => {
 .run-result-step__meta {
   color: var(--text-soft);
   font-variant-numeric: tabular-nums;
+}
+
+/* errorDetail is stored up to 12000 chars, so a stack-trace-shaped failure would otherwise push
+   the whole page down. Scroll it in place and keep the server's own line breaks. */
+.run-result-failure {
+  max-height: 12rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
 }
 
 .run-result-step__error {

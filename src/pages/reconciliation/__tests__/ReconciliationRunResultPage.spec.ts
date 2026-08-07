@@ -1659,6 +1659,42 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.find('[data-testid="run-result-cancel"]').exists()).toBe(false)
   })
 
+  it('prefers the untruncated errorDetail over the 255-char errorMessage', async () => {
+    // errorMessage is capped at 255 chars to fit a text-medium column, which cuts real Spark
+    // errors off mid-sentence — losing exactly the part that names the fix. The run row already
+    // stores the full text in errorDetail; the operator-facing surface must show that instead.
+    enterLiveRunRoute('RR_LIVE_FAIL_DETAIL')
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_FAILED',
+      errorMessage: 'A column or function parameter with name `returns` cannot be re',
+      errorDetail: 'A column or function parameter with name `returns` cannot be resolved. '
+        + 'Did you mean one of the following? [`records`, `metadata`].',
+      steps: [{ stageCode: 'COMPARE', stageSequence: 4, statusEnumId: 'AUT_STAT_FAILED' }],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    const failed = wrapper.get('[data-testid="run-result-live-failed"]').text()
+    expect(failed).toContain('Did you mean one of the following? [`records`, `metadata`]')
+  })
+
+  it('falls back to errorMessage when no errorDetail was captured', async () => {
+    enterLiveRunRoute('RR_LIVE_FAIL_NODETAIL')
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_FAILED',
+      errorMessage: 'Spark compare failed: boom',
+      steps: [{ stageCode: 'COMPARE', stageSequence: 4, statusEnumId: 'AUT_STAT_FAILED' }],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-result-live-failed"]').text()).toContain('Spark compare failed: boom')
+  })
+
   it('surfaces the failure and the failing step when a live run fails', async () => {
     enterLiveRunRoute('RR_LIVE_FAIL')
     getReconciliationRunStatus.mockResolvedValue({
