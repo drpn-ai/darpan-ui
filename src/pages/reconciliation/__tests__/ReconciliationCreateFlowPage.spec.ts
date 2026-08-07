@@ -1281,6 +1281,26 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(wrapper.findAll('[data-testid="workflow-chip-text-chip"]')).toHaveLength(2)
   })
 
+  it('advances the step when a primary id is typed but never Enter-ed', async () => {
+    // The chip input only commits on Enter, so a typed-but-uncommitted column left the draft empty,
+    // canProceed false, and "Next" doing nothing at all -- no chip, no error, no movement. Same
+    // trap that made rule-set exclusions look inert on sm-darpan (DAR-CLIENT-003).
+    //
+    // jsdom does not blur the input when the button is clicked, so this exercises the parent's
+    // explicit flush in handlePrimarySubmit rather than the component's @blur -- which is exactly
+    // the wiring that a production build (where <script setup> is closed without defineExpose)
+    // would otherwise break.
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+    await advanceToFile1PrimaryIdStep(wrapper, 'DftCsv')
+
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('return_id')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="workflow-chip-text-input"]').exists()).toBe(false)
+  })
+
   describe('rules board as the final step', () => {
     it('ends the wizard on the rules board', async () => {
       const wrapper = await mountCreateFlow({ draft: apiToApiDraft })

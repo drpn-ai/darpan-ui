@@ -8,6 +8,7 @@
       :disabled="disabled"
       v-model="pendingValue"
       @keydown.enter.prevent="commitPendingValue"
+      @blur="commitPendingValue"
     />
     <div v-if="modelValue.length" class="workflow-select-chip-row">
       <span
@@ -30,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -47,9 +48,16 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:modelValue': [value: string[]]
+  'update:pending': [value: string]
 }>()
 
 const pendingValue = ref('')
+
+// Report uncommitted text upward so a step can tell "typed but not Entered" apart from "empty".
+// Without this the wizard's canProceed sees only committed chips, disables its own OK button, and
+// the operator cannot submit OR blur their way out of it -- a disabled button receives no mouse
+// events and takes no focus, so @blur below never fires either.
+watch(pendingValue, (value) => emit('update:pending', value))
 
 function commitPendingValue(): void {
   const trimmed = pendingValue.value.trim()
@@ -62,6 +70,13 @@ function commitPendingValue(): void {
 function removeChip(value: string): void {
   emit('update:modelValue', props.modelValue.filter((entry) => entry !== value))
 }
+
+// Typed text only becomes a chip on Enter, so anything still pending when the step is submitted
+// would be silently dropped -- and because the step's canProceed reads the committed chips, the
+// operator gets a Next button that does nothing rather than an error. @blur covers the ordinary
+// browser sequence (pointerdown blurs the input before the button's click fires); this exposed
+// flush is what a parent calls to guarantee it regardless of where focus happens to be.
+defineExpose({ commitPendingValue })
 </script>
 
 <style scoped>

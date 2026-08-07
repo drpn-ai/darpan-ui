@@ -63,9 +63,11 @@
 
       <template v-else-if="isChipTextStep">
         <WorkflowChipTextInput
+          ref="chipTextInputRef"
           v-model="activeChipTextValue"
           data-testid="workflow-chip-text"
           :placeholder="currentPlaceholder"
+          @update:pending="chipPendingValue = $event"
         />
       </template>
 
@@ -508,6 +510,19 @@ const activeSelectValues = computed<string[]>({
   },
 })
 
+const chipTextInputRef = ref<InstanceType<typeof WorkflowChipTextInput> | null>(null)
+const chipPendingValue = ref('')
+
+// Text typed into the chip input but not yet Entered still counts as an answer for this step.
+// Otherwise canProceed is false, the OK button renders disabled, and the operator has no way to
+// commit the value they can plainly see in the box.
+const hasPendingChipText = computed(() => isChipTextStep.value && chipPendingValue.value.trim().length > 0)
+
+// The chip input is remounted per step and starts empty, but a fresh empty ref emits nothing --
+// so without this reset an abandoned value (operator typed, then hit Back) would linger and
+// wrongly satisfy the NEXT chip step.
+watch(currentStepIndex, () => { chipPendingValue.value = '' })
+
 const activeChipTextValue = computed<string[]>({
   get: () => {
     if (currentStep.value.id === 'file1-primary-id') return file1PrimaryIdExpression.value
@@ -763,7 +778,7 @@ const canProceed = computed(() => {
     case 'file1-schema':
       return file1JsonSchemaId.value.length > 0 && !schemaSelectionError.value
     case 'file1-primary-id':
-      return file1PrimaryIdExpression.value.length > 0 && !schemaFieldSelectionError.value
+      return (file1PrimaryIdExpression.value.length > 0 || hasPendingChipText.value) && !schemaFieldSelectionError.value
     case 'file1-api-config':
       return file1SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
     case 'file1-api':
@@ -777,7 +792,7 @@ const canProceed = computed(() => {
     case 'file2-schema':
       return file2JsonSchemaId.value.length > 0 && !schemaSelectionError.value
     case 'file2-primary-id':
-      return file2PrimaryIdExpression.value.length > 0 && !schemaFieldSelectionError.value
+      return (file2PrimaryIdExpression.value.length > 0 || hasPendingChipText.value) && !schemaFieldSelectionError.value
     case 'file2-api-config':
       return file2SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
     case 'file2-api':
@@ -1331,6 +1346,11 @@ async function loadOptions(): Promise<void> {
 }
 
 async function handlePrimarySubmit(): Promise<void> {
+  // Commit whatever is still sitting in the chip input before anything reads the draft. Without
+  // this, a primary-id typed but never Enter-ed is dropped, canProceed stays false and the step
+  // silently refuses to advance -- the same trap that made rule-set exclusions look inert.
+  chipTextInputRef.value?.commitPendingValue()
+
   if (isCreateStep.value) {
     await createRun()
     return
