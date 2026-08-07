@@ -1110,6 +1110,63 @@ describe('ReconciliationRuleSetEditorPage', () => {
       )
     })
 
+    it('commits a typed value that was never Enter-ed when the operator clicks Save exclusion', async () => {
+      // sm-darpan 2026-08-06 (DAR-CLIENT-003): the operator typed a value and clicked "Save
+      // exclusion" without pressing Enter first. The input only committed on Enter, and
+      // applyExclusionEdit never flushed pendingExclusionValue -- so editingExclusionValues was
+      // empty, which is the DELETE branch. The typed value was discarded, no ⊘ mark appeared, and
+      // no request was ever made. Every test above presses Enter first, which is why the suite
+      // stayed green while the feature was unusable. Typing then clicking Save must persist.
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
+      await wrapper.get('[data-testid="ruleset-exclusion-value-input"]').setValue('POS_SALES_CHANNEL')
+      await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
+      await flushPromises()
+
+      // The mark is the operator's only feedback that the exclusion registered at all.
+      expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(true)
+
+      await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      expect(saveRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file1ExcludeFilters: [
+            { fieldExpression: EXCLUDED_FIELD_PATH, operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
+          ],
+        }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    it('still deletes the exclusion when Delete is clicked with text left in the input', async () => {
+      // The flush added above must not resurrect a rule the operator is deleting: Delete clears the
+      // committed chips and reuses applyExclusionEdit, so leftover pending text would otherwise
+      // come straight back as a fresh rule.
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
+      const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
+      await input.setValue('POS_SALES_CHANNEL')
+      await input.trigger('keydown', { key: 'Enter' })
+      await input.setValue('TYPED_BUT_ABANDONED')
+      await wrapper.get('[data-testid="ruleset-exclusion-delete"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(false)
+
+      await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      expect(saveRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({ file1ExcludeFilters: [] }),
+        expect.any(AbortSignal),
+      )
+    })
+
     it('preserves a run other exclusions when one of them is reopened and edited', async () => {
       // FINAL-REVIEW CRITICAL 2. The draft here is built the way a real reopened run builds it —
       // through buildRuleSetDraft, from the wire shape list#SavedRuns returns. Before the hydration

@@ -1068,6 +1068,13 @@ function applyExclusionEdit(): void {
   const editing = editingExclusion.value
   if (!editing || !draft.value) return
 
+  // Flush whatever is still sitting in the value input. The input only commits on Enter, so an
+  // operator who types a value and goes straight for "Save exclusion" -- the obvious gesture --
+  // used to land here with editingExclusionValues empty, which is the delete branch below: the
+  // typed value was dropped, no mark appeared, and nothing was ever sent. That is what made
+  // exclusions look inert on sm-darpan (DAR-CLIENT-003).
+  commitPendingExclusionValue()
+
   const others = excludeFiltersFor(editing.side).filter((filter) => !sameField(filter.fieldExpression, editing.fieldPath))
   const next = editingExclusionValues.value.length
     ? [...others, { fieldExpression: editing.fieldPath, operator: 'EXCLUDE_IN', values: [...editingExclusionValues.value] }]
@@ -1080,6 +1087,10 @@ function applyExclusionEdit(): void {
 }
 
 function deleteEditingExclusion(): void {
+  // Clear the pending text too, not just the committed chips: applyExclusionEdit now flushes the
+  // input, so leftover half-typed text would otherwise come straight back as a fresh rule and
+  // Delete would not delete.
+  pendingExclusionValue.value = ''
   editingExclusionValues.value = []
   applyExclusionEdit()
 }
