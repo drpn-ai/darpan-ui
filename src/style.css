@@ -865,14 +865,27 @@ button:disabled {
   height: var(--static-tile-min-height);
 }
 
+/* Two explicit rows so a page-level banner sits at the top while the panel stays vertically
+   centred. Rows are assigned explicitly rather than by source order: with no banner, row 1
+   collapses to zero height and the panel still centres in row 2 — relying on order would top-align
+   the panel whenever the banner was absent. */
 .login-page {
   min-height: 78vh;
   display: grid;
-  place-items: center;
+  grid-template-rows: auto 1fr;
+  justify-items: center;
+  align-items: center;
   padding: var(--space-5) 0;
 }
 
+.login-page-banner {
+  grid-row: 1;
+  width: min(460px, 100%);
+  margin-bottom: var(--space-4);
+}
+
 .login-panel {
+  grid-row: 2;
   width: min(460px, 100%);
   display: grid;
   gap: var(--space-3);
@@ -1242,9 +1255,41 @@ label > span {
   color: color-mix(in oklab, var(--danger) 88%, var(--text));
 }
 
+.inline-validation.warning {
+  border-color: color-mix(in oklab, var(--warning) 42%, var(--border));
+  color: color-mix(in oklab, var(--warning) 88%, var(--text));
+}
+
 .inline-validation.info {
   border-color: var(--border);
   color: var(--text-soft);
+}
+
+/* Password policy checklist under the new-password field. Monochrome like the rest of the system:
+   a met rule reads at full text colour, an unmet one stays muted — no green/red pass-fail. */
+.password-rules {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-00);
+  font-size: var(--type-label-size);
+  font-weight: 400;
+}
+
+.password-rules li {
+  display: grid;
+  grid-template-columns: 1rem 1fr;
+  align-items: baseline;
+  color: color-mix(in oklab, var(--text) 45%, transparent);
+}
+
+.password-rules li.met {
+  color: var(--text);
+}
+
+.password-rule-mark {
+  text-align: center;
 }
 
 .success-copy {

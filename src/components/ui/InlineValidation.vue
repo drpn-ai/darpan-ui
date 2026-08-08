@@ -9,7 +9,7 @@ import { ref, watch } from 'vue'
 
 const props = defineProps<{
   message: string
-  tone?: 'error' | 'info'
+  tone?: 'error' | 'warning' | 'info'
 }>()
 
 const visible = ref(true)

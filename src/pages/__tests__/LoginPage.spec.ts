@@ -139,10 +139,73 @@ describe('LoginPage', () => {
   it('offers the password change instead of a dead-end error when the account must change it', async () => {
     const wrapper = await signInIntoPasswordChange()
 
-    expect(wrapper.text()).toContain('Change Password')
     expect(wrapper.text()).toContain('Your password must be changed before you can sign in.')
     expect(wrapper.text()).toContain('Enter your new password.')
     expect(replace).not.toHaveBeenCalled()
+  })
+
+  // The step's own question ("Enter your new password.") already says what to do, so a
+  // "Change Password" title above it only repeated the instruction in bigger type.
+  it('drops the redundant Change Password heading in change mode', async () => {
+    const wrapper = await signInIntoPasswordChange()
+
+    expect(wrapper.find('h1').exists()).toBe(false)
+  })
+
+  // The refusal is a standing condition the user has to act on, not body copy — it reads as a
+  // banner so it is not mistaken for part of the question.
+  it('renders the must-change refusal as a warning banner rather than plain body text', async () => {
+    const wrapper = await signInIntoPasswordChange()
+
+    const banner = wrapper.get('[data-testid="password-change-notice"]')
+    expect(banner.classes()).toContain('inline-validation')
+    expect(banner.classes()).toContain('warning')
+    expect(banner.text()).toBe('Your password must be changed before you can sign in.')
+  })
+
+  // The refusal applies to the whole sign-in attempt, not to one field, so it sits at page level
+  // above the panel rather than inside it.
+  it('places the refusal banner outside the login panel', async () => {
+    const wrapper = await signInIntoPasswordChange()
+
+    expect(wrapper.find('.login-panel [data-testid="password-change-notice"]').exists()).toBe(false)
+    expect(wrapper.find('.login-page > [data-testid="password-change-notice"]').exists()).toBe(true)
+  })
+
+  // Backend policy is MoquiDefaultConf <password min-length="8" min-digits="1" min-others="1">.
+  // Without these stated up front the only way to discover them was to be rejected by the server.
+  it('states the password rules and marks each one live as it is satisfied', async () => {
+    const wrapper = await signInIntoPasswordChange()
+    const ruleState = () => ({
+      length: wrapper.get('[data-testid="password-rule-length"]').attributes('data-met'),
+      digit: wrapper.get('[data-testid="password-rule-digit"]').attributes('data-met'),
+      other: wrapper.get('[data-testid="password-rule-other"]').attributes('data-met'),
+    })
+
+    expect(ruleState()).toEqual({ length: 'false', digit: 'false', other: 'false' })
+
+    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdefgh')
+    expect(ruleState()).toEqual({ length: 'true', digit: 'false', other: 'false' })
+
+    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdefg1')
+    expect(ruleState()).toEqual({ length: 'true', digit: 'true', other: 'false' })
+
+    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdef1!')
+    expect(ruleState()).toEqual({ length: 'true', digit: 'true', other: 'true' })
+  })
+
+  it('blocks the change step until the new password satisfies every rule', async () => {
+    const wrapper = await signInIntoPasswordChange()
+    const primary = () => wrapper.get('[data-testid="login-password-next"]')
+
+    await wrapper.get('input[autocomplete="new-password"]').setValue('short1!')
+    expect(primary().attributes('disabled')).toBeDefined()
+
+    await wrapper.get('input[autocomplete="new-password"]').setValue('longenoughbutnodigit!')
+    expect(primary().attributes('disabled')).toBeDefined()
+
+    await wrapper.get('input[autocomplete="new-password"]').setValue('N3w-password!')
+    expect(primary().attributes('disabled')).toBeUndefined()
   })
 
   it('does not ask again for the password login already accepted', async () => {
@@ -181,18 +244,21 @@ describe('LoginPage', () => {
     expect(wrapper.text()).toContain('New passwords do not match.')
   })
 
+  // Uses a password that satisfies every client-side rule, because the ones the client can check
+  // (length, digit, symbol) no longer reach the backend at all. What remains server-only is
+  // history-limit="5" — reuse of a previous password, which the browser cannot know about.
   it('keeps the user in the change panel when the backend refuses the new password', async () => {
     const wrapper = await signInIntoPasswordChange()
 
     changeExpiredPassword.mockImplementation(async () => {
-      authState.error = 'Password shorter than 8 characters'
+      authState.error = 'Password was used too recently'
       return false
     })
-    await completePasswordStep(wrapper, 'short')
-    await completePasswordStep(wrapper, 'short')
+    await completePasswordStep(wrapper, 'N3w-password!')
+    await completePasswordStep(wrapper, 'N3w-password!')
 
-    expect(wrapper.text()).toContain('Password shorter than 8 characters')
-    expect(wrapper.text()).toContain('Change Password')
+    expect(wrapper.text()).toContain('Password was used too recently')
+    expect(wrapper.text()).toContain('Enter your new password')
     expect(replace).not.toHaveBeenCalled()
   })
 

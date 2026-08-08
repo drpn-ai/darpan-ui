@@ -1,8 +1,20 @@
 <template>
   <main class="login-page">
+    <!-- Page-level, above the panel: the account is refused sign-in entirely, so the notice belongs
+         to the whole screen rather than sitting inside the box as if it described one field. -->
+    <InlineValidation
+      v-if="passwordChangeNotice"
+      class="login-page-banner"
+      data-testid="password-change-notice"
+      tone="warning"
+      :message="passwordChangeNotice"
+    />
+
     <section class="login-panel">
       <p class="eyebrow">Darpan</p>
-      <h1>{{ isChangingPasswordMode ? 'Change Password' : 'Sign In' }}</h1>
+      <!-- No heading in change mode: the step's own question ("Enter your new password.") is the
+           instruction, and a title above it only restated that in larger type. -->
+      <h1 v-if="!isChangingPasswordMode">Sign In</h1>
 
       <form v-if="!isChangingPasswordMode" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
         <label>
@@ -21,8 +33,6 @@
       </form>
 
       <template v-else>
-        <p class="section-note">{{ passwordChangeNotice }}</p>
-
         <WorkflowStepForm
           :question="passwordStepQuestion"
           :primary-label="passwordPrimaryLabel"
@@ -44,6 +54,21 @@
               required
             />
           </label>
+
+          <!-- Stated up front and checked as the user types. Without this the only way to discover
+               the backend's policy was to be rejected by it after submitting. -->
+          <ul v-if="isChoosingNewPassword" class="password-rules" aria-label="Password requirements">
+            <li
+              v-for="rule in passwordRules"
+              :key="rule.id"
+              :data-testid="`password-rule-${rule.id}`"
+              :data-met="String(rule.met)"
+              :class="{ met: rule.met }"
+            >
+              <span aria-hidden="true" class="password-rule-mark">{{ rule.met ? '✓' : '·' }}</span>
+              <span>{{ rule.label }}</span>
+            </li>
+          </ul>
         </WorkflowStepForm>
       </template>
 
@@ -120,9 +145,32 @@ const passwordStepValue = computed({
     }
   },
 })
+// Mirrors the backend policy in MoquiDefaultConf's <user-facade><password ...>:
+// min-length="8" min-digits="1" min-others="1". Kept in one place so the helper text, the live
+// checks and the submit gate can never drift apart. history-limit="5" is deliberately not listed:
+// only the server can know a user's previous passwords, so it stays a server-side rejection.
+const PASSWORD_MIN_LENGTH = 8
+
+const isChoosingNewPassword = computed(() => passwordStep.value.name === 'newPassword')
+
+const passwordRules = computed(() => {
+  const value = passwordForm.value.newPassword
+  return [
+    { id: 'length', label: `At least ${PASSWORD_MIN_LENGTH} characters`, met: value.length >= PASSWORD_MIN_LENGTH },
+    { id: 'digit', label: 'At least one number', met: /\d/.test(value) },
+    { id: 'other', label: 'At least one symbol (not a letter or number)', met: /[^\p{L}\p{N}]/u.test(value) },
+  ]
+})
+
+const newPasswordSatisfiesPolicy = computed(() => passwordRules.value.every((rule) => rule.met))
+
 const isPasswordStepBlocked = computed(() => {
   if (isSubmittingPasswordChange.value) return true
-  return passwordStepValue.value.trim().length === 0
+  if (passwordStepValue.value.trim().length === 0) return true
+  // Block the first step on the policy itself rather than letting the user submit and be refused by
+  // the server — the rules are known here, so the round trip teaches nothing.
+  if (isChoosingNewPassword.value) return !newPasswordSatisfiesPolicy.value
+  return false
 })
 
 const errorText = computed(() => {
