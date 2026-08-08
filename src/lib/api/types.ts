@@ -96,9 +96,20 @@ export interface ChangeOwnPasswordResponse extends ApiEnvelope {
   sessionInfo?: SessionInfo | null
 }
 
+/** Why a correct username/password pair still cannot sign in: `PWDCHG` when the account is flagged to
+ *  change its password at next login (every admin-created and admin-reset account is), `PWDTIM` when the
+ *  current password has aged past the rotation window. Both are recoverable by changing the password. */
+export type PasswordChangeReason = 'PWDCHG' | 'PWDTIM'
+
 export interface LoginSessionResponse extends ApiEnvelope, AuthTokenContract {
   authenticated: boolean
   sessionInfo?: SessionInfo | null
+  passwordChangeRequired?: boolean
+  passwordChangeReason?: PasswordChangeReason
+}
+
+export interface ChangeExpiredPasswordResponse extends ApiEnvelope {
+  passwordUpdated?: boolean
 }
 
 // Migration template (MACH P1): sourced from the generated OpenAPI contract types

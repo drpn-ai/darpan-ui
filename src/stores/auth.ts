@@ -6,8 +6,10 @@ import { authFacade, clearApiResponseCache, settingsFacade } from '../lib/api/fa
 import { useReferenceDataStore } from './referenceData'
 import { useRunResultsStore } from './runResults'
 import type {
+  ChangeExpiredPasswordResponse,
   ChangeOwnPasswordResponse,
   LoginSessionResponse,
+  PasswordChangeReason,
   SaveActiveTenantResponse,
   SaveTenantSettingsResponse,
   SaveUserSettingsResponse,
@@ -138,6 +140,9 @@ export const useAuthStore = defineStore('auth', () => {
   const _error = ref<string | null>(null)
   const _status = ref<AuthStatus>('unauthenticated')
   const _sessionInfo = ref<SessionInfo | null>(null)
+  // Set only by a login whose credentials were correct but whose account cannot sign in until its password
+  // changes. LoginPage reads it to offer the change inline instead of a dead-end error.
+  const _passwordChangeReason = ref<PasswordChangeReason | null>(null)
   // Single in-flight ensureAuthenticated promise. Without this, concurrent 401 callbacks (e.g.
   // every page-init API call fans out and all 401 at once) each schedule their own getSessionInfo
   // call, stampeding the auth endpoint and producing flicker in the UI status. Mirror the
@@ -148,6 +153,7 @@ export const useAuthStore = defineStore('auth', () => {
   const error = computed(() => _error.value)
   const status = computed(() => _status.value)
   const sessionInfo = computed(() => _sessionInfo.value)
+  const passwordChangeReason = computed(() => _passwordChangeReason.value)
   const authenticated = computed(() => _status.value === 'authenticated')
   const userId = computed(() => _sessionInfo.value?.userId ?? null)
   const username = computed(() => _sessionInfo.value?.username ?? _sessionInfo.value?.userId ?? null)
@@ -265,8 +271,21 @@ export const useAuthStore = defineStore('auth', () => {
       return true
     }
 
+    _passwordChangeReason.value = null
+
     try {
       const response = await authFacade.loginSession(usernameArg, password)
+      if (response.passwordChangeRequired === true) {
+        // Credentials were accepted; only the session is withheld. The backend reports this as a completed
+        // call with the explanation in `messages`, so _applyAuthResponse's errors-based text does not apply.
+        _passwordChangeReason.value = response.passwordChangeReason ?? 'PWDCHG'
+        clearAuthToken()
+        _applyAuthState({
+          status: 'unauthenticated',
+          error: response.messages?.[0] ?? 'Your password must be changed before you can sign in.',
+        })
+        return false
+      }
       if (response.authenticated) {
         const authToken = response.authToken?.toString()?.trim()
         if (!authToken) throw new Error('Authenticated login response missing authToken')
@@ -506,6 +525,30 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** Change the password of an account that cannot sign in yet, so it can. Deliberately does not touch
+   *  session state: the backend issues no token here, and the caller signs in normally afterwards. */
+  async function changeExpiredPassword(payload: {
+    username: string
+    currentPassword: string
+    newPassword: string
+    newPasswordVerify: string
+  }): Promise<boolean> {
+    if (authBypass) return true
+
+    try {
+      const response: ChangeExpiredPasswordResponse = await authFacade.changeExpiredPassword(payload)
+      const changed = response.ok && response.passwordUpdated === true
+      if (changed) _passwordChangeReason.value = null
+      _error.value = changed ? null : response.errors?.[0] ?? 'Unable to change password.'
+      return changed
+    } catch (err) {
+      // The backend reports a rejected new password as a service error rather than an envelope, so the
+      // policy text ("shorter than 8 characters", "was used in last 5 passwords") arrives here.
+      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      return false
+    }
+  }
+
   async function verifyOwnPassword(currentPassword: string): Promise<boolean> {
     if (authBypass) return true
 
@@ -547,6 +590,7 @@ export const useAuthStore = defineStore('auth', () => {
     authenticated,
     userId,
     username,
+    passwordChangeReason,
     ensureAuthenticated,
     handleExternalAuthChange,
     loginWithCredentials,
@@ -555,6 +599,7 @@ export const useAuthStore = defineStore('auth', () => {
     saveUserSettings,
     saveTenantSettings,
     changeOwnPassword,
+    changeExpiredPassword,
     verifyOwnPassword,
   }
 })

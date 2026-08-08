@@ -15,6 +15,7 @@ export function clearApiResponseCache(): void {
 }
 import type {
   CreateRuleSetRunResponse,
+  ChangeExpiredPasswordResponse,
   ChangeOwnPasswordResponse,
   DeleteJsonSchemaResponse,
   DeleteAutomationResponse,
@@ -79,6 +80,7 @@ import type {
   ValidateJsonResponse,
 } from './types'
 import type {
+  ChangeExpiredPasswordPayload,
   ChangeOwnPasswordPayload,
   CreateRuleSetRunPayload,
   DeleteAutomationPayload,
@@ -140,6 +142,7 @@ const AUTH = {
   saveUserSettings: 'facade.AuthFacadeServices.save#UserSettings',
   verifyOwnPassword: 'facade.AuthFacadeServices.verify#OwnPassword',
   changeOwnPassword: 'facade.AuthFacadeServices.change#OwnPassword',
+  changeExpiredPassword: 'facade.AuthFacadeServices.change#ExpiredPassword',
   logoutSession: 'facade.AuthFacadeServices.logout#Session',
 }
 
@@ -225,6 +228,11 @@ export const authFacade = {
   },
   changeOwnPassword(payload: ChangeOwnPasswordPayload, signal?: AbortSignal): Promise<ChangeOwnPasswordResponse> {
     return callService<ChangeOwnPasswordResponse>(AUTH.changeOwnPassword, payload, signal)
+  },
+  /** Pre-session password change for an account login refuses until its password changes.
+   *  Issues no token — the caller signs in normally afterwards with the new password. */
+  changeExpiredPassword(payload: ChangeExpiredPasswordPayload, signal?: AbortSignal): Promise<ChangeExpiredPasswordResponse> {
+    return callService<ChangeExpiredPasswordResponse>(AUTH.changeExpiredPassword, payload, signal)
   },
   logoutSession(signal?: AbortSignal): Promise<LogoutSessionResponse> {
     return callService<LogoutSessionResponse>(AUTH.logoutSession, {}, signal)

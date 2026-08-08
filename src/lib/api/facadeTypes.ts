@@ -20,6 +20,15 @@ export interface ChangeOwnPasswordPayload {
   newPasswordVerify: string
 }
 
+/** Carries `username` because there is no session to infer it from — this runs before sign-in, for an
+ *  account that login refuses until its password changes. */
+export interface ChangeExpiredPasswordPayload {
+  username: string
+  currentPassword: string
+  newPassword: string
+  newPasswordVerify: string
+}
+
 // ─── Settings ────────────────────────────────────────────────────────────────
 
 export interface GetLlmSettingsPayload {
