@@ -193,6 +193,14 @@
             rows="1"
           />
         </label>
+
+        <div v-if="editWarning" class="shared-edit-warning" data-testid="shared-edit-warning">
+          <InlineValidation tone="warning" :message="editWarning" />
+          <label class="checkbox-inline">
+            <input type="checkbox" v-model="sharedEditConfirmed" class="app-table__checkbox" data-testid="shared-edit-confirm" />
+            <span>Save for every tenant listed above</span>
+          </label>
+        </div>
       </template>
 
       <template v-else>
@@ -357,6 +365,13 @@
         </label>
       </template>
     </WorkflowStepForm>
+
+    <SharedWithPanel
+      v-if="isEditing"
+      :config-type="SHARED_CONFIG_TYPES.netSuiteAuth"
+      :config-id="activeAuthConfigId"
+      @changed="loadSharing"
+    />
   </WorkflowPage>
 </template>
 
@@ -369,11 +384,13 @@ import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
-import { ApiCallError } from '../../lib/api/client'
+import SharedWithPanel from '../../components/settings/SharedWithPanel.vue'
+import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
-import type { NsAuthConfigRecord } from '../../lib/api/types'
+import { SHARED_CONFIG_TYPES, sharedEditWarning } from '../../lib/sharedConfig'
+import type { ConfigSharing, NsAuthConfigRecord } from '../../lib/api/types'
 import type { SaveNsAuthConfigPayload } from '../../lib/api/facadeTypes'
 import { CONFIG_ID_MAX_LENGTH, exceedsConfigIdMaxLength } from './configId'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
@@ -465,10 +482,16 @@ const success = ref<string | null>(null)
 const currentStepIndex = ref(0)
 const selectedScopeValues = ref<string[]>(parseScopeValue(defaultScopeValue))
 const showClientId = ref(false)
+const sharing = ref<ConfigSharing | null>(null)
+const sharedEditConfirmed = ref(false)
 
 const activeAuthConfigId = computed(() => String(route.params.nsAuthConfigId ?? '').trim())
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const isEditing = computed(() => activeAuthConfigId.value.length > 0)
+// DAR-BE-005: editing a shared config changes it for every tenant in the group. memberCount
+// counts the owner plus peers, so sharedEditWarning() returns null for an unshared config and
+// the save path is unchanged for the common case.
+const editWarning = computed(() => sharedEditWarning(sharing.value?.memberCount ?? 1))
 const isBasicAuth = computed(() => form.authType === 'BASIC')
 const isBearerAuth = computed(() => form.authType === 'BEARER')
 const isOauthAuth = computed(() => form.authType === 'OAUTH2_M2M_JWT')
@@ -540,7 +563,7 @@ const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.
 const submitDisabled = computed(() => {
   if (!canEditTenantSettings.value) return true
   if (loading.value) return true
-  if (isEditing.value) return false
+  if (isEditing.value) return Boolean(editWarning.value) && !sharedEditConfirmed.value
 
   switch (currentCreateStep.value.id) {
     case 'username':
@@ -719,11 +742,42 @@ async function handlePrimarySubmit(): Promise<void> {
 
 const pageAbortController = new AbortController()
 let loadAuthConfigController: AbortController | null = null
+let sharingController: AbortController | null = null
 
 onBeforeUnmount(() => {
   pageAbortController.abort()
   loadAuthConfigController?.abort()
+  sharingController?.abort()
 })
+
+// Supplementary to loadAuthConfig below: feeds only the affects-N-tenants save gate, so a
+// failure here falls back to "no warning" (sharing stays null) rather than blocking the page.
+// Self-contained AbortController, mirroring useSettingsPagedList's `load()` — this is called both
+// from initializeForRoute below and directly as the panel's @changed handler, which passes no signal.
+async function loadSharing(): Promise<void> {
+  if (!isEditing.value) {
+    sharing.value = null
+    return
+  }
+
+  sharingController?.abort()
+  const controller = new AbortController()
+  sharingController = controller
+
+  try {
+    const response = await settingsFacade.listConfigTenantAccess({
+      configTypeEnumId: SHARED_CONFIG_TYPES.netSuiteAuth,
+      configId: activeAuthConfigId.value,
+    }, controller.signal)
+    if (controller.signal.aborted) return
+    sharing.value = response.sharing ?? null
+  } catch (sharingError) {
+    if (controller.signal.aborted || isAbortError(sharingError)) return
+    sharing.value = null
+  } finally {
+    if (sharingController === controller) sharingController = null
+  }
+}
 
 async function loadAuthConfig(): Promise<void> {
   if (!isEditing.value) return
@@ -754,6 +808,9 @@ async function loadAuthConfig(): Promise<void> {
 }
 
 async function initializeForRoute(): Promise<void> {
+  sharedEditConfirmed.value = false
+  void loadSharing()
+
   if (!isEditing.value) {
     resetCreateForm()
     loading.value = false

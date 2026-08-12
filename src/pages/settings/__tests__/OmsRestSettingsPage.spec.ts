@@ -165,4 +165,31 @@ describe('OmsRestSettingsPage', () => {
     expect(wrapper.text()).not.toContain('Gorjana HotWax')
     expect(wrapper.find('[data-testid="oms-auth-create-action"]').exists()).toBe(false)
   })
+
+  it('appends the shared-tile suffix for a config shared in from another tenant (DAR-BE-005)', async () => {
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [
+        {
+          omsRestSourceConfigId: 'krewe-oms',
+          description: 'Krewe HotWax',
+          companyUserGroupId: 'GORJANA',
+          companyLabel: 'Gorjana',
+          baseUrl: 'https://oms.example.com',
+          ordersPath: '/rest/s1/oms/orders',
+          authType: 'NONE',
+          isActive: 'Y',
+          isShared: true,
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 12, totalCount: 1, pageCount: 1 },
+    })
+
+    const wrapper = mount(OmsRestSettingsPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="oms-auth-tile"]').text()).toBe('Krewe HotWax — shared from Gorjana')
+  })
 })

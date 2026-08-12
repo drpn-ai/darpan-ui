@@ -1248,6 +1248,12 @@ label > span {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
+  /* Server messages arrive with unbreakable runs in them -- endpoint URLs, and the raw response
+     body the API client appends when it cannot parse a reply. A grid item defaults to min-width:auto,
+     so one of those stretched its container past the fixed panel width and skewed the whole login
+     screen instead of wrapping. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .inline-validation.error {
@@ -1588,6 +1594,14 @@ label > span {
 .checkbox-inline--control-only {
   width: 100%;
   justify-content: flex-start;
+}
+
+/* DAR-BE-005: the affects-N-tenants save gate on the four shared-config edit workflows
+   (HotWax, Shopify, NetSuite auth, NetSuite endpoint). Grid, not the shell's own gap alone, so the
+   warning copy and the confirm checkbox sit close together as one unit inside the wider form. */
+.shared-edit-warning {
+  display: grid;
+  gap: var(--space-1-5);
 }
 
 .app-popup-backdrop {

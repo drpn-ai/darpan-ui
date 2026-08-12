@@ -11,6 +11,9 @@ const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const listNsAuthConfigs = vi.hoisted(() => vi.fn())
 const listNsRestletConfigs = vi.hoisted(() => vi.fn())
 const saveNsRestletConfig = vi.hoisted(() => vi.fn())
+const listConfigTenantAccess = vi.hoisted(() => vi.fn())
+const grantConfigTenantAccess = vi.hoisted(() => vi.fn())
+const revokeConfigTenantAccess = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     userId: 'john.doe',
@@ -32,6 +35,9 @@ vi.mock('../../../lib/api/facade', () => ({
     listNsAuthConfigs,
     listNsRestletConfigs,
     saveNsRestletConfig,
+    listConfigTenantAccess,
+    grantConfigTenantAccess,
+    revokeConfigTenantAccess,
   },
 }))
 
@@ -89,6 +95,26 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     listNsAuthConfigs.mockReset()
     listNsRestletConfigs.mockReset()
     saveNsRestletConfig.mockReset()
+    listConfigTenantAccess.mockReset()
+    grantConfigTenantAccess.mockReset()
+    revokeConfigTenantAccess.mockReset()
+    // Default: an unshared config (memberCount 1, no peers) — the common case, and the shape
+    // that keeps every pre-existing test in this file on the unmodified save path.
+    listConfigTenantAccess.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      sharing: {
+        configTypeEnumId: 'SCFG_NS_RESTLET',
+        configId: 'endpoint_primary',
+        ownerTenantUserGroupId: 'KREWE',
+        ownerTenantLabel: 'Krewe',
+        memberTenantUserGroupIds: [],
+        memberTenantLabels: [],
+        memberCount: 1,
+        canManage: true,
+      },
+    })
     authState.sessionInfo = {
       userId: 'john.doe',
       activeTenantUserGroupId: 'KREWE',
@@ -535,5 +561,138 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     expect(pageSource.match(/workflow-form-textarea--single-row/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
     expect(source).toContain('.workflow-form-textarea--single-row {')
     expect(source).toContain('min-height: 2.2rem;')
+  })
+
+  // DAR-BE-005 Task 12 — the affects-N-tenants save gate. sharedEditWarning() returns null for an
+  // unshared config (memberCount <= 1, the beforeEach default), so this is the "byte-identical to
+  // today" case: no warning renders and Save works exactly as it did before this feature existed.
+  it('saves an unshared config with no confirmation step (byte-identical save path)', async () => {
+    route.params = { nsRestletConfigId: 'endpoint-primary' }
+    route.name = 'settings-netsuite-endpoints-edit'
+    route.fullPath = '/settings/netsuite/endpoints/edit/endpoint-primary'
+    listNsAuthConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      authConfigs: [
+        {
+          nsAuthConfigId: 'auth-primary',
+          description: 'Primary Auth',
+          companyUserGroupId: 'KREWE',
+          authType: 'BASIC',
+          isActive: 'Y',
+          hasPassword: true,
+          hasApiToken: false,
+          hasPrivateKeyPem: false,
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    listNsRestletConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      restletConfigs: [
+        {
+          nsRestletConfigId: 'endpoint-primary',
+          description: 'Invoice Export',
+          companyUserGroupId: 'KREWE',
+          endpointUrl: 'https://netsuite.example.com/restlet',
+          httpMethod: 'POST',
+          nsAuthConfigId: 'auth-primary',
+          authType: 'BASIC',
+          connectTimeoutSeconds: 30,
+          readTimeoutSeconds: 60,
+          isActive: 'Y',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    saveNsRestletConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
+
+    const wrapper = mount(NetSuiteEndpointWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="shared-edit-warning"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
+    await flushPromises()
+
+    expect(saveNsRestletConfig).toHaveBeenCalledTimes(1)
+  })
+
+  it('blocks Save behind an explicit inline confirmation when the config is shared across tenants', async () => {
+    route.params = { nsRestletConfigId: 'endpoint-primary' }
+    route.name = 'settings-netsuite-endpoints-edit'
+    route.fullPath = '/settings/netsuite/endpoints/edit/endpoint-primary'
+    listNsAuthConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      authConfigs: [
+        {
+          nsAuthConfigId: 'auth-primary',
+          description: 'Primary Auth',
+          companyUserGroupId: 'KREWE',
+          authType: 'BASIC',
+          isActive: 'Y',
+          hasPassword: true,
+          hasApiToken: false,
+          hasPrivateKeyPem: false,
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    listNsRestletConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      restletConfigs: [
+        {
+          nsRestletConfigId: 'endpoint-primary',
+          description: 'Invoice Export',
+          companyUserGroupId: 'KREWE',
+          endpointUrl: 'https://netsuite.example.com/restlet',
+          httpMethod: 'POST',
+          nsAuthConfigId: 'auth-primary',
+          authType: 'BASIC',
+          connectTimeoutSeconds: 30,
+          readTimeoutSeconds: 60,
+          isActive: 'Y',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    listConfigTenantAccess.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      sharing: {
+        configTypeEnumId: 'SCFG_NS_RESTLET',
+        configId: 'endpoint-primary',
+        ownerTenantUserGroupId: 'KREWE',
+        ownerTenantLabel: 'Krewe',
+        memberTenantUserGroupIds: ['GORJANA'],
+        memberTenantLabels: [{ tenantUserGroupId: 'GORJANA', label: 'Gorjana' }],
+        memberCount: 2,
+        canManage: true,
+      },
+    })
+    saveNsRestletConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
+
+    const wrapper = mount(NetSuiteEndpointWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
+
+    await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
+    await flushPromises()
+    expect(saveNsRestletConfig).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
+    await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
+    await flushPromises()
+
+    expect(saveNsRestletConfig).toHaveBeenCalledTimes(1)
   })
 })

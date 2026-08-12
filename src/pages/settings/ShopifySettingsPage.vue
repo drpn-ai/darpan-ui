@@ -37,6 +37,7 @@ import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
+import { sharedTileSuffix } from '../../lib/sharedConfig'
 import SettingsRecordListSection from './SettingsRecordListSection.vue'
 import { useSettingsPagedList } from './useSettingsPagedList'
 
@@ -74,7 +75,7 @@ const recordTiles = computed(() => rows.value.map((row) => ({
   label: resolveRecordLabel({
     description: row.description,
     fallbackId: row.shopifyAuthConfigId,
-  }),
+  }) + sharedTileSuffix(Boolean(row.isShared), row.companyLabel),
   to: {
     name: 'settings-shopify-auth',
     params: { shopifyAuthConfigId: row.shopifyAuthConfigId },

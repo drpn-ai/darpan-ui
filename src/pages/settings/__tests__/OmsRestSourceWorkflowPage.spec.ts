@@ -10,6 +10,9 @@ const route = vi.hoisted(() => ({
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
 const saveOmsRestSourceConfig = vi.hoisted(() => vi.fn())
+const listConfigTenantAccess = vi.hoisted(() => vi.fn())
+const grantConfigTenantAccess = vi.hoisted(() => vi.fn())
+const revokeConfigTenantAccess = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     userId: 'john.doe',
@@ -30,6 +33,9 @@ vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: {
     listOmsRestSourceConfigs,
     saveOmsRestSourceConfig,
+    listConfigTenantAccess,
+    grantConfigTenantAccess,
+    revokeConfigTenantAccess,
   },
 }))
 
@@ -96,6 +102,26 @@ describe('OmsRestSourceWorkflowPage', () => {
     push.mockReset()
     listOmsRestSourceConfigs.mockReset()
     saveOmsRestSourceConfig.mockReset()
+    listConfigTenantAccess.mockReset()
+    grantConfigTenantAccess.mockReset()
+    revokeConfigTenantAccess.mockReset()
+    // Default: an unshared config (memberCount 1, no peers) — the common case, and the shape
+    // that keeps every pre-existing test in this file on the unmodified save path.
+    listConfigTenantAccess.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      sharing: {
+        configTypeEnumId: 'SCFG_HOTWAX_OMS',
+        configId: 'dev_oms',
+        ownerTenantUserGroupId: 'KREWE',
+        ownerTenantLabel: 'Krewe',
+        memberTenantUserGroupIds: [],
+        memberTenantLabels: [],
+        memberCount: 1,
+        canManage: true,
+      },
+    })
     authState.sessionInfo = {
       userId: 'john.doe',
       activeTenantUserGroupId: 'KREWE',
@@ -554,5 +580,106 @@ describe('OmsRestSourceWorkflowPage', () => {
 
     expect(saveOmsRestSourceConfig).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('HotWax Config ID must be 20 characters or fewer.')
+  })
+
+  // DAR-BE-005 Task 12 — the affects-N-tenants save gate. sharedEditWarning() returns null for an
+  // unshared config (memberCount <= 1, the beforeEach default), so this is the "byte-identical to
+  // today" case: no warning renders and Save works exactly as it did before this feature existed.
+  it('saves an unshared config with no confirmation step (byte-identical save path)', async () => {
+    route.params = { omsRestSourceConfigId: 'krewe-oms' }
+    route.name = 'settings-oms-edit'
+    route.fullPath = '/settings/hotwax/edit/krewe-oms'
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [
+        {
+          omsRestSourceConfigId: 'krewe-oms',
+          description: 'Krewe HotWax',
+          companyUserGroupId: 'KREWE',
+          baseUrl: 'https://oms.example.com',
+          authType: 'NONE',
+          hasUsername: false,
+          hasPassword: false,
+          hasApiToken: false,
+          customHeaderNames: [],
+          connectTimeoutSeconds: 10,
+          readTimeoutSeconds: 20,
+          isActive: 'Y',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    saveOmsRestSourceConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
+
+    const wrapper = mount(OmsRestSourceWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="shared-edit-warning"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+    await flushPromises()
+
+    expect(saveOmsRestSourceConfig).toHaveBeenCalledTimes(1)
+  })
+
+  it('blocks Save behind an explicit inline confirmation when the config is shared across tenants', async () => {
+    route.params = { omsRestSourceConfigId: 'krewe-oms' }
+    route.name = 'settings-oms-edit'
+    route.fullPath = '/settings/hotwax/edit/krewe-oms'
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [
+        {
+          omsRestSourceConfigId: 'krewe-oms',
+          description: 'Krewe HotWax',
+          companyUserGroupId: 'KREWE',
+          baseUrl: 'https://oms.example.com',
+          authType: 'NONE',
+          hasUsername: false,
+          hasPassword: false,
+          hasApiToken: false,
+          customHeaderNames: [],
+          connectTimeoutSeconds: 10,
+          readTimeoutSeconds: 20,
+          isActive: 'Y',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    listConfigTenantAccess.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      sharing: {
+        configTypeEnumId: 'SCFG_HOTWAX_OMS',
+        configId: 'krewe-oms',
+        ownerTenantUserGroupId: 'KREWE',
+        ownerTenantLabel: 'Krewe',
+        memberTenantUserGroupIds: ['GORJANA'],
+        memberTenantLabels: [{ tenantUserGroupId: 'GORJANA', label: 'Gorjana' }],
+        memberCount: 2,
+        canManage: true,
+      },
+    })
+    saveOmsRestSourceConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
+
+    const wrapper = mount(OmsRestSourceWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
+
+    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+    await flushPromises()
+    expect(saveOmsRestSourceConfig).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
+    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+    await flushPromises()
+
+    expect(saveOmsRestSourceConfig).toHaveBeenCalledTimes(1)
   })
 })

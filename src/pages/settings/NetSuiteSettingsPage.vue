@@ -59,6 +59,7 @@ import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
+import { sharedTileSuffix } from '../../lib/sharedConfig'
 import SettingsRecordListSection from './SettingsRecordListSection.vue'
 import { useSettingsPagedList } from './useSettingsPagedList'
 
@@ -113,7 +114,7 @@ const authTiles = computed(() => authRows.value.map((row) => ({
   label: resolveRecordLabel({
     description: row.description,
     fallbackId: row.nsAuthConfigId,
-  }),
+  }) + sharedTileSuffix(Boolean(row.isShared), row.companyLabel),
   to: {
     name: 'settings-netsuite-auth-edit',
     params: { nsAuthConfigId: row.nsAuthConfigId },
@@ -126,7 +127,7 @@ const endpointTiles = computed(() => endpointRows.value.map((row) => ({
   label: resolveRecordLabel({
     description: row.description,
     fallbackId: row.nsRestletConfigId,
-  }),
+  }) + sharedTileSuffix(Boolean(row.isShared), row.companyLabel),
   to: {
     name: 'settings-netsuite-endpoints-edit',
     params: { nsRestletConfigId: row.nsRestletConfigId },
