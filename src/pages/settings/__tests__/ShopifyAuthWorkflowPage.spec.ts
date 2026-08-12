@@ -589,4 +589,73 @@ describe('ShopifyAuthWorkflowPage', () => {
 
     expect(saveShopifyAuthConfig).toHaveBeenCalledTimes(1)
   })
+
+  // DAR-BE-005 Task 12 review finding: the config fetch and the sharing fetch used to be two
+  // independent races. If the config fetch (fast) resolved before the sharing fetch (slow), the
+  // form went interactive with editWarning still null even for a genuinely shared config -- a
+  // synchronous mock can never exercise this, both promises settle in the same microtask flush.
+  // This test uses a manually-resolved promise for listConfigTenantAccess specifically so the two
+  // fetches settle on different ticks, matching a real slow-sharing-fetch race.
+  it('keeps Save disabled until the sharing fetch settles, even when it resolves after the config fetch', async () => {
+    route.params = { shopifyAuthConfigId: 'krewe-shopify' }
+    route.name = 'settings-shopify-edit'
+    route.fullPath = '/settings/shopify/edit/krewe-shopify'
+    getShopifyAuthConfig.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      shopifyAuthConfig: {
+        shopifyAuthConfigId: 'krewe-shopify',
+        description: 'Krewe Shopify',
+        companyUserGroupId: 'KREWE',
+        shopApiUrl: 'https://krewe.myshopify.com',
+        apiVersion: '2026-01',
+        isActive: 'Y',
+        canReadOrders: true,
+        hasAccessToken: true,
+      },
+    })
+    saveShopifyAuthConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
+
+    let resolveSharing: (value: unknown) => void = () => {}
+    listConfigTenantAccess.mockImplementation(
+      () => new Promise((resolve) => { resolveSharing = resolve }),
+    )
+
+    const wrapper = mount(ShopifyAuthWorkflowPage)
+    await flushPromises()
+
+    expect((wrapper.get('input[name="description"]').element as HTMLInputElement).value).toBe('Krewe Shopify')
+    expect(wrapper.get('[data-testid="save-shopify-auth"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
+    expect(saveShopifyAuthConfig).not.toHaveBeenCalled()
+
+    resolveSharing({
+      ok: true,
+      messages: [],
+      errors: [],
+      sharing: {
+        configTypeEnumId: 'SCFG_SHOPIFY_AUTH',
+        configId: 'krewe-shopify',
+        ownerTenantUserGroupId: 'KREWE',
+        ownerTenantLabel: 'Krewe',
+        memberTenantUserGroupIds: ['GORJANA'],
+        memberTenantLabels: [{ tenantUserGroupId: 'GORJANA', label: 'Gorjana' }],
+        memberCount: 2,
+        canManage: true,
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
+    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
+    expect(saveShopifyAuthConfig).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
+    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
+    await flushPromises()
+
+    expect(saveShopifyAuthConfig).toHaveBeenCalledTimes(1)
+  })
 })

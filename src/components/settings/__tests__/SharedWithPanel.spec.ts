@@ -196,4 +196,30 @@ describe('SharedWithPanel', () => {
 
     expect(wrapper.text()).toContain('Not shared with other tenants.')
   })
+
+  // DAR-BE-005 Task 12 review: this component is the single fetcher of ConfigTenantAccess for a
+  // config. Callers that need memberCount (the four workflow pages' affects-N-tenants save gate)
+  // listen to this event instead of running their own listConfigTenantAccess -- both to avoid a
+  // duplicate round-trip and so they can tell "not yet known" apart from "known unshared".
+  it('emits update:sharing with the loaded payload once the initial load settles', async () => {
+    listConfigTenantAccess.mockResolvedValue({ ok: true, messages: [], errors: [], sharing: baseSharing })
+
+    const wrapper = mountPanel()
+    expect(wrapper.emitted('update:sharing')).toBeUndefined()
+
+    await flushPromises()
+
+    expect(wrapper.emitted('update:sharing')).toHaveLength(1)
+    expect(wrapper.emitted('update:sharing')?.[0]).toEqual([baseSharing])
+  })
+
+  it('emits update:sharing with null when the load fails, so a caller gating on it still unblocks', async () => {
+    listConfigTenantAccess.mockRejectedValue(new Error('network down'))
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.emitted('update:sharing')).toHaveLength(1)
+    expect(wrapper.emitted('update:sharing')?.[0]).toEqual([null])
+  })
 })

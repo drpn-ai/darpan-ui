@@ -129,7 +129,7 @@
           <InlineValidation tone="warning" :message="editWarning" />
           <label class="checkbox-inline">
             <input type="checkbox" v-model="sharedEditConfirmed" class="app-table__checkbox" data-testid="shared-edit-confirm" />
-            <span>Save for every tenant listed above</span>
+            <span>Save for every tenant this configuration is shared with</span>
           </label>
         </div>
       </template>
@@ -229,7 +229,7 @@
       v-if="isEditing"
       :config-type="SHARED_CONFIG_TYPES.netSuiteRestlet"
       :config-id="activeEndpointConfigId"
-      @changed="loadSharing"
+      @update:sharing="handleSharingUpdate"
     />
   </WorkflowPage>
 </template>
@@ -244,7 +244,7 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import SharedWithPanel from '../../components/settings/SharedWithPanel.vue'
-import { ApiCallError, isAbortError } from '../../lib/api/client'
+import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import { SHARED_CONFIG_TYPES, sharedEditWarning } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
@@ -319,7 +319,11 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
 const currentStepIndex = ref(0)
-const sharing = ref<ConfigSharing | null>(null)
+// undefined = SharedWithPanel hasn't reported in for this edit cycle yet -- deliberately distinct
+// from null (reported in, and the config is unshared). See sharingPending below; this is the
+// state that closes the DAR-BE-005 Task 12 review race (save going interactive before the
+// affects-N-tenants warning had a chance to render).
+const sharing = ref<ConfigSharing | null | undefined>(undefined)
 const sharedEditConfirmed = ref(false)
 
 const activeEndpointConfigId = computed(() => String(route.params.nsRestletConfigId ?? '').trim())
@@ -329,6 +333,14 @@ const isEditing = computed(() => activeEndpointConfigId.value.length > 0)
 // counts the owner plus peers, so sharedEditWarning() returns null for an unshared config and
 // the save path is unchanged for the common case.
 const editWarning = computed(() => sharedEditWarning(sharing.value?.memberCount ?? 1))
+// SharedWithPanel is the single fetcher of ConfigTenantAccess (see its `update:sharing` emit);
+// this page never calls listConfigTenantAccess itself. Save must stay disabled until the panel's
+// very first report, whatever it turns out to be -- otherwise a slow sharing fetch racing a fast
+// config fetch lets Save go interactive with editWarning still null on a genuinely shared config.
+const sharingPending = computed(() => isEditing.value && sharing.value === undefined)
+function handleSharingUpdate(value: ConfigSharing | null): void {
+  sharing.value = value
+}
 
 const createSteps: EndpointCreateStep[] = [
   { id: 'endpointUrl', title: 'What URL should this NetSuite endpoint use?', kind: 'text' },
@@ -365,7 +377,7 @@ const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.
 const submitDisabled = computed(() => {
   if (!canEditTenantSettings.value) return true
   if (loading.value) return true
-  if (isEditing.value) return Boolean(editWarning.value) && !sharedEditConfirmed.value
+  if (isEditing.value) return sharingPending.value || (Boolean(editWarning.value) && !sharedEditConfirmed.value)
 
   switch (currentCreateStep.value.id) {
     case 'endpointUrl':
@@ -408,42 +420,11 @@ function resetCreateForm(): void {
 
 const pageAbortController = new AbortController()
 let loadController: AbortController | null = null
-let sharingController: AbortController | null = null
 
 onBeforeUnmount(() => {
   pageAbortController.abort()
   loadController?.abort()
-  sharingController?.abort()
 })
-
-// Supplementary to loadEndpointConfig below: feeds only the affects-N-tenants save gate, so a
-// failure here falls back to "no warning" (sharing stays null) rather than blocking the page.
-// Self-contained AbortController, mirroring useSettingsPagedList's `load()` — this is called both
-// from load() below and directly as the panel's @changed handler, which passes no signal.
-async function loadSharing(): Promise<void> {
-  if (!isEditing.value) {
-    sharing.value = null
-    return
-  }
-
-  sharingController?.abort()
-  const controller = new AbortController()
-  sharingController = controller
-
-  try {
-    const response = await settingsFacade.listConfigTenantAccess({
-      configTypeEnumId: SHARED_CONFIG_TYPES.netSuiteRestlet,
-      configId: activeEndpointConfigId.value,
-    }, controller.signal)
-    if (controller.signal.aborted) return
-    sharing.value = response.sharing ?? null
-  } catch (sharingError) {
-    if (controller.signal.aborted || isAbortError(sharingError)) return
-    sharing.value = null
-  } finally {
-    if (sharingController === controller) sharingController = null
-  }
-}
 
 async function loadAuthOptions(signal?: AbortSignal): Promise<void> {
   const response = await settingsFacade.listNsAuthConfigs({ pageIndex: 0, pageSize: 200 }, signal)
@@ -482,13 +463,16 @@ async function load(): Promise<void> {
   error.value = null
   success.value = null
   sharedEditConfirmed.value = false
+  // Reset to "unknown" every cycle (not just on unmount): the same page instance is reused across
+  // route param changes (see the fullPath watcher below), so a stale sharing value from the
+  // PREVIOUS config must not silently answer the pending check for this one. SharedWithPanel's own
+  // configId watcher will re-fetch and report back in.
+  sharing.value = undefined
   if (!isEditing.value) resetCreateForm()
 
   loadController?.abort()
   loadController = new AbortController()
   const signal = loadController.signal
-
-  void loadSharing()
 
   try {
     await Promise.all([loadAuthOptions(signal), loadEndpointConfig(signal)])

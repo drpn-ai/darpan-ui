@@ -90,7 +90,16 @@ const props = defineProps<{
   configId: string
 }>()
 
-const emit = defineEmits<{ changed: [] }>()
+// `update:sharing` fires whenever a load settles (mount, prop change, or the reload after a
+// successful mutation) with whatever sharing.value now is -- including null on failure. This is
+// the single fetch of ConfigTenantAccess for this config; a caller that needs memberCount (the
+// four workflow pages' affects-N-tenants save gate) listens to this instead of fetching its own
+// copy, both to avoid a duplicate round-trip and, more importantly, so the caller can tell "not
+// yet known" (nothing emitted yet) apart from "known unshared" (emitted with memberCount 1) and
+// keep its own save action disabled until this settles. See DAR-BE-005 Task 12 review: two
+// independent fetches raced, and a page whose own fetch resolved second could go interactive
+// with editWarning still null even though the config was genuinely shared.
+const emit = defineEmits<{ changed: []; 'update:sharing': [value: ConfigSharing | null] }>()
 
 const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
@@ -150,7 +159,14 @@ async function load(): Promise<void> {
     if (controller.signal.aborted || isAbortError(loadError)) return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load sharing state.'
   } finally {
-    if (!controller.signal.aborted) loading.value = false
+    if (!controller.signal.aborted) {
+      loading.value = false
+      // Emitted here, not only on the success path above, so a caller gating on "has this
+      // settled yet" unblocks even when the fetch failed -- sharing.value is whatever it was
+      // before (null on first load), which is the same fail-open fallback this component already
+      // uses for its own rendering.
+      emit('update:sharing', sharing.value)
+    }
     if (loadController === controller) loadController = null
   }
 }

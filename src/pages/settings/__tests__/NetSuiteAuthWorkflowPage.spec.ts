@@ -694,4 +694,76 @@ describe('NetSuiteAuthWorkflowPage', () => {
 
     expect(saveNsAuthConfig).toHaveBeenCalledTimes(1)
   })
+
+  // DAR-BE-005 Task 12 review finding: the config fetch and the sharing fetch used to be two
+  // independent races. If the config fetch (fast) resolved before the sharing fetch (slow), the
+  // form went interactive with editWarning still null even for a genuinely shared config -- a
+  // synchronous mock can never exercise this, both promises settle in the same microtask flush.
+  // This test uses a manually-resolved promise for listConfigTenantAccess specifically so the two
+  // fetches settle on different ticks, matching a real slow-sharing-fetch race.
+  it('keeps Save disabled until the sharing fetch settles, even when it resolves after the config fetch', async () => {
+    route.params = { nsAuthConfigId: 'auth-primary' }
+    route.name = 'settings-netsuite-auth-edit'
+    route.fullPath = '/settings/netsuite/auth/edit/auth-primary'
+    listNsAuthConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      authConfigs: [
+        {
+          nsAuthConfigId: 'auth-primary',
+          description: 'Primary Auth',
+          companyUserGroupId: 'KREWE',
+          authType: 'NONE',
+          isActive: 'Y',
+          hasPassword: false,
+          hasApiToken: false,
+          hasPrivateKeyPem: false,
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    saveNsAuthConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
+
+    let resolveSharing: (value: unknown) => void = () => {}
+    listConfigTenantAccess.mockImplementation(
+      () => new Promise((resolve) => { resolveSharing = resolve }),
+    )
+
+    const wrapper = mount(NetSuiteAuthWorkflowPage)
+    await flushPromises()
+
+    expect((wrapper.get('input[name="description"]').element as HTMLInputElement).value).toBe('Primary Auth')
+    expect(wrapper.get('[data-testid="save-netsuite-auth"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.get('[data-testid="save-netsuite-auth"]').trigger('click')
+    expect(saveNsAuthConfig).not.toHaveBeenCalled()
+
+    resolveSharing({
+      ok: true,
+      messages: [],
+      errors: [],
+      sharing: {
+        configTypeEnumId: 'SCFG_NS_AUTH',
+        configId: 'auth-primary',
+        ownerTenantUserGroupId: 'KREWE',
+        ownerTenantLabel: 'Krewe',
+        memberTenantUserGroupIds: ['GORJANA'],
+        memberTenantLabels: [{ tenantUserGroupId: 'GORJANA', label: 'Gorjana' }],
+        memberCount: 2,
+        canManage: true,
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
+    await wrapper.get('[data-testid="save-netsuite-auth"]').trigger('click')
+    expect(saveNsAuthConfig).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
+    await wrapper.get('[data-testid="save-netsuite-auth"]').trigger('click')
+    await flushPromises()
+
+    expect(saveNsAuthConfig).toHaveBeenCalledTimes(1)
+  })
 })
