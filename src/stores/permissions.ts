@@ -11,11 +11,13 @@ export const usePermissionsStore = defineStore('permissions', () => {
   const canRunActiveTenantReconciliation = computed(() => policy.value.canRunActiveTenantReconciliation)
   const canEditTenantSettings = computed(() => policy.value.canEditTenantSettings)
   const canManageGlobalSettings = computed(() => policy.value.canManageGlobalSettings)
+  const canManageConfigSharing = computed(() => policy.value.canManageConfigSharing)
 
   return {
     canViewTenantSettings,
     canRunActiveTenantReconciliation,
     canEditTenantSettings,
     canManageGlobalSettings,
+    canManageConfigSharing,
   }
 })

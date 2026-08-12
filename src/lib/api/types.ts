@@ -222,6 +222,8 @@ export interface NsAuthConfigRecord {
   hasPassword: boolean
   hasApiToken: boolean
   hasPrivateKeyPem: boolean
+  /** DAR-BE-005: true when this row's owning tenant is not the active tenant — i.e. shared in. */
+  isShared?: boolean
 }
 
 export type SaveNsAuthConfigResponse = Schemas['SaveNsAuthConfigResult']
@@ -241,6 +243,8 @@ export interface NsRestletConfigRecord {
   connectTimeoutSeconds: number
   readTimeoutSeconds: number
   isActive: string
+  /** DAR-BE-005: true when this row's owning tenant is not the active tenant — i.e. shared in. */
+  isShared?: boolean
 }
 
 export type SaveNsRestletConfigResponse = Schemas['SaveNsRestletConfigResult']
@@ -257,6 +261,8 @@ export interface ShopifyAuthConfigRecord {
   isActive: string
   canReadOrders: boolean
   hasAccessToken: boolean
+  /** DAR-BE-005: true when this row's owning tenant is not the active tenant — i.e. shared in. */
+  isShared?: boolean
 }
 
 export type SaveShopifyAuthConfigResponse = Schemas['SaveShopifyAuthConfigResult']
@@ -319,6 +325,8 @@ export interface OmsRestSourceConfigRecord {
   canReadOrders?: boolean
   createdDate?: string
   lastUpdatedDate?: string
+  /** DAR-BE-005: true when this row's owning tenant is not the active tenant — i.e. shared in. */
+  isShared?: boolean
 }
 
 export interface SaveOmsRestSourceConfigResponse extends ApiEnvelope {
@@ -326,6 +334,44 @@ export interface SaveOmsRestSourceConfigResponse extends ApiEnvelope {
 }
 
 export type DeleteOmsRestSourceConfigResponse = Schemas['DeleteHotWaxOmsRestSourceConfigResult']
+
+// ─── Config sharing (DAR-BE-005) ────────────────────────────────────────────
+//
+// `sharing.memberTenantLabels` is a Moqui List<Map> whose inner element is named
+// "member" for schema documentation only (see ConfigSharingFacadeServices.xml).
+// Like ApiEnvelope.messages/errors and TestSourceConnectionResponse.checks above,
+// the wire shape is a flat array of maps — NOT wrapped in a `member` key. The
+// openapi-typescript-generated Schemas['ListConfigTenantAccessResult'] models the
+// wrapped shape (a known contract-generator gap), so this is hand-written to match
+// what the backend actually sends rather than aliased to the generated type.
+
+export interface ConfigSharingMember {
+  tenantUserGroupId: string
+  label?: string | null
+}
+
+export interface ConfigSharing {
+  configTypeEnumId: string
+  configId: string
+  ownerTenantUserGroupId?: string | null
+  ownerTenantLabel?: string | null
+  memberTenantUserGroupIds: string[]
+  memberTenantLabels: ConfigSharingMember[]
+  memberCount: number
+  canManage: boolean
+}
+
+export interface ListConfigTenantAccessResponse extends ApiEnvelope {
+  sharing?: ConfigSharing | null
+}
+
+export interface GrantConfigTenantAccessResponse extends ApiEnvelope {
+  granted?: boolean
+}
+
+export interface RevokeConfigTenantAccessResponse extends ApiEnvelope {
+  revoked?: boolean
+}
 
 export interface PaginatedResponse extends ApiEnvelope {
   pagination: PaginationMeta

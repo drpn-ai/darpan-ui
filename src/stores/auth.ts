@@ -28,6 +28,7 @@ export interface UiPermissionPolicy {
   canRunActiveTenantReconciliation: boolean
   canEditTenantSettings: boolean
   canManageGlobalSettings: boolean
+  canManageConfigSharing: boolean
 }
 
 const authBypass = !import.meta.env.PROD
@@ -115,12 +116,19 @@ export function buildUiPermissionPolicy(sessionInfo: SessionInfo | null | undefi
   )
   const canEditActiveTenantData = sessionInfo?.canEditActiveTenantData === true
   const canManageDarpanCore = isAuthenticated && sessionInfo?.canManageDarpanCore === true
+  // DAR-BE-005: config sharing is gated on TENANT ADMIN, which is strictly narrower than
+  // canEditTenantSettings — a DARPAN_COMPANY_EDITOR may edit a config but must not widen who
+  // can reach its credentials. activeTenantPermissionGroupIds is already in the session payload
+  // (AuthFacadeServices.xml:79), so this needs no contract change.
+  const isTenantAdmin = (sessionInfo?.activeTenantPermissionGroupIds ?? [])
+    .includes('DARPAN_TENANT_ADMIN')
 
   return {
     canViewTenantSettings: isAuthenticated && (canViewActiveTenantData || isSuperAdmin),
     canRunActiveTenantReconciliation,
     canEditTenantSettings: canEditActiveTenantData || isSuperAdmin,
     canManageGlobalSettings: canManageDarpanCore,
+    canManageConfigSharing: isAuthenticated && (isTenantAdmin || isSuperAdmin),
   }
 }
 

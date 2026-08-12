@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { installLocalStorageStub } from '../../test/localStorage'
+import type { SessionInfo } from '../../lib/api/types'
+// Static import (unlike the rest of this file's `await import('../auth')` pattern): the new
+// canManageConfigSharing cases below are synchronous and only exercise the pure
+// buildUiPermissionPolicy function, so they don't need a post-vi.resetModules() fresh instance.
+import { buildUiPermissionPolicy } from '../auth'
 
 const getSessionInfo = vi.hoisted(() => vi.fn())
 const loginSession = vi.hoisted(() => vi.fn())
@@ -337,6 +342,7 @@ describe('auth state', () => {
       canRunActiveTenantReconciliation: false,
       canEditTenantSettings: false,
       canManageGlobalSettings: false,
+      canManageConfigSharing: false,
     })
 
     expect(buildUiPermissionPolicy({
@@ -350,6 +356,7 @@ describe('auth state', () => {
       canRunActiveTenantReconciliation: true,
       canEditTenantSettings: false,
       canManageGlobalSettings: false,
+      canManageConfigSharing: false,
     })
 
     expect(buildUiPermissionPolicy({
@@ -392,6 +399,36 @@ describe('auth state', () => {
       canEditTenantSettings: false,
       canManageGlobalSettings: true,
     })
+  })
+
+  it('grants canManageConfigSharing to a tenant admin', () => {
+    expect(
+      buildUiPermissionPolicy({
+        userId: 'aditi',
+        activeTenantPermissionGroupIds: ['DARPAN_TENANT_ADMIN'],
+      } as SessionInfo).canManageConfigSharing,
+    ).toBe(true)
+  })
+
+  it('denies canManageConfigSharing to an editor or viewer', () => {
+    expect(
+      buildUiPermissionPolicy({
+        userId: 'aditi',
+        activeTenantPermissionGroupIds: ['DARPAN_COMPANY_EDITOR'],
+        canEditActiveTenantData: true,
+      } as SessionInfo).canManageConfigSharing,
+    ).toBe(false)
+  })
+
+  it('grants canManageConfigSharing to a super admin', () => {
+    expect(
+      buildUiPermissionPolicy({ userId: 'root', isSuperAdmin: true } as SessionInfo)
+        .canManageConfigSharing,
+    ).toBe(true)
+  })
+
+  it('denies canManageConfigSharing when unauthenticated', () => {
+    expect(buildUiPermissionPolicy(null).canManageConfigSharing).toBe(false)
   })
 
   it('marks the state as unauthenticated when login key verification returns 401', async () => {

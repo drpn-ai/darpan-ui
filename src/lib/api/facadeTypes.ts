@@ -2,6 +2,7 @@
 // Naming convention: <MethodName>Payload
 
 import type { SourceExcludeFilter } from '../sourceExcludeFilters'
+import type { SharedConfigType } from '../sharedConfig'
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,17 @@ export interface SaveOmsRestSourceConfigPayload {
 
 export interface DeleteOmsRestSourceConfigPayload {
   omsRestSourceConfigId: string
+}
+
+// ─── Config sharing (DAR-BE-005) ───────────────────────────────────────────────
+
+export interface ListConfigTenantAccessPayload {
+  configTypeEnumId: SharedConfigType
+  configId: string
+}
+
+export interface ConfigTenantAccessMutationPayload extends ListConfigTenantAccessPayload {
+  targetTenantUserGroupId: string
 }
 
 // ─── JSON Schema ─────────────────────────────────────────────────────────────

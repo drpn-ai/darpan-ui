@@ -34,10 +34,12 @@ import type {
   GetTenantSettingsResponse,
   GetUserNotificationDefaultResponse,
   GetJsonSchemaResponse,
+  GrantConfigTenantAccessResponse,
   InferJsonSchemaResponse,
   ListAutomationExecutionsResponse,
   ListAutomationsResponse,
   ListAutomationSourceOptionsResponse,
+  ListConfigTenantAccessResponse,
   ListEnumOptionsResponse,
   ListJsonSchemasResponse,
   ListNsAuthConfigsResponse,
@@ -51,6 +53,7 @@ import type {
   LoginSessionResponse,
   LlmSettingsResponse,
   LogoutSessionResponse,
+  RevokeConfigTenantAccessResponse,
   RunAutomationNowResponse,
   RunSavedRunDiffResponse,
   SaveAutomationResponse,
@@ -82,6 +85,7 @@ import type {
 import type {
   ChangeExpiredPasswordPayload,
   ChangeOwnPasswordPayload,
+  ConfigTenantAccessMutationPayload,
   CreateRuleSetRunPayload,
   DeleteAutomationPayload,
   DeleteJsonSchemaPayload,
@@ -100,6 +104,7 @@ import type {
   InferJsonSchemaFromTextPayload,
   ListAutomationExecutionsPayload,
   ListAutomationsPayload,
+  ListConfigTenantAccessPayload,
   ListGeneratedOutputsPayload,
   ListJsonSchemasPayload,
   ListNsAuthConfigsPayload,
@@ -171,6 +176,9 @@ const SETTINGS = {
   saveOmsRestSourceConfig: 'facade.HotWaxOmsFacadeServices.save#HotWaxOmsRestSourceConfig',
   deleteOmsRestSourceConfig: 'facade.HotWaxOmsFacadeServices.delete#HotWaxOmsRestSourceConfig',
   testSourceConnection: 'facade.SettingsFacadeServices.test#SourceConnection',
+  listConfigTenantAccess: 'facade.ConfigSharingFacadeServices.list#ConfigTenantAccess',
+  grantConfigTenantAccess: 'facade.ConfigSharingFacadeServices.grant#ConfigTenantAccess',
+  revokeConfigTenantAccess: 'facade.ConfigSharingFacadeServices.revoke#ConfigTenantAccess',
 }
 
 const JSON_SCHEMA = {
@@ -311,6 +319,15 @@ export const settingsFacade = {
   },
   testSourceConnection(payload: TestSourceConnectionPayload, signal?: AbortSignal): Promise<TestSourceConnectionResponse> {
     return callService<TestSourceConnectionResponse>(SETTINGS.testSourceConnection, payload, signal)
+  },
+  listConfigTenantAccess(payload: ListConfigTenantAccessPayload, signal?: AbortSignal): Promise<ListConfigTenantAccessResponse> {
+    return callService<ListConfigTenantAccessResponse>(SETTINGS.listConfigTenantAccess, payload, signal)
+  },
+  grantConfigTenantAccess(payload: ConfigTenantAccessMutationPayload, signal?: AbortSignal): Promise<GrantConfigTenantAccessResponse> {
+    return callService<GrantConfigTenantAccessResponse>(SETTINGS.grantConfigTenantAccess, payload, signal)
+  },
+  revokeConfigTenantAccess(payload: ConfigTenantAccessMutationPayload, signal?: AbortSignal): Promise<RevokeConfigTenantAccessResponse> {
+    return callService<RevokeConfigTenantAccessResponse>(SETTINGS.revokeConfigTenantAccess, payload, signal)
   },
 }
 
