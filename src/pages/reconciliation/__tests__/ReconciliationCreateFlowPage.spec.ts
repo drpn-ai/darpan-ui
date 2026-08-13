@@ -1364,4 +1364,197 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(false)
     })
   })
+
+  describe('two-step source picker (system, then endpoint)', () => {
+    // Mirrors the real DarpanSystemSource shape: OMS_RETURNS is an endpoint grouped under OMS via
+    // parentEnumId. SHOPIFY/NETSUITE carry no parentEnumId and have nothing grouped under them, so
+    // they must keep today's single-step behaviour.
+    const SYSTEM_OPTIONS_WITH_OMS_ENDPOINT = [
+      ...SYSTEM_OPTIONS,
+      { enumId: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
+    ]
+
+    function mockSystemsWithOmsEndpoint(): void {
+      listAutomationSourceOptions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        inputModes: [],
+        sourceTypes: [],
+        relativeWindows: [],
+        fileTypes: FILE_TYPE_OPTIONS,
+        systems: SYSTEM_OPTIONS_WITH_OMS_ENDPOINT,
+        savedRuns: [],
+        sftpServers: [],
+        sourceConfigs: [],
+        nsRestletConfigs: [],
+        systemRemotes: [],
+      })
+    }
+
+    it('lists only top-level systems at step 1 — endpoints are not promoted to top-level', async () => {
+      mockSystemsWithOmsEndpoint()
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Endpoint Picker Test')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await wrapper.get('[data-testid="file1-system-select"]').trigger('click')
+      const optionValues = wrapper
+        .findAll('[data-testid="workflow-select-option"]')
+        .map((option) => option.attributes('data-option-value'))
+      expect(optionValues).toEqual(['OMS', 'SHOPIFY', 'NETSUITE'])
+      expect(optionValues).not.toContain('OMS_RETURNS')
+    })
+
+    it('asks for the endpoint after a system with endpoints is chosen, offering the system itself as the default plus its endpoints', async () => {
+      mockSystemsWithOmsEndpoint()
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Endpoint Picker Test')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      expect(wrapper.text()).toContain('Which HotWax endpoint provides the first source?')
+      await wrapper.get('[data-testid="file1-endpoint-select"]').trigger('click')
+      const optionValues = wrapper
+        .findAll('[data-testid="workflow-select-option"]')
+        .map((option) => option.attributes('data-option-value'))
+      expect(optionValues).toEqual(['OMS', 'OMS_RETURNS'])
+    })
+
+    it('skips the endpoint step entirely for a system with no endpoints', async () => {
+      mockSystemsWithOmsEndpoint()
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('No Endpoint Test')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      expect(wrapper.text()).toContain('How should Shopify provide data?')
+      expect(wrapper.find('[data-testid="file1-endpoint-select"]').exists()).toBe(false)
+    })
+
+    it('submits the concrete endpoint enumId when a child endpoint is chosen', async () => {
+      mockSystemsWithOmsEndpoint()
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Returns Compare')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_RETURNS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+      await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('return_id')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
+      await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+      await flushPromises()
+
+      expect(createRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({ file1SystemEnumId: 'OMS_RETURNS' }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    it('submits the parent systemEnumId when its own default endpoint is chosen', async () => {
+      mockSystemsWithOmsEndpoint()
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Default Endpoint Compare')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+      await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
+      await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+      await flushPromises()
+
+      expect(createRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({ file1SystemEnumId: 'OMS' }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    it('pre-selects the resumed parent and endpoint when walking back through a draft with a stored child systemEnumId', async () => {
+      mockSystemsWithOmsEndpoint()
+      const draft: ReconciliationRuleSetDraft = {
+        runName: 'Returns Resume Test',
+        file1SystemEnumId: 'OMS_RETURNS',
+        file1SystemLabel: 'HotWax Returns (Reconciliation API)',
+        file1FileTypeEnumId: 'DftJson',
+        file1JsonSchemaId: 'schema-oms-orders',
+        file1PrimaryIdExpression: ['$.orders[0].order_id'],
+        file2SystemEnumId: 'SHOPIFY',
+        file2SystemLabel: 'SHOPIFY',
+        file2FileTypeEnumId: 'DftJson',
+        file2JsonSchemaId: 'schema-shopify-orders',
+        file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
+      }
+      const wrapper = await mountCreateFlow({ draft })
+
+      // A seeded draft always resumes on the last step (ruleset-rules) — see mountCreateFlow's own
+      // comment. Walk back through it to reach file1-endpoint and prove the resumed OMS_RETURNS
+      // value both inserted that step (steps.value) and pre-selected it correctly.
+      let guard = 0
+      while (!wrapper.find('[data-testid="file1-endpoint-select"]').exists() && guard < 20) {
+        await wrapper.get('.wizard-back').trigger('click')
+        await flushPromises()
+        guard += 1
+      }
+      expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax Returns (Reconciliation API)')
+
+      await wrapper.get('.wizard-back').trigger('click')
+      await flushPromises()
+      // deduplicateDarpanSystemOptions relabels the OMS row to its canonical display label
+      // ("HotWax") before it ever reaches allSystemOptions — same as every other system-select
+      // assertion in this file that goes through currentQuestion/resolveSystemLabel.
+      expect(wrapper.get('[data-testid="file1-system-select"]').text()).toBe('HotWax')
+    })
+  })
 })

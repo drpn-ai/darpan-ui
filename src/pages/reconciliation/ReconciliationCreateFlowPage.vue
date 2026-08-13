@@ -121,8 +121,13 @@ import {
 } from '../../lib/reconciliationRuleSetDraft'
 import {
   canonicalDarpanSystemEnumId,
+  darpanSystemEndpointOptions,
+  darpanSystemHasEndpointOptions,
   darpanSystemIdsMatch,
+  darpanSystemParentOptions,
   deduplicateDarpanSystemOptions,
+  resolveDarpanSystemParentEnumId,
+  type DarpanSystemValueOption,
 } from '../../lib/utils/darpanSystems'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -131,6 +136,7 @@ type StepId =
   | 'run-name'
   | 'description'
   | 'file1-system'
+  | 'file1-endpoint'
   | 'file1-source'
   | 'file1-filetype'
   | 'file1-schema'
@@ -138,6 +144,7 @@ type StepId =
   | 'file1-api-config'
   | 'file1-api'
   | 'file2-system'
+  | 'file2-endpoint'
   | 'file2-source'
   | 'file2-filetype'
   | 'file2-schema'
@@ -177,7 +184,16 @@ const pendingSchemaFieldLoads = ref(0)
 const loadingSchemaFields = computed(() => pendingSchemaFieldLoads.value > 0)
 const pageError = ref<string | null>(null)
 const currentStepIndex = ref(0)
-const systemOptions = ref<WorkflowSelectOption[]>([])
+// Full flat systems list from the backend (parentEnumId included). systemOptions below filters it
+// down to top-level systems only — the step 1 "which system" picker; step 2's endpoint options and
+// concrete-value label lookups (resolveSystemLabel) read allSystemOptions directly so endpoint rows
+// (e.g. OMS_RETURNS) keep resolving to their own distinct label everywhere else in the wizard.
+const allSystemOptions = ref<Array<WorkflowSelectOption & DarpanSystemValueOption>>([])
+const systemOptions = computed<WorkflowSelectOption[]>(() => darpanSystemParentOptions(allSystemOptions.value))
+// Tracks the system chosen at step 1 independent of the concrete endpoint value: when the chosen
+// system has endpoints, file{n}SystemEnumId stays blank until step 2 resolves it.
+const file1SystemParentEnumId = ref('')
+const file2SystemParentEnumId = ref('')
 const fileTypeOptions = ref<WorkflowSelectOption[]>([])
 const sourceConfigs = ref<AutomationSourceConfigOption[]>([])
 const nsRestletConfigs = ref<AutomationNsRestletOption[]>([])
@@ -221,15 +237,23 @@ const selectedFile2Schema = computed(() => jsonSchemas.value.find((schema) => sc
 const file1SchemaLabel = computed(() => (selectedFile1Schema.value ? formatSchemaLabel(selectedFile1Schema.value) : 'source 1'))
 const file2SchemaLabel = computed(() => (selectedFile2Schema.value ? formatSchemaLabel(selectedFile2Schema.value) : 'source 2'))
 
+const file1SystemHasEndpointStep = computed(() => darpanSystemHasEndpointOptions(file1SystemParentEnumId.value, allSystemOptions.value))
+const file2SystemHasEndpointStep = computed(() => darpanSystemHasEndpointOptions(file2SystemParentEnumId.value, allSystemOptions.value))
+
 const steps = computed<WizardStep[]>(() => {
   const stepList: WizardStep[] = [
     { id: 'run-name' },
     { id: 'description' },
     { id: 'file1-system' },
-    { id: 'file1-source' },
-    { id: 'file2-system' },
-    { id: 'file2-source' },
   ]
+  // One data point per step: system and endpoint are separate cards. Only inserted when the chosen
+  // system actually has endpoints to choose between (see darpanSystemHasEndpointOptions) — a
+  // system with none (SAPI, Database, NetSuite today) skips straight to file{n}-source, same as
+  // before this change.
+  if (file1SystemHasEndpointStep.value) stepList.push({ id: 'file1-endpoint' })
+  stepList.push({ id: 'file1-source' }, { id: 'file2-system' })
+  if (file2SystemHasEndpointStep.value) stepList.push({ id: 'file2-endpoint' })
+  stepList.push({ id: 'file2-source' })
 
   const file2SystemIndex = stepList.findIndex((step) => step.id === 'file2-system')
   if (file1UsesApi.value) {
@@ -304,6 +328,8 @@ const currentQuestion = computed(() => {
       return 'What description should this run use?'
     case 'file1-system':
       return 'Which system provides the first source?'
+    case 'file1-endpoint':
+      return `Which ${resolveSystemLabel(file1SystemParentEnumId.value)} endpoint provides the first source?`
     case 'file1-source':
       return `How should ${sourceSystemLabel('file1')} provide data?`
     case 'file1-filetype':
@@ -322,6 +348,8 @@ const currentQuestion = computed(() => {
       return `Which API endpoint should ${sourceSystemLabel('file1')} use?`
     case 'file2-system':
       return 'Which system provides the second source?'
+    case 'file2-endpoint':
+      return `Which ${resolveSystemLabel(file2SystemParentEnumId.value)} endpoint provides the second source?`
     case 'file2-source':
       return `How should ${sourceSystemLabel('file2')} provide data?`
     case 'file2-filetype':
@@ -350,11 +378,13 @@ const isRuleSetRulesStep = computed(() => currentStep.value.id === 'ruleset-rule
 const isSelectStep = computed(() => {
   switch (currentStep.value.id) {
     case 'file1-system':
+    case 'file1-endpoint':
     case 'file1-filetype':
     case 'file1-schema':
     case 'file1-api-config':
     case 'file1-api':
     case 'file2-system':
+    case 'file2-endpoint':
     case 'file2-filetype':
     case 'file2-schema':
     case 'file2-api-config':
@@ -384,6 +414,8 @@ const activeSelectValue = computed({
   get: () => {
     switch (currentStep.value.id) {
       case 'file1-system':
+        return file1SystemParentEnumId.value
+      case 'file1-endpoint':
         return file1SystemEnumId.value
       case 'file1-source':
         return file1SourceMode.value
@@ -396,6 +428,8 @@ const activeSelectValue = computed({
       case 'file1-api':
         return selectedApiSourceValue('file1')
       case 'file2-system':
+        return file2SystemParentEnumId.value
+      case 'file2-endpoint':
         return file2SystemEnumId.value
       case 'file2-source':
         return file2SourceMode.value
@@ -414,6 +448,16 @@ const activeSelectValue = computed({
   set: (value: string) => {
     switch (currentStep.value.id) {
       case 'file1-system':
+        file1SystemParentEnumId.value = value
+        // A system with no endpoints resolves straight to its own value (no file1-endpoint step
+        // will be inserted); a system with endpoints leaves file1SystemEnumId blank until step 2
+        // answers it, so canProceed correctly blocks advancing past an unresolved endpoint.
+        file1SystemEnumId.value = darpanSystemHasEndpointOptions(value, allSystemOptions.value) ? '' : value
+        file1JsonSchemaId.value = ''
+        file1PrimaryIdExpression.value = []
+        clearApiSourceConfig('file1')
+        break
+      case 'file1-endpoint':
         file1SystemEnumId.value = value
         file1JsonSchemaId.value = ''
         file1PrimaryIdExpression.value = []
@@ -438,6 +482,13 @@ const activeSelectValue = computed({
         updateApiSource('file1', value)
         break
       case 'file2-system':
+        file2SystemParentEnumId.value = value
+        file2SystemEnumId.value = darpanSystemHasEndpointOptions(value, allSystemOptions.value) ? '' : value
+        file2JsonSchemaId.value = ''
+        file2PrimaryIdExpression.value = []
+        clearApiSourceConfig('file2')
+        break
+      case 'file2-endpoint':
         file2SystemEnumId.value = value
         file2JsonSchemaId.value = ''
         file2PrimaryIdExpression.value = []
@@ -470,6 +521,10 @@ const activeSelectOptions = computed(() => {
     case 'file1-system':
     case 'file2-system':
       return systemOptions.value
+    case 'file1-endpoint':
+      return endpointOptionsForParent(file1SystemParentEnumId.value)
+    case 'file2-endpoint':
+      return endpointOptionsForParent(file2SystemParentEnumId.value)
     case 'file1-filetype':
     case 'file2-filetype':
       return fileTypeOptions.value
@@ -549,6 +604,8 @@ const activeSelectTestId = computed(() => {
   switch (currentStep.value.id) {
     case 'file1-system':
       return 'file1-system-select'
+    case 'file1-endpoint':
+      return 'file1-endpoint-select'
     case 'file1-api-config':
       return 'file1-api-config-select'
     case 'file1-api':
@@ -561,6 +618,8 @@ const activeSelectTestId = computed(() => {
       return 'file1-field-select'
     case 'file2-system':
       return 'file2-system-select'
+    case 'file2-endpoint':
+      return 'file2-endpoint-select'
     case 'file2-api-config':
       return 'file2-api-config-select'
     case 'file2-api':
@@ -623,6 +682,9 @@ const currentPlaceholder = computed(() => {
     case 'file1-system':
     case 'file2-system':
       return 'Select system...'
+    case 'file1-endpoint':
+    case 'file2-endpoint':
+      return 'Select endpoint...'
     case 'file1-api':
     case 'file2-api':
       return 'Select API endpoint...'
@@ -691,7 +753,10 @@ const sourceModeOptions = computed<WorkflowSelectOption[]>(() => [
 ])
 
 const systemSelectionError = computed(() => {
-  if (currentStep.value.id !== 'file2-system') return ''
+  // The "must differ" check is on the concrete resolved value: for a system with no endpoints
+  // that lands on file2-system; for one with endpoints, file2SystemEnumId stays blank there and
+  // the check applies once file2-endpoint resolves it instead.
+  if (currentStep.value.id !== 'file2-system' && currentStep.value.id !== 'file2-endpoint') return ''
   if (!file2SystemEnumId.value) return ''
   if (file1SystemEnumId.value === file2SystemEnumId.value) {
     return 'Source 2 must use a different system than source 1.'
@@ -770,6 +835,8 @@ const canProceed = computed(() => {
     case 'description':
       return true
     case 'file1-system':
+      return file1SystemParentEnumId.value.length > 0
+    case 'file1-endpoint':
       return file1SystemEnumId.value.length > 0
     case 'file1-source':
       return file1SourceMode.value === SOURCE_MODE_FILE || file1SourceMode.value === SOURCE_MODE_API
@@ -784,6 +851,11 @@ const canProceed = computed(() => {
     case 'file1-api':
       return hasApiEndpoint('file1') && !apiSourceSelectionError.value
     case 'file2-system':
+      // When the chosen system has endpoints, file2SystemEnumId stays blank until file2-endpoint
+      // resolves it — the "must differ from source 1" check applies there instead.
+      return file2SystemParentEnumId.value.length > 0 &&
+        (file2SystemHasEndpointStep.value || file2SystemEnumId.value !== file1SystemEnumId.value)
+    case 'file2-endpoint':
       return file2SystemEnumId.value.length > 0 && file2SystemEnumId.value !== file1SystemEnumId.value
     case 'file2-source':
       return file2SourceMode.value === SOURCE_MODE_FILE || file2SourceMode.value === SOURCE_MODE_API
@@ -847,8 +919,15 @@ watch(file2JsonSchemaId, async (nextSchemaId) => {
 })
 
 function resolveSystemLabel(enumId: string): string {
-  const option = systemOptions.value.find((systemOption) => systemOption.value === enumId)
+  // Reads the full list (parents + endpoints), not the step 1-only systemOptions, so a concrete
+  // endpoint value like OMS_RETURNS still resolves to its own distinct label everywhere downstream
+  // (schema labels, "source 1" phrasing, etc.) rather than falling back to the raw enumId.
+  const option = allSystemOptions.value.find((systemOption) => systemOption.value === enumId)
   return softenSystemLabel(option?.label || enumId)
+}
+
+function endpointOptionsForParent(parentEnumId: string): WorkflowSelectOption[] {
+  return darpanSystemEndpointOptions(parentEnumId, resolveSystemLabel(parentEnumId), allSystemOptions.value)
 }
 
 function formatSchemaLabel(schema: JsonSchemaSummary): string {
@@ -1268,6 +1347,11 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   file2SourceConfigType.value = draftState.draft.file2SourceConfigType ?? ''
   file2NsRestletConfigId.value = draftState.draft.file2NsRestletConfigId ?? ''
   file2SystemMessageRemoteId.value = draftState.draft.file2SystemMessageRemoteId ?? ''
+  // Resolve step 1's answer from the resumed concrete value (e.g. OMS_RETURNS -> OMS) BEFORE
+  // steps.value is read below — steps.value only includes file{n}-endpoint when the parent has
+  // one, so this must be set first or a resumeStepId targeting that step would not be found.
+  file1SystemParentEnumId.value = resolveDarpanSystemParentEnumId(file1SystemEnumId.value, allSystemOptions.value)
+  file2SystemParentEnumId.value = resolveDarpanSystemParentEnumId(file2SystemEnumId.value, allSystemOptions.value)
   ruleSetDraftExtras.value = {
     rules: draftState.draft.rules,
     file1ExcludeFilters: draftState.draft.file1ExcludeFilters,
@@ -1325,9 +1409,10 @@ async function loadOptions(): Promise<void> {
       reconciliationFacade.listAutomationSourceOptions(pageAbortController.signal),
     ])
 
-    systemOptions.value = deduplicateDarpanSystemOptions(automationSourceOptionsResponse.systems ?? []).map((option) => ({
+    allSystemOptions.value = deduplicateDarpanSystemOptions(automationSourceOptionsResponse.systems ?? []).map((option) => ({
       value: option.enumId,
       label: option.label || option.enumId,
+      parentEnumId: option.parentEnumId || undefined,
     }))
     fileTypeOptions.value = (automationSourceOptionsResponse.fileTypes ?? []).map((option) => ({
       value: option.enumId,

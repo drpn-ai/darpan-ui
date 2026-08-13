@@ -4,6 +4,27 @@ export interface DarpanSystemOptionInput {
   description?: string
   sequenceNum?: number
   label?: string
+  // Present only on endpoint-level rows grouped under a top-level system (e.g. OMS_RETURNS's
+  // parentEnumId is 'OMS') — see list#AutomationSourceOptions. Absent on top-level systems.
+  parentEnumId?: string
+}
+
+export interface DarpanSystemEndpointOption {
+  value: string
+  label: string
+}
+
+// Shape of an already-mapped-to-WorkflowSelectOption system row (enumId projected to `value`),
+// which is what callers actually hold by the time they group parents/endpoints — distinct from
+// DarpanSystemOptionInput (the raw `enumId`-keyed backend shape consumed above by
+// deduplicateDarpanSystemOptions). Kept as its own type rather than widening DarpanSystemOptionInput
+// because every field on that interface is optional, so a `.value`-only object would satisfy it
+// structurally and silently look for the wrong field name (`.enumId`, which is never set) at runtime.
+export interface DarpanSystemValueOption {
+  value?: string
+  label?: string
+  description?: string
+  parentEnumId?: string
 }
 
 const CANONICAL_SYSTEM_IDS: Record<string, string> = {
@@ -97,4 +118,73 @@ function shouldPreferSystemOption<T extends DarpanSystemOptionInput>(
 
 function normalizeSequenceNumber(sequenceNum: number | undefined): number {
   return typeof sequenceNum === 'number' && Number.isFinite(sequenceNum) ? sequenceNum : Number.MAX_SAFE_INTEGER
+}
+
+// Product-model fix: the source picker asks for the system first (HotWax, Shopify, ...), then the
+// endpoint (Orders, Transfer Orders, Returns, ...) — endpoints must not appear as top-level
+// systems. A row is top-level when it carries no parentEnumId.
+export function darpanSystemIsParentOption(option: DarpanSystemValueOption): boolean {
+  return !option.parentEnumId?.trim()
+}
+
+// Step 1 options: top-level systems only. Call on an already-deduplicated, .value-mapped list
+// (e.g. deduplicateDarpanSystemOptions's output re-projected to WorkflowSelectOption + parentEnumId)
+// so legacy alias rows don't leak through as extra systems.
+export function darpanSystemParentOptions<T extends DarpanSystemValueOption>(options: T[]): T[] {
+  return options.filter((option) => darpanSystemIsParentOption(option))
+}
+
+// True when a chosen parent system has at least one endpoint grouped under it — callers use this
+// to decide whether step 2 ("which endpoint?") is needed at all. Systems with no children (SAPI,
+// Database, NetSuite today) skip straight past it, preserving today's single-step behaviour.
+export function darpanSystemHasEndpointOptions<T extends DarpanSystemValueOption>(
+  parentEnumId: string | null | undefined,
+  allOptions: T[],
+): boolean {
+  if (!parentEnumId) return false
+  return allOptions.some((option) => Boolean(option.parentEnumId?.trim()) && darpanSystemIdsMatch(option.parentEnumId, parentEnumId))
+}
+
+// Step 2 options for a chosen parent system: every row grouped under it, PLUS the parent itself as
+// its own default endpoint — OMS is a real extractable endpoint ("HotWax Orders"), not just a
+// grouping node, and the same holds for Shopify. The submitted value stays the concrete
+// systemEnumId the backend already expects (OMS, OMS_RETURNS, SHOPIFY_RETURN_REFS, ...).
+export function darpanSystemEndpointOptions<T extends DarpanSystemValueOption>(
+  parentEnumId: string | null | undefined,
+  parentFallbackLabel: string,
+  allOptions: T[],
+): DarpanSystemEndpointOption[] {
+  const trimmedParentEnumId = parentEnumId?.trim() ?? ''
+  if (!trimmedParentEnumId) return []
+
+  const children = allOptions.filter((option) =>
+    Boolean(option.parentEnumId?.trim()) && darpanSystemIdsMatch(option.parentEnumId, trimmedParentEnumId),
+  )
+  const parentLabel = darpanSystemDisplayLabel(trimmedParentEnumId, parentFallbackLabel)
+  const defaultOption: DarpanSystemEndpointOption = { value: trimmedParentEnumId, label: `${parentLabel} Orders` }
+
+  return [
+    defaultOption,
+    ...children.flatMap((child) => {
+      const value = child.value?.trim()
+      if (!value) return []
+      return [{ value, label: child.label?.trim() || child.description?.trim() || value }]
+    }),
+  ]
+}
+
+// Editing an existing automation/run only has the concrete stored systemEnumId (e.g. OMS_RETURNS).
+// Resolve which Step 1 answer that belongs to so the wizard can pre-select the right parent.
+// Top-level systems (and anything unrecognized) resolve to themselves — step 2 is then skipped,
+// matching today's behaviour for systems with no endpoints.
+export function resolveDarpanSystemParentEnumId<T extends DarpanSystemValueOption>(
+  systemEnumId: string | null | undefined,
+  allOptions: T[],
+): string {
+  const trimmedSystemEnumId = systemEnumId?.trim() ?? ''
+  if (!trimmedSystemEnumId) return ''
+
+  const match = allOptions.find((option) => darpanSystemIdsMatch(option.value, trimmedSystemEnumId))
+  const parentEnumId = match?.parentEnumId?.trim()
+  return parentEnumId || trimmedSystemEnumId
 }

@@ -2511,6 +2511,7 @@ export interface components {
                 description?: string;
                 sequenceNum?: number;
                 label?: string;
+                parentEnumId?: string;
             }[];
             savedRuns?: unknown[];
             sftpServers?: unknown[];

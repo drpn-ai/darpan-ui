@@ -37,6 +37,9 @@ export interface EnumOption {
   description?: string
   sequenceNum?: number
   label?: string
+  // Only populated for DarpanSystemSource "systems" rows that are an endpoint under a top-level
+  // system (e.g. OMS_RETURNS -> OMS) — see list#AutomationSourceOptions. Absent everywhere else.
+  parentEnumId?: string
 }
 
 export interface SessionInfo {
