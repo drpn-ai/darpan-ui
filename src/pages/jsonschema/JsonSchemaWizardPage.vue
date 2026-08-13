@@ -85,6 +85,15 @@
               submit-on-enter
             />
           </label>
+          <p
+            v-if="showEmptySystemNotice"
+            class="section-note"
+            data-testid="schema-wizard-system-empty"
+          >
+            No systems are configured on this instance, so a schema cannot be assigned to one yet.
+            Systems come from Darpan's reference data — load the component's seed data, then reopen
+            this step.
+          </p>
         </div>
       </template>
 
@@ -171,7 +180,12 @@ const loading = ref(false)
 const saving = ref(false)
 const pageError = ref<string | null>(null)
 const systemOptions = ref<AppSelectOption[]>([])
+const systemOptionsLoaded = ref(false)
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+// An install whose DarpanSystemSource seed data never loaded reaches this step with an empty list, a
+// permanently disabled OK and nothing on screen saying why. The list is reference data, not something
+// the wizard can create, so say what is missing rather than offering an action that cannot work.
+const showEmptySystemNotice = computed(() => systemOptionsLoaded.value && systemOptions.value.length === 0)
 
 function buildWorkflowSteps(uploadIntent: SchemaUploadIntent | ''): WorkflowStep[] {
   const steps: WorkflowStep[] = [
@@ -530,6 +544,7 @@ async function loadSystemOptions(): Promise<void> {
   try {
     const response = await settingsFacade.listEnumOptions('DarpanSystemSource', pageAbortController.signal)
     systemOptions.value = (response.options ?? []).map(toSystemOption)
+    systemOptionsLoaded.value = true
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     pageError.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load reconciliation systems.'

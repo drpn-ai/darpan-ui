@@ -1,5 +1,15 @@
 <template>
-  <form class="wizard-question-shell" @submit.prevent="emit('submit')" @keydown.enter="handleEnter" @change="handleFileChange">
+  <!-- data-enter-advances declares the contract the "press Enter ↵" hint below promises, so answer
+       controls that own their Enter key (AppSelect's trigger, which would otherwise re-open its
+       menu) can honor it without every page remembering an opt-in prop. -->
+  <form
+    ref="formRoot"
+    class="wizard-question-shell"
+    data-enter-advances="true"
+    @submit.prevent="emit('submit')"
+    @keydown.enter="handleEnter"
+    @change="handleFileChange"
+  >
     <div class="wizard-prompt-row">
       <p class="wizard-question">
         <slot name="question">{{ question }}</slot>
@@ -46,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { requestSubmitOnEnter } from '../../lib/keyboard'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import AppCancelAction from '../ui/AppCancelAction.vue'
@@ -94,6 +104,44 @@ const emit = defineEmits<{
 
 let pendingPrimaryFocusTimer: number | null = null
 
+const formRoot = ref<HTMLFormElement | null>(null)
+
+// Every control a step can ask an answer through. `.wizard-answer-control` covers the text inputs and
+// the WorkflowSelect trigger; the bare element types cover the file input (visually hidden, so the
+// class sits on a sibling span) and the checkbox tables.
+const ANSWER_CONTROL_SELECTOR = [
+  '.wizard-answer-control',
+  'input:not([type="hidden"])',
+  'select',
+  'textarea',
+].join(',')
+
+function isFocusable(element: Element): element is HTMLElement {
+  if (!(element instanceof HTMLElement)) return false
+  if (element.hasAttribute('disabled')) return false
+  if (element.getAttribute('aria-hidden') === 'true') return false
+  if (element.tabIndex < 0) return false
+  return true
+}
+
+/** Put the caret back on the step's own control whenever the step changes.
+ *
+ *  Advancing destroys the control the user was typing in, and focus falls to <body> — outside this
+ *  form, so its keydown listener stops seeing Enter and the wizard's own "press Enter ↵" hint stops
+ *  being true after the first step. Worse, focus that happens to sit on Back (because the user
+ *  clicked it) makes the next Enter go backwards again. Both are the same missing move. */
+async function focusAnswerControl(): Promise<void> {
+  await nextTick()
+
+  const form = formRoot.value
+  if (!form) return
+
+  const control = Array.from(form.querySelectorAll(ANSWER_CONTROL_SELECTOR)).find(isFocusable)
+  if (!control) return
+
+  control.focus()
+}
+
 const hasActions = computed(() => (
   props.showBack
   || props.showCancelAction
@@ -137,8 +185,13 @@ function handleFileChange(event: Event): void {
   }, 0)
 }
 
+// The question is what identifies a step to this component — it changes on every transition, and on
+// nothing else.
+watch(() => props.question, () => { void focusAnswerControl() })
+
 onMounted(() => {
   document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleWorkflowCancelRequest)
+  void focusAnswerControl()
 })
 
 onBeforeUnmount(() => {

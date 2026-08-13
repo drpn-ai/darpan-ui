@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../../lib/uiEvents'
 import WorkflowStepForm from '../WorkflowStepForm.vue'
@@ -160,6 +161,65 @@ describe('WorkflowStepForm', () => {
     await wrapper.get('[data-testid="required-field"]').trigger('keydown.enter')
 
     expect(wrapper.emitted('submit')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
+  it('focuses the answer control on mount so the advertised Enter key reaches the form', async () => {
+    const wrapper = mount(WorkflowStepForm, {
+      attachTo: document.body,
+      props: { question: 'Name this run' },
+      slots: {
+        default: '<label class="wizard-input-shell"><input data-testid="run-name" class="wizard-answer-control"></label>',
+      },
+    })
+
+    await nextTick()
+
+    expect((document.activeElement as HTMLElement | null)?.dataset.testid).toBe('run-name')
+
+    wrapper.unmount()
+  })
+
+  it('returns focus to the answer control when the step changes', async () => {
+    // Advancing destroys the control the user typed in and focus falls to <body>, outside this form
+    // -- so the next Enter never reached the keydown listener and the wizard could only be driven by
+    // clicking OK. Focus parked on Back was worse: Enter re-fired Back and walked the user backwards.
+    const wrapper = mount(WorkflowStepForm, {
+      attachTo: document.body,
+      props: { question: 'Name this run', showBack: true },
+      slots: {
+        default: '<label class="wizard-input-shell"><input data-testid="answer" class="wizard-answer-control"></label>',
+      },
+    })
+
+    ;(wrapper.get('.wizard-back').element as HTMLButtonElement).focus()
+    expect((document.activeElement as HTMLElement | null)?.className).toContain('wizard-back')
+
+    await wrapper.setProps({ question: 'Which schema describes it?' })
+    await nextTick()
+
+    expect((document.activeElement as HTMLElement | null)?.dataset.testid).toBe('answer')
+
+    await wrapper.get('[data-testid="answer"]').trigger('keydown.enter')
+
+    expect(wrapper.emitted('submit')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
+  it('leaves focus alone on a step that offers no answer control', async () => {
+    const wrapper = mount(WorkflowStepForm, {
+      attachTo: document.body,
+      props: { question: 'How do you want to start?', showPrimaryAction: false },
+      slots: {
+        default: '<button type="button" class="workflow-shortcut-choice-card">Upload a sample</button>',
+      },
+    })
+
+    await nextTick()
+
+    expect(document.activeElement).toBe(document.body)
 
     wrapper.unmount()
   })

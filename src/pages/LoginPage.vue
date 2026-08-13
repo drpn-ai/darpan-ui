@@ -17,14 +17,16 @@
       <h1 v-if="!isChangingPasswordMode">Sign In</h1>
 
       <form v-if="!isChangingPasswordMode" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
-        <label>
+        <!-- The wrapping label already names each field for assistive tech; id/name are here for the
+             password managers that still key off them rather than the autocomplete tokens. -->
+        <label for="login-username">
           <span>Username</span>
-          <input v-model="username" type="text" autocomplete="username" required />
+          <input id="login-username" v-model="username" name="username" type="text" autocomplete="username" required />
         </label>
 
-        <label>
+        <label for="login-password">
           <span>Password</span>
-          <input v-model="password" type="password" autocomplete="current-password" required />
+          <input id="login-password" v-model="password" name="password" type="password" autocomplete="current-password" required />
         </label>
 
         <div class="action-row">

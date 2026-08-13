@@ -325,6 +325,40 @@ describe('JsonSchemaWizardPage', () => {
     expect(wrapper.text()).toContain('$.orderId')
   })
 
+  it('says why the system step is unusable when no systems are configured', async () => {
+    // A fresh install without the DarpanSystemSource seed data landed here with an empty dropdown,
+    // a permanently disabled OK and no text at all -- indistinguishable from a broken page.
+    listEnumOptions.mockResolvedValue({ options: [] })
+
+    const wrapper = mount(JsonSchemaWizardPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="upload-intent-sample"]').trigger('click')
+    await flushPromises()
+
+    const fileInput = wrapper.get('input[type="file"]')
+    Object.defineProperty(fileInput.element, 'files', {
+      value: [new File(['{"orderId":"1001"}'], 'orders.json', { type: 'application/json' })],
+      configurable: true,
+    })
+    await fileInput.trigger('change')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Assign the system')
+    expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="schema-wizard-system-empty"]').text()).toContain('No systems are configured')
+  })
+
+  it('stays quiet about an empty system list while the options are still loading', async () => {
+    const wrapper = mount(JsonSchemaWizardPage)
+
+    expect(wrapper.find('[data-testid="schema-wizard-system-empty"]').exists()).toBe(false)
+
+    await flushPromises()
+    wrapper.unmount()
+  })
+
   it('advances from the system step when Enter selects a highlighted system option', async () => {
     const wrapper = mount(JsonSchemaWizardPage)
     await flushPromises()

@@ -29,6 +29,16 @@ export function normalizeTimezoneId(value: unknown): string {
   return timezoneAliases[normalized.toUpperCase()] ?? normalized
 }
 
+// The zone Intl would use when no explicit timezone is passed (see formatDateTime in utils/date).
+// Labels that promise "your browser's timezone" have to be able to name it.
+export function resolveBrowserTimeZone(): string {
+  try {
+    return normalizeTimezoneId(new Intl.DateTimeFormat().resolvedOptions().timeZone)
+  } catch {
+    return ''
+  }
+}
+
 export function buildTimezoneOptions(selectedTimeZone: unknown): TimezoneOption[] {
   const timezoneIds = new Set<string>([...preservedTimezoneIds, ...resolveSupportedTimeZones()])
   const normalizedSelectedTimezone = normalizeTimezoneId(selectedTimeZone)

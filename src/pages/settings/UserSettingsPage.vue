@@ -45,7 +45,18 @@
     </StaticPageSection>
 
     <StaticPageSection title="Tenant Context">
-      <div class="static-page-tile-grid static-page-record-grid">
+      <!-- No membership is a dead end everywhere else in the app: tenant-scoped writes refuse with
+           "An active tenant is required", and this was the one screen that could have explained why —
+           it rendered an empty grid instead. Membership is granted server-side on purpose, so the
+           honest answer is what is missing and who can grant it, not a button that cannot work. -->
+      <p
+        v-if="availableTenants.length === 0"
+        class="section-note"
+        data-testid="user-settings-no-tenant"
+      >
+        {{ noTenantMessage }}
+      </p>
+      <div v-else class="static-page-tile-grid static-page-record-grid">
         <button
           v-for="tenant in availableTenants"
           :key="tenant.userGroupId"
@@ -238,7 +249,7 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import type { TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
-import { buildTimezoneOptions } from '../../lib/timezones'
+import { buildTimezoneOptions, resolveBrowserTimeZone } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../../lib/uiEvents'
@@ -309,6 +320,11 @@ const username = computed(() => sessionInfo.value?.username ?? sessionInfo.value
 const displayName = computed(() => sessionInfo.value?.displayName?.toString().trim() || username.value)
 const availableTenants = computed(() => sessionInfo.value?.availableTenants ?? [])
 const activeTenantUserGroupId = computed(() => sessionInfo.value?.activeTenantUserGroupId ?? null)
+const noTenantMessage = computed(() => (
+  permissionsStore.canManageGlobalSettings || sessionInfo.value?.isSuperAdmin === true
+    ? 'This account is not a member of any company yet, so tenant-scoped screens stay read-only and saving a schema or run will be refused. Add it to a company permission group to continue.'
+    : 'This account is not a member of any company yet, so tenant-scoped screens stay read-only and saving a schema or run will be refused. Ask a Darpan admin to add you to a company.'
+))
 const lastLoginLabel = computed(() => formatDateTime(sessionInfo.value?.lastLoginDate, { fallback: '' }))
 const lastRunLabel = computed(() => {
   const lastRun = sessionInfo.value?.lastRun
@@ -324,9 +340,25 @@ const permissionSummary = computed(() => {
 })
 const notificationDefaultSummary = computed(() => notificationDefault.value?.spaceName || 'No default space')
 const userTimeZone = computed(() => sessionInfo.value?.userTimeZone?.toString().trim() || '')
-const userTimezoneSummary = computed(() => savedUserTimeZone.value || 'Tenant default')
+const tenantTimeZone = computed(() => sessionInfo.value?.tenantTimeZone?.toString().trim() || '')
+const activeTenantName = computed(() => (
+  sessionInfo.value?.activeTenantLabel?.toString().trim() || activeTenantUserGroupId.value || ''
+))
+// "Tenant default" named neither the company nor the zone, so it told the user nothing about what
+// times they would actually see. Display resolution is userTimeZone -> tenantTimeZone -> browser
+// (resolveEffectiveTimeZone in stores/auth), so name whichever of the last two actually applies and
+// always show the zone id.
+const clearedTimezoneLabel = computed(() => {
+  if (tenantTimeZone.value) {
+    return `${activeTenantName.value || 'Tenant'} default (${tenantTimeZone.value})`
+  }
+
+  const browserTimeZone = resolveBrowserTimeZone()
+  return browserTimeZone ? `This browser (${browserTimeZone})` : 'This browser'
+})
+const userTimezoneSummary = computed(() => savedUserTimeZone.value || clearedTimezoneLabel.value)
 const userTimezoneOptions = computed<AppSelectOption[]>(() => [
-  { value: '', label: 'Tenant default' },
+  { value: '', label: clearedTimezoneLabel.value },
   ...buildTimezoneOptions(timezoneForm.value.timeZone),
 ])
 const timezonePrimaryLabel = computed(() => (isSavingUserTimezone.value ? 'Saving timezone' : 'Save Timezone'))

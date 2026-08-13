@@ -78,15 +78,19 @@
               type="button"
               class="app-icon-action app-icon-action--large"
               :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`"
-              :aria-pressed="theme === 'dark'"
               @click="toggleTheme"
             >
-              <svg v-if="theme === 'dark'" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" />
-              </svg>
-              <svg v-else viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <!-- The icon names the theme this button switches TO, matching the label it already
+                   carried. It used to draw the theme currently in effect, so the picture and the
+                   accessible name told a sighted user and a screen-reader user opposite things.
+                   aria-pressed is gone with it: a button whose name changes with its state is not a
+                   toggle whose pressed-ness means anything. -->
+              <svg v-if="theme === 'dark'" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                 <circle cx="12" cy="12" r="3.5" />
                 <path d="M12 2.5v3.2M12 18.3v3.2M21.5 12h-3.2M5.7 12H2.5M18.7 5.3l-2.3 2.3M7.6 16.4l-2.3 2.3M18.7 18.7l-2.3-2.3M7.6 7.6 5.3 5.3" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" />
               </svg>
             </button>
             <button

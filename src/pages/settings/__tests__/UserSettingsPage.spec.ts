@@ -10,6 +10,7 @@ type TestSessionInfo = {
   displayName: string
   timeZone: string
   userTimeZone?: string
+  tenantTimeZone?: string
   lastLoginDate?: string
   lastRun?: {
     savedRunId?: string
@@ -50,6 +51,7 @@ const authState = vi.hoisted<{ sessionInfo: TestSessionInfo; error: string | nul
     username: 'john.doe',
     displayName: 'john.doe',
     timeZone: 'America/Los_Angeles',
+    tenantTimeZone: 'America/New_York',
     lastLoginDate: '2026-04-30T14:14:00Z',
     lastRun: {
       savedRunId: 'ORDER_SYNC',
@@ -101,6 +103,14 @@ vi.mock('../../../stores/permissions', () => ({
   usePermissionsStore: () => permissionsShape,
 }))
 
+// Only the browser-zone probe is stubbed: the timezone list stays real so the picker tests still
+// choose from the ids the app actually offers. A real probe would make the fallback assertion
+// depend on the machine running the suite.
+vi.mock('../../../lib/timezones', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/timezones')>()),
+  resolveBrowserTimeZone: () => 'Asia/Kolkata',
+}))
+
 vi.mock('../../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => ({
     workflowOrigin: null,
@@ -139,6 +149,7 @@ describe('UserSettingsPage', () => {
       username: 'john.doe',
       displayName: 'john.doe',
       timeZone: 'America/Los_Angeles',
+      tenantTimeZone: 'America/New_York',
       lastLoginDate: '2026-04-30T14:14:00Z',
       lastRun: {
         savedRunId: 'ORDER_SYNC',
@@ -233,6 +244,38 @@ describe('UserSettingsPage', () => {
     await flushPromises()
 
     expect(saveActiveTenant).toHaveBeenCalledWith('GORJANA')
+  })
+
+  it('explains a missing company membership instead of showing an empty tenant section', () => {
+    // Tenant-scoped writes refuse with "An active tenant is required" and this was the only screen
+    // that could say why -- it rendered nothing at all, so the refusal read as a broken app.
+    authState.sessionInfo = {
+      ...authState.sessionInfo!,
+      activeTenantUserGroupId: '',
+      activeTenantLabel: '',
+      availableTenants: [],
+    }
+
+    const wrapper = mountPage()
+
+    expect(wrapper.findAll('.static-page-record-tile')).toHaveLength(0)
+    const notice = wrapper.get('[data-testid="user-settings-no-tenant"]')
+    expect(notice.text()).toContain('not a member of any company')
+    expect(notice.text()).toContain('Ask a Darpan admin')
+  })
+
+  it('points an admin at the group they can fix it in themselves', () => {
+    authState.sessionInfo = {
+      ...authState.sessionInfo!,
+      activeTenantUserGroupId: '',
+      activeTenantLabel: '',
+      availableTenants: [],
+      isSuperAdmin: true,
+    }
+
+    const wrapper = mountPage()
+
+    expect(wrapper.get('[data-testid="user-settings-no-tenant"]').text()).toContain('company permission group')
   })
 
   it('changes the current user password through the settings flow', async () => {
@@ -500,12 +543,33 @@ describe('UserSettingsPage', () => {
     expect(wrapper.find('.workflow-shortcut-choice-grid').exists()).toBe(false)
   })
 
-  it('shows the preferred timezone card with the tenant-default fallback summary', () => {
+  it('names the tenant and its zone code in the fallback summary instead of "Tenant default"', () => {
     const wrapper = mountPage()
     const card = wrapper.get('[data-testid="user-timezone-card"]')
 
     expect(card.text()).toContain('Timezone')
-    expect(card.text()).toContain('Tenant default')
+    expect(card.text()).toContain('Krewe default (America/New_York)')
+    expect(card.text()).not.toContain('Tenant default')
+  })
+
+  it('offers the same tenant-and-code label as the option that clears the preference', async () => {
+    const wrapper = mountPage()
+
+    await wrapper.get('[data-testid="user-timezone-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-timezone-select"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="app-select-option"][data-option-value=""]').text())
+      .toBe('Krewe default (America/New_York)')
+  })
+
+  it('falls back to the browser zone when the tenant has no timezone configured', () => {
+    // Display resolution is userTimeZone -> tenantTimeZone -> browser, so with no tenant timezone
+    // the honest label is the browser zone, not the tenant's name.
+    authState.sessionInfo = { ...authState.sessionInfo, tenantTimeZone: undefined }
+    const wrapper = mountPage()
+
+    expect(wrapper.get('[data-testid="user-timezone-card"]').text()).toContain('This browser (Asia/Kolkata)')
+    expect(wrapper.get('[data-testid="user-timezone-card"]').text()).not.toContain('Krewe default')
   })
 
   it('saves a preferred timezone via the popup picker', async () => {
@@ -522,7 +586,7 @@ describe('UserSettingsPage', () => {
     expect(wrapper.get('[data-testid="user-timezone-card"]').text()).toContain('America/New_York')
   })
 
-  it('clears the preference by choosing Tenant default', async () => {
+  it('clears the preference by choosing the tenant default option', async () => {
     authState.sessionInfo = { ...authState.sessionInfo, userTimeZone: 'America/New_York' }
     const wrapper = mountPage()
 

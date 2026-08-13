@@ -259,4 +259,77 @@ describe('AppSelect', () => {
     form.removeEventListener('submit', submit)
     form.remove()
   })
+
+  // WorkflowStepForm prints an unconditional "press Enter ↵" hint and marks itself
+  // data-enter-advances, so a select inside a step owes that promise without the page passing
+  // submitOnEnter. Before this, the prop was passed at exactly one of eleven call sites and every
+  // other select step re-opened its own menu on Enter instead of advancing.
+  function mountInMarkedForm(
+    props: { modelValue: string; options: { value: string; label: string }[]; testId?: string },
+    submit: (event: Event) => void,
+  ) {
+    const form = document.createElement('form')
+    form.setAttribute('data-enter-advances', 'true')
+    form.addEventListener('submit', submit)
+    document.body.appendChild(form)
+
+    const wrapper = mount(AppSelect, { attachTo: form, props })
+    return { form, wrapper }
+  }
+
+  it('advances a marked step form on Enter without needing submitOnEnter', async () => {
+    const submit = vi.fn((event: Event) => event.preventDefault())
+    const { form, wrapper } = mountInMarkedForm(
+      {
+        modelValue: 'shopify',
+        testId: 'system-select',
+        options: [
+          { value: 'oms', label: 'OMS' },
+          { value: 'shopify', label: 'SHOPIFY' },
+        ],
+      },
+      submit,
+    )
+
+    await wrapper.get('[data-testid="system-select"]').trigger('keydown.enter')
+    await flushPromises()
+
+    expect(submit).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[data-testid="app-select-option"]')).toBeNull()
+
+    wrapper.unmount()
+    form.removeEventListener('submit', submit)
+    form.remove()
+  })
+
+  it('leaves an unmarked form alone so editor surfaces keep their own Enter semantics', async () => {
+    // The schema editor's refined-fields form is a plain <form>; Enter there must not be
+    // repurposed into a save just because a select happens to sit inside it.
+    const submit = vi.fn((event: Event) => event.preventDefault())
+    const form = document.createElement('form')
+    form.addEventListener('submit', submit)
+    document.body.appendChild(form)
+
+    const wrapper = mount(AppSelect, {
+      attachTo: form,
+      props: {
+        modelValue: 'shopify',
+        testId: 'schema-type-select',
+        options: [
+          { value: 'oms', label: 'OMS' },
+          { value: 'shopify', label: 'SHOPIFY' },
+        ],
+      },
+    })
+
+    await wrapper.get('[data-testid="schema-type-select"]').trigger('keydown.enter')
+    await flushPromises()
+
+    expect(submit).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-testid="app-select-option"]')).not.toBeNull()
+
+    wrapper.unmount()
+    form.removeEventListener('submit', submit)
+    form.remove()
+  })
 })

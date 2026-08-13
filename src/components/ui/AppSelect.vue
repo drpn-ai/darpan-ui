@@ -172,8 +172,22 @@ function normalizeSearchValue(value: string): string {
   return value.trim().toLocaleLowerCase()
 }
 
+// Whether Enter should answer-and-advance rather than just answer. Read from the enclosing form
+// instead of from a prop: WorkflowStepForm marks itself `data-enter-advances="true"` because it
+// prints an unconditional "press Enter ↵" hint beside its primary action, so every answer control
+// inside it owes that promise. This used to be the `submitOnEnter` prop alone, which defaulted to
+// false and had to be remembered per call site — it was passed at exactly one of this app's eleven
+// AppSelect call sites, so the rest silently re-opened their own menu instead of advancing.
+// Marker-via-closest() matches the existing `data-enter-submit="off"` idiom in lib/keyboard.ts.
+// Deliberately narrower than "any enclosing <form>" so ordinary editor forms (the schema editor's
+// refined-fields form) keep their own Enter semantics. The prop is kept as an explicit override
+// for selects that must advance outside a marked form.
+function shouldAdvanceOnEnter(): boolean {
+  return props.submitOnEnter || Boolean(root.value?.closest('[data-enter-advances="true"]'))
+}
+
 async function handleOptionEnter(value: string): Promise<void> {
-  if (props.submitOnEnter) {
+  if (shouldAdvanceOnEnter()) {
     await selectOptionAndSubmit(value)
     return
   }
@@ -196,7 +210,7 @@ async function handleSearchEnter(): Promise<void> {
 async function handleTriggerEnter(): Promise<void> {
   if (props.disabled || filteredOptions.value.length === 0) return
 
-  if (props.submitOnEnter && hasSelection.value) {
+  if (hasSelection.value && shouldAdvanceOnEnter()) {
     await selectOptionAndSubmit(props.modelValue)
     return
   }
