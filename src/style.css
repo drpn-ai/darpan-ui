@@ -1006,10 +1006,22 @@ button:disabled {
 .workflow-form-grid--hotwax-auth {
   grid-template-columns: minmax(18rem, 1.45fr) minmax(18rem, 1fr) max-content;
   column-gap: 1.8rem;
+  /* Overrides the `align-items: start` this row also inherits from .workflow-form-grid--compact.
+     While the shells were start-aligned they were only as tall as their own content, so the
+     checkbox cell had no leftover height for the `1fr` control row below to absorb and centring it
+     was a no-op -- the checkbox stayed pinned to the top of the row. Stretching is what creates the
+     space that makes the centring real. Source order beats --compact here; both are single-class. */
+  align-items: stretch;
 }
 
+/* The three cells in this row hold controls of different heights -- two selects and a bare
+   checkbox. Pairing the stretch above with a `1fr` control row lets that row absorb the leftover
+   height, and centring puts the checkbox on the selects' centre line. The selects are unaffected:
+   they define the row height, so `1fr` resolves to exactly their own height. */
 .workflow-form-grid--hotwax-auth .wizard-input-shell {
   min-width: 0;
+  grid-template-rows: auto 1fr;
+  align-items: center;
 }
 
 .workflow-form-grid--shopify-compact {
@@ -1596,12 +1608,81 @@ label > span {
   justify-content: flex-start;
 }
 
-/* DAR-BE-005: the affects-N-tenants save gate on the four shared-config edit workflows
-   (HotWax, Shopify, NetSuite auth, NetSuite endpoint). Grid, not the shell's own gap alone, so the
-   warning copy and the confirm checkbox sit close together as one unit inside the wider form. */
-.shared-edit-warning {
-  display: grid;
+/* DAR-BE-005: "Shared with" renders as a field group inside the config edit form, in the same chip
+   idiom as Available Endpoints one field above it. Grant fires on select and revoke fires on the
+   remove control -- both commit immediately and silently, so a removed chip leaves an undo slot in
+   its own former position rather than a confirmation dialog. */
+.shared-with-chip {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-1-5);
+  min-height: 2.35rem;
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface-2) 95%, white);
+  font-size: var(--type-muted-size);
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.shared-with-chip--owner {
+  border-style: dashed;
+}
+
+.shared-with-chip--undo {
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.shared-with-chip-note {
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+}
+
+/* min-height: 0 is load bearing. The global `button` rule sets min-height 2.55rem, which is TALLER
+   than the 2.35rem chip that contains this control, so without the reset the remove button inflated
+   its own chip and peer chips rendered visibly taller than the owner chip beside them. Resetting
+   padding/border/background alone does not cover it -- that rule's min-height still applies. */
+.shared-with-chip-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shared-with-chip-action:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.shared-with-chip-action:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.shared-with-chip-action--undo {
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.shared-with-chip--add {
+  border-style: dashed;
+  color: var(--text-dim);
+  background: transparent;
+  cursor: pointer;
+}
+
+.shared-with-chip--add:hover {
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .app-popup-backdrop {

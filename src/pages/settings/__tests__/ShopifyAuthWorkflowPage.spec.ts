@@ -538,7 +538,10 @@ describe('ShopifyAuthWorkflowPage', () => {
     expect(saveShopifyAuthConfig).toHaveBeenCalledTimes(1)
   })
 
-  it('blocks Save behind an explicit inline confirmation when the config is shared across tenants', async () => {
+  // The affects-N-tenants warning and its confirm checkbox were removed with the chip field
+  // group: the tenant list is now rendered inside the form, so the sentence restated what the
+  // chips already show. This pins the removal -- absence alone would let it silently return.
+  it('saves a shared config with no warning and no acknowledgment step', async () => {
     route.params = { shopifyAuthConfigId: 'krewe-shopify' }
     route.name = 'settings-shopify-edit'
     route.fullPath = '/settings/shopify/edit/krewe-shopify'
@@ -577,82 +580,18 @@ describe('ShopifyAuthWorkflowPage', () => {
     const wrapper = mount(ShopifyAuthWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
+    expect(wrapper.find('[data-testid="shared-edit-warning"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="shared-edit-confirm"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="save-shopify-auth"]').attributes('disabled')).toBeUndefined()
 
-    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
-    await flushPromises()
-    expect(saveShopifyAuthConfig).not.toHaveBeenCalled()
+    // Shared with is a field group inside the form, above the divider and the actions --
+    // not a panel appended after the form's terminal Save/Cancel row.
+    const html = wrapper.html()
+    expect(html).toContain('Shared with')
+    expect(html.indexOf('Shared with')).toBeLessThan(html.indexOf('save-shopify-auth'))
+    // Credentials sit above capability: identity -> connection -> credentials -> capability -> access.
+    expect(html.indexOf('leave blank to keep existing')).toBeLessThan(html.indexOf('shopify-endpoint-options'))
 
-    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
-    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
-    await flushPromises()
-
-    expect(saveShopifyAuthConfig).toHaveBeenCalledTimes(1)
-  })
-
-  // DAR-BE-005 Task 12 review finding: the config fetch and the sharing fetch used to be two
-  // independent races. If the config fetch (fast) resolved before the sharing fetch (slow), the
-  // form went interactive with editWarning still null even for a genuinely shared config -- a
-  // synchronous mock can never exercise this, both promises settle in the same microtask flush.
-  // This test uses a manually-resolved promise for listConfigTenantAccess specifically so the two
-  // fetches settle on different ticks, matching a real slow-sharing-fetch race.
-  it('keeps Save disabled until the sharing fetch settles, even when it resolves after the config fetch', async () => {
-    route.params = { shopifyAuthConfigId: 'krewe-shopify' }
-    route.name = 'settings-shopify-edit'
-    route.fullPath = '/settings/shopify/edit/krewe-shopify'
-    getShopifyAuthConfig.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      shopifyAuthConfig: {
-        shopifyAuthConfigId: 'krewe-shopify',
-        description: 'Krewe Shopify',
-        companyUserGroupId: 'KREWE',
-        shopApiUrl: 'https://krewe.myshopify.com',
-        apiVersion: '2026-01',
-        isActive: 'Y',
-        canReadOrders: true,
-        hasAccessToken: true,
-      },
-    })
-    saveShopifyAuthConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
-
-    let resolveSharing: (value: unknown) => void = () => {}
-    listConfigTenantAccess.mockImplementation(
-      () => new Promise((resolve) => { resolveSharing = resolve }),
-    )
-
-    const wrapper = mount(ShopifyAuthWorkflowPage)
-    await flushPromises()
-
-    expect((wrapper.get('input[name="description"]').element as HTMLInputElement).value).toBe('Krewe Shopify')
-    expect(wrapper.get('[data-testid="save-shopify-auth"]').attributes('disabled')).toBeDefined()
-
-    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
-    expect(saveShopifyAuthConfig).not.toHaveBeenCalled()
-
-    resolveSharing({
-      ok: true,
-      messages: [],
-      errors: [],
-      sharing: {
-        configTypeEnumId: 'SCFG_SHOPIFY_AUTH',
-        configId: 'krewe-shopify',
-        ownerTenantUserGroupId: 'KREWE',
-        ownerTenantLabel: 'Krewe',
-        memberTenantUserGroupIds: ['GORJANA'],
-        memberTenantLabels: [{ tenantUserGroupId: 'GORJANA', label: 'Gorjana' }],
-        memberCount: 2,
-        canManage: true,
-      },
-    })
-    await flushPromises()
-
-    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
-    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
-    expect(saveShopifyAuthConfig).not.toHaveBeenCalled()
-
-    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
     await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
     await flushPromises()
 

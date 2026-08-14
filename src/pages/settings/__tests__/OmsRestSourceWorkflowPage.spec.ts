@@ -624,7 +624,10 @@ describe('OmsRestSourceWorkflowPage', () => {
     expect(saveOmsRestSourceConfig).toHaveBeenCalledTimes(1)
   })
 
-  it('blocks Save behind an explicit inline confirmation when the config is shared across tenants', async () => {
+  // The affects-N-tenants warning and its confirm checkbox were removed with the chip field
+  // group: the tenant list is now rendered inside the form, so the sentence restated what the
+  // chips already show. This pins the removal -- absence alone would let it silently return.
+  it('saves a shared config with no warning and no acknowledgment step', async () => {
     route.params = { omsRestSourceConfigId: 'krewe-oms' }
     route.name = 'settings-oms-edit'
     route.fullPath = '/settings/hotwax/edit/krewe-oms'
@@ -638,7 +641,7 @@ describe('OmsRestSourceWorkflowPage', () => {
           description: 'Krewe HotWax',
           companyUserGroupId: 'KREWE',
           baseUrl: 'https://oms.example.com',
-          authType: 'NONE',
+          authType: 'BEARER',
           hasUsername: false,
           hasPassword: false,
           hasApiToken: false,
@@ -670,94 +673,18 @@ describe('OmsRestSourceWorkflowPage', () => {
     const wrapper = mount(OmsRestSourceWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
+    expect(wrapper.find('[data-testid="shared-edit-warning"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="shared-edit-confirm"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="save-oms-rest-source"]').attributes('disabled')).toBeUndefined()
 
-    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
-    await flushPromises()
-    expect(saveOmsRestSourceConfig).not.toHaveBeenCalled()
+    // Shared with is a field group inside the form, above the divider and the actions --
+    // not a panel appended after the form's terminal Save/Cancel row.
+    const html = wrapper.html()
+    expect(html).toContain('Shared with')
+    expect(html.indexOf('Shared with')).toBeLessThan(html.indexOf('save-oms-rest-source'))
+    // Credentials sit above capability: identity -> connection -> credentials -> capability -> access.
+    expect(html.indexOf('leave blank to keep existing')).toBeLessThan(html.indexOf('oms-endpoint-options'))
 
-    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
-    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
-    await flushPromises()
-
-    expect(saveOmsRestSourceConfig).toHaveBeenCalledTimes(1)
-  })
-
-  // DAR-BE-005 Task 12 review finding: the config fetch and the sharing fetch used to be two
-  // independent races. If the config fetch (fast) resolved before the sharing fetch (slow), the
-  // form went interactive with editWarning still null even for a genuinely shared config -- a
-  // synchronous mock can never exercise this, both promises settle in the same microtask flush.
-  // This test uses a manually-resolved promise for listConfigTenantAccess specifically so the two
-  // fetches settle on different ticks, matching a real slow-sharing-fetch race.
-  it('keeps Save disabled until the sharing fetch settles, even when it resolves after the config fetch', async () => {
-    route.params = { omsRestSourceConfigId: 'krewe-oms' }
-    route.name = 'settings-oms-edit'
-    route.fullPath = '/settings/hotwax/edit/krewe-oms'
-    listOmsRestSourceConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      omsRestSourceConfigs: [
-        {
-          omsRestSourceConfigId: 'krewe-oms',
-          description: 'Krewe HotWax',
-          companyUserGroupId: 'KREWE',
-          baseUrl: 'https://oms.example.com',
-          authType: 'NONE',
-          hasUsername: false,
-          hasPassword: false,
-          hasApiToken: false,
-          customHeaderNames: [],
-          connectTimeoutSeconds: 10,
-          readTimeoutSeconds: 20,
-          isActive: 'Y',
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-    })
-    saveOmsRestSourceConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
-
-    let resolveSharing: (value: unknown) => void = () => {}
-    listConfigTenantAccess.mockImplementation(
-      () => new Promise((resolve) => { resolveSharing = resolve }),
-    )
-
-    const wrapper = mount(OmsRestSourceWorkflowPage)
-    await flushPromises()
-
-    // The config fetch has resolved (form fields are populated), but the sharing fetch is still
-    // in flight. Save must not be reachable in this window: an unshared appearance is not the
-    // same fact as "unshared", it just means "we don't know yet".
-    expect((wrapper.get('input[name="description"]').element as HTMLInputElement).value).toBe('Krewe HotWax')
-    expect(wrapper.get('[data-testid="save-oms-rest-source"]').attributes('disabled')).toBeDefined()
-
-    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
-    expect(saveOmsRestSourceConfig).not.toHaveBeenCalled()
-
-    resolveSharing({
-      ok: true,
-      messages: [],
-      errors: [],
-      sharing: {
-        configTypeEnumId: 'SCFG_HOTWAX_OMS',
-        configId: 'krewe-oms',
-        ownerTenantUserGroupId: 'KREWE',
-        ownerTenantLabel: 'Krewe',
-        memberTenantUserGroupIds: ['GORJANA'],
-        memberTenantLabels: [{ tenantUserGroupId: 'GORJANA', label: 'Gorjana' }],
-        memberCount: 2,
-        canManage: true,
-      },
-    })
-    await flushPromises()
-
-    // Now that sharing state has settled, the warning is visible and Save still requires the
-    // explicit confirm -- not a bypass, just no longer an unknown state.
-    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
-    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
-    expect(saveOmsRestSourceConfig).not.toHaveBeenCalled()
-
-    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
     await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
     await flushPromises()
 

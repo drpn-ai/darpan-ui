@@ -1,21 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sharedEditWarning, sharedTileSuffix, SHARED_CONFIG_TYPES } from '../sharedConfig'
-
-describe('sharedEditWarning', () => {
-  it('returns null when the config has no peer tenants (memberCount 1)', () => {
-    expect(sharedEditWarning(1)).toBeNull()
-  })
-
-  it('returns null for a degenerate zero memberCount', () => {
-    expect(sharedEditWarning(0)).toBeNull()
-  })
-
-  it('returns the two-tenant sentence when memberCount is 2', () => {
-    expect(sharedEditWarning(2)).toBe(
-      'This configuration is used by 2 tenants. Changes apply to all of them.',
-    )
-  })
-})
+import { sharedTileSuffix, SHARED_CONFIG_TYPES } from '../sharedConfig'
 
 describe('sharedTileSuffix', () => {
   it('returns an empty string when the config is not shared', () => {

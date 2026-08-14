@@ -1,80 +1,79 @@
 <template>
-  <StaticPageSection title="Shared with">
-    <p v-if="loading && !sharing" class="section-note">Loading sharing state...</p>
+  <div ref="root" class="workflow-context-block" data-testid="shared-with-block">
+    <span class="workflow-context-label">Shared with</span>
+
     <InlineValidation v-if="error" tone="error" :message="error" data-testid="shared-with-error" />
 
-    <ul v-if="sharing" class="shared-with-list" data-testid="shared-with-list">
-      <li class="shared-with-row shared-with-row--owner" data-testid="shared-with-owner">
-        <span class="shared-with-tenant-label">{{ ownerLabel }}</span>
-        <span class="shared-with-role-note">Owner — cannot be removed</span>
-      </li>
+    <div v-if="sharing" class="workflow-choice-grid" data-testid="shared-with-list">
+      <span class="shared-with-chip shared-with-chip--owner" data-testid="shared-with-owner">
+        {{ ownerLabel }}
+        <span class="shared-with-chip-note">owner</span>
+      </span>
 
-      <li
-        v-for="peer in peers"
-        :key="peer.tenantUserGroupId"
-        class="shared-with-row"
-        data-testid="shared-with-peer"
-      >
-        <span class="shared-with-tenant-label">{{ peer.label || peer.tenantUserGroupId }}</span>
-
-        <template v-if="canManageThisConfig">
-          <span v-if="pendingRemoveTenantId === peer.tenantUserGroupId" class="shared-with-confirm-row">
-            <span class="shared-with-role-note">Remove this tenant's access?</span>
-            <button
-              type="button"
-              data-testid="shared-with-confirm-remove"
-              :disabled="revokingTenantId === peer.tenantUserGroupId"
-              @click="confirmRemove(peer.tenantUserGroupId)"
-            >
-              Confirm
-            </button>
-            <button
-              type="button"
-              data-testid="shared-with-cancel-remove"
-              :disabled="revokingTenantId === peer.tenantUserGroupId"
-              @click="cancelRemove"
-            >
-              Cancel
-            </button>
-          </span>
+      <template v-for="entry in chipEntries" :key="entry.tenantUserGroupId">
+        <span
+          v-if="entry.removed"
+          class="shared-with-chip shared-with-chip--undo"
+          data-testid="shared-with-undo-slot"
+        >
+          {{ entry.label }} removed
           <button
-            v-else
             type="button"
-            data-testid="shared-with-remove"
-            @click="requestRemove(peer.tenantUserGroupId)"
+            class="shared-with-chip-action shared-with-chip-action--undo"
+            data-testid="shared-with-undo"
+            :disabled="granting"
+            @click="undoRemove(entry.tenantUserGroupId)"
+            @focus="pauseUndoTimer(entry.tenantUserGroupId)"
+            @blur="resumeUndoTimer(entry.tenantUserGroupId)"
           >
-            Remove
+            undo
           </button>
-        </template>
-      </li>
-    </ul>
+        </span>
 
-    <p v-if="sharing && peers.length === 0" class="section-note" data-testid="shared-with-empty">
-      Not shared with other tenants.
-    </p>
+        <span v-else class="shared-with-chip" data-testid="shared-with-peer">
+          {{ entry.label }}
+          <button
+            v-if="canManageThisConfig"
+            type="button"
+            class="shared-with-chip-action"
+            data-testid="shared-with-remove"
+            :aria-label="`Remove ${entry.label}`"
+            :disabled="revokingTenantId === entry.tenantUserGroupId"
+            @click="removePeer(entry.tenantUserGroupId, entry.label)"
+          >
+            &times;
+          </button>
+        </span>
+      </template>
 
-    <div v-if="canManageThisConfig" class="shared-with-add-row">
-      <AppSelect
-        v-model="selectedTenantId"
-        :options="availableTenantOptions"
-        placeholder="Select a tenant"
-        :disabled="granting || availableTenantOptions.length === 0"
-        test-id="shared-with-tenant-select"
-      />
-      <button
-        type="button"
-        data-testid="shared-with-add"
-        :disabled="!selectedTenantId || granting"
-        @click="grantAccess"
-      >
-        Share
-      </button>
+      <template v-if="canManageThisConfig && availableTenantOptions.length > 0">
+        <AppSelect
+          v-if="picking"
+          :model-value="''"
+          :options="availableTenantOptions"
+          placeholder="Select a tenant"
+          :disabled="granting"
+          test-id="shared-with-tenant-select"
+          @update:model-value="grantAccess"
+        />
+        <button
+          v-else
+          type="button"
+          class="shared-with-chip shared-with-chip--add"
+          data-testid="shared-with-add-chip"
+          @click="openPicker"
+        >
+          + Add tenant
+        </button>
+      </template>
     </div>
-  </StaticPageSection>
+
+    <p class="sr-only" aria-live="polite" data-testid="shared-with-live">{{ liveMessage }}</p>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import type { ConfigSharing, ConfigSharingMember } from '../../lib/api/types'
@@ -83,37 +82,39 @@ import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
-import StaticPageSection from '../ui/StaticPageSection.vue'
 
 const props = defineProps<{
   configType: SharedConfigType
   configId: string
 }>()
 
-// `update:sharing` fires whenever a load settles (mount, prop change, or the reload after a
-// successful mutation) with whatever sharing.value now is -- including null on failure. This is
-// the single fetch of ConfigTenantAccess for this config; a caller that needs memberCount (the
-// four workflow pages' affects-N-tenants save gate) listens to this instead of fetching its own
-// copy, both to avoid a duplicate round-trip and, more importantly, so the caller can tell "not
-// yet known" (nothing emitted yet) apart from "known unshared" (emitted with memberCount 1) and
-// keep its own save action disabled until this settles. See DAR-BE-005 Task 12 review: two
-// independent fetches raced, and a page whose own fetch resolved second could go interactive
-// with editWarning still null even though the config was genuinely shared.
-const emit = defineEmits<{ changed: []; 'update:sharing': [value: ConfigSharing | null] }>()
+const emit = defineEmits<{ changed: [] }>()
 
 const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
 
+/** How long a revoked tenant stays recoverable. Revoke has already committed by then; see undoRemove. */
+const UNDO_WINDOW_MS = 8000
+
+type RemovedSlot = { tenantUserGroupId: string; label: string; index: number }
+type ChipEntry = { tenantUserGroupId: string; label: string; removed: boolean }
+
+const root = ref<HTMLElement | null>(null)
 const sharing = ref<ConfigSharing | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
-const selectedTenantId = ref('')
+const liveMessage = ref('')
+const picking = ref(false)
 const granting = ref(false)
-const pendingRemoveTenantId = ref<string | null>(null)
 const revokingTenantId = ref<string | null>(null)
+const removedSlots = ref<RemovedSlot[]>([])
 
 let loadController: AbortController | null = null
 let mutationController: AbortController | null = null
+
+// One entry per live undo slot. Kept outside `removedSlots` because a timer handle is not render
+// state, and putting it in a ref would make every tick a reactive write.
+const undoTimers = new Map<string, { handle: ReturnType<typeof setTimeout>; remaining: number; startedAt: number }>()
 
 // Double gate, deliberately: `sharing.canManage` is the backend's own two-sided tenant-admin
 // check for THIS config, but `canManageConfigSharing` is whether the signed-in user is a tenant
@@ -128,15 +129,80 @@ const ownerLabel = computed(
   () => sharing.value?.ownerTenantLabel || sharing.value?.ownerTenantUserGroupId || 'Owning tenant',
 )
 
+// A revoked tenant is gone from `peers` the moment the reload settles, so its undo slot is spliced
+// back in at the index it occupied. Without the index the slot would jump to the end of the row and
+// the "in place" part of the gesture would be lost.
+const chipEntries = computed<ChipEntry[]>(() => {
+  const entries: ChipEntry[] = peers.value.map((peer) => ({
+    tenantUserGroupId: peer.tenantUserGroupId,
+    label: peer.label || peer.tenantUserGroupId,
+    removed: false,
+  }))
+
+  for (const slot of removedSlots.value) {
+    entries.splice(Math.min(slot.index, entries.length), 0, {
+      tenantUserGroupId: slot.tenantUserGroupId,
+      label: slot.label,
+      removed: true,
+    })
+  }
+
+  return entries
+})
+
 const availableTenantOptions = computed<AppSelectOption[]>(() => {
   const taken = new Set<string>()
   if (sharing.value?.ownerTenantUserGroupId) taken.add(sharing.value.ownerTenantUserGroupId)
   for (const peer of peers.value) taken.add(peer.tenantUserGroupId)
+  for (const slot of removedSlots.value) taken.add(slot.tenantUserGroupId)
 
   return (authStore.sessionInfo?.availableTenants ?? [])
     .filter((tenant) => !taken.has(tenant.userGroupId))
     .map((tenant) => ({ value: tenant.userGroupId, label: tenant.label || tenant.userGroupId }))
 })
+
+function clearUndoTimer(tenantUserGroupId: string): void {
+  const timer = undoTimers.get(tenantUserGroupId)
+  if (!timer) return
+  clearTimeout(timer.handle)
+  undoTimers.delete(tenantUserGroupId)
+}
+
+function dropSlot(tenantUserGroupId: string): void {
+  clearUndoTimer(tenantUserGroupId)
+  removedSlots.value = removedSlots.value.filter((slot) => slot.tenantUserGroupId !== tenantUserGroupId)
+}
+
+function startUndoTimer(tenantUserGroupId: string, remaining: number): void {
+  clearUndoTimer(tenantUserGroupId)
+  undoTimers.set(tenantUserGroupId, {
+    handle: setTimeout(() => dropSlot(tenantUserGroupId), remaining),
+    remaining,
+    startedAt: Date.now(),
+  })
+}
+
+// Focus pauses the countdown: a keyboard user tabbing toward the undo control must not watch it
+// disappear out from under them mid-traversal.
+function pauseUndoTimer(tenantUserGroupId: string): void {
+  const timer = undoTimers.get(tenantUserGroupId)
+  if (!timer) return
+  clearTimeout(timer.handle)
+  timer.remaining = Math.max(0, timer.remaining - (Date.now() - timer.startedAt))
+}
+
+function resumeUndoTimer(tenantUserGroupId: string): void {
+  const timer = undoTimers.get(tenantUserGroupId)
+  if (!timer) return
+  startUndoTimer(tenantUserGroupId, timer.remaining)
+}
+
+async function openPicker(): Promise<void> {
+  picking.value = true
+  await nextTick()
+  const trigger = root.value?.querySelector<HTMLElement>('[data-testid="shared-with-tenant-select"]')
+  trigger?.click()
+}
 
 async function load(): Promise<void> {
   loadController?.abort()
@@ -159,20 +225,13 @@ async function load(): Promise<void> {
     if (controller.signal.aborted || isAbortError(loadError)) return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load sharing state.'
   } finally {
-    if (!controller.signal.aborted) {
-      loading.value = false
-      // Emitted here, not only on the success path above, so a caller gating on "has this
-      // settled yet" unblocks even when the fetch failed -- sharing.value is whatever it was
-      // before (null on first load), which is the same fail-open fallback this component already
-      // uses for its own rendering.
-      emit('update:sharing', sharing.value)
-    }
+    if (!controller.signal.aborted) loading.value = false
     if (loadController === controller) loadController = null
   }
 }
 
-async function grantAccess(): Promise<void> {
-  if (!selectedTenantId.value || granting.value) return
+async function grantAccess(targetTenantUserGroupId: string): Promise<void> {
+  if (!targetTenantUserGroupId || granting.value) return
 
   mutationController?.abort()
   const controller = new AbortController()
@@ -184,14 +243,14 @@ async function grantAccess(): Promise<void> {
     const response = await settingsFacade.grantConfigTenantAccess({
       configTypeEnumId: props.configType,
       configId: props.configId,
-      targetTenantUserGroupId: selectedTenantId.value,
+      targetTenantUserGroupId,
     }, controller.signal)
     if (controller.signal.aborted) return
     if (!response.ok || (response.errors?.length ?? 0) > 0) {
       error.value = response.errors?.[0] ?? 'Failed to share configuration.'
       return
     }
-    selectedTenantId.value = ''
+    picking.value = false
     await load()
     emit('changed')
   } catch (grantError) {
@@ -203,16 +262,12 @@ async function grantAccess(): Promise<void> {
   }
 }
 
-function requestRemove(tenantUserGroupId: string): void {
-  error.value = null
-  pendingRemoveTenantId.value = tenantUserGroupId
-}
+async function removePeer(tenantUserGroupId: string, label: string): Promise<void> {
+  if (revokingTenantId.value) return
 
-function cancelRemove(): void {
-  pendingRemoveTenantId.value = null
-}
+  // Captured before the reload below drops this peer out of `peers`.
+  const index = chipEntries.value.findIndex((entry) => entry.tenantUserGroupId === tenantUserGroupId)
 
-async function confirmRemove(tenantUserGroupId: string): Promise<void> {
   mutationController?.abort()
   const controller = new AbortController()
   mutationController = controller
@@ -230,7 +285,14 @@ async function confirmRemove(tenantUserGroupId: string): Promise<void> {
       error.value = response.errors?.[0] ?? 'Failed to remove tenant access.'
       return
     }
-    pendingRemoveTenantId.value = null
+
+    removedSlots.value = [
+      ...removedSlots.value,
+      { tenantUserGroupId, label, index: index < 0 ? peers.value.length : index },
+    ]
+    startUndoTimer(tenantUserGroupId, UNDO_WINDOW_MS)
+    liveMessage.value = `${label} removed. Undo available.`
+
     await load()
     emit('changed')
   } catch (revokeError) {
@@ -242,68 +304,66 @@ async function confirmRemove(tenantUserGroupId: string): Promise<void> {
   }
 }
 
-onMounted(() => {
-  void load()
-})
+// Not a rollback. ConfigTenantAccess is append-only (the entity's own comment: "Revoke never
+// deletes a row -- the history of who could reach a credential must survive the revoke"), so the
+// revoke stands thruDated and this writes a fresh grant row. The audit trail keeps both.
+async function undoRemove(tenantUserGroupId: string): Promise<void> {
+  const slot = removedSlots.value.find((entry) => entry.tenantUserGroupId === tenantUserGroupId)
+  if (!slot || granting.value) return
+
+  pauseUndoTimer(tenantUserGroupId)
+
+  mutationController?.abort()
+  const controller = new AbortController()
+  mutationController = controller
+
+  granting.value = true
+  error.value = null
+  try {
+    const response = await settingsFacade.grantConfigTenantAccess({
+      configTypeEnumId: props.configType,
+      configId: props.configId,
+      targetTenantUserGroupId: tenantUserGroupId,
+    }, controller.signal)
+    if (controller.signal.aborted) return
+    if (!response.ok || (response.errors?.length ?? 0) > 0) {
+      // Slot deliberately survives a failed undo so the gesture can be retried.
+      error.value = response.errors?.[0] ?? 'Failed to restore tenant access.'
+      resumeUndoTimer(tenantUserGroupId)
+      return
+    }
+
+    dropSlot(tenantUserGroupId)
+    liveMessage.value = `${slot.label} restored.`
+    await load()
+    emit('changed')
+  } catch (undoError) {
+    if (controller.signal.aborted || isAbortError(undoError)) return
+    error.value = undoError instanceof ApiCallError ? undoError.message : 'Failed to restore tenant access.'
+    resumeUndoTimer(tenantUserGroupId)
+  } finally {
+    if (!controller.signal.aborted) granting.value = false
+    if (mutationController === controller) mutationController = null
+  }
+}
+
+function resetSlots(): void {
+  for (const slot of removedSlots.value) clearUndoTimer(slot.tenantUserGroupId)
+  removedSlots.value = []
+}
+
+void load()
 
 onBeforeUnmount(() => {
   loadController?.abort()
   mutationController?.abort()
+  resetSlots()
 })
 
 watch(() => [props.configType, props.configId], () => {
-  pendingRemoveTenantId.value = null
+  resetSlots()
+  picking.value = false
+  liveMessage.value = ''
   void load()
 })
 </script>
-
-<style scoped>
-.shared-with-list {
-  display: grid;
-  gap: var(--space-1-5);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.shared-with-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-1-5) var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
-
-.shared-with-row--owner {
-  border-style: dashed;
-}
-
-.shared-with-tenant-label {
-  overflow-wrap: anywhere;
-}
-
-.shared-with-role-note {
-  color: var(--text-muted);
-  font-size: var(--type-note-size);
-}
-
-.shared-with-confirm-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1-5);
-}
-
-.shared-with-add-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.shared-with-add-row .app-select {
-  flex: 1;
-}
-</style>

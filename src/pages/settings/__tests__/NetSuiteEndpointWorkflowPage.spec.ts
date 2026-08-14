@@ -621,7 +621,10 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     expect(saveNsRestletConfig).toHaveBeenCalledTimes(1)
   })
 
-  it('blocks Save behind an explicit inline confirmation when the config is shared across tenants', async () => {
+  // The affects-N-tenants warning and its confirm checkbox were removed with the chip field
+  // group: the tenant list is now rendered inside the form, so the sentence restated what the
+  // chips already show. This pins the removal -- absence alone would let it silently return.
+  it('saves a shared config with no warning and no acknowledgment step', async () => {
     route.params = { nsRestletConfigId: 'endpoint-primary' }
     route.name = 'settings-netsuite-endpoints-edit'
     route.fullPath = '/settings/netsuite/endpoints/edit/endpoint-primary'
@@ -683,105 +686,16 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     const wrapper = mount(NetSuiteEndpointWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
+    expect(wrapper.find('[data-testid="shared-edit-warning"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="shared-edit-confirm"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="save-netsuite-endpoint"]').attributes('disabled')).toBeUndefined()
 
-    await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
-    await flushPromises()
-    expect(saveNsRestletConfig).not.toHaveBeenCalled()
+    // Shared with is a field group inside the form, above the divider and the actions --
+    // not a panel appended after the form's terminal Save/Cancel row.
+    const html = wrapper.html()
+    expect(html).toContain('Shared with')
+    expect(html.indexOf('Shared with')).toBeLessThan(html.indexOf('save-netsuite-endpoint'))
 
-    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
-    await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
-    await flushPromises()
-
-    expect(saveNsRestletConfig).toHaveBeenCalledTimes(1)
-  })
-
-  // DAR-BE-005 Task 12 review finding: the config fetch and the sharing fetch used to be two
-  // independent races. If the config fetch (fast) resolved before the sharing fetch (slow), the
-  // form went interactive with editWarning still null even for a genuinely shared config -- a
-  // synchronous mock can never exercise this, both promises settle in the same microtask flush.
-  // This test uses a manually-resolved promise for listConfigTenantAccess specifically so the two
-  // fetches settle on different ticks, matching a real slow-sharing-fetch race.
-  it('keeps Save disabled until the sharing fetch settles, even when it resolves after the config fetch', async () => {
-    route.params = { nsRestletConfigId: 'endpoint-primary' }
-    route.name = 'settings-netsuite-endpoints-edit'
-    route.fullPath = '/settings/netsuite/endpoints/edit/endpoint-primary'
-    listNsAuthConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      authConfigs: [
-        {
-          nsAuthConfigId: 'auth-primary',
-          description: 'Primary Auth',
-          companyUserGroupId: 'KREWE',
-          authType: 'BASIC',
-          isActive: 'Y',
-          hasPassword: true,
-          hasApiToken: false,
-          hasPrivateKeyPem: false,
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-    })
-    listNsRestletConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      restletConfigs: [
-        {
-          nsRestletConfigId: 'endpoint-primary',
-          description: 'Invoice Export',
-          companyUserGroupId: 'KREWE',
-          endpointUrl: 'https://netsuite.example.com/restlet',
-          httpMethod: 'POST',
-          nsAuthConfigId: 'auth-primary',
-          authType: 'BASIC',
-          connectTimeoutSeconds: 30,
-          readTimeoutSeconds: 60,
-          isActive: 'Y',
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-    })
-    saveNsRestletConfig.mockResolvedValue({ ok: true, messages: ['Saved.'], errors: [] })
-
-    let resolveSharing: (value: unknown) => void = () => {}
-    listConfigTenantAccess.mockImplementation(
-      () => new Promise((resolve) => { resolveSharing = resolve }),
-    )
-
-    const wrapper = mount(NetSuiteEndpointWorkflowPage)
-    await flushPromises()
-
-    expect((wrapper.get('input[name="description"]').element as HTMLInputElement).value).toBe('Invoice Export')
-    expect(wrapper.get('[data-testid="save-netsuite-endpoint"]').attributes('disabled')).toBeDefined()
-
-    await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
-    expect(saveNsRestletConfig).not.toHaveBeenCalled()
-
-    resolveSharing({
-      ok: true,
-      messages: [],
-      errors: [],
-      sharing: {
-        configTypeEnumId: 'SCFG_NS_RESTLET',
-        configId: 'endpoint-primary',
-        ownerTenantUserGroupId: 'KREWE',
-        ownerTenantLabel: 'Krewe',
-        memberTenantUserGroupIds: ['GORJANA'],
-        memberTenantLabels: [{ tenantUserGroupId: 'GORJANA', label: 'Gorjana' }],
-        memberCount: 2,
-        canManage: true,
-      },
-    })
-    await flushPromises()
-
-    expect(wrapper.get('[data-testid="shared-edit-warning"]').text()).toContain('2 tenants')
-    await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
-    expect(saveNsRestletConfig).not.toHaveBeenCalled()
-
-    await wrapper.get('[data-testid="shared-edit-confirm"]').setValue(true)
     await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
     await flushPromises()
 
