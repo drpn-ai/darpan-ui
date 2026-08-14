@@ -164,7 +164,7 @@ export interface TenantChatSpace {
   chatSpaceId: string
   spaceName: string
   googleChatConfigured: boolean
-  googleChatWebhookUrlMasked?: string | null
+  googleChatWebhookUrl?: string | null
   isActive: string
   inUse: boolean
   createdDate?: string

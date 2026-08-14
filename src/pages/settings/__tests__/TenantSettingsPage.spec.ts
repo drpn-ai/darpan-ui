@@ -220,7 +220,7 @@ describe('TenantSettingsPage', () => {
           chatSpaceId: 'CS1',
           spaceName: 'Ops',
           googleChatConfigured: true,
-          googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
+          googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
           isActive: 'Y',
           inUse: true,
         },
@@ -228,7 +228,7 @@ describe('TenantSettingsPage', () => {
           chatSpaceId: 'CS2',
           spaceName: 'Finance',
           googleChatConfigured: false,
-          googleChatWebhookUrlMasked: null,
+          googleChatWebhookUrl: null,
           isActive: 'Y',
           inUse: false,
         },
@@ -242,7 +242,7 @@ describe('TenantSettingsPage', () => {
         chatSpaceId: 'CS1',
         spaceName: 'Ops',
         googleChatConfigured: true,
-        googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
+        googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
         isActive: 'Y',
         inUse: true,
       },
@@ -432,7 +432,7 @@ describe('TenantSettingsPage', () => {
           chatSpaceId: 'CS1',
           spaceName: 'Ops',
           googleChatConfigured: true,
-          googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
+          googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
           isActive: 'Y',
           inUse: true,
         },
@@ -446,7 +446,7 @@ describe('TenantSettingsPage', () => {
         chatSpaceId: 'CS1',
         spaceName: 'Ops',
         googleChatConfigured: true,
-        googleChatWebhookUrlMasked: 'https://chat.googleapis.com/***',
+        googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
         isActive: 'N',
         inUse: true,
       },
@@ -492,7 +492,7 @@ describe('TenantSettingsPage', () => {
     expect((wrapper.get('input[name="chatSpaceName"]').element as HTMLInputElement).value).toBe('Ops')
     await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
 
-    expect(wrapper.get('[data-testid="google-chat-webhook-status"]').text()).toContain('Current webhook: https://chat.googleapis.com/***')
+    expect(wrapper.get('[data-testid="google-chat-webhook-status"]').text()).toContain('Current webhook: https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t')
     // Leave the webhook input blank and save — the backend keeps the existing webhook.
     await wrapper.get('[data-testid="save-tenant-chat-space"]').trigger('click')
     await flushPromises()

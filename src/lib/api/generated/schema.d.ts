@@ -3998,7 +3998,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListSftpServersResult"];
         };
-        /** @description List active-tenant Google Chat spaces with webhook redaction. */
+        /** @description List active-tenant Google Chat spaces, including the webhook URL in clear text. */
         ListTenantChatSpacesParams: Record<string, never>;
         ListTenantChatSpacesResult: {
             ok?: boolean;
@@ -4008,7 +4008,7 @@ export interface components {
                 chatSpaceId?: string;
                 spaceName?: string;
                 googleChatConfigured?: boolean;
-                googleChatWebhookUrlMasked?: string;
+                googleChatWebhookUrl?: string;
                 isActive?: string;
                 inUse?: boolean;
                 createdByUserId?: string;
@@ -4224,7 +4224,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SaveSftpServerResult"];
         };
-        /** @description Create or update one named Google Chat space for the active tenant. Webhook URL is write-only. */
+        /** @description Create or update one named Google Chat space for the active tenant. */
         SaveTenantChatSpaceParams: {
             chatSpaceId?: string;
             spaceName: string;

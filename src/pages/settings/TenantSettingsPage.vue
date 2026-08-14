@@ -230,7 +230,7 @@
             class="tenant-notification-current-webhook"
             data-testid="google-chat-webhook-status"
           >
-            Current webhook: {{ activeChatSpace.googleChatWebhookUrlMasked || 'Configured' }}
+            Current webhook: {{ activeChatSpace.googleChatWebhookUrl || 'Configured' }}
           </p>
         </WorkflowStepForm>
 
@@ -689,7 +689,7 @@ const chatSpaceFormHasWebhookForSave = computed(() => (
   chatSpaceWebhookInput.value.length > 0 || (isChatSpaceEditing.value && !!activeChatSpace.value?.googleChatConfigured)
 ))
 const chatSpaceWebhookPlaceholder = computed(() => (
-  activeChatSpace.value?.googleChatWebhookUrlMasked
+  activeChatSpace.value?.googleChatWebhookUrl
   || 'https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=...'
 ))
 const chatSpaceFormSubmitDisabled = computed(() => {
