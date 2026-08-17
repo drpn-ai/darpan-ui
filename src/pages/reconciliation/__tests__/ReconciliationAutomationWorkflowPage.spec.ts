@@ -190,6 +190,15 @@ async function chooseCard(wrapper: ReturnType<typeof mount>, testId: string): Pr
   await wrapper.get(`[data-testid="${testId}"]`).trigger('click')
 }
 
+/** Purpose then saved run. The saved-run step is always asked — a single saved run only PRE-FILLS
+ *  it — so every existing-run walk answers it before automation setup begins. Pass savedRunId when
+ *  the fixture holds more than one run and nothing can be pre-filled. */
+async function chooseExistingRunPurpose(wrapper: ReturnType<typeof mount>, savedRunId?: string): Promise<void> {
+  await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+  if (savedRunId) await chooseWorkflowOption(wrapper, 'automation-saved-run-select', savedRunId)
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+}
+
 async function chooseWorkflowOption(wrapper: ReturnType<typeof mount>, testId: string, value: string): Promise<void> {
   await wrapper.get(`[data-testid="${testId}"]`).trigger('click')
   await wrapper.get(`[data-testid="workflow-select-option"][data-option-value="${value}"]`).trigger('click')
@@ -300,11 +309,39 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.find('[data-testid="automation-input-mode-choice-AUT_IN_SFTP_FILES"]').exists()).toBe(true)
   })
 
-  it('skips saved-run selection when existing-run automation has a single saved run', async () => {
+  it('still asks which saved run to automate when the tenant has exactly one, pre-filled', async () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
     await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+
+    // Asked, not inferred away: the run being automated is the fact the rest of the wizard is
+    // about, so a single-run tenant sees it answered rather than never asked.
+    expect(wrapper.text()).toContain('Which saved run should this automation use?')
+    expect(wrapper.get('[data-testid="automation-saved-run-select"]').text()).toContain('Order Sync')
+
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    expect(wrapper.text()).toContain('How will Darpan get source data for Order Sync?')
+  })
+
+  it('skips the saved-run question when another page already chose the run', async () => {
+    const savedRun = optionsResponse().savedRuns[0]!
+    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
+      {
+        intent: 'existing-run',
+        savedRunId: savedRun.savedRunId,
+        savedRunType: savedRun.runType,
+        returnLabel: 'Automations',
+        returnPath: '/reconciliation/automations',
+      },
+      'input-mode',
+      savedRun,
+    )
+    window.history.replaceState({}, '', '/reconciliation/automation/create')
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="automation-saved-run-select"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('How will Darpan get source data for Order Sync?')
@@ -379,7 +416,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+    await chooseExistingRunPurpose(wrapper)
     await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_API_RANGE')
 
     expect(wrapper.text()).toContain('How far back should each scheduled run reconcile?')
@@ -395,7 +432,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+    await chooseExistingRunPurpose(wrapper)
     await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
 
     expect(wrapper.text()).toContain('Where is the first remote file?')
@@ -420,6 +457,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
     expect(wrapper.get('.wizard-progress').attributes('aria-valuenow')).toBe('20')
     await chooseWorkflowOption(wrapper, 'automation-saved-run-select', 'RS_ORDER_SYNC')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     expect(wrapper.find('[data-testid="automation-selected-run"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('SFTP scheduled file pickup')
     expect(wrapper.text()).not.toContain('SFTP_POLL')
@@ -448,7 +486,11 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await chooseWorkflowOption(wrapper, 'automation-schedule-preset', 'monthly')
     expect(scheduleFieldLabels(wrapper)).toEqual(['Run', 'Date', 'Time', 'Timezone'])
     await chooseWorkflowOption(wrapper, 'automation-schedule-preset', 'weekly')
-    await wrapper.get('[data-testid="automation-schedule-time"]').setValue('07:30')
+    // App-styled parts, not `<input type="time">` — the native picker panel is browser chrome and
+    // cannot be themed (see WorkflowTimeSelect).
+    expect(wrapper.find('input[type="time"]').exists()).toBe(false)
+    await chooseWorkflowOption(wrapper, 'automation-schedule-time-hour', '07')
+    await chooseWorkflowOption(wrapper, 'automation-schedule-time-minute', '30')
     expect(wrapper.get('[data-testid="automation-schedule-weekday"]').element.tagName).toBe('BUTTON')
     await chooseWorkflowOption(wrapper, 'automation-schedule-weekday', 'TUE')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -504,8 +546,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
-    await chooseWorkflowOption(wrapper, 'automation-saved-run-select', 'RS_ORDER_SYNC')
+    await chooseExistingRunPurpose(wrapper, 'RS_ORDER_SYNC')
     await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_API_RANGE')
     await wrapper.get('[data-testid="automation-file1-api-select"]').trigger('click')
     expect(wrapper.text()).toContain('OMS orders')
@@ -733,7 +774,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+    await chooseExistingRunPurpose(wrapper)
     await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
     await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -771,7 +812,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+    await chooseExistingRunPurpose(wrapper)
     await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
     await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -810,7 +851,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
   })
 
   async function walkToNewChatSpaceSubmit(wrapper: ReturnType<typeof mount>): Promise<void> {
-    await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+    await chooseExistingRunPurpose(wrapper)
     await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
     await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')

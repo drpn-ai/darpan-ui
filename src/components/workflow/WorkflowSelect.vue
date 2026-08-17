@@ -13,6 +13,7 @@
         { empty: isEmpty, 'workflow-select-trigger--open': isOpen, 'workflow-select-trigger--disabled': disabled },
       ]"
       :disabled="disabled"
+      :aria-label="ariaLabel || undefined"
       :aria-expanded="isOpen ? 'true' : 'false'"
       aria-haspopup="listbox"
       :aria-controls="listboxId"
@@ -97,11 +98,15 @@ const props = withDefaults(
     disabled?: boolean
     testId?: string
     multiple?: boolean
+    // Names the trigger when the visible label beside it cannot: several of these in one field
+    // (hour / minute / AM-PM) would otherwise all announce as just their value.
+    ariaLabel?: string
   }>(),
   {
     disabled: false,
     testId: '',
     multiple: false,
+    ariaLabel: '',
   },
 )
 

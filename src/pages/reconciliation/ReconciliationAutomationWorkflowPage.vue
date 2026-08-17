@@ -261,16 +261,16 @@
             />
           </label>
 
-          <label v-if="scheduleUsesTime" class="automation-schedule-field">
+          <div v-if="scheduleUsesTime" class="automation-schedule-field">
             <span class="automation-schedule-label">Time</span>
-            <input
+            <WorkflowTimeSelect
               v-model="scheduleTime"
-              class="automation-schedule-control"
-              data-testid="automation-schedule-time"
-              type="time"
+              class="automation-schedule-select"
+              test-id="automation-schedule-time"
+              aria-label="Time"
               :disabled="saving || loadingOptions"
             />
-          </label>
+          </div>
 
           <div class="automation-schedule-field">
             <span class="automation-schedule-label">Timezone</span>
@@ -395,15 +395,15 @@
             />
           </label>
 
-          <label v-if="scheduleUsesTime" class="automation-schedule-field">
+          <div v-if="scheduleUsesTime" class="automation-schedule-field">
             <span class="automation-schedule-label">Time</span>
-            <input
+            <WorkflowTimeSelect
               v-model="scheduleTime"
-              class="automation-schedule-control"
-              data-testid="automation-schedule-time"
-              type="time"
+              class="automation-schedule-select"
+              test-id="automation-schedule-time"
+              aria-label="Time"
             />
-          </label>
+          </div>
 
           <div class="automation-schedule-field">
             <span class="automation-schedule-label">Timezone</span>
@@ -457,6 +457,7 @@ import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowSelect, { type WorkflowSelectOption } from '../../components/workflow/WorkflowSelect.vue'
+import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import { ApiCallError } from '../../lib/api/client'
@@ -521,6 +522,12 @@ const handoffSavedRun = ref<SavedRunSummary | null>(null)
 const automationId = ref('')
 const intent = ref<'existing-run' | 'new-run' | ''>('')
 const selectedSavedRunId = ref('')
+// True only when the run was decided OUTSIDE this wizard: a handoff from a run page, or an
+// automation being edited. The step list used to key off selectedSavedRunId itself, which meant
+// any value the wizard inferred for itself — a tenant holding exactly one saved run — deleted the
+// question before it was ever asked, and nothing downstream named the run either, so the operator
+// scheduled a run they were never shown.
+const savedRunChosenElsewhere = ref(false)
 const savedRunType = ref('ruleset')
 const automationName = ref('')
 const inputModeEnumId = ref('')
@@ -694,7 +701,7 @@ const steps = computed<WizardStep[]>(() => {
     ? automationSetupSteps
     : [
         { id: 'purpose' },
-        ...(selectedSavedRunId.value ? [] : [{ id: 'saved-run' } as WizardStep]),
+        ...(savedRunChosenElsewhere.value ? [] : [{ id: 'saved-run' } as WizardStep]),
         ...automationSetupSteps,
       ]
 })
@@ -1175,6 +1182,9 @@ function selectSavedRun(savedRunId: string): void {
   savedRunType.value = selectedSavedRun.value?.runType || 'ruleset'
 }
 
+/** Pre-fill, not pre-empt: with one saved run the picker is a formality, so it opens already
+ *  answered — but the step still shows, because "which run am I automating?" is the one fact the
+ *  rest of this wizard is about (see savedRunChosenElsewhere). */
 function inferSingleSavedRun(): void {
   if (selectedSavedRunId.value || intent.value !== 'existing-run') return
   const onlySavedRun = sourceOptions.value.savedRuns.length === 1 ? sourceOptions.value.savedRuns[0] : null
@@ -1308,8 +1318,12 @@ async function handlePrimarySubmit(): Promise<void> {
   }
   if (!canProceed.value) return
   if (currentStep.value.id === 'saved-run') {
+    // Answering this can delete steps further down (API sources the chosen run already fixes), so
+    // settle the index against the new list before stepping forward. This step used to delete
+    // ITSELF on answer — hence the bare return — which is no longer true.
     applyDeterministicDefaults()
     settleOnCurrentIndex()
+    advance()
     return
   }
   advance()
@@ -1445,6 +1459,7 @@ function hydrateAutomation(automation: AutomationRecord): void {
   automationId.value = automation.automationId
   intent.value = 'existing-run'
   selectedSavedRunId.value = automation.savedRunId ?? ''
+  savedRunChosenElsewhere.value = true
   savedRunType.value = automation.savedRunType ?? automation.savedRun?.runType ?? 'ruleset'
   automationName.value = automation.automationName ?? ''
   inputModeEnumId.value = automation.inputModeEnumId ?? ''
@@ -1495,6 +1510,10 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   automationId.value = draft.automationId ?? automationId.value
   intent.value = draft.intent ?? ''
   selectedSavedRunId.value = draft.savedRunId ?? ''
+  // draftState.savedRun is present only when another page handed this wizard a run (the run page's
+  // "Automate" action, or the create flow returning with a run it just saved). A draft this wizard
+  // stored for itself carries no savedRun, so resuming one still asks the question.
+  savedRunChosenElsewhere.value = Boolean(draftState.savedRun)
   savedRunType.value = draft.savedRunType ?? draftState.savedRun?.runType ?? 'ruleset'
   automationName.value = draft.automationName ?? (draftState.savedRun ? buildDefaultAutomationName(draftState.savedRun.runName) : '')
   inputModeEnumId.value = draft.inputModeEnumId ?? ''
