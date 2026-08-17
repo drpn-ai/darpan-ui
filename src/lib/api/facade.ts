@@ -49,6 +49,7 @@ import type {
   ListGeneratedOutputsResponse,
   ListSavedRunsResponse,
   ListSftpServersResponse,
+  ListSourceConfigEndpointsResponse,
   ListTenantChatSpacesResponse,
   LoginSessionResponse,
   LlmSettingsResponse,
@@ -80,6 +81,7 @@ import type {
   SaveRefinedSchemaResponse,
   SaveSftpServerResponse,
   SessionInfoResponse,
+  StoreSourceConfigEndpointAccessResponse,
   ValidateJsonResponse,
 } from './types'
 import type {
@@ -113,6 +115,7 @@ import type {
   ListSavedRunsPayload,
   ListSftpServersPayload,
   ListShopifyAuthConfigsPayload,
+  ListSourceConfigEndpointsPayload,
   RunAutomationNowPayload,
   RunSavedRunDiffPayload,
   SaveAutomationPayload,
@@ -133,6 +136,7 @@ import type {
   SaveTenantSettingsPayload,
   SaveUserNotificationDefaultPayload,
   SaveUserSettingsPayload,
+  StoreSourceConfigEndpointAccessPayload,
   SubscribeRunNotificationPayload,
   UnsubscribeRunNotificationPayload,
   CancelReconciliationRunPayload,
@@ -179,6 +183,8 @@ const SETTINGS = {
   listConfigTenantAccess: 'facade.ConfigSharingFacadeServices.list#ConfigTenantAccess',
   grantConfigTenantAccess: 'facade.ConfigSharingFacadeServices.grant#ConfigTenantAccess',
   revokeConfigTenantAccess: 'facade.ConfigSharingFacadeServices.revoke#ConfigTenantAccess',
+  listSourceConfigEndpoints: 'facade.SourceEndpointFacadeServices.list#SourceConfigEndpoints',
+  storeSourceConfigEndpointAccess: 'facade.SourceEndpointFacadeServices.store#SourceConfigEndpointAccess',
 }
 
 const JSON_SCHEMA = {
@@ -328,6 +334,12 @@ export const settingsFacade = {
   },
   revokeConfigTenantAccess(payload: ConfigTenantAccessMutationPayload, signal?: AbortSignal): Promise<RevokeConfigTenantAccessResponse> {
     return callService<RevokeConfigTenantAccessResponse>(SETTINGS.revokeConfigTenantAccess, payload, signal)
+  },
+  listSourceConfigEndpoints(payload: ListSourceConfigEndpointsPayload, signal?: AbortSignal): Promise<ListSourceConfigEndpointsResponse> {
+    return callService<ListSourceConfigEndpointsResponse>(SETTINGS.listSourceConfigEndpoints, payload, signal)
+  },
+  storeSourceConfigEndpointAccess(payload: StoreSourceConfigEndpointAccessPayload, signal?: AbortSignal): Promise<StoreSourceConfigEndpointAccessResponse> {
+    return callService<StoreSourceConfigEndpointAccessResponse>(SETTINGS.storeSourceConfigEndpointAccess, payload, signal)
   },
 }
 

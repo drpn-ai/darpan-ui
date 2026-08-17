@@ -376,6 +376,22 @@ export interface RevokeConfigTenantAccessResponse extends ApiEnvelope {
   revoked?: boolean
 }
 
+// ─── Source endpoint access (per-endpoint enablement) ──────────────────────────
+
+export interface SourceConfigEndpoint {
+  systemEnumId: string
+  endpointLabel: string
+  isEnabled: boolean
+}
+
+export interface ListSourceConfigEndpointsResponse extends ApiEnvelope {
+  endpoints?: SourceConfigEndpoint[]
+}
+
+export interface StoreSourceConfigEndpointAccessResponse extends ApiEnvelope {
+  stored?: boolean
+}
+
 export interface PaginatedResponse extends ApiEnvelope {
   pagination: PaginationMeta
 }

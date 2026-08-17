@@ -186,6 +186,19 @@ export interface ConfigTenantAccessMutationPayload extends ListConfigTenantAcces
   targetTenantUserGroupId: string
 }
 
+// ─── Source endpoint access (per-endpoint enablement) ──────────────────────────
+
+export interface ListSourceConfigEndpointsPayload {
+  configTypeEnumId: SharedConfigType
+  configId: string
+}
+
+export interface StoreSourceConfigEndpointAccessPayload {
+  configTypeEnumId: SharedConfigType
+  configId: string
+  enabledSystemEnumIds: string[]
+}
+
 // ─── JSON Schema ─────────────────────────────────────────────────────────────
 
 export interface ListJsonSchemasPayload {
