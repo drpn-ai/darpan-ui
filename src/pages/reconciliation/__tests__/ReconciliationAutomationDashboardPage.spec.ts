@@ -288,6 +288,26 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(push).toHaveBeenCalledTimes(1)
   })
 
+  it('states no next run while the automation is paused', async () => {
+    // The backend keeps reporting nextScheduledFireTime for a paused automation — it is derived
+    // from the schedule expression, not from `active` — so this page has to be the one that stops
+    // promising a run the scheduler will never fire.
+    getAutomation.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: { ...mockAutomation(false), nextScheduledFireTime: 1777740540000 },
+    })
+
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Paused')
+    expect(wrapper.get('[data-testid="automation-next-run"]').text()).toBe('-')
+    // Previous Run is history and stays true whether or not the schedule is running.
+    expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 1, 2026, 11:00 PM')
+  })
+
   it('formats timestamps using the app display timezone instead of sessionInfo.timeZone', async () => {
     setDefaultDisplayTimeZone('America/New_York')
     // sessionInfo.timeZone stays at 'America/Los_Angeles' (set in beforeEach)

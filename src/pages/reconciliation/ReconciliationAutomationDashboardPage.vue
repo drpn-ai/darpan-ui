@@ -81,7 +81,7 @@
             </div>
             <div class="automation-dashboard-detail-item automation-dashboard-detail-item--date">
               <dt class="micro-label">Next Run</dt>
-              <dd data-testid="automation-next-run">{{ formatTenantDateTime(automation.nextScheduledFireTime) }}</dd>
+              <dd data-testid="automation-next-run">{{ formatTenantDateTime(nextRunTime) }}</dd>
             </div>
           </dl>
         </div>
@@ -269,6 +269,13 @@ const previousRunTime = computed(() => (
   automation.value?.lastExecution?.completedDate ||
   automation.value?.lastExecution?.startedDate ||
   automation.value?.lastScheduledFireTime
+))
+// A paused automation has no next run — the scheduler skips it. nextScheduledFireTime is derived
+// from the schedule expression alone, so the backend keeps reporting the next matching instant
+// while paused; printing it verbatim promises a run that will not happen, directly under a chip
+// that says Paused. Falls back to the same "-" Previous Run shows when there is nothing to state.
+const nextRunTime = computed(() => (
+  automation.value?.active === false ? undefined : automation.value?.nextScheduledFireTime
 ))
 const savedRunRoute = computed<RouteLocationRaw | null>(() => {
   if (automation.value?.savedRun) return buildSavedRunEditorRoute(automation.value.savedRun)
