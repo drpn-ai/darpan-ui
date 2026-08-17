@@ -13,6 +13,8 @@ const saveShopifyAuthConfig = vi.hoisted(() => vi.fn())
 const listConfigTenantAccess = vi.hoisted(() => vi.fn())
 const grantConfigTenantAccess = vi.hoisted(() => vi.fn())
 const revokeConfigTenantAccess = vi.hoisted(() => vi.fn())
+const listSourceConfigEndpoints = vi.hoisted(() => vi.fn())
+const storeSourceConfigEndpointAccess = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     userId: 'john.doe',
@@ -36,6 +38,8 @@ vi.mock('../../../lib/api/facade', () => ({
     listConfigTenantAccess,
     grantConfigTenantAccess,
     revokeConfigTenantAccess,
+    listSourceConfigEndpoints,
+    storeSourceConfigEndpointAccess,
   },
 }))
 
@@ -105,6 +109,18 @@ describe('ShopifyAuthWorkflowPage', () => {
     listConfigTenantAccess.mockReset()
     grantConfigTenantAccess.mockReset()
     revokeConfigTenantAccess.mockReset()
+    listSourceConfigEndpoints.mockReset()
+    storeSourceConfigEndpointAccess.mockReset()
+    // Default: just the Admin GraphQL Orders endpoint, enabled — mirrors the pre-registry
+    // single-checkbox reality so every pre-existing test in this file (which never asserts on the
+    // endpoint list itself) keeps seeing canReadOrders resolve to true, unmodified.
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'SHOPIFY', endpointLabel: 'Admin GraphQL Orders', isEnabled: true }],
+    })
+    storeSourceConfigEndpointAccess.mockResolvedValue({ ok: true, messages: [], errors: [], stored: true })
     // Default: an unshared config (memberCount 1, no peers) — the common case, and the shape
     // that keeps every pre-existing test in this file on the unmodified save path.
     listConfigTenantAccess.mockResolvedValue({
@@ -270,10 +286,10 @@ describe('ShopifyAuthWorkflowPage', () => {
     expect(wrapper.get('input[name="apiVersion"]').classes()).toContain('shopify-inline-control')
     expect(wrapper.get('input[name="accessToken"]').element).toHaveProperty('value', '')
     expect(wrapper.get('input[name="accessToken"]').attributes('autocomplete')).toBe('off')
-    const orderEndpointCheckbox = wrapper.get('[data-testid="shopify-endpoint-SHOPIFY_ORDERS"]')
-    expect(orderEndpointCheckbox.attributes('name')).toBe('canReadOrders')
+    const orderEndpointCheckbox = wrapper.get('[data-testid="endpoint-SHOPIFY"]')
+    expect(orderEndpointCheckbox.attributes('name')).toBe('endpoint-SHOPIFY')
     expect((orderEndpointCheckbox.element as HTMLInputElement).checked).toBe(true)
-    expect(wrapper.get('[data-testid="shopify-endpoint-options"]').text()).toContain('Admin GraphQL Orders')
+    expect(wrapper.get('[data-testid="endpoint-access-block"]').text()).toContain('Admin GraphQL Orders')
     expect(wrapper.get('input[name="isActive"]').attributes('type')).toBe('checkbox')
     expect(wrapper.get('input[name="isActive"]').classes()).toContain('app-table__checkbox')
     expect((wrapper.get('input[name="isActive"]').element as HTMLInputElement).checked).toBe(true)
@@ -429,7 +445,7 @@ describe('ShopifyAuthWorkflowPage', () => {
     const wrapper = mount(ShopifyAuthWorkflowPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="shopify-endpoint-SHOPIFY_ORDERS"]').setValue(false)
+    await wrapper.get('[data-testid="endpoint-SHOPIFY"]').setValue(false)
     await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
     await flushPromises()
 
@@ -437,6 +453,11 @@ describe('ShopifyAuthWorkflowPage', () => {
       shopifyAuthConfigId: 'dev_shopify',
       canReadOrders: false,
     }))
+    expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
+      configTypeEnumId: 'SCFG_SHOPIFY_AUTH',
+      configId: 'dev_shopify',
+      enabledSystemEnumIds: [],
+    })
   })
 
   it('derives a capped config ID from the create label', async () => {
@@ -590,11 +611,69 @@ describe('ShopifyAuthWorkflowPage', () => {
     expect(html).toContain('Shared with')
     expect(html.indexOf('Shared with')).toBeLessThan(html.indexOf('save-shopify-auth'))
     // Credentials sit above capability: identity -> connection -> credentials -> capability -> access.
-    expect(html.indexOf('leave blank to keep existing')).toBeLessThan(html.indexOf('shopify-endpoint-options'))
+    expect(html.indexOf('leave blank to keep existing')).toBeLessThan(html.indexOf('endpoint-access-block'))
 
     await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
     await flushPromises()
 
     expect(saveShopifyAuthConfig).toHaveBeenCalledTimes(1)
+  })
+
+  // Renders the REAL EndpointAccessPanel inside the REAL page and asserts the actual save
+  // payload, not an isolated mock of the panel's shape — a field-shape bug here (e.g. `.enumId`
+  // vs `.value`) would pass a panel-only unit test but silently corrupt what gets persisted.
+  it('renders every registered endpoint and saves the ticked set', async () => {
+    route.params = { shopifyAuthConfigId: 'krewe-shopify' }
+    route.name = 'settings-shopify-edit'
+    route.fullPath = '/settings/shopify/edit/krewe-shopify'
+    getShopifyAuthConfig.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      shopifyAuthConfig: {
+        shopifyAuthConfigId: 'krewe-shopify',
+        description: 'Krewe Shopify',
+        companyUserGroupId: 'KREWE',
+        shopApiUrl: 'https://krewe.myshopify.com',
+        apiVersion: '2026-01',
+        timeZone: 'America/Chicago',
+        isActive: 'Y',
+        hasAccessToken: true,
+      },
+    })
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [
+        { systemEnumId: 'SHOPIFY', endpointLabel: 'Admin GraphQL Orders', isEnabled: true },
+        { systemEnumId: 'SHOPIFY_RETURN_REFS', endpointLabel: 'Shopify Return References', isEnabled: false },
+      ],
+    })
+    saveShopifyAuthConfig.mockResolvedValue({
+      ok: true,
+      messages: ['Saved Shopify auth config.'],
+      errors: [],
+      savedShopifyAuthConfig: { shopifyAuthConfigId: 'krewe-shopify' },
+    })
+
+    const wrapper = mount(ShopifyAuthWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.find('input[data-testid="endpoint-SHOPIFY_RETURN_REFS"]').exists()).toBe(true)
+
+    await wrapper.find('input[data-testid="endpoint-SHOPIFY_RETURN_REFS"]').setValue(true)
+    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
+    await flushPromises()
+
+    expect(saveShopifyAuthConfig).toHaveBeenCalledWith(expect.objectContaining({
+      shopifyAuthConfigId: 'krewe-shopify',
+      canReadOrders: true,
+    }))
+    expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
+      configTypeEnumId: 'SCFG_SHOPIFY_AUTH',
+      configId: 'krewe-shopify',
+      enabledSystemEnumIds: ['SHOPIFY', 'SHOPIFY_RETURN_REFS'],
+    })
   })
 })

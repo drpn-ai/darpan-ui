@@ -13,6 +13,8 @@ const saveOmsRestSourceConfig = vi.hoisted(() => vi.fn())
 const listConfigTenantAccess = vi.hoisted(() => vi.fn())
 const grantConfigTenantAccess = vi.hoisted(() => vi.fn())
 const revokeConfigTenantAccess = vi.hoisted(() => vi.fn())
+const listSourceConfigEndpoints = vi.hoisted(() => vi.fn())
+const storeSourceConfigEndpointAccess = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     userId: 'john.doe',
@@ -36,6 +38,8 @@ vi.mock('../../../lib/api/facade', () => ({
     listConfigTenantAccess,
     grantConfigTenantAccess,
     revokeConfigTenantAccess,
+    listSourceConfigEndpoints,
+    storeSourceConfigEndpointAccess,
   },
 }))
 
@@ -105,6 +109,18 @@ describe('OmsRestSourceWorkflowPage', () => {
     listConfigTenantAccess.mockReset()
     grantConfigTenantAccess.mockReset()
     revokeConfigTenantAccess.mockReset()
+    listSourceConfigEndpoints.mockReset()
+    storeSourceConfigEndpointAccess.mockReset()
+    // Default: just the Orders endpoint, enabled — mirrors the pre-registry single-checkbox
+    // reality so every pre-existing test in this file (which never asserts on the endpoint list
+    // itself) keeps seeing canReadOrders resolve to true, unmodified.
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'OMS', endpointLabel: 'Orders API', isEnabled: true }],
+    })
+    storeSourceConfigEndpointAccess.mockResolvedValue({ ok: true, messages: [], errors: [], stored: true })
     // Default: an unshared config (memberCount 1, no peers) — the common case, and the shape
     // that keeps every pre-existing test in this file on the unmodified save path.
     listConfigTenantAccess.mockResolvedValue({
@@ -331,10 +347,10 @@ describe('OmsRestSourceWorkflowPage', () => {
     expect(wrapper.get('input[name="password"]').attributes('autocomplete')).toBe('off')
     expect(wrapper.find('.workflow-form-grid--hotwax-auth').exists()).toBe(true)
     expect(wrapper.get('[data-testid="oms-timezone-select"]').text()).toContain('America/Chicago')
-    const ordersEndpointCheckbox = wrapper.get('[data-testid="oms-endpoint-orders-list"]')
-    expect(ordersEndpointCheckbox.attributes('name')).toBe('canReadOrders')
+    const ordersEndpointCheckbox = wrapper.get('[data-testid="endpoint-OMS"]')
+    expect(ordersEndpointCheckbox.attributes('name')).toBe('endpoint-OMS')
     expect((ordersEndpointCheckbox.element as HTMLInputElement).checked).toBe(true)
-    expect(wrapper.get('[data-testid="oms-endpoint-options"]').text()).toContain('Orders API')
+    expect(wrapper.get('[data-testid="endpoint-access-block"]').text()).toContain('Orders API')
     expect(wrapper.find('input[name="apiToken"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="oms-is-active"]').exists()).toBe(true)
     expect(wrapper.get('input[name="isActive"]').attributes('type')).toBe('checkbox')
@@ -506,7 +522,7 @@ describe('OmsRestSourceWorkflowPage', () => {
     const wrapper = mount(OmsRestSourceWorkflowPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="oms-endpoint-orders-list"]').setValue(false)
+    await wrapper.get('[data-testid="endpoint-OMS"]').setValue(false)
     await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
     await flushPromises()
 
@@ -514,6 +530,11 @@ describe('OmsRestSourceWorkflowPage', () => {
       omsRestSourceConfigId: 'dev_oms',
       canReadOrders: false,
     }))
+    expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
+      configTypeEnumId: 'SCFG_HOTWAX_OMS',
+      configId: 'dev_oms',
+      enabledSystemEnumIds: [],
+    })
   })
 
   it('derives a capped config ID from the create label', async () => {
@@ -683,11 +704,76 @@ describe('OmsRestSourceWorkflowPage', () => {
     expect(html).toContain('Shared with')
     expect(html.indexOf('Shared with')).toBeLessThan(html.indexOf('save-oms-rest-source'))
     // Credentials sit above capability: identity -> connection -> credentials -> capability -> access.
-    expect(html.indexOf('leave blank to keep existing')).toBeLessThan(html.indexOf('oms-endpoint-options'))
+    expect(html.indexOf('leave blank to keep existing')).toBeLessThan(html.indexOf('endpoint-access-block'))
 
     await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
     await flushPromises()
 
     expect(saveOmsRestSourceConfig).toHaveBeenCalledTimes(1)
+  })
+
+  // Renders the REAL EndpointAccessPanel inside the REAL page and asserts the actual save
+  // payload, not an isolated mock of the panel's shape — a field-shape bug here (e.g. `.enumId`
+  // vs `.value`) would pass a panel-only unit test but silently corrupt what gets persisted.
+  it('renders every registered endpoint and saves the ticked set', async () => {
+    route.params = { omsRestSourceConfigId: 'krewe-oms' }
+    route.name = 'settings-oms-edit'
+    route.fullPath = '/settings/hotwax/edit/krewe-oms'
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [
+        {
+          omsRestSourceConfigId: 'krewe-oms',
+          description: 'Krewe HotWax',
+          companyUserGroupId: 'KREWE',
+          baseUrl: 'https://oms.example.com',
+          authType: 'NONE',
+          hasUsername: false,
+          hasPassword: false,
+          hasApiToken: false,
+          customHeaderNames: [],
+          connectTimeoutSeconds: 10,
+          readTimeoutSeconds: 20,
+          isActive: 'Y',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [
+        { systemEnumId: 'OMS', endpointLabel: 'Orders API', isEnabled: true },
+        { systemEnumId: 'OMS_RETURNS', endpointLabel: 'Reconciliation Returns API', isEnabled: false },
+      ],
+    })
+    saveOmsRestSourceConfig.mockResolvedValue({
+      ok: true,
+      messages: ['Saved HotWax source config.'],
+      errors: [],
+      savedOmsRestSourceConfig: { omsRestSourceConfigId: 'krewe-oms' },
+    })
+
+    const wrapper = mount(OmsRestSourceWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.find('input[data-testid="endpoint-OMS_RETURNS"]').exists()).toBe(true)
+
+    await wrapper.find('input[data-testid="endpoint-OMS_RETURNS"]').setValue(true)
+    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+    await flushPromises()
+
+    expect(saveOmsRestSourceConfig).toHaveBeenCalledWith(expect.objectContaining({
+      omsRestSourceConfigId: 'krewe-oms',
+      canReadOrders: true,
+    }))
+    expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
+      configTypeEnumId: 'SCFG_HOTWAX_OMS',
+      configId: 'krewe-oms',
+      enabledSystemEnumIds: ['OMS', 'OMS_RETURNS'],
+    })
   })
 })

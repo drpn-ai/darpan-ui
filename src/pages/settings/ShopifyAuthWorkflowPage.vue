@@ -110,29 +110,11 @@
           />
         </label>
 
-        <div class="workflow-context-block" data-testid="shopify-endpoint-options">
-          <span class="workflow-context-label">Available Endpoints</span>
-
-          <div class="workflow-choice-grid">
-            <label
-              :class="[
-                'workflow-choice-option',
-                'workflow-choice-option--filter',
-                {
-                  'workflow-choice-option--active': form.canReadOrders,
-                },
-              ]"
-            >
-              <input
-                v-model="form.canReadOrders"
-                name="canReadOrders"
-                type="checkbox"
-                data-testid="shopify-endpoint-SHOPIFY_ORDERS"
-              />
-              <span class="workflow-choice-label">Admin GraphQL Orders</span>
-            </label>
-          </div>
-        </div>
+        <EndpointAccessPanel
+          v-model="form.enabledEndpoints"
+          :config-type="SHARED_CONFIG_TYPES.shopifyAuth"
+          :config-id="activeShopifyConfigId"
+        />
 
         <SharedWithPanel
           :config-type="SHARED_CONFIG_TYPES.shopifyAuth"
@@ -207,6 +189,7 @@ import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import SharedWithPanel from '../../components/settings/SharedWithPanel.vue'
+import EndpointAccessPanel from '../../components/settings/EndpointAccessPanel.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import type { ShopifyAuthConfigRecord } from '../../lib/api/types'
@@ -236,7 +219,7 @@ interface ShopifyForm {
   timeZone: string
   accessToken: string
   isActive: string
-  canReadOrders: boolean
+  enabledEndpoints: string[]
 }
 
 const route = useRoute()
@@ -252,7 +235,7 @@ function createDefaultShopifyForm(): ShopifyForm {
     timeZone: 'UTC',
     accessToken: '',
     isActive: 'Y',
-    canReadOrders: true,
+    enabledEndpoints: [],
   }
 }
 
@@ -339,7 +322,13 @@ function applyRecord(record: ShopifyAuthConfigRecord): void {
   form.timeZone = normalizeTimezoneId(record.timeZone) || 'UTC'
   form.accessToken = ''
   form.isActive = record.isActive ?? 'Y'
-  form.canReadOrders = record.canReadOrders !== false
+  // EndpointAccessPanel seeds this itself once it loads (see the panel's own load()) -- reset to
+  // empty here rather than reading it off the record. This runs on EVERY load, including a
+  // route-driven configId change while this page stays mounted, so a config swap can never carry
+  // the PREVIOUS config's endpoint set into this one if the panel's own reseed then errors: the
+  // failure mode becomes "nothing enabled yet" (fail closed) instead of "still showing another
+  // config's permissions" (fail open, and silently saveable).
+  form.enabledEndpoints = []
 }
 
 function resetCreateForm(): void {
@@ -432,11 +421,35 @@ async function save(): Promise<void> {
       timeZone: normalizeTimezoneId(form.timeZone),
       accessToken: form.accessToken.trim(),
       isActive: form.isActive,
-      canReadOrders: form.canReadOrders,
+      // canReadOrders is being retired in favor of per-endpoint access
+      // (SourceConfigEndpointAccess), but the save service still persists this column for two
+      // releases of backward compatibility -- AutomationFacadeSupport's automation source picker
+      // still gates directly on it. Derive it from the SHOPIFY endpoint's enabled state so the
+      // two never drift apart. The create wizard never renders the panel (no config exists yet to
+      // scope endpoint rows to), so it keeps the pre-existing default of true.
+      canReadOrders: !isEditing.value || form.enabledEndpoints.includes('SHOPIFY'),
     })
+
+    // Endpoint enablement is stored separately because it is generic across config types. The
+    // config save must land first: storing access rows for a config that failed to save would
+    // leave orphans this table has no FK to clean up (hence this sitting after the call above,
+    // inside the same try so a config-save failure skips it entirely via the catch below). Only
+    // an edit save calls this -- the create wizard never renders the panel, so enabledEndpoints
+    // holds no real data yet, and writing it would wrongly disable the return-refs endpoint on a
+    // brand-new config that should start fully enabled (an absent access row already means
+    // enabled).
+    let savedConfigId = form.shopifyAuthConfigId.trim()
+    if (isEditing.value) {
+      savedConfigId = response.savedShopifyAuthConfig?.shopifyAuthConfigId?.trim() || savedConfigId
+      await settingsFacade.storeSourceConfigEndpointAccess({
+        configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth,
+        configId: savedConfigId,
+        enabledSystemEnumIds: form.enabledEndpoints,
+      })
+    }
+
     success.value = response.messages?.[0] ?? 'Saved Shopify config.'
     if (isEditing.value) {
-      const savedConfigId = response.savedShopifyAuthConfig?.shopifyAuthConfigId?.trim() || form.shopifyAuthConfigId.trim()
       await router.push(buildShopifyAuthDashboardRoute(savedConfigId))
       return
     }
