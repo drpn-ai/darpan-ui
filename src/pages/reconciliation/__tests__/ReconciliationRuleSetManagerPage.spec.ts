@@ -614,6 +614,37 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(dialog.text()).not.toContain('Orders API')
   })
 
+  it('renders only the enabled rows from a mixed registry response in the auth popup', async () => {
+    // buildEnabledAuthInfoEndpoints filters on isEnabled before mapping to tiles. Every other test
+    // in this file only ever supplies an all-enabled list (or the empty-array default), so a
+    // filter regression there -- e.g. rendering every row regardless of isEnabled -- would pass
+    // unnoticed. This is the one case with both an enabled and a disabled row in the same response.
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = createApiDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [
+        { systemEnumId: 'OMS_ORDERS', endpointLabel: 'Orders API', isEnabled: true },
+        { systemEnumId: 'OMS_RETURNS', endpointLabel: 'Returns API', isEnabled: false },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ruleset-manager-system-config-file1"]').trigger('click')
+    await flushPromises()
+
+    const dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
+    const endpointTiles = dialog.findAll('[data-testid="ruleset-manager-auth-popup-endpoint"]')
+    expect(endpointTiles).toHaveLength(1)
+    expect(dialog.text()).toContain('Orders API')
+    expect(dialog.text()).not.toContain('Returns API')
+  })
+
   it('names each API source config by its description, per system when one id serves both sides', async () => {
     // The id an operator reuses per environment: one `rails_prod` on the HotWax side, another on
     // the Shopify side. Printing the id names the environment and neither config; matching on id
