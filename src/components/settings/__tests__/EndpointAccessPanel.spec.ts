@@ -5,7 +5,10 @@ import { settingsFacade } from '../../../lib/api/facade'
 import { SHARED_CONFIG_TYPES } from '../../../lib/sharedConfig'
 
 vi.mock('../../../lib/api/facade', () => ({
-  settingsFacade: { listSourceConfigEndpoints: vi.fn() },
+  settingsFacade: {
+    listSourceConfigEndpoints: vi.fn(),
+    storeSourceConfigEndpointAccess: vi.fn(),
+  },
 }))
 
 const endpoints = [
@@ -65,6 +68,64 @@ describe('EndpointAccessPanel', () => {
 
     const emitted = wrapper.emitted('update:modelValue')
     expect(emitted?.at(-1)?.[0]).toContain('OMS_RETURNS')
+    // The panel is read/emit only -- it must never write, even after a toggle. The parent form owns
+    // persistence and only calls the write service on explicit Save.
+    expect(settingsFacade.storeSourceConfigEndpointAccess).not.toHaveBeenCalled()
+  })
+
+  it('never calls the write service on its own', async () => {
+    const wrapper = mount(EndpointAccessPanel, {
+      props: { configType: SHARED_CONFIG_TYPES.hotwaxOms, configId: 'gorjana_prod', modelValue: [] },
+    })
+    await flushPromises()
+    await wrapper.find('input[data-testid="endpoint-OMS_RETURNS"]').setValue(true)
+    await wrapper.find('input[data-testid="endpoint-OMS"]').setValue(false)
+
+    expect(settingsFacade.storeSourceConfigEndpointAccess).not.toHaveBeenCalled()
+  })
+
+  it('does not let a stale click made during an in-flight config switch clobber the new config', async () => {
+    // Config A resolves immediately; config B's response is held open so we can act while it's
+    // still in flight -- the exact window the clobber bug lived in.
+    let resolveB!: (value: unknown) => void
+    const pendingB = new Promise((resolve) => {
+      resolveB = resolve
+    })
+
+    vi.mocked(settingsFacade.listSourceConfigEndpoints)
+      .mockResolvedValueOnce({ ok: true, messages: [], errors: [], endpoints })
+      .mockReturnValueOnce(pendingB as ReturnType<typeof settingsFacade.listSourceConfigEndpoints>)
+
+    const wrapper = mount(EndpointAccessPanel, {
+      props: { configType: SHARED_CONFIG_TYPES.hotwaxOms, configId: 'config_a', modelValue: [] },
+    })
+    await flushPromises()
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toEqual([
+      'OMS',
+      'OMS_RECON_ORDERS',
+      'OMS_TRANSFER_ORDERS',
+    ])
+
+    // Switch to config B while its load is still unresolved -- the instance survives, as it would
+    // when a router reuses the same page across two different records' edit URLs.
+    await wrapper.setProps({ configId: 'config_b' })
+
+    // Try to click what would be a stale, config-A-scoped checkbox. If A's list is still rendered
+    // (the bug), this is a real, clickable control the user could hit during the gap. If the fix
+    // clears the rendered list synchronously on the identity change, this control won't exist and
+    // the click is a no-op either way.
+    const staleCheckbox = wrapper.find('input[data-testid="endpoint-OMS_RETURNS"]')
+    if (staleCheckbox.exists()) {
+      await staleCheckbox.setValue(true)
+    }
+
+    const endpointsB = [{ systemEnumId: 'NS_AUTH', endpointLabel: 'NetSuite Auth', isEnabled: true }]
+    resolveB({ ok: true, messages: [], errors: [], endpoints: endpointsB })
+    await flushPromises()
+
+    // Whatever happened during the gap, the final state bound to config B must be config B's real
+    // server state -- never a value built from config A's stale, in-flight-superseded endpoint list.
+    expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toEqual(['NS_AUTH'])
   })
 
   it('says the seed data is missing rather than rendering an empty panel', async () => {

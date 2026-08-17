@@ -110,6 +110,14 @@ watch(
   () => [props.configType, props.configId],
   () => {
     dirty.value = false
+    // Clear synchronously, before load() is awaited. Without this, the OLD identity's checkboxes
+    // stay rendered (and clickable) for the whole in-flight window; a click during that window sets
+    // `dirty` from data that belongs to a record other than the one now being loaded, which then
+    // suppresses the new record's seed and leaves the old record's endpoint IDs bound to the new
+    // config -- wrong endpoint permissions applied to the wrong config. With no endpoints rendered
+    // there is nothing stale to click, so `dirty` can only be set from the identity now loading.
+    endpoints.value = []
+    loaded.value = false
     void load()
   },
   { immediate: true },
