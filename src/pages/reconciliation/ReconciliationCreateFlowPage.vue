@@ -120,7 +120,6 @@ import {
   type ReconciliationRuleSetDraft,
 } from '../../lib/reconciliationRuleSetDraft'
 import {
-  canonicalDarpanSystemEnumId,
   darpanSystemEndpointOptions,
   darpanSystemHasEndpointOptions,
   darpanSystemIdsMatch,
@@ -162,10 +161,6 @@ const FILE_TYPE_CSV = 'DftCsv'
 const SOURCE_TYPE_API = 'AUT_SRC_API'
 const SOURCE_MODE_FILE = 'file'
 const SOURCE_MODE_API = 'api'
-const SOURCE_CONFIG_TYPE_SHOPIFY_AUTH = 'SHOPIFY_AUTH'
-const SOURCE_CONFIG_TYPE_HOTWAX_OMS_REST = 'HOTWAX_OMS_REST'
-const SOURCE_CONFIG_TYPE_HOTWAX_OMS_REST_TRANSFER = 'HOTWAX_OMS_REST_TRANSFER'
-const SOURCE_CONFIG_TYPE_NETSUITE_AUTH = 'NETSUITE_AUTH'
 const SHORTCUT_KEYS = ['A', 'B', 'C', 'D', 'E', 'F']
 const SYSTEM_LABEL_OVERRIDES: Record<string, string> = {
   HOTWAX: 'HotWax',
@@ -1073,14 +1068,14 @@ function updateApiSourceConfig(side: SourceSide, value: string): void {
   const selectedConfig = selectedSourceConfigOptionForSide(side, value)
   if (side === 'file1') {
     file1SourceConfigId.value = selectedConfig?.sourceConfigId ?? ''
-    file1SourceConfigType.value = selectedConfig?.sourceConfigType || expectedSourceConfigType(file1SystemEnumId.value)
+    file1SourceConfigType.value = selectedConfig?.sourceConfigType ?? ''
     file1PrimaryIdExpression.value = []
     clearApiEndpoint('file1')
     return
   }
 
   file2SourceConfigId.value = selectedConfig?.sourceConfigId ?? ''
-  file2SourceConfigType.value = selectedConfig?.sourceConfigType || expectedSourceConfigType(file2SystemEnumId.value)
+  file2SourceConfigType.value = selectedConfig?.sourceConfigType ?? ''
   file2PrimaryIdExpression.value = []
   clearApiEndpoint('file2')
 }
@@ -1183,21 +1178,6 @@ function selectedRemoteOptionForSide(side: SourceSide): AutomationSystemRemoteOp
     endpointMatchesSystem(remote.systemEnumId, systemEnumId) &&
     (!sourceConfigId || sourceConfigMatches(remote.sourceConfigId || remote.optionKey, sourceConfigId)),
   ) ?? null
-}
-
-function expectedSourceConfigType(systemEnumId: string): string {
-  switch (canonicalDarpanSystemEnumId(systemEnumId)) {
-    case 'SHOPIFY':
-      return SOURCE_CONFIG_TYPE_SHOPIFY_AUTH
-    case 'OMS':
-      return SOURCE_CONFIG_TYPE_HOTWAX_OMS_REST
-    case 'OMS_TRANSFER_ORDERS':
-      return SOURCE_CONFIG_TYPE_HOTWAX_OMS_REST_TRANSFER
-    case 'NETSUITE':
-      return SOURCE_CONFIG_TYPE_NETSUITE_AUTH
-    default:
-      return ''
-  }
 }
 
 function selectedApiSourceLabel(side: SourceSide): string {

@@ -555,10 +555,13 @@ describe('ReconciliationCreateFlowPage', () => {
       sftpServers: [],
       sourceConfigs: [
         {
-          // No sourceConfigType here so the wizard falls back to expectedSourceConfigType(systemEnumId).
+          // Registry-driven as of Task 6: the backend always stamps sourceConfigType from the
+          // connector's expectedSourceConfigType, one row per enabled endpoint. The UI no longer
+          // guesses this from systemEnumId (Task 8 deleted that fallback).
           sourceConfigId: 'KREWE_TRANSFER_ORDERS',
           label: 'Krewe Transfer Orders',
           systemEnumId: 'OMS_TRANSFER_ORDERS',
+          sourceConfigType: 'HOTWAX_OMS_REST_TRANSFER',
         },
       ],
       nsRestletConfigs: [],
@@ -1571,6 +1574,53 @@ describe('ReconciliationCreateFlowPage', () => {
       // ("HotWax") before it ever reaches allSystemOptions — same as every other system-select
       // assertion in this file that goes through currentQuestion/resolveSystemLabel.
       expect(wrapper.get('[data-testid="file1-system-select"]').text()).toBe('HotWax')
+    })
+
+    // Regression guard for Task 6 (Plan 2 registry-driven options): each enabled endpoint gets its
+    // own sourceConfigs row, scoped to its own concrete systemEnumId. Before that change, the config
+    // picker only ever offered rows keyed to the parent OMS system, so picking the OMS_RETURNS
+    // endpoint left the config step empty. Task 8 deletes the UI-side expectedSourceConfigType
+    // fallback that used to paper over a missing sourceConfigType on a row — this test proves the
+    // backend now always supplies one for a config scoped to the child endpoint too.
+    it('offers a connection after picking the returns endpoint', async () => {
+      listAutomationSourceOptions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        inputModes: [],
+        sourceTypes: [],
+        relativeWindows: [],
+        fileTypes: FILE_TYPE_OPTIONS,
+        systems: SYSTEM_OPTIONS_WITH_OMS_ENDPOINT,
+        savedRuns: [],
+        sftpServers: [],
+        sourceConfigs: [
+          { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS', sourceConfigType: 'HOTWAX_OMS_REST', label: 'Gorjana Prod' },
+          { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS_RETURNS', sourceConfigType: 'HOTWAX_OMS_REST_RETURNS', label: 'Gorjana Prod' },
+        ],
+        nsRestletConfigs: [],
+        systemRemotes: [],
+      })
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Returns Config Test')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_RETURNS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+
+      await wrapper.get('[data-testid="file1-api-config-select"]').trigger('click')
+      const optionValues = wrapper
+        .findAll('[data-testid="workflow-select-option"]')
+        .map((option) => option.attributes('data-option-value'))
+      expect(optionValues).toContain('gorjana_prod')
     })
   })
 })
