@@ -439,14 +439,18 @@ function applyRecord(record: OmsRestSourceConfigRecord): void {
   form.connectTimeoutSeconds = record.connectTimeoutSeconds ?? 30
   form.readTimeoutSeconds = record.readTimeoutSeconds ?? 60
   form.isActive = record.isActive ?? 'Y'
-  // EndpointAccessPanel seeds this itself once it loads (see the panel's own load()) -- reset both
-  // the value and its trust state here rather than reading canReadOrders off the record. This runs
-  // on EVERY load, including a route-driven configId change while this page stays mounted, so a
-  // config swap can never carry the PREVIOUS config's endpoint set -- or a stale 'ready' -- into
-  // this one: save() will not write access rows or derive canReadOrders from enabledEndpoints
-  // until the panel confirms 'ready' again for the identity now loading.
-  form.enabledEndpoints = []
-  endpointsLoadState.value = 'loading'
+  // Do NOT touch form.enabledEndpoints or endpointsLoadState here. EndpointAccessPanel is the sole
+  // writer of both: its own props watcher (configType/configId, both derived from the same route
+  // param this function reacts to) fires synchronously on the exact same identity change and emits
+  // 'loading' before it even awaits its fetch, then reseeds modelValue and emits 'ready'/'error' once
+  // that fetch settles. This function's caller (loadOmsConfig) and the panel's load() are two
+  // independent network calls with no ordering guarantee -- writing to these two fields from BOTH
+  // places races. It used to race, and losing was silent and destructive: verified live, a Shopify
+  // config whose config fetch resolved after its endpoints fetch rendered every endpoint UNTICKED
+  // even though the database had zero override rows (absent rows = enabled), i.e. this function's
+  // reset clobbered the panel's already-correct 'ready' seed. Leaving both fields alone here removes
+  // this function from the race entirely, so the outcome no longer depends on fetch ordering.
+  //
   // Fallback used by save() only when the panel never confirms 'ready' in time -- mirrors the
   // hydration this line used to do directly onto the (now-removed) form.canReadOrders field.
   loadedCanReadOrders.value = record.canReadOrders !== false

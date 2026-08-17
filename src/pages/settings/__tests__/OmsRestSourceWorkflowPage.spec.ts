@@ -840,4 +840,88 @@ describe('OmsRestSourceWorkflowPage', () => {
     // Stayed on the edit page rather than navigating away as if the whole save succeeded.
     expect(push).not.toHaveBeenCalled()
   })
+
+  // Task 15 fix, CRITICAL: applyRecord() used to unconditionally reset form.enabledEndpoints to []
+  // and endpointsLoadState to 'loading', racing EndpointAccessPanel's own seed/ready emission. The
+  // panel fetches independently of the config fetch, so whichever resolved LAST won. Verified live on
+  // gorjana_prod: the Shopify config's CONFIG fetch resolved after its ENDPOINTS fetch, so
+  // applyRecord()'s reset clobbered the panel's already-correct seed -- every checkbox rendered
+  // unticked even though the database had zero override rows (absent rows = enabled). This test
+  // reproduces that exact ordering by holding the config fetch open with a deferred promise until
+  // after the (resolved) endpoints fetch has already settled and seeded the form.
+  it('keeps the endpoint seed when the config fetch resolves after the endpoints fetch', async () => {
+    route.params = { omsRestSourceConfigId: 'krewe-oms' }
+    route.name = 'settings-oms-edit'
+    route.fullPath = '/settings/hotwax/edit/krewe-oms'
+
+    let resolveConfigFetch!: (value: unknown) => void
+    listOmsRestSourceConfigs.mockReturnValue(
+      new Promise((resolve) => {
+        resolveConfigFetch = resolve
+      }),
+    )
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [
+        { systemEnumId: 'OMS', endpointLabel: 'Orders API', isEnabled: true },
+        { systemEnumId: 'OMS_RETURNS', endpointLabel: 'Reconciliation Returns API', isEnabled: true },
+      ],
+    })
+    saveOmsRestSourceConfig.mockResolvedValue({
+      ok: true,
+      messages: ['Saved HotWax source config.'],
+      errors: [],
+      savedOmsRestSourceConfig: { omsRestSourceConfigId: 'krewe-oms' },
+    })
+
+    const wrapper = mount(OmsRestSourceWorkflowPage)
+    // Let the endpoints fetch (already resolved) settle and seed the form BEFORE the config fetch
+    // resolves -- this is the ordering that broke on gorjana_prod.
+    await flushPromises()
+    expect((wrapper.get('[data-testid="endpoint-OMS"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('[data-testid="endpoint-OMS_RETURNS"]').element as HTMLInputElement).checked).toBe(true)
+
+    resolveConfigFetch({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [
+        {
+          omsRestSourceConfigId: 'krewe-oms',
+          description: 'Krewe HotWax',
+          companyUserGroupId: 'KREWE',
+          baseUrl: 'https://oms.example.com',
+          authType: 'NONE',
+          hasUsername: false,
+          hasPassword: false,
+          hasApiToken: false,
+          customHeaderNames: [],
+          connectTimeoutSeconds: 10,
+          readTimeoutSeconds: 20,
+          isActive: 'Y',
+          canReadOrders: true,
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    await flushPromises()
+
+    // The config fetch resolving after the endpoints fetch must not wipe the already-seeded set.
+    expect((wrapper.get('[data-testid="endpoint-OMS"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('[data-testid="endpoint-OMS_RETURNS"]').element as HTMLInputElement).checked).toBe(true)
+
+    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+    await flushPromises()
+
+    expect(saveOmsRestSourceConfig).toHaveBeenCalledWith(expect.objectContaining({
+      canReadOrders: true,
+    }))
+    expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
+      configTypeEnumId: 'SCFG_HOTWAX_OMS',
+      configId: 'krewe-oms',
+      enabledSystemEnumIds: ['OMS', 'OMS_RETURNS'],
+    })
+  })
 })
