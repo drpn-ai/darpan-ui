@@ -760,6 +760,14 @@ describe('OmsRestSourceWorkflowPage', () => {
     const wrapper = mount(OmsRestSourceWorkflowPage)
     await flushPromises()
 
+    // Proves the panel is actually wired to THIS config, not just rendered — reading a literal out
+    // of save() would satisfy the assertions below without ever threading configType/configId
+    // through the panel's own props (e.g. a copy-paste leaving :config-type="shopifyAuth" here
+    // would still pass every assertion after this one).
+    expect(listSourceConfigEndpoints).toHaveBeenCalledWith(
+      expect.objectContaining({ configTypeEnumId: 'SCFG_HOTWAX_OMS', configId: 'krewe-oms' }),
+      expect.anything(),
+    )
     expect(wrapper.find('input[data-testid="endpoint-OMS_RETURNS"]').exists()).toBe(true)
 
     await wrapper.find('input[data-testid="endpoint-OMS_RETURNS"]').setValue(true)
@@ -775,5 +783,61 @@ describe('OmsRestSourceWorkflowPage', () => {
       configId: 'krewe-oms',
       enabledSystemEnumIds: ['OMS', 'OMS_RETURNS'],
     })
+  })
+
+  // Fix round 1, CRITICAL: before this fix, applyRecord() reset enabledEndpoints to [] and nothing
+  // gated the follow-up write on the panel's own load outcome, so a failed GET silently disabled
+  // every endpoint for the config (and flipped the legacy canReadOrders gate off in the same
+  // stroke). Verified failing against the pre-fix code in a scratch worktree at b04b64f before this
+  // fix landed: saveOmsRestSourceConfig was called with canReadOrders: false instead of true.
+  it('does not touch endpoint access, and preserves the loaded canReadOrders, when the endpoint read fails', async () => {
+    route.params = { omsRestSourceConfigId: 'krewe-oms' }
+    route.name = 'settings-oms-edit'
+    route.fullPath = '/settings/hotwax/edit/krewe-oms'
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [
+        {
+          omsRestSourceConfigId: 'krewe-oms',
+          description: 'Krewe HotWax',
+          companyUserGroupId: 'KREWE',
+          baseUrl: 'https://oms.example.com',
+          authType: 'NONE',
+          hasUsername: false,
+          hasPassword: false,
+          hasApiToken: false,
+          customHeaderNames: [],
+          connectTimeoutSeconds: 10,
+          readTimeoutSeconds: 20,
+          isActive: 'Y',
+          canReadOrders: true,
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    listSourceConfigEndpoints.mockRejectedValue(new Error('network down'))
+    saveOmsRestSourceConfig.mockResolvedValue({
+      ok: true,
+      messages: ['Saved HotWax source config.'],
+      errors: [],
+      savedOmsRestSourceConfig: { omsRestSourceConfigId: 'krewe-oms' },
+    })
+
+    const wrapper = mount(OmsRestSourceWorkflowPage)
+    await flushPromises()
+
+    await wrapper.get('input[name="description"]').setValue('Krewe HotWax (renamed)')
+    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
+    await flushPromises()
+
+    expect(saveOmsRestSourceConfig).toHaveBeenCalledWith(expect.objectContaining({
+      canReadOrders: true,
+    }))
+    expect(storeSourceConfigEndpointAccess).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('endpoint access could not be verified')
+    // Stayed on the edit page rather than navigating away as if the whole save succeeded.
+    expect(push).not.toHaveBeenCalled()
   })
 })

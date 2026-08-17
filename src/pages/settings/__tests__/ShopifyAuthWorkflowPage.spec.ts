@@ -660,6 +660,14 @@ describe('ShopifyAuthWorkflowPage', () => {
     const wrapper = mount(ShopifyAuthWorkflowPage)
     await flushPromises()
 
+    // Proves the panel is actually wired to THIS config, not just rendered — reading a literal out
+    // of save() would satisfy the assertions below without ever threading configType/configId
+    // through the panel's own props (e.g. a copy-paste leaving :config-type="hotwaxOms" here would
+    // still pass every assertion after this one).
+    expect(listSourceConfigEndpoints).toHaveBeenCalledWith(
+      expect.objectContaining({ configTypeEnumId: 'SCFG_SHOPIFY_AUTH', configId: 'krewe-shopify' }),
+      expect.anything(),
+    )
     expect(wrapper.find('input[data-testid="endpoint-SHOPIFY_RETURN_REFS"]').exists()).toBe(true)
 
     await wrapper.find('input[data-testid="endpoint-SHOPIFY_RETURN_REFS"]').setValue(true)
@@ -675,5 +683,54 @@ describe('ShopifyAuthWorkflowPage', () => {
       configId: 'krewe-shopify',
       enabledSystemEnumIds: ['SHOPIFY', 'SHOPIFY_RETURN_REFS'],
     })
+  })
+
+  // Fix round 1, CRITICAL: before this fix, applyRecord() reset enabledEndpoints to [] and nothing
+  // gated the follow-up write on the panel's own load outcome, so a failed GET silently disabled
+  // every endpoint for the config (and flipped the legacy canReadOrders gate off in the same
+  // stroke). Mirrors the OMS-page regression test verified failing against the pre-fix code
+  // (b04b64f) in a scratch worktree.
+  it('does not touch endpoint access, and preserves the loaded canReadOrders, when the endpoint read fails', async () => {
+    route.params = { shopifyAuthConfigId: 'krewe-shopify' }
+    route.name = 'settings-shopify-edit'
+    route.fullPath = '/settings/shopify/edit/krewe-shopify'
+    getShopifyAuthConfig.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      shopifyAuthConfig: {
+        shopifyAuthConfigId: 'krewe-shopify',
+        description: 'Krewe Shopify',
+        companyUserGroupId: 'KREWE',
+        shopApiUrl: 'https://krewe.myshopify.com',
+        apiVersion: '2026-01',
+        timeZone: 'America/Chicago',
+        isActive: 'Y',
+        canReadOrders: true,
+        hasAccessToken: true,
+      },
+    })
+    listSourceConfigEndpoints.mockRejectedValue(new Error('network down'))
+    saveShopifyAuthConfig.mockResolvedValue({
+      ok: true,
+      messages: ['Saved Shopify auth config.'],
+      errors: [],
+      savedShopifyAuthConfig: { shopifyAuthConfigId: 'krewe-shopify' },
+    })
+
+    const wrapper = mount(ShopifyAuthWorkflowPage)
+    await flushPromises()
+
+    await wrapper.get('input[name="description"]').setValue('Krewe Shopify (renamed)')
+    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
+    await flushPromises()
+
+    expect(saveShopifyAuthConfig).toHaveBeenCalledWith(expect.objectContaining({
+      canReadOrders: true,
+    }))
+    expect(storeSourceConfigEndpointAccess).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('endpoint access could not be verified')
+    // Stayed on the edit page rather than navigating away as if the whole save succeeded.
+    expect(push).not.toHaveBeenCalled()
   })
 })

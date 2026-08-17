@@ -114,6 +114,7 @@
           v-model="form.enabledEndpoints"
           :config-type="SHARED_CONFIG_TYPES.shopifyAuth"
           :config-id="activeShopifyConfigId"
+          @update:load-state="endpointsLoadState = $event"
         />
 
         <SharedWithPanel
@@ -189,7 +190,7 @@ import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import SharedWithPanel from '../../components/settings/SharedWithPanel.vue'
-import EndpointAccessPanel from '../../components/settings/EndpointAccessPanel.vue'
+import EndpointAccessPanel, { type EndpointAccessLoadState } from '../../components/settings/EndpointAccessPanel.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import type { ShopifyAuthConfigRecord } from '../../lib/api/types'
@@ -245,6 +246,14 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
 const currentStepIndex = ref(0)
+// Reported by EndpointAccessPanel (see its own `update:loadState` doc comment). Starts 'loading' so
+// a Save clicked before the panel's first emit ever arrives is treated the same as an in-flight or
+// failed read -- never as an implicit "everything disabled".
+const endpointsLoadState = ref<EndpointAccessLoadState>('loading')
+// Fallback for the legacy canReadOrders column when endpointsLoadState isn't 'ready' at Save time
+// (see save()). Set from the loaded record in applyRecord(), mirroring what this page used to
+// hydrate form.canReadOrders with before the panel existed.
+const loadedCanReadOrders = ref(true)
 
 const activeShopifyConfigId = computed(() => String(route.params.shopifyAuthConfigId ?? '').trim())
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
@@ -322,13 +331,17 @@ function applyRecord(record: ShopifyAuthConfigRecord): void {
   form.timeZone = normalizeTimezoneId(record.timeZone) || 'UTC'
   form.accessToken = ''
   form.isActive = record.isActive ?? 'Y'
-  // EndpointAccessPanel seeds this itself once it loads (see the panel's own load()) -- reset to
-  // empty here rather than reading it off the record. This runs on EVERY load, including a
-  // route-driven configId change while this page stays mounted, so a config swap can never carry
-  // the PREVIOUS config's endpoint set into this one if the panel's own reseed then errors: the
-  // failure mode becomes "nothing enabled yet" (fail closed) instead of "still showing another
-  // config's permissions" (fail open, and silently saveable).
+  // EndpointAccessPanel seeds this itself once it loads (see the panel's own load()) -- reset both
+  // the value and its trust state here rather than reading canReadOrders off the record. This runs
+  // on EVERY load, including a route-driven configId change while this page stays mounted, so a
+  // config swap can never carry the PREVIOUS config's endpoint set -- or a stale 'ready' -- into
+  // this one: save() will not write access rows or derive canReadOrders from enabledEndpoints
+  // until the panel confirms 'ready' again for the identity now loading.
   form.enabledEndpoints = []
+  endpointsLoadState.value = 'loading'
+  // Fallback used by save() only when the panel never confirms 'ready' in time -- mirrors the
+  // hydration this line used to do directly onto the (now-removed) form.canReadOrders field.
+  loadedCanReadOrders.value = record.canReadOrders !== false
 }
 
 function resetCreateForm(): void {
@@ -411,6 +424,10 @@ async function save(): Promise<void> {
       return
     }
 
+    // A Save clicked while the panel's read is still in flight, or after it failed, means
+    // enabledEndpoints does not reflect confirmed server truth -- see the two guards below.
+    const endpointsReady = endpointsLoadState.value === 'ready'
+
     const response = await settingsFacade.saveShopifyAuthConfig({
       shopifyAuthConfigId: isEditing.value
         ? form.shopifyAuthConfigId.trim()
@@ -424,23 +441,39 @@ async function save(): Promise<void> {
       // canReadOrders is being retired in favor of per-endpoint access
       // (SourceConfigEndpointAccess), but the save service still persists this column for two
       // releases of backward compatibility -- AutomationFacadeSupport's automation source picker
-      // still gates directly on it. Derive it from the SHOPIFY endpoint's enabled state so the
-      // two never drift apart. The create wizard never renders the panel (no config exists yet to
-      // scope endpoint rows to), so it keeps the pre-existing default of true.
-      canReadOrders: !isEditing.value || form.enabledEndpoints.includes('SHOPIFY'),
+      // still gates directly on it. Derive it from the SHOPIFY endpoint's enabled state ONLY once
+      // the panel has confirmed a real read (endpointsReady): a still-loading or failed read must
+      // never be read as "SHOPIFY disabled", so it falls back to whatever the record last
+      // reported. The create wizard never renders the panel (no config exists yet to scope
+      // endpoint rows to), so it keeps the pre-existing default of true.
+      canReadOrders: !isEditing.value
+        ? true
+        : endpointsReady
+          ? form.enabledEndpoints.includes('SHOPIFY')
+          : loadedCanReadOrders.value,
     })
 
-    // Endpoint enablement is stored separately because it is generic across config types. The
-    // config save must land first: storing access rows for a config that failed to save would
-    // leave orphans this table has no FK to clean up (hence this sitting after the call above,
-    // inside the same try so a config-save failure skips it entirely via the catch below). Only
-    // an edit save calls this -- the create wizard never renders the panel, so enabledEndpoints
-    // holds no real data yet, and writing it would wrongly disable the return-refs endpoint on a
-    // brand-new config that should start fully enabled (an absent access row already means
-    // enabled).
     let savedConfigId = form.shopifyAuthConfigId.trim()
     if (isEditing.value) {
       savedConfigId = response.savedShopifyAuthConfig?.shopifyAuthConfigId?.trim() || savedConfigId
+
+      if (!endpointsReady) {
+        // The panel never confirmed a real read for this identity (still loading, or its own
+        // fetch failed) -- enabledEndpoints is not trustworthy. storeAccess disables every
+        // catalog endpoint that is NOT in the list it's given, so writing an unconfirmed set here
+        // would silently disable endpoints the user never touched. Skip the write (existing
+        // access rows are left untouched -- the non-destructive outcome), and stay on this page
+        // instead of navigating away as if the whole save succeeded, so the notice below is seen.
+        // The config fields above (e.g. Shop/API URL) are already saved at this point, so a user
+        // who only came here to fix one of those is not stranded -- their edit is durable either way.
+        error.value = 'Saved the Shopify config, but endpoint access could not be verified and was left unchanged. Reload this page and try again.'
+        return
+      }
+
+      // Endpoint enablement is stored separately because it is generic across config types. The
+      // config save must land first: storing access rows for a config that failed to save would
+      // leave orphans this table has no FK to clean up (hence this sitting after the call above,
+      // inside the same try so a config-save failure skips it entirely via the catch below).
       await settingsFacade.storeSourceConfigEndpointAccess({
         configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth,
         configId: savedConfigId,

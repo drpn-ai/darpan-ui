@@ -46,7 +46,16 @@ const props = defineProps<{
   modelValue: string[]
 }>()
 
-const emit = defineEmits<{ 'update:modelValue': [string[]] }>()
+// Reported to the parent so it can gate a destructive write (storeSourceConfigEndpointAccess) on
+// whether modelValue currently reflects confirmed server truth. 'loading' covers both the initial
+// fetch and any in-flight reseed; the parent should treat it the same as 'error' for that gate --
+// modelValue is not yet, or no longer, verified.
+export type EndpointAccessLoadState = 'loading' | 'ready' | 'error'
+
+const emit = defineEmits<{
+  'update:modelValue': [string[]]
+  'update:loadState': [EndpointAccessLoadState]
+}>()
 
 // The registry supplies the catalog AND the current per-endpoint state. The panel never writes:
 // the parent form owns the value and persists it on Save, because this is a hard security gate and
@@ -81,11 +90,16 @@ async function load(): Promise<void> {
   loadController = controller
 
   error.value = ''
+  emit('update:loadState', 'loading')
   try {
     const response = await settingsFacade.listSourceConfigEndpoints(
       { configTypeEnumId: props.configType, configId: props.configId },
       controller.signal,
     )
+    // Superseded by a newer identity's load (see the watcher below): that newer call already
+    // emitted its own 'loading' synchronously before this one could resolve, so staying silent
+    // here avoids a stale 'ready'/'error' arriving AFTER (and clobbering) the current load's
+    // eventual, correct terminal state.
     if (controller.signal.aborted) return
     endpoints.value = response.endpoints ?? []
     loaded.value = true
@@ -97,10 +111,12 @@ async function load(): Promise<void> {
     if (!dirty.value) {
       emit('update:modelValue', endpoints.value.filter((e) => e.isEnabled).map((e) => e.systemEnumId))
     }
+    emit('update:loadState', 'ready')
   } catch (loadError) {
     if (controller.signal.aborted || isAbortError(loadError)) return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load endpoints.'
     loaded.value = true
+    emit('update:loadState', 'error')
   } finally {
     if (loadController === controller) loadController = null
   }

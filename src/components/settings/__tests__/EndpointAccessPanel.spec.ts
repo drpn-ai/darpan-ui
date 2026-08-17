@@ -128,6 +128,28 @@ describe('EndpointAccessPanel', () => {
     expect(wrapper.emitted('update:modelValue')?.at(-1)?.[0]).toEqual(['NS_AUTH'])
   })
 
+  it('emits loading then ready on a successful load', async () => {
+    const wrapper = mount(EndpointAccessPanel, {
+      props: { configType: SHARED_CONFIG_TYPES.hotwaxOms, configId: 'gorjana_prod', modelValue: [] },
+    })
+    await flushPromises()
+
+    expect(wrapper.emitted('update:loadState')?.map((call) => call[0])).toEqual(['loading', 'ready'])
+  })
+
+  it('emits loading then error when the fetch rejects, and never emits ready', async () => {
+    vi.mocked(settingsFacade.listSourceConfigEndpoints).mockRejectedValue(new Error('network down'))
+
+    const wrapper = mount(EndpointAccessPanel, {
+      props: { configType: SHARED_CONFIG_TYPES.hotwaxOms, configId: 'gorjana_prod', modelValue: ['OMS'] },
+    })
+    await flushPromises()
+
+    expect(wrapper.emitted('update:loadState')?.map((call) => call[0])).toEqual(['loading', 'error'])
+    // A failed load must not silently discard whatever the parent already had.
+    expect(wrapper.emitted('update:modelValue')).toBeFalsy()
+  })
+
   it('says the seed data is missing rather than rendering an empty panel', async () => {
     vi.mocked(settingsFacade.listSourceConfigEndpoints).mockResolvedValue({
       ok: true,
