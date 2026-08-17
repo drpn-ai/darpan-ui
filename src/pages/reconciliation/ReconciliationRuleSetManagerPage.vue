@@ -283,7 +283,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade, settingsFacade } from '../../lib/api/facade'
-import type { OmsRestSourceConfigRecord, ShopifyAuthConfigRecord } from '../../lib/api/types'
+import type { AutomationSourceConfigOption, OmsRestSourceConfigRecord, ShopifyAuthConfigRecord } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -297,6 +297,7 @@ import {
 import { buildReconciliationDiffRoute, buildReconciliationRunHistoryRoute } from '../../lib/reconciliationRoutes'
 import type { SourceExcludeFilter } from '../../lib/sourceExcludeFilters'
 import { buildWorkflowOriginState } from '../../lib/workflowOrigin'
+import { darpanSystemIdsMatch } from '../../lib/utils/darpanSystems'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
@@ -368,6 +369,7 @@ const file2Exclusions = computed(() => formatExclusionSummary(file2Title.value, 
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const canViewRunHistory = computed(() => Boolean(savedRunId.value))
+const sourceConfigOptions = ref<AutomationSourceConfigOption[]>([])
 const authInfoPopup = ref<AuthInfoPopupState | null>(null)
 const isAuthInfoPopupOpen = computed(() => Boolean(authInfoPopup.value))
 const runHistoryRoute = computed(() => buildReconciliationRunHistoryRoute({
@@ -438,15 +440,56 @@ function systemTitle(draftValue: ReconciliationRuleSetDraft | null, side: 'file1
   return systemLabel || systemEnumId || (side === 'file1' ? 'System 1' : 'System 2')
 }
 
-/** The API source config backing this side, shown under the system name. Empty for non-API sources. */
+/**
+ * The API source config backing this side, shown under the system name. Empty for non-API sources.
+ *
+ * Named by its description, not its id: config ids are environment names an operator reuses across
+ * systems (`rails_prod` on both the HotWax and the Shopify side of one run), so the id identifies
+ * the environment and says nothing about the config. The description is also exactly what the
+ * create wizard's source picker offered when this run was set up — see sourceConfigDescription —
+ * so the run reads back the way it was chosen. Falls back to the id when a config carries no
+ * description, or before the option list has loaded.
+ */
 function systemConfigName(draftValue: ReconciliationRuleSetDraft | null, side: 'file1' | 'file2'): string {
   if (!draftValue) return ''
 
   const sourceTypeEnumId = side === 'file1' ? draftValue.file1SourceTypeEnumId : draftValue.file2SourceTypeEnumId
   if (sourceTypeEnumId?.trim() !== SOURCE_TYPE_API) return ''
 
-  const sourceConfigId = side === 'file1' ? draftValue.file1SourceConfigId : draftValue.file2SourceConfigId
-  return sourceConfigId?.trim() ?? ''
+  const sourceConfigId = (side === 'file1' ? draftValue.file1SourceConfigId : draftValue.file2SourceConfigId)?.trim() ?? ''
+  if (!sourceConfigId) return ''
+
+  const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId : draftValue.file2SystemEnumId
+  return sourceConfigDescription(sourceConfigId, systemEnumId) || sourceConfigId
+}
+
+/**
+ * Resolve a config id to its description off the same option list the create wizard's picker uses.
+ *
+ * Matched on system as well as id, because one id can name a config on each side of a run (that is
+ * the whole reason the id alone is not a name) — taking the first id match would print the OMS
+ * config's description next to Shopify.
+ */
+function sourceConfigDescription(sourceConfigId: string, systemEnumId: string | undefined): string {
+  const idMatches = sourceConfigOptions.value.filter((option) => option.sourceConfigId?.trim() === sourceConfigId)
+  if (!idMatches.length) return ''
+
+  // An option with no systemEnumId is system-agnostic and stays eligible, matching how the create
+  // wizard filters the very same list (sourceConfigBelongsToSystem).
+  const systemMatch = idMatches.find((option) => (
+    !option.systemEnumId?.trim() || darpanSystemIdsMatch(option.systemEnumId, systemEnumId)
+  ))
+  return (systemMatch ?? idMatches[0])?.description?.trim() ?? ''
+}
+
+/** Best-effort: every caller falls back to the config id, so a failure here is not a page error. */
+async function loadSourceConfigOptions(): Promise<void> {
+  try {
+    const response = await reconciliationFacade.listAutomationSourceOptions(pageAbortController.signal)
+    sourceConfigOptions.value = response.sourceConfigs ?? []
+  } catch {
+    sourceConfigOptions.value = []
+  }
 }
 
 function summarizeSource(draftValue: ReconciliationRuleSetDraft | null, side: 'file1' | 'file2'): string {
@@ -820,6 +863,7 @@ async function deleteSavedRun(): Promise<void> {
 
 onMounted(() => {
   void loadRunSchemaLabels()
+  void loadSourceConfigOptions()
 })
 </script>
 

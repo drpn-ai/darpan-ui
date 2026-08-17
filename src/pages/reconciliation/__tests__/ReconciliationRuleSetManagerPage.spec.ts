@@ -8,6 +8,7 @@ import {
 
 const getJsonSchema = vi.hoisted(() => vi.fn())
 const deleteSavedRun = vi.hoisted(() => vi.fn())
+const listAutomationSourceOptions = vi.hoisted(() => vi.fn())
 const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
 const getShopifyAuthConfig = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
@@ -44,6 +45,7 @@ vi.mock('../../../lib/api/facade', () => ({
   },
   reconciliationFacade: {
     deleteSavedRun,
+    listAutomationSourceOptions,
   },
   settingsFacade: {
     listOmsRestSourceConfigs,
@@ -167,6 +169,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
   beforeEach(() => {
     getJsonSchema.mockReset()
     deleteSavedRun.mockReset()
+    listAutomationSourceOptions.mockReset()
+    listAutomationSourceOptions.mockResolvedValue({ ok: true, messages: [], errors: [], sourceConfigs: [] })
     listOmsRestSourceConfigs.mockReset()
     getShopifyAuthConfig.mockReset()
     routerPush.mockReset()
@@ -553,6 +557,66 @@ describe('ReconciliationRuleSetManagerPage', () => {
       name: 'settings-shopify-auth',
       params: { shopifyAuthConfigId: 'dev_shopify' },
     })
+  })
+
+  it('names each API source config by its description, per system when one id serves both sides', async () => {
+    // The id an operator reuses per environment: one `rails_prod` on the HotWax side, another on
+    // the Shopify side. Printing the id names the environment and neither config; matching on id
+    // alone would print whichever description happened to come first for both rows.
+    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
+      {
+        ...createApiDraftState().draft,
+        file1SourceConfigId: 'rails_prod',
+        file2SourceConfigId: 'rails_prod',
+      },
+      'ruleset-manager',
+    )
+    listAutomationSourceOptions.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      sourceConfigs: [
+        {
+          sourceConfigId: 'rails_prod',
+          sourceConfigType: 'HOTWAX_OMS_REST',
+          description: 'Rails Production OMS',
+          systemEnumId: 'OMS',
+        },
+        {
+          sourceConfigId: 'rails_prod',
+          sourceConfigType: 'SHOPIFY_AUTH',
+          description: 'Rails Production Storefront',
+          systemEnumId: 'SHOPIFY',
+        },
+      ],
+    })
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file1"]').text()).toBe('Rails Production OMS')
+    expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file2"]').text()).toBe('Rails Production Storefront')
+    expect(wrapper.text()).not.toContain('rails_prod')
+  })
+
+  it('falls back to the config id when the option list carries no description', async () => {
+    draftStoreState.ruleSetDraftState = createApiDraftState()
+    listAutomationSourceOptions.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      sourceConfigs: [{ sourceConfigId: 'dev_oms', sourceConfigType: 'HOTWAX_OMS_REST', systemEnumId: 'OMS' }],
+    })
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file1"]').text()).toBe('dev_oms')
+    // Absent from the list entirely — the same fallback has to hold, or the card loses the only
+    // thing it could say about the source.
+    expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file2"]').text()).toBe('dev_shopify')
   })
 
   it('renders a saved run summary and equation without editable rule controls', async () => {
