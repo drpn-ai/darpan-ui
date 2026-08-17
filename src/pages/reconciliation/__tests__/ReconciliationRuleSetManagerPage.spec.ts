@@ -11,6 +11,7 @@ const deleteSavedRun = vi.hoisted(() => vi.fn())
 const listAutomationSourceOptions = vi.hoisted(() => vi.fn())
 const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
 const getShopifyAuthConfig = vi.hoisted(() => vi.fn())
+const listSourceConfigEndpoints = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
@@ -50,6 +51,7 @@ vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: {
     listOmsRestSourceConfigs,
     getShopifyAuthConfig,
+    listSourceConfigEndpoints,
   },
 }))
 
@@ -80,6 +82,7 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => draftStoreState,
 }))
 
+import { ApiCallError } from '../../../lib/api/client'
 import ReconciliationRuleSetManagerPage from '../ReconciliationRuleSetManagerPage.vue'
 
 function createDraftState() {
@@ -173,6 +176,10 @@ describe('ReconciliationRuleSetManagerPage', () => {
     listAutomationSourceOptions.mockResolvedValue({ ok: true, messages: [], errors: [], sourceConfigs: [] })
     listOmsRestSourceConfigs.mockReset()
     getShopifyAuthConfig.mockReset()
+    listSourceConfigEndpoints.mockReset()
+    // Safety-net default: only the auth-info popup test below opens a popup and needs real
+    // endpoint rows; every other test that happens to mount the page never calls this.
+    listSourceConfigEndpoints.mockResolvedValue({ ok: true, messages: [], errors: [], endpoints: [] })
     routerPush.mockReset()
     permissionState.canRunActiveTenantReconciliation = true
     permissionState.canEditTenantSettings = true
@@ -460,6 +467,29 @@ describe('ReconciliationRuleSetManagerPage', () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
       draftStoreState.ruleSetDraftState = createApiDraftState()
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    // Registry-driven endpoint rows for the auth-info popup -- keyed by config type + config id
+    // like the real service, since the popup opens both OMS and Shopify sides in one test.
+    listSourceConfigEndpoints.mockImplementation(
+      async ({ configTypeEnumId, configId }: { configTypeEnumId: string, configId: string }) => {
+        if (configTypeEnumId === 'SCFG_HOTWAX_OMS' && configId === 'dev_oms') {
+          return {
+            ok: true,
+            messages: [],
+            errors: [],
+            endpoints: [{ systemEnumId: 'OMS_ORDERS', endpointLabel: 'Orders API', isEnabled: true }],
+          }
+        }
+        if (configTypeEnumId === 'SCFG_SHOPIFY_AUTH' && configId === 'dev_shopify') {
+          return {
+            ok: true,
+            messages: [],
+            errors: [],
+            endpoints: [{ systemEnumId: 'SHOPIFY_ORDERS', endpointLabel: 'Admin GraphQL Orders', isEnabled: true }],
+          }
+        }
+        return { ok: true, messages: [], errors: [], endpoints: [] }
+      },
+    )
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
@@ -495,6 +525,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
     await flushPromises()
 
     expect(listOmsRestSourceConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 })
+    expect(listSourceConfigEndpoints).toHaveBeenCalledWith({ configTypeEnumId: 'SCFG_HOTWAX_OMS', configId: 'dev_oms' })
     expect(routerPush).not.toHaveBeenCalled()
     let dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
     expect(dialog.attributes('role')).toBe('dialog')
@@ -516,9 +547,9 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(dialog.text()).not.toContain('None')
     expect(dialog.text()).not.toContain('30s')
     expect(dialog.text()).not.toContain('120s')
+    // Label comes from the registry row, not the deleted swagger doc; the registry carries no
+    // method/path, so no such fabricated meta text should appear either.
     expect(dialog.text()).toContain('Orders API')
-    expect(dialog.text()).toContain('GET /rest/s1/oms/orders')
-    expect(dialog.text()).not.toContain('OrderHeader.default[]')
     const authPopupHeadings = dialog.findAll('.ruleset-manager-auth-popup-heading')
     const source = readFileSync('src/pages/reconciliation/ReconciliationRuleSetManagerPage.vue', 'utf8')
     expect(authPopupHeadings).toHaveLength(2)
@@ -538,6 +569,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
     await flushPromises()
 
     expect(getShopifyAuthConfig).toHaveBeenCalledWith({ shopifyAuthConfigId: 'dev_shopify' })
+    expect(listSourceConfigEndpoints).toHaveBeenCalledWith({ configTypeEnumId: 'SCFG_SHOPIFY_AUTH', configId: 'dev_shopify' })
     expect(routerPush).not.toHaveBeenCalled()
     dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
     expect(dialog.text()).toContain('Dev Shopify')
@@ -547,9 +579,11 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(dialog.text()).toContain('https://test.myshopify.com')
     expect(dialog.text()).not.toContain('Access Token')
     expect(dialog.text()).not.toContain('Active')
+    // Label from the registry row; the api-version meta interpolation is the one piece of
+    // per-endpoint detail this popup still derives locally (Shopify endpoints share one GraphQL
+    // URL, so the version is genuinely the same for all of them -- unlike OMS's per-endpoint paths).
     expect(dialog.text()).toContain('Admin GraphQL Orders')
-    expect(dialog.text()).toContain('POST /admin/api/2026-01/graphql.json')
-    expect(dialog.text()).not.toContain('OrderConnection')
+    expect(dialog.text()).toContain('/admin/api/2026-01/graphql.json')
     expect(dialog.find('form').exists()).toBe(false)
     expect(dialog.find('input').exists()).toBe(false)
     expect(dialog.find('[data-testid="shopify-auth-edit-action"]').exists()).toBe(false)
@@ -557,6 +591,27 @@ describe('ReconciliationRuleSetManagerPage', () => {
       name: 'settings-shopify-auth',
       params: { shopifyAuthConfigId: 'dev_shopify' },
     })
+  })
+
+  it('shows an error in the auth popup instead of a false empty endpoint list when the registry fetch fails', async () => {
+    // The popup's loading flag already covers the combined config+endpoint fetch (they run in
+    // parallel); a registry failure must surface as the popup's existing error state, not as a
+    // popup that loads fine but silently shows zero endpoints.
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = createApiDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    listSourceConfigEndpoints.mockRejectedValue(new ApiCallError('Unable to reach the endpoint registry.', 500))
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ruleset-manager-system-config-file1"]').trigger('click')
+    await flushPromises()
+
+    const dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
+    expect(dialog.text()).toContain('Unable to reach the endpoint registry.')
+    expect(dialog.find('[data-testid="ruleset-manager-auth-popup-endpoint"]').exists()).toBe(false)
+    expect(dialog.text()).not.toContain('Orders API')
   })
 
   it('names each API source config by its description, per system when one id serves both sides', async () => {

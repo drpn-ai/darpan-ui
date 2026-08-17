@@ -283,12 +283,17 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade, settingsFacade } from '../../lib/api/facade'
-import type { AutomationSourceConfigOption, OmsRestSourceConfigRecord, ShopifyAuthConfigRecord } from '../../lib/api/types'
+import type {
+  AutomationSourceConfigOption,
+  OmsRestSourceConfigRecord,
+  ShopifyAuthConfigRecord,
+  SourceConfigEndpoint,
+} from '../../lib/api/types'
+import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { editIconPath, listIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
-import { OMS_ORDERS_ENDPOINT_DOC } from '../../lib/omsSwagger'
 import {
   formatReconciliationFieldKey,
   type ReconciliationRuleSetDraft,
@@ -344,11 +349,6 @@ interface AuthInfoPopupState {
 const SOURCE_TYPE_API = 'AUT_SRC_API'
 const ellipsisIconPath =
   'M5 8.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm5 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm5 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z'
-const shopifyOrdersEndpoint = {
-  id: 'SHOPIFY_ORDERS',
-  label: 'Admin GraphQL Orders',
-  method: 'POST',
-}
 
 const draftState = computed(() => draftStore.ruleSetDraftState)
 const draft = computed<ReconciliationRuleSetDraft | null>(() => draftState.value?.draft ?? null)
@@ -626,7 +626,10 @@ function isActiveAuthInfoSource(sourceConfig: SourceConfigSummary): boolean {
 }
 
 async function loadOmsAuthInfo(sourceConfig: SourceConfigSummary): Promise<AuthInfoPopupState> {
-  const response = await settingsFacade.listOmsRestSourceConfigs({ pageIndex: 0, pageSize: 200 })
+  const [response, endpointsResponse] = await Promise.all([
+    settingsFacade.listOmsRestSourceConfigs({ pageIndex: 0, pageSize: 200 }),
+    settingsFacade.listSourceConfigEndpoints({ configTypeEnumId: SHARED_CONFIG_TYPES.hotwaxOms, configId: sourceConfig.configId }),
+  ])
   const matchingConfig = filterRecordsForActiveTenant(
     response.omsRestSourceConfigs ?? [],
     authStore.sessionInfo?.activeTenantUserGroupId ?? null,
@@ -636,11 +639,14 @@ async function loadOmsAuthInfo(sourceConfig: SourceConfigSummary): Promise<AuthI
     throw new Error(`Unable to find HotWax auth config "${sourceConfig.configId}".`)
   }
 
-  return buildOmsAuthInfoPopupState(sourceConfig, matchingConfig)
+  return buildOmsAuthInfoPopupState(sourceConfig, matchingConfig, endpointsResponse.endpoints ?? [])
 }
 
 async function loadShopifyAuthInfo(sourceConfig: SourceConfigSummary): Promise<AuthInfoPopupState> {
-  const response = await settingsFacade.getShopifyAuthConfig({ shopifyAuthConfigId: sourceConfig.configId })
+  const [response, endpointsResponse] = await Promise.all([
+    settingsFacade.getShopifyAuthConfig({ shopifyAuthConfigId: sourceConfig.configId }),
+    settingsFacade.listSourceConfigEndpoints({ configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth, configId: sourceConfig.configId }),
+  ])
   const record = response.shopifyAuthConfig ?? null
   const [matchingConfig] = record
     ? filterRecordsForActiveTenant([record], authStore.sessionInfo?.activeTenantUserGroupId ?? null)
@@ -650,12 +656,14 @@ async function loadShopifyAuthInfo(sourceConfig: SourceConfigSummary): Promise<A
     throw new Error(`Unable to find Shopify config "${sourceConfig.configId}".`)
   }
 
-  return buildShopifyAuthInfoPopupState(sourceConfig, matchingConfig)
+  return buildShopifyAuthInfoPopupState(sourceConfig, matchingConfig, endpointsResponse.endpoints ?? [])
 }
 
-function buildOmsAuthInfoPopupState(sourceConfig: SourceConfigSummary, config: OmsRestSourceConfigRecord): AuthInfoPopupState {
-  const endpointPath = config.ordersPath?.trim() || OMS_ORDERS_ENDPOINT_DOC.path
-
+function buildOmsAuthInfoPopupState(
+  sourceConfig: SourceConfigSummary,
+  config: OmsRestSourceConfigRecord,
+  endpoints: SourceConfigEndpoint[],
+): AuthInfoPopupState {
   return {
     source: sourceConfig,
     title: resolveRecordLabel({
@@ -668,21 +676,23 @@ function buildOmsAuthInfoPopupState(sourceConfig: SourceConfigSummary, config: O
       authInfoField('Auth Type', formatAuthType(config.authType)),
       authInfoField('Timezone', config.timeZone),
     ]),
-    endpoints: config.canReadOrders === false
-      ? []
-      : [{
-          id: OMS_ORDERS_ENDPOINT_DOC.id,
-          label: OMS_ORDERS_ENDPOINT_DOC.label,
-          meta: `${OMS_ORDERS_ENDPOINT_DOC.method} ${endpointPath}`,
-        }],
+    endpoints: buildEnabledAuthInfoEndpoints(endpoints),
     dashboardRoute: buildSourceConfigDashboardRoute(sourceConfig),
     loading: false,
     error: null,
   }
 }
 
-function buildShopifyAuthInfoPopupState(sourceConfig: SourceConfigSummary, config: ShopifyAuthConfigRecord): AuthInfoPopupState {
+function buildShopifyAuthInfoPopupState(
+  sourceConfig: SourceConfigSummary,
+  config: ShopifyAuthConfigRecord,
+  endpoints: SourceConfigEndpoint[],
+): AuthInfoPopupState {
   const apiVersion = displayValue(config.apiVersion, '2026-01')
+  // Every Shopify endpoint the registry can name today reads through the one GraphQL URL, so the
+  // api-version meta is genuinely shared across all of them -- unlike OMS's per-endpoint REST
+  // paths, which the registry doesn't carry and this popup no longer fabricates.
+  const graphQlMeta = `/admin/api/${apiVersion}/graphql.json`
 
   return {
     source: sourceConfig,
@@ -696,17 +706,21 @@ function buildShopifyAuthInfoPopupState(sourceConfig: SourceConfigSummary, confi
       authInfoField('API Version', apiVersion),
       authInfoField('Timezone', config.timeZone),
     ]),
-    endpoints: config.canReadOrders
-      ? [{
-          id: shopifyOrdersEndpoint.id,
-          label: shopifyOrdersEndpoint.label,
-          meta: `${shopifyOrdersEndpoint.method} /admin/api/${apiVersion}/graphql.json`,
-        }]
-      : [],
+    endpoints: buildEnabledAuthInfoEndpoints(endpoints, graphQlMeta),
     dashboardRoute: buildSourceConfigDashboardRoute(sourceConfig),
     loading: false,
     error: null,
   }
+}
+
+function buildEnabledAuthInfoEndpoints(endpoints: SourceConfigEndpoint[], meta = ''): AuthInfoEndpoint[] {
+  return endpoints
+    .filter((endpoint) => endpoint.isEnabled)
+    .map((endpoint) => ({
+      id: endpoint.systemEnumId,
+      label: endpoint.endpointLabel,
+      meta,
+    }))
 }
 
 function displayValue(value: string | undefined, fallback = 'Not set'): string {

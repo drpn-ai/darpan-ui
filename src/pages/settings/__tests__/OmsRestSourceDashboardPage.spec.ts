@@ -9,6 +9,7 @@ const route = vi.hoisted(() => ({
 const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
 const deleteOmsRestSourceConfig = vi.hoisted(() => vi.fn())
 const testSourceConnection = vi.hoisted(() => vi.fn())
+const listSourceConfigEndpoints = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const authState = vi.hoisted(() => ({
   sessionInfo: {
@@ -35,6 +36,7 @@ vi.mock('../../../lib/api/facade', () => ({
     listOmsRestSourceConfigs,
     deleteOmsRestSourceConfig,
     testSourceConnection,
+    listSourceConfigEndpoints,
   },
 }))
 
@@ -81,6 +83,7 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
   }),
 }))
 
+import { ApiCallError } from '../../../lib/api/client'
 import OmsRestSourceDashboardPage from '../OmsRestSourceDashboardPage.vue'
 
 function dashboardListResponse() {
@@ -117,6 +120,10 @@ describe('OmsRestSourceDashboardPage', () => {
     listOmsRestSourceConfigs.mockReset()
     deleteOmsRestSourceConfig.mockReset()
     testSourceConnection.mockReset()
+    listSourceConfigEndpoints.mockReset()
+    // Safety-net default so tests unrelated to the Endpoints section don't have to stub this call;
+    // tests that assert on endpoint tiles override it explicitly.
+    listSourceConfigEndpoints.mockResolvedValue({ ok: true, messages: [], errors: [], endpoints: [] })
     push.mockReset()
     authState.sessionInfo = {
       userId: 'john.doe',
@@ -155,11 +162,21 @@ describe('OmsRestSourceDashboardPage', () => {
       ],
       pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
     })
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'OMS_ORDERS', endpointLabel: 'Orders API', isEnabled: true }],
+    })
 
     const wrapper = mount(OmsRestSourceDashboardPage)
     await flushPromises()
 
     expect(listOmsRestSourceConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
+    expect(listSourceConfigEndpoints).toHaveBeenCalledWith(
+      { configTypeEnumId: 'SCFG_HOTWAX_OMS', configId: 'krewe-oms' },
+      expect.any(AbortSignal),
+    )
     expect(wrapper.text()).toContain('Krewe HotWax')
     expect(wrapper.text()).toContain('Auth')
     expect(wrapper.text()).toContain('Endpoints')
@@ -177,9 +194,9 @@ describe('OmsRestSourceDashboardPage', () => {
     expect(timezoneCard?.classes()).toContain('static-page-summary-card--wide')
     expect(wrapper.text()).not.toContain('Auth Type')
     expect(wrapper.text()).not.toContain('BEARER')
-    expect(wrapper.get('[data-testid="oms-endpoint-tile"]').text()).toContain('Orders API')
-    expect(wrapper.get('[data-testid="oms-endpoint-tile"]').text()).toContain('GET /rest/s1/oms/orders')
-    expect(wrapper.get('[data-testid="oms-endpoint-tile"]').text()).not.toContain('OrderHeader.default[]')
+    // The registry only supplies a label (no method/path/response-schema) -- the tile shows
+    // exactly that, not a fabricated meta line built from data the registry doesn't provide.
+    expect(wrapper.get('[data-testid="oms-endpoint-tile"]').text()).toBe('Orders API')
 
     const editAction = wrapper.get('[data-testid="oms-auth-edit-action"]')
     expect(editAction.classes()).toContain('app-icon-action')
@@ -249,7 +266,9 @@ describe('OmsRestSourceDashboardPage', () => {
     expect(push).toHaveBeenCalledWith('/settings/hotwax')
   })
 
-  it('shows no endpoint tiles when no HotWax endpoints are available', async () => {
+  it('shows no endpoint tiles when no HotWax endpoints are enabled', async () => {
+    // Gating now comes entirely from the registry's per-endpoint isEnabled flag, not the legacy
+    // canReadOrders column -- a disabled registry row is what drives the empty state.
     listOmsRestSourceConfigs.mockResolvedValue({
       ok: true,
       messages: [],
@@ -263,10 +282,15 @@ describe('OmsRestSourceDashboardPage', () => {
           ordersPath: '/rest/s1/oms/orders',
           authType: 'BEARER',
           isActive: 'Y',
-          canReadOrders: false,
         },
       ],
       pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'OMS_ORDERS', endpointLabel: 'Orders API', isEnabled: false }],
     })
 
     const wrapper = mount(OmsRestSourceDashboardPage)
@@ -274,6 +298,78 @@ describe('OmsRestSourceDashboardPage', () => {
 
     expect(wrapper.find('[data-testid="oms-endpoint-tile"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="oms-endpoint-configs"]').text()).toContain('No available endpoints')
+  })
+
+  it('shows a loading note for endpoints while the registry fetch is in flight, not an empty state', async () => {
+    // A read-only surface that shows "No available endpoints" before the fetch has even resolved
+    // would tell an operator the config can do nothing -- a confident wrong answer. It must show
+    // nothing-yet instead.
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [
+        {
+          omsRestSourceConfigId: 'krewe-oms',
+          description: 'Krewe HotWax',
+          companyUserGroupId: 'KREWE',
+          baseUrl: 'https://oms.example.com',
+          ordersPath: '/rest/s1/oms/orders',
+          authType: 'BEARER',
+          isActive: 'Y',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    let resolveEndpoints: ((value: unknown) => void) | undefined
+    listSourceConfigEndpoints.mockReturnValue(new Promise((resolve) => { resolveEndpoints = resolve }))
+
+    const wrapper = mount(OmsRestSourceDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Loading endpoints')
+    expect(wrapper.find('[data-testid="oms-endpoint-tile"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="oms-endpoint-configs"]').exists()).toBe(false)
+
+    resolveEndpoints?.({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'OMS_ORDERS', endpointLabel: 'Orders API', isEnabled: true }],
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Loading endpoints')
+    expect(wrapper.get('[data-testid="oms-endpoint-tile"]').text()).toBe('Orders API')
+  })
+
+  it('shows an error instead of a false empty state when the endpoint registry fetch fails', async () => {
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [
+        {
+          omsRestSourceConfigId: 'krewe-oms',
+          description: 'Krewe HotWax',
+          companyUserGroupId: 'KREWE',
+          baseUrl: 'https://oms.example.com',
+          ordersPath: '/rest/s1/oms/orders',
+          authType: 'BEARER',
+          isActive: 'Y',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    listSourceConfigEndpoints.mockRejectedValue(new ApiCallError('Unable to reach the endpoint registry.', 500))
+
+    const wrapper = mount(OmsRestSourceDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to reach the endpoint registry.')
+    expect(wrapper.find('[data-testid="oms-endpoint-tile"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="oms-endpoint-configs"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('No available endpoints')
   })
 
   it('keeps the dashboard readable but hides the edit icon for view-only users', async () => {

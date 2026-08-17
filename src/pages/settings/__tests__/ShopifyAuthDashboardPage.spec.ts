@@ -10,6 +10,7 @@ const route = vi.hoisted(() => ({
 const getShopifyAuthConfig = vi.hoisted(() => vi.fn())
 const deleteShopifyAuthConfig = vi.hoisted(() => vi.fn())
 const testSourceConnection = vi.hoisted(() => vi.fn())
+const listSourceConfigEndpoints = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const authState = vi.hoisted(() => ({
   sessionInfo: {
@@ -36,6 +37,7 @@ vi.mock('../../../lib/api/facade', () => ({
     getShopifyAuthConfig,
     deleteShopifyAuthConfig,
     testSourceConnection,
+    listSourceConfigEndpoints,
   },
 }))
 
@@ -111,6 +113,10 @@ describe('ShopifyAuthDashboardPage', () => {
     getShopifyAuthConfig.mockReset()
     deleteShopifyAuthConfig.mockReset()
     testSourceConnection.mockReset()
+    listSourceConfigEndpoints.mockReset()
+    // Safety-net default so tests unrelated to the Endpoints section don't have to stub this call;
+    // tests that assert on endpoint tiles override it explicitly.
+    listSourceConfigEndpoints.mockResolvedValue({ ok: true, messages: [], errors: [], endpoints: [] })
     push.mockReset()
     authState.sessionInfo = {
       userId: 'john.doe',
@@ -141,11 +147,21 @@ describe('ShopifyAuthDashboardPage', () => {
         hasAccessToken: true,
       },
     })
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'SHOPIFY_ORDERS', endpointLabel: 'Admin GraphQL Orders', isEnabled: true }],
+    })
 
     const wrapper = mount(ShopifyAuthDashboardPage)
     await flushPromises()
 
     expect(getShopifyAuthConfig).toHaveBeenCalledWith({ shopifyAuthConfigId: 'krewe-shopify' }, expect.any(AbortSignal))
+    expect(listSourceConfigEndpoints).toHaveBeenCalledWith(
+      { configTypeEnumId: 'SCFG_SHOPIFY_AUTH', configId: 'krewe-shopify' },
+      expect.any(AbortSignal),
+    )
     expect(wrapper.text()).toContain('Krewe Shopify')
     expect(wrapper.text()).toContain('Auth')
     expect(wrapper.text()).toContain('Endpoints')
@@ -159,9 +175,9 @@ describe('ShopifyAuthDashboardPage', () => {
     const styleSource = readFileSync('src/style.css', 'utf8')
     expect(styleSource).toMatch(/\.static-page-summary-card--wide\s*\{[^}]*grid-column: span 2;/)
     expect(styleSource).toMatch(/\.static-page-summary-card > span:not\(\.static-page-summary-label\)\s*\{[^}]*overflow-wrap: anywhere;/)
-    expect(wrapper.get('[data-testid="shopify-endpoint-tile"]').text()).toContain('Admin GraphQL Orders')
-    expect(wrapper.get('[data-testid="shopify-endpoint-tile"]').text()).toContain('POST /admin/api/2026-01/graphql.json')
-    expect(wrapper.get('[data-testid="shopify-endpoint-tile"]').text()).toContain('OrderConnection')
+    // The registry only supplies a label (no method/path/response-schema) -- the tile shows
+    // exactly that, not a fabricated meta line built from data the registry doesn't provide.
+    expect(wrapper.get('[data-testid="shopify-endpoint-tile"]').text()).toBe('Admin GraphQL Orders')
 
     const editAction = wrapper.get('[data-testid="shopify-auth-edit-action"]')
     expect(editAction.classes()).toContain('app-icon-action')
@@ -229,7 +245,9 @@ describe('ShopifyAuthDashboardPage', () => {
     expect(push).toHaveBeenCalledWith('/settings/shopify')
   })
 
-  it('shows no endpoint tiles when no Shopify endpoints are available', async () => {
+  it('shows no endpoint tiles when no Shopify endpoints are enabled', async () => {
+    // Gating now comes entirely from the registry's per-endpoint isEnabled flag, not the legacy
+    // canReadOrders column -- a disabled registry row is what drives the empty state.
     getShopifyAuthConfig.mockResolvedValue({
       ok: true,
       messages: [],
@@ -241,9 +259,14 @@ describe('ShopifyAuthDashboardPage', () => {
         shopApiUrl: 'https://hotwax-sandbox.myshopify.com',
         apiVersion: '2026-01',
         isActive: 'Y',
-        canReadOrders: false,
         hasAccessToken: true,
       },
+    })
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'SHOPIFY_ORDERS', endpointLabel: 'Admin GraphQL Orders', isEnabled: false }],
     })
 
     const wrapper = mount(ShopifyAuthDashboardPage)
@@ -251,6 +274,72 @@ describe('ShopifyAuthDashboardPage', () => {
 
     expect(wrapper.find('[data-testid="shopify-endpoint-tile"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="shopify-endpoint-configs"]').text()).toContain('No available endpoints')
+  })
+
+  it('shows a loading note for endpoints while the registry fetch is in flight, not an empty state', async () => {
+    // A read-only surface that shows "No available endpoints" before the fetch has even resolved
+    // would tell an operator the config can do nothing -- a confident wrong answer. It must show
+    // nothing-yet instead.
+    getShopifyAuthConfig.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      shopifyAuthConfig: {
+        shopifyAuthConfigId: 'krewe-shopify',
+        description: 'Krewe Shopify',
+        companyUserGroupId: 'KREWE',
+        shopApiUrl: 'https://hotwax-sandbox.myshopify.com',
+        apiVersion: '2026-01',
+        isActive: 'Y',
+        hasAccessToken: true,
+      },
+    })
+    let resolveEndpoints: ((value: unknown) => void) | undefined
+    listSourceConfigEndpoints.mockReturnValue(new Promise((resolve) => { resolveEndpoints = resolve }))
+
+    const wrapper = mount(ShopifyAuthDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Loading endpoints')
+    expect(wrapper.find('[data-testid="shopify-endpoint-tile"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="shopify-endpoint-configs"]').exists()).toBe(false)
+
+    resolveEndpoints?.({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'SHOPIFY_ORDERS', endpointLabel: 'Admin GraphQL Orders', isEnabled: true }],
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Loading endpoints')
+    expect(wrapper.get('[data-testid="shopify-endpoint-tile"]').text()).toBe('Admin GraphQL Orders')
+  })
+
+  it('shows an error instead of a false empty state when the endpoint registry fetch fails', async () => {
+    getShopifyAuthConfig.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      shopifyAuthConfig: {
+        shopifyAuthConfigId: 'krewe-shopify',
+        description: 'Krewe Shopify',
+        companyUserGroupId: 'KREWE',
+        shopApiUrl: 'https://hotwax-sandbox.myshopify.com',
+        apiVersion: '2026-01',
+        isActive: 'Y',
+        hasAccessToken: true,
+      },
+    })
+    listSourceConfigEndpoints.mockRejectedValue(new ApiCallError('Unable to reach the endpoint registry.', 500))
+
+    const wrapper = mount(ShopifyAuthDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to reach the endpoint registry.')
+    expect(wrapper.find('[data-testid="shopify-endpoint-tile"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="shopify-endpoint-configs"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('No available endpoints')
   })
 
   it('keeps the dashboard readable but hides the edit icon for view-only users', async () => {
