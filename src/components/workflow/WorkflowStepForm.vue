@@ -247,6 +247,22 @@ onBeforeUnmount(() => {
   --workflow-form-context-label-size: 0.76rem;
 }
 
+/* A step whose answer is a board, not a question column: the rules board is a three-column stage
+   sized against --workflow-section-width. Mounted in the default question width it renders 200px
+   narrower — the same board, visibly different, depending only on whether you reached it from run
+   creation or from the rules editor. Both callers wear this modifier so they cannot drift again.
+   It lives here rather than on either page because a page styling this component's root ties with
+   the base rule on specificity, and only bundle order decides which one lands. */
+.wizard-question-shell.workflow-form--board-stage {
+  width: min(var(--workflow-section-width), 100%);
+}
+
+/* Board-width form, so the default left-aligned actions land far from the board's center of mass;
+   center them under it. */
+.workflow-form--board-stage .wizard-actions {
+  justify-content: center;
+}
+
 .wizard-prompt-row {
   display: flex;
   align-items: flex-start;

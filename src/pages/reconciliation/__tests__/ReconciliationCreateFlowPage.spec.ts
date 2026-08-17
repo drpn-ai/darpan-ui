@@ -1312,6 +1312,22 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(wrapper.get('[data-testid="create-run-submit"]').text()).toBe('Save run')
     })
 
+    it('gives the board the same stage the rules editor page does', async () => {
+      // Same board, same width and action alignment, whichever door you came through: the modifier
+      // lives in WorkflowStepForm and both this step and ReconciliationRuleSetEditorPage wear it.
+      // Without it this step renders the board in the 720px question column while the editor page
+      // renders it at 920px — one board, two looks.
+      const plainStep = await mountCreateFlow()
+      expect(plainStep.find('[data-testid="ruleset-editor-board"]').exists()).toBe(false)
+      expect(plainStep.get('.wizard-question-shell').classes()).not.toContain('workflow-form--board-stage')
+
+      const wrapper = await mountCreateFlow({ draft: apiToApiDraft })
+      await advanceToLastStep(wrapper)
+
+      expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(true)
+      expect(wrapper.get('.wizard-question-shell').classes()).toContain('workflow-form--board-stage')
+    })
+
     it('saves a run with rules and exclusions drawn on the final step', async () => {
       const wrapper = await mountCreateFlow({
         draft: {

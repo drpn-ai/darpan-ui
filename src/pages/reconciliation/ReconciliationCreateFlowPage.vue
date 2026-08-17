@@ -4,7 +4,7 @@
 
     <WorkflowStepForm
       ref="stepForm"
-      class="workflow-step-shell"
+      :class="['workflow-step-shell', { 'workflow-form--board-stage': isRuleSetRulesStep }]"
       :question="currentQuestion"
       :primary-label="isCreateStep ? 'Save run' : 'OK'"
       :submit-disabled="isCreateStep ? !canCreateRun || loadingSelections : !canProceed || loadingSelections"

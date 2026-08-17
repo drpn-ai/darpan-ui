@@ -10,7 +10,7 @@
 
     <WorkflowStepForm
       v-if="draft"
-      class="workflow-form--compact workflow-form--edit-single-page ruleset-editor-form"
+      class="workflow-form--compact workflow-form--edit-single-page workflow-form--board-stage ruleset-editor-form"
       question=""
       primary-label="Save"
       primary-action-variant="save"
@@ -181,17 +181,11 @@ onBeforeUnmount(() => {
   padding-top: 0;
 }
 
-.ruleset-editor-form {
-  width: min(var(--workflow-section-width), 100%);
-}
-
+/* Board width and centered actions come from workflow-form--board-stage (WorkflowStepForm.vue),
+   shared with the create wizard's rules step so the same board cannot render two different ways
+   depending on which door you came through. Only the question row is local: this page opens
+   straight onto the board with no question to ask. */
 .ruleset-editor-form :deep(.wizard-prompt-row) {
   display: none;
-}
-
-/* This form is board-width, so the default left-aligned wizard actions land at the
-   viewport edge; center them under the board like other pages' action rows. */
-.ruleset-editor-form :deep(.wizard-actions) {
-  justify-content: center;
 }
 </style>
