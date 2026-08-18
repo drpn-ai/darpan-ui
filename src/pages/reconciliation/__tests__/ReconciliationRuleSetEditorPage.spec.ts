@@ -130,6 +130,22 @@ function apiSourceOptionsResponse() {
         ],
         supportsExcludeFilters: false,
       },
+      // Endpoint sibling that SHARES SHOPIFY_REMOTE and SHOPIFY_MAIN with the parent row above,
+      // exactly as SHOPIFY_RETURN_REFS is seeded. Listed AFTER the parent so a lookup keyed on
+      // remoteId + sourceConfigId alone resolves the WRONG row -- see the endpoint-scoped test.
+      {
+        systemMessageRemoteId: 'SHOPIFY_REMOTE',
+        label: 'Shopify Return References',
+        systemEnumId: 'SHOPIFY_RETURN_REFS',
+        optionKey: 'SHOPIFY_MAIN',
+        sourceConfigId: 'SHOPIFY_MAIN',
+        sourceConfigType: 'SHOPIFY_RETURN_REFS_API',
+        primaryIdOptions: [
+          { fieldPath: '$.records[*].refundOrReturnId', label: 'Refund ID / Return ID', type: 'String' },
+          { fieldPath: '$.records[*].orderId', label: 'Order ID', type: 'String' },
+        ],
+        supportsExcludeFilters: false,
+      },
     ],
   }
 }
@@ -405,6 +421,47 @@ describe('ReconciliationRuleSetEditorPage', () => {
     expect(wrapper.get('[data-testid="ruleset-field-file1-2"]').text()).toContain('External ID')
     expect(wrapper.get('[data-testid="ruleset-field-file2-1"]').text()).toContain('Order name')
     expect(wrapper.find('[data-testid="ruleset-rule-operator-api-rule"]').exists()).toBe(true)
+  })
+
+  // Same defect the run-edit workflow had: systemMessageRemoteId is SHARED across a system family,
+  // so resolving the board's field list by remoteId + sourceConfigId alone returned the PARENT's
+  // option row. A SHOPIFY_RETURN_REFS side then listed Shopify's ORDER fields, and its own
+  // refundOrReturnId -- the join key -- was not offerable at all.
+  it('lists the endpoint\'s own board fields, not the parent system\'s', async () => {
+    listAutomationSourceOptions.mockResolvedValue(apiSourceOptionsResponse())
+    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
+      {
+        savedRunId: 'RS_RETURNS_PROD',
+        runName: 'Returns Prod',
+        file1SystemEnumId: 'OMS',
+        file1SystemLabel: 'HotWax',
+        file1SourceTypeEnumId: 'AUT_SRC_API',
+        file1SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        file1SourceConfigId: 'KREWE_OMS',
+        file1SourceConfigType: 'HOTWAX_OMS_REST',
+        file1FileTypeEnumId: '',
+        file1PrimaryIdExpression: ['$.records[*].externalId'],
+        file2SystemEnumId: 'SHOPIFY_RETURN_REFS',
+        file2SystemLabel: 'Shopify Order Return References',
+        file2SourceTypeEnumId: 'AUT_SRC_API',
+        file2SystemMessageRemoteId: 'SHOPIFY_REMOTE',
+        file2SourceConfigId: 'SHOPIFY_MAIN',
+        file2SourceConfigType: 'SHOPIFY_RETURN_REFS_API',
+        file2FileTypeEnumId: '',
+        file2PrimaryIdExpression: ['$.records[*].refundOrReturnId'],
+      },
+      'ruleset-manager',
+    )
+
+    const wrapper = mount(ReconciliationRuleSetEditorPage)
+    await flushPromises()
+
+    // The board renders each field by its own name and path, not the pill label.
+    const file2Fields = wrapper.get('[data-testid="ruleset-field-list-file2"]').text()
+    expect(file2Fields).toContain('$.records[*].refundOrReturnId')
+    // The parent's order fields, served when the lookup ignored systemEnumId.
+    expect(file2Fields).not.toContain('$.records[*].name')
+    expect(file2Fields).not.toContain('$.records[*].id')
   })
 
   it('uses a single theme-independent pen cursor with a black outline and white fill', () => {

@@ -390,14 +390,39 @@ function selectedApiSourceLabel(sourceKey: SourceKey): string {
   return option?.label || option?.description || ''
 }
 
+/**
+ * The remote option this side actually selected -- the row whose primaryIdOptions become the
+ * Primary ID dropdown and whose label is saved as file{n}SystemMessageRemoteLabel.
+ *
+ * MUST be constrained by systemEnumId. systemMessageRemoteId is deliberately SHARED across a system
+ * family (SHOPIFY_RETURN_REFS reuses SHOPIFY's SHOPIFY_REMOTE; OMS_RETURNS, OMS_RECON_ORDERS and
+ * OMS_TRANSFER_ORDERS all reuse OMS's HOTWAX_ORDERS_API -- see SourceSystemConnectorSeedData.xml),
+ * so remoteId + sourceConfigId does not identify one row. Matching on those alone made .find()
+ * return whichever sibling came first -- in practice the PARENT -- and a returns run's Primary ID
+ * dropdown offered Shopify's ORDER fields ("Order ID", "Order name") with the endpoint's own
+ * refundOrReturnId nowhere in the list. Same defect class as the Schema card's endpoint label.
+ *
+ * Falls back to the unconstrained match when the side carries no systemEnumId or nothing matches,
+ * so bespoke remotes outside the endpoint registry keep resolving as before.
+ */
 function selectedRemoteOptionForSource(sourceKey: SourceKey): AutomationSystemRemoteOption | null {
   const source = sourceForm(sourceKey)
   if (!source.systemMessageRemoteId) return null
 
-  return systemRemotes.value.find((remote) =>
+  const matchesRemoteAndConfig = (remote: AutomationSystemRemoteOption): boolean => (
     remote.systemMessageRemoteId === source.systemMessageRemoteId &&
-    (!source.sourceConfigId || sourceConfigMatches(remote.sourceConfigId || remote.optionKey, source.sourceConfigId)),
-  ) ?? null
+    (!source.sourceConfigId || sourceConfigMatches(remote.sourceConfigId || remote.optionKey, source.sourceConfigId))
+  )
+
+  const systemEnumId = sourceSystemEnumId(sourceKey)
+  if (systemEnumId) {
+    const endpointMatch = systemRemotes.value.find((remote) =>
+      matchesRemoteAndConfig(remote) && endpointMatchesSystem(remote.systemEnumId, systemEnumId),
+    )
+    if (endpointMatch) return endpointMatch
+  }
+
+  return systemRemotes.value.find(matchesRemoteAndConfig) ?? null
 }
 
 function apiPrimaryIdOptionsForSource(sourceKey: SourceKey): AppSelectOption[] {

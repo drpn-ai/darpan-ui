@@ -404,6 +404,7 @@ import type {
   AutomationSystemRemoteOption,
   JsonSchemaField,
 } from '../../lib/api/types'
+import { darpanSystemIdsMatch } from '../../lib/utils/darpanSystems'
 import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { normalizeExcludeFilters, parseExcludeFilterValues, type SourceExcludeFilter } from '../../lib/sourceExcludeFilters'
 import {
@@ -675,10 +676,26 @@ function selectedApiSourceOption(side: RuleSide): AutomationNsRestletOption | Au
   }
 
   if (systemMessageRemoteId?.trim()) {
-    return systemRemotes.value.find((remote) => (
+    // systemMessageRemoteId is deliberately SHARED across a system family (SHOPIFY_RETURN_REFS
+    // reuses SHOPIFY's SHOPIFY_REMOTE; the three OMS endpoints all reuse HOTWAX_ORDERS_API), so
+    // remoteId + sourceConfigId does not identify one row -- .find() would return whichever sibling
+    // came first, in practice the PARENT, and this board would list the parent's ORDER fields for a
+    // returns run. Narrow by the side's own systemEnumId first, and only fall back to the
+    // unconstrained match for bespoke remotes outside the endpoint registry.
+    const systemEnumId = (side === 'file1' ? draft.value.file1SystemEnumId : draft.value.file2SystemEnumId)?.trim()
+    const matchesRemoteAndConfig = (remote: AutomationSystemRemoteOption): boolean => (
       remote.systemMessageRemoteId === systemMessageRemoteId.trim()
       && sourceConfigMatches(remote.sourceConfigId || remote.optionKey, sourceConfigId)
-    )) ?? null
+    )
+
+    if (systemEnumId) {
+      const endpointMatch = systemRemotes.value.find((remote) =>
+        matchesRemoteAndConfig(remote) && darpanSystemIdsMatch(remote.systemEnumId, systemEnumId),
+      )
+      if (endpointMatch) return endpointMatch
+    }
+
+    return systemRemotes.value.find(matchesRemoteAndConfig) ?? null
   }
 
   return null

@@ -332,6 +332,23 @@ describe('RunsSettingsWorkflowPage', () => {
             { fieldPath: '$.records[*].id', label: 'Order ID' },
           ],
         },
+        // Endpoint sibling that SHARES the parent's remote id and source config -- exactly how
+        // SHOPIFY_RETURN_REFS is seeded (SourceSystemConnectorSeedData.xml). Listed AFTER the
+        // parent on purpose: a lookup keyed on remoteId + sourceConfigId alone returns the parent,
+        // which is the defect the endpoint-scoped test below pins.
+        {
+          systemMessageRemoteId: 'SHOPIFY_REMOTE',
+          description: 'Shopify Return References',
+          label: 'Shopify Return References',
+          systemEnumId: 'SHOPIFY_RETURN_REFS',
+          optionKey: 'SHOPIFY_MAIN',
+          sourceConfigId: 'SHOPIFY_MAIN',
+          sourceConfigType: 'SHOPIFY_RETURN_REFS_API',
+          primaryIdOptions: [
+            { fieldPath: '$.records[*].refundOrReturnId', label: 'Refund ID / Return ID' },
+            { fieldPath: '$.records[*].orderId', label: 'Order ID' },
+          ],
+        },
       ],
     })
   })
@@ -587,6 +604,51 @@ describe('RunsSettingsWorkflowPage', () => {
   // workflow hands back must carry the value it opened with. Dropping it silently reverted that card
   // to the ENDPOINT name after any edit -- "Shopify Order Return References" where the operator
   // expects "Shopify".
+  // Live defect (2026-08-18 "Returns Prod" edit): the Primary ID dropdown for a SHOPIFY_RETURN_REFS
+  // side offered Shopify's ORDER fields and no refundOrReturnId at all, so the run could not be
+  // re-pointed after the extractor rename. systemMessageRemoteId is SHARED across a system family,
+  // so a lookup keyed on remoteId + sourceConfigId resolved the PARENT's option row and served its
+  // pills. The lookup must be scoped by the side's own systemEnumId.
+  it('offers the selected endpoint\'s primary ID fields, not the parent system\'s', async () => {
+    route.params.reconciliationMappingId = 'RS_RETURNS_PROD'
+    draftStoreState.workflowOrigin = { label: 'Run Details', path: '/reconciliation/ruleset-manager' }
+    draftStoreState.ruleSetDraftState = {
+      draft: {
+        savedRunId: 'RS_RETURNS_PROD',
+        runName: 'Returns Prod',
+        file1SystemEnumId: 'SHOPIFY_RETURN_REFS',
+        file1SystemLabel: 'Shopify Order Return References',
+        file1SourceTypeEnumId: 'AUT_SRC_API',
+        file1SystemMessageRemoteId: 'SHOPIFY_REMOTE',
+        file1SourceConfigId: 'SHOPIFY_MAIN',
+        file1SourceConfigType: 'SHOPIFY_RETURN_REFS_API',
+        file1FileTypeEnumId: '',
+        file1PrimaryIdExpression: [],
+        file2SystemEnumId: 'OMS',
+        file2SystemLabel: 'HotWax',
+        file2SourceTypeEnumId: 'AUT_SRC_API',
+        file2SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        file2SourceConfigId: 'KREWE_OMS',
+        file2SourceConfigType: 'HOTWAX_OMS_REST',
+        file2FileTypeEnumId: '',
+        file2PrimaryIdExpression: ['$.records[*].orderId'],
+      },
+      resumeStepId: 'ruleset-manager',
+    }
+    window.history.replaceState({}, '', '/settings/runs/edit/RS_RETURNS_PROD')
+
+    const wrapper = mount(RunsSettingsWorkflowPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="run-api-field-1"]').trigger('click')
+    const optionValues = wrapper.findAll('[data-testid="workflow-select-option"]')
+      .map((option) => option.attributes('data-option-value'))
+
+    expect(optionValues).toContain('$.records[*].refundOrReturnId')
+    // The parent's own order key must not leak in from SHOPIFY_REMOTE's other row.
+    expect(optionValues).not.toContain('$.records[*].id')
+  })
+
   it('carries the system parent label through an edit', async () => {
     route.params.reconciliationMappingId = 'RS_RETURNS_PROD'
     saveRuleSetRun.mockResolvedValueOnce({
