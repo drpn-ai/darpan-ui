@@ -582,6 +582,59 @@ describe('RunsSettingsWorkflowPage', () => {
     expect(push).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
   })
 
+  // The manager page's System card reads file{n}SystemParentLabel; nothing in this form can derive
+  // it (an API source has no schema row, and a schema row has no parent concept), so the draft this
+  // workflow hands back must carry the value it opened with. Dropping it silently reverted that card
+  // to the ENDPOINT name after any edit -- "Shopify Order Return References" where the operator
+  // expects "Shopify".
+  it('carries the system parent label through an edit', async () => {
+    route.params.reconciliationMappingId = 'RS_RETURNS_PROD'
+    saveRuleSetRun.mockResolvedValueOnce({
+      ok: true,
+      messages: ['Saved RuleSet run Returns Prod.'],
+      errors: [],
+      savedRun: { savedRunId: 'RS_RETURNS_PROD', runName: 'Returns Prod', runType: 'ruleset' },
+    })
+    draftStoreState.workflowOrigin = { label: 'Run Details', path: '/reconciliation/ruleset-manager' }
+    draftStoreState.ruleSetDraftState = {
+      draft: {
+        savedRunId: 'RS_RETURNS_PROD',
+        runName: 'Returns Prod',
+        file1SystemEnumId: 'OMS',
+        file1SystemLabel: 'HotWax Returns (Reconciliation API)',
+        file1SystemParentLabel: 'HotWax',
+        file1SourceTypeEnumId: 'AUT_SRC_API',
+        file1SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        file1SourceConfigId: 'KREWE_OMS',
+        file1SourceConfigType: 'HOTWAX_OMS_REST',
+        file1FileTypeEnumId: '',
+        file1PrimaryIdExpression: ['$.records[*].orderId'],
+        file2SystemEnumId: 'SHOPIFY',
+        file2SystemLabel: 'Shopify Order Return References',
+        file2SystemParentLabel: 'Shopify',
+        file2SourceTypeEnumId: 'AUT_SRC_API',
+        file2SystemMessageRemoteId: 'SHOPIFY_REMOTE',
+        file2SourceConfigId: 'SHOPIFY_MAIN',
+        file2SourceConfigType: 'SHOPIFY_AUTH',
+        file2FileTypeEnumId: '',
+        file2PrimaryIdExpression: ['$.records[*].id'],
+      },
+      resumeStepId: 'ruleset-manager',
+    }
+    window.history.replaceState({}, '', '/settings/runs/edit/RS_RETURNS_PROD')
+
+    const wrapper = mount(RunsSettingsWorkflowPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+    await flushPromises()
+
+    expect(draftStoreState.setRuleSetDraft).toHaveBeenCalled()
+    const handedBack = draftStoreState.setRuleSetDraft.mock.calls.at(-1)?.[0] as Record<string, unknown>
+    expect(handedBack.file1SystemParentLabel).toBe('HotWax')
+    expect(handedBack.file2SystemParentLabel).toBe('Shopify')
+  })
+
   it('uses the schema label for the selected schema text instead of internal identifiers', async () => {
     listSchemas.mockResolvedValueOnce({
       ok: true,

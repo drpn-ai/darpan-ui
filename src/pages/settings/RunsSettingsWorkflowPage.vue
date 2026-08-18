@@ -559,6 +559,23 @@ function hydrateRuleSetDraftForm(draft: ReconciliationRuleSetDraft): void {
   form.source2.systemMessageRemoteId = draft.file2SystemMessageRemoteId ?? ''
 }
 
+/**
+ * The system FAMILY label ("Shopify", "HotWax") the manager page's System card reads, carried over
+ * from the draft this workflow opened with. Nothing in this form can derive it — a JSON schema row
+ * has no parent concept and an API source has no schema row at all — so the only source is the
+ * backend-resolved value already on the draft, and dropping it silently reverts that card to the
+ * ENDPOINT name after any edit. Carried ONLY when the side still points at the same system: switch
+ * the source system in the workflow and the old family label would be plain wrong, so it is dropped
+ * and the card falls back to the endpoint label until the run is reloaded from the backend.
+ */
+function carriedSystemParentLabel(side: 'file1' | 'file2', resolvedSystemEnumId: string): string | undefined {
+  const prior = ruleSetDraft.value
+  if (!prior) return undefined
+  const priorSystemEnumId = side === 'file1' ? prior.file1SystemEnumId : prior.file2SystemEnumId
+  if (!darpanSystemIdsMatch(priorSystemEnumId, resolvedSystemEnumId)) return undefined
+  return side === 'file1' ? prior.file1SystemParentLabel : prior.file2SystemParentLabel
+}
+
 function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetDraft {
   const source1 = source1Schema.value
   const source2 = source2Schema.value
@@ -570,13 +587,16 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
     ruleSetDraft.value?.file2PrimaryIdExpression,
     form.source2.fieldPaths,
   ).map((value) => value.trim()).filter(Boolean)
+  const file1SystemEnumId = source1?.systemEnumId ?? ruleSetDraft.value?.file1SystemEnumId ?? ''
+  const file2SystemEnumId = source2?.systemEnumId ?? ruleSetDraft.value?.file2SystemEnumId ?? ''
 
   return {
     savedRunId: ruleSetDraft.value?.savedRunId ?? activeMappingId.value,
     runName: savedRunName,
     description: ruleSetDraft.value?.description,
-    file1SystemEnumId: source1?.systemEnumId ?? ruleSetDraft.value?.file1SystemEnumId ?? '',
+    file1SystemEnumId: file1SystemEnumId,
     file1SystemLabel: source1?.systemLabel ?? ruleSetDraft.value?.file1SystemLabel,
+    file1SystemParentLabel: carriedSystemParentLabel('file1', file1SystemEnumId),
     ...(source1UsesApi.value
       ? {
           file1SourceTypeEnumId: SOURCE_TYPE_API,
@@ -595,8 +615,9 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
           file1SchemaFileName: source1?.schemaName,
         }),
     file1PrimaryIdExpression,
-    file2SystemEnumId: source2?.systemEnumId ?? ruleSetDraft.value?.file2SystemEnumId ?? '',
+    file2SystemEnumId: file2SystemEnumId,
     file2SystemLabel: source2?.systemLabel ?? ruleSetDraft.value?.file2SystemLabel,
+    file2SystemParentLabel: carriedSystemParentLabel('file2', file2SystemEnumId),
     ...(source2UsesApi.value
       ? {
           file2SourceTypeEnumId: SOURCE_TYPE_API,
