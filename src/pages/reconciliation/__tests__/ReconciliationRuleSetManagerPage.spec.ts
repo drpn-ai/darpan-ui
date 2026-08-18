@@ -593,6 +593,74 @@ describe('ReconciliationRuleSetManagerPage', () => {
     })
   })
 
+  // Live bug (2026-08 "Returns Prod" run): the two API sides use non-parent endpoints --
+  // SHOPIFY_RETURN_REFS off the SHOPIFY parent, OMS_RETURNS off the OMS parent -- and the Schema
+  // card must show each endpoint's OWN label ("Shopify Return References" / "Reconciliation
+  // Returns API"), not the parent system's default connector label ("Admin GraphQL Orders" /
+  // "Orders API") that the operator actually saw in production. This page only ever displays
+  // file{n}SystemMessageRemoteLabel verbatim (see apiEndpointLabel/summarizeSource) -- the value
+  // itself came from the backend wrong (ReconciliationSavedRunSupport.buildRuleSetSystemOptions
+  // resolved the label off the SHARED SystemMessageRemote row keyed by systemMessageRemoteId,
+  // which SHOPIFY_RETURN_REFS/OMS_RETURNS deliberately reuse from their parent -- see
+  // SourceSystemConnectorSeedData.xml). This test fixes the label at the value a corrected backend
+  // now sends (darpan-backend fix: prefer SourceSystemConnector.endpointLabel, keyed to the run's
+  // own systemEnumId, ahead of the shared remote's description); it is a pass-through contract
+  // guard on the UI side, not a reproduction of the defect itself -- the UI never mis-derived this
+  // value, so no UI code change was needed here.
+  it('shows each API endpoint\'s own label on the Schema card, not the parent system\'s label', async () => {
+    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
+      {
+        savedRunId: 'RS_RETURNS_PROD',
+        runName: 'Returns Prod',
+        file1SystemEnumId: 'SHOPIFY_RETURN_REFS',
+        file1SystemLabel: 'Shopify Order Return References',
+        file1SourceTypeEnumId: 'AUT_SRC_API',
+        file1SystemMessageRemoteId: 'SHOPIFY_REMOTE',
+        file1SystemMessageRemoteLabel: 'Shopify Return References',
+        file1SourceConfigId: 'gorjana_prod',
+        file1SourceConfigType: 'SHOPIFY_RETURN_REFS_API',
+        file1FileTypeEnumId: 'DftJson',
+        file1PrimaryIdExpression: ['eventId'],
+        file2SystemEnumId: 'OMS_RETURNS',
+        file2SystemLabel: 'HotWax Returns (Reconciliation API)',
+        file2SourceTypeEnumId: 'AUT_SRC_API',
+        file2SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        file2SystemMessageRemoteLabel: 'Reconciliation Returns API',
+        file2SourceConfigId: 'gorjana_prod',
+        file2SourceConfigType: 'HOTWAX_OMS_REST_RETURNS',
+        file2FileTypeEnumId: 'DftJson',
+        file2PrimaryIdExpression: ['externalId'],
+        rules: [
+          {
+            file1FieldPath: 'eventId',
+            file2FieldPath: 'externalId',
+            operator: '=',
+            sequenceNum: 1,
+          },
+        ],
+      },
+      'ruleset-manager',
+    )
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Returns Prod')
+    const schemaRows = wrapper.findAll('.ruleset-manager-schema-row')
+    expect(schemaRows).toHaveLength(2)
+
+    expect(schemaRows[0]?.text()).toContain('Shopify Order Return References')
+    expect(schemaRows[0]?.text()).toContain('Schema')
+    expect(schemaRows[0]?.text()).toContain('Shopify Return References')
+    expect(schemaRows[0]?.text()).not.toContain('Admin GraphQL Orders')
+
+    expect(schemaRows[1]?.text()).toContain('HotWax Returns (Reconciliation API)')
+    expect(schemaRows[1]?.text()).toContain('Schema')
+    expect(schemaRows[1]?.text()).toContain('Reconciliation Returns API')
+    expect(schemaRows[1]?.text()).not.toContain('Orders API')
+  })
+
   it('shows an error in the auth popup instead of a false empty endpoint list when the registry fetch fails', async () => {
     // The popup's loading flag already covers the combined config+endpoint fetch (they run in
     // parallel); a registry failure must surface as the popup's existing error state, not as a
