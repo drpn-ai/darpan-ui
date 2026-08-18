@@ -504,9 +504,9 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'KREWE_OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    await chooseWorkflowOption(wrapper, 'file1-api-select', 'remote:HOTWAX_ORDERS_API:KREWE_OMS')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
+    // KREWE_OMS resolves to exactly one API endpoint (HOTWAX_ORDERS_API), so the file1-api card is
+    // skipped and that endpoint is auto-selected -- landing directly on the primary-id question.
+    expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Which field identifies each record from Orders API?')
     await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].orderId')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -595,9 +595,9 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'KREWE_TRANSFER_ORDERS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    await chooseWorkflowOption(wrapper, 'file1-api-select', 'remote:HOTWAX_TRANSFER_ORDERS_API:KREWE_TRANSFER_ORDERS')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
+    // KREWE_TRANSFER_ORDERS resolves to exactly one API endpoint, so the file1-api card is skipped
+    // and that endpoint is auto-selected.
+    expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
     await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].transferOrderId')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -629,7 +629,7 @@ describe('ReconciliationCreateFlowPage', () => {
     }, expect.any(AbortSignal))
   })
 
-  it('filters API endpoint choices to endpoints for the selected system', async () => {
+  it('auto-selects the API endpoint scoped to the selected system when only one option matches', async () => {
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()
 
@@ -645,20 +645,15 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'SHOPIFY_MAIN')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    await wrapper.get('[data-testid="file1-api-select"]').trigger('click')
-
-    expect(wrapper.text()).toContain('Orders')
-    expect(wrapper.text()).not.toContain('Shopify orders API')
-    expect(wrapper.text()).not.toContain('Orders API')
-    expect(wrapper.text()).not.toContain('NetSuite orders RESTlet')
-
-    await wrapper.get('[data-testid="workflow-select-option"][data-option-value="remote:SHOPIFY_REMOTE:SHOPIFY_MAIN"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
+    // SHOPIFY_MAIN matches exactly one systemRemote (SHOPIFY_REMOTE, scoped to SHOPIFY) -- the
+    // file1-api card is skipped, and the primary-id options come from that remote alone, not from
+    // OMS's HOTWAX_ORDERS_API or NetSuite's restlet config.
+    expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
     expect(wrapper.find('input[name="file1PrimaryIdExpression"]').exists()).toBe(false)
     await wrapper.get('[data-testid="file1-field-select"]').trigger('click')
     expect(wrapper.text()).toContain('Order ID')
     expect(wrapper.find('[data-testid="workflow-select-option"][data-option-value="$.records[*].id"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="workflow-select-option"][data-option-value="$.records[*].orderId"]').exists()).toBe(false)
   })
 
   it('keeps source config type scoped when Shopify and OMS use the same config id', async () => {
@@ -730,8 +725,9 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'gorjana_prod')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    await chooseWorkflowOption(wrapper, 'file1-api-select', 'remote:SHOPIFY_REMOTE:gorjana_prod')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    // gorjana_prod resolves to exactly one API endpoint per system (SHOPIFY_REMOTE here), so the
+    // file1-api card is skipped and that endpoint is auto-selected.
+    expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
     await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].id')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -742,8 +738,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowOption(wrapper, 'file2-api-config-select', 'gorjana_prod')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    await chooseWorkflowOption(wrapper, 'file2-api-select', 'remote:HOTWAX_ORDERS_API:gorjana_prod')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    // Likewise for file2 (HOTWAX_ORDERS_API is the sole match for gorjana_prod under OMS).
+    expect(wrapper.find('[data-testid="file2-api-select"]').exists()).toBe(false)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.records[*].externalId')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
@@ -877,13 +873,215 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'SHOPIFY_MAIN')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    await chooseWorkflowOption(wrapper, 'file1-api-select', 'remote:SHOPIFY_REMOTE:SHOPIFY_MAIN')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
+    // SHOPIFY_MAIN resolves to exactly one API endpoint, so the file1-api card is skipped and that
+    // endpoint (which has no primaryIdOptions) is auto-selected.
+    expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
     expect(wrapper.find('input[name="file1PrimaryIdExpression"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="file1-field-select"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('No ID fields are available for Orders.')
     expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeDefined()
+  })
+
+  describe('redundant file{n}-api step skip', () => {
+    // Post option-rows-are-one-per-(config x endpoint), OMS/Shopify configs resolve to exactly one
+    // API endpoint, making "which API endpoint" redundant with "which config" -- see the file{n}Api
+    // SourceStepNeeded computeds. NetSuite keeps several restlet configs per auth config, so the
+    // card must stay meaningful (and visible) there.
+
+    it('skips the file1-api card for a single-option Shopify config and still saves the auto-selected remote', async () => {
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Shopify Returns Compare')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+      // SHOPIFY_MAIN resolves to exactly one systemRemote (SHOPIFY_REMOTE) in the default fixture.
+      await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'SHOPIFY_MAIN')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Which field identifies each record from Orders?')
+      await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].id')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file2-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
+      await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+      await flushPromises()
+
+      expect(createRuleSetRun).toHaveBeenCalledWith({
+        runName: 'Shopify Returns Compare',
+        description: undefined,
+        file1SystemEnumId: 'SHOPIFY',
+        file1SourceTypeEnumId: 'AUT_SRC_API',
+        file1SystemMessageRemoteId: 'SHOPIFY_REMOTE',
+        file1SourceConfigId: 'SHOPIFY_MAIN',
+        file1SourceConfigType: 'SHOPIFY_AUTH',
+        file1PrimaryIdExpression: '$.records[*].id',
+        file2SystemEnumId: 'OMS',
+        file2FileTypeEnumId: 'DftCsv',
+        file2SchemaFileName: undefined,
+        file2PrimaryIdExpression: 'order_id',
+      }, expect.any(AbortSignal))
+    })
+
+    it('keeps the file1-api card when a NetSuite auth config resolves to two restlet configs', async () => {
+      listAutomationSourceOptions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        inputModes: [],
+        sourceTypes: [],
+        relativeWindows: [],
+        fileTypes: FILE_TYPE_OPTIONS,
+        systems: SYSTEM_OPTIONS,
+        savedRuns: [],
+        sftpServers: [],
+        sourceConfigs: [
+          { sourceConfigId: 'NS_AUTH', sourceConfigType: 'NETSUITE_AUTH', label: 'NetSuite Auth', systemEnumId: 'NETSUITE' },
+        ],
+        nsRestletConfigs: [
+          {
+            nsRestletConfigId: 'NS_ORDERS',
+            description: 'NetSuite orders RESTlet',
+            label: 'Orders RESTlet',
+            systemEnumId: 'NETSUITE',
+            sourceConfigId: 'NS_AUTH',
+            sourceConfigType: 'NETSUITE_AUTH',
+            primaryIdOptions: [{ fieldPath: '$.records[*].orderId', label: 'Order ID' }],
+          },
+          {
+            nsRestletConfigId: 'NS_RETURNS',
+            description: 'NetSuite returns RESTlet',
+            label: 'Returns RESTlet',
+            systemEnumId: 'NETSUITE',
+            sourceConfigId: 'NS_AUTH',
+            sourceConfigType: 'NETSUITE_AUTH',
+            primaryIdOptions: [{ fieldPath: '$.records[*].returnId', label: 'Return ID' }],
+          },
+        ],
+        systemRemotes: [],
+      })
+
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('NetSuite API Compare')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'NETSUITE')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+      await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'NS_AUTH')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      // Two restlet configs share NS_AUTH -- this is a real choice, unlike the single-option
+      // OMS/Shopify case, so the card must still render.
+      expect(wrapper.text()).toContain('Which API endpoint should NetSuite use?')
+      await wrapper.get('[data-testid="file1-api-select"]').trigger('click')
+      expect(wrapper.find('[data-testid="workflow-select-option"][data-option-value="ns:NS_ORDERS"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="workflow-select-option"][data-option-value="ns:NS_RETURNS"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="workflow-select-option"][data-option-value="ns:NS_RETURNS"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      expect(wrapper.text()).toContain('Which field identifies each record from Returns RESTlet?')
+    })
+
+    it('going Back and switching to a config with a different option count updates the step list', async () => {
+      listAutomationSourceOptions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        inputModes: [],
+        sourceTypes: [],
+        relativeWindows: [],
+        fileTypes: FILE_TYPE_OPTIONS,
+        systems: SYSTEM_OPTIONS,
+        savedRuns: [],
+        sftpServers: [],
+        sourceConfigs: [
+          { sourceConfigId: 'NS_AUTH', sourceConfigType: 'NETSUITE_AUTH', label: 'NetSuite Prod Auth', systemEnumId: 'NETSUITE' },
+          { sourceConfigId: 'NS_AUTH_ALT', sourceConfigType: 'NETSUITE_AUTH', label: 'NetSuite Alt Auth', systemEnumId: 'NETSUITE' },
+        ],
+        nsRestletConfigs: [
+          {
+            nsRestletConfigId: 'NS_ORDERS',
+            description: 'NetSuite orders RESTlet',
+            label: 'Orders RESTlet',
+            systemEnumId: 'NETSUITE',
+            sourceConfigId: 'NS_AUTH',
+            sourceConfigType: 'NETSUITE_AUTH',
+            primaryIdOptions: [{ fieldPath: '$.records[*].orderId', label: 'Order ID' }],
+          },
+          {
+            nsRestletConfigId: 'NS_RETURNS',
+            description: 'NetSuite returns RESTlet',
+            label: 'Returns RESTlet',
+            systemEnumId: 'NETSUITE',
+            sourceConfigId: 'NS_AUTH',
+            sourceConfigType: 'NETSUITE_AUTH',
+            primaryIdOptions: [{ fieldPath: '$.records[*].returnId', label: 'Return ID' }],
+          },
+          {
+            nsRestletConfigId: 'NS_ALT_ORDERS',
+            description: 'NetSuite alt orders RESTlet',
+            label: 'Alt Orders RESTlet',
+            systemEnumId: 'NETSUITE',
+            sourceConfigId: 'NS_AUTH_ALT',
+            sourceConfigType: 'NETSUITE_AUTH',
+            primaryIdOptions: [{ fieldPath: '$.records[*].altOrderId', label: 'Alt Order ID' }],
+          },
+        ],
+        systemRemotes: [],
+      })
+
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('NetSuite Config Switch')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'NETSUITE')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+      await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'NS_AUTH')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      // NS_AUTH has two restlet configs -- the card is a real choice and must render.
+      expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(true)
+      await chooseWorkflowOption(wrapper, 'file1-api-select', 'ns:NS_ORDERS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      expect(wrapper.text()).toContain('Which field identifies each record from Orders RESTlet?')
+
+      await wrapper.get('.wizard-back').trigger('click')
+      await wrapper.get('.wizard-back').trigger('click')
+      expect(wrapper.get('[data-testid="file1-api-config-select"]').text()).toContain('NetSuite Prod Auth')
+
+      // Switching to NS_AUTH_ALT, which resolves to exactly one restlet config, must drop the
+      // file1-api card from the step list and auto-select that sole option.
+      await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'NS_AUTH_ALT')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Which field identifies each record from Alt Orders RESTlet?')
+    })
   })
 
   it('renders file type selection with keyed choice cards and advances on keyboard shortcut', async () => {

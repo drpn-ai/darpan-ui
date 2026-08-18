@@ -235,6 +235,18 @@ const file2SchemaLabel = computed(() => (selectedFile2Schema.value ? formatSchem
 const file1SystemHasEndpointStep = computed(() => darpanSystemHasEndpointOptions(file1SystemParentEnumId.value, allSystemOptions.value))
 const file2SystemHasEndpointStep = computed(() => darpanSystemHasEndpointOptions(file2SystemParentEnumId.value, allSystemOptions.value))
 
+// A source config now maps 1:1 to a single API endpoint for OMS/Shopify (option rows are one per
+// config x endpoint), so "which API endpoint" is redundant once the config narrows it to exactly
+// one option -- skip the card and auto-select that option instead (see updateApiSourceConfig /
+// autoSelectSoleApiSource). Zero options still show the card: that is a real "no endpoint
+// configured" problem the operator needs to see (apiSourceSelectionError), not something to skip
+// past silently. NetSuite still offers several restlet configs per auth config, so the card stays
+// meaningful (and visible) there.
+const file1ApiSourceOptions = computed(() => apiSourceOptionsForSide('file1'))
+const file2ApiSourceOptions = computed(() => apiSourceOptionsForSide('file2'))
+const file1ApiSourceStepNeeded = computed(() => file1ApiSourceOptions.value.length !== 1)
+const file2ApiSourceStepNeeded = computed(() => file2ApiSourceOptions.value.length !== 1)
+
 const steps = computed<WizardStep[]>(() => {
   const stepList: WizardStep[] = [
     { id: 'run-name' },
@@ -252,7 +264,10 @@ const steps = computed<WizardStep[]>(() => {
 
   const file2SystemIndex = stepList.findIndex((step) => step.id === 'file2-system')
   if (file1UsesApi.value) {
-    stepList.splice(file2SystemIndex, 0, { id: 'file1-api-config' }, { id: 'file1-api' }, { id: 'file1-primary-id' })
+    const file1ApiSteps: WizardStep[] = [{ id: 'file1-api-config' }]
+    if (file1ApiSourceStepNeeded.value) file1ApiSteps.push({ id: 'file1-api' })
+    file1ApiSteps.push({ id: 'file1-primary-id' })
+    stepList.splice(file2SystemIndex, 0, ...file1ApiSteps)
   } else {
     stepList.splice(file2SystemIndex, 0, { id: 'file1-filetype' }, { id: 'file1-primary-id' })
     if (file1UsesJson.value) {
@@ -261,7 +276,10 @@ const steps = computed<WizardStep[]>(() => {
   }
 
   if (file2UsesApi.value) {
-    stepList.push({ id: 'file2-api-config' }, { id: 'file2-api' }, { id: 'file2-primary-id' })
+    const file2ApiSteps: WizardStep[] = [{ id: 'file2-api-config' }]
+    if (file2ApiSourceStepNeeded.value) file2ApiSteps.push({ id: 'file2-api' })
+    file2ApiSteps.push({ id: 'file2-primary-id' })
+    stepList.push(...file2ApiSteps)
   } else {
     stepList.push({ id: 'file2-filetype' }, { id: 'file2-primary-id' })
     if (file2UsesJson.value) {
@@ -1071,6 +1089,7 @@ function updateApiSourceConfig(side: SourceSide, value: string): void {
     file1SourceConfigType.value = selectedConfig?.sourceConfigType ?? ''
     file1PrimaryIdExpression.value = []
     clearApiEndpoint('file1')
+    autoSelectSoleApiSource('file1')
     return
   }
 
@@ -1078,6 +1097,19 @@ function updateApiSourceConfig(side: SourceSide, value: string): void {
   file2SourceConfigType.value = selectedConfig?.sourceConfigType ?? ''
   file2PrimaryIdExpression.value = []
   clearApiEndpoint('file2')
+  autoSelectSoleApiSource('file2')
+}
+
+// When apiSourceOptionsForSide narrows to exactly one option, the file{n}-api card is skipped
+// (see file1ApiSourceStepNeeded/file2ApiSourceStepNeeded) -- select that option here so the
+// primary-id step and the saved payload end up in the same state they would if the operator had
+// picked it by hand. Zero and 2+ option counts leave the endpoint refs alone: the card still
+// renders for those, and updateApiSource(side, value) drives selection from there instead.
+function autoSelectSoleApiSource(side: SourceSide): void {
+  const options = apiSourceOptionsForSide(side)
+  if (options.length === 1) {
+    updateApiSource(side, options[0]!.value)
+  }
 }
 
 function updateApiSource(side: SourceSide, value: string): void {
