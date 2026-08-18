@@ -1827,6 +1827,8 @@ export interface components {
                     enumCode?: string;
                     description?: string;
                     label?: string;
+                    systemParentEnumId?: string;
+                    systemParentLabel?: string;
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
@@ -1987,6 +1989,8 @@ export interface components {
                     enumCode?: string;
                     description?: string;
                     label?: string;
+                    systemParentEnumId?: string;
+                    systemParentLabel?: string;
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
@@ -2719,6 +2723,8 @@ export interface components {
                     enumCode?: string;
                     description?: string;
                     label?: string;
+                    systemParentEnumId?: string;
+                    systemParentLabel?: string;
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
@@ -2782,6 +2788,8 @@ export interface components {
                     enumCode?: string;
                     description?: string;
                     label?: string;
+                    systemParentEnumId?: string;
+                    systemParentLabel?: string;
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
@@ -3428,6 +3436,8 @@ export interface components {
                     enumCode?: string;
                     description?: string;
                     label?: string;
+                    systemParentEnumId?: string;
+                    systemParentLabel?: string;
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
@@ -3524,6 +3534,8 @@ export interface components {
                     enumCode?: string;
                     description?: string;
                     label?: string;
+                    systemParentEnumId?: string;
+                    systemParentLabel?: string;
                     fileTypeEnumId?: string;
                     fileTypeLabel?: string;
                     idFieldExpression?: string;
@@ -4367,6 +4379,15 @@ export interface components {
                     detail?: string;
                     durationMillis?: number;
                 };
+            }[];
+            /**
+             * @description Per-endpoint enablement, when the connector's probe reports it (currently
+             *                         only Shopify's). Connectors that don't report it leave this empty.
+             */
+            endpoints?: {
+                systemEnumId?: string;
+                endpointLabel?: string;
+                isEnabled?: boolean;
             }[];
         };
         /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.test#SourceConnection */

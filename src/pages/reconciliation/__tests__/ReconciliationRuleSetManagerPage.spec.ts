@@ -594,10 +594,13 @@ describe('ReconciliationRuleSetManagerPage', () => {
   })
 
   // Live bug (2026-08 "Returns Prod" run): the two API sides use non-parent endpoints --
-  // SHOPIFY_RETURN_REFS off the SHOPIFY parent, OMS_RETURNS off the OMS parent -- and the Schema
-  // card must show each endpoint's OWN label ("Shopify Return References" / "Reconciliation
-  // Returns API"), not the parent system's default connector label ("Admin GraphQL Orders" /
-  // "Orders API") that the operator actually saw in production. This page only ever displays
+  // SHOPIFY_RETURN_REFS off the SHOPIFY parent, OMS_RETURNS off the OMS parent -- so the two cards
+  // split the naming between them. The System card names the SYSTEM ("Shopify" / "HotWax", from the
+  // enum's parentEnumId), and the Schema card names each endpoint's OWN label ("Shopify Return
+  // References" / "Reconciliation Returns API"), not the parent system's default connector label
+  // ("Admin GraphQL Orders" / "Orders API") that the operator actually saw in production. Before the
+  // fix the System card showed the endpoint name where the operator expected the system, and the
+  // Schema card showed the parent's connector label. This page only ever displays
   // file{n}SystemMessageRemoteLabel verbatim (see apiEndpointLabel/summarizeSource) -- the value
   // itself came from the backend wrong (ReconciliationSavedRunSupport.buildRuleSetSystemOptions
   // resolved the label off the SHARED SystemMessageRemote row keyed by systemMessageRemoteId,
@@ -607,22 +610,24 @@ describe('ReconciliationRuleSetManagerPage', () => {
   // own systemEnumId, ahead of the shared remote's description); it is a pass-through contract
   // guard on the UI side, not a reproduction of the defect itself -- the UI never mis-derived this
   // value, so no UI code change was needed here.
-  it('shows each API endpoint\'s own label on the Schema card, not the parent system\'s label', async () => {
+  it('names the system on the System card and the endpoint on the Schema card', async () => {
     draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
       {
         savedRunId: 'RS_RETURNS_PROD',
         runName: 'Returns Prod',
         file1SystemEnumId: 'SHOPIFY_RETURN_REFS',
         file1SystemLabel: 'Shopify Order Return References',
+        file1SystemParentLabel: 'Shopify',
         file1SourceTypeEnumId: 'AUT_SRC_API',
         file1SystemMessageRemoteId: 'SHOPIFY_REMOTE',
         file1SystemMessageRemoteLabel: 'Shopify Return References',
         file1SourceConfigId: 'gorjana_prod',
         file1SourceConfigType: 'SHOPIFY_RETURN_REFS_API',
         file1FileTypeEnumId: 'DftJson',
-        file1PrimaryIdExpression: ['eventId'],
+        file1PrimaryIdExpression: ['refundOrReturnId'],
         file2SystemEnumId: 'OMS_RETURNS',
         file2SystemLabel: 'HotWax Returns (Reconciliation API)',
+        file2SystemParentLabel: 'HotWax',
         file2SourceTypeEnumId: 'AUT_SRC_API',
         file2SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
         file2SystemMessageRemoteLabel: 'Reconciliation Returns API',
@@ -632,7 +637,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
         file2PrimaryIdExpression: ['externalId'],
         rules: [
           {
-            file1FieldPath: 'eventId',
+            file1FieldPath: 'refundOrReturnId',
             file2FieldPath: 'externalId',
             operator: '=',
             sequenceNum: 1,
@@ -650,12 +655,23 @@ describe('ReconciliationRuleSetManagerPage', () => {
     const schemaRows = wrapper.findAll('.ruleset-manager-schema-row')
     expect(schemaRows).toHaveLength(2)
 
-    expect(schemaRows[0]?.text()).toContain('Shopify Order Return References')
+    // The System card names the system, not the endpoint: the endpoint label must not appear there.
+    const file1System = schemaRows[0]?.findAll('.ruleset-manager-basic-card')[0]
+    expect(file1System?.text()).toContain('System')
+    expect(file1System?.text()).toContain('Shopify')
+    expect(file1System?.text()).not.toContain('Shopify Order Return References')
+
     expect(schemaRows[0]?.text()).toContain('Schema')
     expect(schemaRows[0]?.text()).toContain('Shopify Return References')
     expect(schemaRows[0]?.text()).not.toContain('Admin GraphQL Orders')
+    // The renamed join key, not the internal `eventId` the extractor used to emit.
+    expect(schemaRows[0]?.text()).toContain('refundOrReturnId')
 
-    expect(schemaRows[1]?.text()).toContain('HotWax Returns (Reconciliation API)')
+    const file2System = schemaRows[1]?.findAll('.ruleset-manager-basic-card')[0]
+    expect(file2System?.text()).toContain('System')
+    expect(file2System?.text()).toContain('HotWax')
+    expect(file2System?.text()).not.toContain('HotWax Returns (Reconciliation API)')
+
     expect(schemaRows[1]?.text()).toContain('Schema')
     expect(schemaRows[1]?.text()).toContain('Reconciliation Returns API')
     expect(schemaRows[1]?.text()).not.toContain('Orders API')

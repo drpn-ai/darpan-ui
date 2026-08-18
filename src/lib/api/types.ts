@@ -401,6 +401,10 @@ export interface MappingSystemOption {
   enumCode?: string
   description?: string
   label?: string
+  // The system FAMILY an endpoint-level option belongs to: SHOPIFY_RETURN_REFS -> SHOPIFY/"Shopify".
+  // Absent on the family enums themselves, whose own `label` is already the system name.
+  systemParentEnumId?: string
+  systemParentLabel?: string
   fileTypeEnumId?: string
   fileTypeLabel?: string
   idFieldExpression?: string

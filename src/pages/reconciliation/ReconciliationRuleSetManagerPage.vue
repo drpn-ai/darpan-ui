@@ -431,13 +431,20 @@ function formatRulePreview(rule: ReconciliationRuleSetDraftRule): string {
  * differently-named configs and became useless when they did not: a Shopify/HotWax run whose configs
  * are both named e.g. `gorjana_prod` showed the same value on both rows and never named either
  * system. The config id is still shown, as a secondary line — see systemConfigName.
+ *
+ * Since endpoint-level systems exist (SHOPIFY_RETURN_REFS, OMS_RETURNS), the side's own
+ * `systemLabel` names the ENDPOINT — "Shopify Order Return References" — not the system, so this
+ * prefers the family label the backend resolves from the enum's parentEnumId. The endpoint keeps
+ * its own card: it is what the Schema card shows (see apiEndpointLabel). Falls back to the
+ * endpoint/enum label for the family enums themselves, which carry no parent.
  */
 function systemTitle(draftValue: ReconciliationRuleSetDraft | null, side: 'file1' | 'file2'): string {
   if (!draftValue) return side === 'file1' ? 'System 1' : 'System 2'
 
+  const parentLabel = side === 'file1' ? draftValue.file1SystemParentLabel : draftValue.file2SystemParentLabel
   const systemLabel = side === 'file1' ? draftValue.file1SystemLabel : draftValue.file2SystemLabel
   const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId : draftValue.file2SystemEnumId
-  return systemLabel || systemEnumId || (side === 'file1' ? 'System 1' : 'System 2')
+  return parentLabel?.trim() || systemLabel || systemEnumId || (side === 'file1' ? 'System 1' : 'System 2')
 }
 
 /**

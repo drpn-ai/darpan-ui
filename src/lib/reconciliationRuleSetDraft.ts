@@ -37,6 +37,8 @@ export interface ReconciliationRuleSetDraft {
   description?: string
   file1SystemEnumId: string
   file1SystemLabel?: string
+  /** Family name for an endpoint-level system ("Shopify" for SHOPIFY_RETURN_REFS). See SavedRunSystemOption. */
+  file1SystemParentLabel?: string
   file1SourceTypeEnumId?: string
   file1SystemMessageRemoteId?: string
   file1SystemMessageRemoteLabel?: string
@@ -51,6 +53,8 @@ export interface ReconciliationRuleSetDraft {
   file1PrimaryIdExpression: string[]
   file2SystemEnumId: string
   file2SystemLabel?: string
+  /** Family name for an endpoint-level system ("Shopify" for SHOPIFY_RETURN_REFS). See SavedRunSystemOption. */
+  file2SystemParentLabel?: string
   file2SourceTypeEnumId?: string
   file2SystemMessageRemoteId?: string
   file2SystemMessageRemoteLabel?: string

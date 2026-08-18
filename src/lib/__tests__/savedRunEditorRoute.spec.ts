@@ -49,6 +49,41 @@ describe('buildRuleSetDraft', () => {
     expect(draft?.file2PrimaryIdExpression).toEqual(['shopify_return_id', 'shopify_product_id'])
   })
 
+  // Endpoint-level systems (SHOPIFY_RETURN_REFS, OMS_RETURNS) carry a `label` that names the
+  // ENDPOINT, so the manager page's System card reads the family name off systemParentLabel instead
+  // (see ReconciliationRuleSetManagerPage.systemTitle). Dropping it here silently reverted that card
+  // to the endpoint name, which is the bug the field exists to fix.
+  it('threads systemParentLabel through for endpoint-level systems', () => {
+    const row = createSavedRun({
+      systemOptions: [
+        createSystemOption({
+          enumId: 'SHOPIFY_RETURN_REFS',
+          fileSide: 'FILE_1',
+          label: 'Shopify Order Return References',
+          systemParentEnumId: 'SHOPIFY',
+          systemParentLabel: 'Shopify',
+          idFieldExpression: '$.records[*].refundOrReturnId',
+        }),
+        createSystemOption({
+          enumId: 'OMS_RETURNS',
+          fileSide: 'FILE_2',
+          label: 'HotWax Returns (Reconciliation API)',
+          systemParentEnumId: 'OMS',
+          systemParentLabel: 'HotWax',
+          idFieldExpression: '$.records[*].externalId',
+        }),
+      ],
+    })
+
+    const draft = buildRuleSetDraft(row)
+
+    expect(draft?.file1SystemParentLabel).toBe('Shopify')
+    expect(draft?.file2SystemParentLabel).toBe('HotWax')
+    // The endpoint label is still carried — the Schema card shows it.
+    expect(draft?.file1SystemLabel).toBe('Shopify Order Return References')
+    expect(draft?.file2SystemLabel).toBe('HotWax Returns (Reconciliation API)')
+  })
+
   it('falls back to a single-element array for legacy single-field idFieldExpression', () => {
     const row = createSavedRun({
       systemOptions: [
