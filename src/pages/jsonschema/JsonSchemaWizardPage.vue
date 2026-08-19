@@ -244,7 +244,29 @@ const submitDisabled = computed(() => {
       return true
   }
 })
-const uploadAccept = computed(() => '.json,application/json,application/schema+json')
+// Head slice sent to the backend for CSV samples. Mirrors CsvHeaderSchemaInferrer.HEADER_SLICE_LIMIT;
+// the two must move together or a truncated header stops being detectable.
+const CSV_HEADER_SLICE_LIMIT = 65536
+
+// CSV belongs to the sample intent only -- there is no such thing as a CSV *schema* file.
+const uploadAccept = computed(() =>
+  selectedUploadIntent.value === 'sample'
+    ? '.json,application/json,application/schema+json,.csv,text/csv'
+    : '.json,application/json,application/schema+json',
+)
+
+function looksLikeCsvFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv'
+}
+
+function readBlobAsText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(new Error('Unable to read file'))
+    reader.readAsText(blob)
+  })
+}
 
 function deriveSchemaName(fileName: string): string {
   const baseName = fileName.replace(/\.[^.]+$/, '')
@@ -436,10 +458,23 @@ async function inferSchemaFromSampleUpload(): Promise<boolean> {
   pageError.value = null
 
   try {
-    const jsonText = await readFileAsText(selectedFile.value)
-    const response = await jsonSchemaFacade.inferFromText({ jsonText })
+    const file = selectedFile.value
+    const response = looksLikeCsvFile(file)
+      ? await jsonSchemaFacade.inferFromCsvText({
+        // Only the header row is needed, and these files run to hundreds of megabytes.
+        csvText: await readBlobAsText(file.slice(0, CSV_HEADER_SLICE_LIMIT)),
+        isCompleteFile: file.size <= CSV_HEADER_SLICE_LIMIT,
+      })
+      : await jsonSchemaFacade.inferFromText({ jsonText: await readFileAsText(file) })
+
     schemaTextToSave.value = response.jsonSchemaString ?? ''
     fieldRows.value = response.fieldList ?? []
+
+    if (response.ok === false) {
+      // The backend's refusal is written for the person holding the file; show it verbatim.
+      pageError.value = response.errors?.[0] ?? 'Unable to read the uploaded sample file.'
+      return false
+    }
 
     if (!schemaTextToSave.value.trim() || fieldRows.value.length === 0) {
       pageError.value = 'No refined fields were returned for the uploaded sample file.'

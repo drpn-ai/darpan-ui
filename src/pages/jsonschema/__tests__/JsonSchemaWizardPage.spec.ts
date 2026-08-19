@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const inferFromText = vi.hoisted(() => vi.fn())
+const inferFromCsvText = vi.hoisted(() => vi.fn())
 const saveText = vi.hoisted(() => vi.fn())
 const listEnumOptions = vi.hoisted(() => vi.fn())
 const inferredSchemaText = JSON.stringify({
@@ -30,6 +31,7 @@ vi.mock('vue-router', () => ({
 vi.mock('../../../lib/api/facade', () => ({
   jsonSchemaFacade: {
     inferFromText,
+    inferFromCsvText,
     saveText,
   },
   settingsFacade: {
@@ -110,6 +112,7 @@ describe('JsonSchemaWizardPage', () => {
   beforeEach(() => {
     push.mockClear()
     inferFromText.mockReset()
+    inferFromCsvText.mockReset()
     saveText.mockReset()
     listEnumOptions.mockReset()
     authState.sessionInfo = {
@@ -422,4 +425,147 @@ describe('JsonSchemaWizardPage', () => {
 
     wrapper.unmount()
   })
+
+  describe('CSV sample upload', () => {
+    // The beforeEach FileReader stub returns fixed text regardless of the blob, so it cannot show
+    // whether the page sliced the file. jsdom's Blob exposes neither .text() nor .arrayBuffer(),
+    // so the slice content is reconstructed from its size -- which is real, and for the ASCII CSV
+    // fixtures here byte length equals character length, so this reproduces the true slice exactly.
+    // Kept synchronous like the stub it replaces, so the file's existing flushPromises cadence holds.
+    function stubSliceAwareFileReader(sourceText: string): void {
+      class SliceAwareMockFileReader {
+        result: string | ArrayBuffer | null = null
+        onload: null | (() => void) = null
+        onerror: null | (() => void) = null
+
+        readAsText(blob: Blob): void {
+          this.result = sourceText.slice(0, blob.size)
+          this.onload?.()
+        }
+      }
+
+      vi.stubGlobal('FileReader', SliceAwareMockFileReader as unknown as typeof FileReader)
+    }
+
+    // For the sample intent, inference fires when LEAVING the system step (handlePrimarySubmit),
+    // not the upload step. Walk: intent -> file -> next -> system -> next.
+    async function uploadSampleAndInfer(
+      wrapper: ReturnType<typeof mount>,
+      file: File,
+    ): Promise<void> {
+      await wrapper.get('[data-testid="upload-intent-sample"]').trigger('click')
+      await flushPromises()
+
+      const fileInput = wrapper.get('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', { value: [file], configurable: true })
+      await fileInput.trigger('change')
+
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await flushPromises()
+
+      await chooseAppSelectOption(wrapper, 'schema-wizard-system', 'DarSysOms')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await flushPromises()
+    }
+
+    const csvInferenceResult = {
+      ok: true,
+      jsonSchemaString: JSON.stringify({
+        type: 'object',
+        properties: { orderId: { type: 'string' }, status: { type: 'string' } },
+      }),
+      fieldList: [
+        { fieldPath: 'orderId', type: 'string', required: false },
+        { fieldPath: 'status', type: 'string', required: false },
+      ],
+    }
+
+    it('accepts csv files for the sample intent', async () => {
+      const wrapper = mount(JsonSchemaWizardPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="upload-intent-sample"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('input[type="file"]').attributes('accept')).toContain('.csv')
+      wrapper.unmount()
+    })
+
+    it('does not accept csv files for the schema-file intent', async () => {
+      const wrapper = mount(JsonSchemaWizardPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="upload-intent-schema"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('input[type="file"]').attributes('accept')).not.toContain('.csv')
+      wrapper.unmount()
+    })
+
+    it('sends only the head slice of a large csv and marks it incomplete', async () => {
+      const bigCsv = `orderId,status\n${'1001,OPEN\n'.repeat(20000)}`
+      expect(bigCsv.length).toBeGreaterThan(65536)
+      stubSliceAwareFileReader(bigCsv)
+      inferFromCsvText.mockResolvedValue(csvInferenceResult)
+
+      const wrapper = mount(JsonSchemaWizardPage)
+      await flushPromises()
+      await uploadSampleAndInfer(wrapper, new File([bigCsv], 'orders.csv', { type: 'text/csv' }))
+
+      expect(inferFromCsvText).toHaveBeenCalledTimes(1)
+      const payload = inferFromCsvText.mock.calls[0][0]
+      expect(payload.isCompleteFile).toBe(false)
+      expect(payload.csvText.length).toBeLessThanOrEqual(65536)
+      expect(payload.csvText.startsWith('orderId,status')).toBe(true)
+      expect(inferFromText).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('marks a small csv as complete and sends the whole file', async () => {
+      const smallCsv = 'orderId,status\n1001,OPEN\n'
+      stubSliceAwareFileReader(smallCsv)
+      inferFromCsvText.mockResolvedValue(csvInferenceResult)
+
+      const wrapper = mount(JsonSchemaWizardPage)
+      await flushPromises()
+      await uploadSampleAndInfer(wrapper, new File([smallCsv], 'orders.csv', { type: 'text/csv' }))
+
+      expect(inferFromCsvText).toHaveBeenCalledTimes(1)
+      expect(inferFromCsvText.mock.calls[0][0].isCompleteFile).toBe(true)
+      expect(inferFromCsvText.mock.calls[0][0].csvText).toBe(smallCsv)
+
+      wrapper.unmount()
+    })
+
+    it('still routes json samples to the json inference path', async () => {
+      const wrapper = mount(JsonSchemaWizardPage)
+      await flushPromises()
+      await uploadSampleAndInfer(
+        wrapper,
+        new File(['{"orderId":"1001"}'], 'orders.json', { type: 'application/json' }),
+      )
+
+      expect(inferFromText).toHaveBeenCalledTimes(1)
+      expect(inferFromCsvText).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    it('surfaces the backend refusal message', async () => {
+      const duplicateCsv = 'orderId,orderId\n1,2\n'
+      stubSliceAwareFileReader(duplicateCsv)
+      inferFromCsvText.mockResolvedValue({
+        ok: false,
+        errors: ['The header row repeats these column names: orderId.'],
+      })
+
+      const wrapper = mount(JsonSchemaWizardPage)
+      await flushPromises()
+      await uploadSampleAndInfer(wrapper, new File([duplicateCsv], 'orders.csv', { type: 'text/csv' }))
+
+      expect(wrapper.text()).toContain('repeats these column names')
+      wrapper.unmount()
+    })
+  })
+
 })
