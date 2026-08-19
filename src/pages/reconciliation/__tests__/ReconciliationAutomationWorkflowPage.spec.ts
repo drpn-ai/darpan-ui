@@ -53,6 +53,14 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => draftStoreState,
 }))
 
+const authStoreState = vi.hoisted(() => ({
+  sessionInfo: null as null | { tenantTimeZone?: string, userTimeZone?: string },
+}))
+
+vi.mock('../../../stores/auth', () => ({
+  useAuthStore: () => authStoreState,
+}))
+
 import ReconciliationAutomationWorkflowPage from '../ReconciliationAutomationWorkflowPage.vue'
 
 function optionsResponse() {
@@ -220,6 +228,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     getUserNotificationDefault.mockReset()
     listTenantChatSpaces.mockReset()
     saveTenantChatSpace.mockReset()
+    authStoreState.sessionInfo = null
     draftStoreState.workflowOrigin = null
     draftStoreState.ruleSetDraftState = null
     draftStoreState.automationDraftState = null
@@ -1142,5 +1151,101 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
     expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('No notifications')
+  })
+
+  describe('schedule timezone follows the tenant', () => {
+    function editAutomationResponse(timezone: string | undefined) {
+      return {
+        ok: true,
+        messages: [],
+        errors: [],
+        automation: {
+          automationId: 'AUT_ORDER_SYNC',
+          automationName: 'Daily order sync',
+          savedRunId: 'RS_ORDER_SYNC',
+          savedRunName: 'Order Sync',
+          savedRunType: 'ruleset',
+          savedRun: optionsResponse().savedRuns[0],
+          inputModeEnumId: 'AUT_IN_API_RANGE',
+          scheduleExpr: '0 0 6 * * ?',
+          timezone,
+          relativeWindowTypeEnumId: 'AUT_WIN_PREV_DAY',
+          relativeWindowCount: 1,
+          active: true,
+          sources: [
+            {
+              fileSide: 'FILE_1',
+              sourceTypeEnumId: 'AUT_SRC_API',
+              systemEnumId: 'OMS',
+              systemMessageRemoteId: 'OMS_REMOTE',
+              safeMetadataJson: '{"extractServiceName":"fixture.extractOmsOrders"}',
+            },
+            {
+              fileSide: 'FILE_2',
+              sourceTypeEnumId: 'AUT_SRC_API',
+              systemEnumId: 'SHOPIFY',
+              systemMessageRemoteId: 'SHOPIFY_REMOTE',
+              safeMetadataJson: '{"extractServiceName":"fixture.extractShopifyOrders"}',
+            },
+          ],
+        },
+      }
+    }
+
+    async function mountEdit(timezone: string | undefined): Promise<ReturnType<typeof mount>> {
+      route.name = 'reconciliation-automation-edit'
+      route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+      route.params = { automationId: 'AUT_ORDER_SYNC' }
+      getAutomation.mockResolvedValue(editAutomationResponse(timezone))
+      const wrapper = mount(ReconciliationAutomationWorkflowPage)
+      await flushPromises()
+      return wrapper
+    }
+
+    it('shows the tenant timezone when the automation has not pinned one', async () => {
+      authStoreState.sessionInfo = { tenantTimeZone: 'Asia/Kolkata' }
+      const wrapper = await mountEdit(undefined)
+
+      expect(wrapper.get('[data-testid="automation-schedule-timezone"]').text()).toBe('Asia/Kolkata')
+    })
+
+    it('keeps the timezone the automation was saved with, ignoring the tenant', async () => {
+      authStoreState.sessionInfo = { tenantTimeZone: 'Asia/Kolkata' }
+      const wrapper = await mountEdit('America/New_York')
+
+      // An existing schedule already fires at a fixed moment; re-reading it through a different
+      // zone would silently move it.
+      expect(wrapper.get('[data-testid="automation-schedule-timezone"]').text()).toBe('America/New_York')
+    })
+
+    it('follows the tenant, not the viewer, when the two differ', async () => {
+      // One automation fires once for the whole tenant, so the card must not read differently
+      // depending on who opened it.
+      authStoreState.sessionInfo = { tenantTimeZone: 'Asia/Kolkata', userTimeZone: 'America/Los_Angeles' }
+      const wrapper = await mountEdit(undefined)
+
+      expect(wrapper.get('[data-testid="automation-schedule-timezone"]').text()).toBe('Asia/Kolkata')
+    })
+
+    it('falls back to UTC when the tenant has no timezone set', async () => {
+      authStoreState.sessionInfo = { tenantTimeZone: undefined }
+      const wrapper = await mountEdit(undefined)
+
+      expect(wrapper.get('[data-testid="automation-schedule-timezone"]').text()).toBe('UTC')
+    })
+
+    it('sends the tenant timezone with the saved automation', async () => {
+      authStoreState.sessionInfo = { tenantTimeZone: 'Asia/Kolkata' }
+      saveAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: { automationId: 'AUT_ORDER_SYNC' } })
+      const wrapper = await mountEdit(undefined)
+
+      await wrapper.get('[data-testid="save-automation"]').trigger('click')
+      await flushPromises()
+
+      expect(saveAutomation).toHaveBeenCalledWith(
+        expect.objectContaining({ windowTimeZone: 'Asia/Kolkata' }),
+        expect.any(AbortSignal),
+      )
+    })
   })
 })

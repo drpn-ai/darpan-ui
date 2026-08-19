@@ -274,7 +274,7 @@
 
           <div class="automation-schedule-field">
             <span class="automation-schedule-label">Timezone</span>
-            <span class="automation-schedule-static" data-testid="automation-schedule-timezone">{{ windowTimeZone }}</span>
+            <span class="automation-schedule-static" data-testid="automation-schedule-timezone">{{ scheduleTimeZone }}</span>
           </div>
         </div>
       </template>
@@ -407,7 +407,7 @@
 
           <div class="automation-schedule-field">
             <span class="automation-schedule-label">Timezone</span>
-            <span class="automation-schedule-static" data-testid="automation-schedule-timezone">{{ windowTimeZone }}</span>
+            <span class="automation-schedule-static" data-testid="automation-schedule-timezone">{{ scheduleTimeZone }}</span>
           </div>
         </div>
       </template>
@@ -493,7 +493,9 @@ import {
   type ReconciliationAutomationSourceDraft,
   type ReconciliationAutomationStepId,
 } from '../../lib/reconciliationAutomationDraft'
+import { useAuthStore } from '../../stores/auth'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
+import { normalizeTimezoneId } from '../../lib/timezones'
 import { useCronExpression, SCHEDULE_WEEKDAY_OPTIONS, type SchedulePreset } from '../../composables/useCronExpression'
 import { useAutomationSourceDraft, type ApiSourceSelectOption } from '../../composables/useAutomationSourceDraft'
 
@@ -512,6 +514,7 @@ interface SourceOptions {
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const draftStore = useReconciliationDraftStore()
 
 const loadingOptions = ref(false)
@@ -544,8 +547,21 @@ const relativeWindowTypeEnumId = ref('AUT_WIN_LAST_DAYS')
 const relativeWindowCount = ref<number | null>(1)
 const customWindowStartDate = ref('')
 const customWindowEndDate = ref('')
-const windowTimeZone = ref('UTC')
+// Blank means the automation has not pinned a zone of its own yet, so it follows the tenant's.
+// Resolved through scheduleTimeZone below -- read that, never this, outside the restore paths.
+const windowTimeZone = ref('')
 const isActive = ref(true)
+
+/**
+ * The zone this schedule actually runs in. Deliberately the TENANT's zone and not the viewer's
+ * (resolveEffectiveTimeZone prefers the user's): an automation fires once for the whole tenant, so
+ * "06:00" has to mean the same moment no matter who opened the card. The backend honours this --
+ * AutomationExecutionSupport resolves the stored windowTimeZone when the scanner computes the next
+ * fire time -- so this is the scheduled time, not a label on top of a UTC one.
+ */
+const tenantTimeZone = computed(() => normalizeTimezoneId(authStore.sessionInfo?.tenantTimeZone) || '')
+const scheduleTimeZone = computed(() => windowTimeZone.value || tenantTimeZone.value || 'UTC')
+
 const returnLabel = ref('')
 const returnPath = ref('')
 const chatSpaceChoice = ref<ReconciliationAutomationChatSpaceChoice>('')
@@ -1132,7 +1148,7 @@ const activeDraft = computed<ReconciliationAutomationDraft>(() => ({
   savedRunType: savedRunType.value || selectedSavedRun.value?.runType || 'ruleset',
   inputModeEnumId: effectiveInputModeEnumId.value || undefined,
   scheduleExpr: scheduleExpr.value.trim() || undefined,
-  windowTimeZone: windowTimeZone.value || 'UTC',
+  windowTimeZone: scheduleTimeZone.value,
   relativeWindowTypeEnumId: usesApi.value ? relativeWindowTypeEnumId.value || undefined : undefined,
   relativeWindowCount: usesApi.value && dateWindowNeedsCount.value ? relativeWindowCount.value ?? undefined : undefined,
   customWindowStartDate: usesApi.value && dateWindowUsesCustomRange.value ? dateStartIso(customWindowStartDate.value) : undefined,
@@ -1469,7 +1485,7 @@ function hydrateAutomation(automation: AutomationRecord): void {
   relativeWindowCount.value = automation.relativeWindowCount ?? relativeWindowCount.value
   customWindowStartDate.value = dateInputValue(automation.customWindowStartDate)
   customWindowEndDate.value = automation.customWindowEndDate ? previousDateValue(automation.customWindowEndDate) : ''
-  windowTimeZone.value = automation.timezone ?? 'UTC'
+  windowTimeZone.value = normalizeTimezoneId(automation.timezone)
   isActive.value = automation.active !== false
   sourceDrafts.value = sourceDraftsFromAutomation(automation)
   handoffSavedRun.value = automation.savedRun ?? handoffSavedRun.value
@@ -1523,7 +1539,7 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   relativeWindowCount.value = draft.relativeWindowCount ?? relativeWindowCount.value
   customWindowStartDate.value = draft.customWindowStartDate?.slice(0, 10) ?? ''
   customWindowEndDate.value = draft.customWindowEndDate ? previousDateValue(draft.customWindowEndDate) : ''
-  windowTimeZone.value = draft.windowTimeZone ?? 'UTC'
+  windowTimeZone.value = normalizeTimezoneId(draft.windowTimeZone)
   isActive.value = draft.isActive ?? true
   returnLabel.value = draft.returnLabel ?? ''
   returnPath.value = draft.returnPath ?? ''
