@@ -48,6 +48,18 @@
 
         <InlineValidation v-if="activeStepError" tone="error" :message="activeStepError" />
 
+        <div v-if="activeConfigCreateTarget" class="reconciliation-create-schema-choice">
+          <p class="wizard-or" data-testid="create-config-divider">Or</p>
+          <button
+            type="button"
+            class="wizard-secondary-link reconciliation-create-schema-link"
+            data-testid="create-config-from-reconciliation"
+            @click="openConfigCreateWorkflow"
+          >
+            Add a {{ activeConfigCreateTarget.label }} config
+          </button>
+        </div>
+
         <div v-if="isSchemaSelectionStep" class="reconciliation-create-schema-choice">
           <p class="wizard-or" data-testid="create-schema-divider">Or</p>
           <button
@@ -117,9 +129,12 @@ import {
 import {
   buildCreateRuleSetRunPayload,
   fieldSharesRecordRoot,
+  type ReconciliationCreateFlowStepId,
   type ReconciliationRuleSetDraft,
+  type ReconciliationRuleSetDraftStepId,
 } from '../../lib/reconciliationRuleSetDraft'
 import {
+  canonicalDarpanSystemEnumId,
   darpanSystemEndpointOptions,
   darpanSystemHasEndpointOptions,
   darpanSystemIdsMatch,
@@ -131,29 +146,27 @@ import {
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 
-type StepId =
-  | 'run-name'
-  | 'description'
-  | 'file1-system'
-  | 'file1-endpoint'
-  | 'file1-source'
-  | 'file1-filetype'
-  | 'file1-schema'
-  | 'file1-primary-id'
-  | 'file1-api-config'
-  | 'file1-api'
-  | 'file2-system'
-  | 'file2-endpoint'
-  | 'file2-source'
-  | 'file2-filetype'
-  | 'file2-schema'
-  | 'file2-primary-id'
-  | 'file2-api-config'
-  | 'file2-api'
-  | 'ruleset-rules'
+type StepId = ReconciliationCreateFlowStepId
 
 interface WizardStep {
   id: StepId
+}
+
+/**
+ * The four things the wizard asks about, in order. Progress is measured against these rather than
+ * against the card count: the card list grows and shrinks as answers come in (an API source costs
+ * more cards than a file upload), so a card-count denominator moves under the operator and the bar
+ * slides backwards without anything being undone. Stages never change, so the bar only ever builds.
+ */
+const STAGES = ['name', 'file1', 'file2', 'rules'] as const
+// The most cards a stage can ever cost, used as that stage's denominator so the fraction within a
+// stage is computed against a constant. A stage that finishes in fewer cards jumps to the next
+// stage's floor, which is forwards -- never backwards.
+const STAGE_MAX_CARDS: Record<(typeof STAGES)[number], number> = {
+  name: 2,
+  file1: 6,
+  file2: 6,
+  rules: 1,
 }
 
 const FILE_TYPE_JSON = 'DftJson'
@@ -162,6 +175,14 @@ const SOURCE_TYPE_API = 'AUT_SRC_API'
 const SOURCE_MODE_FILE = 'file'
 const SOURCE_MODE_API = 'api'
 const SHORTCUT_KEYS = ['A', 'B', 'C', 'D', 'E', 'F']
+// Where an operator goes to create the API credentials a source needs, keyed by canonical parent
+// system. Used only by the escape hatch on the API cards: reaching one of those with an empty list
+// is a dead end, and Back is not an answer to "you have no config yet".
+const CONFIG_CREATE_TARGETS: Record<string, { path: string, label: string }> = {
+  OMS: { path: '/settings/hotwax/create', label: 'HotWax' },
+  SHOPIFY: { path: '/settings/shopify/create', label: 'Shopify' },
+  NETSUITE: { path: '/settings/netsuite/auth/create', label: 'NetSuite' },
+}
 const SYSTEM_LABEL_OVERRIDES: Record<string, string> = {
   HOTWAX: 'HotWax',
   NETSUITE: 'NetSuite',
@@ -247,56 +268,138 @@ const file2ApiSourceOptions = computed(() => apiSourceOptionsForSide('file2'))
 const file1ApiSourceStepNeeded = computed(() => file1ApiSourceOptions.value.length !== 1)
 const file2ApiSourceStepNeeded = computed(() => file2ApiSourceOptions.value.length !== 1)
 
-const steps = computed<WizardStep[]>(() => {
-  const stepList: WizardStep[] = [
-    { id: 'run-name' },
-    { id: 'description' },
-    { id: 'file1-system' },
+/**
+ * One source arm, built once and called twice. Order matters and is the whole point of the shape:
+ * "how does this source deliver data" comes BEFORE "which endpoint", because an endpoint is an API
+ * concept and asking for one first presumes an answer the operator has not given yet.
+ */
+function sourceArmSteps(side: SourceSide): WizardStep[] {
+  const armSteps: WizardStep[] = [
+    { id: `${side}-system` as StepId },
+    { id: `${side}-source` as StepId },
   ]
-  // One data point per step: system and endpoint are separate cards. Only inserted when the chosen
-  // system actually has endpoints to choose between (see darpanSystemHasEndpointOptions) — a
-  // system with none (SAPI, Database, NetSuite today) skips straight to file{n}-source, same as
-  // before this change.
-  if (file1SystemHasEndpointStep.value) stepList.push({ id: 'file1-endpoint' })
-  stepList.push({ id: 'file1-source' }, { id: 'file2-system' })
-  if (file2SystemHasEndpointStep.value) stepList.push({ id: 'file2-endpoint' })
-  stepList.push({ id: 'file2-source' })
-
-  const file2SystemIndex = stepList.findIndex((step) => step.id === 'file2-system')
-  if (file1UsesApi.value) {
-    const file1ApiSteps: WizardStep[] = [{ id: 'file1-api-config' }]
-    if (file1ApiSourceStepNeeded.value) file1ApiSteps.push({ id: 'file1-api' })
-    file1ApiSteps.push({ id: 'file1-primary-id' })
-    stepList.splice(file2SystemIndex, 0, ...file1ApiSteps)
+  if (armUsesApi(side)) {
+    // Parent before child. A config is an account on the system, and which endpoints exist is
+    // stored PER CONFIG (SourceConfigEndpointAccess), so the config has to be answered before the
+    // endpoint list can be honest. Asking the other way round offers endpoints the operator's
+    // config may not have enabled -- the dead end that used to surface two cards later.
+    armSteps.push({ id: `${side}-api-config` as StepId })
+    if (armEndpointOptions(side).length > 1) armSteps.push({ id: `${side}-endpoint` as StepId })
+    if (armNeedsApiSourceStep(side)) armSteps.push({ id: `${side}-api` as StepId })
   } else {
-    stepList.splice(file2SystemIndex, 0, { id: 'file1-filetype' }, { id: 'file1-primary-id' })
-    if (file1UsesJson.value) {
-      stepList.splice(stepList.findIndex((step) => step.id === 'file1-primary-id'), 0, { id: 'file1-schema' })
-    }
+    // No config in a file upload, so the system is the endpoint's only parent and is already
+    // answered. A system that groups nothing under it (SAPI, Database, NetSuite today) resolves to
+    // itself at the system card and never sees this one.
+    if (armHasEndpointStep(side)) armSteps.push({ id: `${side}-endpoint` as StepId })
+    armSteps.push({ id: `${side}-filetype` as StepId })
+    if (armUsesJson(side)) armSteps.push({ id: `${side}-schema` as StepId })
   }
 
-  if (file2UsesApi.value) {
-    const file2ApiSteps: WizardStep[] = [{ id: 'file2-api-config' }]
-    if (file2ApiSourceStepNeeded.value) file2ApiSteps.push({ id: 'file2-api' })
-    file2ApiSteps.push({ id: 'file2-primary-id' })
-    stepList.push(...file2ApiSteps)
-  } else {
-    stepList.push({ id: 'file2-filetype' }, { id: 'file2-primary-id' })
-    if (file2UsesJson.value) {
-      stepList.splice(stepList.findIndex((step) => step.id === 'file2-primary-id'), 0, { id: 'file2-schema' })
-    }
-  }
+  armSteps.push({ id: `${side}-primary-id` as StepId })
+  return armSteps
+}
 
+const steps = computed<WizardStep[]>(() => [
+  { id: 'run-name' },
+  { id: 'description' },
+  ...sourceArmSteps('file1'),
+  ...sourceArmSteps('file2'),
   // Final step regardless of source shape: the rules board, so comparison rules and exclusions
   // are set before the run is saved instead of in a second trip through the Ruleset Manager.
-  stepList.push({ id: 'ruleset-rules' })
+  { id: 'ruleset-rules' },
+])
 
-  return stepList
-})
+function armUsesApi(side: SourceSide): boolean {
+  return side === 'file1' ? file1UsesApi.value : file2UsesApi.value
+}
+
+function armUsesJson(side: SourceSide): boolean {
+  return side === 'file1' ? file1UsesJson.value : file2UsesJson.value
+}
+
+function armHasEndpointStep(side: SourceSide): boolean {
+  return side === 'file1' ? file1SystemHasEndpointStep.value : file2SystemHasEndpointStep.value
+}
+
+function armNeedsApiSourceStep(side: SourceSide): boolean {
+  return side === 'file1' ? file1ApiSourceStepNeeded.value : file2ApiSourceStepNeeded.value
+}
+
+function armParentEnumId(side: SourceSide): string {
+  return side === 'file1' ? file1SystemParentEnumId.value : file2SystemParentEnumId.value
+}
+
+/**
+ * The endpoints this arm may pick from. On a file upload that is every endpoint grouped under the
+ * system. On an API source it is only the endpoints the chosen config actually carries a row for,
+ * which is why the config card runs first.
+ */
+function armEndpointOptions(side: SourceSide): WorkflowSelectOption[] {
+  const allEndpoints = endpointOptionsForParent(armParentEnumId(side))
+  if (!armUsesApi(side)) return allEndpoints
+
+  const sourceConfigId = selectedSourceConfigId(side)
+  if (!sourceConfigId) return []
+  return allEndpoints.filter((option) => configCoversEndpoint(sourceConfigId, option.value))
+}
+
+/** True when list#AutomationSourceOptions returned a (config x endpoint) row for this pair. */
+function configCoversEndpoint(sourceConfigId: string, endpointEnumId: string): boolean {
+  return sourceConfigs.value.some((config) =>
+    sourceConfigMatches(config.sourceConfigId, sourceConfigId) &&
+    (!config.systemEnumId || endpointMatchesSystem(config.systemEnumId, endpointEnumId)),
+  )
+}
+
+/** The (config x endpoint) row's own config type -- the payload field that pins the extractor. */
+function resolveSourceConfigType(sourceConfigId: string, endpointEnumId: string): string {
+  const row = sourceConfigs.value.find((config) =>
+    sourceConfigMatches(config.sourceConfigId, sourceConfigId) &&
+    (!config.systemEnumId || endpointMatchesSystem(config.systemEnumId, endpointEnumId)),
+  )
+  return row?.sourceConfigType ?? ''
+}
+
+// The endpoint card is skipped when the config leaves exactly one, so resolve it here or the run
+// would be saved with a blank systemEnumId and no config type.
+function syncSoleApiEndpoint(side: SourceSide): void {
+  const options = armEndpointOptions(side)
+  if (options.length !== 1) return
+  applyApiEndpointSelection(side, options[0]!.value)
+}
+
+function applyApiEndpointSelection(side: SourceSide, endpointEnumId: string): void {
+  const sourceConfigType = resolveSourceConfigType(selectedSourceConfigId(side), endpointEnumId)
+  if (side === 'file1') {
+    file1SystemEnumId.value = endpointEnumId
+    file1SourceConfigType.value = sourceConfigType
+  } else {
+    file2SystemEnumId.value = endpointEnumId
+    file2SourceConfigType.value = sourceConfigType
+  }
+  autoSelectSoleApiSource(side)
+}
+
+/** Which of the four STAGES a card belongs to. Drives the progress bar; see STAGE_MAX_CARDS. */
+function stageOfStep(stepId: StepId): number {
+  if (stepId === 'run-name' || stepId === 'description') return 0
+  if (stepId.startsWith('file1-')) return 1
+  if (stepId.startsWith('file2-')) return 2
+  return 3
+}
 
 const currentStep = computed<WizardStep>(() => steps.value[currentStepIndex.value] ?? steps.value[steps.value.length - 1]!)
 const isCreateStep = computed(() => currentStepIndex.value === steps.value.length - 1)
-const progressPercent = computed(() => ((Math.max(1, currentStepIndex.value + 1) / steps.value.length) * 100).toFixed(2))
+const progressPercent = computed(() => {
+  const stage = stageOfStep(currentStep.value.id)
+  const stageName = STAGES[stage]!
+  const cardsInStage = steps.value.filter((step) => stageOfStep(step.id) === stage)
+  const positionInStage = Math.max(0, cardsInStage.findIndex((step) => step.id === currentStep.value.id))
+  // Denominator is the stage's constant ceiling, never its live card count, so answering a
+  // question that adds cards can only ever move the bar forwards.
+  const withinStage = Math.min((positionInStage + 1) / STAGE_MAX_CARDS[stageName], 1)
+  return (((stage + withinStage) / STAGES.length) * 100).toFixed(2)
+})
 const trimmedRunName = computed(() => runName.value.trim())
 const file1SystemLabel = computed(() => resolveSystemLabel(file1SystemEnumId.value))
 const file2SystemLabel = computed(() => resolveSystemLabel(file2SystemEnumId.value))
@@ -342,7 +445,11 @@ const currentQuestion = computed(() => {
     case 'file1-system':
       return 'Which system provides the first source?'
     case 'file1-endpoint':
-      return `Which ${resolveSystemLabel(file1SystemParentEnumId.value)} endpoint provides the first source?`
+      // Worded for the branch the operator already chose one card earlier. "Endpoint" is
+      // API vocabulary and reads as nonsense to someone about to upload a CSV.
+      return file1UsesApi.value
+        ? `Which ${resolveSystemLabel(file1SystemParentEnumId.value)} endpoint provides the first source?`
+        : `Which ${resolveSystemLabel(file1SystemParentEnumId.value)} data is in the first source file?`
     case 'file1-source':
       return `How should ${sourceSystemLabel('file1')} provide data?`
     case 'file1-filetype':
@@ -362,7 +469,11 @@ const currentQuestion = computed(() => {
     case 'file2-system':
       return 'Which system provides the second source?'
     case 'file2-endpoint':
-      return `Which ${resolveSystemLabel(file2SystemParentEnumId.value)} endpoint provides the second source?`
+      // Worded for the branch the operator already chose one card earlier. "Endpoint" is
+      // API vocabulary and reads as nonsense to someone about to upload a CSV.
+      return file2UsesApi.value
+        ? `Which ${resolveSystemLabel(file2SystemParentEnumId.value)} endpoint provides the second source?`
+        : `Which ${resolveSystemLabel(file2SystemParentEnumId.value)} data is in the second source file?`
     case 'file2-source':
       return `How should ${sourceSystemLabel('file2')} provide data?`
     case 'file2-filetype':
@@ -471,10 +582,15 @@ const activeSelectValue = computed({
         clearApiSourceConfig('file1')
         break
       case 'file1-endpoint':
-        file1SystemEnumId.value = value
         file1JsonSchemaId.value = ''
         file1PrimaryIdExpression.value = []
-        clearApiSourceConfig('file1')
+        // On the API branch the config is this card's PARENT and must survive it; only
+        // the endpoint-derived half of the selection is re-resolved here.
+        if (file1UsesApi.value) {
+          applyApiEndpointSelection('file1', value)
+        } else {
+          file1SystemEnumId.value = value
+        }
         break
       case 'file1-source':
         setSourceMode('file1', value)
@@ -502,10 +618,15 @@ const activeSelectValue = computed({
         clearApiSourceConfig('file2')
         break
       case 'file2-endpoint':
-        file2SystemEnumId.value = value
         file2JsonSchemaId.value = ''
         file2PrimaryIdExpression.value = []
-        clearApiSourceConfig('file2')
+        // On the API branch the config is this card's PARENT and must survive it; only
+        // the endpoint-derived half of the selection is re-resolved here.
+        if (file2UsesApi.value) {
+          applyApiEndpointSelection('file2', value)
+        } else {
+          file2SystemEnumId.value = value
+        }
         break
       case 'file2-source':
         setSourceMode('file2', value)
@@ -535,9 +656,9 @@ const activeSelectOptions = computed(() => {
     case 'file2-system':
       return systemOptions.value
     case 'file1-endpoint':
-      return endpointOptionsForParent(file1SystemParentEnumId.value)
+      return armEndpointOptions('file1')
     case 'file2-endpoint':
-      return endpointOptionsForParent(file2SystemParentEnumId.value)
+      return armEndpointOptions('file2')
     case 'file1-filetype':
     case 'file2-filetype':
       return fileTypeOptions.value
@@ -696,8 +817,9 @@ const currentPlaceholder = computed(() => {
     case 'file2-system':
       return 'Select system...'
     case 'file1-endpoint':
+      return file1UsesApi.value ? 'Select endpoint...' : 'Select data...'
     case 'file2-endpoint':
-      return 'Select endpoint...'
+      return file2UsesApi.value ? 'Select endpoint...' : 'Select data...'
     case 'file1-api':
     case 'file2-api':
       return 'Select API endpoint...'
@@ -841,6 +963,19 @@ const apiSourceSelectionError = computed(() => {
 
 const activeStepError = computed(() => activeSelectError.value || apiSourceSelectionError.value)
 
+// The API cards are the only ones that can strand an operator with nothing to pick and nowhere to
+// go. When one of them has an error, offer the same "Or -> go make one" exit the schema card has.
+const activeConfigCreateTarget = computed<{ path: string, label: string } | null>(() => {
+  const stepId = currentStep.value.id
+  const isApiCard = stepId === 'file1-api-config' || stepId === 'file2-api-config' ||
+    stepId === 'file1-api' || stepId === 'file2-api'
+  if (!isApiCard || !activeStepError.value) return null
+
+  const side: SourceSide = stepId.startsWith('file1') ? 'file1' : 'file2'
+  const parentEnumId = side === 'file1' ? file1SystemParentEnumId.value : file2SystemParentEnumId.value
+  return CONFIG_CREATE_TARGETS[canonicalDarpanSystemEnumId(parentEnumId)] ?? null
+})
+
 const canProceed = computed(() => {
   switch (currentStep.value.id) {
     case 'run-name':
@@ -978,10 +1113,15 @@ function resolveSelectedSchemaLabel(schemaId: string): string | undefined {
 
 type SourceSide = 'file1' | 'file2'
 
+// Falls back to the parent system's label before the generic "source N". The source card now runs
+// BEFORE the endpoint card, so file{n}SystemEnumId is still blank there for a system with
+// endpoints -- without this fallback that card would read "How should source 1 provide data?".
 function sourceSystemLabel(side: SourceSide): string {
-  return side === 'file1'
-    ? file1SystemLabel.value || 'source 1'
-    : file2SystemLabel.value || 'source 2'
+  const resolvedLabel = side === 'file1' ? file1SystemLabel.value : file2SystemLabel.value
+  if (resolvedLabel) return resolvedLabel
+
+  const parentEnumId = side === 'file1' ? file1SystemParentEnumId.value : file2SystemParentEnumId.value
+  return resolveSystemLabel(parentEnumId) || (side === 'file1' ? 'source 1' : 'source 2')
 }
 
 function apiRecordSourceLabel(side: SourceSide): string {
@@ -1000,14 +1140,36 @@ function selectedSourceConfigId(side: SourceSide): string {
   return side === 'file1' ? file1SourceConfigId.value : file2SourceConfigId.value
 }
 
+// Scoped to the PARENT system, not to a chosen endpoint: this card now runs before the endpoint
+// one. The backend returns a row per (config x endpoint), so a config with three endpoints enabled
+// arrives three times -- collapse to one option each, and let the endpoint card do the narrowing.
 function apiSourceConfigOptionsForSide(side: SourceSide): WorkflowSelectOption[] {
-  const systemEnumId = selectedSystemEnumId(side)
+  const parentEnumId = armParentEnumId(side)
+  const seenConfigIds = new Set<string>()
   return sourceConfigs.value
-    .filter((config) => sourceConfigBelongsToSystem(config, systemEnumId))
+    .filter((config) => sourceConfigBelongsToParentSystem(config, parentEnumId))
+    .filter((config) => {
+      const sourceConfigId = config.sourceConfigId?.trim() ?? ''
+      if (!sourceConfigId || seenConfigIds.has(sourceConfigId)) return false
+      seenConfigIds.add(sourceConfigId)
+      return true
+    })
     .map((config) => ({
       value: config.sourceConfigId,
       label: config.label || config.description || config.sourceConfigId,
     }))
+}
+
+// A config row carries its ENDPOINT's systemEnumId (OMS_RETURNS), so matching it against a parent
+// (OMS) means resolving that endpoint back to its parent first. A row with no systemEnumId is
+// unscoped and belongs to every system.
+function sourceConfigBelongsToParentSystem(config: AutomationSourceConfigOption, parentEnumId: string): boolean {
+  if (!config.systemEnumId?.trim()) return true
+  if (!parentEnumId) return false
+  return darpanSystemIdsMatch(
+    resolveDarpanSystemParentEnumId(config.systemEnumId, allSystemOptions.value),
+    parentEnumId,
+  )
 }
 
 function apiSourceOptionsForSide(side: SourceSide): WorkflowSelectOption[] {
@@ -1035,18 +1197,6 @@ function apiSourceOptionsForSide(side: SourceSide): WorkflowSelectOption[] {
 
 function sourceConfigMatches(candidate: string | undefined, selected: string): boolean {
   return Boolean(candidate?.trim() && selected.trim() && candidate.trim() === selected.trim())
-}
-
-function sourceConfigBelongsToSystem(config: AutomationSourceConfigOption, systemEnumId: string): boolean {
-  return !config.systemEnumId || endpointMatchesSystem(config.systemEnumId, systemEnumId)
-}
-
-function selectedSourceConfigOptionForSide(side: SourceSide, sourceConfigId: string): AutomationSourceConfigOption | null {
-  const systemEnumId = selectedSystemEnumId(side)
-  return sourceConfigs.value.find((config) =>
-    sourceConfigMatches(config.sourceConfigId, sourceConfigId) &&
-    sourceConfigBelongsToSystem(config, systemEnumId),
-  ) ?? null
 }
 
 function remoteSelectValue(remote: AutomationSystemRemoteOption): string {
@@ -1082,22 +1232,27 @@ function selectedApiSourceValue(side: SourceSide): string {
   return ''
 }
 
+/**
+ * Answer the config card. sourceConfigType is deliberately NOT set here: it belongs to a
+ * (config x endpoint) row, and the endpoint is the next card. syncSoleApiEndpoint fills both in
+ * when the config leaves exactly one endpoint and that card is skipped.
+ */
 function updateApiSourceConfig(side: SourceSide, value: string): void {
-  const selectedConfig = selectedSourceConfigOptionForSide(side, value)
   if (side === 'file1') {
-    file1SourceConfigId.value = selectedConfig?.sourceConfigId ?? ''
-    file1SourceConfigType.value = selectedConfig?.sourceConfigType ?? ''
+    file1SourceConfigId.value = value
+    file1SourceConfigType.value = ''
+    file1SystemEnumId.value = ''
     file1PrimaryIdExpression.value = []
     clearApiEndpoint('file1')
-    autoSelectSoleApiSource('file1')
-    return
+  } else {
+    file2SourceConfigId.value = value
+    file2SourceConfigType.value = ''
+    file2SystemEnumId.value = ''
+    file2PrimaryIdExpression.value = []
+    clearApiEndpoint('file2')
   }
 
-  file2SourceConfigId.value = selectedConfig?.sourceConfigId ?? ''
-  file2SourceConfigType.value = selectedConfig?.sourceConfigType ?? ''
-  file2PrimaryIdExpression.value = []
-  clearApiEndpoint('file2')
-  autoSelectSoleApiSource('file2')
+  syncSoleApiEndpoint(side)
 }
 
 // When apiSourceOptionsForSide narrows to exactly one option, the file{n}-api card is skipped
@@ -1331,8 +1486,25 @@ function boardDraftExtras(): Pick<ReconciliationRuleSetDraft, 'rules' | 'file1Ex
  * takes no props and reads only that store — has something to render and edit. Called once when
  * the wizard lands on the final step, whether by clicking through or by resuming a seeded draft.
  */
+function publishDraftForDetour(resumeStepId: ReconciliationRuleSetDraftStepId): void {
+  draftStore.setRuleSetDraft({ ...activeDraft.value, ...boardDraftExtras() }, resumeStepId)
+}
+
 function seedRuleSetBoardDraft(): void {
-  draftStore.setRuleSetDraft({ ...activeDraft.value, ...boardDraftExtras() }, 'ruleset-manager')
+  publishDraftForDetour('ruleset-manager')
+}
+
+/**
+ * Leave the wizard for a settings/schema workflow and come back to the same card with the same
+ * answers. Without the publish the draft store is empty on return and restoreDraftFromHistoryState
+ * has nothing to hydrate, so the operator restarts from card one -- which is what the schema
+ * detour did before this.
+ */
+async function openCreateDetour(path: string): Promise<void> {
+  continuingFlowElsewhere = true
+  publishDraftForDetour(currentStep.value.id)
+  draftStore.setWorkflowOrigin('Reconciliation Setup', '/reconciliation/create')
+  await router.push({ path })
 }
 
 async function restoreDraftFromHistoryState(): Promise<void> {
@@ -1461,9 +1633,13 @@ async function handlePrimarySubmit(): Promise<void> {
 }
 
 async function openSchemaCreateWorkflow(): Promise<void> {
-  continuingFlowElsewhere = true
-  draftStore.setWorkflowOrigin('Reconciliation Setup', '/reconciliation/create')
-  await router.push({ path: '/schemas/create' })
+  await openCreateDetour('/schemas/create')
+}
+
+async function openConfigCreateWorkflow(): Promise<void> {
+  const target = activeConfigCreateTarget.value
+  if (!target) return
+  await openCreateDetour(target.path)
 }
 
 function isAutomationCreateRoute(): boolean {

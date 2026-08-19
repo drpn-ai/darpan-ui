@@ -7,7 +7,33 @@ import { normalizeString } from './utils/strings'
 
 const RULESET_SOURCE_TYPE_API = 'AUT_SRC_API'
 
-export type ReconciliationRuleSetDraftStepId = 'ruleset-manager'
+/**
+ * Every card in the create-reconciliation wizard. Lives here rather than in the page because a
+ * draft records which card the operator left from, so a side trip (schema builder, settings) can
+ * put them back on it instead of at card one.
+ */
+export type ReconciliationCreateFlowStepId =
+  | 'run-name'
+  | 'description'
+  | 'file1-system'
+  | 'file1-source'
+  | 'file1-endpoint'
+  | 'file1-filetype'
+  | 'file1-schema'
+  | 'file1-api-config'
+  | 'file1-api'
+  | 'file1-primary-id'
+  | 'file2-system'
+  | 'file2-source'
+  | 'file2-endpoint'
+  | 'file2-filetype'
+  | 'file2-schema'
+  | 'file2-api-config'
+  | 'file2-api'
+  | 'file2-primary-id'
+  | 'ruleset-rules'
+
+export type ReconciliationRuleSetDraftStepId = 'ruleset-manager' | ReconciliationCreateFlowStepId
 export type ReconciliationRulePreAction = 'STRING_TO_INT' | 'STRING_TO_NUMBER'
 export type ReconciliationRulePreActionFieldSide = 'file1' | 'file2'
 

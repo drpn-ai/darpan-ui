@@ -1626,7 +1626,7 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(optionValues).not.toContain('OMS_RETURNS')
     })
 
-    it('asks for the endpoint after a system with endpoints is chosen, offering the system itself as the default plus its endpoints', async () => {
+    it('offers the system itself as the default endpoint plus its endpoints on the file branch', async () => {
       mockSystemsWithOmsEndpoint()
       const wrapper = mount(ReconciliationCreateFlowPage)
       await flushPromises()
@@ -1638,7 +1638,12 @@ describe('ReconciliationCreateFlowPage', () => {
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      expect(wrapper.text()).toContain('Which HotWax endpoint provides the first source?')
+      // Mode first: "endpoint" is API vocabulary and must not be asked before the API/file choice.
+      // On the file branch there is no config, so the system is the endpoint's only parent and the
+      // full parent-plus-children list is offered straight away.
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+
+      expect(wrapper.text()).toContain('Which HotWax data is in the first source file?')
       await wrapper.get('[data-testid="file1-endpoint-select"]').trigger('click')
       const optionValues = wrapper
         .findAll('[data-testid="workflow-select-option"]')
@@ -1674,10 +1679,11 @@ describe('ReconciliationCreateFlowPage', () => {
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+
       await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_RETURNS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
       await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('return_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
@@ -1712,10 +1718,11 @@ describe('ReconciliationCreateFlowPage', () => {
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+
       await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
       await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
@@ -1766,6 +1773,9 @@ describe('ReconciliationCreateFlowPage', () => {
       }
       expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax Returns (Reconciliation API)')
 
+      // Two cards back, not one: file1-source now sits between the endpoint and the system.
+      await wrapper.get('.wizard-back').trigger('click')
+      await flushPromises()
       await wrapper.get('.wizard-back').trigger('click')
       await flushPromises()
       // deduplicateDarpanSystemOptions relabels the OMS row to its canonical display label
@@ -1809,16 +1819,349 @@ describe('ReconciliationCreateFlowPage', () => {
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_RETURNS')
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
 
+      // Config is the endpoint's parent, so it is asked first -- and the two (config x endpoint)
+      // rows for gorjana_prod collapse into a single option here.
       await wrapper.get('[data-testid="file1-api-config-select"]').trigger('click')
-      const optionValues = wrapper
+      const configValues = wrapper
         .findAll('[data-testid="workflow-select-option"]')
         .map((option) => option.attributes('data-option-value'))
-      expect(optionValues).toContain('gorjana_prod')
+      expect(configValues).toEqual(['gorjana_prod'])
+
+      // The menu is already open from the assertion above, so pick straight from it.
+      await wrapper.get('[data-testid="workflow-select-option"][data-option-value="gorjana_prod"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      // Only then the endpoints that config actually carries a row for.
+      await wrapper.get('[data-testid="file1-endpoint-select"]').trigger('click')
+      const endpointValues = wrapper
+        .findAll('[data-testid="workflow-select-option"]')
+        .map((option) => option.attributes('data-option-value'))
+      expect(endpointValues).toEqual(['OMS', 'OMS_RETURNS'])
+    })
+  })
+  describe('source-mode ordering, escape hatches, and building progress', () => {
+    const SYSTEMS_WITH_OMS_ENDPOINT = [
+      ...SYSTEM_OPTIONS,
+      { enumId: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
+    ]
+
+    function mockSourceOptions(overrides: Record<string, unknown> = {}): void {
+      listAutomationSourceOptions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        inputModes: [],
+        sourceTypes: [],
+        relativeWindows: [],
+        fileTypes: FILE_TYPE_OPTIONS,
+        systems: SYSTEMS_WITH_OMS_ENDPOINT,
+        savedRuns: [],
+        sftpServers: [],
+        sourceConfigs: [],
+        nsRestletConfigs: [],
+        systemRemotes: [],
+        ...overrides,
+      })
+    }
+
+    async function startFlow(runName: string): Promise<ReturnType<typeof mount>> {
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+      await wrapper.get('input[name="runName"]').setValue(runName)
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      return wrapper
+    }
+
+    function readProgress(wrapper: ReturnType<typeof mount>): number {
+      return Number(wrapper.get('[role="progressbar"]').attributes('aria-valuenow'))
+    }
+
+    it('asks how the source delivers data before asking which endpoint', async () => {
+      mockSourceOptions()
+      const wrapper = await startFlow('Ordering Test')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      expect(wrapper.text()).toContain('How should HotWax provide data?')
+      expect(wrapper.find('[data-testid="file1-endpoint-select"]').exists()).toBe(false)
+    })
+
+    it('drops the endpoint wording on the file-upload branch', async () => {
+      mockSourceOptions()
+      const wrapper = await startFlow('File Branch Wording')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+
+      expect(wrapper.text()).toContain('Which HotWax data is in the first source file?')
+      expect(wrapper.text()).not.toContain('endpoint')
+    })
+
+    it('offers a way out when the system has no API config, keeping the answers so far', async () => {
+      mockSourceOptions()
+      const wrapper = await startFlow('Shopify No Config')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+
+      expect(wrapper.text()).toContain('No API configs are available for Shopify.')
+      const escape = wrapper.get('[data-testid="create-config-from-reconciliation"]')
+      expect(escape.text()).toBe('Add a Shopify config')
+
+      await escape.trigger('click')
+
+      expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledWith(
+        expect.objectContaining({ runName: 'Shopify No Config', file1SystemEnumId: 'SHOPIFY' }),
+        'file1-api-config',
+      )
+      expect(push).toHaveBeenCalledWith({ path: '/settings/shopify/create' })
+    })
+
+    it('routes the escape hatch to the settings surface that owns the chosen system', async () => {
+      mockSourceOptions()
+      const wrapper = await startFlow('HotWax No Config')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+
+      expect(wrapper.get('[data-testid="create-config-from-reconciliation"]').text()).toBe('Add a HotWax config')
+      await wrapper.get('[data-testid="create-config-from-reconciliation"]').trigger('click')
+      expect(push).toHaveBeenCalledWith({ path: '/settings/hotwax/create' })
+    })
+
+    it('hides the escape hatch while the card still has something to pick', async () => {
+      mockSourceOptions({
+        sourceConfigs: [
+          { sourceConfigId: 'SHOPIFY_MAIN', sourceConfigType: 'SHOPIFY_AUTH', label: 'Krewe Shopify', systemEnumId: 'SHOPIFY' },
+        ],
+      })
+      const wrapper = await startFlow('Shopify With Config')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+
+      expect(wrapper.find('[data-testid="create-config-from-reconciliation"]').exists()).toBe(false)
+    })
+
+    // Regression: the schema detour used to navigate away without publishing a draft, so returning
+    // hydrated nothing and the operator restarted from card one.
+    it('keeps the answers so far when leaving to build a schema', async () => {
+      const wrapper = await startFlow('Schema Detour')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+      await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftJson')
+
+      await wrapper.get('[data-testid="create-schema-from-reconciliation"]').trigger('click')
+
+      expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledWith(
+        expect.objectContaining({ runName: 'Schema Detour', file1SystemEnumId: 'OMS' }),
+        'file1-schema',
+      )
+      expect(push).toHaveBeenCalledWith({ path: '/schemas/create' })
+    })
+
+    it('never moves the progress bar backwards, even when an answer adds cards', async () => {
+      mockSourceOptions({
+        sourceConfigs: [
+          { sourceConfigId: 'SHOPIFY_MAIN', sourceConfigType: 'SHOPIFY_AUTH', label: 'Krewe Shopify', systemEnumId: 'SHOPIFY' },
+        ],
+        systemRemotes: [
+          {
+            systemMessageRemoteId: 'SHOPIFY_REMOTE',
+            description: 'Shopify',
+            label: 'Orders',
+            systemEnumId: 'SHOPIFY',
+            optionKey: 'SHOPIFY_MAIN',
+            sourceConfigId: 'SHOPIFY_MAIN',
+            sourceConfigType: 'SHOPIFY_AUTH',
+            primaryIdOptions: [{ fieldPath: '$.records[*].id', label: 'Order ID' }],
+          },
+        ],
+      })
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      const readings: number[] = [readProgress(wrapper)]
+      await wrapper.get('input[name="runName"]').setValue('Progress Builds')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      readings.push(readProgress(wrapper))
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      readings.push(readProgress(wrapper))
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      readings.push(readProgress(wrapper))
+
+      // The answer that used to make the bar retreat: API costs more cards than a file upload.
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+      readings.push(readProgress(wrapper))
+
+      await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'SHOPIFY_MAIN')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      readings.push(readProgress(wrapper))
+
+      const sorted = [...readings].sort((left, right) => left - right)
+      expect(readings).toEqual(sorted)
+      expect(readings[readings.length - 1]).toBeGreaterThan(readings[0]!)
+    })
+
+    describe('parent before child on the API branch', () => {
+      // gorjana_prod is enabled on two endpoints, krewe_oms on one. The backend returns a row per
+      // (config x endpoint), which is exactly why the config has to be answered first: the endpoint
+      // list is a property of the config, not of the system.
+      const TWO_CONFIG_FIXTURE = {
+        sourceConfigs: [
+          { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS', sourceConfigType: 'HOTWAX_OMS_REST', label: 'Gorjana Prod' },
+          { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS_RETURNS', sourceConfigType: 'HOTWAX_OMS_REST_RETURNS', label: 'Gorjana Prod' },
+          { sourceConfigId: 'krewe_oms', systemEnumId: 'OMS', sourceConfigType: 'HOTWAX_OMS_REST', label: 'Krewe OMS' },
+        ],
+        systemRemotes: [
+          {
+            systemMessageRemoteId: 'HOTWAX_ORDERS_API',
+            description: 'Orders API',
+            label: 'Orders API',
+            systemEnumId: 'OMS',
+            optionKey: 'krewe_oms',
+            sourceConfigId: 'krewe_oms',
+            sourceConfigType: 'HOTWAX_OMS_REST',
+            primaryIdOptions: [{ fieldPath: '$.records[*].orderId', label: 'Order ID' }],
+          },
+        ],
+      }
+
+      it('asks which config before which endpoint', async () => {
+        mockSourceOptions(TWO_CONFIG_FIXTURE)
+        const wrapper = await startFlow('Config First')
+
+        await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+        await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+
+        expect(wrapper.text()).toContain('Which HotWax config should this source use?')
+        expect(wrapper.find('[data-testid="file1-endpoint-select"]').exists()).toBe(false)
+      })
+
+      it('narrows the endpoint list to the endpoints the chosen config carries', async () => {
+        mockSourceOptions(TWO_CONFIG_FIXTURE)
+        const wrapper = await startFlow('Scoped Endpoints')
+
+        await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+        await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+
+        await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'gorjana_prod')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+        await wrapper.get('[data-testid="file1-endpoint-select"]').trigger('click')
+        const endpointValues = wrapper
+          .findAll('[data-testid="workflow-select-option"]')
+          .map((option) => option.attributes('data-option-value'))
+        expect(endpointValues).toEqual(['OMS', 'OMS_RETURNS'])
+      })
+
+      it('skips the endpoint card when the config carries exactly one, and still saves its config type', async () => {
+        mockSourceOptions(TWO_CONFIG_FIXTURE)
+        const wrapper = await startFlow('Sole Endpoint')
+
+        await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+        await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+
+        await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'krewe_oms')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+        // krewe_oms has one endpoint and one remote, so both cards collapse away.
+        expect(wrapper.find('[data-testid="file1-endpoint-select"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
+
+        await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].orderId')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+        await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+        await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
+        await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+        await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+        await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+        await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+        await flushPromises()
+
+        expect(createRuleSetRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            file1SystemEnumId: 'OMS',
+            file1SourceConfigId: 'krewe_oms',
+            file1SourceConfigType: 'HOTWAX_OMS_REST',
+            file1SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+          }),
+          expect.any(AbortSignal),
+        )
+      })
+
+      it('re-resolves the config type from the endpoint when the config carries several', async () => {
+        mockSourceOptions({
+          ...TWO_CONFIG_FIXTURE,
+          systemRemotes: [
+            {
+              systemMessageRemoteId: 'HOTWAX_RETURNS_API',
+              description: 'Returns API',
+              label: 'Returns API',
+              systemEnumId: 'OMS_RETURNS',
+              optionKey: 'gorjana_prod',
+              sourceConfigId: 'gorjana_prod',
+              sourceConfigType: 'HOTWAX_OMS_REST_RETURNS',
+              primaryIdOptions: [{ fieldPath: '$.records[*].returnId', label: 'Return ID' }],
+            },
+          ],
+        })
+        const wrapper = await startFlow('Returns Type')
+
+        await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+        await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+        await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'gorjana_prod')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+        await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_RETURNS')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+        await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].returnId')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+        await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+        await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
+        await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+        await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+        await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+        await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+        await flushPromises()
+
+        // The endpoint half of the (config x endpoint) row, not the config's first row.
+        expect(createRuleSetRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            file1SystemEnumId: 'OMS_RETURNS',
+            file1SourceConfigType: 'HOTWAX_OMS_REST_RETURNS',
+          }),
+          expect.any(AbortSignal),
+        )
+      })
+    })
+
+    it('reaches exactly 100 percent on the rules board', async () => {
+      const wrapper = await mountCreateFlow({ draft: apiToApiDraft })
+      expect(readProgress(wrapper)).toBe(100)
     })
   })
 })
