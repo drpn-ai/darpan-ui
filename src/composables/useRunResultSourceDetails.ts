@@ -72,6 +72,9 @@ function formatRunSourceDateRange(start: string | undefined, end: string | undef
   return formattedStart || formattedEnd
 }
 
+// SHOPIFY, OMS, AUT_SRC_API -- an id the backend stored, not something to show a person.
+const ENUM_TOKEN_LABEL = /^[A-Z][A-Z0-9_]*$/
+
 export function useRunResultSourceDetails(deps: UseRunResultSourceDetailsDeps): UseRunResultSourceDetails {
   const runSourceDetails = ref<GeneratedOutputSourceDetails | null>(null)
 
@@ -83,7 +86,13 @@ export function useRunResultSourceDetails(deps: UseRunResultSourceDetailsDeps): 
       fileNameFromPath(filePath)
     if (!fileName && !filePath) return null
 
-    const label = normalizeDisplayText(sourceFile.label) || (index === 0 ? deps.file1Label.value : deps.file2Label.value)
+    // The backend sends the raw system enum id here (SHOPIFY), while the rest of this screen shows
+    // the resolved display label (Shopify) -- so the file badge read "SHOPIFY orders-b.csv" right
+    // above a tile reading "Missing from Shopify". Prefer the resolved label, and keep the
+    // backend's only when it is a real name rather than an enum token.
+    const resolvedSideLabel = index === 0 ? deps.file1Label.value : deps.file2Label.value
+    const backendLabel = normalizeDisplayText(sourceFile.label)
+    const label = (ENUM_TOKEN_LABEL.test(backendLabel) ? resolvedSideLabel : backendLabel) || resolvedSideLabel
     const sourceFormat = normalizeDisplayText(sourceFile.sourceFormat) || fileNameFromPath(fileName).split('.').pop()?.toLowerCase() || 'json'
     return {
       key: `${sourceFile.side || index}-${filePath || fileName}`,

@@ -66,6 +66,41 @@ describe('useRunResultSourceDetails', () => {
     expect(source.showRunSourceDetails.value).toBe(true)
   })
 
+  it('shows the resolved system label rather than the raw enum token the backend sends', () => {
+    // The run-result screen showed "SHOPIFY orders-b.csv" beside a tile reading "Missing from
+    // Shopify". The badge must agree with the rest of the screen.
+    const source = useRunResultSourceDetails({
+      file1Label: computed(() => 'HotWax'),
+      file2Label: computed(() => 'Shopify'),
+    })
+    source.runSourceDetails.value = {
+      mode: 'FILES',
+      files: [
+        { side: 'file1', label: '', fileName: 'orders-a.csv', filePath: 'runs/RS/a.csv', canDownload: true },
+        { side: 'file2', label: 'SHOPIFY', fileName: 'orders-b.csv', filePath: 'runs/RS/b.csv', canDownload: true },
+      ],
+    } as never
+
+    const [file1, file2] = source.runSourceFiles.value
+    expect(file1?.label).toBe('HotWax')
+    expect(file2?.label).toBe('Shopify')
+  })
+
+  it('keeps a real backend label instead of overriding it with the side label', () => {
+    const source = useRunResultSourceDetails({
+      file1Label: computed(() => 'HotWax'),
+      file2Label: computed(() => 'Shopify'),
+    })
+    source.runSourceDetails.value = {
+      mode: 'FILES',
+      files: [
+        { side: 'file1', label: 'Orders API', fileName: 'orders-a.csv', filePath: 'runs/RS/a.csv', canDownload: true },
+      ],
+    } as never
+
+    expect(source.runSourceFiles.value[0]?.label).toBe('Orders API')
+  })
+
   it('drops entries without any file name or path', () => {
     const source = buildSourceDetails()
     source.runSourceDetails.value = {
