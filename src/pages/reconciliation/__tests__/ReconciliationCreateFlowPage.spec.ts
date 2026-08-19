@@ -188,6 +188,11 @@ async function advanceToFile1PrimaryIdStep(
     await chooseWorkflowOption(wrapper, 'file1-schema-select', 'schema-return-items')
     await flushPromises()
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+  } else {
+    // CSV now gets a schema step too, but it is skippable -- advancing with nothing selected is
+    // exactly the chip-text fallback these callers are exercising.
+    await flushPromises()
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
   }
 }
 
@@ -516,6 +521,9 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
     await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+    // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+    await flushPromises()
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
     await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
     await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
@@ -606,6 +614,9 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
     await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+    // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+    await flushPromises()
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
     await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
     await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
@@ -914,6 +925,9 @@ describe('ReconciliationCreateFlowPage', () => {
 
       await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
       await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+      // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+      await flushPromises()
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
@@ -1301,6 +1315,9 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
     await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
+    // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+    await flushPromises()
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
     await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
     await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
@@ -1685,6 +1702,9 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
       await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
+      // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+      await flushPromises()
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('return_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1694,6 +1714,9 @@ describe('ReconciliationCreateFlowPage', () => {
 
       await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
       await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+      // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+      await flushPromises()
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1724,6 +1747,9 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
       await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
+      // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+      await flushPromises()
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1733,6 +1759,9 @@ describe('ReconciliationCreateFlowPage', () => {
 
       await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
       await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+      // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+      await flushPromises()
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -2091,6 +2120,9 @@ describe('ReconciliationCreateFlowPage', () => {
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
         await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+        // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+        await flushPromises()
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
         await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -2142,6 +2174,9 @@ describe('ReconciliationCreateFlowPage', () => {
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
         await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+        // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
+        await flushPromises()
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
         await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -2164,4 +2199,103 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(readProgress(wrapper)).toBe(100)
     })
   })
+
+  describe('CSV source schema step', () => {
+    // Two schemas on the same system: one flat (a CSV column list) and one nested. The CSV picker
+    // must offer the first and hide the second -- a nested schema on a CSV side yields dotted
+    // paths no column matches, and the run then reports everything missing with no error at all.
+    const csvSchemaFixtures = [
+      { jsonSchemaId: 'SchemaFlatCsv', schemaName: 'orders.csv', description: 'CSV columns', systemEnumId: 'SHOPIFY', systemLabel: 'SHOPIFY', isFlatFieldList: true },
+      { jsonSchemaId: 'SchemaNestedJson', schemaName: 'orders.json', description: 'Nested JSON', systemEnumId: 'SHOPIFY', systemLabel: 'SHOPIFY', isFlatFieldList: false },
+    ]
+
+    const csvFlatFieldList = [
+      { fieldPath: 'status', type: 'string', required: false },
+      { fieldPath: 'orderId', type: 'string', required: false },
+      { fieldPath: 'total', type: 'string', required: false },
+    ]
+
+    beforeEach(() => {
+      listJsonSchemas.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        pagination: { pageIndex: 0, pageSize: 200, totalCount: 2, pageCount: 1 },
+        schemas: csvSchemaFixtures,
+      })
+      flattenJsonSchema.mockResolvedValue({ ok: true, messages: [], errors: [], fieldList: csvFlatFieldList })
+    })
+
+    // Stops ON the CSV schema step rather than skipping past it.
+    async function advanceToFile1CsvSchemaStep(wrapper: ReturnType<typeof mount>): Promise<void> {
+      await wrapper.get('input[name="runName"]').setValue('CSV column run')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+      await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
+      await flushPromises()
+    }
+
+    it('asks for a column list on a CSV side', async () => {
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+      await advanceToFile1CsvSchemaStep(wrapper)
+
+      expect(wrapper.text()).toContain('column list')
+      expect(wrapper.find('[data-testid="file1-schema-select"]').exists()).toBe(true)
+    })
+
+    it('omits nested schemas from the CSV schema picker', async () => {
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+      await advanceToFile1CsvSchemaStep(wrapper)
+
+      await wrapper.get('[data-testid="file1-schema-select"]').trigger('click')
+      const optionValues = wrapper
+        .findAll('[data-testid="workflow-select-option"]')
+        .map((option) => option.attributes('data-option-value'))
+
+      expect(optionValues).toContain('SchemaFlatCsv')
+      expect(optionValues).not.toContain('SchemaNestedJson')
+    })
+
+    it('falls back to typed column names when the schema step is skipped', async () => {
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+      await advanceToFile1CsvSchemaStep(wrapper)
+
+      // Nothing selected: OK must still advance, landing on today's chip-text input.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="workflow-chip-text-input"]').exists()).toBe(true)
+    })
+
+    it('shows a ranked column dropdown once a CSV schema is chosen', async () => {
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+      await advanceToFile1CsvSchemaStep(wrapper)
+
+      await chooseWorkflowOption(wrapper, 'file1-schema-select', 'SchemaFlatCsv')
+      await flushPromises()
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="workflow-chip-text-input"]').exists()).toBe(false)
+
+      await wrapper.get('[data-testid="file1-field-select"]').trigger('click')
+      const optionValues = wrapper
+        .findAll('[data-testid="workflow-select-option"]')
+        .map((option) => option.attributes('data-option-value'))
+
+      // Fixture column order is status, orderId, total -- the likely key must lift to the front.
+      expect(optionValues[0]).toBe('orderId')
+    })
+  })
+
 })

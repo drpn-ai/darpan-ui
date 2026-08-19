@@ -144,6 +144,7 @@ import {
   type DarpanSystemValueOption,
 } from '../../lib/utils/darpanSystems'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
+import { rankPrimaryIdCandidates } from '../../lib/reconciliation/primaryIdCandidates'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 
 type StepId = ReconciliationCreateFlowStepId
@@ -292,7 +293,9 @@ function sourceArmSteps(side: SourceSide): WizardStep[] {
     // itself at the system card and never sees this one.
     if (armHasEndpointStep(side)) armSteps.push({ id: `${side}-endpoint` as StepId })
     armSteps.push({ id: `${side}-filetype` as StepId })
-    if (armUsesJson(side)) armSteps.push({ id: `${side}-schema` as StepId })
+    // Both file types get the step now. For JSON it is required; for CSV it is skippable, and a
+    // skip falls through to typing column names, so no existing CSV run is forced to acquire one.
+    armSteps.push({ id: `${side}-schema` as StepId })
   }
 
   armSteps.push({ id: `${side}-primary-id` as StepId })
@@ -455,7 +458,9 @@ const currentQuestion = computed(() => {
     case 'file1-filetype':
       return `What file type does ${sourceSystemLabel('file1')} upload use?`
     case 'file1-schema':
-      return `Which saved schema describes the ${sourceSystemLabel('file1')} JSON?`
+      return file1UsesJson.value
+        ? `Which saved schema describes the ${sourceSystemLabel('file1')} JSON?`
+        : `Which column list describes the ${sourceSystemLabel('file1')} CSV?`
     case 'file1-primary-id':
       return file1UsesApi.value
         ? `Which field identifies each record from ${apiRecordSourceLabel('file1')}?`
@@ -479,7 +484,9 @@ const currentQuestion = computed(() => {
     case 'file2-filetype':
       return `What file type does ${sourceSystemLabel('file2')} upload use?`
     case 'file2-schema':
-      return `Which saved schema describes the ${sourceSystemLabel('file2')} JSON?`
+      return file2UsesJson.value
+        ? `Which saved schema describes the ${sourceSystemLabel('file2')} JSON?`
+        : `Which column list describes the ${sourceSystemLabel('file2')} CSV?`
     case 'file2-primary-id':
       return file2UsesApi.value
         ? `Which field identifies each record from ${apiRecordSourceLabel('file2')}?`
@@ -515,9 +522,9 @@ const isSelectStep = computed(() => {
     case 'file2-api':
       return true
     case 'file1-primary-id':
-      return file1UsesJson.value || file1UsesApi.value
+      return file1UsesJson.value || file1UsesApi.value || file1JsonSchemaId.value.length > 0
     case 'file2-primary-id':
-      return file2UsesJson.value || file2UsesApi.value
+      return file2UsesJson.value || file2UsesApi.value || file2JsonSchemaId.value.length > 0
     default:
       return false
   }
@@ -526,9 +533,10 @@ const isSelectStep = computed(() => {
 const isChipTextStep = computed(() => {
   switch (currentStep.value.id) {
     case 'file1-primary-id':
-      return !file1UsesJson.value && !file1UsesApi.value
+      // A CSV side that skipped the schema step still types its column names.
+      return !file1UsesJson.value && !file1UsesApi.value && file1JsonSchemaId.value.length === 0
     case 'file2-primary-id':
-      return !file2UsesJson.value && !file2UsesApi.value
+      return !file2UsesJson.value && !file2UsesApi.value && file2JsonSchemaId.value.length === 0
     default:
       return false
   }
@@ -671,13 +679,17 @@ const activeSelectOptions = computed(() => {
     case 'file2-api':
       return apiSourceOptionsForSide('file2')
     case 'file1-schema':
-      return buildSchemaOptions(file1SystemEnumId.value)
+      return buildSchemaOptions(file1SystemEnumId.value, !file1UsesJson.value)
     case 'file1-primary-id':
-      return file1UsesApi.value ? apiPrimaryIdOptions('file1') : file1UsesJson.value ? buildFieldOptions(file1JsonSchemaId.value) : []
+      return file1UsesApi.value
+        ? apiPrimaryIdOptions('file1')
+        : buildRankedFieldOptions(file1JsonSchemaId.value, file1UsesJson.value)
     case 'file2-schema':
-      return buildSchemaOptions(file2SystemEnumId.value)
+      return buildSchemaOptions(file2SystemEnumId.value, !file2UsesJson.value)
     case 'file2-primary-id':
-      return file2UsesApi.value ? apiPrimaryIdOptions('file2') : file2UsesJson.value ? buildFieldOptions(file2JsonSchemaId.value) : []
+      return file2UsesApi.value
+        ? apiPrimaryIdOptions('file2')
+        : buildRankedFieldOptions(file2JsonSchemaId.value, file2UsesJson.value)
     default:
       return []
   }
@@ -830,8 +842,9 @@ const currentPlaceholder = computed(() => {
     case 'file2-filetype':
       return 'Select file type...'
     case 'file1-schema':
+      return file1UsesJson.value ? 'Select schema...' : 'Select a column list, or continue to type them'
     case 'file2-schema':
-      return 'Select schema...'
+      return file2UsesJson.value ? 'Select schema...' : 'Select a column list, or continue to type them'
     case 'file1-primary-id':
       return file1UsesJson.value
         ? (file1JsonSchemaId.value ? 'Select ID field...' : 'Choose a schema first')
@@ -901,12 +914,15 @@ const systemSelectionError = computed(() => {
 
 const schemaSelectionError = computed(() => {
   switch (currentStep.value.id) {
+    // JSON only. On a CSV side the step is optional, so "none available" is not a dead end --
+    // and raising it here would set canProceed false and trap the user on a step they are
+    // entitled to skip, with the chip-text fallback unreachable behind it.
     case 'file1-schema':
-      return buildSchemaOptions(file1SystemEnumId.value).length === 0
+      return file1UsesJson.value && buildSchemaOptions(file1SystemEnumId.value).length === 0
         ? `No saved JSON schemas are available for ${file1SystemLabel.value || 'source 1'}.`
         : ''
     case 'file2-schema':
-      return buildSchemaOptions(file2SystemEnumId.value).length === 0
+      return file2UsesJson.value && buildSchemaOptions(file2SystemEnumId.value).length === 0
         ? `No saved JSON schemas are available for ${file2SystemLabel.value || 'source 2'}.`
         : ''
     default:
@@ -991,7 +1007,8 @@ const canProceed = computed(() => {
     case 'file1-filetype':
       return file1FileTypeEnumId.value.length > 0
     case 'file1-schema':
-      return file1JsonSchemaId.value.length > 0 && !schemaSelectionError.value
+      // Required for JSON, skippable for CSV -- a skipped CSV schema falls back to chip text.
+      return (file1UsesJson.value ? file1JsonSchemaId.value.length > 0 : true) && !schemaSelectionError.value
     case 'file1-primary-id':
       return (file1PrimaryIdExpression.value.length > 0 || hasPendingChipText.value) && !schemaFieldSelectionError.value
     case 'file1-api-config':
@@ -1010,7 +1027,7 @@ const canProceed = computed(() => {
     case 'file2-filetype':
       return file2FileTypeEnumId.value.length > 0
     case 'file2-schema':
-      return file2JsonSchemaId.value.length > 0 && !schemaSelectionError.value
+      return (file2UsesJson.value ? file2JsonSchemaId.value.length > 0 : true) && !schemaSelectionError.value
     case 'file2-primary-id':
       return (file2PrimaryIdExpression.value.length > 0 || hasPendingChipText.value) && !schemaFieldSelectionError.value
     case 'file2-api-config':
@@ -1051,7 +1068,7 @@ watch(
 )
 
 watch(file1JsonSchemaId, async (nextSchemaId) => {
-  if (!file1UsesJson.value || !nextSchemaId) return
+  if (!nextSchemaId) return
   await ensureFieldsLoaded(nextSchemaId)
   if (currentStep.value.id === 'file1-schema' && file1JsonSchemaId.value === nextSchemaId) {
     await focusActiveSelectTrigger()
@@ -1059,7 +1076,7 @@ watch(file1JsonSchemaId, async (nextSchemaId) => {
 })
 
 watch(file2JsonSchemaId, async (nextSchemaId) => {
-  if (!file2UsesJson.value || !nextSchemaId) return
+  if (!nextSchemaId) return
   await ensureFieldsLoaded(nextSchemaId)
   if (currentStep.value.id === 'file2-schema' && file2JsonSchemaId.value === nextSchemaId) {
     await focusActiveSelectTrigger()
@@ -1085,9 +1102,13 @@ function formatSchemaLabel(schema: JsonSchemaSummary): string {
   })
 }
 
-function buildSchemaOptions(systemEnumId: string): WorkflowSelectOption[] {
+function buildSchemaOptions(systemEnumId: string, requireFlat = false): WorkflowSelectOption[] {
   return jsonSchemas.value
     .filter((schema) => !systemEnumId || darpanSystemIdsMatch(schema.systemEnumId, systemEnumId))
+    // A CSV side can only carry flat columns. A nested schema here would hand the board dotted
+    // paths that no CSV column matches, and the run would match nothing with no error at all.
+    // undefined (a backend predating isFlatFieldList) reads as "not proven flat" and is excluded.
+    .filter((schema) => !requireFlat || schema.isFlatFieldList === true)
     .map((schema) => ({
       value: schema.jsonSchemaId,
       label: formatSchemaLabel(schema),
@@ -1099,6 +1120,18 @@ function buildFieldOptions(schemaId: string): WorkflowSelectOption[] {
     value: field.fieldPath,
     label: field.fieldPath,
   }))
+}
+
+// CSV columns get name-ranked so likely keys surface first. JSON keeps schema order, which is
+// meaningful there and is what every existing run and test already expects.
+function buildRankedFieldOptions(schemaId: string, usesJson: boolean): WorkflowSelectOption[] {
+  const options = buildFieldOptions(schemaId)
+  if (usesJson || !schemaId) return options
+
+  const optionsByPath = new Map(options.map((option) => [option.value, option]))
+  return rankPrimaryIdCandidates(options.map((option) => option.value))
+    .map((fieldPath) => optionsByPath.get(fieldPath))
+    .filter((option): option is WorkflowSelectOption => option !== undefined)
 }
 
 function resolveSchemaFileName(schemaId: string): string | undefined {
