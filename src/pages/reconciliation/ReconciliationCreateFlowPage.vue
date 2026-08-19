@@ -316,9 +316,6 @@ function armUsesApi(side: SourceSide): boolean {
   return side === 'file1' ? file1UsesApi.value : file2UsesApi.value
 }
 
-function armUsesJson(side: SourceSide): boolean {
-  return side === 'file1' ? file1UsesJson.value : file2UsesJson.value
-}
 
 function armHasEndpointStep(side: SourceSide): boolean {
   return side === 'file1' ? file1SystemHasEndpointStep.value : file2SystemHasEndpointStep.value

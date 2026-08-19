@@ -513,7 +513,7 @@ describe('JsonSchemaWizardPage', () => {
       await uploadSampleAndInfer(wrapper, new File([bigCsv], 'orders.csv', { type: 'text/csv' }))
 
       expect(inferFromCsvText).toHaveBeenCalledTimes(1)
-      const payload = inferFromCsvText.mock.calls[0][0]
+      const payload = inferFromCsvText.mock.calls[0]![0]
       expect(payload.isCompleteFile).toBe(false)
       expect(payload.csvText.length).toBeLessThanOrEqual(65536)
       expect(payload.csvText.startsWith('orderId,status')).toBe(true)
@@ -532,8 +532,8 @@ describe('JsonSchemaWizardPage', () => {
       await uploadSampleAndInfer(wrapper, new File([smallCsv], 'orders.csv', { type: 'text/csv' }))
 
       expect(inferFromCsvText).toHaveBeenCalledTimes(1)
-      expect(inferFromCsvText.mock.calls[0][0].isCompleteFile).toBe(true)
-      expect(inferFromCsvText.mock.calls[0][0].csvText).toBe(smallCsv)
+      expect(inferFromCsvText.mock.calls[0]![0].isCompleteFile).toBe(true)
+      expect(inferFromCsvText.mock.calls[0]![0].csvText).toBe(smallCsv)
 
       wrapper.unmount()
     })
