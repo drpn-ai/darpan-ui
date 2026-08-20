@@ -1600,11 +1600,13 @@ describe('ReconciliationCreateFlowPage', () => {
   })
 
   describe('two-step source picker (system, then endpoint)', () => {
-    // Mirrors the real DarpanSystemSource shape: OMS_RETURNS is an endpoint grouped under OMS via
-    // parentEnumId. SHOPIFY/NETSUITE carry no parentEnumId and have nothing grouped under them, so
-    // they must keep today's single-step behaviour.
+    // Mirrors the real DarpanSystemSource shape: both endpoints are grouped under OMS via
+    // parentEnumId, and they differ in kind — OMS_TRANSFER_ORDERS is a dataset anyone can export to
+    // a file, OMS_RETURNS exists only as a Reconciliation API pull. SHOPIFY/NETSUITE carry no
+    // parentEnumId and have nothing grouped under them, so they keep today's single-step behaviour.
     const SYSTEM_OPTIONS_WITH_OMS_ENDPOINT = [
       ...SYSTEM_OPTIONS,
+      { enumId: 'OMS_TRANSFER_ORDERS', label: 'HotWax Transfer Orders', parentEnumId: 'OMS' },
       { enumId: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
     ]
 
@@ -1643,7 +1645,7 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(optionValues).not.toContain('OMS_RETURNS')
     })
 
-    it('offers the system itself as the default endpoint plus its endpoints on the file branch', async () => {
+    it('offers the system itself plus its file-valid endpoints, API-only endpoints excluded, on the file branch', async () => {
       mockSystemsWithOmsEndpoint()
       const wrapper = mount(ReconciliationCreateFlowPage)
       await flushPromises()
@@ -1656,8 +1658,9 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
       // Mode first: "endpoint" is API vocabulary and must not be asked before the API/file choice.
-      // On the file branch there is no config, so the system is the endpoint's only parent and the
-      // full parent-plus-children list is offered straight away.
+      // On the file branch there is no config, so the system is the endpoint's only parent — but
+      // the question being asked is "which data is in this file", so endpoints that only an API
+      // pull can produce are not answers to it.
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
 
       expect(wrapper.text()).toContain('Which HotWax data is in the first source file?')
@@ -1665,7 +1668,8 @@ describe('ReconciliationCreateFlowPage', () => {
       const optionValues = wrapper
         .findAll('[data-testid="workflow-select-option"]')
         .map((option) => option.attributes('data-option-value'))
-      expect(optionValues).toEqual(['OMS', 'OMS_RETURNS'])
+      expect(optionValues).toEqual(['OMS', 'OMS_TRANSFER_ORDERS'])
+      expect(optionValues).not.toContain('OMS_RETURNS')
     })
 
     it('skips the endpoint step entirely for a system with no endpoints', async () => {
@@ -1684,6 +1688,99 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(wrapper.find('[data-testid="file1-endpoint-select"]').exists()).toBe(false)
     })
 
+    it('skips the endpoint card and resolves the system itself when every endpoint under it is API-only', async () => {
+      // SHOPIFY_RETURN_REFS is a per-order API lookup, so a Shopify file upload has exactly one
+      // answer left — the system itself. Asking a one-answer question is the dead card this
+      // avoids; the value still has to end up on the payload, which is what the submit proves.
+      listAutomationSourceOptions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        inputModes: [],
+        sourceTypes: [],
+        relativeWindows: [],
+        fileTypes: FILE_TYPE_OPTIONS,
+        systems: [
+          ...SYSTEM_OPTIONS,
+          { enumId: 'SHOPIFY_RETURN_REFS', label: 'Shopify Order Return References', parentEnumId: 'SHOPIFY' },
+        ],
+        savedRuns: [],
+        sftpServers: [],
+        sourceConfigs: [],
+        nsRestletConfigs: [],
+        systemRemotes: [],
+      })
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Shopify File Compare')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+      expect(wrapper.find('[data-testid="file1-endpoint-select"]').exists()).toBe(false)
+
+      await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
+      await flushPromises()
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file2-system-select', 'NETSUITE')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
+      await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+      await flushPromises()
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
+      await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+      await flushPromises()
+
+      expect(createRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({ file1SystemEnumId: 'SHOPIFY' }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    it('drops an API-only endpoint carried by a resumed file-upload draft instead of keeping it selected', async () => {
+      // Only a draft written before API-only endpoints were filtered out can hold this pairing.
+      // Leaving it selected would carry a Reconciliation API endpoint into a file run through a
+      // value the operator can no longer see in the list.
+      mockSystemsWithOmsEndpoint()
+      const draft: ReconciliationRuleSetDraft = {
+        runName: 'Stale Returns Draft',
+        file1SystemEnumId: 'OMS_RETURNS',
+        file1SystemLabel: 'HotWax Returns (Reconciliation API)',
+        file1FileTypeEnumId: 'DftJson',
+        file1JsonSchemaId: 'schema-oms-orders',
+        file1PrimaryIdExpression: ['$.orders[0].order_id'],
+        file2SystemEnumId: 'SHOPIFY',
+        file2SystemLabel: 'SHOPIFY',
+        file2FileTypeEnumId: 'DftJson',
+        file2JsonSchemaId: 'schema-shopify-orders',
+        file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
+      }
+      const wrapper = await mountCreateFlow({ draft })
+
+      let guard = 0
+      while (!wrapper.find('[data-testid="file1-endpoint-select"]').exists() && guard < 20) {
+        await wrapper.get('.wizard-back').trigger('click')
+        await flushPromises()
+        guard += 1
+      }
+
+      const endpointSelect = wrapper.get('[data-testid="file1-endpoint-select"]')
+      expect(endpointSelect.text()).not.toContain('HotWax Returns (Reconciliation API)')
+      expect(endpointSelect.text()).toContain('Select data...')
+    })
+
     it('submits the concrete endpoint enumId when a child endpoint is chosen', async () => {
       mockSystemsWithOmsEndpoint()
       const wrapper = mount(ReconciliationCreateFlowPage)
@@ -1698,7 +1795,7 @@ describe('ReconciliationCreateFlowPage', () => {
 
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
 
-      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_RETURNS')
+      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_TRANSFER_ORDERS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
       await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
@@ -1724,7 +1821,7 @@ describe('ReconciliationCreateFlowPage', () => {
       await flushPromises()
 
       expect(createRuleSetRun).toHaveBeenCalledWith(
-        expect.objectContaining({ file1SystemEnumId: 'OMS_RETURNS' }),
+        expect.objectContaining({ file1SystemEnumId: 'OMS_TRANSFER_ORDERS' }),
         expect.any(AbortSignal),
       )
     })
@@ -1778,8 +1875,8 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSystemsWithOmsEndpoint()
       const draft: ReconciliationRuleSetDraft = {
         runName: 'Returns Resume Test',
-        file1SystemEnumId: 'OMS_RETURNS',
-        file1SystemLabel: 'HotWax Returns (Reconciliation API)',
+        file1SystemEnumId: 'OMS_TRANSFER_ORDERS',
+        file1SystemLabel: 'HotWax Transfer Orders',
         file1FileTypeEnumId: 'DftJson',
         file1JsonSchemaId: 'schema-oms-orders',
         file1PrimaryIdExpression: ['$.orders[0].order_id'],
@@ -1792,15 +1889,15 @@ describe('ReconciliationCreateFlowPage', () => {
       const wrapper = await mountCreateFlow({ draft })
 
       // A seeded draft always resumes on the last step (ruleset-rules) — see mountCreateFlow's own
-      // comment. Walk back through it to reach file1-endpoint and prove the resumed OMS_RETURNS
-      // value both inserted that step (steps.value) and pre-selected it correctly.
+      // comment. Walk back through it to reach file1-endpoint and prove the resumed
+      // OMS_TRANSFER_ORDERS value both inserted that step (steps.value) and pre-selected it.
       let guard = 0
       while (!wrapper.find('[data-testid="file1-endpoint-select"]').exists() && guard < 20) {
         await wrapper.get('.wizard-back').trigger('click')
         await flushPromises()
         guard += 1
       }
-      expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax Returns (Reconciliation API)')
+      expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax Transfer Orders')
 
       // Two cards back, not one: file1-source now sits between the endpoint and the system.
       await wrapper.get('.wizard-back').trigger('click')
@@ -1871,8 +1968,11 @@ describe('ReconciliationCreateFlowPage', () => {
     })
   })
   describe('source-mode ordering, escape hatches, and building progress', () => {
+    // Both kinds of endpoint under OMS: the file branch drops the API-only one, so the file-valid
+    // one is what keeps the endpoint card on screen for the wording assertions below.
     const SYSTEMS_WITH_OMS_ENDPOINT = [
       ...SYSTEM_OPTIONS,
+      { enumId: 'OMS_TRANSFER_ORDERS', label: 'HotWax Transfer Orders', parentEnumId: 'OMS' },
       { enumId: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
     ]
 

@@ -56,6 +56,14 @@ describe('AppToggleSwitch', () => {
     expect(off.get('[data-testid="toggle-glyph-on"]').classes()).not.toContain('app-toggle-switch-glyph--visible')
   })
 
+  it('uses the power-bar pipe for on and O for off', () => {
+    // Pinned deliberately: the on glyph is U+007C, not a capital I. Plex Mono renders capital I
+    // with full serifs, which reads as a letter in the track instead of the IEC 60417 power bar.
+    const wrapper = mountSwitch()
+    expect(wrapper.get('[data-testid="toggle-glyph-on"]').text()).toBe('|')
+    expect(wrapper.get('[data-testid="toggle-glyph-off"]').text()).toBe('O')
+  })
+
   it('hides both glyphs from assistive tech, which reads aria-checked instead', () => {
     const wrapper = mountSwitch()
     expect(wrapper.get('[data-testid="toggle-glyph-on"]').attributes('aria-hidden')).toBe('true')

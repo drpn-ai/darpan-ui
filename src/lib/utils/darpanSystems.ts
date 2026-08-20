@@ -173,6 +173,29 @@ export function darpanSystemEndpointOptions<T extends DarpanSystemValueOption>(
   ]
 }
 
+// Endpoints that exist ONLY as an API pull. Their enum rows name a Reconciliation API endpoint or
+// a per-order lookup service, not a dataset anyone can hand over as a file — two of them say
+// "(Reconciliation API)" in the label the operator reads. Offering them on the file-upload branch
+// asks "which data is in this CSV?" and lists an API as a possible answer.
+//
+// A DENYLIST rather than an allowlist on purpose: a newly seeded endpoint that IS file-valid must
+// show up on its own, and the worse failure is a real dataset the operator cannot configure. The
+// backend carries no flag separating the two — every DarpanSystemSource row has a
+// SourceSystemConnector, including the top-level systems — so a new API-only endpoint has to be
+// added here by hand.
+const API_ONLY_SYSTEM_ENUM_IDS = ['OMS_RECON_ORDERS', 'OMS_RETURNS', 'SHOPIFY_RETURN_REFS']
+
+export function darpanSystemIsApiOnlyEndpoint(systemEnumId: string | null | undefined): boolean {
+  return API_ONLY_SYSTEM_ENUM_IDS.some((apiOnlyEnumId) => darpanSystemIdsMatch(apiOnlyEnumId, systemEnumId))
+}
+
+// The endpoint options a FILE source may pick from: darpanSystemEndpointOptions minus the rows
+// that only an API pull can produce. The API branch keeps the full list (it filters by which
+// endpoints the chosen config actually carries instead).
+export function excludeApiOnlyEndpointOptions<T extends { value: string }>(options: T[]): T[] {
+  return options.filter((option) => !darpanSystemIsApiOnlyEndpoint(option.value))
+}
+
 // Editing an existing automation/run only has the concrete stored systemEnumId (e.g. OMS_RETURNS).
 // Resolve which Step 1 answer that belongs to so the wizard can pre-select the right parent.
 // Top-level systems (and anything unrecognized) resolve to themselves — step 2 is then skipped,

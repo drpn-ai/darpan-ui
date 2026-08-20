@@ -9,6 +9,7 @@ import {
   darpanSystemNamePair,
   darpanSystemParentOptions,
   deduplicateDarpanSystemOptions,
+  excludeApiOnlyEndpointOptions,
   resolveDarpanSystemParentEnumId,
 } from '../utils/darpanSystems'
 
@@ -99,6 +100,27 @@ describe('darpanSystems', () => {
     ])
 
     expect(darpanSystemEndpointOptions('', 'HotWax', SYSTEM_AND_ENDPOINT_OPTIONS)).toEqual([])
+  })
+
+  it('drops API-only endpoints from the file-upload endpoint list', () => {
+    // A file upload is a dataset handed over by hand. Endpoints that only exist as API pulls are
+    // not possible answers to "which data is in this file" — and two of them say "Reconciliation
+    // API" in the label the operator reads.
+    const omsEndpoints = darpanSystemEndpointOptions('OMS', 'HotWax', SYSTEM_AND_ENDPOINT_OPTIONS)
+    expect(excludeApiOnlyEndpointOptions(omsEndpoints)).toEqual([
+      { value: 'OMS', label: 'HotWax Orders' },
+      { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax Transfer Orders' },
+    ])
+
+    // Every Shopify endpoint under the parent is an API pull, so only the system itself is left.
+    const shopifyEndpoints = darpanSystemEndpointOptions('SHOPIFY', 'Shopify', SYSTEM_AND_ENDPOINT_OPTIONS)
+    expect(excludeApiOnlyEndpointOptions(shopifyEndpoints)).toEqual([
+      { value: 'SHOPIFY', label: 'Shopify Orders' },
+    ])
+
+    // Systems with no endpoints at all are untouched.
+    expect(excludeApiOnlyEndpointOptions(darpanSystemEndpointOptions('NETSUITE', 'NetSuite', SYSTEM_AND_ENDPOINT_OPTIONS)))
+      .toEqual([{ value: 'NETSUITE', label: 'NetSuite Orders' }])
   })
 
   it('resolves the owning parent for a concrete stored systemEnumId, for edit pre-selection', () => {

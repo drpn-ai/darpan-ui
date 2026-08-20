@@ -139,6 +139,7 @@ import {
   darpanSystemHasEndpointOptions,
   darpanSystemIdsMatch,
   darpanSystemParentOptions,
+  excludeApiOnlyEndpointOptions,
   deduplicateDarpanSystemOptions,
   resolveDarpanSystemParentEnumId,
   type DarpanSystemValueOption,
@@ -254,9 +255,6 @@ const selectedFile2Schema = computed(() => jsonSchemas.value.find((schema) => sc
 const file1SchemaLabel = computed(() => (selectedFile1Schema.value ? formatSchemaLabel(selectedFile1Schema.value) : 'source 1'))
 const file2SchemaLabel = computed(() => (selectedFile2Schema.value ? formatSchemaLabel(selectedFile2Schema.value) : 'source 2'))
 
-const file1SystemHasEndpointStep = computed(() => darpanSystemHasEndpointOptions(file1SystemParentEnumId.value, allSystemOptions.value))
-const file2SystemHasEndpointStep = computed(() => darpanSystemHasEndpointOptions(file2SystemParentEnumId.value, allSystemOptions.value))
-
 // A source config now maps 1:1 to a single API endpoint for OMS/Shopify (option rows are one per
 // config x endpoint), so "which API endpoint" is redundant once the config narrows it to exactly
 // one option -- skip the card and auto-select that option instead (see updateApiSourceConfig /
@@ -285,12 +283,13 @@ function sourceArmSteps(side: SourceSide): WizardStep[] {
     // endpoint list can be honest. Asking the other way round offers endpoints the operator's
     // config may not have enabled -- the dead end that used to surface two cards later.
     armSteps.push({ id: `${side}-api-config` as StepId })
-    if (armEndpointOptions(side).length > 1) armSteps.push({ id: `${side}-endpoint` as StepId })
+    if (armHasEndpointStep(side)) armSteps.push({ id: `${side}-endpoint` as StepId })
     if (armNeedsApiSourceStep(side)) armSteps.push({ id: `${side}-api` as StepId })
   } else {
     // No config in a file upload, so the system is the endpoint's only parent and is already
-    // answered. A system that groups nothing under it (SAPI, Database, NetSuite today) resolves to
-    // itself at the system card and never sees this one.
+    // answered. A system that groups nothing under it (SAPI, Database, NetSuite today), or whose
+    // every endpoint is an API-only one this branch drops, resolves to itself in
+    // syncFileEndpointSelection and never sees this card.
     if (armHasEndpointStep(side)) armSteps.push({ id: `${side}-endpoint` as StepId })
     armSteps.push({ id: `${side}-filetype` as StepId })
     // Both file types get the step now. For JSON it is required; for CSV it is skippable, and a
@@ -317,8 +316,14 @@ function armUsesApi(side: SourceSide): boolean {
 }
 
 
+/**
+ * Whether this arm's endpoint card is worth showing: one answer is not a question. Same rule on
+ * both branches -- the API side narrows the list by the chosen config, the file side by dropping
+ * endpoints only an API pull can produce. Both can collapse it to a single answer, which
+ * syncSoleApiEndpoint / syncFileEndpointSelection then resolve without a card.
+ */
 function armHasEndpointStep(side: SourceSide): boolean {
-  return side === 'file1' ? file1SystemHasEndpointStep.value : file2SystemHasEndpointStep.value
+  return armEndpointOptions(side).length > 1
 }
 
 function armNeedsApiSourceStep(side: SourceSide): boolean {
@@ -331,12 +336,14 @@ function armParentEnumId(side: SourceSide): string {
 
 /**
  * The endpoints this arm may pick from. On a file upload that is every endpoint grouped under the
- * system. On an API source it is only the endpoints the chosen config actually carries a row for,
- * which is why the config card runs first.
+ * system MINUS the ones only an API pull can produce: the card asks which data is in the file, and
+ * "HotWax Returns (Reconciliation API)" is not an answer a file can give. On an API source it is
+ * only the endpoints the chosen config actually carries a row for, which is why the config card
+ * runs first.
  */
 function armEndpointOptions(side: SourceSide): WorkflowSelectOption[] {
   const allEndpoints = endpointOptionsForParent(armParentEnumId(side))
-  if (!armUsesApi(side)) return allEndpoints
+  if (!armUsesApi(side)) return excludeApiOnlyEndpointOptions(allEndpoints)
 
   const sourceConfigId = selectedSourceConfigId(side)
   if (!sourceConfigId) return []
@@ -366,6 +373,30 @@ function syncSoleApiEndpoint(side: SourceSide): void {
   const options = armEndpointOptions(side)
   if (options.length !== 1) return
   applyApiEndpointSelection(side, options[0]!.value)
+}
+
+/**
+ * The file branch's counterpart to syncSoleApiEndpoint, run whenever the arm's shape changes.
+ * Two jobs, both invisible otherwise:
+ *   - the card is skipped when one endpoint is left, and nothing else would ever set the value;
+ *   - a value the file branch no longer offers (an API-only endpoint picked before the arm was
+ *     switched to file, or carried by an older draft) must not survive into a file run.
+ * No-op on the API branch, which resolves its own value through applyApiEndpointSelection.
+ */
+function syncFileEndpointSelection(side: SourceSide): void {
+  if (armUsesApi(side) || !armParentEnumId(side)) return
+
+  const options = armEndpointOptions(side)
+  const currentEnumId = selectedSystemEnumId(side)
+  const resolvedEnumId = options.length === 1
+    ? options[0]!.value
+    : (options.some((option) => option.value === currentEnumId) ? currentEnumId : '')
+
+  if (side === 'file1') {
+    file1SystemEnumId.value = resolvedEnumId
+  } else {
+    file2SystemEnumId.value = resolvedEnumId
+  }
 }
 
 function applyApiEndpointSelection(side: SourceSide, endpointEnumId: string): void {
@@ -585,6 +616,7 @@ const activeSelectValue = computed({
         file1JsonSchemaId.value = ''
         file1PrimaryIdExpression.value = []
         clearApiSourceConfig('file1')
+        syncFileEndpointSelection('file1')
         break
       case 'file1-endpoint':
         file1JsonSchemaId.value = ''
@@ -621,6 +653,7 @@ const activeSelectValue = computed({
         file2JsonSchemaId.value = ''
         file2PrimaryIdExpression.value = []
         clearApiSourceConfig('file2')
+        syncFileEndpointSelection('file2')
         break
       case 'file2-endpoint':
         file2JsonSchemaId.value = ''
@@ -1016,7 +1049,7 @@ const canProceed = computed(() => {
       // When the chosen system has endpoints, file2SystemEnumId stays blank until file2-endpoint
       // resolves it — the "must differ from source 1" check applies there instead.
       return file2SystemParentEnumId.value.length > 0 &&
-        (file2SystemHasEndpointStep.value || file2SystemEnumId.value !== file1SystemEnumId.value)
+        (armHasEndpointStep('file2') || file2SystemEnumId.value !== file1SystemEnumId.value)
     case 'file2-endpoint':
       return file2SystemEnumId.value.length > 0 && file2SystemEnumId.value !== file1SystemEnumId.value
     case 'file2-source':
@@ -1360,6 +1393,7 @@ function setSourceMode(side: SourceSide, value: string): void {
       file1JsonSchemaId.value = ''
     } else {
       clearApiSourceConfig('file1')
+      syncFileEndpointSelection('file1')
     }
     return
   }
@@ -1370,6 +1404,7 @@ function setSourceMode(side: SourceSide, value: string): void {
     file2JsonSchemaId.value = ''
   } else {
     clearApiSourceConfig('file2')
+    syncFileEndpointSelection('file2')
   }
 }
 
@@ -1566,6 +1601,9 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   // one, so this must be set first or a resumeStepId targeting that step would not be found.
   file1SystemParentEnumId.value = resolveDarpanSystemParentEnumId(file1SystemEnumId.value, allSystemOptions.value)
   file2SystemParentEnumId.value = resolveDarpanSystemParentEnumId(file2SystemEnumId.value, allSystemOptions.value)
+  // A draft written before the file branch dropped API-only endpoints can still name one.
+  syncFileEndpointSelection('file1')
+  syncFileEndpointSelection('file2')
   ruleSetDraftExtras.value = {
     rules: draftState.draft.rules,
     file1ExcludeFilters: draftState.draft.file1ExcludeFilters,

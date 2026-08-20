@@ -13,13 +13,17 @@
   >
     <!-- Only the glyph in the half the knob has vacated stays visible, so the symbol and the knob
          position always agree instead of showing both states at once. Both are aria-hidden: the
-         switch role plus aria-checked is what assistive tech reads. -->
+         switch role plus aria-checked is what assistive tech reads.
+
+         The on glyph is a pipe (|), NOT a capital I: Plex Mono gives capital I full serifs, which
+         read as a letter sitting in the track rather than the IEC 60417 power bar. The pipe is also
+         the literal standard pairing with O for off. Do not "correct" it back to I. -->
     <span
       class="app-toggle-switch-glyph app-toggle-switch-glyph--on"
       :class="{ 'app-toggle-switch-glyph--visible': modelValue }"
       data-testid="toggle-glyph-on"
       aria-hidden="true"
-    >I</span>
+    >|</span>
     <span
       class="app-toggle-switch-glyph app-toggle-switch-glyph--off"
       :class="{ 'app-toggle-switch-glyph--visible': !modelValue }"
