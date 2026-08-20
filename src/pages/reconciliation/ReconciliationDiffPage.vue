@@ -211,11 +211,11 @@
                   <dd>{{ latestSavedOutput.totalDifferences ?? 0 }}</dd>
                 </div>
                 <div>
-                  <dt>Missing from {{ latestSavedOutput.file1Label || file1PromptSystemName }}</dt>
+                  <dt>Missing from {{ latestSavedOutputSystemNames.file1 }}</dt>
                   <dd>{{ latestSavedOutput.onlyInFile2Count ?? 0 }}</dd>
                 </div>
                 <div>
-                  <dt>Missing from {{ latestSavedOutput.file2Label || file2PromptSystemName }}</dt>
+                  <dt>Missing from {{ latestSavedOutputSystemNames.file2 }}</dt>
                   <dd>{{ latestSavedOutput.onlyInFile1Count ?? 0 }}</dd>
                 </div>
               </dl>
@@ -269,6 +269,7 @@ import {
   formatSavedResultDateTime,
   todayInDisplayTimeZone,
 } from '../../lib/utils/date'
+import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { useCalendarWidget, type CalendarRange } from '../../composables/useCalendarWidget'
 import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -454,6 +455,13 @@ const activeFileAccept = computed(() => {
   return ''
 })
 const latestSavedOutputRoute = computed<RouteLocationRaw | null>(() => buildRunResultRoute(latestSavedOutput.value?.fileName ?? ''))
+// The saved-result card counts records per SYSTEM, so it names the system rather than the endpoint
+// the run extracted ("Shopify Order Return References"). The upload prompts keep the endpoint name:
+// there it is what tells an operator which extract to hand over.
+const latestSavedOutputSystemNames = computed(() => darpanSystemNamePair(
+  latestSavedOutput.value?.file1Label || file1PromptSystemName.value,
+  latestSavedOutput.value?.file2Label || file2PromptSystemName.value,
+))
 const runHistoryRoute = computed<RouteLocationRaw | null>(() => {
   return reconciliationRunRouteContext.value
     ? buildReconciliationRunHistoryRoute(reconciliationRunRouteContext.value)

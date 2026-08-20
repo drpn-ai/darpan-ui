@@ -500,6 +500,7 @@ import {
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { listIconPath, playIconPath, playIconTransform } from '../../lib/iconPaths'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
+import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { useRunResultDifferences } from '../../composables/useRunResultDifferences'
 import { useRunResultDownloads } from '../../composables/useRunResultDownloads'
@@ -599,6 +600,10 @@ const diffDetailsFile1Label = computed(
 const diffDetailsFile2Label = computed(
   () => diffDetailsMeta.value.file2Label || savedOutput.value?.file2Label || file2SystemLabel.value || 'File 2',
 )
+// Difference counts are per SYSTEM, so the bucket cards name the system rather than the endpoint
+// the run extracted ("Shopify Order Return References"). The stage timeline and the compared-files
+// section keep the full labels above: there the endpoint IS the subject.
+const diffDetailsSystemNames = computed(() => darpanSystemNamePair(diffDetailsFile1Label.value, diffDetailsFile2Label.value))
 const reconciliationRunRouteContext = computed<ReconciliationRunRouteContext>(() => ({
   savedRunId: savedRunId.value,
   runName: runName.value,
@@ -972,7 +977,7 @@ const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
     {
       key: 'file-1',
       bucketKey: 'file-1',
-      label: `Missing from ${diffDetailsFile1Label.value}`,
+      label: `Missing from ${diffDetailsSystemNames.value.file1}`,
       count:
         diffDetailsSummary.value.onlyInFile2Count ??
         diffDetailBucketCounts.value['file-1'],
@@ -981,7 +986,7 @@ const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
     {
       key: 'file-2',
       bucketKey: 'file-2',
-      label: `Missing from ${diffDetailsFile2Label.value}`,
+      label: `Missing from ${diffDetailsSystemNames.value.file2}`,
       count:
         diffDetailsSummary.value.onlyInFile1Count ??
         diffDetailBucketCounts.value['file-2'],

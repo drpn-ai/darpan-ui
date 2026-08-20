@@ -188,3 +188,59 @@ export function resolveDarpanSystemParentEnumId<T extends DarpanSystemValueOptio
   const parentEnumId = match?.parentEnumId?.trim()
   return parentEnumId || trimmedSystemEnumId
 }
+
+// The top-level systems only. Endpoint ids (OMS_TRANSFER_ORDERS) are deliberately excluded: an
+// endpoint is what the collapse below reads FROM, never an answer it may return.
+const TOP_LEVEL_SYSTEM_ENUM_IDS = ['OMS', 'SHOPIFY', 'NETSUITE', 'SAPI']
+
+const TOP_LEVEL_SYSTEM_NAMES = TOP_LEVEL_SYSTEM_ENUM_IDS
+  .map((enumId) => CANONICAL_SYSTEM_LABELS[enumId])
+  .filter((name): name is string => Boolean(name))
+
+// Prefix match on a word boundary so "Shopifyish Orders" is not read as Shopify.
+function labelStartsWithSystemName(label: string, systemName: string): boolean {
+  if (label.length < systemName.length) return false
+  if (label.slice(0, systemName.length).toLowerCase() !== systemName.toLowerCase()) return false
+
+  const nextCharacter = label.charAt(systemName.length)
+  return !nextCharacter || !/[A-Za-z0-9]/.test(nextCharacter)
+}
+
+// Result surfaces count records per SYSTEM ("Missing from Shopify"), but the only name they hold is
+// the label stamped into the run output when the run executed — the endpoint enum's description
+// ("Shopify Order Return References"), or the raw enum code on runs older than the 2026-08-13 seed
+// correction ("SHOPIFY"). Resolving the system name at DISPLAY time covers both, and covers runs
+// already stored in prod, which re-stamping never could. Seed data names every endpoint
+// "<System> <what it extracts>", which is what makes the prefix read reliable; an endpoint that
+// ever breaks that convention degrades to showing its own label rather than the wrong system.
+export function darpanSystemNameFromLabel(label: string | null | undefined): string {
+  const trimmed = label?.trim() ?? ''
+  if (!trimmed) return ''
+
+  const canonicalEnumId = canonicalDarpanSystemEnumId(trimmed)
+  if (TOP_LEVEL_SYSTEM_ENUM_IDS.includes(canonicalEnumId)) {
+    const systemName = CANONICAL_SYSTEM_LABELS[canonicalEnumId]
+    if (systemName) return systemName
+  }
+
+  return TOP_LEVEL_SYSTEM_NAMES.find((systemName) => labelStartsWithSystemName(trimmed, systemName)) ?? trimmed
+}
+
+// Both sides of one run, resolved together: when two endpoints of the SAME system are compared
+// (HotWax Returns vs HotWax Transfer Orders) collapsing would print "Missing from HotWax" twice and
+// leave the two counts indistinguishable, so that pairing keeps the endpoint labels.
+export function darpanSystemNamePair(
+  file1Label: string | null | undefined,
+  file2Label: string | null | undefined,
+): { file1: string, file2: string } {
+  const file1 = file1Label?.trim() ?? ''
+  const file2 = file2Label?.trim() ?? ''
+  const file1SystemName = darpanSystemNameFromLabel(file1)
+  const file2SystemName = darpanSystemNameFromLabel(file2)
+
+  if (file1SystemName && file2SystemName && file1SystemName.toLowerCase() === file2SystemName.toLowerCase()) {
+    return { file1, file2 }
+  }
+
+  return { file1: file1SystemName, file2: file2SystemName }
+}

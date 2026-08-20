@@ -34,18 +34,20 @@
 
     <StaticPageSection v-if="attentionFailedRuns.length > 0" title="Needs Attention">
       <div class="static-page-tile-grid run-history-grid" data-testid="run-history-failed-results">
-        <article
+        <component
+          :is="failedRun.runResultId ? RouterLink : 'article'"
           v-for="failedRun in attentionFailedRuns"
           :key="failedRun.failedRunId"
           class="static-page-tile run-history-tile run-history-failed-tile"
           data-testid="run-history-failed-tile"
+          :to="failedRun.runResultId ? buildLiveRunRoute(failedRun.runResultId) : undefined"
         >
           <div class="run-history-tile__head run-history-tile__head--status">
             <span class="static-page-tile-title">{{ formatSavedResultDateTime(failedRun.failedAt) }}</span>
             <StatusBadge label="Failed" tone="danger" />
           </div>
           <p class="section-note" data-testid="run-history-failed-error">{{ failedRun.errorLine }}</p>
-        </article>
+        </component>
       </div>
     </StaticPageSection>
 
@@ -64,11 +66,11 @@
             <dd>{{ featuredOutput.totalDifferences ?? 0 }}</dd>
           </div>
           <div>
-            <dt>Missing from {{ featuredOutput.file1Label || file1SystemLabel }}</dt>
+            <dt>Missing from {{ sourceSystemNames(featuredOutput).file1 }}</dt>
             <dd>{{ featuredOutput.onlyInFile2Count ?? 0 }}</dd>
           </div>
           <div>
-            <dt>Missing from {{ featuredOutput.file2Label || file2SystemLabel }}</dt>
+            <dt>Missing from {{ sourceSystemNames(featuredOutput).file2 }}</dt>
             <dd>{{ featuredOutput.onlyInFile1Count ?? 0 }}</dd>
           </div>
         </dl>
@@ -96,11 +98,11 @@
               <dd>{{ output.totalDifferences ?? 0 }}</dd>
             </div>
             <div>
-              <dt>Missing from {{ output.file1Label || file1SystemLabel }}</dt>
+              <dt>Missing from {{ sourceSystemNames(output).file1 }}</dt>
               <dd>{{ output.onlyInFile2Count ?? 0 }}</dd>
             </div>
             <div>
-              <dt>Missing from {{ output.file2Label || file2SystemLabel }}</dt>
+              <dt>Missing from {{ sourceSystemNames(output).file2 }}</dt>
               <dd>{{ output.onlyInFile1Count ?? 0 }}</dd>
             </div>
           </dl>
@@ -194,6 +196,7 @@ import {
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { playIconPath, playIconTransform } from '../../lib/iconPaths'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
+import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 
 const GENERATED_OUTPUT_FETCH_PAGE_SIZE = 6
 const OTHER_RESULTS_BATCH_SIZE = 5
@@ -203,6 +206,9 @@ const FAILED_RUN_STATUS_ID = 'AUT_STAT_FAILED'
 
 interface FailedRunView {
   failedRunId: string
+  // Backend run id when the server row exists; empty when the failure never got one, which leaves
+  // the tile a plain article — same rule as RunningRunView.
+  runResultId: string
   failedAt: string
   errorLine: string
 }
@@ -306,6 +312,17 @@ const hasMoreHistoryPages = computed(() => (
 ))
 const hasMoreOtherOutputs = computed(() => hasMoreLoadedOtherOutputs.value || hasMoreHistoryPages.value)
 
+// These tiles count records per SYSTEM, so they name the system rather than the endpoint the run
+// extracted: a run's stamped labels are endpoint descriptions ("Shopify Order Return References"),
+// which read as noise above a difference count. Same-system runs keep the endpoint labels — see
+// darpanSystemNamePair.
+function sourceSystemNames(output: GeneratedOutput): { file1: string, file2: string } {
+  return darpanSystemNamePair(
+    output.file1Label || file1SystemLabel.value,
+    output.file2Label || file2SystemLabel.value,
+  )
+}
+
 function buildResultRoute(outputFileName: string) {
   return buildReconciliationRunResultRoute(reconciliationRunRouteContext.value, outputFileName)
 }
@@ -382,6 +399,7 @@ function buildFailedRunView(output: GeneratedOutput): FailedRunView {
   const stageLabel = failingStage ? reconciliationStageLabel(failingStage, file1SystemLabel.value, file2SystemLabel.value) : ''
   return {
     failedRunId: runResultId || generatedOutputKey(output),
+    runResultId,
     failedAt: firstText(output.completedDate, output.createdDate, output.lastUpdatedDate) || new Date().toISOString(),
     errorLine: errorMessage || (stageLabel ? `Failed during ${stageLabel}` : 'Run failed before any results were produced.'),
   }

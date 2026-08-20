@@ -5,6 +5,8 @@ import {
   darpanSystemEndpointOptions,
   darpanSystemHasEndpointOptions,
   darpanSystemIdsMatch,
+  darpanSystemNameFromLabel,
+  darpanSystemNamePair,
   darpanSystemParentOptions,
   deduplicateDarpanSystemOptions,
   resolveDarpanSystemParentEnumId,
@@ -109,5 +111,63 @@ describe('darpanSystems', () => {
     // Unrecognized/legacy value: resolves to itself so step 2 is skipped rather than crashing.
     expect(resolveDarpanSystemParentEnumId('UNKNOWN_SYSTEM', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('UNKNOWN_SYSTEM')
     expect(resolveDarpanSystemParentEnumId('', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('')
+  })
+})
+
+// Result surfaces count records per SYSTEM ("Missing from Shopify"), but the label they are handed
+// is whatever was stamped into the run output at run time — the endpoint enum's description
+// (SHOPIFY_RETURN_REFS -> "Shopify Order Return References"), or, on runs older than the 2026-08-13
+// seed correction, the shouty raw enum code ("SHOPIFY"). Both collapse to the system name here so
+// old and new runs read the same without rewriting stored output documents.
+describe('system names for result count labels', () => {
+  it('collapses endpoint descriptions to the owning system name', () => {
+    expect(darpanSystemNameFromLabel('Shopify Order Return References')).toBe('Shopify')
+    expect(darpanSystemNameFromLabel('HotWax Returns (Reconciliation API)')).toBe('HotWax')
+    expect(darpanSystemNameFromLabel('HotWax Orders (Reconciliation API)')).toBe('HotWax')
+    expect(darpanSystemNameFromLabel('HotWax Transfer Orders')).toBe('HotWax')
+  })
+
+  it('normalizes system labels stamped as raw enum ids or codes', () => {
+    expect(darpanSystemNameFromLabel('SHOPIFY')).toBe('Shopify')
+    expect(darpanSystemNameFromLabel('OMS')).toBe('HotWax')
+    expect(darpanSystemNameFromLabel('HotWax')).toBe('HotWax')
+  })
+
+  it('leaves labels it cannot place untouched', () => {
+    expect(darpanSystemNameFromLabel('Acme Feed Extract')).toBe('Acme Feed Extract')
+    expect(darpanSystemNameFromLabel('File 1')).toBe('File 1')
+    expect(darpanSystemNameFromLabel('')).toBe('')
+    expect(darpanSystemNameFromLabel(undefined)).toBe('')
+  })
+
+  it('matches the system name as a whole word, not a bare prefix', () => {
+    expect(darpanSystemNameFromLabel('Shopifyish Orders')).toBe('Shopifyish Orders')
+  })
+
+  it('collapses both sides of a cross-system run', () => {
+    expect(darpanSystemNamePair('Shopify Order Return References', 'HotWax Returns (Reconciliation API)')).toEqual({
+      file1: 'Shopify',
+      file2: 'HotWax',
+    })
+  })
+
+  // Two endpoints of one system would both render "Missing from HotWax", making the two counts
+  // indistinguishable — so that pairing keeps the endpoint labels.
+  it('keeps endpoint labels when both sides are the same system', () => {
+    expect(darpanSystemNamePair('HotWax Returns (Reconciliation API)', 'HotWax Transfer Orders')).toEqual({
+      file1: 'HotWax Returns (Reconciliation API)',
+      file2: 'HotWax Transfer Orders',
+    })
+  })
+
+  it('still collapses a known side when the other side is missing', () => {
+    expect(darpanSystemNamePair('Shopify Order Return References', '')).toEqual({
+      file1: 'Shopify',
+      file2: '',
+    })
+    expect(darpanSystemNamePair('Acme Feed Extract', 'HotWax Returns (Reconciliation API)')).toEqual({
+      file1: 'Acme Feed Extract',
+      file2: 'HotWax',
+    })
   })
 })

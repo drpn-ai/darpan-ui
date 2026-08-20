@@ -289,6 +289,44 @@ describe('ReconciliationRunHistoryPage', () => {
     vi.useRealTimers()
   })
 
+  function mockSingleOutputWithLabels(file1Label: string, file2Label: string) {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{ ...buildGeneratedOutput(31), file1Label, file2Label }],
+    })
+  }
+
+  // Prod's Returns run compares two endpoint-level sources, so the labels stamped into its output
+  // are endpoint descriptions. These tiles count records per SYSTEM, so they name the system.
+  it('names the system rather than the endpoint on the difference-count tiles', async () => {
+    mockSingleOutputWithLabels('Shopify Order Return References', 'HotWax Returns (Reconciliation API)')
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    const featuredTile = wrapper.get('[data-testid="run-history-featured-tile"]')
+    expect(featuredTile.text()).toContain('Missing from Shopify')
+    expect(featuredTile.text()).toContain('Missing from HotWax')
+    expect(featuredTile.text()).not.toContain('Return References')
+    expect(featuredTile.text()).not.toContain('Reconciliation API')
+  })
+
+  // Both sides of one system would print "Missing from HotWax" twice and leave the two counts
+  // indistinguishable, so that pairing keeps the endpoint names.
+  it('keeps endpoint names when both sides are endpoints of the same system', async () => {
+    mockSingleOutputWithLabels('HotWax Returns (Reconciliation API)', 'HotWax Transfer Orders')
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    const featuredTile = wrapper.get('[data-testid="run-history-featured-tile"]')
+    expect(featuredTile.text()).toContain('Missing from HotWax Returns (Reconciliation API)')
+    expect(featuredTile.text()).toContain('Missing from HotWax Transfer Orders')
+  })
+
   it('loads saved-run scoped results and features the most recent output above the previous results list', async () => {
     const wrapper = mount(ReconciliationRunHistoryPage)
     await flushPromises()
@@ -730,6 +768,49 @@ describe('ReconciliationRunHistoryPage', () => {
 
     const failedTile = wrapper.get('[data-testid="run-history-failed-tile"]')
     expect(failedTile.text()).toContain('Failed during Extracting SHOPIFY')
+  })
+
+  it('links a failed tile to the live run view and leaves id-less failures unlinked', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [buildFailedGeneratedOutput()],
+    })
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_FAILED',
+      currentStage: 'EXTRACT_FILE2',
+      errorMessage: 'HotWax: OMS REST request failed with status 504.',
+    })
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    // The tile shows the 255-char-truncated errorMessage; the run view it opens shows the full
+    // errorDetail and the failing step, so the failure tile must be a way in to that page.
+    const failedTile = wrapper.get('[data-testid="run-history-failed-tile"]')
+    expect(JSON.parse(failedTile.attributes('data-to') as string)).toEqual({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RUN_RESULT_FAILED' },
+      query: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
+    })
+
+    // A failure with no backend run id has no run view to open, exactly like a local pending marker.
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{ ...buildFailedGeneratedOutput(), reconciliationRunResultId: '' }],
+    })
+    const unlinkedWrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    const unlinkedTile = unlinkedWrapper.get('[data-testid="run-history-failed-tile"]')
+    expect(unlinkedTile.element.tagName).toBe('ARTICLE')
+    expect(unlinkedTile.attributes('data-to')).toBeUndefined()
   })
 
   it('clears the local pending marker when the backend run failed', async () => {

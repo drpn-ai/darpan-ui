@@ -565,8 +565,12 @@ describe('ReconciliationRunResultPage', () => {
     expect(sourceDetails.text()).toContain('SHOPIFY')
     expect(sourceDetails.text()).toContain('orders-2.csv')
     expect(sourceDetails.findAll('[data-testid="run-result-source-download"]')).toHaveLength(2)
-    expect(wrapper.text()).toContain('Missing from OMS')
-    expect(wrapper.text()).toContain('Missing from SHOPIFY')
+    // The stamped labels on this fixture are the raw enum ids ('OMS'/'SHOPIFY'), as every run
+    // recorded before the 2026-08-13 seed correction has. Difference counts are per system, so the
+    // bucket cards resolve them to system names; the source-files section above keeps what was
+    // stamped, because it names the extract that was compared.
+    expect(wrapper.text()).toContain('Missing from HotWax')
+    expect(wrapper.text()).toContain('Missing from Shopify')
     expect(wrapper.find('[data-testid="diff-bucket-rule"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Rule differences')
     expect(wrapper.findAll('[data-testid="diff-details-row"]')).toHaveLength(2)

@@ -12,6 +12,8 @@ const getAutomation = vi.hoisted(() => vi.fn())
 const listAutomationExecutions = vi.hoisted(() => vi.fn())
 const runAutomationNow = vi.hoisted(() => vi.fn())
 const deleteAutomation = vi.hoisted(() => vi.fn())
+const pauseAutomation = vi.hoisted(() => vi.fn())
+const resumeAutomation = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const permissions = vi.hoisted(() => ({
   canEditTenantSettings: true,
@@ -39,6 +41,8 @@ vi.mock('../../../lib/api/facade', () => ({
     listAutomationExecutions,
     runAutomationNow,
     deleteAutomation,
+    pauseAutomation,
+    resumeAutomation,
   },
 }))
 
@@ -176,6 +180,8 @@ describe('ReconciliationAutomationDashboardPage', () => {
     listAutomationExecutions.mockReset()
     runAutomationNow.mockReset()
     deleteAutomation.mockReset()
+    pauseAutomation.mockReset()
+    resumeAutomation.mockReset()
     vi.restoreAllMocks()
     getAutomation.mockResolvedValue({
       ok: true,
@@ -192,6 +198,8 @@ describe('ReconciliationAutomationDashboardPage', () => {
     })
     runAutomationNow.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation() })
     deleteAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], deleted: true, deletedAutomationId: 'AUT_ACTIVE_API' })
+    pauseAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation(false) })
+    resumeAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation(true) })
   })
 
   afterEach(() => {
@@ -302,10 +310,153 @@ describe('ReconciliationAutomationDashboardPage', () => {
     const wrapper = mount(ReconciliationAutomationDashboardPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Paused')
+    expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-checked')).toBe('false')
     expect(wrapper.get('[data-testid="automation-next-run"]').text()).toBe('-')
     // Previous Run is history and stays true whether or not the schedule is running.
     expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 1, 2026, 11:00 PM')
+  })
+
+  describe('active toggle', () => {
+    it('replaces the status pill with an ARIA switch reflecting the automation state', async () => {
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      const toggle = wrapper.get('[data-testid="automation-active-toggle"]')
+      expect(toggle.attributes('role')).toBe('switch')
+      expect(toggle.attributes('aria-checked')).toBe('true')
+      expect(toggle.attributes('aria-label')).toBe('Automation is running')
+      // The word the pill used to carry is gone; aria-checked is now the state carrier.
+      expect(wrapper.find('.automation-dashboard-status').exists()).toBe(false)
+    })
+
+    it('names the off state in the accessible label so the switch is not glyph-only to a screen reader', async () => {
+      getAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation(false) })
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-label')).toBe('Automation is paused')
+    })
+
+    it('pauses through pause#Automation and adopts the returned row, not save#Automation', async () => {
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="automation-active-toggle"]').trigger('click')
+      await flushPromises()
+
+      expect(pauseAutomation).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
+      expect(resumeAutomation).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-checked')).toBe('false')
+      // The response row is authoritative, so the derived Next Run cell moves with it.
+      expect(wrapper.get('[data-testid="automation-next-run"]').text()).toBe('-')
+    })
+
+    it('resumes through resume#Automation when the automation is paused', async () => {
+      getAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation(false) })
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="automation-active-toggle"]').trigger('click')
+      await flushPromises()
+
+      expect(resumeAutomation).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
+      expect(pauseAutomation).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-checked')).toBe('true')
+    })
+
+    it('flips optimistically and blocks a second click while the call is in flight', async () => {
+      let releasePause: (value: unknown) => void = () => {}
+      pauseAutomation.mockReturnValue(new Promise((resolve) => { releasePause = resolve }))
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="automation-active-toggle"]').trigger('click')
+
+      // Optimistic: the switch reads its new state before the backend has answered, so a
+      // pause never looks like a dead click on a slow connection.
+      const toggle = wrapper.get('[data-testid="automation-active-toggle"]')
+      expect(toggle.attributes('aria-checked')).toBe('false')
+      expect(toggle.attributes('aria-busy')).toBe('true')
+      expect(toggle.attributes('disabled')).toBeDefined()
+
+      await toggle.trigger('click')
+      expect(pauseAutomation).toHaveBeenCalledTimes(1)
+
+      releasePause({ ok: true, messages: [], errors: [], automation: mockAutomation(false) })
+      await flushPromises()
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-busy')).toBeUndefined()
+    })
+
+    it('reverts the optimistic flip and surfaces the error when the call fails', async () => {
+      pauseAutomation.mockRejectedValue(new ApiCallError('Your active tenant only has view access for automation changes.'))
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="automation-active-toggle"]').trigger('click')
+      await flushPromises()
+
+      // Leaving the switch off after a failed pause would claim a scheduler state that is not real.
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-checked')).toBe('true')
+      expect(wrapper.text()).toContain('Your active tenant only has view access for automation changes.')
+    })
+
+    it('falls back to a generic message when the failure is not an ApiCallError', async () => {
+      pauseAutomation.mockRejectedValue(new Error('socket hang up'))
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="automation-active-toggle"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Unable to pause automation.')
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-checked')).toBe('true')
+    })
+
+    it('disables the switch when the backend withholds the pause permission', async () => {
+      getAutomation.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        automation: { ...mockAutomation(true), permissions: { ...mockAutomation(true).permissions, canPause: false } },
+      })
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      const toggle = wrapper.get('[data-testid="automation-active-toggle"]')
+      expect(toggle.attributes('disabled')).toBeDefined()
+      // Still rendered, not hidden: the switch is this card's only statement of run state.
+      expect(toggle.attributes('aria-checked')).toBe('true')
+
+      await toggle.trigger('click')
+      expect(pauseAutomation).not.toHaveBeenCalled()
+    })
+
+    it('disables the switch for a view-only tenant', async () => {
+      permissions.canEditTenantSettings = false
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('disabled')).toBeDefined()
+    })
+
+    it('disables the switch while a run-now is in flight', async () => {
+      runAutomationNow.mockReturnValue(new Promise(() => {}))
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('disabled')).toBeDefined()
+    })
   })
 
   it('formats timestamps using the app display timezone instead of sessionInfo.timeZone', async () => {

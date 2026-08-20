@@ -54,12 +54,14 @@
               </RouterLink>
               <span v-else class="automation-dashboard-run-link">{{ savedRunLabel }}</span>
             </div>
-            <span
-              class="automation-dashboard-status"
-              :class="{ 'automation-dashboard-status--inactive': automation.active === false }"
-            >
-              {{ activeLabel }}
-            </span>
+            <AppToggleSwitch
+              :model-value="isAutomationActive"
+              :label="activeToggleLabel"
+              :disabled="!canToggleActive || actionInFlight"
+              :busy="activeToggleInFlight"
+              test-id="automation-active-toggle"
+              @update:model-value="setAutomationActive"
+            />
           </div>
 
           <dl class="automation-dashboard-detail-grid">
@@ -185,6 +187,7 @@ import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
@@ -234,6 +237,9 @@ const actionInFlight = ref(false)
 // Separate from actionInFlight, which also covers deleteAutomation(): the "Starting run..."
 // status line must not appear while a delete is in flight.
 const runNowInFlight = ref(false)
+// Separate from actionInFlight so the switch can report aria-busy for its own change only,
+// while still being disabled by any other action in flight.
+const activeToggleInFlight = ref(false)
 const error = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const weekdayLabels: Record<string, string> = {
@@ -253,7 +259,16 @@ const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunA
 const canEditAutomation = computed(() => canEditTenantSettings.value && automation.value?.permissions?.canEdit !== false)
 const canDeleteAutomation = computed(() => canEditTenantSettings.value && automation.value?.permissions?.canDelete === true)
 const canRunAutomation = computed(() => canRunActiveTenantReconciliation.value && automation.value?.permissions?.canRunNow !== false)
-const activeLabel = computed(() => (automation.value?.active === false ? 'Paused' : 'Active'))
+const isAutomationActive = computed(() => automation.value?.active !== false)
+// The switch carries no visible text, so its accessible name is the only place the state is
+// spelled out -- it has to name the state, not just the control.
+const activeToggleLabel = computed(() => (isAutomationActive.value ? 'Automation is running' : 'Automation is paused'))
+// The backend decides per row which direction is permitted; the tenant-level gate is the floor.
+const canToggleActive = computed(() => {
+  const row = automation.value
+  if (!row || !canEditTenantSettings.value) return false
+  return isAutomationActive.value ? row.permissions?.canPause !== false : row.permissions?.canResume !== false
+})
 const savedRunLabel = computed(() => automation.value?.savedRunName || automation.value?.savedRunId || 'Selected run')
 const scheduleLabel = computed(() => scheduleDisplayLabel(automation.value))
 const windowLabel = computed(() => {
@@ -734,6 +749,36 @@ async function runNow(): Promise<void> {
   }
 }
 
+async function setAutomationActive(next: boolean): Promise<void> {
+  const row = automation.value
+  if (!row || !canToggleActive.value || actionInFlight.value) return
+
+  const previous = row.active
+  actionInFlight.value = true
+  activeToggleInFlight.value = true
+  actionError.value = null
+  // Optimistic: pause/resume is a single-field write with no confirmation step, so the switch
+  // must move under the pointer rather than waiting out a round trip and reading as a dead click.
+  automation.value = { ...row, active: next }
+  try {
+    const response = next
+      ? await reconciliationFacade.resumeAutomation({ automationId: row.automationId })
+      : await reconciliationFacade.pauseAutomation({ automationId: row.automationId })
+    // Both services rebuild and return the whole row (permissions and schedule fields included),
+    // so adopting it keeps every derived cell -- Next Run especially -- consistent with the write.
+    if (response.automation) automation.value = response.automation
+  } catch (toggleError) {
+    // The optimistic state claimed a scheduler change that did not happen; put it back.
+    if (automation.value) automation.value = { ...automation.value, active: previous }
+    actionError.value = toggleError instanceof ApiCallError
+      ? toggleError.message
+      : `Unable to ${next ? 'resume' : 'pause'} automation.`
+  } finally {
+    activeToggleInFlight.value = false
+    actionInFlight.value = false
+  }
+}
+
 async function deleteAutomation(): Promise<void> {
   if (!automation.value || !canDeleteAutomation.value || actionInFlight.value) return
   if (!window.confirm(`Delete automation "${automation.value.automationName}"?`)) return
@@ -804,26 +849,6 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.automation-dashboard-status {
-  flex: 0 0 auto;
-  min-height: 2rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 var(--space-2);
-  border: 1px solid color-mix(in oklab, var(--accent) 36%, var(--border));
-  border-radius: var(--radius-pill);
-  color: var(--text);
-  background: color-mix(in oklab, var(--accent) 10%, transparent);
-  font-size: var(--type-muted-size);
-}
-
-.automation-dashboard-status--inactive {
-  border-color: var(--border);
-  color: var(--text-soft);
-  background: transparent;
-}
-
 .automation-dashboard-detail-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -879,7 +904,7 @@ onMounted(() => {
     display: grid;
   }
 
-  .automation-dashboard-status {
+  .automation-dashboard-setup-head :deep(.app-toggle-switch) {
     justify-self: start;
   }
 
