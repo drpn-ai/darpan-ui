@@ -1,6 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { GeneratedOutputSourceDetails, GeneratedOutputSourceFile } from '../lib/api/types'
 import { fileNameFromPath, normalizeDisplayText, normalizeDisplayToken } from '../lib/reconciliationDisplay'
+import { darpanSystemNameFromLabel, darpanSystemNamePair } from '../lib/utils/darpanSystems'
 import { addDays, displayCalendarDayOf, startOfLocalDay } from '../lib/utils/date'
 
 export interface RunSourceFileView {
@@ -105,11 +106,27 @@ export function useRunResultSourceDetails(deps: UseRunResultSourceDetailsDeps): 
     }
   }
 
-  const runSourceFiles = computed<RunSourceFileView[]>(() =>
-    (runSourceDetails.value?.files ?? [])
+  // The label the backend stamps into a run is the ENDPOINT the extract used ("HotWax Returns
+  // (Reconciliation API)"), but a file belongs to a system -- so name the system, matching the
+  // difference tiles beside it and leaving room for the file name. Resolved as a PAIR, never one
+  // side at a time: two endpoints of the same system would both collapse to "HotWax" and leave the
+  // two files indistinguishable, and darpanSystemNamePair keeps the endpoint labels for exactly
+  // that case.
+  const runSourceFiles = computed<RunSourceFileView[]>(() => {
+    const files = (runSourceDetails.value?.files ?? [])
       .map((sourceFile, index) => normalizeRunSourceFile(sourceFile, index))
-      .filter((sourceFile): sourceFile is RunSourceFileView => sourceFile !== null),
-  )
+      .filter((sourceFile): sourceFile is RunSourceFileView => sourceFile !== null)
+
+    if (files.length === 2) {
+      const systemNames = darpanSystemNamePair(files[0]!.label, files[1]!.label)
+      return [
+        { ...files[0]!, label: systemNames.file1 },
+        { ...files[1]!, label: systemNames.file2 },
+      ]
+    }
+
+    return files.map((file) => ({ ...file, label: darpanSystemNameFromLabel(file.label) || file.label }))
+  })
   const isApiRunSource = computed(() => {
     const mode = normalizeDisplayToken(runSourceDetails.value?.mode)
     return mode.includes('api') || Boolean(runSourceDetails.value?.dateRange?.start || runSourceDetails.value?.dateRange?.end)

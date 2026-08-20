@@ -560,9 +560,10 @@ describe('ReconciliationRunResultPage', () => {
     expect(editableTitle.classes()).toContain('static-page-inline-edit-title')
     const sourceDetails = wrapper.get('[data-testid="run-result-source-details"]')
     expect(sourceDetails.text()).toContain('Source files')
-    expect(sourceDetails.text()).toContain('OMS')
+    // The chip names the SYSTEM, not the raw enum id the backend stamped into the run.
+    expect(sourceDetails.text()).toContain('HotWax')
     expect(sourceDetails.text()).toContain('orders-1.csv')
-    expect(sourceDetails.text()).toContain('SHOPIFY')
+    expect(sourceDetails.text()).toContain('Shopify')
     expect(sourceDetails.text()).toContain('orders-2.csv')
     expect(sourceDetails.findAll('[data-testid="run-result-source-download"]')).toHaveLength(2)
     // The stamped labels on this fixture are the raw enum ids ('OMS'/'SHOPIFY'), as every run
@@ -1553,7 +1554,7 @@ describe('ReconciliationRunResultPage', () => {
 
     const sourceDetails = wrapper.get('[data-testid="run-result-source-details"]')
     expect(sourceDetails.text()).toContain('RS_LIVE_file1.json')
-    expect(sourceDetails.text()).toContain('OMS')
+    expect(sourceDetails.text()).toContain('HotWax')
     expect(sourceDetails.text()).toContain('Jul 30, 2026')
     expect(sourceDetails.text()).not.toContain('file2')
   })

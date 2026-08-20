@@ -51,16 +51,18 @@ describe('useRunResultSourceDetails', () => {
     } as never
 
     const [file1, file2] = source.runSourceFiles.value
+    // Labels come out as system NAMES, so a raw enum token from either the backend or the side
+    // label resolves to the name the rest of the screen uses.
     expect(file1).toEqual({
       key: 'file1-runs/RS/file1/orders-1.csv',
-      label: 'OMS',
+      label: 'HotWax',
       fileName: 'orders-1.csv',
       filePath: 'runs/RS/file1/orders-1.csv',
       sourceFormat: 'csv',
       downloadFileName: 'orders-1.csv',
       canDownload: true,
     })
-    expect(file2?.label).toBe('SHOPIFY')
+    expect(file2?.label).toBe('Shopify')
     // No file path means the entry renders but cannot be downloaded.
     expect(file2?.canDownload).toBe(false)
     expect(source.showRunSourceDetails.value).toBe(true)
@@ -84,6 +86,44 @@ describe('useRunResultSourceDetails', () => {
     const [file1, file2] = source.runSourceFiles.value
     expect(file1?.label).toBe('HotWax')
     expect(file2?.label).toBe('Shopify')
+  })
+
+  it('names the system rather than the endpoint the run extracted', () => {
+    // The backend stamps the endpoint enum's description into the run output, so the compared-files
+    // chips read "Shopify Order Return References" / "HotWax Returns (Reconciliation API)" -- the
+    // transport, not the system, and long enough to truncate the file name beside it.
+    const source = useRunResultSourceDetails({
+      file1Label: computed(() => 'Shopify Order Return References'),
+      file2Label: computed(() => 'HotWax Returns (Reconciliation API)'),
+    })
+    source.runSourceDetails.value = {
+      mode: 'API',
+      files: [
+        { side: 'file1', label: 'Shopify Order Return References', fileName: 'RS_RETURNS_PROD_file1.json', filePath: 'runs/RS/a.json', canDownload: true },
+        { side: 'file2', label: 'HotWax Returns (Reconciliation API)', fileName: 'RS_RETURNS_PROD_file2.json', filePath: 'runs/RS/b.json', canDownload: true },
+      ],
+    }
+
+    expect(source.runSourceFiles.value.map((file) => file.label)).toEqual(['Shopify', 'HotWax'])
+  })
+
+  it('keeps the endpoint labels when both sides are endpoints of the same system', () => {
+    // Collapsing here would print "HotWax" on both chips and leave the two files
+    // indistinguishable, which is worse than the endpoint name being long.
+    const source = useRunResultSourceDetails({
+      file1Label: computed(() => 'HotWax Returns (Reconciliation API)'),
+      file2Label: computed(() => 'HotWax Transfer Orders'),
+    })
+    source.runSourceDetails.value = {
+      mode: 'API',
+      files: [
+        { side: 'file1', label: 'HotWax Returns (Reconciliation API)', fileName: 'a.json', filePath: 'runs/RS/a.json', canDownload: true },
+        { side: 'file2', label: 'HotWax Transfer Orders', fileName: 'b.json', filePath: 'runs/RS/b.json', canDownload: true },
+      ],
+    }
+
+    expect(source.runSourceFiles.value.map((file) => file.label))
+      .toEqual(['HotWax Returns (Reconciliation API)', 'HotWax Transfer Orders'])
   })
 
   it('keeps a real backend label instead of overriding it with the side label', () => {
