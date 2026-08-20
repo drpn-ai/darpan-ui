@@ -220,6 +220,40 @@ describe('auth state', () => {
     await expect(useAuthStore().saveActiveTenant('TENANT_B')).resolves.toBe(false)
   })
 
+  it('starts with no deep-link tenant switch to announce', async () => {
+    const { useAuthStore } = await import('../auth')
+
+    expect(useAuthStore().deepLinkTenantSwitch).toBeNull()
+  })
+
+  it('remembers the tenant a deep link switched into', async () => {
+    const { useAuthStore } = await import('../auth')
+
+    const store = useAuthStore()
+    store.noteDeepLinkTenantSwitch('Gorjana')
+
+    expect(store.deepLinkTenantSwitch).toBe('Gorjana')
+  })
+
+  it('clears the announcement when the tenant is switched again', async () => {
+    saveActiveTenantRpc.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      authenticated: true,
+      sessionInfo: { userId: 'backend-user', username: 'backend', activeTenantUserGroupId: 'TENANT_C' },
+    })
+
+    const { useAuthStore } = await import('../auth')
+
+    const store = useAuthStore()
+    store.noteDeepLinkTenantSwitch('Gorjana')
+    await store.switchActiveTenant('TENANT_C')
+
+    // A later switch means the banner's statement is no longer true.
+    expect(store.deepLinkTenantSwitch).toBeNull()
+  })
+
   it('updates the authenticated session when user settings change', async () => {
     saveUserSettingsRpc.mockResolvedValue({
       ok: true,

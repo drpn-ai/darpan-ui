@@ -155,6 +155,10 @@ export const useAuthStore = defineStore('auth', () => {
   // Set only by a login whose credentials were correct but whose account cannot sign in until its password
   // changes. LoginPage reads it to offer the change inline instead of a dead-end error.
   const _passwordChangeReason = ref<PasswordChangeReason | null>(null)
+  // The tenant a deep link switched into, held so the shell can say so. Persistent by design:
+  // the active tenant is a server-side user preference shared by every tab, so this describes a
+  // condition that stays true, not an event that already passed.
+  const _deepLinkTenantSwitch = ref<string | null>(null)
   // Single in-flight ensureAuthenticated promise. Without this, concurrent 401 callbacks (e.g.
   // every page-init API call fans out and all 401 at once) each schedule their own getSessionInfo
   // call, stampeding the auth endpoint and producing flicker in the UI status. Mirror the
@@ -166,9 +170,14 @@ export const useAuthStore = defineStore('auth', () => {
   const status = computed(() => _status.value)
   const sessionInfo = computed(() => _sessionInfo.value)
   const passwordChangeReason = computed(() => _passwordChangeReason.value)
+  const deepLinkTenantSwitch = computed(() => _deepLinkTenantSwitch.value)
   const authenticated = computed(() => _status.value === 'authenticated')
   const userId = computed(() => _sessionInfo.value?.userId ?? null)
   const username = computed(() => _sessionInfo.value?.username ?? _sessionInfo.value?.userId ?? null)
+
+  function noteDeepLinkTenantSwitch(tenantLabel: string): void {
+    _deepLinkTenantSwitch.value = tenantLabel?.toString()?.trim() || null
+  }
 
   function _applyAuthState(nextState: {
     status: AuthStatus
@@ -354,6 +363,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function switchActiveTenant(activeTenantUserGroupId: string): Promise<TenantSwitchOutcome> {
     if (authBypass) {
+      _deepLinkTenantSwitch.value = null
       clearApiResponseCache()
       _hydrateReferenceData()
       return 'switched'
@@ -363,7 +373,13 @@ export const useAuthStore = defineStore('auth', () => {
       const response: SaveActiveTenantResponse = await authFacade.saveActiveTenant(activeTenantUserGroupId)
       if (response.authenticated) {
         const errorMessage = response.ok ? null : response.errors?.[0] ?? 'Unable to switch tenant.'
-        if (response.ok) clearApiResponseCache()
+        if (response.ok) {
+          // Any successful switch invalidates a standing deep-link announcement: whatever the
+          // banner said about the current tenant stopped being true here. The guard re-raises it
+          // right after when the switch came from a link.
+          _deepLinkTenantSwitch.value = null
+          clearApiResponseCache()
+        }
         _applyAuthenticatedSession(response.sessionInfo, errorMessage)
         if (response.ok) _hydrateReferenceData()
         // The backend answered and said no. That is a permission verdict.
@@ -609,11 +625,13 @@ export const useAuthStore = defineStore('auth', () => {
     userId,
     username,
     passwordChangeReason,
+    deepLinkTenantSwitch,
     ensureAuthenticated,
     handleExternalAuthChange,
     loginWithCredentials,
     logoutSession,
     switchActiveTenant,
+    noteDeepLinkTenantSwitch,
     saveActiveTenant,
     saveUserSettings,
     saveTenantSettings,
