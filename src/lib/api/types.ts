@@ -752,6 +752,16 @@ export interface RunAutomationNowResponse extends ApiEnvelope {
   runResult?: Record<string, unknown> | null
 }
 
+// pause#Automation and resume#Automation each return the fully rebuilt automation row, not just
+// an ok flag -- the caller can adopt it directly instead of refetching.
+export interface PauseAutomationResponse extends ApiEnvelope {
+  automation?: AutomationRecord | null
+}
+
+export interface ResumeAutomationResponse extends ApiEnvelope {
+  automation?: AutomationRecord | null
+}
+
 export interface ListAutomationExecutionsResponse extends PaginatedResponse {
   executions: AutomationExecutionSummary[]
 }
@@ -893,6 +903,10 @@ export interface JsonSchemaSummary {
   companyUserGroupId?: string
   companyLabel?: string
   statusId?: string
+  // True when every field flattens to a top-level scalar. CSV sides can only use flat schemas:
+  // a nested one hands the rules board dotted paths no CSV column matches. Optional because a
+  // backend predating this field returns undefined, which must read as "not proven flat".
+  isFlatFieldList?: boolean
   createdDate?: string
   lastUpdatedStamp?: string
 }

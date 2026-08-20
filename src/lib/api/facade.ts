@@ -57,6 +57,8 @@ import type {
   RevokeConfigTenantAccessResponse,
   RunAutomationNowResponse,
   RunSavedRunDiffResponse,
+  PauseAutomationResponse,
+  ResumeAutomationResponse,
   SaveAutomationResponse,
   SaveJsonSchemaTextResponse,
   SaveLlmSettingsResponse,
@@ -103,6 +105,7 @@ import type {
   GetLlmSettingsPayload,
   GetMappingPayload,
   GetShopifyAuthConfigPayload,
+  InferJsonSchemaFromCsvTextPayload,
   InferJsonSchemaFromTextPayload,
   ListAutomationExecutionsPayload,
   ListAutomationsPayload,
@@ -116,6 +119,8 @@ import type {
   ListSftpServersPayload,
   ListShopifyAuthConfigsPayload,
   ListSourceConfigEndpointsPayload,
+  PauseAutomationPayload,
+  ResumeAutomationPayload,
   RunAutomationNowPayload,
   RunSavedRunDiffPayload,
   SaveAutomationPayload,
@@ -192,6 +197,7 @@ const JSON_SCHEMA = {
   get: 'facade.JsonSchemaFacadeServices.get#JsonSchema',
   saveText: 'facade.JsonSchemaFacadeServices.save#JsonSchemaText',
   inferFromText: 'facade.JsonSchemaFacadeServices.infer#JsonSchemaFromText',
+  inferFromCsvText: 'facade.JsonSchemaFacadeServices.infer#JsonSchemaFromCsvText',
   validateText: 'facade.JsonSchemaFacadeServices.validate#JsonTextAgainstSchema',
   flatten: 'facade.JsonSchemaFacadeServices.flatten#JsonSchema',
   saveRefined: 'facade.JsonSchemaFacadeServices.save#RefinedSchema',
@@ -217,6 +223,8 @@ const RECONCILIATION = {
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
   deleteAutomation: 'facade.ReconciliationFacadeServices.delete#Automation',
   runAutomationNow: 'facade.ReconciliationFacadeServices.run#AutomationNow',
+  pauseAutomation: 'facade.ReconciliationFacadeServices.pause#Automation',
+  resumeAutomation: 'facade.ReconciliationFacadeServices.resume#Automation',
   listAutomationExecutions: 'facade.ReconciliationFacadeServices.list#AutomationExecutions',
   listAutomationSourceOptions: 'facade.ReconciliationFacadeServices.list#AutomationSourceOptions',
   subscribeRunNotification: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
@@ -356,6 +364,9 @@ export const jsonSchemaFacade = {
   inferFromText(payload: InferJsonSchemaFromTextPayload, signal?: AbortSignal): Promise<InferJsonSchemaResponse> {
     return callService<InferJsonSchemaResponse>(JSON_SCHEMA.inferFromText, payload, signal)
   },
+  inferFromCsvText(payload: InferJsonSchemaFromCsvTextPayload, signal?: AbortSignal): Promise<InferJsonSchemaResponse> {
+    return callService<InferJsonSchemaResponse>(JSON_SCHEMA.inferFromCsvText, payload, signal)
+  },
   validateText(payload: ValidateJsonTextPayload, signal?: AbortSignal): Promise<ValidateJsonResponse> {
     return callService<ValidateJsonResponse>(JSON_SCHEMA.validateText, payload, signal)
   },
@@ -430,6 +441,12 @@ export const reconciliationFacade = {
   },
   runAutomationNow(payload: RunAutomationNowPayload, signal?: AbortSignal): Promise<RunAutomationNowResponse> {
     return callService<RunAutomationNowResponse>(RECONCILIATION.runAutomationNow, payload, signal)
+  },
+  pauseAutomation(payload: PauseAutomationPayload, signal?: AbortSignal): Promise<PauseAutomationResponse> {
+    return callService<PauseAutomationResponse>(RECONCILIATION.pauseAutomation, payload, signal)
+  },
+  resumeAutomation(payload: ResumeAutomationPayload, signal?: AbortSignal): Promise<ResumeAutomationResponse> {
+    return callService<ResumeAutomationResponse>(RECONCILIATION.resumeAutomation, payload, signal)
   },
   listAutomationExecutions(payload: ListAutomationExecutionsPayload, signal?: AbortSignal): Promise<ListAutomationExecutionsResponse> {
     return callService<ListAutomationExecutionsResponse>(RECONCILIATION.listAutomationExecutions, payload, signal)

@@ -224,6 +224,14 @@ export interface InferJsonSchemaFromTextPayload {
   jsonText: string
 }
 
+export interface InferJsonSchemaFromCsvTextPayload {
+  // Head slice of the upload, not necessarily the whole file.
+  csvText: string
+  // Whether csvText is the entire file. A truncated header and a complete header-only file with
+  // no trailing newline are byte-identical; this is the only thing that separates them.
+  isCompleteFile: boolean
+}
+
 export interface ValidateJsonTextPayload {
   jsonText?: string
   jsonSchemaId?: string
@@ -419,6 +427,14 @@ export interface DeleteAutomationPayload {
 }
 
 export interface RunAutomationNowPayload {
+  automationId: string
+}
+
+export interface PauseAutomationPayload {
+  automationId: string
+}
+
+export interface ResumeAutomationPayload {
   automationId: string
 }
 
