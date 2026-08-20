@@ -1164,6 +1164,62 @@ describe('App shell logout', () => {
     expect(replace).toHaveBeenCalledWith({ name: 'login' })
   })
 
+  it('reports recovery to the API client and stays put when the session re-verifies as valid', async () => {
+    // get#SessionInfo restores the session from the persistent-login cookie, so the re-check
+    // answers "authenticated" for a call the backend just rejected. Redirecting here would make
+    // the user retype credentials they still hold; the client retries the call instead.
+    ensureAuthenticated.mockResolvedValue(true)
+    route.name = 'reconciliation-automation-dashboard'
+    route.path = '/reconciliation/automations/100051'
+    route.fullPath = '/reconciliation/automations/100051'
+    route.meta = {}
+
+    mountApp()
+    await flushPromises()
+    replace.mockClear()
+
+    const recovered = await authRequiredHandlerRef.current?.({
+      message: 'User must be logged in to call service facade.X.list#Y',
+      method: 'facade.X.list#Y',
+      candidateUrl: '/rpc/json',
+      status: 401,
+      recoveryExhausted: false,
+    })
+
+    expect(recovered).toBe(true)
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('routes to login without re-probing once the recovery retry is spent', async () => {
+    // A session that re-verifies as valid but still cannot call a service is not usable. Probing
+    // again would just return "authenticated" a second time and strand the user on the error.
+    ensureAuthenticated.mockResolvedValue(true)
+    route.name = 'reconciliation-automation-dashboard'
+    route.path = '/reconciliation/automations/100051'
+    route.fullPath = '/reconciliation/automations/100051'
+    route.meta = {}
+
+    mountApp()
+    await flushPromises()
+    replace.mockClear()
+    ensureAuthenticated.mockClear()
+
+    const recovered = await authRequiredHandlerRef.current?.({
+      message: 'User must be logged in to call service facade.X.list#Y',
+      method: 'facade.X.list#Y',
+      candidateUrl: '/rpc/json',
+      status: 401,
+      recoveryExhausted: true,
+    })
+
+    expect(recovered).toBe(false)
+    expect(ensureAuthenticated).not.toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledWith({
+      name: 'login',
+      query: { redirect: '/reconciliation/automations/100051' },
+    })
+  })
+
   it('removes the standalone auth-required fallback route and page from the active app shell', () => {
     const routerSource = readFileSync('src/router/index.ts', 'utf8')
     const appSource = readFileSync('src/App.vue', 'utf8')

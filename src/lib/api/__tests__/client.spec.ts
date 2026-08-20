@@ -461,3 +461,103 @@ describe('callService', () => {
     setAuthRequiredHandler(null)
   })
 })
+
+describe('callService auth recovery', () => {
+  const METHOD = 'facade.ReconciliationFacadeServices.list#AutomationExecutions'
+
+  // The exact prod payload: Moqui rejects the call in ServiceCallSyncImpl BEFORE the service
+  // body runs, and reports it as HTTP 200 carrying a JSON-RPC error.
+  function authRejection(): Response {
+    return new Response(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        error: { code: 500, message: `User must be logged in to call service ${METHOD}` },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+
+  function executionsPayload(): Response {
+    return new Response(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        result: { ok: true, messages: [], errors: [], executions: [{ automationExecutionId: 'EX_1' }] },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+    window.history.replaceState({}, '', '/reconciliation/automations/100051')
+    installLocalStorageStub()
+  })
+
+  it('retries the call once when the handler reports the session recovered', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(authRejection())
+      .mockResolvedValueOnce(executionsPayload())
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { callService, setAuthRequiredHandler } = await import('../client')
+    // get#SessionInfo restores the session from the persistent-login cookie, so the shell's
+    // re-check answers "still authenticated" for a request the service call just rejected.
+    const handler = vi.fn().mockResolvedValue(true)
+    setAuthRequiredHandler(handler)
+
+    const result = await callService<{ executions: Array<{ automationExecutionId: string }> }>(METHOD, {
+      automationId: '100051',
+    })
+
+    expect(result.executions).toEqual([{ automationExecutionId: 'EX_1' }])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    setAuthRequiredHandler(null)
+  })
+
+  it('stops after one recovery retry and tells the handler recovery is exhausted', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(authRejection())
+      .mockResolvedValueOnce(authRejection())
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { callService, setAuthRequiredHandler } = await import('../client')
+    const handler = vi.fn().mockResolvedValue(true)
+    setAuthRequiredHandler(handler)
+
+    await expect(callService(METHOD, { automationId: '100051' })).rejects.toMatchObject({
+      name: 'AuthRequiredError',
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(handler).toHaveBeenCalledTimes(2)
+    expect(handler.mock.calls[0]?.[0]).toMatchObject({ recoveryExhausted: false })
+    expect(handler.mock.calls[1]?.[0]).toMatchObject({ recoveryExhausted: true })
+    setAuthRequiredHandler(null)
+  })
+
+  it('surfaces the friendly session message instead of the raw backend service name', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(authRejection())
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { callService, setAuthRequiredHandler } = await import('../client')
+    setAuthRequiredHandler(vi.fn().mockResolvedValue(false))
+
+    let error: unknown
+    try {
+      await callService(METHOD, { automationId: '100051' })
+    } catch (caught) {
+      error = caught
+    }
+
+    expect((error as Error).message).toBe('Your session has ended. Sign in again to continue.')
+    // The raw backend text stays available for diagnostics, just never as the rendered message.
+    expect((error as { detail?: { message?: string } }).detail?.message).toContain(
+      'User must be logged in to call service',
+    )
+    setAuthRequiredHandler(null)
+  })
+})

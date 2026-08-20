@@ -37,25 +37,39 @@ export function isAbortError(error: unknown): boolean {
 }
 
 export interface AuthRequiredDetail {
+  /** Raw backend text, for diagnostics only — never rendered (see AuthRequiredError). */
   message: string
   method: string
   candidateUrl: string
   status?: number
+  /**
+   * True once the one recovery retry has already been spent on this request. The handler must
+   * stop re-probing the session and send the user to sign in: a session that re-verifies as
+   * valid but still cannot call a service is not a usable session.
+   */
+  recoveryExhausted: boolean
 }
 
 // AuthRequiredError extends ApiCallError so existing `instanceof ApiCallError`
 // catch sites (status === 401 branches) keep working unchanged.
 export class AuthRequiredError extends ApiCallError {
   detail: AuthRequiredDetail
+  /** True when the handler re-verified the session and reported it usable again. */
+  recovered: boolean
 
-  constructor(detail: AuthRequiredDetail, details?: Record<string, unknown>) {
-    super(detail.message, 401, details)
+  constructor(detail: AuthRequiredDetail, details?: Record<string, unknown>, recovered = false) {
+    // Always the friendly text: ~85 call sites render `err.message` directly, and the backend's
+    // wording is an internal service name ("User must be logged in to call service facade.X.y#Z").
+    // The raw text stays on `detail.message` for diagnostics.
+    super(AUTH_REQUIRED_MESSAGE, 401, details)
     this.name = 'AuthRequiredError'
     this.detail = detail
+    this.recovered = recovered
   }
 }
 
-type AuthRequiredHandler = (detail: AuthRequiredDetail) => void
+/** Returns true when the session was re-verified as usable, meaning the caller should retry. */
+type AuthRequiredHandler = (detail: AuthRequiredDetail) => boolean | void | Promise<boolean | void>
 
 let authRequiredHandler: AuthRequiredHandler | null = null
 
@@ -456,8 +470,14 @@ function shouldNotifyAuthRequired(method: string): boolean {
   return method !== AUTH_SESSION_INFO_METHOD
 }
 
-function notifyAuthRequired(detail: AuthRequiredDetail): void {
-  authRequiredHandler?.(detail)
+async function notifyAuthRequired(detail: AuthRequiredDetail): Promise<boolean> {
+  if (!authRequiredHandler) return false
+  try {
+    return (await authRequiredHandler(detail)) === true
+  } catch {
+    // A handler that blows up must not mask the auth failure it was told about.
+    return false
+  }
 }
 
 function withMethodDetails(method: string, details: Record<string, unknown>): Record<string, unknown> {
@@ -467,7 +487,12 @@ function withMethodDetails(method: string, details: Record<string, unknown>): Re
   }
 }
 
-async function dispatchService<T>(method: string, params: object, signal?: AbortSignal): Promise<T> {
+async function dispatchService<T>(
+  method: string,
+  params: object,
+  signal?: AbortSignal,
+  recoveryExhausted = false,
+): Promise<T> {
   const request: JsonRpcRequest = {
     jsonrpc: '2.0',
     id: Date.now(),
@@ -535,9 +560,9 @@ async function dispatchService<T>(method: string, params: object, signal?: Abort
         clearAuthToken()
         const details = withMethodDetails(method, { candidateUrl, data: parsed.error?.data })
         if (shouldNotifyAuthRequired(method)) {
-          const detail: AuthRequiredDetail = { message, method, candidateUrl, status: 401 }
-          notifyAuthRequired(detail)
-          throw new AuthRequiredError(detail, details)
+          const detail: AuthRequiredDetail = { message, method, candidateUrl, status: 401, recoveryExhausted }
+          const recovered = await notifyAuthRequired(detail)
+          throw new AuthRequiredError(detail, details, recovered)
         }
         throw new ApiCallError(message, 401, details)
       }
@@ -555,9 +580,9 @@ async function dispatchService<T>(method: string, params: object, signal?: Abort
         clearAuthToken()
         const details = withMethodDetails(method, { candidateUrl, data: parsed.error.data })
         if (shouldNotifyAuthRequired(method)) {
-          const detail: AuthRequiredDetail = { message: parsed.error.message, method, candidateUrl, status: 401 }
-          notifyAuthRequired(detail)
-          throw new AuthRequiredError(detail, details)
+          const detail: AuthRequiredDetail = { message: parsed.error.message, method, candidateUrl, status: 401, recoveryExhausted }
+          const recovered = await notifyAuthRequired(detail)
+          throw new AuthRequiredError(detail, details, recovered)
         }
         throw new ApiCallError(parsed.error.message, 401, details)
       }
@@ -582,9 +607,9 @@ async function dispatchService<T>(method: string, params: object, signal?: Abort
         clearAuthToken()
         const details = withMethodDetails(method, { candidateUrl, result })
         if (shouldNotifyAuthRequired(method)) {
-          const detail: AuthRequiredDetail = { message, method, candidateUrl, status: 401 }
-          notifyAuthRequired(detail)
-          throw new AuthRequiredError(detail, details)
+          const detail: AuthRequiredDetail = { message, method, candidateUrl, status: 401, recoveryExhausted }
+          const recovered = await notifyAuthRequired(detail)
+          throw new AuthRequiredError(detail, details, recovered)
         }
         throw new ApiCallError(message, 401, details)
       }
@@ -625,9 +650,10 @@ async function dispatchService<T>(method: string, params: object, signal?: Abort
         method,
         candidateUrl: authLikeFailure.url,
         status: authLikeFailure.status ?? 401,
+        recoveryExhausted,
       }
-      notifyAuthRequired(detail)
-      throw new AuthRequiredError({ ...detail, message: AUTH_REQUIRED_MESSAGE }, details)
+      const recovered = await notifyAuthRequired(detail)
+      throw new AuthRequiredError(detail, details, recovered)
     }
 
     throw new ApiCallError(AUTH_REQUIRED_MESSAGE, 401, details)
@@ -663,11 +689,24 @@ function isTransientNetworkError(err: unknown): boolean {
   return true
 }
 
+// Moqui gates `authenticate="true"` in ServiceCallSyncImpl BEFORE the service body runs, so a
+// call rejected with "User must be logged in" had no side effects. Replaying it is therefore safe
+// for writes too, which is why this sits outside the reads-only retryRead below.
+async function dispatchWithAuthRecovery<T>(method: string, params: object, signal?: AbortSignal): Promise<T> {
+  try {
+    return await dispatchService<T>(method, params, signal)
+  } catch (error) {
+    if (!(error instanceof AuthRequiredError) || !error.recovered) throw error
+    // Exactly one replay: an error from this call escapes the catch it was thrown in.
+    return dispatchService<T>(method, params, signal, true)
+  }
+}
+
 export async function callService<T>(method: string, params: object = {}, signal?: AbortSignal): Promise<T> {
-  const doRequest = () => dispatchService<T>(method, params, signal)
+  const doRequest = () => dispatchWithAuthRecovery<T>(method, params, signal)
   return isIdempotentReadMethod(method)
     ? retryRead(doRequest, { shouldRetry: isTransientNetworkError }) // reads: retry transient network errors only
-    : doRequest()                                                      // writes: exactly once, never retried
+    : doRequest()                                                      // writes: exactly once, apart from the auth replay above
 }
 
 export function getRpcUrl(): string {

@@ -133,7 +133,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 import { buildAuthRedirect, useAuthStore } from './stores/auth'
 import { usePermissionsStore } from './stores/permissions'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
-import { setAuthRequiredHandler } from './lib/api/client'
+import { setAuthRequiredHandler, type AuthRequiredDetail } from './lib/api/client'
 import { handleAuthExpiry } from './lib/api/sessionExpiry'
 import { shouldAbortWorkflowOnEscape } from './lib/keyboard'
 import { useTheme } from './composables/useTheme'
@@ -498,13 +498,26 @@ async function redirectToAuthBoundary(): Promise<void> {
   handleAuthExpiry(route.fullPath, { push: (to) => router.replace(to as Parameters<typeof router.replace>[0]), build: buildAuthRedirect })
 }
 
-async function handleAuthRequired(): Promise<void> {
-  if (isShelllessRoute.value) return
+// Returns true when the session is usable again, which tells the API client to replay the call
+// that failed. Backend note: `get#SessionInfo` runs a cookie-based session restore before it
+// reports `authenticated`, while a normal `authenticate="true"` service just checks `ec.user`.
+// So this re-check can legitimately answer "signed in" about a request the backend just rejected
+// with "User must be logged in" -- the session was restored a moment too late for that call.
+// Redirecting to login there would strand a user who is, by then, signed in; replaying works.
+async function handleAuthRequired(detail: AuthRequiredDetail): Promise<boolean> {
+  if (isShelllessRoute.value) return false
+
+  // The replay already happened and hit the same wall. Stop believing the probe.
+  if (detail.recoveryExhausted) {
+    await redirectToAuthBoundary()
+    return false
+  }
 
   const authenticated = await authStore.ensureAuthenticated(true)
-  if (authenticated) return
+  if (authenticated) return true
 
   await redirectToAuthBoundary()
+  return false
 }
 
 function syncBodySurfaceMode(nextMode: 'static' | 'workflow'): void {
@@ -617,9 +630,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleKeyboard)
   window.addEventListener('mousedown', handleWindowMouseDown)
   window.addEventListener('storage', handleAuthStorageEvent)
-  setAuthRequiredHandler(() => {
-    void handleAuthRequired()
-  })
+  setAuthRequiredHandler((detail) => handleAuthRequired(detail))
   document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, handleWorkflowHintRequest)
   syncBodySurfaceMode(surfaceMode.value)
   if (!isShelllessRoute.value) {
