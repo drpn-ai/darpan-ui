@@ -464,6 +464,23 @@ router.beforeEach(async (to) => {
     scheduleRoutePrefetch(router)
     const permissions = usePermissionsStore()
 
+    // Tenant-scoped deep links (Google Chat run alerts) carry the run's tenant. Switch into it
+    // before any permission gate below reads the permissions store, or those gates evaluate this
+    // page against the tenant the user came from.
+    const linkTenantId = typeof to.query.tenantId === 'string' ? to.query.tenantId.trim() : ''
+    if (linkTenantId && linkTenantId !== authStore.sessionInfo?.activeTenantUserGroupId) {
+      const outcome = await authStore.switchActiveTenant(linkTenantId)
+      // 'refused' is the backend saying this tenant is not the user's. 'failed' means the call
+      // never reached a verdict — rendering that as access-denied would tell someone they lack
+      // permission they actually have, so it falls through and the page surfaces its own error.
+      if (outcome === 'refused') return { name: 'access-denied' }
+      if (outcome === 'switched') {
+        authStore.noteDeepLinkTenantSwitch(
+          authStore.sessionInfo?.activeTenantLabel ?? linkTenantId,
+        )
+      }
+    }
+
     // AI provider settings workflow is a global-admin surface; gate it on the destination route
     // because the source routes (settings-ai-create / settings-ai-edit) are redirect-only and Vue
     // Router skips beforeEnter on redirect routes. Without this check, the only gate was an

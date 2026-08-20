@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ensureAuthenticated = vi.hoisted(() => vi.fn())
+const switchActiveTenant = vi.hoisted(() => vi.fn())
+const noteDeepLinkTenantSwitch = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   checked: true,
   error: null as string | null,
@@ -8,6 +10,8 @@ const authState = vi.hoisted(() => ({
   sessionInfo: null as {
     userId: string
     username?: string
+    activeTenantUserGroupId?: string
+    activeTenantLabel?: string
     canRunActiveTenantReconciliation?: boolean
     canEditActiveTenantData?: boolean
     canManageDarpanCore?: boolean
@@ -51,6 +55,8 @@ vi.mock('../../stores/auth', () => ({
   useAuthStore: () => ({
     ...authState,
     ensureAuthenticated,
+    switchActiveTenant,
+    noteDeepLinkTenantSwitch,
   }),
 }))
 
@@ -70,12 +76,117 @@ describe('router auth guard', () => {
   beforeEach(async () => {
     ensureAuthenticated.mockReset()
     ensureAuthenticated.mockResolvedValue(true)
+    switchActiveTenant.mockReset()
+    noteDeepLinkTenantSwitch.mockReset()
     scheduleRoutePrefetch.mockReset()
     authState.checked = true
     authState.error = null
     authState.status = 'unauthenticated'
     authState.sessionInfo = null
     await router.push('/login')
+  })
+
+  describe('tenant-scoped deep links', () => {
+    function authenticateAs(tenantId: string | undefined) {
+      ensureAuthenticated.mockResolvedValue(true)
+      authState.status = 'authenticated'
+      authState.sessionInfo = {
+        userId: '100000',
+        username: 'test.customer',
+        activeTenantUserGroupId: tenantId,
+        activeTenantLabel: tenantId ? `Tenant ${tenantId}` : undefined,
+      }
+    }
+
+    it('does not touch the tenant when a link carries no tenantId', async () => {
+      authenticateAs('TENANT_A')
+      await router.push('/reconciliation/run-result/SR1/result.json')
+
+      expect(switchActiveTenant).not.toHaveBeenCalled()
+      expect(router.currentRoute.value.name).toBe('reconciliation-run-result')
+    })
+
+    it('does not switch when the link names the tenant already active', async () => {
+      authenticateAs('TENANT_A')
+      await router.push('/reconciliation/run-result/SR1/result.json?tenantId=TENANT_A')
+
+      // A banner here would fire on every same-tenant alert, which is most of them.
+      expect(switchActiveTenant).not.toHaveBeenCalled()
+      expect(noteDeepLinkTenantSwitch).not.toHaveBeenCalled()
+    })
+
+    it('switches and announces when the link names a different tenant', async () => {
+      authenticateAs('TENANT_A')
+      switchActiveTenant.mockResolvedValue('switched')
+      await router.push('/reconciliation/run-result/SR1/result.json?tenantId=TENANT_B')
+
+      expect(switchActiveTenant).toHaveBeenCalledWith('TENANT_B')
+      expect(noteDeepLinkTenantSwitch).toHaveBeenCalled()
+      expect(router.currentRoute.value.name).toBe('reconciliation-run-result')
+    })
+
+    it('sends a refused switch to access-denied', async () => {
+      authenticateAs('TENANT_A')
+      switchActiveTenant.mockResolvedValue('refused')
+      await router.push('/reconciliation/run-result/SR1/result.json?tenantId=TENANT_B')
+
+      expect(router.currentRoute.value.name).toBe('access-denied')
+    })
+
+    it('does NOT send a failed switch to access-denied', async () => {
+      authenticateAs('TENANT_A')
+      switchActiveTenant.mockResolvedValue('failed')
+      await router.push('/reconciliation/run-result/SR1/result.json?tenantId=TENANT_B')
+
+      // A dropped connection is not a permission verdict. The page surfaces its own error.
+      expect(router.currentRoute.value.name).not.toBe('access-denied')
+    })
+
+    it('applies to every tenant-scoped deep link, not just run-result', async () => {
+      authenticateAs('TENANT_A')
+      switchActiveTenant.mockResolvedValue('switched')
+      await router.push('/reconciliation/run-live/SR1/100511?tenantId=TENANT_B')
+
+      expect(switchActiveTenant).toHaveBeenCalledWith('TENANT_B')
+    })
+
+    it('switches the tenant before the permission gates read the permissions store', async () => {
+      ensureAuthenticated.mockResolvedValue(true)
+      authState.status = 'authenticated'
+      authState.sessionInfo = {
+        userId: '100000',
+        username: 'view.customer',
+        activeTenantUserGroupId: 'TENANT_A',
+        canEditActiveTenantData: false,
+        isSuperAdmin: false,
+      }
+      switchActiveTenant.mockImplementation(async () => {
+        // The destination tenant is one this user may edit; the origin tenant is not.
+        authState.sessionInfo = {
+          userId: '100000',
+          username: 'view.customer',
+          activeTenantUserGroupId: 'TENANT_B',
+          canEditActiveTenantData: true,
+          isSuperAdmin: false,
+        }
+        return 'switched'
+      })
+
+      await router.push('/settings/sftp/create?tenantId=TENANT_B')
+
+      // Run the switch after the requiresTenantEdit gate and this lands on settings-sftp instead.
+      expect(router.currentRoute.value.name).toBe('settings-sftp-create')
+    })
+
+    it('preserves tenantId through the login redirect', async () => {
+      ensureAuthenticated.mockResolvedValue(false)
+      authState.status = 'unauthenticated'
+      authState.sessionInfo = null
+      await router.push('/reconciliation/run-result/SR1/result.json?tenantId=TENANT_B')
+
+      expect(router.currentRoute.value.name).toBe('login')
+      expect(String(router.currentRoute.value.query.redirect)).toContain('tenantId=TENANT_B')
+    })
   })
 
   it('schedules route chunk prefetching once authenticated, not before', async () => {
