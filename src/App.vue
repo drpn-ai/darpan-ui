@@ -2,6 +2,7 @@
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <OfflineBanner />
+  <TenantSwitchBanner />
 
   <div
     :class="[
@@ -151,6 +152,7 @@ import { resolveStaticPageLabel } from './lib/workflowOrigin'
 
 import AppErrorBoundary from './components/shell/AppErrorBoundary.vue'
 import OfflineBanner from './components/shell/OfflineBanner.vue'
+import TenantSwitchBanner from './components/shell/TenantSwitchBanner.vue'
 
 const CommandPalette = defineAsyncComponent(() => import('./components/shell/CommandPalette.vue').then((module) => module.default))
 
