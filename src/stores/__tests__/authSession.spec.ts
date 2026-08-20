@@ -169,6 +169,57 @@ describe('auth state', () => {
     expect(clearApiResponseCache).toHaveBeenCalledTimes(1)
   })
 
+  it('reports a backend refusal as refused, not failed', async () => {
+    // response.authenticated true + ok false is the backend saying "not your tenant".
+    saveActiveTenantRpc.mockResolvedValue({
+      ok: false,
+      messages: [],
+      errors: ['Active tenant is not available.'],
+      authenticated: true,
+      sessionInfo: { userId: 'backend-user', username: 'backend' },
+    })
+
+    const { useAuthStore } = await import('../auth')
+
+    await expect(useAuthStore().switchActiveTenant('TENANT_B')).resolves.toBe('refused')
+  })
+
+  it('reports a transport error as failed, not refused', async () => {
+    saveActiveTenantRpc.mockRejectedValue(new Error('network down'))
+
+    const { useAuthStore } = await import('../auth')
+
+    await expect(useAuthStore().switchActiveTenant('TENANT_B')).resolves.toBe('failed')
+  })
+
+  it('reports a successful switch as switched', async () => {
+    saveActiveTenantRpc.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      authenticated: true,
+      sessionInfo: { userId: 'backend-user', username: 'backend', activeTenantUserGroupId: 'TENANT_B' },
+    })
+
+    const { useAuthStore } = await import('../auth')
+
+    await expect(useAuthStore().switchActiveTenant('TENANT_B')).resolves.toBe('switched')
+  })
+
+  it('keeps saveActiveTenant returning a boolean for existing callers', async () => {
+    saveActiveTenantRpc.mockResolvedValue({
+      ok: false,
+      messages: [],
+      errors: ['nope'],
+      authenticated: true,
+      sessionInfo: { userId: 'backend-user', username: 'backend' },
+    })
+
+    const { useAuthStore } = await import('../auth')
+
+    await expect(useAuthStore().saveActiveTenant('TENANT_B')).resolves.toBe(false)
+  })
+
   it('updates the authenticated session when user settings change', async () => {
     saveUserSettingsRpc.mockResolvedValue({
       ok: true,

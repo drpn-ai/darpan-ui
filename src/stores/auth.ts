@@ -23,6 +23,10 @@ import { setDefaultDisplayTimeZone } from '../lib/utils/date'
 
 export type AuthStatus = 'authenticated' | 'unauthenticated' | 'verification-failed'
 
+// A tenant switch has three outcomes, not two. 'refused' is the backend's permission verdict;
+// 'failed' means the call never reached one, so callers must not render it as a denial.
+export type TenantSwitchOutcome = 'switched' | 'refused' | 'failed'
+
 export interface UiPermissionPolicy {
   canViewTenantSettings: boolean
   canRunActiveTenantReconciliation: boolean
@@ -348,11 +352,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function saveActiveTenant(activeTenantUserGroupId: string): Promise<boolean> {
+  async function switchActiveTenant(activeTenantUserGroupId: string): Promise<TenantSwitchOutcome> {
     if (authBypass) {
       clearApiResponseCache()
       _hydrateReferenceData()
-      return true
+      return 'switched'
     }
 
     try {
@@ -362,7 +366,8 @@ export const useAuthStore = defineStore('auth', () => {
         if (response.ok) clearApiResponseCache()
         _applyAuthenticatedSession(response.sessionInfo, errorMessage)
         if (response.ok) _hydrateReferenceData()
-        return response.ok
+        // The backend answered and said no. That is a permission verdict.
+        return response.ok ? 'switched' : 'refused'
       }
 
       clearAuthToken()
@@ -371,13 +376,13 @@ export const useAuthStore = defineStore('auth', () => {
         status: 'unauthenticated',
         error: response.errors?.[0] ?? 'Authentication required to change the active tenant.',
       })
-      return false
+      return 'failed'
     } catch (err) {
       if (err instanceof ApiCallError && err.status === 401) {
         clearAuthToken()
         clearApiResponseCache()
         _applyAuthState({ status: 'unauthenticated', error: err.message })
-        return false
+        return 'failed'
       }
 
       _applyAuthState({
@@ -385,8 +390,13 @@ export const useAuthStore = defineStore('auth', () => {
         error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
         sessionInfo: _sessionInfo.value,
       })
-      return false
+      // The call never reached a verdict. Never render this as access-denied.
+      return 'failed'
     }
+  }
+
+  async function saveActiveTenant(activeTenantUserGroupId: string): Promise<boolean> {
+    return (await switchActiveTenant(activeTenantUserGroupId)) === 'switched'
   }
 
   async function saveUserSettings(payload: { displayName?: string; timeZone?: string }): Promise<boolean> {
@@ -603,6 +613,7 @@ export const useAuthStore = defineStore('auth', () => {
     handleExternalAuthChange,
     loginWithCredentials,
     logoutSession,
+    switchActiveTenant,
     saveActiveTenant,
     saveUserSettings,
     saveTenantSettings,
