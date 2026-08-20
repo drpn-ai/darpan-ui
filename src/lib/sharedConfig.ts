@@ -10,9 +10,3 @@ export const SHARED_CONFIG_TYPES = {
 } as const
 
 export type SharedConfigType = (typeof SHARED_CONFIG_TYPES)[keyof typeof SHARED_CONFIG_TYPES]
-
-/** Suffix appended to a settings tile for a config shared in from another tenant. */
-export function sharedTileSuffix(isShared: boolean, ownerTenantLabel?: string | null): string {
-  if (!isShared) return ''
-  return ownerTenantLabel ? ` — shared from ${ownerTenantLabel}` : ' — shared'
-}

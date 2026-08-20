@@ -166,7 +166,7 @@ describe('OmsRestSettingsPage', () => {
     expect(wrapper.find('[data-testid="oms-auth-create-action"]').exists()).toBe(false)
   })
 
-  it('appends the shared-tile suffix for a config shared in from another tenant (DAR-BE-005)', async () => {
+  it('does not mark a config shared in from another tenant on the tile', async () => {
     listOmsRestSourceConfigs.mockResolvedValue({
       ok: true,
       messages: [],
@@ -190,6 +190,11 @@ describe('OmsRestSettingsPage', () => {
     const wrapper = mount(OmsRestSettingsPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="oms-auth-tile"]').text()).toBe('Krewe HotWax — shared from Gorjana')
+    // The tile is the plain description even though the backend reports this config as shared in
+    // from another tenant. The "— shared"/"— shared from X" suffix was removed 2026-08-20; the
+    // shared-in relationship is surfaced by the Shared with panel on the config's edit form instead.
+    // Fixture keeps isShared/companyLabel populated on purpose so this fails if the suffix returns.
+    expect(wrapper.get('[data-testid="oms-auth-tile"]').text()).toBe('Krewe HotWax')
+    expect(wrapper.text()).not.toContain('shared')
   })
 })
