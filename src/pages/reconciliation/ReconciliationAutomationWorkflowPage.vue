@@ -82,19 +82,6 @@
                 :disabled="saving || loadingOptions"
               />
             </label>
-            <label
-              class="wizard-input-shell automation-edit-active-field"
-              data-testid="automation-edit-active-field"
-            >
-              <span class="workflow-context-label">Status</span>
-              <WorkflowSelect
-                v-model="editActiveStatus"
-                test-id="automation-edit-active"
-                :disabled="saving || loadingOptions"
-                :options="activeStatusOptions"
-                placeholder="Select status..."
-              />
-            </label>
             <template v-if="dateWindowUsesCustomRange">
               <label class="wizard-input-shell">
                 <span class="workflow-context-label">Start Date</span>
@@ -169,20 +156,6 @@
                 :disabled="saving || loadingOptions"
               />
             </label>
-
-            <label
-              class="wizard-input-shell automation-edit-active-field"
-              data-testid="automation-edit-active-field"
-            >
-              <span class="workflow-context-label">Status</span>
-              <WorkflowSelect
-                v-model="editActiveStatus"
-                test-id="automation-edit-active"
-                :disabled="saving || loadingOptions"
-                :options="activeStatusOptions"
-                placeholder="Select status..."
-              />
-            </label>
           </div>
         </template>
 
@@ -190,19 +163,35 @@
           class="automation-edit-chat-space-fields"
           data-testid="automation-edit-chat-space-fields"
         >
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Chat Space</span>
+          <label
+            class="wizard-input-shell automation-edit-active-field"
+            data-testid="automation-edit-active-field"
+          >
+            <span class="workflow-context-label">Status</span>
             <WorkflowSelect
-              v-model="editChatSpaceValue"
-              test-id="automation-chat-space-select"
+              v-model="editActiveStatus"
+              test-id="automation-edit-active"
               :disabled="saving || loadingOptions"
-              :options="editChatSpaceSelectOptions"
-              placeholder="Select chat space..."
+              :options="activeStatusOptions"
+              placeholder="Select status..."
             />
           </label>
-          <p v-if="automationChatSpaceInactive" class="section-note" data-testid="automation-chat-space-inactive-note">
-            {{ automationChatSpaceName }} is no longer active.
-          </p>
+
+          <div class="automation-edit-chat-space-field">
+            <label class="wizard-input-shell">
+              <span class="workflow-context-label">Chat Space</span>
+              <WorkflowSelect
+                v-model="editChatSpaceValue"
+                test-id="automation-chat-space-select"
+                :disabled="saving || loadingOptions"
+                :options="editChatSpaceSelectOptions"
+                placeholder="Select chat space..."
+              />
+            </label>
+            <p v-if="automationChatSpaceInactive" class="section-note" data-testid="automation-chat-space-inactive-note">
+              {{ automationChatSpaceName }} is no longer active.
+            </p>
+          </div>
         </div>
 
         <div
@@ -1653,7 +1642,15 @@ onUnmounted(() => {
 .automation-edit-chat-space-fields {
   width: 100%;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+  align-items: end;
+}
+
+.automation-edit-chat-space-field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .automation-edit-date-window-fields {
@@ -1733,6 +1730,7 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .automation-edit-primary-fields,
   .automation-date-window-fields,
+  .automation-edit-chat-space-fields,
   .automation-schedule-helper {
     grid-template-columns: 1fr;
   }
