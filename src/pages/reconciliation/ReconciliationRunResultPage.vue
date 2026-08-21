@@ -893,7 +893,9 @@ function stepStatusTone(step: ReconciliationRunStep): 'neutral' | 'success' | 'w
 }
 
 function stepStageLabel(step: ReconciliationRunStep): string {
-  return reconciliationStageLabel(step.stageCode, diffDetailsFile1Label.value, diffDetailsFile2Label.value)
+  // metricsJson carries which systems a VERIFY step rechecked -- without it, a run with two
+  // verification passes renders two rows reading exactly the same thing.
+  return reconciliationStageLabel(step.stageCode, diffDetailsFile1Label.value, diffDetailsFile2Label.value, step.metricsJson)
 }
 
 function stepDurationLabel(step: ReconciliationRunStep): string {

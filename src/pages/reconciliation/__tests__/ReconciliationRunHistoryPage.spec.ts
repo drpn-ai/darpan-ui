@@ -671,7 +671,7 @@ describe('ReconciliationRunHistoryPage', () => {
     await flushPromises()
 
     const progress = wrapper.get('[data-testid="run-history-running-progress"]')
-    expect(progress.text()).toContain('Extracting SHOPIFY')
+    expect(progress.text()).toContain('Extracting Shopify')
     expect(progress.text()).toContain('45%')
   })
 
@@ -767,7 +767,7 @@ describe('ReconciliationRunHistoryPage', () => {
     await flushPromises()
 
     const failedTile = wrapper.get('[data-testid="run-history-failed-tile"]')
-    expect(failedTile.text()).toContain('Failed during Extracting SHOPIFY')
+    expect(failedTile.text()).toContain('Failed during Extracting Shopify')
   })
 
   it('links a failed tile to the live run view and leaves id-less failures unlinked', async () => {
