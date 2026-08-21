@@ -33,10 +33,12 @@
 
         <p id="command-palette-hint" class="mono-copy">
           Use Up/Down to select a result. Press Enter to open the selected match.
+          Type / for actions such as /switch-tenant.
         </p>
         <p v-if="showDataSearchLoading" class="mono-copy" role="status">Searching records...</p>
+        <p v-if="slashNotice" class="mono-copy" role="status">{{ slashNotice }}</p>
 
-        <div v-if="grouped.length === 0" class="empty-state compact">
+        <div v-if="grouped.length === 0 && !slashNotice" class="empty-state compact">
           <h3>No matching results</h3>
           <p>Try words like compare files, API key, schema upload, or SFTP.</p>
         </div>
@@ -46,19 +48,19 @@
             <p v-if="showGroupLabels" class="command-group-label">{{ group.name }}</p>
             <div class="stack-sm">
               <button
-                v-for="action in group.actions"
-                :id="getActionDomId(action.id)"
-                :key="action.id"
+                v-for="row in group.rows"
+                :id="getActionDomId(row.id)"
+                :key="row.id"
                 :ref="setActionRef"
                 type="button"
-                :aria-current="action.id === activeActionId ? 'true' : undefined"
-                :class="['command-item', { 'command-item--active': action.id === activeActionId }]"
-                @focus="handleActionFocus(action.id)"
-                @mouseenter="handleActionMouseenter(action.id)"
-                @click="execute(action)"
+                :aria-current="row.id === activeActionId ? 'true' : undefined"
+                :class="['command-item', { 'command-item--active': row.id === activeActionId }]"
+                @focus="handleActionFocus(row.id)"
+                @mouseenter="handleActionMouseenter(row.id)"
+                @click="execute(row)"
               >
-                <span>{{ action.label }}</span>
-                <span class="muted-copy">{{ action.description }}</span>
+                <span>{{ row.label }}</span>
+                <span class="muted-copy">{{ row.description }}</span>
               </button>
             </div>
           </div>
@@ -71,6 +73,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUpdate, ref, watch, type ComponentPublicInstance } from 'vue'
 import { rankCommandActions } from '../../lib/commandSearch'
+import {
+  DEFAULT_SLASH_COMMANDS,
+  resolveSlashResults,
+  SLASH_PREFIX,
+  type SlashCommandContext,
+  type SlashResultRow,
+} from '../../lib/slashCommands'
 import type { CommandAction } from '../../lib/types/ux'
 
 const props = defineProps<{
@@ -78,12 +87,27 @@ const props = defineProps<{
   actions: CommandAction[]
   recentCommandIds?: string[]
   dataSearchLoading?: boolean
+  slashContext?: SlashCommandContext
 }>()
 
 const emit = defineEmits<{
   close: []
   execute: [action: CommandAction]
+  runSlash: [row: SlashResultRow]
 }>()
+
+/** A navigation result and a slash result share one list so keyboard nav stays a single code path. */
+interface PaletteRow {
+  id: string
+  label: string
+  description: string
+  group: string
+  kind: 'action' | 'command' | 'option'
+  action: CommandAction | null
+  slashRow: SlashResultRow | null
+}
+
+const EMPTY_SLASH_CONTEXT: SlashCommandContext = { availableTenants: [], activeTenantUserGroupId: null }
 
 const query = ref('')
 const activeIndex = ref(-1)
@@ -92,22 +116,48 @@ const searchInput = ref<HTMLInputElement | null>(null)
 const interactionMode = ref<'keyboard' | 'pointer'>('keyboard')
 const resultsListId = 'command-palette-results'
 
-const filtered = computed(() => {
-  return rankCommandActions(props.actions, query.value, props.recentCommandIds ?? [])
+const slashResolution = computed(() =>
+  resolveSlashResults(query.value, DEFAULT_SLASH_COMMANDS, props.slashContext ?? EMPTY_SLASH_CONTEXT),
+)
+const isSlashMode = computed(() => slashResolution.value.isSlashQuery)
+const slashNotice = computed(() => (isSlashMode.value ? slashResolution.value.notice : null))
+
+const rows = computed<PaletteRow[]>(() => {
+  if (isSlashMode.value) {
+    return slashResolution.value.rows.map((slashRow) => ({
+      id: slashRow.id,
+      label: slashRow.label,
+      description: slashRow.description,
+      group: 'Commands',
+      kind: slashRow.kind,
+      action: null,
+      slashRow,
+    }))
+  }
+
+  return rankCommandActions(props.actions, query.value, props.recentCommandIds ?? []).map((action) => ({
+    id: action.id,
+    label: action.label,
+    description: action.description,
+    group: action.group,
+    kind: 'action' as const,
+    action,
+    slashRow: null,
+  }))
 })
 
-const activeActionId = computed(() => filtered.value[activeIndex.value]?.id ?? null)
+const activeActionId = computed(() => rows.value[activeIndex.value]?.id ?? null)
 const activeActionDomId = computed(() => (activeActionId.value ? getActionDomId(activeActionId.value) : undefined))
 
 const grouped = computed(() => {
-  const groups: Array<{ name: string; actions: CommandAction[] }> = []
+  const groups: Array<{ name: string; rows: PaletteRow[] }> = []
 
-  for (const action of filtered.value) {
-    const existing = groups.find((item) => item.name === action.group)
+  for (const row of rows.value) {
+    const existing = groups.find((item) => item.name === row.group)
     if (existing) {
-      existing.actions.push(action)
+      existing.rows.push(row)
     } else {
-      groups.push({ name: action.group, actions: [action] })
+      groups.push({ name: row.group, rows: [row] })
     }
   }
 
@@ -115,7 +165,9 @@ const grouped = computed(() => {
 })
 
 const showGroupLabels = computed(() => grouped.value.length > 1)
-const showDataSearchLoading = computed(() => props.dataSearchLoading === true && query.value.trim().length > 0)
+const showDataSearchLoading = computed(
+  () => props.dataSearchLoading === true && query.value.trim().length > 0 && !isSlashMode.value,
+)
 
 onBeforeUpdate(() => {
   actionRefs.value = []
@@ -135,16 +187,48 @@ function getActionDomId(actionId: string): string {
   return `command-palette-option-${actionId}`
 }
 
-function execute(action: CommandAction): void {
-  emit('execute', action)
+/**
+ * The text that typing this row out in full would produce. A command row stops at the trailing
+ * space that opens argument mode; an option row spells out its label so Enter can confirm it.
+ */
+function completionFor(row: PaletteRow): string | null {
+  if (!row.slashRow) return null
+  const prefix = `${SLASH_PREFIX}${row.slashRow.commandName} `
+  return row.kind === 'command' ? prefix : `${prefix}${row.label}`
+}
+
+function completeInput(row: PaletteRow): void {
+  const completion = completionFor(row)
+  if (completion === null) return
+
+  query.value = completion
+  void nextTick(() => {
+    searchInput.value?.focus()
+  })
+}
+
+function execute(row: PaletteRow): void {
+  if (row.kind === 'action' && row.action) {
+    emit('execute', row.action)
+    return
+  }
+
+  // A command row names a command that still needs its argument, so Enter completes the input to
+  // `/name ` and hands the user straight to the argument list. Only option rows run anything.
+  if (row.kind === 'command') {
+    completeInput(row)
+    return
+  }
+
+  if (row.slashRow) emit('runSlash', row.slashRow)
 }
 
 function resetActiveIndex(): void {
-  activeIndex.value = filtered.value.length > 0 ? 0 : -1
+  activeIndex.value = rows.value.length > 0 ? 0 : -1
 }
 
 function moveActive(delta: number): void {
-  const resultCount = filtered.value.length
+  const resultCount = rows.value.length
   if (resultCount === 0) return
 
   interactionMode.value = 'keyboard'
@@ -153,7 +237,7 @@ function moveActive(delta: number): void {
 }
 
 function setActiveIndexById(actionId: string): void {
-  const nextIndex = filtered.value.findIndex((action) => action.id === actionId)
+  const nextIndex = rows.value.findIndex((row) => row.id === actionId)
   if (nextIndex >= 0) {
     activeIndex.value = nextIndex
   }
@@ -196,6 +280,14 @@ function handlePanelKeydown(event: KeyboardEvent): void {
       moveActive(-1)
       if (actionButtonIsFocused) focusActiveAction()
       return
+    case 'Tab':
+      // Tab only means "complete" while a slash command is being typed. Outside slash mode it stays
+      // the browser's focus key, and Shift+Tab always does, so the palette never traps focus.
+      if (!searchIsFocused && !actionButtonIsFocused) return
+      if (!isSlashMode.value || event.shiftKey) return
+      event.preventDefault()
+      completeActive()
+      return
     case 'Enter':
       if (!searchIsFocused) return
       event.preventDefault()
@@ -206,21 +298,31 @@ function handlePanelKeydown(event: KeyboardEvent): void {
   }
 }
 
+function readActiveRow(): PaletteRow | null {
+  return (activeIndex.value >= 0 ? rows.value[activeIndex.value] : rows.value[0]) ?? null
+}
+
 function executeActive(): void {
-  const activeAction = activeIndex.value >= 0 ? filtered.value[activeIndex.value] : filtered.value[0]
-  if (!activeAction) return
-  execute(activeAction)
+  const activeRow = readActiveRow()
+  if (!activeRow) return
+  execute(activeRow)
+}
+
+function completeActive(): void {
+  const activeRow = readActiveRow()
+  if (!activeRow) return
+  completeInput(activeRow)
 }
 
 watch(
-  filtered,
-  (actions) => {
-    if (actions.length === 0) {
+  rows,
+  (nextRows) => {
+    if (nextRows.length === 0) {
       activeIndex.value = -1
       return
     }
 
-    if (activeIndex.value < 0 || activeIndex.value >= actions.length) {
+    if (activeIndex.value < 0 || activeIndex.value >= nextRows.length) {
       activeIndex.value = 0
     }
   },

@@ -45,6 +45,10 @@ describe('CommandPalette', () => {
     document.body.innerHTML = ''
   })
 
+  function searchValue(wrapper: ReturnType<typeof mount<typeof CommandPalette>>): string {
+    return (wrapper.get('#command-palette-search').element as HTMLInputElement).value
+  }
+
   async function triggerSearchKey(
     wrapper: ReturnType<typeof mount<typeof CommandPalette>>,
     key: string,
@@ -167,5 +171,145 @@ describe('CommandPalette', () => {
     expect(styleSource).toContain('.app-shell--popup-open {')
     expect(styleSource).toContain('filter: blur(var(--popup-background-blur));')
     expect(styleSource).toContain('opacity: var(--popup-background-opacity);')
+  })
+  describe('slash commands', () => {
+    const slashContext = {
+      availableTenants: [
+        { userGroupId: 'ACME_RETAIL', label: 'Acme Retail' },
+        { userGroupId: 'GORJANA', label: 'Gorjana' },
+      ],
+      activeTenantUserGroupId: 'GORJANA',
+    }
+
+    function mountPalette() {
+      return mount(CommandPalette, {
+        attachTo: document.body,
+        global: { stubs: { teleport: true } },
+        props: { open: true, actions, slashContext },
+      })
+    }
+
+    it('lists the slash commands instead of navigation results once the query opens with a slash', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/')
+
+      const items = wrapper.findAll('.command-item')
+      expect(items).toHaveLength(1)
+      expect(items[0]?.text()).toContain('/switch-tenant')
+      expect(wrapper.text()).not.toContain('Go to Dashboard')
+    })
+
+    it('completes the input rather than running when Enter lands on a command row', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/swi')
+
+      await triggerSearchKey(wrapper, 'Enter')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.emitted('runSlash')).toBeUndefined()
+      expect(searchValue(wrapper)).toBe('/switch-tenant ')
+      expect(wrapper.findAll('.command-item')[0]?.text()).toContain('Acme Retail')
+    })
+
+    it('runs the chosen option on Enter and names the command and value', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/switch-tenant acme')
+
+      await triggerSearchKey(wrapper, 'Enter')
+
+      expect(wrapper.emitted('runSlash')?.[0]?.[0]).toMatchObject({
+        commandName: 'switch-tenant',
+        value: 'ACME_RETAIL',
+        label: 'Acme Retail',
+      })
+    })
+
+    it('moves between option rows with arrow keys', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/switch-tenant ')
+
+      await triggerSearchKey(wrapper, 'ArrowDown')
+
+      expect(wrapper.get('#command-palette-search').attributes('aria-activedescendant')).toBe(
+        'command-palette-option-slash-switch-tenant-ACME_RETAIL',
+      )
+    })
+
+    it('completes the highlighted command on Tab without running it', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/swi')
+
+      await triggerSearchKey(wrapper, 'Tab')
+      await wrapper.vm.$nextTick()
+
+      expect(searchValue(wrapper)).toBe('/switch-tenant ')
+      expect(wrapper.emitted('runSlash')).toBeUndefined()
+    })
+
+    it('fills the highlighted option into the input on Tab so Enter can confirm it', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/switch-tenant ac')
+
+      await triggerSearchKey(wrapper, 'Tab')
+      await wrapper.vm.$nextTick()
+
+      expect(searchValue(wrapper)).toBe('/switch-tenant Acme Retail')
+      expect(wrapper.emitted('runSlash')).toBeUndefined()
+
+      await triggerSearchKey(wrapper, 'Enter')
+
+      expect(wrapper.emitted('runSlash')?.[0]?.[0]).toMatchObject({ value: 'ACME_RETAIL' })
+    })
+
+    it('completes the option the arrow keys moved to, not the first one', async () => {
+      const wrapper = mount(CommandPalette, {
+        attachTo: document.body,
+        global: { stubs: { teleport: true } },
+        props: {
+          open: true,
+          actions,
+          slashContext: {
+            availableTenants: [
+              { userGroupId: 'ACME_RETAIL', label: 'Acme Retail' },
+              { userGroupId: 'RAILS', label: 'Rails' },
+            ],
+            activeTenantUserGroupId: 'GORJANA',
+          },
+        },
+      })
+      await wrapper.get('#command-palette-search').setValue('/switch-tenant ')
+
+      await triggerSearchKey(wrapper, 'ArrowDown')
+      await triggerSearchKey(wrapper, 'Tab')
+      await wrapper.vm.$nextTick()
+
+      expect(searchValue(wrapper)).toBe('/switch-tenant Rails')
+    })
+
+    it('leaves Tab to the browser outside slash mode', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('api key')
+
+      await triggerSearchKey(wrapper, 'Tab')
+      await wrapper.vm.$nextTick()
+
+      expect(searchValue(wrapper)).toBe('api key')
+    })
+
+    it('shows why a slash result is empty instead of the generic search advice', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/switch-tenant gorjana')
+
+      expect(wrapper.findAll('.command-item')).toHaveLength(0)
+      expect(wrapper.text()).toContain('Already on Gorjana.')
+      expect(wrapper.text()).not.toContain('Try words like compare files')
+    })
+
+    it('leaves plain searches on the navigation actions', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('api key')
+
+      expect(wrapper.findAll('.command-item')[0]?.text()).toContain('Open AI Settings')
+    })
   })
 })
