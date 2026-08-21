@@ -22,6 +22,7 @@
     v-if="workflowHint"
     :class="[
       'workflow-escape-hint',
+      { 'workflow-escape-hint--static': surfaceMode === 'static' },
       { 'workflow-escape-hint--warning': workflowHint.tone === 'warning' },
     ]"
     role="status"
@@ -123,8 +124,10 @@
     :actions="commandActions"
     :recent-command-ids="recentCommandIds"
     :data-search-loading="isLoadingCommandData"
+    :slash-context="slashContext"
     @close="closeCommandPalette"
     @execute="executeCommand"
+    @run-slash="runSlashCommand"
   />
 </template>
 
@@ -139,6 +142,7 @@ import { handleAuthExpiry } from './lib/api/sessionExpiry'
 import { shouldAbortWorkflowOnEscape } from './lib/keyboard'
 import { useTheme } from './composables/useTheme'
 import { useCommandPalette } from './composables/useCommandPalette'
+import { switchTenantCommand, type SlashCommandContext, type SlashResultRow } from './lib/slashCommands'
 import type { CommandAction } from './lib/types/ux'
 import {
   DISMISS_INLINE_MENUS_EVENT,
@@ -186,6 +190,10 @@ const routerViewKey = computed(
 )
 const userDisplayName = computed(() => resolveUserDisplayName(authStore.sessionInfo))
 const activeTenantUserGroupId = computed(() => authStore.sessionInfo?.activeTenantUserGroupId ?? null)
+const slashContext = computed<SlashCommandContext>(() => ({
+  availableTenants: authStore.sessionInfo?.availableTenants ?? [],
+  activeTenantUserGroupId: activeTenantUserGroupId.value,
+}))
 const activeTenantName = computed<string | null>(() => {
   const sessionInfo = authStore.sessionInfo
   const activeTenantId = sessionInfo?.activeTenantUserGroupId?.toString().trim()
@@ -448,6 +456,27 @@ async function executeCommand(action: CommandAction): Promise<void> {
     return
   }
   await router.push(action.to)
+}
+
+async function runSlashCommand(row: SlashResultRow): Promise<void> {
+  if (row.commandName !== switchTenantCommand.name || !row.value) return
+
+  commandPalette.close()
+  const outcome = await authStore.switchActiveTenant(row.value)
+  if (outcome === 'switched') {
+    // The top-centre pill is the product's only transient-notice surface — there are no toasts and
+    // no second banner. It still owes the cross-tab warning: the active tenant is a server-side
+    // preference, so this switch re-points every other tab this account has open.
+    showWorkflowHint(`Now on ${row.label}. Your other tabs use it too.`, { durationMs: 3000 })
+    return
+  }
+
+  showWorkflowHint(
+    outcome === 'refused'
+      ? `Switching to ${row.label} was refused.`
+      : `Could not switch to ${row.label}. Try again.`,
+    { tone: 'warning', durationMs: 5000 },
+  )
 }
 
 function handleKeyboard(event: KeyboardEvent): void {

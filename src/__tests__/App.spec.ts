@@ -7,6 +7,7 @@ import { DISMISS_INLINE_MENUS_EVENT, WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HIN
 const ensureAuthenticated = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const logoutSession = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const saveActiveTenant = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+const switchActiveTenant = vi.hoisted(() => vi.fn().mockResolvedValue('switched'))
 const listSftpServers = vi.hoisted(() => vi.fn())
 const listGeneratedOutputs = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
@@ -109,9 +110,14 @@ vi.mock('vue-router', () => ({
 
 vi.mock('../components/shell/CommandPalette.vue', () => ({
   default: {
-    emits: ['execute'],
+    name: 'CommandPalette',
+    emits: ['execute', 'runSlash'],
     props: {
       open: Boolean,
+      slashContext: {
+        type: Object,
+        default: null,
+      },
       actions: {
         type: Array,
         default: () => [],
@@ -168,6 +174,7 @@ vi.mock('../stores/auth', () => ({
     ensureAuthenticated,
     logoutSession,
     saveActiveTenant,
+    switchActiveTenant,
   }),
 }))
 
@@ -230,6 +237,8 @@ describe('App shell logout', () => {
     ensureAuthenticated.mockClear()
     logoutSession.mockClear()
     saveActiveTenant.mockClear()
+    switchActiveTenant.mockClear()
+    switchActiveTenant.mockResolvedValue('switched')
     listSftpServers.mockReset()
     listGeneratedOutputs.mockReset()
     listSftpServers.mockResolvedValue({
@@ -306,6 +315,124 @@ describe('App shell logout', () => {
     expect(wrapper.find('.home-fab').exists()).toBe(true)
     expect(wrapper.find('.app-shell').classes()).toContain('app-shell--static')
     expect(document.body.classList.contains('surface-mode-static')).toBe(true)
+  })
+
+  it('gives Ask Darpan the companies this account can switch between', async () => {
+    authState.sessionInfo = {
+      ...authState.sessionInfo!,
+      activeTenantUserGroupId: 'GORJANA',
+      availableTenants: [
+        { userGroupId: 'GORJANA', label: 'Gorjana' },
+        { userGroupId: 'ACME_RETAIL', label: 'Acme Retail' },
+      ],
+    }
+
+    const wrapper = mountApp()
+    await flushPromises()
+    await wrapper.get('.command-bubble').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'CommandPalette' }).props('slashContext')).toEqual({
+      availableTenants: [
+        { userGroupId: 'GORJANA', label: 'Gorjana' },
+        { userGroupId: 'ACME_RETAIL', label: 'Acme Retail' },
+      ],
+      activeTenantUserGroupId: 'GORJANA',
+    })
+  })
+
+  it('switches the active company when /switch-tenant runs, and says so', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+    await wrapper.get('.command-bubble').trigger('click')
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('runSlash', {
+      id: 'slash-switch-tenant-ACME_RETAIL',
+      label: 'Acme Retail',
+      description: 'ACME_RETAIL',
+      kind: 'option',
+      commandName: 'switch-tenant',
+      value: 'ACME_RETAIL',
+    })
+    await flushPromises()
+
+    expect(switchActiveTenant).toHaveBeenCalledWith('ACME_RETAIL')
+    expect(wrapper.find('[data-testid="command-palette-stub"]').exists()).toBe(false)
+    // The top-centre hint pill is the product's one transient-notice surface; a tenant switch does
+    // not get a second one. It still owes the cross-tab warning, which is the surprising part.
+    const hint = wrapper.get('.workflow-escape-hint')
+    expect(hint.text()).toContain('Now on Acme Retail.')
+    expect(hint.text().toLowerCase()).toContain('other tabs')
+    expect(hint.classes()).not.toContain('workflow-escape-hint--warning')
+    expect(wrapper.find('.tenant-switch-banner').exists()).toBe(false)
+  })
+
+  it('reports a refused company switch instead of closing on a silent no-op', async () => {
+    switchActiveTenant.mockResolvedValue('refused')
+
+    const wrapper = mountApp()
+    await flushPromises()
+    await wrapper.get('.command-bubble').trigger('click')
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('runSlash', {
+      id: 'slash-switch-tenant-ACME_RETAIL',
+      label: 'Acme Retail',
+      description: 'ACME_RETAIL',
+      kind: 'option',
+      commandName: 'switch-tenant',
+      value: 'ACME_RETAIL',
+    })
+    await flushPromises()
+
+    const hint = wrapper.get('.workflow-escape-hint')
+    expect(hint.text()).toContain('Acme Retail')
+    expect(hint.classes()).toContain('workflow-escape-hint--warning')
+  })
+
+  async function raiseHint(
+    wrapper: { vm: { $nextTick: () => Promise<void> } },
+    message = 'Now on Acme Retail. Your other tabs use it too.',
+  ): Promise<void> {
+    document.dispatchEvent(new CustomEvent(WORKFLOW_HINT_REQUEST_EVENT, { detail: { message } }))
+    await wrapper.vm.$nextTick()
+  }
+
+  it('marks the notice pill as static-surface so it sits in the reserved lane', async () => {
+    route.meta = { surfaceMode: 'static' }
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await raiseHint(wrapper)
+
+    expect(wrapper.get('.workflow-escape-hint').classes()).toContain('workflow-escape-hint--static')
+  })
+
+  it('leaves the notice pill clear of the workflow progress bar on workflow surfaces', async () => {
+    route.meta = { surfaceMode: 'workflow' }
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await raiseHint(wrapper)
+
+    // The workflow surface pins its progress hairline near the top of the viewport. Moving the pill
+    // up into a static-page lane would land it on that hairline, so workflow keeps the lower offset.
+    expect(wrapper.get('.workflow-escape-hint').classes()).not.toContain('workflow-escape-hint--static')
+  })
+
+  it('reserves a lane at the top of static pages so a notice can never cover content', () => {
+    const styleSource = readFileSync('src/style.css', 'utf8')
+
+    // The lane the shell reserves and the pill's own ceiling come from the same tokens, so the two
+    // cannot drift apart into an overlap.
+    expect(styleSource).toContain('--notice-pill-max-height:')
+    expect(styleSource).toMatch(
+      /--notice-lane-height: calc\(var\(--notice-lane-top\) \+ var\(--notice-pill-max-height\)/,
+    )
+    expect(styleSource).toMatch(/\.app-shell \{[^}]*padding: var\(--notice-lane-height\)/)
+    expect(styleSource).toMatch(/\.workflow-escape-hint \{[^}]*max-height: var\(--notice-pill-max-height\);/)
+    expect(styleSource).toMatch(/\.workflow-escape-hint--static \{[^}]*top: var\(--notice-lane-top\);/)
   })
 
   it('dismisses open inline menus before opening Ask Darpan', async () => {
