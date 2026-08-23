@@ -557,6 +557,50 @@ describe('TenantSettingsPage', () => {
 
     expect(saveSlackBotToken).toHaveBeenCalledWith({ botAccessToken: 'xoxb-real-token' }, expect.anything())
     expect(wrapper.text()).toContain('Connected to Acme')
+
+    // Connecting a workspace creates NO destination, so the flow must not end here. Closing the
+    // popup on the success message read as completion and left "Add a chat space" undiscovered.
+    expect(wrapper.find('[data-testid="tenant-chat-space-add"]').exists()).toBe(true)
+  })
+
+  it('offers a route to a channel from the connected-workspace menu, with Slack preselected', async () => {
+    // Without this the connected menu is workspace maintenance only — replace token / disconnect —
+    // and the operator who just connected has no route to the thing they connected FOR.
+    getSlackInstall.mockResolvedValue({
+      ok: true, slackConfigured: true, oauthAvailable: false,
+      installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', botUserId: 'U_BOT', isActive: 'Y' }],
+    })
+    listSlackChannels.mockResolvedValue({
+      ok: true, nextCursor: null,
+      channels: [{ id: 'C1', name: 'darpan-test', isPrivate: false, isMember: false }],
+    })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-slack"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-slack-menu-add-space"]').trigger('click')
+    await wrapper.get('input[name="chatSpaceName"]').setValue('Ops Slack')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await flushPromises()
+
+    // Slack was preselected, so the third card is the picker rather than a webhook field.
+    expect(wrapper.find('input[name="webhookUrl"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tenant-slack-channel-select"]').exists()).toBe(true)
+  })
+
+  it('says so when the Slack connection lookup fails, instead of just losing the option', async () => {
+    // An empty install list silently removes the channel picker, which is indistinguishable from
+    // "no workspace connected" and sends the operator hunting for a step that is still there.
+    getSlackInstall.mockRejectedValue(new ApiCallError('Slack lookup failed.', 500, {}))
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="slack-load-error"]').text()).toContain('Slack lookup failed.')
   })
 
   it('surfaces a missing-scope warning alongside the success message', async () => {

@@ -17,6 +17,8 @@ const saveAutomation = vi.hoisted(() => vi.fn())
 const syncAutomation = vi.hoisted(() => vi.fn())
 const getUserNotificationDefault = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
+const getSlackInstall = vi.hoisted(() => vi.fn())
+const listSlackChannels = vi.hoisted(() => vi.fn())
 const saveTenantChatSpace = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({
@@ -34,6 +36,8 @@ vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: {
     getUserNotificationDefault,
     listTenantChatSpaces,
+    getSlackInstall,
+    listSlackChannels,
     saveTenantChatSpace,
   },
 }))
@@ -250,6 +254,9 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     })
     getUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [] })
     listTenantChatSpaces.mockResolvedValue({ ok: true, messages: [], errors: [], chatSpaces: [] })
+    // No workspace connected by default, so the inline flow keeps its webhook card.
+    getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: false, installs: [] })
+    listSlackChannels.mockResolvedValue({ ok: true, channels: [], nextCursor: null })
   })
 
   it('starts with a single branch decision and routes new-reconciliation automation to the create flow', async () => {
@@ -817,6 +824,64 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await flushPromises()
 
     expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS1' }), expect.any(AbortSignal))
+  })
+
+  it('asks for a Slack channel instead of a webhook when a workspace is connected', async () => {
+    // The gap this closes: the inline flow asked for a webhook URL even for a bot-token workspace,
+    // which has none — the Tenant Settings wizard offered a picker and this one did not.
+    getSlackInstall.mockResolvedValue({
+      ok: true, slackConfigured: true, oauthAvailable: false,
+      installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', isActive: 'Y' }],
+    })
+    listSlackChannels.mockResolvedValue({
+      ok: true, nextCursor: null,
+      channels: [{ id: 'C1', name: 'darpan-test', isPrivate: false, isMember: false }],
+    })
+    saveTenantChatSpace.mockResolvedValue({
+      ok: true, messages: [], errors: [],
+      chatSpace: { chatSpaceId: 'CS9', spaceName: 'Ops Slack', isActive: 'Y', inUse: true },
+    })
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+    await chooseExistingRunPurpose(wrapper)
+    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
+    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseCard(wrapper, 'automation-chat-space-new')
+    await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Slack')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'automation-chat-provider-select', 'CHAT_PROV_SLACK')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+
+    // A channel picker, not a webhook field.
+    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="automation-slack-channel-select"]').exists()).toBe(true)
+    expect(listSlackChannels).toHaveBeenCalledWith({ slackInstallId: 'SI1' }, expect.anything())
+
+    await chooseWorkflowOption(wrapper, 'automation-slack-channel-select', 'C1')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
+    await wrapper.get('[data-testid="create-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenCalledWith({
+      spaceName: 'Ops Slack',
+      chatProviderEnumId: 'CHAT_PROV_SLACK',
+      slackInstallId: 'SI1',
+      slackChannelId: 'C1',
+      slackChannelName: 'darpan-test',
+      isActive: true,
+    }, expect.any(AbortSignal))
   })
 
   it('creates a new space inline as three separate cards', async () => {

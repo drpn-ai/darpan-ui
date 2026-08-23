@@ -44,6 +44,7 @@ export type ReconciliationAutomationStepId =
   | 'chat-space-select'
   | 'chat-space-name'
   | 'chat-space-provider'
+  | 'chat-space-channel'
   | 'chat-space-url'
 
 export interface ReconciliationAutomationSourceDraft {
@@ -88,6 +89,7 @@ export interface ReconciliationAutomationDraft {
   chatSpaceId?: string
   newChatSpaceName?: string
   newChatSpaceProvider?: string
+  newChatSpaceChannelId?: string
   newChatSpaceUrl?: string
   sources?: Partial<Record<ReconciliationAutomationFileSide, ReconciliationAutomationSourceDraft>>
 }
@@ -242,6 +244,7 @@ function readDraft(value: unknown): ReconciliationAutomationDraft | null {
     chatSpaceId: normalizeString(value.chatSpaceId),
     newChatSpaceName: normalizeString(value.newChatSpaceName),
     newChatSpaceProvider: normalizeString(value.newChatSpaceProvider),
+    newChatSpaceChannelId: normalizeString(value.newChatSpaceChannelId),
     newChatSpaceUrl: normalizeString(value.newChatSpaceUrl),
     sources: readSources(value.sources),
   }) as ReconciliationAutomationDraft

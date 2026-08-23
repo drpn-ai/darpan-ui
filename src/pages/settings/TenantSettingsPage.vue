@@ -160,6 +160,12 @@
           @cancel="closePopup"
         >
           <InlineValidation v-if="chatSpacesError" tone="error" :message="chatSpacesError" />
+          <InlineValidation
+            v-if="slackLoadError"
+            tone="error"
+            :message="slackLoadError"
+            data-testid="slack-load-error"
+          />
           <WorkflowShortcutChoiceCards
             :options="chatSpaceListOptions"
             test-id-prefix="tenant-chat-space"
@@ -643,6 +649,7 @@ const slackChannels = ref<SlackChannel[]>([])
 const slackChannelsLoading = ref(false)
 const slackBotUserId = ref<string | null>(null)
 const slackConnecting = ref(false)
+const slackLoadError = ref<string | null>(null)
 const slackOauthAvailable = ref(false)
 const slackTokenInput = ref('')
 const slackTokenSaving = ref(false)
@@ -800,6 +807,10 @@ const slackMenuQuestion = computed(() => (
 const slackMenuOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
   const options: Array<{ value: string; label: string; description?: string }> = []
   if (connectedSlackInstall.value) {
+    // FIRST, because it is the only reason anyone connected a workspace. Without it this menu offers
+    // nothing but workspace maintenance, and the operator who just connected is left with no route
+    // to the thing they came for — a channel that actually receives notifications.
+    options.push({ value: 'add-space', label: 'Add a chat space', description: 'Choose the channel that gets notified' })
     // The token path is offered here too: re-pasting is how a rotated token gets replaced.
     if (slackOauthAvailable.value) {
       options.push({ value: 'reconnect', label: 'Reconnect workspace', description: 'Re-authorise through Slack' })
@@ -1143,6 +1154,13 @@ function handleChatSpaceListChoice(value: string): void {
 }
 
 function handleSlackMenuChoice(value: string): void {
+  if (value === 'add-space') {
+    openChatSpaceCreateForm()
+    // Set AFTER the open, which resets the form: arriving from the Slack menu is unambiguous intent,
+    // and defaulting back to Google Chat here would send them to a webhook field.
+    chatSpaceForm.chatProviderEnumId = 'CHAT_PROV_SLACK'
+    return
+  }
   if (value === 'connect' || value === 'reconnect') {
     void connectSlack()
     return
@@ -1173,7 +1191,11 @@ async function saveSlackToken(): Promise<void> {
     slackTokenInput.value = ''
     slackChannels.value = []
     await loadSlackInstall()
-    closePopup()
+    // Back to the chat-space list, NOT closePopup(). Connecting a workspace creates no destination
+    // on its own — a run still has nowhere to post until a chat space names a channel. Closing the
+    // workflow here ended the flow on a success message that looked like completion, leaving "Add a
+    // chat space" undiscovered one screen away.
+    openNotificationMenu()
   } catch (saveError) {
     notificationWorkflowError.value = saveError instanceof ApiCallError
       ? saveError.message : 'Unable to save the Slack token.'
@@ -1270,12 +1292,17 @@ async function loadSlackInstall(): Promise<void> {
     slackInstalls.value = response.installs ?? []
     slackConfigured.value = response.slackConfigured ?? false
     slackOauthAvailable.value = response.oauthAvailable ?? false
-  } catch {
+    slackLoadError.value = null
+  } catch (loadError) {
     // A Slack lookup failure must not take the whole settings page down — chat spaces, timezone and
-    // AI settings are all independently useful, and the connect action reports its own errors.
+    // AI settings are all independently useful. But it must not be silent either: an empty install
+    // list makes the channel picker disappear, which is indistinguishable from "no workspace
+    // connected" and sends the operator looking for a step that is actually still there.
     slackInstalls.value = []
     slackConfigured.value = false
     slackOauthAvailable.value = false
+    slackLoadError.value = loadError instanceof ApiCallError
+      ? loadError.message : 'Could not check the Slack connection.'
   }
 }
 
@@ -1581,7 +1608,9 @@ function consumeSlackReturn(): void {
   if (!outcome) return
   if (outcome === 'connected') {
     const team = normalizeStringOrEmpty(route.query.team as string | undefined)
-    notificationWorkflowSuccess.value = team ? `Connected to ${team}.` : 'Connected to Slack.'
+    notificationWorkflowSuccess.value = team
+      ? `Connected to ${team}. Add a chat space to choose which channel gets notified.`
+      : 'Connected to Slack. Add a chat space to choose which channel gets notified.'
   } else {
     notificationWorkflowError.value = describeSlackReturnError(
       normalizeStringOrEmpty(route.query.reason as string | undefined))

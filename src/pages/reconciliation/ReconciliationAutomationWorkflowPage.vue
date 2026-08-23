@@ -504,6 +504,8 @@ import type {
   AutomationSystemRemoteOption,
   ChatProviderId,
   EnumOption,
+  SlackChannel,
+  SlackWorkspaceInstall,
   SavedRunSummary,
   TenantChatSpace,
   UserNotificationDefault,
@@ -607,6 +609,10 @@ const chatSpaceId = ref('')
 const newChatSpaceName = ref('')
 const newChatSpaceProvider = ref<ChatProviderId>('CHAT_PROV_GOOGLE')
 const newChatSpaceUrl = ref('')
+const newChatSpaceChannelId = ref('')
+const slackInstalls = ref<SlackWorkspaceInstall[]>([])
+const slackChannels = ref<SlackChannel[]>([])
+const slackChannelsLoading = ref(false)
 const chatProviderOptions: WorkflowSelectOption[] = [
   { value: 'CHAT_PROV_GOOGLE', label: 'Google Chat' },
   { value: 'CHAT_PROV_SLACK', label: 'Slack' },
@@ -735,7 +741,12 @@ const chatSpaceSteps = computed<WizardStep[]>(() => {
   const chatSpaceStepList: WizardStep[] = [{ id: 'chat-space' }]
   if (chatSpaceChoice.value === 'existing') chatSpaceStepList.push({ id: 'chat-space-select' })
   if (chatSpaceChoice.value === 'new') {
-    chatSpaceStepList.push({ id: 'chat-space-name' }, { id: 'chat-space-provider' }, { id: 'chat-space-url' })
+    chatSpaceStepList.push({ id: 'chat-space-name' }, { id: 'chat-space-provider' })
+    // Mirrors the Tenant Settings wizard: with a connected workspace the destination is a channel,
+    // not a URL. Asking for a webhook here was unanswerable for a bot-token workspace.
+    chatSpaceStepList.push(usesSlackChannelPicker.value
+      ? { id: 'chat-space-channel' }
+      : { id: 'chat-space-url' })
   }
   return chatSpaceStepList
 })
@@ -937,6 +948,8 @@ const currentQuestion = computed(() => {
       return 'What should the new chat space be called?'
     case 'chat-space-provider':
       return 'Which chat product does it post to?'
+    case 'chat-space-channel':
+      return 'Which Slack channel should it post to?'
     case 'chat-space-url':
       return `What is the ${newChatSpaceProviderLabel.value} webhook URL for this space?`
     default:
@@ -944,7 +957,18 @@ const currentQuestion = computed(() => {
   }
 })
 
-const isSelectStep = computed(() => ['saved-run', 'file1-sftp', 'file2-sftp', 'file1-api', 'file2-api', 'chat-space-select', 'chat-space-provider'].includes(currentStep.value.id))
+const isSelectStep = computed(() => ['saved-run', 'file1-sftp', 'file2-sftp', 'file1-api', 'file2-api', 'chat-space-select', 'chat-space-provider', 'chat-space-channel'].includes(currentStep.value.id))
+const connectedSlackInstall = computed<SlackWorkspaceInstall | null>(() => slackInstalls.value[0] ?? null)
+const usesSlackChannelPicker = computed(() => (
+  newChatSpaceProvider.value === 'CHAT_PROV_SLACK' && connectedSlackInstall.value !== null
+))
+const slackChannelSelectOptions = computed<WorkflowSelectOption[]>(() => slackChannels.value.map((channel) => ({
+  value: channel.id,
+  label: channel.isPrivate ? `🔒 ${channel.name}` : `#${channel.name}`,
+})))
+const selectedSlackChannel = computed<SlackChannel | null>(() => (
+  slackChannels.value.find((channel) => channel.id === newChatSpaceChannelId.value) ?? null
+))
 const newChatSpaceProviderLabel = computed(() => (
   chatProviderOptions.find((option) => option.value === newChatSpaceProvider.value)?.label ?? 'chat'
 ))
@@ -963,6 +987,8 @@ const activeSelectOptions = computed<WorkflowSelectOption[]>(() => {
       return chatSpaceSelectOptions.value
     case 'chat-space-provider':
       return chatProviderOptions
+    case 'chat-space-channel':
+      return slackChannelSelectOptions.value
     default:
       return []
   }
@@ -990,6 +1016,8 @@ const activeSelectTestId = computed(() => {
       return 'automation-chat-space-select'
     case 'chat-space-provider':
       return 'automation-chat-provider-select'
+    case 'chat-space-channel':
+      return 'automation-slack-channel-select'
     default:
       return 'automation-select'
   }
@@ -1017,6 +1045,8 @@ const currentPlaceholder = computed(() => {
       return 'Select chat space...'
     case 'chat-space-provider':
       return 'Select chat product...'
+    case 'chat-space-channel':
+      return slackChannelsLoading.value ? 'Loading channels...' : 'Select channel...'
     default:
       return ''
   }
@@ -1039,6 +1069,8 @@ const activeSelectValue = computed({
         return chatSpaceId.value
       case 'chat-space-provider':
         return newChatSpaceProvider.value
+      case 'chat-space-channel':
+        return newChatSpaceChannelId.value
       default:
         return ''
     }
@@ -1063,6 +1095,9 @@ const activeSelectValue = computed({
         break
       case 'chat-space-select':
         chatSpaceId.value = value
+        break
+      case 'chat-space-channel':
+        newChatSpaceChannelId.value = value
         break
       case 'chat-space-provider':
         newChatSpaceProvider.value = value as ChatProviderId
@@ -1169,6 +1204,8 @@ const canProceed = computed(() => {
       return newChatSpaceName.value.trim().length > 0
     case 'chat-space-provider':
       return newChatSpaceProvider.value.length > 0
+    case 'chat-space-channel':
+      return newChatSpaceChannelId.value.length > 0
     case 'chat-space-url':
       return newChatSpaceUrl.value.trim().length > 0
     default:
@@ -1178,7 +1215,13 @@ const canProceed = computed(() => {
 
 const chatSpaceChoiceReady = computed(() => {
   if (chatSpaceChoice.value === 'existing') return Boolean(chatSpaceId.value)
-  if (chatSpaceChoice.value === 'new') return Boolean(newChatSpaceName.value.trim() && newChatSpaceUrl.value.trim())
+  if (chatSpaceChoice.value === 'new') {
+    if (!newChatSpaceName.value.trim()) return false
+    // A bot-token destination is complete with a channel; it has no webhook to supply.
+    return usesSlackChannelPicker.value
+      ? Boolean(newChatSpaceChannelId.value)
+      : Boolean(newChatSpaceUrl.value.trim())
+  }
   return true
 })
 
@@ -1224,6 +1267,7 @@ const activeDraft = computed<ReconciliationAutomationDraft>(() => ({
   chatSpaceId: chatSpaceId.value || undefined,
   newChatSpaceName: newChatSpaceName.value || undefined,
   newChatSpaceProvider: newChatSpaceProvider.value,
+  newChatSpaceChannelId: newChatSpaceChannelId.value || undefined,
   newChatSpaceUrl: newChatSpaceUrl.value || undefined,
   sources: {
     FILE_1: sourceDrafts.value.FILE_1,
@@ -1447,7 +1491,13 @@ async function saveAutomationSetup(): Promise<void> {
         const spaceResponse = await settingsFacade.saveTenantChatSpace({
           spaceName: newChatSpaceName.value,
           chatProviderEnumId: newChatSpaceProvider.value,
-          webhookUrl: newChatSpaceUrl.value,
+          ...(usesSlackChannelPicker.value
+            ? {
+                slackInstallId: connectedSlackInstall.value!.slackInstallId,
+                slackChannelId: newChatSpaceChannelId.value,
+                slackChannelName: selectedSlackChannel.value?.name,
+              }
+            : { webhookUrl: newChatSpaceUrl.value }),
           isActive: true,
         }, submitSignal)
         if (!spaceResponse.chatSpace?.chatSpaceId) {
@@ -1647,6 +1697,7 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   chatSpaceId.value = draft.chatSpaceId ?? ''
   newChatSpaceName.value = draft.newChatSpaceName ?? ''
   newChatSpaceProvider.value = (draft.newChatSpaceProvider as ChatProviderId | undefined) ?? 'CHAT_PROV_GOOGLE'
+  newChatSpaceChannelId.value = draft.newChatSpaceChannelId ?? ''
   newChatSpaceUrl.value = draft.newChatSpaceUrl ?? ''
   sourceDrafts.value = {
     FILE_1: { ...(draft.sources?.FILE_1 ?? {}) },
@@ -1656,6 +1707,39 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   applyDeterministicDefaults()
   return draftState.resumeStepId
 }
+
+async function loadSlackInstalls(signal: AbortSignal): Promise<void> {
+  try {
+    const response = await settingsFacade.getSlackInstall(signal)
+    slackInstalls.value = response.installs ?? []
+  } catch {
+    // Deliberately non-fatal and separate from loadChatSpaceOptions: this only decides whether the
+    // inline "new space" flow offers a channel picker or a webhook field. Sharing that call's
+    // Promise.all made a Slack hiccup also erase "My default space", which has nothing to do with it.
+    slackInstalls.value = []
+  }
+}
+
+async function loadSlackChannelOptions(): Promise<void> {
+  const install = connectedSlackInstall.value
+  if (!install || slackChannels.value.length || slackChannelsLoading.value) return
+  slackChannelsLoading.value = true
+  try {
+    const response = await settingsFacade.listSlackChannels(
+      { slackInstallId: install.slackInstallId }, pageAbortController.signal)
+    slackChannels.value = response.channels ?? []
+  } catch (loadError) {
+    if ((loadError as { name?: string })?.name === 'AbortError') return
+    slackChannels.value = []
+    pageError.value = 'Unable to load Slack channels.'
+  } finally {
+    slackChannelsLoading.value = false
+  }
+}
+
+watch(currentStep, (step) => {
+  if (step.id === 'chat-space-channel') void loadSlackChannelOptions()
+})
 
 async function loadChatSpaceOptions(signal: AbortSignal): Promise<void> {
   try {
@@ -1683,6 +1767,7 @@ async function loadOptions(): Promise<void> {
 
   try {
     const chatSpaceOptionsPromise = loadChatSpaceOptions(pageAbortController.signal)
+    void loadSlackInstalls(pageAbortController.signal)
     const response = await reconciliationFacade.listAutomationSourceOptions(pageAbortController.signal)
     sourceOptions.value = {
       inputModes: response.inputModes ?? [],
