@@ -617,13 +617,18 @@ const createSteps: CreateStep[] = [
  * the admin picks a channel from a list Darpan fetches; otherwise they paste a webhook URL, which is
  * also the fallback for a workspace whose admins do not permit app installation.
  */
-const chatSpaceFormSteps = computed<ChatSpaceFormStep[]>(() => [
-  { id: 'name', question: 'Name this chat space.' },
-  { id: 'provider', question: 'Which chat product does it post to?' },
-  usesSlackChannelPicker.value
+const chatSpaceFormSteps = computed<ChatSpaceFormStep[]>(() => {
+  const steps: ChatSpaceFormStep[] = [{ id: 'name', question: 'Name this chat space.' }]
+  // Omitted entirely rather than shown pre-filled: arriving from the Slack menu already answered
+  // this, and a card that only needs Next is a step that reads as a mistake.
+  if (!chatSpaceProviderPreset.value) {
+    steps.push({ id: 'provider', question: 'Which chat product does it post to?' })
+  }
+  steps.push(usesSlackChannelPicker.value
     ? { id: 'channel', question: 'Which Slack channel should it post to?' }
-    : { id: 'webhook', question: 'Paste the incoming webhook URL.' },
-])
+    : { id: 'webhook', question: 'Paste the incoming webhook URL.' })
+  return steps
+})
 const chatProviderOptions: Array<{ value: ChatProviderId; label: string }> = [
   { value: 'CHAT_PROV_GOOGLE', label: 'Google Chat' },
   { value: 'CHAT_PROV_SLACK', label: 'Slack' },
@@ -650,6 +655,11 @@ const slackChannelsLoading = ref(false)
 const slackBotUserId = ref<string | null>(null)
 const slackConnecting = ref(false)
 const slackLoadError = ref<string | null>(null)
+/**
+ * True when the create form was opened from the Slack menu, which already establishes the provider.
+ * Asking again on the next card is a question the operator has just answered by navigating.
+ */
+const chatSpaceProviderPreset = ref(false)
 const slackOauthAvailable = ref(false)
 const slackTokenInput = ref('')
 const slackTokenSaving = ref(false)
@@ -1118,6 +1128,7 @@ function resetChatSpaceForm(): void {
   chatSpaceForm.chatProviderEnumId = 'CHAT_PROV_GOOGLE'
   chatSpaceForm.webhookUrl = ''
   chatSpaceForm.slackChannelId = ''
+  chatSpaceProviderPreset.value = false
 }
 
 function openChatSpaceCreateForm(): void {
@@ -1156,9 +1167,10 @@ function handleChatSpaceListChoice(value: string): void {
 function handleSlackMenuChoice(value: string): void {
   if (value === 'add-space') {
     openChatSpaceCreateForm()
-    // Set AFTER the open, which resets the form: arriving from the Slack menu is unambiguous intent,
-    // and defaulting back to Google Chat here would send them to a webhook field.
+    // Both set AFTER the open, which resets the form. Arriving from the Slack menu is unambiguous
+    // intent, so the provider is fixed and its card is skipped: name -> channel.
     chatSpaceForm.chatProviderEnumId = 'CHAT_PROV_SLACK'
+    chatSpaceProviderPreset.value = true
     return
   }
   if (value === 'connect' || value === 'reconnect') {

@@ -584,12 +584,27 @@ describe('TenantSettingsPage', () => {
     await wrapper.get('[data-testid="tenant-slack-menu-add-space"]').trigger('click')
     await wrapper.get('input[name="chatSpaceName"]').setValue('Ops Slack')
     await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
-    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
     await flushPromises()
 
-    // Slack was preselected, so the third card is the picker rather than a webhook field.
+    // ONE Next, not two: the provider card is skipped because coming from the Slack menu already
+    // answered it. Showing it pre-filled made the operator confirm a choice they had just made.
+    expect(wrapper.find('[data-testid="tenant-chat-provider-select"]').exists()).toBe(false)
     expect(wrapper.find('input[name="webhookUrl"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tenant-slack-channel-select"]').exists()).toBe(true)
+  })
+
+  it('still asks which product when the space is added from the generic entry point', async () => {
+    // The provider card is only redundant when the entry point fixed it. Reached from "Add a chat
+    // space" in the list, nothing has been chosen yet and the question is real.
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-add"]').trigger('click')
+    await wrapper.get('input[name="chatSpaceName"]').setValue('Somewhere')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="tenant-chat-provider-select"]').exists()).toBe(true)
   })
 
   it('says so when the Slack connection lookup fails, instead of just losing the option', async () => {
