@@ -31,9 +31,14 @@
           <button type="button" class="ghost-btn" @click="close">Close</button>
         </header>
 
-        <p id="command-palette-hint" class="mono-copy">
-          Use Up/Down to select a result. Press Enter to open the selected match.
-          Type / for actions such as /switch-tenant.
+        <p id="command-palette-hint" class="sr-only">
+          Up and down arrows move through results, Enter opens the selected one, and typing a
+          slash lists commands.
+        </p>
+        <p class="command-keyline" aria-hidden="true">
+          <span>&#8593;&#8595; move</span>
+          <span>&#8629; open</span>
+          <span>/ commands</span>
         </p>
         <p v-if="showDataSearchLoading" class="mono-copy" role="status">Searching records...</p>
         <p v-if="slashNotice" class="mono-copy" role="status">{{ slashNotice }}</p>

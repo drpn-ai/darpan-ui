@@ -73,7 +73,14 @@ describe('CommandPalette', () => {
     await wrapper.vm.$nextTick()
 
     const input = wrapper.get('#command-palette-search')
-    expect(wrapper.text()).toContain('Use Up/Down to select a result. Press Enter to open the selected match.')
+    const hint = wrapper.get('#command-palette-hint')
+    expect(hint.classes()).toContain('sr-only')
+    expect(hint.text()).toContain('Up and down arrows move through results')
+    const keyline = wrapper.get('.command-keyline')
+    expect(keyline.attributes('aria-hidden')).toBe('true')
+    expect(keyline.text()).toContain('↑↓ move')
+    expect(keyline.text()).toContain('↵ open')
+    expect(keyline.text()).toContain('/ commands')
     expect(input.attributes('aria-activedescendant')).toBe('command-palette-option-navigate-dashboard')
     expect(wrapper.findAll('.command-item')[0]?.classes()).toContain('command-item--active')
 
