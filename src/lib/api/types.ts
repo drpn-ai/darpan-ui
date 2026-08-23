@@ -160,9 +160,27 @@ export interface SaveTenantSettingsResponse extends ApiEnvelope {
   tenantSettings?: TenantSettings
 }
 
+/** DarpanChatProvider enum ids. A space with no provider is Google Chat. */
+export type ChatProviderId = 'CHAT_PROV_GOOGLE' | 'CHAT_PROV_SLACK'
+
 export interface TenantChatSpace {
   chatSpaceId: string
   spaceName: string
+  chatProviderEnumId: ChatProviderId
+  /** Server-resolved display name for the provider ("Google Chat", "Slack"). */
+  chatProviderLabel: string
+  /** Set when this space posts through a connected workspace rather than a webhook. */
+  slackInstallId?: string | null
+  slackChannelId?: string | null
+  slackChannelName?: string | null
+  deliveryMode?: 'WEBHOOK' | 'SLACK_BOT'
+  webhookConfigured: boolean
+  webhookUrl?: string | null
+  /**
+   * Pre-Slack names, kept one release. The backend mirrors the resolved provider-agnostic values
+   * into these, so they are NOT Google-specific despite the name — prefer webhookConfigured /
+   * webhookUrl in new code.
+   */
   googleChatConfigured: boolean
   googleChatWebhookUrl?: string | null
   isActive: string
@@ -170,6 +188,55 @@ export interface TenantChatSpace {
   createdDate?: string
   lastUpdatedDate?: string
 }
+
+export interface SlackWorkspaceInstall {
+  slackInstallId: string
+  teamId: string
+  teamName?: string | null
+  /** The bot's own user id, for the "invite @Darpan" instruction on private channels. */
+  botUserId?: string | null
+  grantedScopes?: string | null
+  isActive: string
+  installedDate?: string
+}
+
+export interface SlackChannel {
+  id: string
+  name: string
+  isPrivate: boolean
+  /**
+   * Whether the bot is already in the channel. chat:write.public covers PUBLIC channels it never
+   * joined, so this only gates private ones — but a private channel it is not in fails at the first
+   * run, hours after the admin walked away.
+   */
+  isMember: boolean
+}
+
+export interface GetSlackInstallResponse extends ApiEnvelope {
+  /** Slack is usable at all — always true now that a bot token can be pasted. */
+  slackConfigured?: boolean
+  /** Whether the one-click OAuth install is ALSO offered (needs a client id + redirect URI). */
+  oauthAvailable?: boolean
+  installs?: SlackWorkspaceInstall[]
+}
+
+export interface SaveSlackBotTokenResponse extends ApiEnvelope {
+  install?: SlackWorkspaceInstall
+  /** Granted-scope gaps: the token still delivers, but these features will not work. */
+  missingScopes?: string[]
+}
+
+export interface BeginSlackInstallResponse extends ApiEnvelope {
+  authorizeUrl?: string
+}
+
+export interface ListSlackChannelsResponse extends ApiEnvelope {
+  channels?: SlackChannel[]
+  nextCursor?: string | null
+  botUserId?: string | null
+}
+
+export type DisconnectSlackWorkspaceResponse = ApiEnvelope
 
 export interface ListTenantChatSpacesResponse extends ApiEnvelope {
   chatSpaces?: TenantChatSpace[]
@@ -739,8 +806,26 @@ export interface ListAutomationsResponse extends PaginatedResponse {
   automations: AutomationRecord[]
 }
 
+/**
+ * Whether an automation's snapshot still matches its saved run. Computed by the backend from the
+ * same derive that sync#Automation applies, so the edit form's out-of-date marker can never
+ * disagree with what Sync would change. A missing saved run is reported here, not as drift.
+ */
+export interface AutomationSyncStatus {
+  inSync: boolean
+  changedFields: string[]
+  inputModeChanging: boolean
+  savedRunMissing: boolean
+}
+
 export interface GetAutomationResponse extends ApiEnvelope {
   automation?: AutomationRecord | null
+  syncStatus?: AutomationSyncStatus | null
+}
+
+export interface SyncAutomationResponse extends ApiEnvelope {
+  automation?: AutomationRecord | null
+  changedFields?: string[]
 }
 
 export type SaveAutomationResponse = Schemas['SaveAutomationResult']

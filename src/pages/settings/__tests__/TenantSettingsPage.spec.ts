@@ -9,6 +9,11 @@ const saveTenantSettings = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
 const saveTenantChatSpace = vi.hoisted(() => vi.fn())
 const deleteTenantChatSpace = vi.hoisted(() => vi.fn())
+const getSlackInstall = vi.hoisted(() => vi.fn())
+const saveSlackBotToken = vi.hoisted(() => vi.fn())
+const beginSlackInstall = vi.hoisted(() => vi.fn())
+const listSlackChannels = vi.hoisted(() => vi.fn())
+const disconnectSlackWorkspace = vi.hoisted(() => vi.fn())
 const listSftpServers = vi.hoisted(() => vi.fn())
 const listNsAuthConfigs = vi.hoisted(() => vi.fn())
 const listNsRestletConfigs = vi.hoisted(() => vi.fn())
@@ -52,6 +57,11 @@ vi.mock('../../../lib/api/facade', () => ({
     listTenantChatSpaces,
     saveTenantChatSpace,
     deleteTenantChatSpace,
+    getSlackInstall,
+    saveSlackBotToken,
+    beginSlackInstall,
+    listSlackChannels,
+    disconnectSlackWorkspace,
     listSftpServers,
     listNsAuthConfigs,
     listNsRestletConfigs,
@@ -110,6 +120,16 @@ describe('TenantSettingsPage', () => {
   beforeEach(() => {
     route.fullPath = '/settings/tenant'
     route.query = {}
+    // Default: Slack is configured on the deployment but no workspace is connected, so the wizard
+    // keeps its webhook step. Tests that need a connection override this.
+    getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: true, installs: [] })
+    saveSlackBotToken.mockResolvedValue({
+      ok: true, messages: ['Connected to Acme as darpan.'], missingScopes: [],
+      install: { slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', isActive: 'Y' } })
+    beginSlackInstall.mockResolvedValue({
+      ok: true, authorizeUrl: 'https://slack.com/oauth/v2/authorize?client_id=1&state=abc' })
+    listSlackChannels.mockResolvedValue({ ok: true, channels: [], nextCursor: null })
+    disconnectSlackWorkspace.mockResolvedValue({ ok: true, messages: ['Disconnected Acme.'] })
     authState.sessionInfo = {
       userId: 'admin',
       activeTenantUserGroupId: 'KREWE',
@@ -219,7 +239,11 @@ describe('TenantSettingsPage', () => {
         {
           chatSpaceId: 'CS1',
           spaceName: 'Ops',
+          chatProviderEnumId: 'CHAT_PROV_GOOGLE',
+          chatProviderLabel: 'Google Chat',
+          webhookConfigured: true,
           googleChatConfigured: true,
+          webhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
           googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
           isActive: 'Y',
           inUse: true,
@@ -227,6 +251,9 @@ describe('TenantSettingsPage', () => {
         {
           chatSpaceId: 'CS2',
           spaceName: 'Finance',
+          chatProviderEnumId: 'CHAT_PROV_GOOGLE',
+          chatProviderLabel: 'Google Chat',
+          webhookConfigured: false,
           googleChatConfigured: false,
           googleChatWebhookUrl: null,
           isActive: 'Y',
@@ -241,7 +268,11 @@ describe('TenantSettingsPage', () => {
       chatSpace: {
         chatSpaceId: 'CS1',
         spaceName: 'Ops',
+        chatProviderEnumId: 'CHAT_PROV_GOOGLE',
+        chatProviderLabel: 'Google Chat',
+        webhookConfigured: true,
         googleChatConfigured: true,
+        webhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
         googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
         isActive: 'Y',
         inUse: true,
@@ -272,8 +303,8 @@ describe('TenantSettingsPage', () => {
       messages: [],
       errors: [],
       chatSpaces: [
-        { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: true },
-        { chatSpaceId: 'CS2', spaceName: 'Finance', googleChatConfigured: false, isActive: 'Y', inUse: false },
+        { chatSpaceId: 'CS1', spaceName: 'Ops', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, googleChatConfigured: true, isActive: 'Y', inUse: true },
+        { chatSpaceId: 'CS2', spaceName: 'Finance', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: false, googleChatConfigured: false, isActive: 'Y', inUse: false },
       ],
     })
     await flushPromises()
@@ -402,10 +433,10 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.find('[data-testid="tenant-llm-provider"]').exists()).toBe(true)
   })
 
-  it('lists chat spaces and adds one through the two-step popup', async () => {
+  it('lists chat spaces and adds one through the three-step popup', async () => {
     const WEBHOOK = 'https://chat.googleapis.com/v1/spaces/KREWE_SPACE/messages?key=test-key&token=test-token'
     listTenantChatSpaces.mockResolvedValue({ ok: true, chatSpaces: [
-      { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: true }] })
+      { chatSpaceId: 'CS1', spaceName: 'Ops', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, googleChatConfigured: true, isActive: 'Y', inUse: true }] })
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
     await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
@@ -414,14 +445,230 @@ describe('TenantSettingsPage', () => {
     await wrapper.get('[data-testid="tenant-chat-space-add"]').trigger('click')
     await wrapper.get('input[name="chatSpaceName"]').setValue('Finance')
     await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
-    await wrapper.get('input[name="googleChatWebhookUrl"]').setValue(WEBHOOK)
+    // Provider step — defaults to Google Chat, so it is answerable without touching it.
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Which chat product does it post to?')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('input[name="webhookUrl"]').setValue(WEBHOOK)
     await wrapper.get('[data-testid="save-tenant-chat-space"]').trigger('click')
     await flushPromises()
     expect(saveTenantChatSpace).toHaveBeenCalledWith(
-      { spaceName: 'Finance', googleChatWebhookUrl: WEBHOOK, isActive: true }, expect.anything())
+      { spaceName: 'Finance', chatProviderEnumId: 'CHAT_PROV_GOOGLE', webhookUrl: WEBHOOK, isActive: true },
+      expect.anything())
     expect(push).not.toHaveBeenCalledWith('/settings/notifications')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Saved chat space.')
+  })
+
+  it('creates a Slack space and sends the Slack provider with the webhook', async () => {
+    const SLACK_WEBHOOK = 'https://hooks.slack.com/services/T-EXAMPLE/B-EXAMPLE/placeholder-not-a-real-secret'
+    listTenantChatSpaces.mockResolvedValue({ ok: true, chatSpaces: [] })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-add"]').trigger('click')
+
+    await wrapper.get('input[name="chatSpaceName"]').setValue('Ops Slack')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('[data-testid="tenant-chat-provider-select"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value="CHAT_PROV_SLACK"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('input[name="webhookUrl"]').setValue(SLACK_WEBHOOK)
+    await wrapper.get('[data-testid="save-tenant-chat-space"]').trigger('click')
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenCalledWith(
+      { spaceName: 'Ops Slack', chatProviderEnumId: 'CHAT_PROV_SLACK', webhookUrl: SLACK_WEBHOOK, isActive: true },
+      expect.anything(),
+    )
+  })
+
+  it('will not save an edited space on its old webhook after the provider is switched', async () => {
+    // The existing row still carries a chat.googleapis.com URL. Treating that as "already
+    // configured" would save a Slack space pointing at Google Chat, which fails server-side with a
+    // message about the wrong host rather than telling the admin what they actually have to do.
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-CS1"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-menu-edit"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('[data-testid="tenant-chat-provider-select"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value="CHAT_PROV_SLACK"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="chat-provider-changed-note"]').text()).toContain('Switching to Slack')
+    expect(wrapper.find('[data-testid="google-chat-webhook-status"]').exists()).toBe(false)
+    expect(
+      (wrapper.get('[data-testid="save-tenant-chat-space"]').element as HTMLButtonElement).disabled,
+    ).toBe(true)
+  })
+
+  it('offers a Slack connection and sends the admin to the authorize URL', async () => {
+    const assign = vi.fn()
+    const original = window.location
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, assign } })
+    try {
+      const wrapper = mount(TenantSettingsPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+      await flushPromises()
+
+      await wrapper.get('[data-testid="tenant-chat-space-slack"]').trigger('click')
+      await flushPromises()
+      await wrapper.get('[data-testid="tenant-slack-menu-connect"]').trigger('click')
+      await flushPromises()
+
+      expect(beginSlackInstall).toHaveBeenCalled()
+      // Full-page navigation, not a popup: Slack's consent screen refuses to render in an iframe.
+      expect(assign).toHaveBeenCalledWith('https://slack.com/oauth/v2/authorize?client_id=1&state=abc')
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: original })
+    }
+  })
+
+  it('connects with a pasted bot token when OAuth is not configured on the deployment', async () => {
+    // The whole point of this path: a deployment with no client id still offers Slack, and a
+    // workspace whose admins will not install apps can still be connected.
+    getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: false, installs: [] })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-slack"]').trigger('click')
+    await flushPromises()
+
+    // No OAuth option offered, because this deployment cannot complete it.
+    expect(wrapper.find('[data-testid="tenant-slack-menu-connect"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="tenant-slack-menu-token"]').trigger('click')
+    await flushPromises()
+
+    const input = wrapper.get('[data-testid="slack-bot-token-input"]')
+    expect(input.attributes('type')).toBe('password')
+    await input.setValue('xoxb-real-token')
+    await wrapper.get('[data-testid="save-slack-bot-token"]').trigger('click')
+    await flushPromises()
+
+    expect(saveSlackBotToken).toHaveBeenCalledWith({ botAccessToken: 'xoxb-real-token' }, expect.anything())
+    expect(wrapper.text()).toContain('Connected to Acme')
+  })
+
+  it('surfaces a missing-scope warning alongside the success message', async () => {
+    // A partially scoped token connects successfully and then produces an empty channel picker.
+    // A success-only banner would make that look like a bug rather than a permissions gap.
+    saveSlackBotToken.mockResolvedValue({
+      ok: true,
+      messages: ['Connected to Thin as darpan.', 'Missing scope(s): channels:read. Notifications will still send, but channel listing or posting to channels the app has not joined may fail.'],
+      missingScopes: ['channels:read'],
+      install: { slackInstallId: 'SI2', teamId: 'T2', teamName: 'Thin', isActive: 'Y' },
+    })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-slack"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-slack-menu-token"]').trigger('click')
+    await wrapper.get('[data-testid="slack-bot-token-input"]').setValue('xoxb-thin')
+    await wrapper.get('[data-testid="save-slack-bot-token"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Missing scope(s): channels:read')
+  })
+
+  it('reports a token Slack rejected without claiming success', async () => {
+    saveSlackBotToken.mockResolvedValue({ ok: false, errors: ['Slack rejected that token: Slack rejected Darpan\u2019s access.'] })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-slack"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-slack-menu-token"]').trigger('click')
+    await wrapper.get('[data-testid="slack-bot-token-input"]').setValue('xoxb-bad')
+    await wrapper.get('[data-testid="save-slack-bot-token"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Slack rejected that token')
+    // The popup stays open so the paste can be corrected in place.
+    expect(wrapper.find('[data-testid="slack-bot-token-input"]').exists()).toBe(true)
+  })
+
+  it('replaces the webhook card with a channel picker once a workspace is connected', async () => {
+    getSlackInstall.mockResolvedValue({
+      ok: true,
+      slackConfigured: true,
+      installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', botUserId: 'U_BOT', isActive: 'Y' }],
+    })
+    listSlackChannels.mockResolvedValue({
+      ok: true,
+      botUserId: 'U_BOT',
+      channels: [
+        { id: 'C1', name: 'ops', isPrivate: false, isMember: false },
+        { id: 'G2', name: 'secret', isPrivate: true, isMember: false },
+      ],
+      nextCursor: null,
+    })
+    listTenantChatSpaces.mockResolvedValue({ ok: true, chatSpaces: [] })
+
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-add"]').trigger('click')
+    await wrapper.get('input[name="chatSpaceName"]').setValue('Ops Slack')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('[data-testid="tenant-chat-provider-select"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value="CHAT_PROV_SLACK"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await flushPromises()
+
+    // No webhook to paste — the workspace token plus a channel id is the whole configuration.
+    expect(wrapper.find('input[name="webhookUrl"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tenant-slack-channel-select"]').exists()).toBe(true)
+    expect(listSlackChannels).toHaveBeenCalledWith({ slackInstallId: 'SI1' }, expect.anything())
+
+    await wrapper.get('[data-testid="tenant-slack-channel-select"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value="G2"]').trigger('click')
+    await flushPromises()
+    // chat:write.public covers public channels; a PRIVATE one the bot is not in fails at the first
+    // run, so the warning has to appear here rather than hours later.
+    expect(wrapper.get('[data-testid="slack-invite-note"]').text()).toContain('invite the Darpan app')
+
+    await wrapper.get('[data-testid="save-tenant-chat-space"]').trigger('click')
+    await flushPromises()
+    expect(saveTenantChatSpace).toHaveBeenCalledWith({
+      spaceName: 'Ops Slack',
+      isActive: true,
+      chatProviderEnumId: 'CHAT_PROV_SLACK',
+      slackInstallId: 'SI1',
+      slackChannelId: 'G2',
+      slackChannelName: 'secret',
+    }, expect.anything())
+  })
+
+  it('reports the Slack callback result and clears it from the URL', async () => {
+    route.query = { slack: 'connected', team: 'Acme' }
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Connected to Acme.')
+    // Left in place, a refresh would replay the banner.
+    expect(replace).toHaveBeenCalledWith({ query: {} })
+  })
+
+  it('explains a refused Slack authorisation', async () => {
+    route.query = { slack: 'error', reason: 'declined' }
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    expect(wrapper.text()).toContain('cancelled')
   })
 
   it('blocks delete for in-use spaces and offers deactivate', async () => {
@@ -431,7 +678,11 @@ describe('TenantSettingsPage', () => {
         {
           chatSpaceId: 'CS1',
           spaceName: 'Ops',
+          chatProviderEnumId: 'CHAT_PROV_GOOGLE',
+          chatProviderLabel: 'Google Chat',
+          webhookConfigured: true,
           googleChatConfigured: true,
+          webhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
           googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
           isActive: 'Y',
           inUse: true,
@@ -445,7 +696,11 @@ describe('TenantSettingsPage', () => {
       chatSpace: {
         chatSpaceId: 'CS1',
         spaceName: 'Ops',
+        chatProviderEnumId: 'CHAT_PROV_GOOGLE',
+        chatProviderLabel: 'Google Chat',
+        webhookConfigured: true,
         googleChatConfigured: true,
+        webhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
         googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
         isActive: 'N',
         inUse: true,
@@ -491,6 +746,7 @@ describe('TenantSettingsPage', () => {
 
     expect((wrapper.get('input[name="chatSpaceName"]').element as HTMLInputElement).value).toBe('Ops')
     await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
 
     expect(wrapper.get('[data-testid="google-chat-webhook-status"]').text()).toContain('Current webhook: https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t')
     // Leave the webhook input blank and save — the backend keeps the existing webhook.
@@ -498,7 +754,7 @@ describe('TenantSettingsPage', () => {
     await flushPromises()
 
     expect(saveTenantChatSpace).toHaveBeenCalledWith(
-      { chatSpaceId: 'CS1', spaceName: 'Ops', isActive: true },
+      { chatSpaceId: 'CS1', spaceName: 'Ops', chatProviderEnumId: 'CHAT_PROV_GOOGLE', isActive: true },
       expect.anything(),
     )
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)

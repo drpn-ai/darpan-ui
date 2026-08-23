@@ -147,6 +147,280 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["UpdateTenantMemberRoleResult"];
         };
+        /** @description Preview one named migration. */
+        DryRunMigrationParams: {
+            migrationId: string;
+        };
+        DryRunMigrationResult: {
+            ok?: boolean;
+            outcome?: string;
+            runId?: string;
+            rowsAffected?: number;
+            detail?: string;
+        };
+        /** @description JSON-RPC request envelope for admin.MigrationAdminServices.dryRun#Migration */
+        DryRunMigrationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MigrationAdminServices.dryRun#Migration";
+            params?: components["schemas"]["DryRunMigrationParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MigrationAdminServices.dryRun#Migration. Check result.ok / result.errors for business failures. */
+        DryRunMigrationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DryRunMigrationResult"];
+        };
+        /**
+         * @description Preview what running the pending migrations would do. Writes DRY_RUN ledger rows
+         *                 only; a DRY_RUN row never satisfies the already-applied check.
+         */
+        DryRunPendingMigrationsParams: Record<string, never>;
+        DryRunPendingMigrationsResult: {
+            ok?: boolean;
+            results?: {
+                result?: {
+                    migrationId?: string;
+                    outcome?: string;
+                    runId?: string;
+                    rowsAffected?: number;
+                    detail?: string;
+                };
+            }[];
+            appliedCount?: number;
+            skippedCount?: number;
+            blockedCount?: number;
+            failedCount?: number;
+        };
+        /** @description JSON-RPC request envelope for admin.MigrationAdminServices.dryRun#PendingMigrations */
+        DryRunPendingMigrationsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MigrationAdminServices.dryRun#PendingMigrations";
+            params?: components["schemas"]["DryRunPendingMigrationsParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MigrationAdminServices.dryRun#PendingMigrations. Check result.ok / result.errors for business failures. */
+        DryRunPendingMigrationsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DryRunPendingMigrationsResult"];
+        };
+        /**
+         * @description Every recorded attempt at one migration, newest first, each with its own
+         *                 sanitized failure detail. This is how a failed migration is diagnosed without database
+         *                 access.
+         */
+        GetMigrationHistoryParams: {
+            migrationId: string;
+            /** @description Default 50. */
+            maxRows?: number;
+        };
+        GetMigrationHistoryResult: {
+            ok?: boolean;
+            attempts?: {
+                attempt?: {
+                    runId?: string;
+                    statusId?: string;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    startedDate?: string | number;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    completedDate?: string | number;
+                    appliedByUserId?: string;
+                    rowsAffected?: number;
+                    messageDetail?: string;
+                };
+            }[];
+        };
+        /** @description JSON-RPC request envelope for admin.MigrationAdminServices.get#MigrationHistory */
+        GetMigrationHistoryRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MigrationAdminServices.get#MigrationHistory";
+            params?: components["schemas"]["GetMigrationHistoryParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MigrationAdminServices.get#MigrationHistory. Check result.ok / result.errors for business failures. */
+        GetMigrationHistoryResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetMigrationHistoryResult"];
+        };
+        /**
+         * @description Registry and ledger state for every registered migration on this installation,
+         *                 in sequence order, including the detail of the most recent attempt. Read-only.
+         */
+        GetMigrationStatusParams: Record<string, never>;
+        GetMigrationStatusResult: {
+            ok?: boolean;
+            /** @description One row per registered migration, sequenceNum order. */
+            migrations?: {
+                migration?: {
+                    migrationId?: string;
+                    description?: string;
+                    sequenceNum?: number;
+                    supportsDryRun?: boolean;
+                    enabled?: boolean;
+                    /** @description APPLIED | PENDING | BLOCKED | DISABLED */
+                    status?: string;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    lastRunDate?: string | number;
+                    lastStatusId?: string;
+                    /** @description Sanitized detail of the most recent attempt. */
+                    lastMessageDetail?: string;
+                    lastRunId?: string;
+                    rowsAffected?: number;
+                    attemptCount?: number;
+                };
+            }[];
+        };
+        /** @description JSON-RPC request envelope for admin.MigrationAdminServices.get#MigrationStatus */
+        GetMigrationStatusRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MigrationAdminServices.get#MigrationStatus";
+            params?: components["schemas"]["GetMigrationStatusParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MigrationAdminServices.get#MigrationStatus. Check result.ok / result.errors for business failures. */
+        GetMigrationStatusResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetMigrationStatusResult"];
+        };
+        /**
+         * @description Run one named migration, for targeted remediation. Parked migrations are
+         *                 refused, prerequisites are enforced, and an already-applied migration is skipped unless
+         *                 force is set.
+         */
+        RunMigrationParams: {
+            migrationId: string;
+            /**
+             * @description Re-run even when a SUCCESS row exists — for re-running an idempotent
+             *                         backfill. Never overrides prerequisites.
+             */
+            force?: boolean;
+        };
+        RunMigrationResult: {
+            ok?: boolean;
+            /** @description APPLIED | ALREADY_APPLIED | BLOCKED | FAILED | DISABLED | NOT_FOUND | NO_PREVIEW */
+            outcome?: string;
+            runId?: string;
+            rowsAffected?: number;
+            detail?: string;
+        };
+        /** @description JSON-RPC request envelope for admin.MigrationAdminServices.run#Migration */
+        RunMigrationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MigrationAdminServices.run#Migration";
+            params?: components["schemas"]["RunMigrationParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MigrationAdminServices.run#Migration. Check result.ok / result.errors for business failures. */
+        RunMigrationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RunMigrationResult"];
+        };
+        /**
+         * @description Run every registered migration on this installation with no SUCCESS ledger row,
+         *                 in sequence order. Idempotent: a second call applies nothing. Sweeps every tenant's data;
+         *                 super admin only.
+         */
+        RunPendingMigrationsParams: Record<string, never>;
+        RunPendingMigrationsResult: {
+            ok?: boolean;
+            results?: {
+                result?: {
+                    migrationId?: string;
+                    outcome?: string;
+                    runId?: string;
+                    rowsAffected?: number;
+                    detail?: string;
+                };
+            }[];
+            appliedCount?: number;
+            skippedCount?: number;
+            blockedCount?: number;
+            failedCount?: number;
+        };
+        /** @description JSON-RPC request envelope for admin.MigrationAdminServices.run#PendingMigrations */
+        RunPendingMigrationsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MigrationAdminServices.run#PendingMigrations";
+            params?: components["schemas"]["RunPendingMigrationsParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MigrationAdminServices.run#PendingMigrations. Check result.ok / result.errors for business failures. */
+        RunPendingMigrationsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RunPendingMigrationsResult"];
+        };
+        /**
+         * @description Park or unpark a migration on this installation. Parking lets the rest of a
+         *                 sweep through when one migration is broken, instead of stranding the whole upgrade.
+         *                 A parked migration reports status DISABLED and is refused even when named directly.
+         */
+        SetMigrationEnabledParams: {
+            migrationId: string;
+            enabled: boolean;
+        };
+        SetMigrationEnabledResult: {
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.MigrationAdminServices.set#MigrationEnabled */
+        SetMigrationEnabledRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.MigrationAdminServices.set#MigrationEnabled";
+            params?: components["schemas"]["SetMigrationEnabledParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.MigrationAdminServices.set#MigrationEnabled. Check result.ok / result.errors for business failures. */
+        SetMigrationEnabledResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SetMigrationEnabledResult"];
+        };
         /**
          * @description Fence probe + admin-app route guard: returns the operator identity when the caller
          *                 passes the DARPAN_ADMIN_API artifact fence and the isSuperAdmin() content gate.
@@ -2204,6 +2478,7 @@ export interface components {
             messages?: string[];
             errors?: string[];
             automation?: Record<string, never>;
+            syncStatus?: Record<string, never>;
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#Automation */
         GetAutomationRequest: {
@@ -3639,6 +3914,47 @@ export interface components {
             result: components["schemas"]["SubscribeRunNotificationResult"];
         };
         /**
+         * @description Re-derive an automation's snapshot from its saved run. Overwrites the compare
+         *                 scope, input mode, both source definitions and the exclusion filters; preserves the name,
+         *                 schedule, window, chat space, active status, and the SFTP server, path and pattern the run
+         *                 cannot supply. Never re-points the automation at a different run.
+         *
+         *                 Writes nothing directly: it derives, merges the result over the stored source rows, and
+         *                 delegates to save#Automation, which already deletes and recreates every source and filter
+         *                 row on each save. That inherits the whole save path (validateSources, validateApiSource,
+         *                 applyApiSourceMetadataDefaults, tenant stamping, the response builder) rather than growing
+         *                 a second writer that would drift from it.
+         */
+        SyncAutomationParams: {
+            automationId: string;
+        };
+        SyncAutomationResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            automation?: Record<string, never>;
+            changedFields?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.sync#Automation */
+        SyncAutomationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.sync#Automation";
+            params?: components["schemas"]["SyncAutomationParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.sync#Automation. Check result.ok / result.errors for business failures. */
+        SyncAutomationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SyncAutomationResult"];
+        };
+        /**
          * @description Remove the caller's notify-me subscription for one run. Caller-scoped: only the caller's own
          *                 row for that run is ever deleted. Reports an ERROR when there was nothing to remove instead of
          *                 reporting success — a retried automation carries subscriptions forward onto the new attempt's
@@ -4046,7 +4362,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListSftpServersResult"];
         };
-        /** @description List active-tenant Google Chat spaces, including the webhook URL in clear text. */
+        /** @description List active-tenant chat spaces (Google Chat or Slack), including the webhook URL in clear text. */
         ListTenantChatSpacesParams: Record<string, never>;
         ListTenantChatSpacesResult: {
             ok?: boolean;
@@ -4055,6 +4371,14 @@ export interface components {
             chatSpaces?: {
                 chatSpaceId?: string;
                 spaceName?: string;
+                chatProviderEnumId?: string;
+                chatProviderLabel?: string;
+                slackInstallId?: string;
+                slackChannelId?: string;
+                slackChannelName?: string;
+                deliveryMode?: string;
+                webhookConfigured?: boolean;
+                webhookUrl?: string;
                 googleChatConfigured?: boolean;
                 googleChatWebhookUrl?: string;
                 isActive?: string;
@@ -4272,10 +4596,15 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SaveSftpServerResult"];
         };
-        /** @description Create or update one named Google Chat space for the active tenant. */
+        /** @description Create or update one named chat space (Google Chat or Slack) for the active tenant. */
         SaveTenantChatSpaceParams: {
             chatSpaceId?: string;
             spaceName: string;
+            chatProviderEnumId?: string;
+            slackInstallId?: string;
+            slackChannelId?: string;
+            slackChannelName?: string;
+            webhookUrl?: string;
             googleChatWebhookUrl?: string;
             isActive?: boolean;
         };
@@ -4617,6 +4946,195 @@ export interface components {
             result: components["schemas"]["SaveShopifyAuthConfigResult"];
         };
         /**
+         * @description Start the Slack app install for the active tenant: mint a single-use state token
+         *                 and return the Slack authorize URL the browser should be sent to. Does not contact Slack.
+         */
+        BeginSlackInstallParams: Record<string, never>;
+        BeginSlackInstallResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            authorizeUrl?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.SlackFacadeServices.begin#SlackInstall */
+        BeginSlackInstallRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SlackFacadeServices.begin#SlackInstall";
+            params?: components["schemas"]["BeginSlackInstallParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SlackFacadeServices.begin#SlackInstall. Check result.ok / result.errors for business failures. */
+        BeginSlackInstallResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["BeginSlackInstallResult"];
+        };
+        /**
+         * @description Deactivate a connected workspace. Refuses while chat spaces still post through
+         *                 it, naming them — silently disconnecting would leave those destinations resolving to
+         *                 nothing and the tenant would learn about it from missing notifications.
+         */
+        DisconnectSlackWorkspaceParams: {
+            slackInstallId: string;
+        };
+        DisconnectSlackWorkspaceResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.SlackFacadeServices.disconnect#SlackWorkspace */
+        DisconnectSlackWorkspaceRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SlackFacadeServices.disconnect#SlackWorkspace";
+            params?: components["schemas"]["DisconnectSlackWorkspaceParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SlackFacadeServices.disconnect#SlackWorkspace. Check result.ok / result.errors for business failures. */
+        DisconnectSlackWorkspaceResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DisconnectSlackWorkspaceResult"];
+        };
+        /**
+         * @description The active tenant's connected Slack workspaces. Returns identity and granted
+         *                 scopes only — never the bot token.
+         */
+        GetSlackInstallParams: Record<string, never>;
+        GetSlackInstallResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            slackConfigured?: boolean;
+            oauthAvailable?: boolean;
+            installs?: {
+                slackInstallId?: string;
+                teamId?: string;
+                teamName?: string;
+                botUserId?: string;
+                grantedScopes?: string;
+                isActive?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                installedDate?: string | number;
+            }[];
+        };
+        /** @description JSON-RPC request envelope for facade.SlackFacadeServices.get#SlackInstall */
+        GetSlackInstallRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SlackFacadeServices.get#SlackInstall";
+            params?: components["schemas"]["GetSlackInstallParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SlackFacadeServices.get#SlackInstall. Check result.ok / result.errors for business failures. */
+        GetSlackInstallResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetSlackInstallResult"];
+        };
+        /**
+         * @description One page of channels from a connected workspace, for the chat-space channel
+         *                 picker. Paginated rather than exhaustive: conversations.list is rate-limit Tier 2 and a
+         *                 large workspace has thousands of channels.
+         */
+        ListSlackChannelsParams: {
+            slackInstallId: string;
+            cursor?: string;
+        };
+        ListSlackChannelsResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            channels?: {
+                id?: string;
+                name?: string;
+                isPrivate?: boolean;
+                isMember?: boolean;
+            }[];
+            nextCursor?: string;
+            botUserId?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.SlackFacadeServices.list#SlackChannels */
+        ListSlackChannelsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SlackFacadeServices.list#SlackChannels";
+            params?: components["schemas"]["ListSlackChannelsParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SlackFacadeServices.list#SlackChannels. Check result.ok / result.errors for business failures. */
+        ListSlackChannelsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListSlackChannelsResult"];
+        };
+        /**
+         * @description Connect a Slack workspace by pasting a bot user OAuth token (xoxb-), for
+         *                 workspaces whose administrators do not permit installing the Darpan app. The token is
+         *                 verified against Slack before it is stored, and the workspace identity is taken from
+         *                 Slack's answer rather than from the caller.
+         *
+         *                 Storing goes through the entity facade so the encrypted column is written correctly; a
+         *                 token placed into the database any other way would be plaintext where reads expect
+         *                 ciphertext.
+         */
+        SaveSlackBotTokenParams: {
+            botAccessToken: string;
+        };
+        SaveSlackBotTokenResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            install?: {
+                slackInstallId?: string;
+                teamId?: string;
+                teamName?: string;
+                botUserId?: string;
+                grantedScopes?: string;
+            };
+            missingScopes?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.SlackFacadeServices.save#SlackBotToken */
+        SaveSlackBotTokenRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.SlackFacadeServices.save#SlackBotToken";
+            params?: components["schemas"]["SaveSlackBotTokenParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.SlackFacadeServices.save#SlackBotToken. Check result.ok / result.errors for business failures. */
+        SaveSlackBotTokenResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveSlackBotTokenResult"];
+        };
+        /**
          * @description Endpoints registered for this config type, each with its current enablement.
          *                 The catalog comes from SourceSystemConnector; access rows only supply isEnabled.
          */
@@ -4711,7 +5229,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"];
+                "application/json": components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"];
             };
         };
         responses: {
@@ -4721,7 +5239,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"];
                 };
             };
         };

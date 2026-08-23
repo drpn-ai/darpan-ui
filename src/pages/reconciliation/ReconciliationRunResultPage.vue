@@ -756,7 +756,7 @@ watch([liveRunStatusEnumId, liveRunResultId], ([statusEnumId]) => {
   void router.replace(buildReconciliationRunResultRoute(reconciliationRunRouteContext.value, resultFileName))
 }, { immediate: true })
 
-// Notify-me (Task 12): subscribe/unsubscribe the current user to Google Chat notifications
+// Notify-me (Task 12): subscribe/unsubscribe the current user to chat notifications
 // for this run. Only offered while the run is still active (PENDING/RUNNING) — a terminal
 // run has already notified or never will. Mirrors the run-settings action's busy/error
 // conventions (boolean busy flag + dedicated error ref surfaced via InlineValidation), not

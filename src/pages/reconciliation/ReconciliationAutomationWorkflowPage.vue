@@ -43,16 +43,60 @@
             />
           </label>
 
-          <label class="wizard-input-shell">
+          <!-- Read-only by design: the automation holds a SNAPSHOT of this run's config, so
+               re-pointing it would leave a snapshot derived from a different run. Sync re-derives
+               from the run instead. -->
+          <div class="wizard-input-shell automation-edit-saved-run">
             <span class="workflow-context-label">Saved Run</span>
-            <WorkflowSelect
-              v-model="editSavedRunId"
-              test-id="automation-edit-saved-run-select"
-              :disabled="saving || loadingOptions"
-              :options="savedRunSelectOptions"
-              placeholder="Select saved run..."
-            />
-          </label>
+            <div class="automation-edit-saved-run__row">
+              <span
+                class="automation-edit-saved-run__name"
+                data-testid="automation-edit-saved-run-name"
+              >{{ selectedSavedRun?.runName ?? '—' }}</span>
+              <button
+                v-if="!syncConfirming"
+                type="button"
+                class="automation-edit-saved-run__sync"
+                data-testid="automation-edit-sync"
+                :disabled="saving || syncing || loadingOptions || automationSyncStatus?.savedRunMissing"
+                @click="syncConfirming = true"
+              >
+                {{ syncing ? 'Syncing…' : 'Sync' }}
+              </button>
+            </div>
+            <span
+              v-if="driftMessage"
+              class="section-note"
+              data-testid="automation-edit-drift"
+            >{{ driftMessage }}</span>
+            <div
+              v-if="syncConfirming"
+              class="automation-edit-saved-run__confirm"
+              data-testid="automation-edit-sync-confirm"
+            >
+              <span class="section-note">{{ syncConfirmMessage }}</span>
+              <div class="automation-edit-saved-run__row">
+                <button
+                  type="button"
+                  class="automation-edit-saved-run__sync"
+                  data-testid="automation-edit-sync-confirm-yes"
+                  :disabled="syncing"
+                  @click="void syncFromSavedRun()"
+                >
+                  Sync now
+                </button>
+                <button
+                  type="button"
+                  class="automation-edit-saved-run__sync"
+                  data-testid="automation-edit-sync-confirm-no"
+                  :disabled="syncing"
+                  @click="syncConfirming = false"
+                >
+                  Keep as is
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <template v-if="usesApi">
@@ -421,7 +465,7 @@
             class="wizard-answer-control"
             data-testid="automation-chat-space-url"
             type="password"
-            placeholder="https://chat.googleapis.com/v1/spaces/..."
+            :placeholder="chatProviderWebhookPlaceholders[newChatSpaceProvider]"
           />
         </label>
       </template>
@@ -455,8 +499,10 @@ import type {
   AutomationNsRestletOption,
   AutomationRecord,
   AutomationSourceRecord,
+  AutomationSyncStatus,
   AutomationSftpServerOption,
   AutomationSystemRemoteOption,
+  ChatProviderId,
   EnumOption,
   SavedRunSummary,
   TenantChatSpace,
@@ -509,6 +555,9 @@ const draftStore = useReconciliationDraftStore()
 const loadingOptions = ref(false)
 const saving = ref(false)
 const pageError = ref<string | null>(null)
+const automationSyncStatus = ref<AutomationSyncStatus | null>(null)
+const syncConfirming = ref(false)
+const syncing = ref(false)
 const currentStepIndex = ref(0)
 const handoffSavedRun = ref<SavedRunSummary | null>(null)
 const automationId = ref('')
@@ -556,7 +605,16 @@ const returnPath = ref('')
 const chatSpaceChoice = ref<ReconciliationAutomationChatSpaceChoice>('')
 const chatSpaceId = ref('')
 const newChatSpaceName = ref('')
+const newChatSpaceProvider = ref<ChatProviderId>('CHAT_PROV_GOOGLE')
 const newChatSpaceUrl = ref('')
+const chatProviderOptions: WorkflowSelectOption[] = [
+  { value: 'CHAT_PROV_GOOGLE', label: 'Google Chat' },
+  { value: 'CHAT_PROV_SLACK', label: 'Slack' },
+]
+const chatProviderWebhookPlaceholders: Record<ChatProviderId, string> = {
+  CHAT_PROV_GOOGLE: 'https://chat.googleapis.com/v1/spaces/...',
+  CHAT_PROV_SLACK: 'https://hooks.slack.com/services/T.../B.../...',
+}
 const userNotificationDefault = ref<UserNotificationDefault | null>(null)
 const tenantChatSpaces = ref<TenantChatSpace[]>([])
 // Snapshot of the automation's own linked chat space at load time, for the edit-surface
@@ -676,7 +734,9 @@ const editChatSpaceValue = computed({
 const chatSpaceSteps = computed<WizardStep[]>(() => {
   const chatSpaceStepList: WizardStep[] = [{ id: 'chat-space' }]
   if (chatSpaceChoice.value === 'existing') chatSpaceStepList.push({ id: 'chat-space-select' })
-  if (chatSpaceChoice.value === 'new') chatSpaceStepList.push({ id: 'chat-space-name' }, { id: 'chat-space-url' })
+  if (chatSpaceChoice.value === 'new') {
+    chatSpaceStepList.push({ id: 'chat-space-name' }, { id: 'chat-space-provider' }, { id: 'chat-space-url' })
+  }
   return chatSpaceStepList
 })
 
@@ -769,14 +829,6 @@ const sftpServerSelectOptions = computed<WorkflowSelectOption[]>(() => sourceOpt
   value: server.sftpServerId,
   label: server.label || server.description || server.sftpServerId,
 })))
-const editSavedRunId = computed({
-  get: () => selectedSavedRunId.value,
-  set: (value: string) => {
-    selectSavedRun(value)
-    applyDeterministicDefaults()
-    settleOnCurrentIndex()
-  },
-})
 function deterministicInputModeEnumId(): string {
   if (savedRunUsesOnlyApiSources.value) return AUTOMATION_INPUT_MODE_API_RANGE
   return inputModeOptions.value.length === 1 ? inputModeOptions.value[0]?.value ?? '' : ''
@@ -883,14 +935,19 @@ const currentQuestion = computed(() => {
       return 'Which chat space should get notified?'
     case 'chat-space-name':
       return 'What should the new chat space be called?'
+    case 'chat-space-provider':
+      return 'Which chat product does it post to?'
     case 'chat-space-url':
-      return 'What is the Google Chat webhook URL for this space?'
+      return `What is the ${newChatSpaceProviderLabel.value} webhook URL for this space?`
     default:
       return ''
   }
 })
 
-const isSelectStep = computed(() => ['saved-run', 'file1-sftp', 'file2-sftp', 'file1-api', 'file2-api', 'chat-space-select'].includes(currentStep.value.id))
+const isSelectStep = computed(() => ['saved-run', 'file1-sftp', 'file2-sftp', 'file1-api', 'file2-api', 'chat-space-select', 'chat-space-provider'].includes(currentStep.value.id))
+const newChatSpaceProviderLabel = computed(() => (
+  chatProviderOptions.find((option) => option.value === newChatSpaceProvider.value)?.label ?? 'chat'
+))
 
 const activeSelectOptions = computed<WorkflowSelectOption[]>(() => {
   switch (currentStep.value.id) {
@@ -904,6 +961,8 @@ const activeSelectOptions = computed<WorkflowSelectOption[]>(() => {
       return apiSourceOptionsForCurrentStep.value
     case 'chat-space-select':
       return chatSpaceSelectOptions.value
+    case 'chat-space-provider':
+      return chatProviderOptions
     default:
       return []
   }
@@ -929,6 +988,8 @@ const activeSelectTestId = computed(() => {
       return 'automation-file2-api-select'
     case 'chat-space-select':
       return 'automation-chat-space-select'
+    case 'chat-space-provider':
+      return 'automation-chat-provider-select'
     default:
       return 'automation-select'
   }
@@ -954,6 +1015,8 @@ const currentPlaceholder = computed(() => {
       return '/remote/source-2/orders'
     case 'chat-space-select':
       return 'Select chat space...'
+    case 'chat-space-provider':
+      return 'Select chat product...'
     default:
       return ''
   }
@@ -974,6 +1037,8 @@ const activeSelectValue = computed({
         return selectedApiSourceValue('FILE_2')
       case 'chat-space-select':
         return chatSpaceId.value
+      case 'chat-space-provider':
+        return newChatSpaceProvider.value
       default:
         return ''
     }
@@ -998,6 +1063,12 @@ const activeSelectValue = computed({
         break
       case 'chat-space-select':
         chatSpaceId.value = value
+        break
+      case 'chat-space-provider':
+        newChatSpaceProvider.value = value as ChatProviderId
+        // A pasted URL belongs to the product it was copied from; keeping it across a provider
+        // change would send a chat.googleapis.com URL to the Slack validator.
+        newChatSpaceUrl.value = ''
         break
     }
   },
@@ -1096,6 +1167,8 @@ const canProceed = computed(() => {
       return chatSpaceId.value.length > 0
     case 'chat-space-name':
       return newChatSpaceName.value.trim().length > 0
+    case 'chat-space-provider':
+      return newChatSpaceProvider.value.length > 0
     case 'chat-space-url':
       return newChatSpaceUrl.value.trim().length > 0
     default:
@@ -1150,6 +1223,7 @@ const activeDraft = computed<ReconciliationAutomationDraft>(() => ({
   chatSpaceChoice: chatSpaceChoice.value || undefined,
   chatSpaceId: chatSpaceId.value || undefined,
   newChatSpaceName: newChatSpaceName.value || undefined,
+  newChatSpaceProvider: newChatSpaceProvider.value,
   newChatSpaceUrl: newChatSpaceUrl.value || undefined,
   sources: {
     FILE_1: sourceDrafts.value.FILE_1,
@@ -1372,7 +1446,8 @@ async function saveAutomationSetup(): Promise<void> {
       try {
         const spaceResponse = await settingsFacade.saveTenantChatSpace({
           spaceName: newChatSpaceName.value,
-          googleChatWebhookUrl: newChatSpaceUrl.value,
+          chatProviderEnumId: newChatSpaceProvider.value,
+          webhookUrl: newChatSpaceUrl.value,
           isActive: true,
         }, submitSignal)
         if (!spaceResponse.chatSpace?.chatSpaceId) {
@@ -1486,6 +1561,41 @@ function hydrateAutomation(automation: AutomationRecord): void {
   automationChatSpaceInactive.value = Boolean(automation.chatSpaceId) && automation.chatSpaceActive === false
 }
 
+const driftMessage = computed<string>(() => {
+  const status = automationSyncStatus.value
+  if (!status) return ''
+  if (status.savedRunMissing) return 'This automation\u2019s saved run is no longer available, so it cannot be synced.'
+  if (status.inSync) return ''
+  return 'Out of date \u2014 the run changed after this automation last synced.'
+})
+
+const syncConfirmMessage = computed<string>(() => {
+  const base = 'Sync replaces this automation\u2019s source setup and exclusion filters with the run\u2019s current ones.'
+  return automationSyncStatus.value?.inputModeChanging
+    ? `${base} The run now uses a different kind of source, so the schedule shape changes and the current window settings stop applying.`
+    : base
+})
+
+async function syncFromSavedRun(): Promise<void> {
+  const automationId = routeAutomationId.value
+  if (!automationId || syncing.value) return
+  syncing.value = true
+  try {
+    const response = await reconciliationFacade.syncAutomation({ automationId }, pageAbortController.signal)
+    if (!response.ok) {
+      pageError.value = response.errors?.[0] ?? 'Unable to sync this automation with its saved run.'
+      return
+    }
+    syncConfirming.value = false
+    await loadAutomationForEdit()
+  } catch (syncError) {
+    if ((syncError as { name?: string })?.name === 'AbortError') return
+    pageError.value = 'Unable to sync this automation with its saved run.'
+  } finally {
+    syncing.value = false
+  }
+}
+
 async function loadAutomationForEdit(): Promise<boolean> {
   const editAutomationId = routeAutomationId.value
   if (!editAutomationId) return false
@@ -1499,6 +1609,7 @@ async function loadAutomationForEdit(): Promise<boolean> {
       return false
     }
     hydrateAutomation(response.automation)
+    automationSyncStatus.value = response.syncStatus ?? null
     return true
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return false
@@ -1535,6 +1646,7 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   chatSpaceChoice.value = draft.chatSpaceChoice ?? ''
   chatSpaceId.value = draft.chatSpaceId ?? ''
   newChatSpaceName.value = draft.newChatSpaceName ?? ''
+  newChatSpaceProvider.value = (draft.newChatSpaceProvider as ChatProviderId | undefined) ?? 'CHAT_PROV_GOOGLE'
   newChatSpaceUrl.value = draft.newChatSpaceUrl ?? ''
   sourceDrafts.value = {
     FILE_1: { ...(draft.sources?.FILE_1 ?? {}) },
@@ -1664,6 +1776,48 @@ onUnmounted(() => {
 .automation-edit-active-field {
   align-content: end;
   min-width: 0;
+}
+
+.automation-edit-saved-run {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.automation-edit-saved-run__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.automation-edit-saved-run__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Matches the borderless, weight-400 affordances the rest of this form uses; the underline is the
+   only signal, exactly as the wizard's own inline actions read. */
+.automation-edit-saved-run__sync {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-soft);
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.automation-edit-saved-run__sync:disabled {
+  cursor: default;
+  text-decoration: none;
+  opacity: 0.6;
+}
+
+.automation-edit-saved-run__confirm {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .automation-edit-schedule-helper .automation-schedule-control,

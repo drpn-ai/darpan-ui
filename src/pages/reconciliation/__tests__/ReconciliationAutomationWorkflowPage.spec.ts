@@ -14,6 +14,7 @@ const route = vi.hoisted(() => ({
 const listAutomationSourceOptions = vi.hoisted(() => vi.fn())
 const getAutomation = vi.hoisted(() => vi.fn())
 const saveAutomation = vi.hoisted(() => vi.fn())
+const syncAutomation = vi.hoisted(() => vi.fn())
 const getUserNotificationDefault = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
 const saveTenantChatSpace = vi.hoisted(() => vi.fn())
@@ -28,6 +29,7 @@ vi.mock('../../../lib/api/facade', () => ({
     listAutomationSourceOptions,
     getAutomation,
     saveAutomation,
+    syncAutomation,
   },
   settingsFacade: {
     getUserNotificationDefault,
@@ -675,7 +677,10 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(activeSelect.text()).toBe('Active')
     expect(activeField.find('input[name="isActive"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="automation-edit-schedule-fields"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="automation-edit-saved-run-select"]').exists()).toBe(true)
+    // The run is shown, never chosen: an automation is a snapshot of its run, so re-pointing it
+    // would leave a snapshot derived from a different run. Sync pulls the run's config instead.
+    expect(wrapper.find('[data-testid="automation-edit-saved-run-select"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="automation-edit-saved-run-name"]').text()).toBe('Order Sync')
     expect(wrapper.find('[data-testid="automation-edit-input-mode-select"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="automation-edit-file1-api-select"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="automation-edit-file2-api-select"]').exists()).toBe(false)
@@ -814,7 +819,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS1' }), expect.any(AbortSignal))
   })
 
-  it('creates a new space inline as two separate cards', async () => {
+  it('creates a new space inline as three separate cards', async () => {
     saveTenantChatSpace.mockResolvedValue({
       ok: true,
       messages: [],
@@ -843,6 +848,10 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Alerts')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     expect(wrapper.find('[data-testid="automation-chat-space-name"]').exists()).toBe(false)
+    // Provider card sits between name and URL — one data point per card.
+    expect(wrapper.find('[data-testid="automation-chat-provider-select"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="automation-chat-space-url"]').attributes('type')).toBe('password')
     await wrapper.get('[data-testid="automation-chat-space-url"]').setValue('https://chat.googleapis.com/v1/spaces/AAA')
@@ -854,7 +863,8 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
     expect(saveTenantChatSpace).toHaveBeenCalledWith({
       spaceName: 'Ops Alerts',
-      googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA',
+      chatProviderEnumId: 'CHAT_PROV_GOOGLE',
+      webhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA',
       isActive: true,
     }, expect.any(AbortSignal))
     expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS9' }), expect.any(AbortSignal))
@@ -878,6 +888,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
     await chooseCard(wrapper, 'automation-chat-space-new')
     await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Alerts')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="automation-chat-space-url"]').setValue('https://chat.googleapis.com/v1/spaces/AAA')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1250,6 +1261,129 @@ describe('ReconciliationAutomationWorkflowPage', () => {
         expect.objectContaining({ windowTimeZone: 'Asia/Kolkata' }),
         expect.any(AbortSignal),
       )
+    })
+  })
+
+  describe('syncing an automation with its saved run', () => {
+    function editResponse(syncStatus: Record<string, unknown>) {
+      return {
+        ok: true,
+        messages: [],
+        errors: [],
+        automation: {
+          automationId: 'AUT_ORDER_SYNC',
+          automationName: 'Daily order sync',
+          savedRunId: 'RS_ORDER_SYNC',
+          savedRunName: 'Order Sync',
+          savedRunType: 'ruleset',
+          savedRun: optionsResponse().savedRuns[0],
+          inputModeEnumId: 'AUT_IN_API_RANGE',
+          scheduleExpr: '0 0 6 * * ?',
+          timezone: 'UTC',
+          relativeWindowTypeEnumId: 'AUT_WIN_PREV_DAY',
+          relativeWindowCount: 1,
+          active: true,
+          sources: [
+            {
+              fileSide: 'FILE_1',
+              sourceTypeEnumId: 'AUT_SRC_API',
+              systemEnumId: 'OMS',
+              systemMessageRemoteId: 'OMS_REMOTE',
+              safeMetadataJson: '{"extractServiceName":"reconciliation.HotWaxOmsExtractionServices.extract#HotWaxOmsOrders","parameters":{"omsRestSourceConfigId":"OMS_REST_SOURCE"}}',
+            },
+            {
+              fileSide: 'FILE_2',
+              sourceTypeEnumId: 'AUT_SRC_API',
+              systemEnumId: 'SHOPIFY',
+              systemMessageRemoteId: 'SHOPIFY_REMOTE',
+              safeMetadataJson: '{"extractServiceName":"fixture.extractShopifyOrders"}',
+            },
+          ],
+        },
+        syncStatus,
+      }
+    }
+
+    const inSync = { inSync: true, changedFields: [], inputModeChanging: false, savedRunMissing: false }
+    const drifted = {
+      inSync: false,
+      changedFields: ['FILE_1.schemaFileName'],
+      inputModeChanging: false,
+      savedRunMissing: false,
+    }
+
+    async function mountEditWithSyncStatus(syncStatus: Record<string, unknown>): Promise<ReturnType<typeof mount>> {
+      route.name = 'reconciliation-automation-edit'
+      route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+      route.params = { automationId: 'AUT_ORDER_SYNC' }
+      getAutomation.mockResolvedValue(editResponse(syncStatus))
+      const wrapper = mount(ReconciliationAutomationWorkflowPage)
+      await flushPromises()
+      return wrapper
+    }
+
+    it('shows the drift line only when the snapshot is out of date', async () => {
+      const clean = await mountEditWithSyncStatus(inSync)
+      expect(clean.find('[data-testid="automation-edit-drift"]').exists()).toBe(false)
+
+      const stale = await mountEditWithSyncStatus(drifted)
+      expect(stale.find('[data-testid="automation-edit-drift"]').exists()).toBe(true)
+    })
+
+    it('confirms before syncing and does not call the facade until confirmed', async () => {
+      syncAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], changedFields: [] })
+      const wrapper = await mountEditWithSyncStatus(drifted)
+
+      await wrapper.get('[data-testid="automation-edit-sync"]').trigger('click')
+      expect(syncAutomation).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="automation-edit-sync-confirm"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="automation-edit-sync-confirm-yes"]').trigger('click')
+      await flushPromises()
+      expect(syncAutomation).toHaveBeenCalledWith({ automationId: 'AUT_ORDER_SYNC' }, expect.any(AbortSignal))
+    })
+
+    it('warns in the confirm when the input mode is about to change', async () => {
+      const wrapper = await mountEditWithSyncStatus({
+        inSync: false,
+        changedFields: ['inputMode'],
+        inputModeChanging: true,
+        savedRunMissing: false,
+      })
+      await wrapper.get('[data-testid="automation-edit-sync"]').trigger('click')
+      expect(wrapper.get('[data-testid="automation-edit-sync-confirm"]').text()).toContain('schedule')
+    })
+
+    it('disables sync and explains when the saved run is unavailable', async () => {
+      const wrapper = await mountEditWithSyncStatus({
+        inSync: true,
+        changedFields: [],
+        inputModeChanging: false,
+        savedRunMissing: true,
+      })
+      expect(wrapper.get('[data-testid="automation-edit-sync"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('[data-testid="automation-edit-drift"]').exists()).toBe(true)
+    })
+
+    it('leaves the create wizard free to choose a saved run', async () => {
+      // The wizard renders its OWN control (automation-saved-run-select), untouched by this change —
+      // only the edit form's picker is removed. Two runs are needed to see it: with exactly one the
+      // wizard pre-fills that run and skips the step (see preselectOnlySavedRun).
+      const twoRuns = optionsResponse()
+      const firstRun = twoRuns.savedRuns[0]
+      if (!firstRun) throw new Error('fixture must define at least one saved run')
+      twoRuns.savedRuns = [
+        firstRun,
+        { ...firstRun, savedRunId: 'RS_SECOND', runName: 'Second Run', ruleSetId: 'RS_SECOND' },
+      ]
+      listAutomationSourceOptions.mockResolvedValue(twoRuns)
+      route.name = 'reconciliation-automation-create'
+      route.fullPath = '/reconciliation/automations/create'
+      route.params = {}
+      const wrapper = mount(ReconciliationAutomationWorkflowPage)
+      await flushPromises()
+      await chooseCard(wrapper, 'automation-purpose-choice-existing-run')
+      expect(wrapper.find('[data-testid="automation-saved-run-select"]').exists()).toBe(true)
     })
   })
 })

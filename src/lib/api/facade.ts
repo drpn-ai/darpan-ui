@@ -22,9 +22,15 @@ import type {
   DeleteOmsRestSourceConfigResponse,
   DeleteSavedRunResponse,
   DeleteShopifyAuthConfigResponse,
+  BeginSlackInstallResponse,
   DeleteTenantChatSpaceResponse,
+  DisconnectSlackWorkspaceResponse,
+  GetSlackInstallResponse,
+  ListSlackChannelsResponse,
+  SaveSlackBotTokenResponse,
   FlattenJsonSchemaResponse,
   GetAutomationResponse,
+  SyncAutomationResponse,
   GetMappingResponse,
   GetGeneratedOutputResponse,
   GetReconciliationRunStatusPayload,
@@ -97,8 +103,12 @@ import type {
   DeleteSavedRunPayload,
   DeleteShopifyAuthConfigPayload,
   DeleteTenantChatSpacePayload,
+  DisconnectSlackWorkspacePayload,
+  ListSlackChannelsPayload,
+  SaveSlackBotTokenPayload,
   FlattenJsonSchemaPayload,
   GetAutomationPayload,
+  SyncAutomationPayload,
   GetGeneratedOutputPayload,
   GetGeneratedOutputDifferencesPayload,
   GetJsonSchemaPayload,
@@ -169,6 +179,11 @@ const SETTINGS = {
   listTenantChatSpaces: 'facade.SettingsFacadeServices.list#TenantChatSpaces',
   saveTenantChatSpace: 'facade.SettingsFacadeServices.save#TenantChatSpace',
   deleteTenantChatSpace: 'facade.SettingsFacadeServices.delete#TenantChatSpace',
+  beginSlackInstall: 'facade.SlackFacadeServices.begin#SlackInstall',
+  getSlackInstall: 'facade.SlackFacadeServices.get#SlackInstall',
+  saveSlackBotToken: 'facade.SlackFacadeServices.save#SlackBotToken',
+  listSlackChannels: 'facade.SlackFacadeServices.list#SlackChannels',
+  disconnectSlackWorkspace: 'facade.SlackFacadeServices.disconnect#SlackWorkspace',
   getUserNotificationDefault: 'facade.SettingsFacadeServices.get#UserNotificationDefault',
   saveUserNotificationDefault: 'facade.SettingsFacadeServices.save#UserNotificationDefault',
   listSftpServers: 'facade.SettingsFacadeServices.list#SftpServers',
@@ -221,6 +236,7 @@ const RECONCILIATION = {
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
+  syncAutomation: 'facade.ReconciliationFacadeServices.sync#Automation',
   deleteAutomation: 'facade.ReconciliationFacadeServices.delete#Automation',
   runAutomationNow: 'facade.ReconciliationFacadeServices.run#AutomationNow',
   pauseAutomation: 'facade.ReconciliationFacadeServices.pause#Automation',
@@ -285,6 +301,21 @@ export const settingsFacade = {
   },
   deleteTenantChatSpace(payload: DeleteTenantChatSpacePayload, signal?: AbortSignal): Promise<DeleteTenantChatSpaceResponse> {
     return callService<DeleteTenantChatSpaceResponse>(SETTINGS.deleteTenantChatSpace, payload, signal)
+  },
+  beginSlackInstall(signal?: AbortSignal): Promise<BeginSlackInstallResponse> {
+    return callService<BeginSlackInstallResponse>(SETTINGS.beginSlackInstall, {}, signal)
+  },
+  getSlackInstall(signal?: AbortSignal): Promise<GetSlackInstallResponse> {
+    return callService<GetSlackInstallResponse>(SETTINGS.getSlackInstall, {}, signal)
+  },
+  saveSlackBotToken(payload: SaveSlackBotTokenPayload, signal?: AbortSignal): Promise<SaveSlackBotTokenResponse> {
+    return callService<SaveSlackBotTokenResponse>(SETTINGS.saveSlackBotToken, payload, signal)
+  },
+  listSlackChannels(payload: ListSlackChannelsPayload, signal?: AbortSignal): Promise<ListSlackChannelsResponse> {
+    return callService<ListSlackChannelsResponse>(SETTINGS.listSlackChannels, payload, signal)
+  },
+  disconnectSlackWorkspace(payload: DisconnectSlackWorkspacePayload, signal?: AbortSignal): Promise<DisconnectSlackWorkspaceResponse> {
+    return callService<DisconnectSlackWorkspaceResponse>(SETTINGS.disconnectSlackWorkspace, payload, signal)
   },
   getUserNotificationDefault(signal?: AbortSignal): Promise<GetUserNotificationDefaultResponse> {
     return callService<GetUserNotificationDefaultResponse>(SETTINGS.getUserNotificationDefault, {}, signal)
@@ -435,6 +466,9 @@ export const reconciliationFacade = {
   },
   saveAutomation(payload: SaveAutomationPayload, signal?: AbortSignal): Promise<SaveAutomationResponse> {
     return callService<SaveAutomationResponse>(RECONCILIATION.saveAutomation, payload, signal)
+  },
+  syncAutomation(payload: SyncAutomationPayload, signal?: AbortSignal): Promise<SyncAutomationResponse> {
+    return callService<SyncAutomationResponse>(RECONCILIATION.syncAutomation, payload, signal)
   },
   deleteAutomation(payload: DeleteAutomationPayload, signal?: AbortSignal): Promise<DeleteAutomationResponse> {
     return callService<DeleteAutomationResponse>(RECONCILIATION.deleteAutomation, payload, signal)

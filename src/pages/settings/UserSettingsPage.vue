@@ -171,7 +171,7 @@
       <div class="workflow-step-wrapper">
         <WorkflowStepForm
           class="workflow-form--popup-compact"
-          question="Which Google Chat space should get your notifications?"
+          question="Which chat space should get your notifications?"
           :show-primary-action="false"
           show-cancel-action
           cancel-label="Close"

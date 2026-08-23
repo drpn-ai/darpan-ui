@@ -393,7 +393,7 @@ describe('UserSettingsPage', () => {
     await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Which Google Chat space')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Which chat space')
     expect(wrapper.get('[data-testid="user-chat-space-choice-CS1"]').text()).toContain('Ops')
     expect(wrapper.get('[data-testid="user-chat-space-choice-CS2"]').text()).toContain('Finance')
     expect(wrapper.get('[data-testid="user-chat-space-choice-clear"]').text()).toContain('No notifications')

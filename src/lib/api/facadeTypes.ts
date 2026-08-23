@@ -3,6 +3,7 @@
 
 import type { SourceExcludeFilter } from '../sourceExcludeFilters'
 import type { SharedConfigType } from '../sharedConfig'
+import type { ChatProviderId } from './types'
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
@@ -49,9 +50,28 @@ export interface SaveTenantSettingsPayload {
   timeZone?: string
 }
 
+export interface ListSlackChannelsPayload {
+  slackInstallId: string
+  cursor?: string
+}
+
+export interface SaveSlackBotTokenPayload {
+  botAccessToken: string
+}
+
+export interface DisconnectSlackWorkspacePayload {
+  slackInstallId: string
+}
+
 export interface SaveTenantChatSpacePayload {
   chatSpaceId?: string
   spaceName: string
+  chatProviderEnumId?: ChatProviderId
+  slackInstallId?: string
+  slackChannelId?: string
+  slackChannelName?: string
+  webhookUrl?: string
+  /** Pre-Slack alias for webhookUrl, accepted by the backend one release. */
   googleChatWebhookUrl?: string
   isActive?: boolean
 }
@@ -374,6 +394,10 @@ export interface ListAutomationsPayload {
 }
 
 export interface GetAutomationPayload {
+  automationId: string
+}
+
+export interface SyncAutomationPayload {
   automationId: string
 }
 
