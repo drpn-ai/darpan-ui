@@ -250,7 +250,19 @@ describe('auth state', () => {
     store.noteDeepLinkTenantSwitch('Gorjana')
     await store.switchActiveTenant('TENANT_C')
 
-    // A later switch means the banner's statement is no longer true.
+    // A later switch names a tenant this one just left, so an unconsumed notice is stale.
+    expect(store.deepLinkTenantSwitch).toBeNull()
+  })
+
+  it('lets the shell consume the announcement so it cannot be shown twice', async () => {
+    const { useAuthStore } = await import('../auth')
+
+    const store = useAuthStore()
+    store.noteDeepLinkTenantSwitch('Gorjana')
+    store.clearDeepLinkTenantSwitch()
+
+    // One-shot: the shell reads this on every confirmed route, so a notice left standing would
+    // replay on the next navigation inside the tenant it already announced.
     expect(store.deepLinkTenantSwitch).toBeNull()
   })
 

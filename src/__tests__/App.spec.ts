@@ -8,6 +8,7 @@ const ensureAuthenticated = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const logoutSession = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const saveActiveTenant = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const switchActiveTenant = vi.hoisted(() => vi.fn().mockResolvedValue('switched'))
+const clearDeepLinkTenantSwitch = vi.hoisted(() => vi.fn())
 const listSftpServers = vi.hoisted(() => vi.fn())
 const listGeneratedOutputs = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
@@ -59,6 +60,7 @@ type AuthSessionInfo = {
 const authState = vi.hoisted(() => ({
   checked: true,
   error: null as string | null,
+  deepLinkTenantSwitch: null as string | null,
   status: 'authenticated' as 'authenticated' | 'unauthenticated' | 'verification-failed',
   sessionInfo: {
     userId: '100000',
@@ -175,6 +177,7 @@ vi.mock('../stores/auth', () => ({
     logoutSession,
     saveActiveTenant,
     switchActiveTenant,
+    clearDeepLinkTenantSwitch,
   }),
 }))
 
@@ -1355,5 +1358,80 @@ describe('App shell logout', () => {
     expect(routerSource).not.toContain("name: 'auth-required'")
     expect(appSource).not.toContain("route.name === 'auth-required'")
     expect(existsSync('src/pages/AuthRequiredPage.vue')).toBe(false)
+  })
+})
+
+describe('App shell deep-link tenant notice', () => {
+  beforeEach(() => {
+    installLocalStorageStub()
+    ensureAuthenticated.mockClear()
+    clearDeepLinkTenantSwitch.mockClear()
+    listSftpServers.mockReset()
+    listGeneratedOutputs.mockReset()
+    listSftpServers.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 0, pageCount: 1 },
+      servers: [],
+    })
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 80, totalCount: 0, pageCount: 1 },
+      generatedOutputs: [],
+    })
+    route.name = 'hub'
+    route.path = '/'
+    route.fullPath = '/'
+    route.query = {}
+    route.meta = {}
+    document.body.classList.remove('surface-mode-static', 'surface-mode-workflow')
+    authState.deepLinkTenantSwitch = null
+  })
+
+  afterEach(() => {
+    authState.deepLinkTenantSwitch = null
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
+  })
+
+  it('announces a deep-link tenant switch through the pill, not a second banner', async () => {
+    authState.deepLinkTenantSwitch = 'Rails'
+
+    const wrapper = mountApp()
+    await flushPromises()
+
+    const hint = wrapper.get('.workflow-escape-hint')
+    expect(hint.text()).toContain('Rails')
+    // The cross-tab effect is the whole reason this announcement exists: the active tenant is a
+    // server-side preference, so arriving on this link re-pointed every other tab.
+    expect(hint.text().toLowerCase()).toContain('other tabs')
+    expect(hint.classes()).not.toContain('workflow-escape-hint--warning')
+    expect(wrapper.find('.tenant-switch-banner').exists()).toBe(false)
+  })
+
+  it('consumes the notice so a later navigation does not replay it', async () => {
+    authState.deepLinkTenantSwitch = 'Rails'
+
+    mountApp()
+    await flushPromises()
+
+    expect(clearDeepLinkTenantSwitch).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays silent when no deep link switched the tenant', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    expect(wrapper.find('.workflow-escape-hint').exists()).toBe(false)
+    expect(clearDeepLinkTenantSwitch).not.toHaveBeenCalled()
+  })
+
+  it('retires the standalone tenant-switch banner component', () => {
+    const appSource = readFileSync('src/App.vue', 'utf8')
+
+    expect(appSource).not.toContain('TenantSwitchBanner')
+    expect(existsSync('src/components/shell/TenantSwitchBanner.vue')).toBe(false)
   })
 })

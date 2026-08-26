@@ -155,9 +155,9 @@ export const useAuthStore = defineStore('auth', () => {
   // Set only by a login whose credentials were correct but whose account cannot sign in until its password
   // changes. LoginPage reads it to offer the change inline instead of a dead-end error.
   const _passwordChangeReason = ref<PasswordChangeReason | null>(null)
-  // The tenant a deep link switched into, held so the shell can say so. Persistent by design:
-  // the active tenant is a server-side user preference shared by every tab, so this describes a
-  // condition that stays true, not an event that already passed.
+  // The tenant a deep link switched into, held for the shell to announce once. One-shot by design:
+  // the guard sets it mid-navigation, before the shell can show anything, and the shell consumes it
+  // on the confirmed route. It is a handoff between two points in one arrival, not standing state.
   const _deepLinkTenantSwitch = ref<string | null>(null)
   // Single in-flight ensureAuthenticated promise. Without this, concurrent 401 callbacks (e.g.
   // every page-init API call fans out and all 401 at once) each schedule their own getSessionInfo
@@ -177,6 +177,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   function noteDeepLinkTenantSwitch(tenantLabel: string): void {
     _deepLinkTenantSwitch.value = tenantLabel?.toString()?.trim() || null
+  }
+
+  function clearDeepLinkTenantSwitch(): void {
+    _deepLinkTenantSwitch.value = null
   }
 
   function _applyAuthState(nextState: {
@@ -374,9 +378,9 @@ export const useAuthStore = defineStore('auth', () => {
       if (response.authenticated) {
         const errorMessage = response.ok ? null : response.errors?.[0] ?? 'Unable to switch tenant.'
         if (response.ok) {
-          // Any successful switch invalidates a standing deep-link announcement: whatever the
-          // banner said about the current tenant stopped being true here. The guard re-raises it
-          // right after when the switch came from a link.
+          // Any successful switch drops an unconsumed deep-link announcement: it named a tenant
+          // this switch just left. The guard re-raises it right after when the switch came from a
+          // link.
           _deepLinkTenantSwitch.value = null
           clearApiResponseCache()
         }
@@ -632,6 +636,7 @@ export const useAuthStore = defineStore('auth', () => {
     logoutSession,
     switchActiveTenant,
     noteDeepLinkTenantSwitch,
+    clearDeepLinkTenantSwitch,
     saveActiveTenant,
     saveUserSettings,
     saveTenantSettings,

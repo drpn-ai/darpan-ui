@@ -2,7 +2,6 @@
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <OfflineBanner />
-  <TenantSwitchBanner />
 
   <div
     :class="[
@@ -156,7 +155,6 @@ import { resolveStaticPageLabel } from './lib/workflowOrigin'
 
 import AppErrorBoundary from './components/shell/AppErrorBoundary.vue'
 import OfflineBanner from './components/shell/OfflineBanner.vue'
-import TenantSwitchBanner from './components/shell/TenantSwitchBanner.vue'
 
 const CommandPalette = defineAsyncComponent(() => import('./components/shell/CommandPalette.vue').then((module) => module.default))
 
@@ -610,6 +608,21 @@ function syncWorkflowEscapeOrigin(): void {
   showWorkflowHint(`Press Esc to go back to ${workflowOrigin.label}`, { durationMs: 2000 })
 }
 
+function announceDeepLinkTenantSwitch(): void {
+  const tenantLabel = authStore.deepLinkTenantSwitch
+  if (!tenantLabel) return
+
+  // Consume before showing. The notice describes an arrival, so a later navigation must not replay
+  // it — and this runs on every route change, which is what makes replay possible at all.
+  authStore.clearDeepLinkTenantSwitch()
+  // Longer than the palette's own switch notice: nobody asked for this one, and it competes with a
+  // page the reader is seeing for the first time.
+  showWorkflowHint(
+    `Switched to ${tenantLabel} to show this result. Your other tabs use it too.`,
+    { durationMs: 6000 },
+  )
+}
+
 watch(activeTenantUserGroupId, () => {
   commandPalette.clearCommandData()
   if (isCommandPaletteOpen.value) {
@@ -632,6 +645,10 @@ watch(
   () => route.fullPath,
   () => {
     syncWorkflowEscapeOrigin()
+    // After, never before: syncWorkflowEscapeOrigin clears the pill on any non-workflow surface, so
+    // announcing first would show the tenant notice and wipe it in the same tick. The router guard
+    // sets the flag mid-navigation, which lands before this fires on the confirmed route.
+    announceDeepLinkTenantSwitch()
   },
   { immediate: true },
 )
