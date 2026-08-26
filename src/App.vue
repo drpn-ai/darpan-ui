@@ -8,6 +8,7 @@
       'app-shell',
       `app-shell--${surfaceMode}`,
       { 'app-shell--popup-open': isCommandPaletteOpen || isUserMenuOpen },
+      { 'app-shell--notice-open': workflowHint !== null && surfaceMode === 'static' },
     ]"
   >
     <section id="main-content" :class="['content-shell', `content-shell--${surfaceMode}`]" tabindex="-1">
@@ -456,23 +457,31 @@ async function executeCommand(action: CommandAction): Promise<void> {
   await router.push(action.to)
 }
 
+// One wording for both switch paths — the palette and a deep link are the same event, and the
+// previous split was the whole reason the deep-link notice looked like a different feature. The
+// pill is the product's only transient-notice surface, so this still owes the cross-tab warning:
+// the active tenant is a server-side preference, so a switch re-points every other open tab.
+// 'Other tabs too.' is the shortest form of that which still says it.
+function tenantSwitchNotice(label: string): string {
+  return `Now on ${label}. Other tabs too.`
+}
+
 async function runSlashCommand(row: SlashResultRow): Promise<void> {
   if (row.commandName !== switchTenantCommand.name || !row.value) return
 
   commandPalette.close()
   const outcome = await authStore.switchActiveTenant(row.value)
   if (outcome === 'switched') {
-    // The top-centre pill is the product's only transient-notice surface — there are no toasts and
-    // no second banner. It still owes the cross-tab warning: the active tenant is a server-side
-    // preference, so this switch re-points every other tab this account has open.
-    showWorkflowHint(`Now on ${row.label}. Your other tabs use it too.`, { durationMs: 3000 })
+    showWorkflowHint(tenantSwitchNotice(row.label), { durationMs: 3000 })
     return
   }
 
   showWorkflowHint(
+    // 'refused' is a permission verdict, 'failed' never reached one — the store is explicit that a
+    // failure must not read as a denial, so the two keep separate wording even at this length.
     outcome === 'refused'
-      ? `Switching to ${row.label} was refused.`
-      : `Could not switch to ${row.label}. Try again.`,
+      ? `No access to ${row.label}.`
+      : `Could not switch to ${row.label}.`,
     { tone: 'warning', durationMs: 5000 },
   )
 }
@@ -605,7 +614,7 @@ function syncWorkflowEscapeOrigin(): void {
     return
   }
 
-  showWorkflowHint(`Press Esc to go back to ${workflowOrigin.label}`, { durationMs: 2000 })
+  showWorkflowHint(`Esc to go back to ${workflowOrigin.label}`, { durationMs: 2000 })
 }
 
 function announceDeepLinkTenantSwitch(): void {
@@ -615,12 +624,9 @@ function announceDeepLinkTenantSwitch(): void {
   // Consume before showing. The notice describes an arrival, so a later navigation must not replay
   // it — and this runs on every route change, which is what makes replay possible at all.
   authStore.clearDeepLinkTenantSwitch()
-  // Longer than the palette's own switch notice: nobody asked for this one, and it competes with a
-  // page the reader is seeing for the first time.
-  showWorkflowHint(
-    `Switched to ${tenantLabel} to show this result. Your other tabs use it too.`,
-    { durationMs: 6000 },
-  )
+  // Same words as the palette, held longer: nobody asked for this one, and it competes with a page
+  // the reader is seeing for the first time.
+  showWorkflowHint(tenantSwitchNotice(tenantLabel), { durationMs: 6000 })
 }
 
 watch(activeTenantUserGroupId, () => {

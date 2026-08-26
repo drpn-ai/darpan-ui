@@ -365,8 +365,7 @@ describe('App shell logout', () => {
     // The top-centre hint pill is the product's one transient-notice surface; a tenant switch does
     // not get a second one. It still owes the cross-tab warning, which is the surprising part.
     const hint = wrapper.get('.workflow-escape-hint')
-    expect(hint.text()).toContain('Now on Acme Retail.')
-    expect(hint.text().toLowerCase()).toContain('other tabs')
+    expect(hint.text()).toContain('Now on Acme Retail. Other tabs too.')
     expect(hint.classes()).not.toContain('workflow-escape-hint--warning')
     expect(wrapper.find('.tenant-switch-banner').exists()).toBe(false)
   })
@@ -396,7 +395,7 @@ describe('App shell logout', () => {
 
   async function raiseHint(
     wrapper: { vm: { $nextTick: () => Promise<void> } },
-    message = 'Now on Acme Retail. Your other tabs use it too.',
+    message = 'Now on Acme Retail. Other tabs too.',
   ): Promise<void> {
     document.dispatchEvent(new CustomEvent(WORKFLOW_HINT_REQUEST_EVENT, { detail: { message } }))
     await wrapper.vm.$nextTick()
@@ -412,6 +411,54 @@ describe('App shell logout', () => {
     expect(wrapper.get('.workflow-escape-hint').classes()).toContain('workflow-escape-hint--static')
   })
 
+  it('reserves no lane at rest, so a static page does not open on an empty band', async () => {
+    route.meta = { surfaceMode: 'static' }
+    const wrapper = mountApp()
+    await flushPromises()
+
+    // A standing reserve was ~119px of empty top padding on every page for a pill that is almost
+    // never on screen. The lane is taken only when something is in it.
+    expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--notice-open')
+  })
+
+  it('reserves the lane while a notice is up so the pill never covers page content', async () => {
+    route.meta = { surfaceMode: 'static' }
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await raiseHint(wrapper)
+
+    expect(wrapper.get('.app-shell').classes()).toContain('app-shell--notice-open')
+  })
+
+  it('releases the lane when the notice expires', async () => {
+    vi.useFakeTimers()
+    route.meta = { surfaceMode: 'static' }
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await raiseHint(wrapper)
+    expect(wrapper.get('.app-shell').classes()).toContain('app-shell--notice-open')
+
+    vi.advanceTimersByTime(5000)
+    await flushPromises()
+
+    expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--notice-open')
+    vi.useRealTimers()
+  })
+
+  it('never reserves the lane on a workflow surface, which pads to zero', async () => {
+    route.meta = { surfaceMode: 'workflow' }
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await raiseHint(wrapper)
+
+    // .app-shell--workflow sets padding: 0; adding the reserve here would fight it, and the
+    // workflow pill sits at its own lower offset anyway.
+    expect(wrapper.get('.app-shell').classes()).not.toContain('app-shell--notice-open')
+  })
+
   it('leaves the notice pill clear of the workflow progress bar on workflow surfaces', async () => {
     route.meta = { surfaceMode: 'workflow' }
     const wrapper = mountApp()
@@ -424,7 +471,7 @@ describe('App shell logout', () => {
     expect(wrapper.get('.workflow-escape-hint').classes()).not.toContain('workflow-escape-hint--static')
   })
 
-  it('reserves a lane at the top of static pages so a notice can never cover content', () => {
+  it('reserves the lane only while a notice is up, and never lets it cover content', () => {
     const styleSource = readFileSync('src/style.css', 'utf8')
 
     // The lane the shell reserves and the pill's own ceiling come from the same tokens, so the two
@@ -433,7 +480,18 @@ describe('App shell logout', () => {
     expect(styleSource).toMatch(
       /--notice-lane-height: calc\(var\(--notice-lane-top\) \+ var\(--notice-pill-max-height\)/,
     )
-    expect(styleSource).toMatch(/\.app-shell \{[^}]*padding: var\(--notice-lane-height\)/)
+    // The reserve hangs off the notice-open modifier, never off .app-shell itself: a standing
+    // reserve is an empty band on every page, which is what this replaced.
+    expect(styleSource).toMatch(
+      /\.app-shell--notice-open:not\(\.app-shell--workflow\) \{[^}]*padding-top: var\(--notice-lane-height\);/,
+    )
+    expect(styleSource).not.toMatch(/\.app-shell \{[^}]*padding: var\(--notice-lane-height\)/)
+    // Twice: once at desktop, once restated inside the <=1020px block, whose padding shorthand
+    // resets padding-top and wins on order. Drop the second and the reserve dies on narrow screens.
+    expect(styleSource.match(/\.app-shell--notice-open:not\(\.app-shell--workflow\) \{/g)).toHaveLength(2)
+    // Never bare: .app-shell--workflow zeroes padding and this rule sits after it, so an unguarded
+    // selector would un-zero a workflow surface the moment the class leaked onto one.
+    expect(styleSource).not.toMatch(/\.app-shell--notice-open \{/)
     expect(styleSource).toMatch(/\.workflow-escape-hint \{[^}]*max-height: var\(--notice-pill-max-height\);/)
     expect(styleSource).toMatch(/\.workflow-escape-hint--static \{[^}]*top: var\(--notice-lane-top\);/)
   })
@@ -1126,12 +1184,12 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Press Esc to go back to Dashboard')
+    expect(wrapper.text()).toContain('Esc to go back to Dashboard')
 
     vi.advanceTimersByTime(2000)
     await flushPromises()
 
-    expect(wrapper.text()).not.toContain('Press Esc to go back to Dashboard')
+    expect(wrapper.text()).not.toContain('Esc to go back to Dashboard')
   })
 
   it('shows workflow warning hints for five seconds in the Escape hint position', async () => {
@@ -1403,10 +1461,10 @@ describe('App shell deep-link tenant notice', () => {
     await flushPromises()
 
     const hint = wrapper.get('.workflow-escape-hint')
-    expect(hint.text()).toContain('Rails')
-    // The cross-tab effect is the whole reason this announcement exists: the active tenant is a
-    // server-side preference, so arriving on this link re-pointed every other tab.
-    expect(hint.text().toLowerCase()).toContain('other tabs')
+    // Verbatim the palette's sentence — a deep link and a typed /switch-tenant are the same event,
+    // and the cross-tab clause is the part a user cannot guess: the active tenant is a server-side
+    // preference, so arriving on this link re-pointed every other tab.
+    expect(hint.text()).toContain('Now on Rails. Other tabs too.')
     expect(hint.classes()).not.toContain('workflow-escape-hint--warning')
     expect(wrapper.find('.tenant-switch-banner').exists()).toBe(false)
   })

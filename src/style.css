@@ -150,11 +150,13 @@
   --floating-fab-size: 2.65rem;
   --floating-command-bubble-height: 3rem;
   /* Transient notices (the top-centre pill) are the product's ONE feedback surface, and they must
-     never be drawn over page content. The static shell reserves --notice-lane-height at its top and
-     the pill is capped at --notice-pill-max-height, so the reserve and the thing being reserved for
-     move together. The cap is two lines at --type-muted-size; longer text ellipsizes rather than
-     growing out of its lane. Workflow surfaces keep the lower offset below (their progress hairline
-     already owns the top of the viewport). */
+     never be drawn over page content. The static shell reserves --notice-lane-height at its top
+     ONLY while a notice is actually up (.app-shell--notice-open) — a standing reserve was ~119px of
+     empty band on every page for a pill that is almost never on screen. The pill is capped at
+     --notice-pill-max-height, so the reserve and the thing being reserved for move together. The cap
+     is two lines at --type-muted-size; longer text ellipsizes rather than growing out of its lane.
+     Workflow surfaces keep the lower offset below (their progress hairline already owns the top of
+     the viewport) and never reserve, which is why the class is bound on static surfaces only. */
   --notice-lane-top: var(--space-5);
   --notice-pill-max-height: 4.4rem;
   --notice-lane-height: calc(var(--notice-lane-top) + var(--notice-pill-max-height) + var(--space-2));
@@ -361,14 +363,24 @@ button:disabled {
 .app-shell {
   max-width: 1220px;
   margin: 0 auto;
-  padding: var(--notice-lane-height) var(--space-4) var(--space-6);
+  padding: var(--space-5) var(--space-4) var(--space-6);
   display: grid;
   gap: var(--space-3);
+  /* The reserve opens and closes with the notice, so move it rather than snapping the page down.
+     The global prefers-reduced-motion rule already collapses this duration. */
+  transition: padding-top 160ms ease;
 }
 
 .app-shell--workflow {
   max-width: none;
   padding: 0;
+}
+
+/* Bound only when a notice is up on a static surface — see --notice-lane-height above. The :not()
+   is belt-and-braces: this rule sits after .app-shell--workflow's `padding: 0`, so without it a
+   leaked class would silently un-zero a workflow surface's padding. */
+.app-shell--notice-open:not(.app-shell--workflow) {
+  padding-top: var(--notice-lane-height);
 }
 
 .workflow-escape-hint {
@@ -377,7 +389,8 @@ button:disabled {
   left: 50%;
   transform: translateX(-50%);
   z-index: 55;
-  width: min(32rem, calc(100vw - (var(--space-4) * 2)));
+  width: fit-content;
+  max-width: min(32rem, calc(100vw - (var(--space-4) * 2)));
   max-height: var(--notice-pill-max-height);
   overflow: hidden;
   display: -webkit-box;
@@ -1988,6 +2001,11 @@ label > span {
 @media (max-width: 1020px) {
   .app-shell {
     padding: var(--space-4) var(--space-3) var(--space-5);
+  }
+
+  /* Restated because the shorthand above resets padding-top and this block wins on order. */
+  .app-shell--notice-open:not(.app-shell--workflow) {
+    padding-top: var(--notice-lane-height);
   }
 
   .command-bubble-shortcut {
