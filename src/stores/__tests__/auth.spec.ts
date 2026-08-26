@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 const saveUserSettingsMock = vi.hoisted(() => vi.fn())
+const saveTenantSettingsMock = vi.hoisted(() => vi.fn())
 const logoutSessionMock = vi.hoisted(() => vi.fn())
 const loginSessionMock = vi.hoisted(() => vi.fn())
 const changeExpiredPasswordMock = vi.hoisted(() => vi.fn())
@@ -13,7 +14,9 @@ vi.mock('../../lib/api/facade', () => ({
     loginSession: loginSessionMock,
     changeExpiredPassword: changeExpiredPasswordMock,
   },
-  settingsFacade: {},
+  settingsFacade: {
+    saveTenantSettings: saveTenantSettingsMock,
+  },
   clearApiResponseCache: vi.fn(),
 }))
 
@@ -22,10 +25,31 @@ import { getDefaultDisplayTimeZone, setDefaultDisplayTimeZone } from '../../lib/
 import { clearAuthToken } from '../../lib/api/client'
 
 describe('resolveEffectiveTimeZone', () => {
-  it('prefers userTimeZone, then tenantTimeZone, then undefined', () => {
+  /**
+   * The backend already answers this question. TenantAccessSupport.resolveTenantSettingsTimeZone is
+   * tenant -> user -> l10n -> default and ships the result as `timeZone`; this recomputed it from
+   * the raw parts with the precedence INVERTED (user first), so a tenant timezone was silently
+   * ignored for anyone who had set a personal one. Reconciliation timestamps belong to the tenant's
+   * business day, so the tenant leads.
+   */
+  it('honours the backend-resolved timeZone, which puts the tenant ahead of the user', () => {
+    expect(resolveEffectiveTimeZone({
+      userId: 'U',
+      timeZone: 'America/Los_Angeles',
+      userTimeZone: 'America/New_York',
+      tenantTimeZone: 'America/Los_Angeles',
+    })).toBe('America/Los_Angeles')
+  })
+
+  it('still leads with the tenant when the backend-resolved field is absent', () => {
+    // Older sessions and the auth-bypass path do not carry `timeZone`; the fallback keeps the same
+    // ordering rather than reverting to the inverted one.
     expect(resolveEffectiveTimeZone({ userId: 'U', userTimeZone: 'America/New_York', tenantTimeZone: 'Asia/Kolkata' }))
-      .toBe('America/New_York')
-    expect(resolveEffectiveTimeZone({ userId: 'U', tenantTimeZone: 'Asia/Kolkata' })).toBe('Asia/Kolkata')
+      .toBe('Asia/Kolkata')
+  })
+
+  it('uses a personal timezone only when the tenant has none', () => {
+    expect(resolveEffectiveTimeZone({ userId: 'U', userTimeZone: 'America/New_York' })).toBe('America/New_York')
     expect(resolveEffectiveTimeZone({ userId: 'U' })).toBeUndefined()
     expect(resolveEffectiveTimeZone(null)).toBeUndefined()
   })
@@ -44,7 +68,8 @@ describe('auth store display-timezone sync', () => {
       authenticated: true,
       messages: [],
       errors: [],
-      sessionInfo: { userId: 'M100000', userTimeZone: 'America/New_York', tenantTimeZone: 'Asia/Kolkata' },
+      // No tenant timezone: a personal preference applies only where the tenant has not set one.
+      sessionInfo: { userId: 'M100000', userTimeZone: 'America/New_York' },
     })
 
     const store = useAuthStore()
@@ -68,6 +93,39 @@ describe('auth store display-timezone sync', () => {
     await store.saveUserSettings({ timeZone: '' })
 
     expect(getDefaultDisplayTimeZone()).toBe('Asia/Kolkata')
+  })
+
+  /**
+   * saveTenantSettings writes the saved zone into sessionInfo.timeZone — which is precisely the
+   * field the old resolver never read, so changing a tenant's timezone in-app left every timestamp
+   * rendering in the previous zone until a full session refetch. Reading the backend-resolved field
+   * closes that as a side effect of fixing the precedence.
+   */
+  it('applies the new zone as soon as tenant settings are saved', async () => {
+    saveTenantSettingsMock.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      tenantSettings: { companyUserGroupId: 'RAILS', companyLabel: 'Rails', timeZone: 'America/Los_Angeles' },
+    })
+
+    const store = useAuthStore()
+    // saveTenantSettings only re-applies onto an existing session (you must be signed in to save
+    // tenant settings at all), so seed one first. It starts in a DIFFERENT zone so a pass cannot be
+    // the seed value leaking through.
+    saveUserSettingsMock.mockResolvedValue({
+      ok: true,
+      authenticated: true,
+      messages: [],
+      errors: [],
+      sessionInfo: { userId: 'M100000', timeZone: 'Asia/Kolkata', tenantTimeZone: 'Asia/Kolkata' },
+    })
+    await store.saveUserSettings({})
+    expect(getDefaultDisplayTimeZone()).toBe('Asia/Kolkata')
+
+    await store.saveTenantSettings({ timeZone: 'America/Los_Angeles' })
+
+    expect(getDefaultDisplayTimeZone()).toBe('America/Los_Angeles')
   })
 
   it('clears the display timezone when the session ends', async () => {

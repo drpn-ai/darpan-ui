@@ -105,8 +105,20 @@ function normalizeSessionInfo(sessionInfo: SessionInfo | null | undefined): Sess
   }
 }
 
+// The backend already answers this: TenantAccessSupport.resolveTenantSettingsTimeZone is
+// tenant -> user -> l10n -> default, and it ships that answer as `timeZone`. This used to recompute
+// it from the raw parts with the precedence INVERTED (user first), so a tenant's timezone was
+// silently ignored for anyone who had set a personal one — two layers disagreeing about the same
+// question. Reconciliation timestamps describe the tenant's business day, so the tenant leads.
+//
+// Reading `timeZone` also fixes a second defect for free: saveTenantSettings writes the saved zone
+// into exactly that field, which the old resolver never read, so changing a tenant's timezone
+// in-app left every timestamp in the previous zone until a full session refetch.
+//
+// tenantTimeZone/userTimeZone remain as fallbacks in the same order, for sessions that predate
+// `timeZone` and for the auth-bypass path, which does not populate it.
 export function resolveEffectiveTimeZone(sessionInfo: SessionInfo | null | undefined): string | undefined {
-  return sessionInfo?.userTimeZone || sessionInfo?.tenantTimeZone || undefined
+  return sessionInfo?.timeZone || sessionInfo?.tenantTimeZone || sessionInfo?.userTimeZone || undefined
 }
 
 export function buildUiPermissionPolicy(sessionInfo: SessionInfo | null | undefined): UiPermissionPolicy {
