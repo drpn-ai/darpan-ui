@@ -434,11 +434,19 @@ const progressPercent = computed(() => {
 const trimmedRunName = computed(() => runName.value.trim())
 const file1SystemLabel = computed(() => resolveSystemLabel(file1SystemEnumId.value))
 const file2SystemLabel = computed(() => resolveSystemLabel(file2SystemEnumId.value))
+// The family name behind an endpoint-level pick (OMS_RETURNS -> "HotWax"). Blank for a family
+// system, which IS its own system, so the draft carries undefined and consumers fall back to the
+// side label. The rule set board titles its columns from this.
+const file1SystemParentLabel = computed(() =>
+  (file1SystemParentEnumId.value ? resolveSystemLabel(file1SystemParentEnumId.value) : '') || undefined)
+const file2SystemParentLabel = computed(() =>
+  (file2SystemParentEnumId.value ? resolveSystemLabel(file2SystemParentEnumId.value) : '') || undefined)
 const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   runName: trimmedRunName.value,
   description: description.value.trim() || undefined,
   file1SystemEnumId: file1SystemEnumId.value,
   file1SystemLabel: file1SystemLabel.value || undefined,
+  file1SystemParentLabel: file1SystemParentLabel.value,
   file1SourceTypeEnumId: file1UsesApi.value ? SOURCE_TYPE_API : undefined,
   file1SystemMessageRemoteId: file1UsesApi.value ? file1SystemMessageRemoteId.value || undefined : undefined,
   file1SystemMessageRemoteLabel: file1UsesApi.value && file1SystemMessageRemoteId.value ? selectedApiSourceLabel('file1') || undefined : undefined,
@@ -453,6 +461,7 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file1PrimaryIdExpression: file1PrimaryIdExpression.value,
   file2SystemEnumId: file2SystemEnumId.value,
   file2SystemLabel: file2SystemLabel.value || undefined,
+  file2SystemParentLabel: file2SystemParentLabel.value,
   file2SourceTypeEnumId: file2UsesApi.value ? SOURCE_TYPE_API : undefined,
   file2SystemMessageRemoteId: file2UsesApi.value ? file2SystemMessageRemoteId.value || undefined : undefined,
   file2SystemMessageRemoteLabel: file2UsesApi.value && file2SystemMessageRemoteId.value ? selectedApiSourceLabel('file2') || undefined : undefined,

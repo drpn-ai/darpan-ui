@@ -1672,6 +1672,38 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(optionValues).not.toContain('OMS_RETURNS')
     })
 
+    // The rule set board titles its columns from file{n}SystemParentLabel. The wizard is the only
+    // producer of a draft for a NEW run -- nothing here comes back from the backend -- so if it does
+    // not carry the family name, the board falls back to the endpoint label and asks the operator to
+    // compare "HotWax Transfer Orders" with something, when the question is about systems.
+    it('carries the system family name onto the draft when an endpoint was chosen', async () => {
+      mockSystemsWithOmsEndpoint()
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Endpoint Family Label')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
+      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_TRANSFER_ORDERS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftJson')
+
+      await wrapper.get('[data-testid="create-schema-from-reconciliation"]').trigger('click')
+
+      expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file1SystemEnumId: 'OMS_TRANSFER_ORDERS',
+          file1SystemLabel: 'HotWax Transfer Orders',
+          file1SystemParentLabel: 'HotWax',
+        }),
+        'file1-schema',
+      )
+    })
+
     it('skips the endpoint step entirely for a system with no endpoints', async () => {
       mockSystemsWithOmsEndpoint()
       const wrapper = mount(ReconciliationCreateFlowPage)

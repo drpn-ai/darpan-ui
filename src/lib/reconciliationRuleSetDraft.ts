@@ -462,3 +462,31 @@ function escapeDrlString(value: string): string {
     .replace(/"/g, '\\"')
     .replace(/\r?\n/g, ' ')
 }
+
+/**
+ * The SYSTEM a side belongs to — Shopify, HotWax, NetSuite — for surfaces that name systems rather
+ * than the endpoint an extract came through.
+ *
+ * Since endpoint-level systems exist (SHOPIFY_RETURN_REFS, OMS_RETURNS), the side's own
+ * `systemLabel` names the ENDPOINT — "Shopify Order Return References" — not the system, so this
+ * prefers the family label the backend resolves from the enum's parentEnumId. The endpoint keeps
+ * its own card: it is what the Schema card shows. Falls back to the endpoint/enum label for the
+ * family enums themselves, which carry no parent.
+ *
+ * Shared by the rule set manager's System card and the rule set board's column titles, which ask
+ * "how should Darpan compare these two systems?" and so must answer with a system. `fallbackNoun`
+ * exists only because those two surfaces label an empty draft differently.
+ */
+export function reconciliationSystemTitle(
+  draftValue: ReconciliationRuleSetDraft | null,
+  side: 'file1' | 'file2',
+  fallbackNoun: 'System' | 'Source' = 'System',
+): string {
+  const fallback = side === 'file1' ? `${fallbackNoun} 1` : `${fallbackNoun} 2`
+  if (!draftValue) return fallback
+
+  const parentLabel = side === 'file1' ? draftValue.file1SystemParentLabel : draftValue.file2SystemParentLabel
+  const systemLabel = side === 'file1' ? draftValue.file1SystemLabel : draftValue.file2SystemLabel
+  const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId : draftValue.file2SystemEnumId
+  return parentLabel?.trim() || systemLabel || systemEnumId || fallback
+}

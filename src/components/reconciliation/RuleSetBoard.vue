@@ -416,6 +416,7 @@ import {
   type ReconciliationRuleSetDraft,
   type ReconciliationRuleSetDraftRule,
   type ReconciliationRulePreActionEntry,
+  reconciliationSystemTitle,
 } from '../../lib/reconciliationRuleSetDraft'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 
@@ -549,8 +550,10 @@ let generatedPreActionCounter = 0
 
 const draftState = computed(() => draftStore.ruleSetDraftState)
 const draft = computed<ReconciliationRuleSetDraft | null>(() => draftState.value?.draft ?? null)
-const file1Title = computed(() => draft.value?.file1SystemLabel || draft.value?.file1SystemEnumId || 'Source 1')
-const file2Title = computed(() => draft.value?.file2SystemLabel || draft.value?.file2SystemEnumId || 'Source 2')
+// Names the SYSTEM, not the endpoint the extract reads through: the board's own question is
+// "how should Darpan compare these two systems?". Shared with the rule set manager's System card.
+const file1Title = computed(() => reconciliationSystemTitle(draft.value, 'file1', 'Source'))
+const file2Title = computed(() => reconciliationSystemTitle(draft.value, 'file2', 'Source'))
 const file1Fields = computed(() => withPrimaryField(loadedFields.value.file1, draft.value?.file1PrimaryIdExpression?.[0]))
 const file2Fields = computed(() => withPrimaryField(loadedFields.value.file2, draft.value?.file2PrimaryIdExpression?.[0]))
 const orderedRules = computed(() => [...rules.value].sort((left, right) => left.sequenceNum - right.sequenceNum || left.id.localeCompare(right.id)))

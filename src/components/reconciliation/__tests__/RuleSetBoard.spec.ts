@@ -81,4 +81,70 @@ describe('RuleSetBoard with CSV column lists', () => {
 
     wrapper.unmount()
   })
+
+  it('titles each column with the system family, not the endpoint it reads through', async () => {
+    // Endpoint-level systems (OMS_RETURNS, SHOPIFY_RETURN_REFS) make the side's own systemLabel
+    // name the ENDPOINT -- "HotWax Returns (Reconciliation API)". The board asks how to compare two
+    // SYSTEMS, so its column titles must read the family name, the same way the rule set manager's
+    // System card already does. The endpoint is still named on the schema/source cards.
+    flattenJsonSchema.mockResolvedValue({ ok: true, messages: [], errors: [], fieldList: [] })
+
+    draftStoreState.ruleSetDraftState = {
+      resumeStepId: null,
+      draft: {
+        runName: 'Returns presence',
+        file1SystemEnumId: 'OMS_RETURNS',
+        file1SystemLabel: 'HotWax Returns (Reconciliation API)',
+        file1SystemParentLabel: 'HotWax',
+        file1FileTypeEnumId: 'DftCsv',
+        file1PrimaryIdExpression: ['returnId'],
+        file2SystemEnumId: 'SHOPIFY_RETURN_REFS',
+        file2SystemLabel: 'Shopify Order Return References',
+        file2SystemParentLabel: 'Shopify',
+        file2FileTypeEnumId: 'DftCsv',
+        file2PrimaryIdExpression: ['refundOrReturnId'],
+        rules: [],
+      },
+    }
+
+    const wrapper = mount(RuleSetBoard)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('HotWax')
+    expect(wrapper.text()).toContain('Shopify')
+    expect(wrapper.text()).not.toContain('HotWax Returns (Reconciliation API)')
+    expect(wrapper.text()).not.toContain('Shopify Order Return References')
+
+    wrapper.unmount()
+  })
+
+  it('falls back to the side label for a family system that has no parent', async () => {
+    // SHOPIFY and OMS are the families themselves and carry no systemParentLabel; dropping the
+    // fallback would regress every ordinary run to a bare enum id.
+    flattenJsonSchema.mockResolvedValue({ ok: true, messages: [], errors: [], fieldList: [] })
+
+    draftStoreState.ruleSetDraftState = {
+      resumeStepId: null,
+      draft: {
+        runName: 'Orders',
+        file1SystemEnumId: 'SHOPIFY',
+        file1SystemLabel: 'Shopify',
+        file1FileTypeEnumId: 'DftCsv',
+        file1PrimaryIdExpression: ['orderId'],
+        file2SystemEnumId: 'OMS',
+        file2SystemLabel: 'HotWax',
+        file2FileTypeEnumId: 'DftCsv',
+        file2PrimaryIdExpression: ['orderId'],
+        rules: [],
+      },
+    }
+
+    const wrapper = mount(RuleSetBoard)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Shopify')
+    expect(wrapper.text()).toContain('HotWax')
+
+    wrapper.unmount()
+  })
 })
