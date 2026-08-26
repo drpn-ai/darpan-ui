@@ -920,7 +920,17 @@ export interface CancelReconciliationRunResponse extends ApiEnvelope {
 export interface GeneratedOutputDifferencesMetadata {
   file1Label?: string
   file2Label?: string
+  /**
+   * ZONE-LESS wall clock written in the reconciliation host's zone, e.g. "2026-08-26 05:10:38.673".
+   * `new Date(string)` resolves that against the BROWSER's zone, so it names a different instant for
+   * every viewer. Prefer `createdDate`; this remains only for results written before it existed.
+   */
   timestamp?: string
+  /**
+   * ReconciliationRunResult.createdDate — a real instant (epoch ms), so it needs no zone guess.
+   * Present for any run backed by a run-result row, including ones already on disk.
+   */
+  createdDate?: number | string
   savedRunId?: string
   savedRunName?: string
   savedRunType?: string

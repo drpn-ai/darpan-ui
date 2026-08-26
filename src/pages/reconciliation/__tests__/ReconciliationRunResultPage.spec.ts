@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
+import { setDefaultDisplayTimeZone } from '../../../lib/utils/date'
 
 const route = vi.hoisted(() => ({
   params: {
@@ -765,6 +766,53 @@ describe('ReconciliationRunResultPage', () => {
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:result')
 
     anchorClick.mockRestore()
+  })
+
+  /**
+   * Reported from prod 2026-08-26 (Gorjana RS_RETURNS, result 100617). metadata.timestamp is a
+   * ZONE-LESS wall clock written in the reconciliation host's zone; `new Date(string)` then assumes
+   * the BROWSER's zone, and the value is finally rendered in the tenant's zone — two stacked
+   * guesses. A 09:10 UTC run surfaced as "Aug 25, 4:40 PM" to an IST viewer on an
+   * America/Los_Angeles tenant: a day early and 9h30m out, and wrong by a DIFFERENT amount for
+   * every viewer. The backend now ships ReconciliationRunResult.createdDate, a real instant, which
+   * needs no parsing guess and also repairs runs already written to disk.
+   */
+  it('renders the run time from the authoritative instant, not the zone-less string', async () => {
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
+      metadata: {
+        ...defaultDiffDetails.metadata,
+        // Exactly what prod holds for result 100617.
+        timestamp: '2026-08-26 05:10:38.673',
+        createdDate: 1787735438940,
+      },
+      summary: defaultDiffDetails.summary,
+      differences: defaultDiffDetails.differences,
+    }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Aug 26, 2026')
+    expect(wrapper.text()).toContain('2:10 AM')
+    // The shape the old code produced for an IST viewer. Asserting its absence keeps the parse from
+    // creeping back in behind a passing date check.
+    expect(wrapper.text()).not.toContain('4:40 PM')
+  })
+
+  it('falls back to the zone-less string when no authoritative instant is available', async () => {
+    // Runs written before the backend shipped createdDate still have to render something.
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
+      metadata: { ...defaultDiffDetails.metadata, timestamp: '2026-08-26 05:10:38.673' },
+      summary: defaultDiffDetails.summary,
+      differences: defaultDiffDetails.differences,
+    }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('2026')
   })
 
   it('does not stringify every object detail while rendering a large saved result page', async () => {

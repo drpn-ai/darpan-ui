@@ -1087,7 +1087,12 @@ function buildGeneratedOutputFromSummary(
     totalDifferences: summary.totalDifferences ?? 0,
     onlyInFile1Count: summary.onlyInFile1Count ?? 0,
     onlyInFile2Count: summary.onlyInFile2Count ?? 0,
-    createdDate: metadata.timestamp,
+    // The instant first: metadata.timestamp is a zone-less wall clock, and parsing it against the
+    // browser's zone put a 09:10 UTC run at "Aug 25, 4:40 PM" for an IST viewer on an
+    // America/Los_Angeles tenant — wrong by browser-offset + host-offset, so wrong by a different
+    // amount for every viewer. The string stays as the fallback for results written before the
+    // backend shipped createdDate.
+    createdDate: metadata.createdDate ?? metadata.timestamp,
   }
 }
 
