@@ -123,6 +123,84 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Processing error',
     body: 'the run could not parse, compare or output part of the data. Counts below this are incomplete rather than clean.',
   },
+
+  /* ── The vocabulary the app actually puts on screen ───────────────────────────
+     Counted from the templates rather than imagined: most labels in this product are
+     connection and setup fields, not run counts. A glossary of run terms alone left
+     entire pages with nothing to ask about. ─────────────────────────────────── */
+  timezone: {
+    // Wording follows darpan-docs/guides/manage-tenant-settings.mdx.
+    title: 'Timezone',
+    body: 'the tenant’s default reading of dates and times, for workflows, schedules and date windows. Set once per tenant — everyone on it reads the same interpretation.',
+  },
+  systemLabel: {
+    title: 'System',
+    body: 'which external system this side of the run is. When both sides are the same system, these labels are the only thing telling the two instances apart.',
+  },
+  activeFlag: {
+    title: 'Active',
+    body: 'whether this runs on its own. Turning it off stops the schedule and keeps the setup — nothing is deleted.',
+  },
+  primaryId: {
+    title: 'Primary ID',
+    body: 'the field that identifies a record so both sides can be matched on it. Choose one that is stable and unique, or every run will disagree with itself.',
+  },
+  endpoint: {
+    title: 'Endpoint',
+    body: 'the specific call this side fetches from. The connection says which system; this says which door.',
+  },
+  sourceField: {
+    title: 'Field',
+    body: 'one field inside the source, as the schema named it. Only fields the schema knows about can be compared.',
+  },
+  baseUrl: {
+    title: 'Base URL',
+    body: 'the root address every request is built on. A trailing path here quietly changes every endpoint below it.',
+  },
+  authType: {
+    title: 'Auth Type',
+    body: 'how Darpan proves who it is to this system. Change it and the credentials below change with it.',
+  },
+  apiVersion: {
+    title: 'API Version',
+    body: 'which version of the remote API to speak. Pinned deliberately — a system that moves on can rename fields your schema still expects.',
+  },
+  configId: {
+    title: 'Config ID',
+    body: 'the identifier of this saved setup. Useful when a run names a config rather than a system, and when someone asks which one broke.',
+  },
+  webhookUrl: {
+    title: 'Webhook URL',
+    body: 'where notifications are posted. Anyone holding this can post into that space, so treat it as a credential.',
+  },
+  timeoutSeconds: {
+    title: 'Timeout',
+    body: 'how long to wait on this system before giving up. Too short turns a slow source into a failed run; too long hides one.',
+  },
+  sharedWith: {
+    title: 'Shared with',
+    body: 'the other tenants allowed to use this configuration. Sharing grants use of the setup, not sight of the data a run produces.',
+  },
+  permissions: {
+    title: 'Permissions',
+    body: 'what this account may do inside the active tenant. Access is scoped per tenant, so the same person can differ between them.',
+  },
+  runName: {
+    title: 'Run name',
+    body: 'what you will search for later. Ask Darpan finds runs by this and by output file name, so a dated, specific name pays for itself.',
+  },
+  startDate: {
+    title: 'Start date',
+    body: 'the beginning of the window this run reaches back to. A record dated just before it looks missing even when both systems hold it.',
+  },
+  updatedAt: {
+    title: 'Updated',
+    body: 'when this record last changed, in your zone. Not when the data it describes changed.',
+  },
+  remoteAttributes: {
+    title: 'Remote attributes',
+    body: 'extra values passed through to the remote system on each call. Wrong ones fail quietly as an empty extract rather than an error.',
+  },
 })
 
 /** Null rather than a throw: a missing phrase is a content gap, not a crash. */

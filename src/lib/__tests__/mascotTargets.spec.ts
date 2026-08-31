@@ -44,6 +44,31 @@ describe('resolveExplainTarget', () => {
     expect(resolveExplainTarget(host.querySelector('dt'))?.term).toBe('ruleSet')
   })
 
+  it('reads the label classes the product actually uses', () => {
+    // .static-page-summary-label and .workflow-context-label carry most labels in the
+    // app. An earlier selector list guessed ".summary-label", which exists nowhere, so
+    // whole pages had nothing to hover.
+    const summary = render('<span class="static-page-summary-label">Timezone</span>')
+    const context = render('<span class="workflow-context-label">Primary ID</span>')
+
+    expect(resolveExplainTarget(summary.querySelector('span'))?.term).toBe('timezone')
+    expect(resolveExplainTarget(context.querySelector('span'))?.term).toBe('primaryId')
+  })
+
+  it('ignores a parenthetical aimed at the person filling the form', () => {
+    const host = render('<span class="static-page-summary-label">Timeout (seconds)</span>')
+
+    expect(resolveExplainTarget(host.querySelector('span'))?.term).toBe('timeoutSeconds')
+  })
+
+  it('treats the same field on both sides of a run as one term', () => {
+    const one = render('<span class="workflow-context-label">Source 1 Schema</span>')
+    const two = render('<span class="workflow-context-label">Source 2 Schema</span>')
+
+    expect(resolveExplainTarget(one.querySelector('span'))?.term).toBe('schema')
+    expect(resolveExplainTarget(two.querySelector('span'))?.term).toBe('schema')
+  })
+
   it('stays silent on a label it has no phrase for', () => {
     // Silence is the right answer for an unknown heading. Guessing would produce a
     // confident wrong explanation, which is worse than no explanation.

@@ -23,7 +23,19 @@ import { describeTimeZone } from './utils/date'
 function normalizeLabel(text: string): string {
   // Collapse first, then strip the colon, then trim again — stripping " :" leaves a
   // trailing space that would otherwise miss every entry in the index.
-  return text.replace(/\s+/g, ' ').trim().replace(/[:：]$/, '').trim().toLowerCase()
+  return text
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[:：]$/, '')
+    .trim()
+    // "Timeout (seconds)", "Private Key (optional)", "Username (leave blank to keep
+    // existing)" — the parenthetical is an instruction to the person filling the form,
+    // not part of the field's name.
+    .replace(/\s*\([^)]*\)$/, '')
+    // "Source 1 Schema" and "Source 2 Schema" are the same field on two sides of a run.
+    .replace(/^source \d+\s+/i, '')
+    .trim()
+    .toLowerCase()
 }
 
 /**
@@ -64,6 +76,35 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'company': 'activeTenant',
   'reconciliation run': 'reconciliationRun',
   'run': 'reconciliationRun',
+
+  // The setup vocabulary, which is most of what is on screen outside a run result.
+  'timezone': 'timezone',
+  'time zone': 'timezone',
+  'system': 'systemLabel',
+  'active': 'activeFlag',
+  'primary id': 'primaryId',
+  'schema id': 'schema',
+  'schema name': 'schema',
+  'endpoint': 'endpoint',
+  'api config': 'connection',
+  'field': 'sourceField',
+  'base url': 'baseUrl',
+  'shop/api url': 'baseUrl',
+  'token url': 'baseUrl',
+  'auth type': 'authType',
+  'api version': 'apiVersion',
+  'config id': 'configId',
+  'shopify config id': 'configId',
+  'webhook url': 'webhookUrl',
+  'timeout': 'timeoutSeconds',
+  'read timeout': 'timeoutSeconds',
+  'shared with': 'sharedWith',
+  'permissions': 'permissions',
+  'run name': 'runName',
+  'start date': 'startDate',
+  'start': 'startDate',
+  'updated': 'updatedAt',
+  'remote attributes': 'remoteAttributes',
 })
 
 /** Every glossary title is its own label, so a new entry is reachable the moment it exists. */
@@ -78,8 +119,27 @@ function buildIndex(): Record<string, string> {
 
 const LABEL_INDEX = buildIndex()
 
-/** Elements that carry a name rather than a value. */
-const LABEL_SELECTOR = 'th, dt, legend, .micro-label, .summary-label, [data-explain-label]'
+/**
+ * Elements that carry a name rather than a value.
+ *
+ * These are the classes the product actually uses — counted from the templates rather
+ * than guessed. The first cut listed `.summary-label`, which exists nowhere, and missed
+ * `.static-page-summary-label` and `.workflow-context-label`, which between them carry
+ * most of the labels in the app. That is why whole pages had nothing to hover.
+ */
+const LABEL_SELECTOR = [
+  'th',
+  'dt',
+  'legend',
+  '.micro-label',
+  '.static-page-summary-label',
+  '.workflow-context-label',
+  '.workflow-choice-label',
+  '.ruleset-field-label',
+  '.connection-diagnostics-label',
+  '.option-label',
+  '[data-explain-label]',
+].join(', ')
 
 /**
  * Elements that could carry one of our rendered timestamps. `span` is in the list only
