@@ -433,6 +433,24 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.find('[data-testid="tenant-llm-provider"]').exists()).toBe(true)
   })
 
+  // The webhook URL is not a secret here by the 2026-08-14 decision that removed encrypt="true"
+  // from the column: the entity description says reads "are no longer masked either", and the step
+  // prints the stored URL in clear directly below this input ("Current webhook: ..."). A masked
+  // entry box therefore hid nothing, while making it impossible to eyeball a pasted URL for the
+  // truncation that otherwise only surfaces at delivery time.
+  it('does not mask the webhook input, which sits above the URL printed in clear', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-add"]').trigger('click')
+    await wrapper.get('input[name="chatSpaceName"]').setValue('Finance')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+
+    expect(wrapper.get('input[name="webhookUrl"]').attributes('type')).not.toBe('password')
+  })
+
   it('lists chat spaces and adds one through the three-step popup', async () => {
     const WEBHOOK = 'https://chat.googleapis.com/v1/spaces/KREWE_SPACE/messages?key=test-key&token=test-token'
     listTenantChatSpaces.mockResolvedValue({ ok: true, chatSpaces: [

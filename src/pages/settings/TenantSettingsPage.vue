@@ -322,7 +322,7 @@
               v-model="chatSpaceForm.webhookUrl"
               class="wizard-answer-control"
               name="webhookUrl"
-              type="password"
+              type="text"
               autocomplete="off"
               autocapitalize="none"
               spellcheck="false"
