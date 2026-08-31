@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { MASCOT_GLOSSARY, lookupGlossary } from '../mascotGlossary'
 
 /**
- * The bubble clamps at three lines of roughly 52 characters. An entry that overruns is
- * not truncated gracefully — it ends mid-sentence with an ellipsis, which is worse than
- * saying less. The cap is the design, so it is enforced here rather than left to whoever
- * writes the next entry.
+ * The bubble no longer crops — it grows to fit, because an answer that stops
+ * mid-sentence is worse than a taller bubble. This budget therefore exists for
+ * readability rather than for truncation: the mascot interrupts a page to say one
+ * thing, and a paragraph in the corner of a dashboard does not get read.
  */
-const RENDERED_LIMIT = 150
+const RENDERED_LIMIT = 200
 
 function rendered(term: string): string {
   const entry = MASCOT_GLOSSARY[term]
@@ -17,12 +17,12 @@ function rendered(term: string): string {
 }
 
 describe('mascot glossary', () => {
-  it('fits every entry in the three lines the bubble allows', () => {
+  it('keeps every entry to something a person will actually read', () => {
     const overruns = Object.keys(MASCOT_GLOSSARY)
       .map((term) => ({ term, length: rendered(term).length }))
       .filter((row) => row.length > RENDERED_LIMIT)
 
-    expect(overruns, `these would be cut off mid-sentence: ${JSON.stringify(overruns)}`).toEqual([])
+    expect(overruns, `too long to read in a corner bubble: ${JSON.stringify(overruns)}`).toEqual([])
   })
 
   it('never leaves a {detail} slot unfilled in a body that has no filler', () => {

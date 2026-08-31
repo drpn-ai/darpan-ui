@@ -1890,15 +1890,12 @@ label > span {
   color: var(--text-soft);
   padding: var(--space-1-5) var(--space-2);
   font-size: var(--type-mono-copy-size);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  /* The clamp alone left a sliced fourth line showing under the ellipsis. Pinning the
-     line box and capping the height at exactly three of them makes the crop land on a
-     line boundary instead of through the middle of one. */
   line-height: 1.5;
-  max-height: 4.5em;
+  /* No clamp. An answer that stops mid-sentence is worse than a taller bubble — the
+     three-line cap was a design preference and it truncated real explanations twice.
+     Width is still bounded so the bubble never spans the viewport; height follows the
+     sentence. Entries are kept short by a spec rather than by cropping them here. */
+  overflow-wrap: anywhere;
   /* The release is visible for its full half second so it stays cancellable —
      drift back onto the value, or onto the bubble, and it returns. */
   transition: opacity 500ms linear;
@@ -1908,8 +1905,8 @@ label > span {
   opacity: 0;
 }
 
+/* The hint is a label, not a sentence, so it stays on one line — nothing to truncate. */
 .mascot-say--hint {
-  -webkit-line-clamp: 1;
   white-space: nowrap;
   color: var(--text-muted);
 }
