@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   displayCalendarDayOf,
+  timeZoneCode,
   displayDayStart,
   formatDateTime,
   getDefaultDisplayTimeZone,
@@ -70,5 +71,55 @@ describe('display day helpers', () => {
     const day = todayInDisplayTimeZone()
     expect([day.getFullYear(), day.getMonth(), day.getDate()])
       .toEqual([now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()])
+  })
+})
+
+// Pinned in BOTH DST halves on purpose. A zone whose code is derived from its long name (IST, BST,
+// AEST) reads correctly year-round only if the derivation follows the season, and the failure mode
+// if CLDR shifts under us is silent: the code quietly becomes an offset like "GMT+5:30" again,
+// which is the exact ambiguity this exists to remove.
+describe('timeZoneCode', () => {
+  const AUGUST = new Date('2026-08-31T06:07:00Z')
+  const JANUARY = new Date('2026-01-15T06:07:00Z')
+
+  it.each([
+    ['Asia/Kolkata', 'IST', 'IST'],
+    ['America/Los_Angeles', 'PDT', 'PST'],
+    ['America/New_York', 'EDT', 'EST'],
+    ['UTC', 'UTC', 'UTC'],
+    ['Europe/London', 'BST', 'GMT'],
+    ['Asia/Tokyo', 'JST', 'JST'],
+    ['Australia/Sydney', 'AEST', 'AEDT'],
+    ['Asia/Dubai', 'GST', 'GST'],
+  ])('resolves %s to %s in August and %s in January', (zone, august, january) => {
+    expect(timeZoneCode(AUGUST, zone)).toBe(august)
+    expect(timeZoneCode(JANUARY, zone)).toBe(january)
+  })
+
+  // Initialising "Central European Standard Time" yields CEST, which asserts summer time in the
+  // middle of winter — a wrong code is worse than an unfamiliar one, so this pair is overridden.
+  it('does not claim summer time in winter for Central Europe', () => {
+    expect(timeZoneCode(AUGUST, 'Europe/Paris')).toBe('CEST')
+    expect(timeZoneCode(JANUARY, 'Europe/Paris')).toBe('CET')
+  })
+
+  // The viewer's locale must not decide this. en-IN renders Kolkata as IST but Los Angeles as
+  // GMT-7, and en-US does the reverse, so an unpinned locale means two people reading the same run
+  // see different labels on the same instant.
+  it('is independent of the ambient locale', () => {
+    expect(timeZoneCode(AUGUST, 'Asia/Kolkata')).toBe('IST')
+    expect(timeZoneCode(AUGUST, 'America/Los_Angeles')).toBe('PDT')
+  })
+})
+
+describe('formatDateTime carries the zone', () => {
+  it('appends the code so a timestamp is unambiguous on its own', () => {
+    expect(formatDateTime('2026-05-02T06:00:00.000Z', { locale: 'en-US', timeZone: 'Asia/Kolkata' }))
+      .toBe('May 2, 2026, 11:30 AM IST')
+  })
+
+  it('leaves the fallback alone when there is no date to label', () => {
+    expect(formatDateTime(null)).toBe('-')
+    expect(formatDateTime('not-a-date')).toBe('not-a-date')
   })
 })

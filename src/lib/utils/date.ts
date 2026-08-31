@@ -19,6 +19,59 @@ export function getDefaultDisplayTimeZone(): string | undefined {
   return defaultDisplayTimeZone
 }
 
+// Timezone CODES, not offsets. Intl alone cannot do this: `timeZoneName: 'short'` is
+// locale-dependent and inconsistent — en-US renders Los Angeles as PDT but Kolkata as "GMT+5:30",
+// and en-IN does the reverse. CLDR only carries an abbreviation for the zones a locale considers
+// familiar. So the locale here is PINNED rather than following the viewer: an unpinned one means
+// two people reading the same run see different labels for the same instant, which is the exact
+// ambiguity a zone label exists to remove.
+const ZONE_CODE_LOCALE = 'en-US'
+// A real abbreviation, as opposed to the "GMT+5:30" / "GMT-7" offsets Intl falls back to.
+const ZONE_CODE_PATTERN = /^[A-Z]{2,5}$/
+// Only where initialising the long name is provably WRONG, not merely unfamiliar. "Central
+// European Standard Time" initialises to CEST, which asserts summer time in January — a wrong code
+// is worse than an unfamiliar one. Deliberately tiny: the derivation below handles new zones
+// without maintenance, and a large table here would go stale silently.
+const ZONE_CODE_OVERRIDES: Record<string, string> = {
+  'Central European Standard Time': 'CET',
+  'Nepal Time': 'NPT',
+  'Iran Standard Time': 'IRST',
+}
+
+function zoneNamePart(date: Date, timeZone: string | undefined, style: 'short' | 'long'): string {
+  return new Intl.DateTimeFormat(ZONE_CODE_LOCALE, { timeZone, timeZoneName: style })
+    .formatToParts(date)
+    .find((part) => part.type === 'timeZoneName')?.value ?? ''
+}
+
+/**
+ * The abbreviation for `timeZone` at `date` — IST, PDT, BST, UTC. DST-aware by construction, since
+ * both lookups are resolved against the instant: Los Angeles is PDT in August and PST in January.
+ *
+ * Falls back through three steps. CLDR's own short name when it is a real code; otherwise the
+ * initials of the long name ("India Standard Time" -> IST); otherwise the offset, so a zone with no
+ * phrase-like name still renders something rather than nothing.
+ */
+export function timeZoneCode(date: Date, timeZone?: string): string {
+  try {
+    const short = zoneNamePart(date, timeZone, 'short')
+    if (ZONE_CODE_PATTERN.test(short)) return short
+
+    const long = zoneNamePart(date, timeZone, 'long')
+    if (ZONE_CODE_OVERRIDES[long]) return ZONE_CODE_OVERRIDES[long]
+
+    const initials = long
+      .split(/[\s-]+/)
+      .filter((word) => /^[A-Z]/.test(word))
+      .map((word) => word[0])
+      .join('')
+    return initials.length >= 2 ? initials : short
+  } catch {
+    // An unusable zone must not take the whole timestamp down with it.
+    return ''
+  }
+}
+
 export interface FormatDateTimeOptions {
   fallback?: string
   locale?: Intl.LocalesArgument
@@ -44,11 +97,17 @@ export function formatDateTime(value: unknown, options: FormatDateTimeOptions = 
     return fallback
   }
 
-  return new Intl.DateTimeFormat(options.locale, {
+  // dateStyle/timeStyle cannot be combined with timeZoneName — Intl throws — so the zone is
+  // resolved separately and appended. That also keeps the date and time rendering byte-identical
+  // to what every page showed before, instead of switching the whole app to explicit components.
+  const zone = options.timeZone?.trim() || defaultDisplayTimeZone
+  const formatted = new Intl.DateTimeFormat(options.locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: options.timeZone?.trim() || defaultDisplayTimeZone,
+    timeZone: zone,
   }).format(parsedDate)
+  const zoneCode = timeZoneCode(parsedDate, zone)
+  return zoneCode ? `${formatted} ${zoneCode}` : formatted
 }
 
 export function formatSavedResultDateTime(value: unknown): string {

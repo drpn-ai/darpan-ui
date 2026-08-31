@@ -20,6 +20,6 @@ describe('date utilities', () => {
   })
 
   it('formats timestamps in the requested timezone', () => {
-    expect(formatDateTime('2026-05-02T06:00:00.000Z', { locale: 'en-US', timeZone: 'America/Los_Angeles' })).toBe('May 1, 2026, 11:00 PM')
+    expect(formatDateTime('2026-05-02T06:00:00.000Z', { locale: 'en-US', timeZone: 'America/Los_Angeles' })).toBe('May 1, 2026, 11:00 PM PDT')
   })
 })

@@ -211,7 +211,7 @@ import { useListPagination } from '../../lib/listPagination'
 import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
-import { formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
+import { formatDateTime, getDefaultDisplayTimeZone, timeZoneCode } from '../../lib/utils/date'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
 
@@ -411,13 +411,18 @@ function scheduleDisplayLabel(row: AutomationRecord | null): string {
   return row.scheduleExpr ? 'Custom schedule' : '-'
 }
 
-// Display formatting only -- the schedule still renders in the automation's own timezone;
-// this just matches the AM/PM convention every other timestamp on the page already uses
-// (formatDateTime, via formatTenantDateTime).
+// Matches the AM/PM convention every other timestamp on the page uses (formatDateTime), and
+// carries the zone code for the same reason formatDateTime now does: this hour has already been
+// converted into the VIEWER's zone by cronTimeInViewerZone, so it is the viewer's zone that is
+// named. Naming the automation's own zone here would label a converted time with the zone it is
+// not in. Resolved against now, the same reference instant the conversion above uses, so the two
+// cannot disagree about DST.
 function formatHourMinuteAmPm(hour: number, minute: number): string {
   const period = hour < 12 ? 'AM' : 'PM'
   const hour12 = hour % 12 === 0 ? 12 : hour % 12
-  return `${hour12}:${minute.toString().padStart(2, '0')} ${period}`
+  const zone = timeZoneCode(new Date(), getDefaultDisplayTimeZone())
+  const time = `${hour12}:${minute.toString().padStart(2, '0')} ${period}`
+  return zone ? `${time} ${zone}` : time
 }
 
 function scheduleLabelFromCron(expression: string | undefined, sourceZone = 'UTC'): string | null {

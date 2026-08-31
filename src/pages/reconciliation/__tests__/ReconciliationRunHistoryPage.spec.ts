@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { formatDateTime } from '../../../lib/utils/date'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
@@ -94,11 +95,12 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 import ReconciliationRunHistoryPage from '../ReconciliationRunHistoryPage.vue'
 import { useRunResultsStore } from '../../../stores/runResults'
 
+// Calls the production formatter rather than re-implementing it. The previous version duplicated
+// the Intl options inline, so it asserted the tile matched a SECOND copy of the format instead of
+// the real one -- and went red the moment formatDateTime started carrying the timezone code, which
+// is a change it should never have noticed.
 function formatCreatedDateForExpectation(createdDate: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(createdDate))
+  return formatDateTime(createdDate)
 }
 
 function buildGeneratedOutput(day: number) {
