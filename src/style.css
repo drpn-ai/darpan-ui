@@ -1864,33 +1864,44 @@ label > span {
   display: flex;
 }
 
-/* Same size, border, fill and shadow as .home-fab / .user-fab. It is one control
-   cluster, so the third button has to be a sibling of the other two rather than a
-   different object that happens to live nearby. */
+/* No pill. The other two are icons and need a container to be legible as buttons; the
+   mascot is a character and reads as itself, so a disc around it is packaging rather
+   than affordance. The button element stays at the full FAB size for the hit area —
+   only the chrome is removed, not the target. */
 .mascot-fab {
   width: var(--floating-fab-size);
   height: var(--floating-fab-size);
+  border: 0;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--border));
-  background: color-mix(in oklab, var(--accent) 92%, var(--surface));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+  background: none;
+  box-shadow: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-00);
-  transition: background 160ms ease, border-color 160ms ease;
+  padding: 0;
+  transition: transform 160ms ease;
 }
 
-/* On the light fill the face inverts: dark head, light markings. Without this the
-   head would be light-on-light and the eyes would vanish into the ground. */
-.mascot-fab .mascot {
-  color: var(--accent-ink);
-  --mascot-ground: var(--accent);
-}
-
+/* The eyes already follow the pointer, which is most of the hover feedback. This is
+   the smallest nudge that also says "clickable" without a border to change. */
 .mascot-fab:hover {
-  border-color: color-mix(in oklab, var(--accent) 60%, var(--border));
-  background: color-mix(in oklab, var(--accent) 96%, var(--surface));
+  transform: scale(1.06);
+}
+
+/* With no border or fill, focus needs a ring of its own or it has nothing to show. */
+.mascot-fab:focus-visible {
+  outline: 2px solid var(--text-dim);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-fab {
+    transition: none;
+  }
+
+  .mascot-fab:hover {
+    transform: none;
+  }
 }
 
 /* Everything the mascot says appears here and nowhere else, so there is one place
