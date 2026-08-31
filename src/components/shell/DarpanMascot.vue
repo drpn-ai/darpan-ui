@@ -7,11 +7,17 @@
     Three things carry the species: ears set wide and tilted out, a broad fluffy
     head, and the tear stripes running from each eye to the jaw. Drafts that shrank
     the ears or added brow spots read as a bear and a mouse respectively.
+
+    The viewBox is deliberately larger than the artwork's own 0-64 grid. Measured, the
+    ears run from -4.8 to 68.8, so on a plain 0 0 64 64 box both were sliced flat down
+    their outer edges — invisible while a pill sat behind them, obvious the moment the
+    character stood on its own. The margin also leaves room for the ears to rotate when
+    listening without clipping at the extremes.
   -->
   <svg
     class="mascot"
     :class="[`mascot--d${detail}`, { 'mascot--listening': listening, 'mascot--speaking': speaking }]"
-    viewBox="0 0 64 64"
+    viewBox="-6 -9 76 76"
     focusable="false"
     aria-hidden="true"
   >

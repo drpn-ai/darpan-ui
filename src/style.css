@@ -1869,8 +1869,12 @@ label > span {
    than affordance. The button element stays at the full FAB size for the hit area —
    only the chrome is removed, not the target. */
 .mascot-fab {
-  width: var(--floating-fab-size);
-  height: var(--floating-fab-size);
+  /* Larger than the icon buttons on purpose. The mascot's viewBox carries a margin so
+     the ears are not clipped, which would otherwise render the face ~84% the size of
+     the discs beside it; the extra box restores the visual match. With no pill drawn,
+     a bigger box costs nothing on screen and gives a more generous hit area. */
+  width: calc(var(--floating-fab-size) * 1.2);
+  height: calc(var(--floating-fab-size) * 1.2);
   border: 0;
   border-radius: var(--radius-pill);
   background: none;
