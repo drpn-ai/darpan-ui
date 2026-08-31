@@ -8,6 +8,7 @@ import { useReferenceDataStore } from './stores/referenceData'
 import { useRunResultsStore } from './stores/runResults'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
 import { reportError } from './lib/observability/report'
+import { vExplain } from './directives/vExplain'
 import './style.css'
 
 const RECONCILIATION_DRAFT_SESSION_KEY = 'darpan.reconciliationDraftStore'
@@ -45,4 +46,7 @@ window.addEventListener('unhandledrejection', (e) => reportError(e.reason, { sou
 app
   .use(pinia)
   .use(router)
+  // v-explain needs pinia already installed: the directive resolves the mascot
+  // store on mount, which is after this point for every element that uses it.
+  .directive('explain', vExplain)
   .mount('#app')

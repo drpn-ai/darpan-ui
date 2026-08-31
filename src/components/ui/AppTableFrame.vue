@@ -14,7 +14,9 @@
               ]"
             >
               <slot :name="`header-${column.key}`" :column="column">
-                <span>{{ column.label }}</span>
+                <!-- An empty explain key is a no-op in the directive, so every table
+                     keeps its current markup until a column opts in. -->
+                <span v-explain="column.explain ?? ''">{{ column.label }}</span>
               </slot>
             </div>
           </th>
@@ -46,6 +48,7 @@
 
 <script setup lang="ts">
 import { computed, type StyleValue } from 'vue'
+import { vExplain } from '../../directives/vExplain'
 
 interface TableColumn {
   key: string
@@ -55,6 +58,13 @@ interface TableColumn {
   colStyle?: StyleValue
   headerClass?: string
   cellClass?: string
+  /**
+   * Glossary key the mascot should explain when someone rests on this column's
+   * header. Headers are the right home for this and cells are not: a header is one
+   * phrase amortised over every row beneath it, while a cell would be a phrase
+   * written two hundred times and read none.
+   */
+  explain?: string
 }
 
 const props = defineProps<{

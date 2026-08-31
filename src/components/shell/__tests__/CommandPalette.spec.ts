@@ -201,9 +201,37 @@ describe('CommandPalette', () => {
       await wrapper.get('#command-palette-search').setValue('/')
 
       const items = wrapper.findAll('.command-item')
-      expect(items).toHaveLength(1)
-      expect(items[0]?.text()).toContain('/switch-tenant')
+      expect(items.map((item) => item.get('span').text())).toEqual([
+        '/switch-tenant',
+        '/light',
+        '/dark',
+        '/logout',
+      ])
       expect(wrapper.text()).not.toContain('Go to Dashboard')
+    })
+
+    it('runs a command that takes no argument on Enter instead of completing the input', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/logout')
+
+      await triggerSearchKey(wrapper, 'Enter')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.emitted('runSlash')?.[0]?.[0]).toMatchObject({
+        commandName: 'logout',
+        kind: 'run',
+      })
+    })
+
+    it('completes a no-argument command on Tab without the space that would open argument mode', async () => {
+      const wrapper = mountPalette()
+      await wrapper.get('#command-palette-search').setValue('/logo')
+
+      await triggerSearchKey(wrapper, 'Tab')
+      await wrapper.vm.$nextTick()
+
+      expect(searchValue(wrapper)).toBe('/logout')
+      expect(wrapper.emitted('runSlash')).toBeUndefined()
     })
 
     it('completes the input rather than running when Enter lands on a command row', async () => {

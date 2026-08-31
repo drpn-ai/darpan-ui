@@ -17,19 +17,39 @@ export interface SlashCommandResolution {
   notice: string | null
 }
 
-export interface SlashCommand {
+interface SlashCommandBase {
   name: string
   aliases: string[]
   description: string
+}
+
+/** Needs an argument before it can do anything: `/switch-tenant {company}`. */
+export interface SlashArgumentCommand extends SlashCommandBase {
   argumentLabel: string
   resolve: (argumentQuery: string, context: SlashCommandContext) => SlashCommandResolution
 }
+
+/**
+ * Complete the moment it is named: `/logout`. Kept as a separate shape rather than an optional
+ * `argumentLabel` so the resolver never has to assert that `resolve` exists.
+ */
+export interface SlashActionCommand extends SlashCommandBase {
+  argumentLabel?: undefined
+  resolve?: undefined
+}
+
+export type SlashCommand = SlashArgumentCommand | SlashActionCommand
 
 export interface SlashResultRow {
   id: string
   label: string
   description: string
-  kind: 'command' | 'option'
+  /**
+   * 'command' still needs its argument, so choosing it completes the input. 'option' is a chosen
+   * argument. 'run' is a whole instruction on its own — the command name IS the argument — so
+   * choosing it runs immediately.
+   */
+  kind: 'command' | 'option' | 'run'
   commandName: string
   value: string | null
 }
@@ -92,7 +112,33 @@ function findCommand(commands: SlashCommand[], name: string): SlashCommand | nul
   )
 }
 
+function takesArgument(command: SlashCommand): command is SlashArgumentCommand {
+  return typeof command.argumentLabel === 'string'
+}
+
+/**
+ * A hit on the command's own name outranks one that only reached it through an alias. Without this
+ * `/d` led with `/light` — matched on its 'day' alias — so Enter set the theme already in effect.
+ * Equal ranks keep declaration order, which Array.prototype.sort preserves.
+ */
+function matchRank(command: SlashCommand, typedName: string): number {
+  return matchesText(command.name, typedName) ? 0 : 1
+}
+
 function toCommandRow(command: SlashCommand): SlashResultRow {
+  // A usage line that spells out an argument the command does not take would be a lie, so the
+  // action shape carries its description alone.
+  if (!takesArgument(command)) {
+    return {
+      id: `slash-command-${command.name}`,
+      label: `${SLASH_PREFIX}${command.name}`,
+      description: command.description,
+      kind: 'run',
+      commandName: command.name,
+      value: null,
+    }
+  }
+
   return {
     id: `slash-command-${command.name}`,
     label: `${SLASH_PREFIX}${command.name}`,
@@ -120,6 +166,7 @@ export function resolveSlashResults(
           matchesText(command.name, parsed.name) ||
           command.aliases.some((alias) => matchesText(alias, parsed.name)),
       )
+      .sort((left, right) => matchRank(left, parsed.name) - matchRank(right, parsed.name))
       .map(toCommandRow)
 
     return {
@@ -135,6 +182,12 @@ export function resolveSlashResults(
       rows: [],
       notice: `No command matches "${SLASH_PREFIX}${parsed.name}".`,
     }
+  }
+
+  // `/logout ` — a trailing space is argument mode, but this command has no argument to fill in.
+  // Offering the run row keeps a stray keystroke from reading as a dead end.
+  if (!takesArgument(matchedCommand)) {
+    return { isSlashQuery: true, rows: [toCommandRow(matchedCommand)], notice: null }
   }
 
   const resolution = matchedCommand.resolve(parsed.argument, context)
@@ -189,4 +242,31 @@ export const switchTenantCommand: SlashCommand = {
   },
 }
 
-export const DEFAULT_SLASH_COMMANDS: SlashCommand[] = [switchTenantCommand]
+/**
+ * The three commands the floating user menu used to carry. They are absolute rather than a toggle:
+ * `/light` says which theme you want, where the old button only said "the other one".
+ */
+export const lightThemeCommand: SlashActionCommand = {
+  name: 'light',
+  aliases: ['light mode', 'day', 'bright'],
+  description: 'Show the app in light mode on this browser.',
+}
+
+export const darkThemeCommand: SlashActionCommand = {
+  name: 'dark',
+  aliases: ['dark mode', 'night'],
+  description: 'Show the app in dark mode on this browser.',
+}
+
+export const logoutCommand: SlashActionCommand = {
+  name: 'logout',
+  aliases: ['log out', 'sign out', 'signout', 'exit'],
+  description: 'End this session and return to sign in.',
+}
+
+export const DEFAULT_SLASH_COMMANDS: SlashCommand[] = [
+  switchTenantCommand,
+  lightThemeCommand,
+  darkThemeCommand,
+  logoutCommand,
+]

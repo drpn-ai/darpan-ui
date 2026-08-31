@@ -61,7 +61,12 @@ describe('resolveSlashResults command mode', () => {
     const resolution = resolve('/')
 
     expect(resolution.isSlashQuery).toBe(true)
-    expect(resolution.rows.map((row) => row.label)).toEqual(['/switch-tenant'])
+    expect(resolution.rows.map((row) => row.label)).toEqual([
+      '/switch-tenant',
+      '/light',
+      '/dark',
+      '/logout',
+    ])
     expect(resolution.rows[0]?.kind).toBe('command')
   })
 
@@ -124,5 +129,64 @@ describe('resolveSlashResults /switch-tenant argument mode', () => {
 
     expect(resolution.rows).toEqual([])
     expect(resolution.notice).toBe('This account is not a member of any company yet.')
+  })
+})
+
+describe('resolveSlashResults commands that take no argument', () => {
+  it('marks a no-argument command as a row that runs rather than one that completes', () => {
+    const resolution = resolve('/logout')
+
+    expect(resolution.rows).toHaveLength(1)
+    expect(resolution.rows[0]?.kind).toBe('run')
+  })
+
+  it('leaves the usage tail off a command that has no argument to spell out', () => {
+    expect(resolve('/logout').rows[0]?.description).toBe('End this session and return to sign in.')
+  })
+
+  it('keeps the usage tail on a command that does take an argument', () => {
+    expect(resolve('/switch-tenant').rows[0]?.description).toContain(
+      'Usage: /switch-tenant {company}',
+    )
+  })
+
+  it('still offers the run row when a stray space follows a no-argument command', () => {
+    const resolution = resolve('/logout ')
+
+    expect(resolution.rows.map((row) => row.kind)).toEqual(['run'])
+    expect(resolution.notice).toBeNull()
+  })
+
+  it('finds /light without also offering /dark', () => {
+    expect(resolve('/light').rows.map((row) => row.label)).toEqual(['/light'])
+  })
+
+  it('finds /dark without also offering /light', () => {
+    expect(resolve('/dark').rows.map((row) => row.label)).toEqual(['/dark'])
+  })
+
+  it('matches a theme command by alias', () => {
+    expect(resolve('/night').rows.map((row) => row.label)).toEqual(['/dark'])
+  })
+
+  it('gives a run row no value, because the command name is the whole instruction', () => {
+    expect(resolve('/light').rows[0]?.value).toBeNull()
+  })
+})
+
+describe('resolveSlashResults command ranking', () => {
+  it('puts a command matched on its own name above one matched only by an alias', () => {
+    // '/d' reaches /light only through its 'day' alias, and /dark by name. Declaration order alone
+    // put /light on top, so Enter on '/d' switched to the theme you were already in.
+    expect(resolve('/d').rows.map((row) => row.label)).toEqual(['/dark', '/light'])
+  })
+
+  it('keeps declaration order when two commands match with the same strength', () => {
+    // Both match by name, so neither is promoted — and /logout must not lead on '/l'.
+    expect(resolve('/l').rows.map((row) => row.label)).toEqual(['/light', '/logout'])
+  })
+
+  it('still finds a command by an alias no name contains', () => {
+    expect(resolve('/day').rows.map((row) => row.label)).toEqual(['/light'])
   })
 })

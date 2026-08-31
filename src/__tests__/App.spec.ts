@@ -46,6 +46,7 @@ const resolve = vi.hoisted(() =>
   }),
 )
 const toggleTheme = vi.hoisted(() => vi.fn())
+const setTheme = vi.hoisted(() => vi.fn())
 type AuthSessionInfo = {
   userId: string
   username?: string
@@ -221,7 +222,7 @@ vi.mock('../composables/useTheme', () => ({
   useTheme: () => ({
     theme: { value: 'light' },
     toggleTheme,
-    setTheme: vi.fn(),
+    setTheme,
   }),
   initTheme: vi.fn(),
 }))
@@ -262,6 +263,7 @@ describe('App shell logout', () => {
     push.mockClear()
     resolve.mockClear()
     toggleTheme.mockClear()
+    setTheme.mockClear()
     route.name = 'hub'
     route.path = '/'
     route.fullPath = '/'
@@ -292,30 +294,48 @@ describe('App shell logout', () => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
   })
 
-  it('shows a visible logout action that calls the facade logout flow', async () => {
+
+/**
+ * Home, account, theme and sign out no longer have buttons of their own — the mascot is
+ * the only thing in the corner, and it opens the launcher that carries them. These read
+ * the launcher's own action list rather than poking at chrome that no longer exists.
+ */
+async function openLauncher(wrapper: ReturnType<typeof mountApp>) {
+  await wrapper.get('.mascot-fab').trigger('click')
+  await flushPromises()
+  return wrapper.findComponent({ name: 'CommandPalette' })
+}
+
+interface LauncherAction { id: string, label: string, description: string, to?: string }
+
+function launcherAction(palette: { props: (name: string) => unknown }, id: string): LauncherAction | undefined {
+  return (palette.props('actions') as LauncherAction[]).find((action) => action.id === id)
+}
+
+  it('leaves signing out to /logout instead of also listing it as a searchable action', async () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.user-fab').trigger('click')
-    await flushPromises()
+    const palette = await openLauncher(wrapper)
 
-    const logoutButton = wrapper.get('.user-menu-actions .app-icon-action[aria-label="Sign out"]')
-
-    await logoutButton.trigger('click')
-    await flushPromises()
-
-    expect(logoutSession).toHaveBeenCalledTimes(1)
-    expect(replace).toHaveBeenCalledWith({ name: 'login' })
+    // Sign out is a command now, not a search result. The identity row is the only account
+    // entry left in the list, and it still routes rather than running.
+    expect(launcherAction(palette, 'action-sign-out')).toBeUndefined()
+    expect(launcherAction(palette, 'action-identity')?.to).toBe('/settings/user')
   })
 
-  it('keeps home and command controls in the floating action cluster', async () => {
+  it('leaves exactly one object in the floating corner', async () => {
     const wrapper = mountApp()
     await flushPromises()
 
     expect(wrapper.find('.utility-header').exists()).toBe(false)
     expect(wrapper.find('.floating-actions').exists()).toBe(true)
-    expect(wrapper.find('.command-bubble').text()).toContain('Ask Darpan')
-    expect(wrapper.find('.home-fab').exists()).toBe(true)
+    // The launcher is the mascot now, so its name lives on the accessible label
+    // rather than in visible text — the face carries the identity on screen.
+    expect(wrapper.find('.mascot-fab').attributes('aria-label')).toContain('Ask Darpan')
+    // Home and account are results inside the launcher rather than standing chrome.
+    expect(wrapper.find('.home-fab').exists()).toBe(false)
+    expect(wrapper.find('.user-fab').exists()).toBe(false)
     expect(wrapper.find('.app-shell').classes()).toContain('app-shell--static')
     expect(document.body.classList.contains('surface-mode-static')).toBe(true)
   })
@@ -332,7 +352,7 @@ describe('App shell logout', () => {
 
     const wrapper = mountApp()
     await flushPromises()
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'CommandPalette' }).props('slashContext')).toEqual({
@@ -347,7 +367,7 @@ describe('App shell logout', () => {
   it('switches the active company when /switch-tenant runs, and says so', async () => {
     const wrapper = mountApp()
     await flushPromises()
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('runSlash', {
@@ -375,7 +395,7 @@ describe('App shell logout', () => {
 
     const wrapper = mountApp()
     await flushPromises()
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('runSlash', {
@@ -391,6 +411,63 @@ describe('App shell logout', () => {
     const hint = wrapper.get('.workflow-escape-hint')
     expect(hint.text()).toContain('Acme Retail')
     expect(hint.classes()).toContain('workflow-escape-hint--warning')
+  })
+
+  /**
+   * The three commands that replace the floating user menu. They arrive as run rows — the command
+   * name is the whole instruction, so there is no value to carry.
+   */
+  async function runSlashAction(wrapper: ReturnType<typeof mountApp>, commandName: string) {
+    await wrapper.get('.mascot-fab').trigger('click')
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('runSlash', {
+      id: `slash-command-${commandName}`,
+      label: `/${commandName}`,
+      description: '',
+      kind: 'run',
+      commandName,
+      value: null,
+    })
+    await flushPromises()
+  }
+
+  it('sets light mode when /light runs, rather than toggling to whatever is next', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await runSlashAction(wrapper, 'light')
+
+    expect(setTheme).toHaveBeenCalledWith('light')
+    expect(toggleTheme).not.toHaveBeenCalled()
+  })
+
+  it('sets dark mode when /dark runs', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await runSlashAction(wrapper, 'dark')
+
+    expect(setTheme).toHaveBeenCalledWith('dark')
+  })
+
+  it('closes the launcher after a theme command, since it has nowhere to navigate', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await runSlashAction(wrapper, 'dark')
+
+    expect(wrapper.find('[data-testid="command-palette-stub"]').exists()).toBe(false)
+  })
+
+  it('signs out when /logout runs, the same way the launcher action does', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await runSlashAction(wrapper, 'logout')
+
+    expect(logoutSession).toHaveBeenCalledTimes(1)
+    expect(replace).toHaveBeenCalledWith({ name: 'login' })
   })
 
   async function raiseHint(
@@ -503,7 +580,7 @@ describe('App shell logout', () => {
     const handleDismiss = vi.fn()
     document.addEventListener(DISMISS_INLINE_MENUS_EVENT, handleDismiss)
 
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
 
     document.removeEventListener(DISMISS_INLINE_MENUS_EVENT, handleDismiss)
     expect(handleDismiss).toHaveBeenCalledTimes(1)
@@ -547,7 +624,7 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     expect(listSftpServers).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
@@ -583,7 +660,7 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
     await wrapper.get('[data-testid="command-action-data-sftp-server-warehouse"]').trigger('click')
     await flushPromises()
@@ -608,7 +685,7 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[data-testid="command-action-navigate-tenant-settings"]').text()).toBe('Open Tenant Settings')
@@ -1032,23 +1109,15 @@ describe('App shell logout', () => {
     expect(source).not.toContain('#5f6b79')
   })
 
-  it('keeps extra helper copy out of the user menu when no tenant switcher is available', async () => {
+  it('leaves the theme to /light and /dark instead of listing a toggle action', async () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.user-fab').trigger('click')
-    await flushPromises()
+    const palette = await openLauncher(wrapper)
 
-    expect(wrapper.text()).not.toContain('User details')
-    expect(wrapper.text()).not.toContain('Theme')
-    expect(wrapper.text()).not.toContain('Signed in')
-    expect(wrapper.text()).not.toContain('Ask Darpan shortcut: Cmd/Ctrl+K')
-    expect(wrapper.find('.user-menu-tenant').exists()).toBe(false)
-
-    const themeToggle = wrapper.get('.user-menu-actions .app-icon-action[aria-label="Switch to dark mode"]')
-    await themeToggle.trigger('click')
-
-    expect(toggleTheme).toHaveBeenCalledTimes(1)
+    // The toggle had to name the theme it switched TO, which meant a label that changed
+    // under the reader. Two absolute commands say it once and never move.
+    expect(launcherAction(palette, 'action-toggle-theme')).toBeUndefined()
   })
 
   it('shows the active tenant below the user name in the user menu', async () => {
@@ -1062,11 +1131,11 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.user-fab').trigger('click')
-    await flushPromises()
+    const palette = await openLauncher(wrapper)
 
-    expect(wrapper.get('.user-menu-name').text()).toBe('test.customer')
-    expect(wrapper.get('.user-menu-tenant').text()).toBe('Gorjana')
+    // Who you are and which tenant you are in was the menu's job. It is load-bearing in
+    // a multi-tenant app, so it moved with the rest rather than being dropped.
+    expect(launcherAction(palette, 'action-identity')?.label).toBe('test.customer · Gorjana')
   })
 
   it('does not render authenticated action errors inside the user menu', async () => {
@@ -1075,43 +1144,34 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.user-fab').trigger('click')
-    await flushPromises()
+    const palette = await openLauncher(wrapper)
+    const identity = launcherAction(palette, 'action-identity')
 
-    expect(wrapper.get('.user-menu-name').text()).toBe('test.customer')
-    expect(wrapper.find('.user-menu-card').text()).not.toContain('metaClass')
+    expect(identity?.label).toBe('test.customer')
+    expect(identity?.description).not.toContain('metaClass')
   })
 
-  it('routes user settings from the user menu gear action', async () => {
+  it('routes to user settings from the identity row', async () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.user-fab').trigger('click')
-    await flushPromises()
-
-    await wrapper.get('.user-menu-actions .app-icon-action[aria-label="Open user settings"]').trigger('click')
+    const palette = await openLauncher(wrapper)
+    palette.vm.$emit('execute', launcherAction(palette, 'action-identity'))
     await flushPromises()
 
     expect(push).toHaveBeenCalledWith('/settings/user')
-    expect(wrapper.find('.user-menu-card').exists()).toBe(false)
   })
 
-  it('keeps the page visible by avoiding a full-screen user-menu backdrop', async () => {
+  it('dims the page for the launcher and lets it go again', async () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.user-fab').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('.user-menu-backdrop').exists()).toBe(false)
-    expect(wrapper.find('.user-menu-visual-backdrop').exists()).toBe(false)
+    await openLauncher(wrapper)
     expect(wrapper.find('.app-shell').classes()).toContain('app-shell--popup-open')
-    expect(wrapper.find('.user-menu-card').exists()).toBe(true)
 
-    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('close')
     await flushPromises()
 
-    expect(wrapper.find('.user-menu-card').exists()).toBe(false)
     expect(wrapper.find('.app-shell').classes()).not.toContain('app-shell--popup-open')
   })
 
@@ -1129,7 +1189,7 @@ describe('App shell logout', () => {
     expect(document.body.classList.contains('surface-mode-workflow')).toBe(true)
   })
 
-  it('routes the floating home action back to the hub on non-hub routes', async () => {
+  it('routes back to the hub from the launcher on non-hub routes', async () => {
     route.name = 'settings-tenant'
     route.path = '/settings/tenant'
     route.fullPath = '/settings/tenant'
@@ -1138,7 +1198,9 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.home-fab').trigger('click')
+    const palette = await openLauncher(wrapper)
+    palette.vm.$emit('execute', launcherAction(palette, 'navigate-hub'))
+    await flushPromises()
 
     expect(push).toHaveBeenCalledWith('/')
   })
@@ -1309,14 +1371,14 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    const homeButton = wrapper.get('.home-fab').element as HTMLButtonElement
-    homeButton.focus()
-    expect(document.activeElement).toBe(homeButton)
+    const focusTarget = wrapper.get('.mascot-fab').element as HTMLButtonElement
+    focusTarget.focus()
+    expect(document.activeElement).toBe(focusTarget)
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
     await flushPromises()
 
-    expect(document.activeElement).not.toBe(homeButton)
+    expect(document.activeElement).not.toBe(focusTarget)
   })
 
   it('does not navigate home on Escape for non-workflow routes', async () => {
