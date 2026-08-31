@@ -13,13 +13,14 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly string[]>> = Object.
   // RuleSetBoard: @dblclick opens the exclusion editor, pointerdown/up draws a pairing,
   // and Enter is the keyboard equivalent of the drag.
   'reconciliation-ruleset-editor': Object.freeze([
-    'Double-click a field to exclude it from the comparison.',
+    'Double-click a field to set what this source should leave out when it pulls.',
     'Drag from a field on one side to a field on the other to pair them.',
+    'Not every source can filter at the pull — a side that cannot will say so.',
     'Keyboard: Enter on a field, then Enter on its partner, does the same pairing.',
   ]),
   'reconciliation-ruleset-manager': Object.freeze([
     'The pencil beside Run and Rules opens each for editing.',
-    'Exclusions are per source — the two sides can skip different things.',
+    'Exclusions are per source — each side can leave out different records as it pulls.',
   ]),
   'reconciliation-automation-dashboard': Object.freeze([
     'Rest on Schedule or Window — they are the two most easily confused settings here.',

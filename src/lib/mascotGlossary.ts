@@ -206,8 +206,12 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
      The first thing anybody lost on a page reads is the heading over the region, so
      it is the cheapest possible place to answer "what am I looking at". ───────── */
   exclusions: {
+    // Not a filter on the comparison: exclusions are pushed to the connector as filter
+    // parameters, so excluded records are never fetched in the first place. A side that
+    // cannot filter at the source has no exclusions at all, which is why the board says
+    // so when you try — see RuleSetBoard's "cannot filter records at the source".
     title: 'Exclusions',
-    body: 'records a run deliberately skips, so the count is what needs attention. An automation copies these when it is created.',
+    body: 'rules for what a source leaves out when a run pulls its data. Excluded records never arrive, so they cannot show up as differences.',
   },
   previousRuns: {
     title: 'Previous runs',
