@@ -31,7 +31,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   onlyInFile2Count: {
     title: 'Only in the second source',
-    body: 'the same story the other way round — the second has them, the first has never heard of them, inside this run’s window.',
+    body: 'the same story the other way round, inside this run’s window. The second has them; the first does not.',
   },
   runStartedAt: {
     // {detail} is filled by describeTimeZone() from the actual value, because the useful
@@ -54,7 +54,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   runStatus: {
     title: 'Status',
-    body: 'where the run got to. A finished run can still be a disappointing run, so read it next to the counts rather than instead of them.',
+    body: 'where the run got to. A finished run can still be a disappointing one — read it next to the counts.',
   },
   scheduledDate: {
     title: 'Scheduled',
@@ -66,22 +66,22 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   timestamp: {
     title: 'This time',
-    body: 'is shown in {detail}. Everyone reads the same instant in their own zone, so mine and yours will not match — and neither is wrong.',
+    body: 'is shown in {detail}. The same instant reads differently in each zone, and neither is wrong.',
   },
   previousRun: {
     title: 'Previous run',
-    body: 'the last time this automation actually went. If it is further back than the schedule implies, something skipped rather than failed quietly.',
+    body: 'the last time this automation actually went. Further back than the schedule implies means something skipped.',
   },
   nextRun: {
     title: 'Next run',
-    body: 'when it is due to go again, in your zone. A paused automation has no next run, which is different from having a late one.',
+    body: 'when it is due to go again, in your zone. Paused means no next run — not a late one.',
   },
 
   /* ── Straight from darpan-docs/reference/glossary.mdx, so the product and the docs
      cannot drift into describing the same word two ways. ───────────────────────── */
   savedRun: {
     title: 'Saved run',
-    body: 'the reusable setup tying sources, schemas, primary IDs and rules together. Executions come and go; this is the thing they are all instances of.',
+    body: 'the reusable setup tying sources, schemas, primary IDs and rules together. Executions are instances of it.',
   },
   reconciliationRun: {
     title: 'Reconciliation run',
@@ -117,7 +117,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   missingInSource: {
     title: 'Missing in source',
-    body: 'a record in one source and not the other. Before you chase it: verification passes and structural suppression have already dropped the ones that were never real.',
+    body: 'in one source, not the other. Verification and suppression already dropped the ones that were never real.',
   },
   processingError: {
     title: 'Processing error',
@@ -131,11 +131,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   timezone: {
     // Wording follows darpan-docs/guides/manage-tenant-settings.mdx.
     title: 'Timezone',
-    body: 'the tenant’s default reading of dates and times, for workflows, schedules and date windows. Set once per tenant — everyone on it reads the same interpretation.',
+    body: 'this tenant’s default reading of dates and times, for workflows, schedules and windows. Everyone on it sees the same one.',
   },
   systemLabel: {
     title: 'System',
-    body: 'which external system this side of the run is. When both sides are the same system, these labels are the only thing telling the two instances apart.',
+    body: 'which external system this side is. When both sides are the same system, these labels tell the instances apart.',
   },
   activeFlag: {
     title: 'Active',
@@ -143,7 +143,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   primaryId: {
     title: 'Primary ID',
-    body: 'the field that identifies a record so both sides can be matched on it. Choose one that is stable and unique, or every run will disagree with itself.',
+    body: 'the field records are matched on. Pick one stable and unique, or every run disagrees with itself.',
   },
   endpoint: {
     title: 'Endpoint',
@@ -187,7 +187,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   runName: {
     title: 'Run name',
-    body: 'what you will search for later. Ask Darpan finds runs by this and by output file name, so a dated, specific name pays for itself.',
+    body: 'what you search for later. Ask Darpan finds runs by this and by output file name, so be specific.',
   },
   startDate: {
     title: 'Start date',
@@ -207,7 +207,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
      it is the cheapest possible place to answer "what am I looking at". ───────── */
   exclusions: {
     title: 'Exclusions',
-    body: 'records a run deliberately does not compare, so the count is what needs attention rather than everything that exists. An automation copies these at the moment it is created.',
+    body: 'records a run deliberately skips, so the count is what needs attention. An automation copies these when it is created.',
   },
   previousRuns: {
     title: 'Previous runs',
@@ -247,7 +247,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   activity: {
     title: 'Activity',
-    body: 'what has happened here recently, newest first. A quiet list is not the same as a healthy one — check the schedule if you expected more.',
+    body: 'what happened here recently, newest first. A quiet list is not the same as a healthy one.',
   },
   operations: {
     title: 'Operations',

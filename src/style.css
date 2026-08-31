@@ -1894,6 +1894,11 @@ label > span {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* The clamp alone left a sliced fourth line showing under the ellipsis. Pinning the
+     line box and capping the height at exactly three of them makes the crop land on a
+     line boundary instead of through the middle of one. */
+  line-height: 1.5;
+  max-height: 4.5em;
   /* The release is visible for its full half second so it stays cancellable —
      drift back onto the value, or onto the bubble, and it returns. */
   transition: opacity 500ms linear;
