@@ -111,11 +111,10 @@
       </div>
     </div>
 
-    <button type="button" class="command-bubble" aria-label="Open command menu" @click="openCommandPalette">
-      <span class="command-bubble-dot" aria-hidden="true"></span>
-      <span>Ask Darpan</span>
-      <span class="command-bubble-shortcut">Cmd/Ctrl+K</span>
-    </button>
+    <!-- The "Ask Darpan" pill is now a face. It is still the launcher — and it is
+         also where every v-explain answer is spoken, so the corner holds one object
+         rather than a button plus a help affordance. -->
+    <MascotDock @open="openCommandPalette" />
   </div>
 
   <CommandPalette
@@ -156,6 +155,7 @@ import { resolveStaticPageLabel } from './lib/workflowOrigin'
 
 import AppErrorBoundary from './components/shell/AppErrorBoundary.vue'
 import OfflineBanner from './components/shell/OfflineBanner.vue'
+import MascotDock from './components/shell/MascotDock.vue'
 
 const CommandPalette = defineAsyncComponent(() => import('./components/shell/CommandPalette.vue').then((module) => module.default))
 

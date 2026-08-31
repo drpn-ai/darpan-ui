@@ -219,7 +219,10 @@ const columns = [
   { key: 'status', label: 'Status', colStyle: { width: '16%' } },
   { key: 'scheduled', label: 'Scheduled', colStyle: { width: '34%' } },
   { key: 'completed', label: 'Completed', colStyle: { width: '34%' } },
-  { key: 'counts', label: 'Differences', colStyle: { width: '16%' } },
+  // "Differences" is the number operators most often read as "everything that is
+  // wrong". It is not: records missing on one side are counted separately, so a run
+  // can show zero here and still have hundreds of unmatched records.
+  { key: 'counts', label: 'Differences', colStyle: { width: '16%' }, explain: 'differenceCount' },
 ]
 
 type AutomationExecutionTableRow = Record<string, unknown> & {

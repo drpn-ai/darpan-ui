@@ -314,7 +314,9 @@ describe('App shell logout', () => {
 
     expect(wrapper.find('.utility-header').exists()).toBe(false)
     expect(wrapper.find('.floating-actions').exists()).toBe(true)
-    expect(wrapper.find('.command-bubble').text()).toContain('Ask Darpan')
+    // The launcher is the mascot now, so its name lives on the accessible label
+    // rather than in visible text — the face carries the identity on screen.
+    expect(wrapper.find('.mascot-fab').attributes('aria-label')).toContain('Ask Darpan')
     expect(wrapper.find('.home-fab').exists()).toBe(true)
     expect(wrapper.find('.app-shell').classes()).toContain('app-shell--static')
     expect(document.body.classList.contains('surface-mode-static')).toBe(true)
@@ -332,7 +334,7 @@ describe('App shell logout', () => {
 
     const wrapper = mountApp()
     await flushPromises()
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'CommandPalette' }).props('slashContext')).toEqual({
@@ -347,7 +349,7 @@ describe('App shell logout', () => {
   it('switches the active company when /switch-tenant runs, and says so', async () => {
     const wrapper = mountApp()
     await flushPromises()
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('runSlash', {
@@ -375,7 +377,7 @@ describe('App shell logout', () => {
 
     const wrapper = mountApp()
     await flushPromises()
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('runSlash', {
@@ -503,7 +505,7 @@ describe('App shell logout', () => {
     const handleDismiss = vi.fn()
     document.addEventListener(DISMISS_INLINE_MENUS_EVENT, handleDismiss)
 
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
 
     document.removeEventListener(DISMISS_INLINE_MENUS_EVENT, handleDismiss)
     expect(handleDismiss).toHaveBeenCalledTimes(1)
@@ -547,7 +549,7 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     expect(listSftpServers).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
@@ -583,7 +585,7 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
     await wrapper.get('[data-testid="command-action-data-sftp-server-warehouse"]').trigger('click')
     await flushPromises()
@@ -608,7 +610,7 @@ describe('App shell logout', () => {
     const wrapper = mountApp()
     await flushPromises()
 
-    await wrapper.get('.command-bubble').trigger('click')
+    await wrapper.get('.mascot-fab').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[data-testid="command-action-navigate-tenant-settings"]').text()).toBe('Open Tenant Settings')

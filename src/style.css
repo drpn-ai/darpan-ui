@@ -108,6 +108,12 @@
   --selection-bg: color-mix(in oklab, var(--accent) 28%, var(--surface));
   --selection-text: var(--text);
 
+  /* The only hue in the product, and it exists exactly once: the mascot's inner ears
+     and tear stripes. Those two markings are what stop the face reading as a bear.
+     Keeping it as a single token is what makes "one colour, one place" enforceable
+     rather than a note in a doc — grep the token, and every use is accounted for. */
+  --mascot-rust: #b56437;
+
   /* Static system: boards, dashboards, editors */
   --static-frame-width: 920px;
   --static-shell-padding-y: var(--space-3);
@@ -185,6 +191,9 @@
   --shadow: 0 0 0 rgba(0, 0, 0, 0);
   --selection-bg: color-mix(in oklab, var(--accent) 18%, white);
   --selection-text: var(--text);
+  /* Darkened for the light ground: the dark-theme rust sits at too low a contrast
+     against white to read as a marking rather than a smudge. */
+  --mascot-rust: #a85c30;
 }
 
 *,
@@ -1840,37 +1849,89 @@ label > span {
   stroke-linejoin: round;
 }
 
-.command-bubble {
-  min-height: var(--floating-command-bubble-height);
+/* ── Mascot dock ──────────────────────────────────────────────────────────────
+   Replaces the "Ask Darpan" pill. The stack is bottom-aligned so whatever the
+   mascot says grows upward out of the face, rather than floating the face to the
+   middle of its own speech. */
+.mascot-dock {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.mascot-fab {
+  width: var(--floating-command-bubble-height);
+  height: var(--floating-command-bubble-height);
   border-radius: var(--radius-pill);
   border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--border));
-  background: color-mix(in oklab, var(--accent) 92%, var(--surface));
-  color: var(--accent-ink);
+  background: var(--surface-2);
+  color: var(--text);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  /* Sits between scale steps by more than the fold tolerance; snapping it would be a visible shift rather than a sub-pixel one. */
-  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
-  padding: 0.68rem 0.92rem;
+  display: grid;
+  place-items: center;
+  padding: var(--space-1);
+  transition: background 160ms ease, border-color 160ms ease;
 }
 
-.command-bubble:hover {
+.mascot-fab:hover {
+  background: var(--surface-3);
   border-color: color-mix(in oklab, var(--accent) 60%, var(--border));
-  background: color-mix(in oklab, var(--accent) 96%, var(--surface));
 }
 
-.command-bubble-dot {
-  width: 0.52rem;
-  height: 0.52rem;
-  border-radius: var(--radius-pill);
-  background: color-mix(in oklab, var(--accent-ink) 82%, transparent);
-  opacity: 0.8;
+/* Everything the mascot says appears here and nowhere else, so there is one place
+   to look. Clamped the way the notice pill is clamped: a phrase that will not fit
+   in three lines is the wrong phrase, not a bubble that needs to be bigger. */
+.mascot-say {
+  max-width: min(28rem, calc(100vw - var(--space-7)));
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  padding: var(--space-1-5) var(--space-2);
+  font-size: var(--type-mono-copy-size);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* The release is visible for its full half second so it stays cancellable —
+     drift back onto the value, or onto the bubble, and it returns. */
+  transition: opacity 500ms linear;
 }
 
-.command-bubble-shortcut {
+.mascot-say--going {
+  opacity: 0;
+}
+
+.mascot-say--hint {
+  -webkit-line-clamp: 1;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.mascot-say-lead {
+  color: var(--text);
+}
+
+.mascot-key {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-dim);
   font-size: var(--type-table-head-size);
-  opacity: 0.7;
+  padding: 0 var(--space-0);
+}
+
+/* Marks a value the mascot can explain. cursor: help is the only standing signal —
+   anything louder would decorate every counter in the product. */
+.is-explainable {
+  cursor: help;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-say {
+    transition: none;
+  }
 }
 
 .command-panel {
@@ -2008,7 +2069,9 @@ label > span {
     padding-top: var(--notice-lane-height);
   }
 
-  .command-bubble-shortcut {
+  /* Narrow screens are usually touch, where there is no hover to summon the
+     mascot's label and no keyboard to press. The face still opens the launcher. */
+  .mascot-say--hint {
     display: none;
   }
 
