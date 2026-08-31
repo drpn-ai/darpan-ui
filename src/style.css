@@ -1887,18 +1887,14 @@ label > span {
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: transform 160ms ease;
 }
 
-/* The eyes already follow the pointer, which is most of the hover feedback. This is
-   the smallest nudge that also says "clickable" without a border to change.
-   The background and border are restated here, not redundantly: the global
-   `button:hover` rule paints a surface at specificity (0,1,1), which outranks
-   `.mascot-fab` at (0,1,0). Setting them only on the base rule left a disc appearing
-   behind the character the moment the pointer arrived — the one moment anyone is
-   looking at it. */
+/* The mascot does not react to being hovered — the bubble it opens is the response, and
+   a character that also flinches makes two answers to one gesture. What is left here is
+   only defensive: the global `button:hover` rule paints a surface at specificity (0,1,1),
+   which outranks `.mascot-fab` at (0,1,0), so without restating these a disc appears
+   behind the character the moment the pointer arrives. */
 .mascot-fab:hover {
-  transform: scale(1.06);
   background: none;
   border-color: transparent;
 }
@@ -1907,16 +1903,6 @@ label > span {
 .mascot-fab:focus-visible {
   outline: 2px solid var(--text-dim);
   outline-offset: 3px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mascot-fab {
-    transition: none;
-  }
-
-  .mascot-fab:hover {
-    transform: none;
-  }
 }
 
 /* Everything the mascot says appears here and nowhere else, so there is one place
