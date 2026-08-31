@@ -312,19 +312,16 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
   return (palette.props('actions') as LauncherAction[]).find((action) => action.id === id)
 }
 
-  it('signs out from the launcher, which is the only place that action now lives', async () => {
+  it('leaves signing out to /logout instead of also listing it as a searchable action', async () => {
     const wrapper = mountApp()
     await flushPromises()
 
     const palette = await openLauncher(wrapper)
-    const signOut = launcherAction(palette, 'action-sign-out')
-    expect(signOut?.label).toBe('Sign out')
 
-    palette.vm.$emit('execute', signOut)
-    await flushPromises()
-
-    expect(logoutSession).toHaveBeenCalledTimes(1)
-    expect(replace).toHaveBeenCalledWith({ name: 'login' })
+    // Sign out is a command now, not a search result. The identity row is the only account
+    // entry left in the list, and it still routes rather than running.
+    expect(launcherAction(palette, 'action-sign-out')).toBeUndefined()
+    expect(launcherAction(palette, 'action-identity')?.to).toBe('/settings/user')
   })
 
   it('leaves exactly one object in the floating corner', async () => {
@@ -1112,20 +1109,15 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(source).not.toContain('#5f6b79')
   })
 
-  it('switches theme from the launcher, naming the theme it switches to', async () => {
+  it('leaves the theme to /light and /dark instead of listing a toggle action', async () => {
     const wrapper = mountApp()
     await flushPromises()
 
     const palette = await openLauncher(wrapper)
-    const themeCommand = launcherAction(palette, 'action-toggle-theme')
-    // The label names the destination, not the current state — a command reading
-    // "Dark mode" while already dark says nothing about what pressing it does.
-    expect(themeCommand?.label).toBe('Switch to dark mode')
 
-    palette.vm.$emit('execute', themeCommand)
-    await flushPromises()
-
-    expect(toggleTheme).toHaveBeenCalledTimes(1)
+    // The toggle had to name the theme it switched TO, which meant a label that changed
+    // under the reader. Two absolute commands say it once and never move.
+    expect(launcherAction(palette, 'action-toggle-theme')).toBeUndefined()
   })
 
   it('shows the active tenant below the user name in the user menu', async () => {

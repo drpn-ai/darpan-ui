@@ -8,9 +8,10 @@ export interface CommandAction {
   /** Route to navigate to. Omitted for actions that do something in place. */
   to?: string
   /**
-   * Runs instead of navigating. Added so the launcher can carry the things that used
-   * to live only in the floating user menu — signing out and switching theme — now
-   * that the mascot is the only object in the corner.
+   * Runs instead of navigating. Added so the launcher could carry signing out and
+   * switching theme; both became slash commands instead (/logout, /light, /dark), so
+   * nothing declares this today. Kept because `to` is optional only while it exists —
+   * dropping it would make every action a navigation again.
    */
   run?: () => void | Promise<void>
   aliases: string[]

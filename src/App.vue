@@ -96,7 +96,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const permissions = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
-const { theme, setTheme, toggleTheme } = useTheme()
+const { setTheme } = useTheme()
 const { resolveUserDisplayName } = useUserDisplayNamePreference()
 
 const commandPalette = useCommandPalette({
@@ -150,13 +150,13 @@ const userStatusText = computed<string | null>(() => {
 const canEditTenantSettings = computed(() => permissions.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissions.canRunActiveTenantReconciliation)
 /**
- * The three things the floating user menu used to be the only home for. They live here
- * now that the mascot is the only object in the corner — reachable by the same keystroke
- * as everything else rather than behind a button that existed solely to hold them.
+ * What is left of the floating user menu. Signing out and switching theme became /logout,
+ * /light and /dark — a search list should hold the places you can go, not the two things
+ * that act on the session itself, and the theme toggle had to relabel itself under the
+ * reader to say which way it pointed.
  *
- * Built in the computed rather than in staticCommandActions because their labels depend
- * on live state: the theme command has to name the theme it switches TO, and the identity
- * row has to name who and where you actually are.
+ * Still a computed rather than part of staticCommandActions because the identity row has
+ * to name who and where you actually are.
  */
 const accountCommandActions = computed<CommandAction[]>(() => [
   {
@@ -171,24 +171,6 @@ const accountCommandActions = computed<CommandAction[]>(() => [
     group: 'Navigate',
     to: '/settings/user',
     aliases: ['who am i', 'account', 'tenant', 'company', 'signed in', 'switch tenant'],
-  },
-  {
-    id: 'action-toggle-theme',
-    label: `Switch to ${theme.value === 'dark' ? 'light' : 'dark'} mode`,
-    description: 'Change the appearance of the app for this browser.',
-    group: 'Navigate',
-    run: () => { toggleTheme() },
-    aliases: ['theme', 'dark mode', 'light mode', 'appearance', 'contrast'],
-  },
-  {
-    id: 'action-sign-out',
-    label: 'Sign out',
-    description: userDisplayName.value
-      ? `End the session for ${userDisplayName.value}.`
-      : 'End this session.',
-    group: 'Navigate',
-    run: () => handleLogout(),
-    aliases: ['log out', 'logout', 'sign off', 'exit', 'leave'],
   },
 ])
 
@@ -382,7 +364,7 @@ async function handleLogout(): Promise<void> {
 async function executeCommand(action: CommandAction): Promise<void> {
   commandPalette.close()
   commandPalette.recordExecution(action.id)
-  // In-place actions (sign out, theme) run and stop; they have nowhere to navigate.
+  // An action carrying run() acts in place and stops; it has nowhere to navigate.
   if (action.run) {
     await action.run()
     return
