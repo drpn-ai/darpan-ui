@@ -96,10 +96,13 @@ withDefaults(
   fill: var(--mascot-rust);
 }
 
+/* The dark features are knocked out in whatever sits behind the face. That is the page
+   ground by default, but a filled button overrides --mascot-ground so the eyes do not
+   disappear into a surface the same colour as they are. */
 .mascot-eye,
 .mascot-nose,
 .mascot-mouth {
-  fill: var(--bg);
+  fill: var(--mascot-ground, var(--bg));
 }
 
 .mascot-glint {

@@ -1746,7 +1746,10 @@ label > span {
   z-index: 45;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  /* Centred, not right-aligned: the mascot is one button under a pair of them, so
+     hanging it off the right edge reads as an L rather than a cluster. The old "Ask
+     Darpan" pill was as wide as the pair, which is why the stack looked balanced. */
+  align-items: center;
   gap: var(--floating-actions-gap);
 }
 
@@ -1853,37 +1856,53 @@ label > span {
    Replaces the "Ask Darpan" pill. The stack is bottom-aligned so whatever the
    mascot says grows upward out of the face, rather than floating the face to the
    middle of its own speech. */
+/* The dock is exactly as wide as its button. The bubble is taken out of flow so that
+   speaking never shoves the quick actions sideways — and so the button can sit centred
+   under them rather than hanging off one end. */
 .mascot-dock {
+  position: relative;
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
 }
 
+/* Same size, border, fill and shadow as .home-fab / .user-fab. It is one control
+   cluster, so the third button has to be a sibling of the other two rather than a
+   different object that happens to live nearby. */
 .mascot-fab {
-  width: var(--floating-command-bubble-height);
-  height: var(--floating-command-bubble-height);
+  width: var(--floating-fab-size);
+  height: var(--floating-fab-size);
   border-radius: var(--radius-pill);
   border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--border));
-  background: var(--surface-2);
-  color: var(--text);
+  background: color-mix(in oklab, var(--accent) 92%, var(--surface));
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
-  display: grid;
-  place-items: center;
-  padding: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-00);
   transition: background 160ms ease, border-color 160ms ease;
 }
 
+/* On the light fill the face inverts: dark head, light markings. Without this the
+   head would be light-on-light and the eyes would vanish into the ground. */
+.mascot-fab .mascot {
+  color: var(--accent-ink);
+  --mascot-ground: var(--accent);
+}
+
 .mascot-fab:hover {
-  background: var(--surface-3);
   border-color: color-mix(in oklab, var(--accent) 60%, var(--border));
+  background: color-mix(in oklab, var(--accent) 96%, var(--surface));
 }
 
 /* Everything the mascot says appears here and nowhere else, so there is one place
    to look. Clamped the way the notice pill is clamped: a phrase that will not fit
    in three lines is the wrong phrase, not a bubble that needs to be bigger. */
 .mascot-say {
+  position: absolute;
+  right: 100%;
+  bottom: 0;
+  margin: 0 var(--space-2) 0 0;
+  width: max-content;
   max-width: min(28rem, calc(100vw - var(--space-7)));
-  margin: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-2);
