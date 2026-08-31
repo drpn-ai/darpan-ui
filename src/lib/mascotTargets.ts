@@ -105,6 +105,32 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'start': 'startDate',
   'updated': 'updatedAt',
   'remote attributes': 'remoteAttributes',
+
+  // Section headings, as the pages actually title them.
+  'exclusions': 'exclusions',
+  'exclusion': 'exclusions',
+  'has exclusion': 'exclusions',
+  'previous runs': 'previousRuns',
+  'automation runs': 'previousRuns',
+  'other runs': 'previousRuns',
+  'most recent': 'previousRuns',
+  'previous results': 'previousResults',
+  'results': 'previousResults',
+  'saved schemas': 'savedSchemas',
+  'schemas': 'savedSchemas',
+  'saved runs': 'savedRuns',
+  'saved configs': 'savedConfigs',
+  'saved servers': 'savedConfigs',
+  'endpoints': 'endpoints',
+  'tenant context': 'tenantContext',
+  'localization': 'localization',
+  'preferences': 'localization',
+  'pinned runs': 'pinnedRuns',
+  'activity': 'activity',
+  'operations': 'operations',
+  'auth': 'authType',
+  'rule sets': 'ruleSet',
+  'automations': 'previousRuns',
 })
 
 /** Every glossary title is its own label, so a new entry is reachable the moment it exists. */
@@ -131,6 +157,16 @@ const LABEL_SELECTOR = [
   'th',
   'dt',
   'legend',
+  // Section and page headings. "Exclusions", "Previous Runs", "Saved Schemas" name a
+  // whole region, so they are the first thing someone lost on a page reads — and the
+  // cheapest place to answer "what am I looking at".
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  '.static-page-section-heading',
   '.micro-label',
   '.static-page-summary-label',
   '.workflow-context-label',

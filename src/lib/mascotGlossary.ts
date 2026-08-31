@@ -201,6 +201,58 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Remote attributes',
     body: 'extra values passed through to the remote system on each call. Wrong ones fail quietly as an empty extract rather than an error.',
   },
+
+  /* ── Section headings ─────────────────────────────────────────────────────────
+     The first thing anybody lost on a page reads is the heading over the region, so
+     it is the cheapest possible place to answer "what am I looking at". ───────── */
+  exclusions: {
+    title: 'Exclusions',
+    body: 'records a run deliberately does not compare, so the count is what needs attention rather than everything that exists. An automation copies these at the moment it is created.',
+  },
+  previousRuns: {
+    title: 'Previous runs',
+    body: 'every execution of this automation, newest first. Each is a record of what was true when it went — re-run rather than editing one.',
+  },
+  previousResults: {
+    title: 'Previous results',
+    body: 'the reviewable output of earlier runs. The run is the execution; the result is what it left behind.',
+  },
+  savedSchemas: {
+    title: 'Saved schemas',
+    body: 'the source shapes this tenant has defined. A run can only compare fields that appear in one of these.',
+  },
+  savedRuns: {
+    title: 'Saved runs',
+    body: 'the reusable setups — sources, schemas, primary IDs and rules — that executions are instances of.',
+  },
+  savedConfigs: {
+    title: 'Saved configs',
+    body: 'connection setups this tenant can point a run at. One config, many runs.',
+  },
+  endpoints: {
+    title: 'Endpoints',
+    body: 'the specific calls available on this connection. The connection is the system; these are the doors into it.',
+  },
+  tenantContext: {
+    title: 'Tenant context',
+    body: 'which tenant everything on this page is scoped to. It is a server-side preference, so switching it re-points your other tabs as well.',
+  },
+  localization: {
+    title: 'Localization',
+    body: 'how this tenant reads dates and times. Set it before the first automated run, or the team reads timestamps in the wrong zone.',
+  },
+  pinnedRuns: {
+    title: 'Pinned runs',
+    body: 'the runs you asked to keep at the top. Pinning changes what you see first, never what a run does.',
+  },
+  activity: {
+    title: 'Activity',
+    body: 'what has happened here recently, newest first. A quiet list is not the same as a healthy one — check the schedule if you expected more.',
+  },
+  operations: {
+    title: 'Operations',
+    body: 'the actions you can take on this record. Anything here changes something; reading is everywhere else on the page.',
+  },
 })
 
 /** Null rather than a throw: a missing phrase is a content gap, not a crash. */

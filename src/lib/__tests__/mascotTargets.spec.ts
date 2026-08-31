@@ -69,6 +69,14 @@ describe('resolveExplainTarget', () => {
     expect(resolveExplainTarget(two.querySelector('span'))?.term).toBe('schema')
   })
 
+  it('explains section headings, which is what someone lost reads first', () => {
+    const section = render('<h2 class="static-page-section-heading">Previous Runs</h2>')
+    const plain = render('<h3>Exclusions</h3>')
+
+    expect(resolveExplainTarget(section.querySelector('h2'))?.term).toBe('previousRuns')
+    expect(resolveExplainTarget(plain.querySelector('h3'))?.term).toBe('exclusions')
+  })
+
   it('stays silent on a label it has no phrase for', () => {
     // Silence is the right answer for an unknown heading. Guessing would produce a
     // confident wrong explanation, which is worse than no explanation.
