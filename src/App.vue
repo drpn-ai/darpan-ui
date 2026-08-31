@@ -66,7 +66,14 @@ import { handleAuthExpiry } from './lib/api/sessionExpiry'
 import { shouldAbortWorkflowOnEscape } from './lib/keyboard'
 import { useTheme } from './composables/useTheme'
 import { useCommandPalette } from './composables/useCommandPalette'
-import { switchTenantCommand, type SlashCommandContext, type SlashResultRow } from './lib/slashCommands'
+import {
+  darkThemeCommand,
+  lightThemeCommand,
+  logoutCommand,
+  switchTenantCommand,
+  type SlashCommandContext,
+  type SlashResultRow,
+} from './lib/slashCommands'
 import type { CommandAction } from './lib/types/ux'
 import {
   DISMISS_INLINE_MENUS_EVENT,
@@ -89,7 +96,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const permissions = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
-const { theme, toggleTheme } = useTheme()
+const { theme, setTheme, toggleTheme } = useTheme()
 const { resolveUserDisplayName } = useUserDisplayNamePreference()
 
 const commandPalette = useCommandPalette({
@@ -401,6 +408,21 @@ function tenantSwitchNotice(label: string): string {
 }
 
 async function runSlashCommand(row: SlashResultRow): Promise<void> {
+  // The three commands the floating user menu used to hold. They carry no value — the command name
+  // is the whole instruction — so they dispatch on the name alone.
+  if (row.commandName === logoutCommand.name) {
+    // handleLogout closes the launcher itself, and guards against a second press mid-flight.
+    await handleLogout()
+    return
+  }
+
+  if (row.commandName === lightThemeCommand.name || row.commandName === darkThemeCommand.name) {
+    commandPalette.close()
+    // Absolute, not a toggle: /light while already light is a no-op rather than a surprise.
+    setTheme(row.commandName === lightThemeCommand.name ? 'light' : 'dark')
+    return
+  }
+
   if (row.commandName !== switchTenantCommand.name || !row.value) return
 
   commandPalette.close()

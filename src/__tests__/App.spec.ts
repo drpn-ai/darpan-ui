@@ -46,6 +46,7 @@ const resolve = vi.hoisted(() =>
   }),
 )
 const toggleTheme = vi.hoisted(() => vi.fn())
+const setTheme = vi.hoisted(() => vi.fn())
 type AuthSessionInfo = {
   userId: string
   username?: string
@@ -221,7 +222,7 @@ vi.mock('../composables/useTheme', () => ({
   useTheme: () => ({
     theme: { value: 'light' },
     toggleTheme,
-    setTheme: vi.fn(),
+    setTheme,
   }),
   initTheme: vi.fn(),
 }))
@@ -262,6 +263,7 @@ describe('App shell logout', () => {
     push.mockClear()
     resolve.mockClear()
     toggleTheme.mockClear()
+    setTheme.mockClear()
     route.name = 'hub'
     route.path = '/'
     route.fullPath = '/'
@@ -412,6 +414,63 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const hint = wrapper.get('.workflow-escape-hint')
     expect(hint.text()).toContain('Acme Retail')
     expect(hint.classes()).toContain('workflow-escape-hint--warning')
+  })
+
+  /**
+   * The three commands that replace the floating user menu. They arrive as run rows — the command
+   * name is the whole instruction, so there is no value to carry.
+   */
+  async function runSlashAction(wrapper: ReturnType<typeof mountApp>, commandName: string) {
+    await wrapper.get('.mascot-fab').trigger('click')
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('runSlash', {
+      id: `slash-command-${commandName}`,
+      label: `/${commandName}`,
+      description: '',
+      kind: 'run',
+      commandName,
+      value: null,
+    })
+    await flushPromises()
+  }
+
+  it('sets light mode when /light runs, rather than toggling to whatever is next', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await runSlashAction(wrapper, 'light')
+
+    expect(setTheme).toHaveBeenCalledWith('light')
+    expect(toggleTheme).not.toHaveBeenCalled()
+  })
+
+  it('sets dark mode when /dark runs', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await runSlashAction(wrapper, 'dark')
+
+    expect(setTheme).toHaveBeenCalledWith('dark')
+  })
+
+  it('closes the launcher after a theme command, since it has nowhere to navigate', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await runSlashAction(wrapper, 'dark')
+
+    expect(wrapper.find('[data-testid="command-palette-stub"]').exists()).toBe(false)
+  })
+
+  it('signs out when /logout runs, the same way the launcher action does', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    await runSlashAction(wrapper, 'logout')
+
+    expect(logoutSession).toHaveBeenCalledTimes(1)
+    expect(replace).toHaveBeenCalledWith({ name: 'login' })
   })
 
   async function raiseHint(

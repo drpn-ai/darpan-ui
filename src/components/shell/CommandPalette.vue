@@ -107,7 +107,7 @@ interface PaletteRow {
   label: string
   description: string
   group: string
-  kind: 'action' | 'command' | 'option'
+  kind: 'action' | 'command' | 'option' | 'run'
   action: CommandAction | null
   slashRow: SlashResultRow | null
 }
@@ -194,10 +194,15 @@ function getActionDomId(actionId: string): string {
 
 /**
  * The text that typing this row out in full would produce. A command row stops at the trailing
- * space that opens argument mode; an option row spells out its label so Enter can confirm it.
+ * space that opens argument mode; an option row spells out its label so Enter can confirm it; a
+ * run row is already whole.
  */
 function completionFor(row: PaletteRow): string | null {
   if (!row.slashRow) return null
+  // A run row completes to the bare name and stops. The trailing space IS argument mode, so adding
+  // one to a command that takes no argument would push it straight past itself.
+  if (row.kind === 'run') return `${SLASH_PREFIX}${row.slashRow.commandName}`
+
   const prefix = `${SLASH_PREFIX}${row.slashRow.commandName} `
   return row.kind === 'command' ? prefix : `${prefix}${row.label}`
 }
@@ -219,7 +224,7 @@ function execute(row: PaletteRow): void {
   }
 
   // A command row names a command that still needs its argument, so Enter completes the input to
-  // `/name ` and hands the user straight to the argument list. Only option rows run anything.
+  // `/name ` and hands the user straight to the argument list. Option and run rows run.
   if (row.kind === 'command') {
     completeInput(row)
     return
