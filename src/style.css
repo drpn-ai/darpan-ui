@@ -156,9 +156,12 @@
   --floating-fab-size: 2.65rem;
   --floating-command-bubble-height: 3rem;
   /* The mascot is the only thing left in the corner, so it is no longer sized to match
-     a pair of icon discs — it can be itself. --space-7 off the ramp; the viewBox margin
-     that keeps the ears whole means the face renders at ~84% of this. */
-  --floating-mascot-size: var(--space-7);
+     a pair of icon discs — it can be itself. The viewBox margin that keeps the ears whole
+     means the face renders at ~84% of this box.
+     6.1rem continues the spacing ramp's own ratio one step past --space-7 (4.4 × ~1.38)
+     rather than being picked by eye; the ramp has no step above 4.4rem to borrow. */
+  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
+  --floating-mascot-size: 6.1rem;
   /* Transient notices (the top-centre pill) are the product's ONE feedback surface, and they must
      never be drawn over page content. The static shell reserves --notice-lane-height at its top
      ONLY while a notice is actually up (.app-shell--notice-open) — a standing reserve was ~119px of
