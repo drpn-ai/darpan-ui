@@ -68,6 +68,14 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'This time',
     body: 'is shown in {detail}. Everyone reads the same instant in their own zone, so mine and yours will not match — and neither is wrong.',
   },
+  previousRun: {
+    title: 'Previous run',
+    body: 'the last time this automation actually went. If it is further back than the schedule implies, something skipped rather than failed quietly.',
+  },
+  nextRun: {
+    title: 'Next run',
+    body: 'when it is due to go again, in your zone. A paused automation has no next run, which is different from having a late one.',
+  },
 
   /* ── Straight from darpan-docs/reference/glossary.mdx, so the product and the docs
      cannot drift into describing the same word two ways. ───────────────────────── */

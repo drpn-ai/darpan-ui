@@ -17,7 +17,7 @@
       @pointerleave="onBubbleLeave"
     >
       <template v-if="mascot.mode === 'hint'">
-        Click or <span class="mascot-key">&#8984;K</span> to search
+        Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.
       </template>
       <template v-else>
         <span class="mascot-say-lead">{{ leadText }}</span> {{ bodyText }}
@@ -43,6 +43,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import DarpanMascot from './DarpanMascot.vue'
 import { useMascotStore } from '../../stores/mascot'
+import { createDwellController, type DwellController } from '../../composables/useMascotDwell'
+import { resolveExplainTarget } from '../../lib/mascotTargets'
 
 const emit = defineEmits<{ (event: 'open'): void }>()
 
@@ -53,9 +55,9 @@ const fabLabel = 'Ask Darpan: search, or rest on a value to have it explained'
 
 const bubbleText = computed(() => mascot.mode !== 'idle')
 
-const leadText = computed(() => (mascot.isStumped ? 'Nothing written yet' : (mascot.entry?.title ?? '')))
+const leadText = computed(() => (mascot.isStumped ? 'Drawing a blank' : (mascot.entry?.title ?? '')))
 const bodyText = computed(() =>
-  mascot.isStumped ? '— no one has explained this field to me yet.' : `— ${mascot.entry?.body ?? ''}`,
+  mascot.isStumped ? '— nobody has taught me this one yet.' : `— ${mascot.entry?.body ?? ''}`,
 )
 
 function onFaceEnter(event: PointerEvent): void {
@@ -99,14 +101,83 @@ function onEscape(event: KeyboardEvent): void {
   if (event.key === 'Escape' && mascot.mode !== 'idle') mascot.clear()
 }
 
+/* ── App-wide hover help ───────────────────────────────────────────────────────
+   One delegated listener rather than a directive on every element. Hand-wiring did
+   not scale past the page being edited, which is why the first cut covered a single
+   column header and read as broken. Anything the label index or the timestamp shape
+   recognises is explainable, on every page, with no markup changes. */
+let hovered: HTMLElement | null = null
+let controller: DwellController | null = null
+
+/* Hover is a fine-pointer affordance. Without the guard, :hover latches after a tap
+   on touch and the answer has no way to be dismissed. */
+function hasFinePointer(): boolean {
+  if (typeof window.matchMedia !== 'function') return true
+  return window.matchMedia('(hover: hover) and (pointer: fine)').matches
+}
+
+function stopWatching(): void {
+  controller?.cancel()
+  hovered?.classList.remove('is-explainable-auto')
+  controller = null
+  hovered = null
+}
+
+function onPointerOver(event: PointerEvent): void {
+  if (event.pointerType !== 'mouse' || !hasFinePointer()) return
+  const target = resolveExplainTarget(event.target as Element | null)
+
+  if (!target) {
+    // Left everything explainable: release whatever is on screen, if anything.
+    if (hovered) {
+      controller?.leave()
+      hovered = null
+      controller = null
+    }
+    return
+  }
+
+  // An element already marked by v-explain owns its own dwell; do not double-drive it.
+  if (target.el.classList.contains('is-explainable')) return
+  if (target.el === hovered) return
+
+  stopWatching()
+  hovered = target.el
+  // The only standing signal that a thing is askable. Applied on hover rather than at
+  // paint, so a page of headings is not permanently decorated with help cursors.
+  hovered.classList.add('is-explainable-auto')
+  controller = createDwellController({
+    onListen: () => mascot.listen(),
+    onSpeak: () => mascot.explain(target.term, target.detail),
+    onRelease: () => mascot.clear(),
+  })
+  controller.enter()
+}
+
+function onPointerOut(event: PointerEvent): void {
+  if (!hovered || !controller) return
+  // relatedTarget still inside the same element is a move between its children.
+  const to = event.relatedTarget as Node | null
+  if (to && hovered.contains(to)) return
+  controller.leave()
+  hovered.classList.remove('is-explainable-auto')
+  hovered = null
+  controller = null
+}
+
 onMounted(() => {
   window.addEventListener('pointermove', trackGaze, { passive: true })
   window.addEventListener('keydown', onEscape)
+  document.addEventListener('pointerover', onPointerOver, { passive: true })
+  document.addEventListener('pointerout', onPointerOut, { passive: true })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('pointermove', trackGaze)
   window.removeEventListener('keydown', onEscape)
+  document.removeEventListener('pointerover', onPointerOver)
+  document.removeEventListener('pointerout', onPointerOut)
+  stopWatching()
   mascot.clear()
 })
 </script>

@@ -36,8 +36,8 @@ describe('MascotDock', () => {
 
     const say = wrapper.get('.mascot-say')
     expect(say.classes()).toContain('mascot-say--hint')
-    expect(say.text()).toContain('Click or')
-    expect(say.text()).toContain('to search')
+    expect(say.text()).toContain('Click me')
+    expect(say.text()).toContain('if you’re in a hurry')
   })
 
   it('ignores a touch tap for the hover label, which would otherwise latch open', async () => {
@@ -57,7 +57,7 @@ describe('MascotDock', () => {
 
     const say = wrapper.get('.mascot-say')
     expect(say.get('.mascot-say-lead').text()).toBe('Differences')
-    expect(say.text()).toContain('disagree on a compared field')
+    expect(say.text()).toContain('don’t line up on a compared field')
     expect(say.classes()).not.toContain('mascot-say--hint')
   })
 
@@ -68,7 +68,7 @@ describe('MascotDock', () => {
     mascot.explain('noSuchTermExists')
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('.mascot-say').text()).toContain('Nothing written yet')
+    expect(wrapper.get('.mascot-say').text()).toContain('Drawing a blank')
   })
 
   it('does not let the face label interrupt an explanation already on screen', async () => {
