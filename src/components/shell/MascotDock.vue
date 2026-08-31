@@ -37,7 +37,11 @@
       @focus="mascot.showHint()"
       @blur="mascot.hideHint()"
     >
-      <DarpanMascot :detail="2" :listening="mascot.listening" :speaking="mascot.isSpeaking" />
+      <!-- Full detail. The reduction schedule exists for marks under 24px; this one renders at
+           ~82px, where dropping the mouth is not a simplification, just a face missing a feature.
+           It also had a side effect worth naming: .mascot--speaking animates the mouth, so while
+           the dock rendered detail 2 the speaking state had nothing to move. -->
+      <DarpanMascot :detail="3" :listening="mascot.listening" :speaking="mascot.isSpeaking" />
     </button>
   </div>
 </template>

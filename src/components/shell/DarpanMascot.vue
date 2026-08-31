@@ -92,6 +92,26 @@ withDefaults(
   width: 100%;
   height: 100%;
   color: var(--mascot-ink, var(--text));
+  /* Pivot near the chin rather than the middle of the box, so listening reads as a head
+     cocking on a neck instead of the whole drawing spinning. */
+  transform-origin: 50% 84%;
+  transition: transform 200ms ease;
+}
+
+/* Leaning in. The rotation is on the svg element, deliberately not on a group inside it:
+   the artwork already runs to the edges of the viewBox — the ears span -4.8 to 68.8 of a
+   -6..70 box — so rotating within it slices whichever ear swings outward. Rotating the
+   element takes the viewport with the content and nothing clips.
+
+   Counter-clockwise because the dock sits in the bottom-right corner: the page, and the term
+   being explained, are up and to the left, so this tips the head toward what it is attending
+   to. Tilting the other way reads as turning away from it.
+
+   6deg, well under the 20 the motion sketch called for. At that size a small angle is the
+   whole effect: it is enough to notice out of the corner of the eye, and it keeps the mark
+   inside the fab, where the larger angles swung the raised ear out over the bubble. */
+.mascot--listening {
+  transform: rotate(-6deg);
 }
 
 .mascot-head,
@@ -150,7 +170,11 @@ withDefaults(
   transform: scaleY(2.1);
 }
 
+/* The states still land, they just stop being animated into — same treatment the ears and
+   mouth already had. A tilt that snaps is still a tilt; one that sweeps is motion someone
+   has explicitly asked not to see. */
 @media (prefers-reduced-motion: reduce) {
+  .mascot,
   .mascot-glint,
   .mascot-ear,
   .mascot-mouth {
