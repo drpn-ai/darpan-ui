@@ -70,20 +70,34 @@
               <dd>{{ automation.automationId }}</dd>
             </div>
             <div class="automation-dashboard-detail-item">
-              <dt class="micro-label">Schedule</dt>
+              <!-- Schedule and Window get confused for each other constantly: one is
+                   when the run happens, the other is which records it reaches. -->
+              <dt class="micro-label" v-explain="'automationSchedule'">Schedule</dt>
               <dd>{{ scheduleLabel }}</dd>
             </div>
             <div class="automation-dashboard-detail-item">
-              <dt class="micro-label">Window</dt>
+              <dt class="micro-label" v-explain="'automationWindow'">Window</dt>
               <dd>{{ windowLabel }}</dd>
             </div>
+            <!-- The zone code used to be printed after every timestamp. It is asked for
+                 instead: rest on the time and the mascot names the zone it is in. -->
             <div class="automation-dashboard-detail-item automation-dashboard-detail-item--date">
               <dt class="micro-label">Previous Run</dt>
-              <dd data-testid="automation-previous-run">{{ formatTenantDateTime(previousRunTime) }}</dd>
+              <dd
+                data-testid="automation-previous-run"
+                v-explain="{ term: 'timestamp', detail: describeTimeZone(previousRunTime) }"
+              >
+                {{ formatTenantDateTime(previousRunTime) }}
+              </dd>
             </div>
             <div class="automation-dashboard-detail-item automation-dashboard-detail-item--date">
               <dt class="micro-label">Next Run</dt>
-              <dd data-testid="automation-next-run">{{ formatTenantDateTime(nextRunTime) }}</dd>
+              <dd
+                data-testid="automation-next-run"
+                v-explain="{ term: 'timestamp', detail: describeTimeZone(nextRunTime) }"
+              >
+                {{ formatTenantDateTime(nextRunTime) }}
+              </dd>
             </div>
           </dl>
         </div>
@@ -183,6 +197,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import AppListPager from '../../components/ui/AppListPager.vue'
 import AppTableFrame from '../../components/ui/AppTableFrame.vue'
+// Imported rather than relying on the global registration in main.ts, so this page's
+// own tests mount without a "failed to resolve directive" warning.
+import { vExplain } from '../../directives/vExplain'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
@@ -211,14 +228,14 @@ import { useListPagination } from '../../lib/listPagination'
 import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
-import { formatDateTime, getDefaultDisplayTimeZone, timeZoneCode } from '../../lib/utils/date'
+import { describeTimeZone as describeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
 
 const columns = [
-  { key: 'status', label: 'Status', colStyle: { width: '16%' } },
-  { key: 'scheduled', label: 'Scheduled', colStyle: { width: '34%' } },
-  { key: 'completed', label: 'Completed', colStyle: { width: '34%' } },
+  { key: 'status', label: 'Status', colStyle: { width: '16%' }, explain: 'runStatus' },
+  { key: 'scheduled', label: 'Scheduled', colStyle: { width: '34%' }, explain: 'scheduledDate' },
+  { key: 'completed', label: 'Completed', colStyle: { width: '34%' }, explain: 'completedDate' },
   // "Differences" is the number operators most often read as "everything that is
   // wrong". It is not: records missing on one side are counted separately, so a run
   // can show zero here and still have hundreds of unmatched records.
@@ -353,6 +370,11 @@ function formatTenantDateTime(value: unknown, fallback = '-'): string {
   return formatDateTime(value, { fallback })
 }
 
+/** The zone sentence for one timestamp, handed to the mascot rather than printed. */
+function describeTimeZone(value: unknown): string {
+  return describeZone(value)
+}
+
 function automationSystemLabel(fileSide: string, fallback: string): string {
   const savedRunOption = automation.value?.savedRun?.systemOptions?.find((option) => option.fileSide === fileSide)
   if (savedRunOption) return savedRunOption.label || savedRunOption.description || savedRunOption.enumCode || savedRunOption.enumId || fallback
@@ -423,9 +445,9 @@ function scheduleDisplayLabel(row: AutomationRecord | null): string {
 function formatHourMinuteAmPm(hour: number, minute: number): string {
   const period = hour < 12 ? 'AM' : 'PM'
   const hour12 = hour % 12 === 0 ? 12 : hour % 12
-  const zone = timeZoneCode(new Date(), getDefaultDisplayTimeZone())
-  const time = `${hour12}:${minute.toString().padStart(2, '0')} ${period}`
-  return zone ? `${time} ${zone}` : time
+  // No zone code appended: the schedule is already converted to the viewer's zone above,
+  // and the code is available on demand by resting on the Schedule label.
+  return `${hour12}:${minute.toString().padStart(2, '0')} ${period}`
 }
 
 function scheduleLabelFromCron(expression: string | undefined, sourceZone = 'UTC'): string | null {

@@ -15,6 +15,19 @@ interface ExplainElement extends HTMLElement {
   __explainTeardown?: () => void
 }
 
+/**
+ * Either a glossary key on its own, or a key plus the specific fact this instance
+ * needs to state. A timestamp has to name ITS zone rather than describe timezones, so
+ * `{ term: 'runStartedAt', detail: describeTimeZone(value) }` fills the body's {detail}.
+ */
+export type ExplainBinding = string | { term: string, detail?: string | null }
+
+function readBinding(value: ExplainBinding | null | undefined): { term: string, detail: string | null } {
+  if (typeof value === 'string') return { term: value, detail: null }
+  if (value && typeof value === 'object') return { term: value.term ?? '', detail: value.detail ?? null }
+  return { term: '', detail: null }
+}
+
 /* Hover is a fine-pointer affordance. Without this guard :hover latches after a tap
    on a touch device and the answer has no way to be dismissed. */
 function hasFinePointer(): boolean {
@@ -22,14 +35,14 @@ function hasFinePointer(): boolean {
   return window.matchMedia('(hover: hover) and (pointer: fine)').matches
 }
 
-function bind(el: ExplainElement, binding: DirectiveBinding<string>): void {
-  const term = binding.value
+function bind(el: ExplainElement, binding: DirectiveBinding<ExplainBinding>): void {
+  const { term, detail } = readBinding(binding.value)
   if (!term) return
 
   const mascot = useMascotStore()
   const controller = createDwellController({
     onListen: () => mascot.listen(),
-    onSpeak: () => mascot.explain(term),
+    onSpeak: () => mascot.explain(term, detail),
     onRelease: () => mascot.clear(),
   })
 
@@ -41,7 +54,7 @@ function bind(el: ExplainElement, binding: DirectiveBinding<string>): void {
   // A Tab already spent getting here is intent enough; making a keyboard user hold
   // still for a second would be a tax rather than a filter.
   const focus = (): void => {
-    mascot.explain(term)
+    mascot.explain(term, detail)
     controller.focus()
   }
   const blur = (): void => {
@@ -73,10 +86,14 @@ function unbind(el: ExplainElement): void {
   delete el.__explainTeardown
 }
 
-export const vExplain: Directive<ExplainElement, string> = {
+export const vExplain: Directive<ExplainElement, ExplainBinding> = {
   mounted: bind,
   updated(el, binding) {
-    if (binding.value === binding.oldValue) return
+    const next = readBinding(binding.value)
+    const prev = readBinding(binding.oldValue)
+    // An object binding is a new reference on every render, so compare the two fields
+    // that matter rather than the reference — otherwise every re-render rebinds.
+    if (next.term === prev.term && next.detail === prev.detail) return
     unbind(el)
     bind(el, binding)
   },

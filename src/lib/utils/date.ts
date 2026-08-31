@@ -97,17 +97,50 @@ export function formatDateTime(value: unknown, options: FormatDateTimeOptions = 
     return fallback
   }
 
-  // dateStyle/timeStyle cannot be combined with timeZoneName — Intl throws — so the zone is
-  // resolved separately and appended. That also keeps the date and time rendering byte-identical
-  // to what every page showed before, instead of switching the whole app to explicit components.
+  // The zone code used to be appended to every timestamp in the product. It is not any
+  // more: a code repeated on hundreds of rows is noise, and the one moment anybody needs
+  // it is the moment they doubt a particular time. That is a question, so it is answered
+  // on demand — rest on a timestamp and the mascot names the zone (see describeTimeZone).
   const zone = options.timeZone?.trim() || defaultDisplayTimeZone
-  const formatted = new Intl.DateTimeFormat(options.locale, {
+  return new Intl.DateTimeFormat(options.locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: zone,
   }).format(parsedDate)
-  const zoneCode = timeZoneCode(parsedDate, zone)
-  return zoneCode ? `${formatted} ${zoneCode}` : formatted
+}
+
+/**
+ * The sentence the mascot says when someone rests on a timestamp: which zone the time is
+ * being shown in, and how far that is from UTC. Two people in different zones read
+ * different text for the same instant, which is exactly why it has to be askable.
+ */
+export function describeTimeZone(value?: unknown, timeZone?: string): string {
+  // No tenant preference set means the browser decides, which is a real answer worth
+  // naming rather than a blank — that fallback is precisely when people are confused.
+  const zone = timeZone?.trim()
+    || defaultDisplayTimeZone
+    || Intl.DateTimeFormat().resolvedOptions().timeZone
+    || 'UTC'
+  const at = value instanceof Date
+    ? value
+    : new Date(typeof value === 'string' || typeof value === 'number' ? value : Date.now())
+  const instant = Number.isNaN(at.getTime()) ? new Date() : at
+  const code = timeZoneCode(instant, zone)
+  const offset = utcOffsetLabel(instant, zone)
+  if (!code) return zone
+  return offset ? `${code} (${zone}, ${offset})` : `${code} (${zone})`
+}
+
+/** "UTC+05:30" for the given instant, so the answer survives a DST boundary. */
+function utcOffsetLabel(date: Date, timeZone: string): string {
+  try {
+    const part = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+      .formatToParts(date)
+      .find((entry) => entry.type === 'timeZoneName')
+    return part?.value ?? ''
+  } catch {
+    return ''
+  }
 }
 
 export function formatSavedResultDateTime(value: unknown): string {

@@ -14,7 +14,19 @@ export const useMascotStore = defineStore('mascot', () => {
   const listening = ref(false)
   const releasing = ref(false)
 
-  const entry = computed<GlossaryEntry | null>(() => lookupGlossary(term.value))
+  /**
+   * Filled in by whatever was hovered, for entries whose answer depends on the actual
+   * value — a timestamp has to name its own zone, not timezones in general. Bodies opt
+   * in with a {detail} token; entries without one ignore it.
+   */
+  const detail = ref<string | null>(null)
+
+  const entry = computed<GlossaryEntry | null>(() => {
+    const found = lookupGlossary(term.value)
+    if (!found) return null
+    if (!found.body.includes('{detail}')) return found
+    return { ...found, body: found.body.replace('{detail}', detail.value ?? 'your local time') }
+  })
   /** A term with no phrase written for it: say so rather than open an empty bubble. */
   const isStumped = computed(() => mode.value === 'explain' && entry.value === null)
   const isSpeaking = computed(() => mode.value === 'explain')
@@ -35,10 +47,11 @@ export const useMascotStore = defineStore('mascot', () => {
     listening.value = true
   }
 
-  function explain(nextTerm: string): void {
+  function explain(nextTerm: string, nextDetail?: string | null): void {
     listening.value = false
     releasing.value = false
     term.value = nextTerm
+    detail.value = nextDetail ?? null
     mode.value = 'explain'
   }
 
@@ -52,12 +65,14 @@ export const useMascotStore = defineStore('mascot', () => {
     listening.value = false
     releasing.value = false
     term.value = null
+    detail.value = null
     mode.value = 'idle'
   }
 
   return {
     mode,
     term,
+    detail,
     listening,
     releasing,
     entry,

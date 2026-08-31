@@ -232,8 +232,8 @@ describe('ReconciliationAutomationDashboardPage', () => {
     const nextRunField = wrapper.get('[data-testid="automation-next-run"]').element.closest('.automation-dashboard-detail-item')
     expect(previousRunField?.classList.contains('automation-dashboard-detail-item--date')).toBe(true)
     expect(nextRunField?.classList.contains('automation-dashboard-detail-item--date')).toBe(true)
-    expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 1, 2026, 11:00 PM PDT')
-    expect(wrapper.get('[data-testid="automation-next-run"]').text()).toBe('May 2, 2026, 9:49 AM PDT')
+    expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 1, 2026, 11:00 PM')
+    expect(wrapper.get('[data-testid="automation-next-run"]').text()).toBe('May 2, 2026, 9:49 AM')
 
     // "Based On" must carry the shared micro-label role, like the dt elements in the detail grid.
     // A v2.4.0 regression left a dangling `.automation-dashboard-label,` selector before a comment,
@@ -261,10 +261,10 @@ describe('ReconciliationAutomationDashboardPage', () => {
       'width: 16%;',
     ])
     expect(wrapper.findAll('.automation-dashboard-date-text').map((node) => node.text())).toEqual([
-      'May 1, 2026, 11:00 PM PDT',
-      'May 1, 2026, 11:03 PM PDT',
-      'Apr 30, 2026, 11:00 PM PDT',
-      'Apr 30, 2026, 11:03 PM PDT',
+      'May 1, 2026, 11:00 PM',
+      'May 1, 2026, 11:03 PM',
+      'Apr 30, 2026, 11:00 PM',
+      'Apr 30, 2026, 11:03 PM',
     ])
     expect(wrapper.find('[data-testid="automation-execution-result-link"]').exists()).toBe(false)
     expect(rows.at(0)?.text()).toContain('Succeeded')
@@ -313,7 +313,7 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-checked')).toBe('false')
     expect(wrapper.get('[data-testid="automation-next-run"]').text()).toBe('-')
     // Previous Run is history and stays true whether or not the schedule is running.
-    expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 1, 2026, 11:00 PM PDT')
+    expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 1, 2026, 11:00 PM')
   })
 
   describe('active toggle', () => {
@@ -466,7 +466,7 @@ describe('ReconciliationAutomationDashboardPage', () => {
     await flushPromises()
 
     // The same UTC time 2026-05-02T06:00:00Z should render in NY time (EDT, UTC-4) as 2:00 AM, not LA time (PDT, UTC-7) as 11:00 PM
-    expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 2, 2026, 2:00 AM EDT')
+    expect(wrapper.get('[data-testid="automation-previous-run"]').text()).toBe('May 2, 2026, 2:00 AM')
   })
 
   it('renders the schedule in the viewer zone so it agrees with Next Run', async () => {
@@ -489,12 +489,13 @@ describe('ReconciliationAutomationDashboardPage', () => {
     const wrapper = mount(ReconciliationAutomationDashboardPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Daily at 1:00 PM CIT')
+    expect(wrapper.text()).toContain('Daily at 1:00 PM')
     expect(wrapper.text()).not.toContain('Daily at 6:00 AM')
-    // The card is now annotated AS WELL as converted (2026-08-31). Conversion alone left the
-    // reader trusting that every time on the page shared one zone; the code says which. It is the
-    // VIEWER's zone that is named, because that is the zone the time was converted into -- naming
-    // the automation's 'UTC' here would label 1:00 PM with the zone it is not in.
+    // The card is converted but no longer annotated. The code was appended everywhere for a
+    // day and read as noise on a page where every time already shares one zone; it is now
+    // asked for instead, by resting on the Schedule label or on any timestamp. What must
+    // still hold is the conversion: the automation's own 'UTC' never reaches the screen,
+    // because 1:00 PM is not in UTC.
     expect(wrapper.text()).not.toContain('UTC')
   })
 

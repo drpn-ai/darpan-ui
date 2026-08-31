@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  describeTimeZone,
   displayCalendarDayOf,
   timeZoneCode,
   displayDayStart,
@@ -113,9 +114,24 @@ describe('timeZoneCode', () => {
 })
 
 describe('formatDateTime carries the zone', () => {
-  it('appends the code so a timestamp is unambiguous on its own', () => {
+  it('no longer appends the code — a timestamp is just the time', () => {
+    // The code used to be printed after every timestamp. Repeated down hundreds of rows
+    // it is noise, and it is only wanted at the moment someone doubts one particular
+    // time. That is a question now, answered by describeTimeZone below.
     expect(formatDateTime('2026-05-02T06:00:00.000Z', { locale: 'en-US', timeZone: 'Asia/Kolkata' }))
-      .toBe('May 2, 2026, 11:30 AM IST')
+      .toBe('May 2, 2026, 11:30 AM')
+  })
+
+  it('names the zone on demand, with its offset, for the instant given', () => {
+    expect(describeTimeZone('2026-05-02T06:00:00.000Z', 'Asia/Kolkata'))
+      .toBe('IST (Asia/Kolkata, GMT+05:30)')
+  })
+
+  it('resolves the zone against the instant, so DST is not guessed', () => {
+    // Los Angeles is PDT in August and PST in January; the same call must answer
+    // differently rather than caching one of them.
+    expect(describeTimeZone('2026-08-02T06:00:00.000Z', 'America/Los_Angeles')).toContain('PDT')
+    expect(describeTimeZone('2026-01-02T06:00:00.000Z', 'America/Los_Angeles')).toContain('PST')
   })
 
   it('leaves the fallback alone when there is no date to label', () => {
