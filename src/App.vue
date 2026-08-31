@@ -35,7 +35,11 @@
     <!-- The "Ask Darpan" pill is now a face. It is still the launcher — and it is
          also where every v-explain answer is spoken, so the corner holds one object
          rather than a button plus a help affordance. -->
-    <MascotDock @open="openCommandPalette" />
+    <MascotDock
+      :route-name="typeof route.name === 'string' ? route.name : null"
+      :route-key="route.fullPath"
+      @open="openCommandPalette"
+    />
   </div>
 
   <CommandPalette

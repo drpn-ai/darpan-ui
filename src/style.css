@@ -1750,10 +1750,9 @@ label > span {
   z-index: 45;
   display: flex;
   flex-direction: column;
-  /* Centred, not right-aligned: the mascot is one button under a pair of them, so
-     hanging it off the right edge reads as an L rather than a cluster. The old "Ask
-     Darpan" pill was as wide as the pair, which is why the stack looked balanced. */
-  align-items: center;
+  /* One child now — the mascot — so the stack hugs the right edge and its speech grows
+     leftward from there. */
+  align-items: flex-end;
   gap: var(--floating-actions-gap);
 }
 
@@ -1860,12 +1859,14 @@ label > span {
    Replaces the "Ask Darpan" pill. The stack is bottom-aligned so whatever the
    mascot says grows upward out of the face, rather than floating the face to the
    middle of its own speech. */
-/* The dock is exactly as wide as its button. The bubble is taken out of flow so that
-   speaking never shoves the quick actions sideways — and so the button can sit centred
-   under them rather than hanging off one end. */
+/* The bubble is a flex sibling of the face, centred against it. It used to be absolutely
+   positioned so that speaking could not shove the home and account buttons sideways —
+   with those gone there is nothing left to shove, and laying it out properly is the only
+   way the two are actually centred on each other at any bubble height. */
 .mascot-dock {
-  position: relative;
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* No pill. The other two are icons and need a container to be legible as buttons; the
@@ -1919,10 +1920,7 @@ label > span {
    to look. Clamped the way the notice pill is clamped: a phrase that will not fit
    in three lines is the wrong phrase, not a bubble that needs to be bigger. */
 .mascot-say {
-  position: absolute;
-  right: 100%;
-  bottom: 0;
-  margin: 0 var(--space-2) 0 0;
+  margin: 0;
   width: max-content;
   max-width: min(28rem, calc(100vw - var(--space-7)));
   border: 1px solid var(--border);

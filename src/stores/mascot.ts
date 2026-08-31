@@ -6,7 +6,12 @@ import { lookupGlossary, type GlossaryEntry } from '../lib/mascotGlossary'
  * What the mascot is currently doing. There are deliberately only three modes: a
  * fourth is a fourth thing to draw, test and keep consistent across every surface.
  */
-export type MascotMode = 'idle' | 'hint' | 'explain'
+/**
+ * `hint` is the mascot's own label when you look at it. `explain` is an answer you asked
+ * for by resting on something. `tip` is the only one it offers unprompted, after a page
+ * has sat untouched — kept separate because an offer must never outrank an answer.
+ */
+export type MascotMode = 'idle' | 'hint' | 'explain' | 'tip'
 
 export const useMascotStore = defineStore('mascot', () => {
   const mode = ref<MascotMode>('idle')
@@ -29,11 +34,28 @@ export const useMascotStore = defineStore('mascot', () => {
   })
   /** A term with no phrase written for it: say so rather than open an empty bubble. */
   const isStumped = computed(() => mode.value === 'explain' && entry.value === null)
-  const isSpeaking = computed(() => mode.value === 'explain')
+  const isSpeaking = computed(() => mode.value === 'explain' || mode.value === 'tip')
+
+  /** The unprompted offer. Never interrupts an answer already on screen. */
+  const tipText = ref<string | null>(null)
+
+  function offerTip(text: string): boolean {
+    if (mode.value === 'explain') return false
+    tipText.value = text
+    mode.value = 'tip'
+    return true
+  }
+
+  function clearTip(): void {
+    if (mode.value !== 'tip') return
+    tipText.value = null
+    mode.value = 'idle'
+  }
 
   /** Hovering the face itself only ever shows its own label, never an explanation. */
   function showHint(): void {
     if (mode.value === 'explain') return
+    tipText.value = null
     mode.value = 'hint'
   }
 
@@ -50,6 +72,8 @@ export const useMascotStore = defineStore('mascot', () => {
   function explain(nextTerm: string, nextDetail?: string | null): void {
     listening.value = false
     releasing.value = false
+    // An answer always wins over an offer.
+    tipText.value = null
     term.value = nextTerm
     detail.value = nextDetail ?? null
     mode.value = 'explain'
@@ -66,6 +90,7 @@ export const useMascotStore = defineStore('mascot', () => {
     releasing.value = false
     term.value = null
     detail.value = null
+    tipText.value = null
     mode.value = 'idle'
   }
 
@@ -73,6 +98,9 @@ export const useMascotStore = defineStore('mascot', () => {
     mode,
     term,
     detail,
+    tipText,
+    offerTip,
+    clearTip,
     listening,
     releasing,
     entry,

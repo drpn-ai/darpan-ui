@@ -19,6 +19,9 @@
       <template v-if="mascot.mode === 'hint'">
         Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.
       </template>
+      <template v-else-if="mascot.mode === 'tip'">
+        {{ mascot.tipText }}
+      </template>
       <template v-else>
         <span class="mascot-say-lead">{{ leadText }}</span> {{ bodyText }}
       </template>
@@ -40,11 +43,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import DarpanMascot from './DarpanMascot.vue'
 import { useMascotStore } from '../../stores/mascot'
 import { createDwellController, type DwellController } from '../../composables/useMascotDwell'
+import { createIdleHintController } from '../../composables/useIdleHints'
 import { resolveExplainTarget } from '../../lib/mascotTargets'
+import { hintsForRoute } from '../../lib/mascotHints'
+
+/**
+ * The route arrives as a prop rather than through useRoute(): the dock is shell furniture
+ * that its own tests mount on their own, and reaching for the router from in here made
+ * every one of them depend on a router they have no reason to build.
+ */
+const props = withDefaults(defineProps<{ routeName?: string | null, routeKey?: string | null }>(), {
+  routeName: null,
+  routeKey: null,
+})
 
 const emit = defineEmits<{ (event: 'open'): void }>()
 
@@ -165,11 +180,38 @@ function onPointerOut(event: PointerEvent): void {
   controller = null
 }
 
+/* ── Unprompted hints ──────────────────────────────────────────────────────────
+   If a page sits untouched, offer something it can do. Activity means acting —
+   clicking, typing, editing — not moving the pointer while reading; counting movement
+   would mean the hint only ever reached someone who had left the screen. */
+const idle = createIdleHintController({
+  getHints: () => hintsForRoute(props.routeName),
+  // Never talk over an answer somebody asked for.
+  canOffer: () => mascot.mode === 'idle',
+  onOffer: (hint) => { mascot.offerTip(hint) },
+  onExpire: () => { mascot.clearTip() },
+})
+
+function noteActivity(): void {
+  // Acting is also how you dismiss the offer — it has been answered by doing.
+  mascot.clearTip()
+  idle.noteActivity()
+}
+
+watch(() => props.routeKey, () => {
+  mascot.clearTip()
+  idle.enter()
+})
+
 onMounted(() => {
   window.addEventListener('pointermove', trackGaze, { passive: true })
   window.addEventListener('keydown', onEscape)
   document.addEventListener('pointerover', onPointerOver, { passive: true })
   document.addEventListener('pointerout', onPointerOut, { passive: true })
+  document.addEventListener('pointerdown', noteActivity, { passive: true })
+  document.addEventListener('keydown', noteActivity, { passive: true })
+  document.addEventListener('input', noteActivity, { passive: true })
+  idle.enter()
 })
 
 onBeforeUnmount(() => {
@@ -177,6 +219,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onEscape)
   document.removeEventListener('pointerover', onPointerOver)
   document.removeEventListener('pointerout', onPointerOut)
+  document.removeEventListener('pointerdown', noteActivity)
+  document.removeEventListener('keydown', noteActivity)
+  document.removeEventListener('input', noteActivity)
+  idle.stop()
   stopWatching()
   mascot.clear()
 })
