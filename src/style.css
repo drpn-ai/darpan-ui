@@ -114,6 +114,13 @@
      rather than a note in a doc — grep the token, and every use is accounted for. */
   --mascot-rust: #b56437;
 
+  /* The character's body colour. It is a token rather than plain --text because the two
+     grounds do not want the same weight of mark, and --text has to stay where it is: it is
+     the product's reading colour, so bending it for the mascot would move every word on the
+     page. On this ground the mark is light-on-dark and already sits back, so it takes --text
+     unchanged; the light block is where this earns its keep. */
+  --mascot-ink: var(--text);
+
   /* Static system: boards, dashboards, editors */
   --static-frame-width: 920px;
   --static-shell-padding-y: var(--space-3);
@@ -198,9 +205,21 @@
   --shadow: 0 0 0 rgba(0, 0, 0, 0);
   --selection-bg: color-mix(in oklab, var(--accent) 18%, white);
   --selection-text: var(--text);
-  /* Darkened for the light ground: the dark-theme rust sits at too low a contrast
-     against white to read as a marking rather than a smudge. */
-  --mascot-rust: #a85c30;
+  /* The mascot is the one mark in the product that does not simply take --text. Drawn in the
+     light theme's near-black it became a solid 18:1 blob roughly 85px across: the tear stripes
+     and inner ears had nothing to separate from, so the markings that carry the species were
+     invisible and what was left was a dark shape in the corner. A medium grey head at 11.7:1
+     is still unambiguously present and gives those markings a ground to sit on.
+
+     #383838 is the light theme's --text-soft to the byte. It is written as a literal anyway,
+     because the mascot should not move the next time the reading colours are re-tuned — the
+     match is a coincidence worth noting, not a dependency worth taking.
+
+     The rust darkens with it. It is the one hue in the product and it only ever touches the
+     head, never the page, so its job is to separate from the body colour — and once the body
+     lifted out of near-black, the old #a85c30 sat too close above it. */
+  --mascot-ink: #383838;
+  --mascot-rust: #8a4926;
 }
 
 *,

@@ -83,11 +83,15 @@ withDefaults(
 </script>
 
 <style scoped>
+/* --mascot-ink, not --text: on the light ground the character is drawn a step softer than
+   the reading colour, or it lands as a solid dark mass and its own markings stop reading.
+   Still a single colour taken through currentColor, so one copy of the mark works on every
+   surface and in both themes — that property is what the fallback preserves. */
 .mascot {
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--text);
+  color: var(--mascot-ink, var(--text));
 }
 
 .mascot-head,
