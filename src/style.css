@@ -155,6 +155,10 @@
   --floating-actions-gap: calc(var(--space-4) / 2);
   --floating-fab-size: 2.65rem;
   --floating-command-bubble-height: 3rem;
+  /* The mascot is the only thing left in the corner, so it is no longer sized to match
+     a pair of icon discs — it can be itself. --space-7 off the ramp; the viewBox margin
+     that keeps the ears whole means the face renders at ~84% of this. */
+  --floating-mascot-size: var(--space-7);
   /* Transient notices (the top-centre pill) are the product's ONE feedback surface, and they must
      never be drawn over page content. The static shell reserves --notice-lane-height at its top
      ONLY while a notice is actually up (.app-shell--notice-open) — a standing reserve was ~119px of
@@ -1869,12 +1873,8 @@ label > span {
    than affordance. The button element stays at the full FAB size for the hit area —
    only the chrome is removed, not the target. */
 .mascot-fab {
-  /* Larger than the icon buttons on purpose. The mascot's viewBox carries a margin so
-     the ears are not clipped, which would otherwise render the face ~84% the size of
-     the discs beside it; the extra box restores the visual match. With no pill drawn,
-     a bigger box costs nothing on screen and gives a more generous hit area. */
-  width: calc(var(--floating-fab-size) * 1.2);
-  height: calc(var(--floating-fab-size) * 1.2);
+  width: var(--floating-mascot-size);
+  height: var(--floating-mascot-size);
   border: 0;
   border-radius: var(--radius-pill);
   background: none;
@@ -1887,9 +1887,16 @@ label > span {
 }
 
 /* The eyes already follow the pointer, which is most of the hover feedback. This is
-   the smallest nudge that also says "clickable" without a border to change. */
+   the smallest nudge that also says "clickable" without a border to change.
+   The background and border are restated here, not redundantly: the global
+   `button:hover` rule paints a surface at specificity (0,1,1), which outranks
+   `.mascot-fab` at (0,1,0). Setting them only on the base rule left a disc appearing
+   behind the character the moment the pointer arrived — the one moment anyone is
+   looking at it. */
 .mascot-fab:hover {
   transform: scale(1.06);
+  background: none;
+  border-color: transparent;
 }
 
 /* With no border or fill, focus needs a ring of its own or it has nothing to show. */

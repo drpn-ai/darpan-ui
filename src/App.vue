@@ -7,7 +7,7 @@
     :class="[
       'app-shell',
       `app-shell--${surfaceMode}`,
-      { 'app-shell--popup-open': isCommandPaletteOpen || isUserMenuOpen },
+      { 'app-shell--popup-open': isCommandPaletteOpen },
       { 'app-shell--notice-open': workflowHint !== null && surfaceMode === 'static' },
     ]"
   >
@@ -32,85 +32,6 @@
   </div>
 
   <div v-if="!isShelllessRoute" class="floating-actions">
-    <div class="floating-quick-actions">
-      <button type="button" class="home-fab" aria-label="Go to Dashboard" @click="goToHub()">
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-          <path d="M3.8 10.4 12 4l8.2 6.4" />
-          <path d="M6.7 9.5V20h10.6V9.5" />
-          <path d="M10.3 20v-5.8h3.4V20" />
-        </svg>
-      </button>
-
-      <div ref="userMenuWrap" class="user-menu-wrap">
-        <button
-          type="button"
-          class="user-fab"
-          :aria-expanded="isUserMenuOpen"
-          aria-haspopup="dialog"
-          aria-label="Open user details and settings"
-          @click="toggleUserMenu"
-        >
-          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <circle cx="12" cy="8" r="3.5" />
-            <path d="M4 19.5c1.9-3 5-4.5 8-4.5s6.1 1.5 8 4.5" />
-          </svg>
-        </button>
-
-        <section v-if="isUserMenuOpen" class="user-menu-card" role="dialog" aria-label="User details and settings">
-          <p class="user-menu-name">{{ userDisplayName }}</p>
-          <p v-if="activeTenantName" class="user-menu-tenant" :aria-label="`Current tenant: ${activeTenantName}`">
-            {{ activeTenantName }}
-          </p>
-          <p v-if="userStatusText" class="mono-copy">{{ userStatusText }}</p>
-
-          <div class="user-menu-actions">
-            <button
-              type="button"
-              class="app-icon-action app-icon-action--large"
-              :disabled="isLoggingOut"
-              aria-label="Sign out"
-              @click="handleLogout"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M12 2v10" />
-                <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="app-icon-action app-icon-action--large"
-              :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`"
-              @click="toggleTheme"
-            >
-              <!-- The icon names the theme this button switches TO, matching the label it already
-                   carried. It used to draw the theme currently in effect, so the picture and the
-                   accessible name told a sighted user and a screen-reader user opposite things.
-                   aria-pressed is gone with it: a button whose name changes with its state is not a
-                   toggle whose pressed-ness means anything. -->
-              <svg v-if="theme === 'dark'" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                <circle cx="12" cy="12" r="3.5" />
-                <path d="M12 2.5v3.2M12 18.3v3.2M21.5 12h-3.2M5.7 12H2.5M18.7 5.3l-2.3 2.3M7.6 16.4l-2.3 2.3M18.7 18.7l-2.3-2.3M7.6 7.6 5.3 5.3" />
-              </svg>
-              <svg v-else viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="app-icon-action app-icon-action--large"
-              aria-label="Open user settings"
-              @click="goToUserSettings"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 0 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3 14H2.7a2 2 0 0 1 0-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6v-.3a2 2 0 0 1 4 0V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1A1.7 1.7 0 0 0 21 10h.3a2 2 0 0 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" />
-              </svg>
-            </button>
-          </div>
-        </section>
-      </div>
-    </div>
-
     <!-- The "Ask Darpan" pill is now a face. It is still the launcher — and it is
          also where every v-explain answer is spoken, so the corner holds one object
          rather than a button plus a help affordance. -->
@@ -176,9 +97,7 @@ const {
   recentCommandIds,
   dataCommandActions,
 } = commandPalette
-const isUserMenuOpen = ref(false)
 const isLoggingOut = ref(false)
-const userMenuWrap = ref<HTMLElement | null>(null)
 const workflowHint = ref<{ message: string, tone: WorkflowHintTone } | null>(null)
 const workflowEscapeOriginPath = ref<string | null>(null)
 
@@ -219,7 +138,51 @@ const userStatusText = computed<string | null>(() => {
 
 const canEditTenantSettings = computed(() => permissions.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissions.canRunActiveTenantReconciliation)
+/**
+ * The three things the floating user menu used to be the only home for. They live here
+ * now that the mascot is the only object in the corner — reachable by the same keystroke
+ * as everything else rather than behind a button that existed solely to hold them.
+ *
+ * Built in the computed rather than in staticCommandActions because their labels depend
+ * on live state: the theme command has to name the theme it switches TO, and the identity
+ * row has to name who and where you actually are.
+ */
+const accountCommandActions = computed<CommandAction[]>(() => [
+  {
+    // The menu showed who you are and which tenant you are in, at a glance. That is
+    // load-bearing in a multi-tenant app — switching tenant re-points every other tab —
+    // so it is stated here rather than dropped with the button that used to carry it.
+    id: 'action-identity',
+    label: activeTenantName.value
+      ? `${userDisplayName.value} · ${activeTenantName.value}`
+      : userDisplayName.value,
+    description: userStatusText.value ?? 'Signed in. Open user settings to switch tenant.',
+    group: 'Navigate',
+    to: '/settings/user',
+    aliases: ['who am i', 'account', 'tenant', 'company', 'signed in', 'switch tenant'],
+  },
+  {
+    id: 'action-toggle-theme',
+    label: `Switch to ${theme.value === 'dark' ? 'light' : 'dark'} mode`,
+    description: 'Change the appearance of the app for this browser.',
+    group: 'Navigate',
+    run: () => { toggleTheme() },
+    aliases: ['theme', 'dark mode', 'light mode', 'appearance', 'contrast'],
+  },
+  {
+    id: 'action-sign-out',
+    label: 'Sign out',
+    description: userDisplayName.value
+      ? `End the session for ${userDisplayName.value}.`
+      : 'End this session.',
+    group: 'Navigate',
+    run: () => handleLogout(),
+    aliases: ['log out', 'logout', 'sign off', 'exit', 'leave'],
+  },
+])
+
 const commandActions = computed<CommandAction[]>(() => [
+  ...accountCommandActions.value,
   ...staticCommandActions.filter((action) => {
     if (action.id === 'navigate-run-reconciliation') return canRunActiveTenantReconciliation.value
     if (
@@ -361,28 +324,12 @@ const staticCommandActions: CommandAction[] = [
 let workflowEscapeHintTimer: ReturnType<typeof globalThis.setTimeout> | null = null
 
 function openCommandPalette(): void {
-  isUserMenuOpen.value = false
   document.dispatchEvent(new Event(DISMISS_INLINE_MENUS_EVENT))
   commandPalette.open()
 }
 
 function closeCommandPalette(): void {
   commandPalette.close()
-}
-
-function toggleUserMenu(): void {
-  isUserMenuOpen.value = !isUserMenuOpen.value
-}
-
-function closeUserMenu(): void {
-  isUserMenuOpen.value = false
-}
-
-function handleWindowMouseDown(event: MouseEvent): void {
-  if (!isUserMenuOpen.value) return
-  if (!(event.target instanceof Node)) return
-  if (userMenuWrap.value?.contains(event.target)) return
-  closeUserMenu()
 }
 
 function clearActiveElementFocus(): void {
@@ -394,23 +341,10 @@ function clearActiveElementFocus(): void {
   }
 }
 
-async function goToHub(options: { clearFocus?: boolean } = {}): Promise<void> {
-  isCommandPaletteOpen.value = false
-  isUserMenuOpen.value = false
-  if (options.clearFocus) clearActiveElementFocus()
-  if (route.path === '/') return
-  await router.push('/')
-  if (options.clearFocus) {
-    await nextTick()
-    clearActiveElementFocus()
-  }
-}
-
 async function goToWorkflowOrigin(options: { clearFocus?: boolean } = {}): Promise<void> {
   const targetPath = workflowEscapeOriginPath.value || '/'
 
   isCommandPaletteOpen.value = false
-  isUserMenuOpen.value = false
   if (options.clearFocus) clearActiveElementFocus()
   if (route.fullPath === targetPath) return
   await router.push(targetPath)
@@ -418,13 +352,6 @@ async function goToWorkflowOrigin(options: { clearFocus?: boolean } = {}): Promi
     await nextTick()
     clearActiveElementFocus()
   }
-}
-
-async function goToUserSettings(): Promise<void> {
-  isCommandPaletteOpen.value = false
-  isUserMenuOpen.value = false
-  if (route.path === '/settings/user') return
-  await router.push('/settings/user')
 }
 
 async function handleLogout(): Promise<void> {
@@ -435,8 +362,6 @@ async function handleLogout(): Promise<void> {
   try {
     const loggedOut = await authStore.logoutSession()
     if (!loggedOut) return
-
-    isUserMenuOpen.value = false
     await router.replace({ name: 'login' })
   } finally {
     isLoggingOut.value = false
@@ -446,7 +371,12 @@ async function handleLogout(): Promise<void> {
 async function executeCommand(action: CommandAction): Promise<void> {
   commandPalette.close()
   commandPalette.recordExecution(action.id)
-  if (action.to === route.fullPath) return
+  // In-place actions (sign out, theme) run and stop; they have nowhere to navigate.
+  if (action.run) {
+    await action.run()
+    return
+  }
+  if (!action.to || action.to === route.fullPath) return
   const staticPageLabel = resolveStaticPageLabel(route)
   const targetRoute = router.resolve(action.to)
   if (staticPageLabel && targetRoute.meta.surfaceMode === 'workflow') {
@@ -506,12 +436,6 @@ function handleKeyboard(event: KeyboardEvent): void {
     return
   }
 
-  if (key === 'escape' && isUserMenuOpen.value) {
-    event.preventDefault()
-    isUserMenuOpen.value = false
-    return
-  }
-
   const plainEscapePressed = shouldAbortWorkflowOnEscape(event, { workflowActive: true })
   if (plainEscapePressed) {
     const cancelRequest = new Event(WORKFLOW_CANCEL_REQUEST_EVENT, { cancelable: true })
@@ -532,7 +456,6 @@ async function redirectToAuthBoundary(): Promise<void> {
   if (isShelllessRoute.value) return
 
   isCommandPaletteOpen.value = false
-  isUserMenuOpen.value = false
   handleAuthExpiry(route.fullPath, { push: (to) => router.replace(to as Parameters<typeof router.replace>[0]), build: buildAuthRedirect })
 }
 
@@ -640,7 +563,6 @@ watch(
   () => route.fullPath,
   () => {
     isCommandPaletteOpen.value = false
-    isUserMenuOpen.value = false
     if (!isShelllessRoute.value) {
       void authStore.ensureAuthenticated()
     }
@@ -682,7 +604,6 @@ function handleAuthStorageEvent(event: StorageEvent) {
 onMounted(() => {
   commandPalette.loadRecentFromStorage()
   window.addEventListener('keydown', handleKeyboard)
-  window.addEventListener('mousedown', handleWindowMouseDown)
   window.addEventListener('storage', handleAuthStorageEvent)
   setAuthRequiredHandler((detail) => handleAuthRequired(detail))
   document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, handleWorkflowHintRequest)
@@ -695,7 +616,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   hideWorkflowEscapeHint()
   window.removeEventListener('keydown', handleKeyboard)
-  window.removeEventListener('mousedown', handleWindowMouseDown)
   window.removeEventListener('storage', handleAuthStorageEvent)
   setAuthRequiredHandler(null)
   document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, handleWorkflowHintRequest)
