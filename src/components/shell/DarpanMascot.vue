@@ -54,6 +54,29 @@
     <path class="mascot-stripe" d="M21.4 40.2c-.6 3.8-2 7-3.8 9.4l-2.4-1.4c1.9-2.6 3.2-6 3.7-9.6z" />
     <path class="mascot-stripe" d="M42.6 40.2c.6 3.8 2 7 3.8 9.4l2.4-1.4c-1.9-2.6-3.2-6-3.7-9.6z" />
 
+    <!--
+      Lashes. Drawn in the ground colour, not the ink, and that inversion is forced by the
+      construction rather than chosen: the head is a solid currentColor fill and each eye is
+      punched out of it, so a dark lash would be dark-on-dark the instant it left the patch.
+      Light wedges leaving a light patch are the only version whose silhouette survives.
+
+      Each is a triangle sampled off the eye ellipse itself — base at 0.8 of its radius so it
+      sits inside the patch and cannot leave a seam where the two fills meet, tip at 1.85, out
+      along 105, 137 and 167 degrees. That is upper-outer only; a fan that reached over the
+      inner corner read as a startled brow rather than a lash.
+
+      Flat fills again, no stroke, for the reason the mark has none anywhere: a stroked lash
+      needs its weight re-tuned at every size and turns to mud at dock scale.
+    -->
+    <g v-if="detail >= 2" class="mascot-lashes">
+      <path class="mascot-lash" d="M23.22 33.06 L21.92 29.39 L22.43 33.30 Z" />
+      <path class="mascot-lash" d="M21.88 33.67 L19.04 31.33 L21.31 34.34 Z" />
+      <path class="mascot-lash" d="M21.05 34.89 L17.55 34.46 L20.87 35.79 Z" />
+      <path class="mascot-lash" d="M40.78 33.06 L42.08 29.39 L41.57 33.30 Z" />
+      <path class="mascot-lash" d="M42.12 33.67 L44.96 31.33 L42.69 34.34 Z" />
+      <path class="mascot-lash" d="M42.95 34.89 L46.45 34.46 L43.13 35.79 Z" />
+    </g>
+
     <ellipse class="mascot-eye" cx="23.5" cy="36" rx="3.3" ry="3.7" />
     <ellipse class="mascot-eye" cx="40.5" cy="36" rx="3.3" ry="3.7" />
     <!-- The glints are the whole reason it reads as alive rather than drawn: the dock
@@ -71,7 +94,8 @@ withDefaults(
   defineProps<{
     /**
      * Detail drops on a schedule rather than by shrinking the full mark: 3 keeps
-     * everything, 2 loses the mouth, 1 keeps only ears, head, eyes and stripes.
+     * everything, 2 loses the mouth, 1 keeps only ears, head, eyes and stripes —
+     * so 1 also drops the lashes, whose wedges go sub-pixel there.
      * Under 24px a smudge reads worse than a simpler shape.
      */
     detail?: 1 | 2 | 3
@@ -130,6 +154,7 @@ withDefaults(
    ground by default, but a filled button overrides --mascot-ground so the eyes do not
    disappear into a surface the same colour as they are. */
 .mascot-eye,
+.mascot-lash,
 .mascot-nose,
 .mascot-mouth {
   fill: var(--mascot-ground, var(--bg));
