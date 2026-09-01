@@ -1943,6 +1943,17 @@ label > span {
      Width is still bounded so the bubble never spans the viewport; height follows the
      sentence. Entries are kept short by a spec rather than by cropping them here. */
   overflow-wrap: anywhere;
+  /* Aligned to the face, not to the box the face is drawn in. align-items: center lines the
+     bubble up with the middle of the fab, and the ears sit at the top of the artwork, so the
+     box centre lands above the head and the bubble reads as riding high next to it.
+
+     The head's own bbox centres at y 36.25 of a viewBox running -9..67, whose centre is 29 —
+     so the correction is 7.25 of the viewBox's 76 units, written as that ratio rather than a
+     px value so it keeps up if --floating-mascot-size changes. Roughly 9px at present.
+
+     The bubble moves rather than the mascot: the character's position in the corner is
+     already settled, and nudging it to suit its own speech bubble is the wrong way round. */
+  transform: translateY(calc(var(--floating-mascot-size) * 7.25 / 76));
   /* The release is visible for its full half second so it stays cancellable —
      drift back onto the value, or onto the bubble, and it returns. */
   transition: opacity 500ms linear;
