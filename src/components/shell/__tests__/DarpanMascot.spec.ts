@@ -130,7 +130,13 @@ describe('DarpanMascot blinking', () => {
     await nextTick()
     expect(isBlinking(wrapper)).toBe(true)
 
-    vi.advanceTimersByTime(200)
+    // The hold is pinned to the millisecond rather than checked loosely, because how long the
+    // eyes stay shut is the whole character of the blink — too short and it reads as a glitch.
+    vi.advanceTimersByTime(179)
+    await nextTick()
+    expect(isBlinking(wrapper), 'reopened before the hold was up').toBe(true)
+
+    vi.advanceTimersByTime(1)
     await nextTick()
     expect(isBlinking(wrapper)).toBe(false)
   })

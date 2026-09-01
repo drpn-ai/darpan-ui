@@ -127,8 +127,12 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
  */
 const BLINK_GAP_MIN_MS = 3000
 const BLINK_GAP_SPREAD_MS = 3000
-/** Long enough to see the lid land, short enough not to read as a wince. */
-const BLINK_HOLD_MS = 120
+/**
+ * Long enough to see the lid land, short enough not to read as a wince. 120ms was the first
+ * value and read as a glitch rather than a blink — the eye had barely registered as shut
+ * before it was open again.
+ */
+const BLINK_HOLD_MS = 180
 
 withDefaults(
   defineProps<{
