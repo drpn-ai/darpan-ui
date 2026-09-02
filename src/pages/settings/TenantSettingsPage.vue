@@ -332,14 +332,7 @@
           </label>
 
           <p
-            v-if="currentChatSpaceFormStep.id === 'webhook' && chatSpaceProviderChangedOnEdit"
-            class="tenant-notification-current-webhook"
-            data-testid="chat-provider-changed-note"
-          >
-            Switching to {{ activeChatProviderLabel }} — paste that product's webhook URL.
-          </p>
-          <p
-            v-else-if="currentChatSpaceFormStep.id === 'webhook' && isChatSpaceEditing && activeChatSpace?.webhookConfigured"
+            v-if="currentChatSpaceFormStep.id === 'webhook' && isChatSpaceEditing && activeChatSpace?.webhookConfigured"
             class="tenant-notification-current-webhook"
             data-testid="google-chat-webhook-status"
           >
@@ -619,9 +612,13 @@ const createSteps: CreateStep[] = [
  */
 const chatSpaceFormSteps = computed<ChatSpaceFormStep[]>(() => {
   const steps: ChatSpaceFormStep[] = [{ id: 'name', question: 'Name this chat space.' }]
-  // Omitted entirely rather than shown pre-filled: arriving from the Slack menu already answered
-  // this, and a card that only needs Next is a step that reads as a mistake.
-  if (!chatSpaceProviderPreset.value) {
+  // Omitted entirely rather than shown pre-filled, for two different reasons. Arriving from the
+  // Slack menu already answered this, and a card that only needs Next reads as a mistake. On an
+  // EDIT the question has no valid second answer at all: the provider decides which credential the
+  // space carries and which address shape is valid for it, so changing it is a different
+  // destination wearing the same id. save#TenantChatSpace refuses it, which is the actual guard --
+  // this omission is what stops the form asking a question the service will reject.
+  if (!chatSpaceProviderPreset.value && !isChatSpaceEditing.value) {
     steps.push({ id: 'provider', question: 'Which chat product does it post to?' })
   }
   steps.push(usesSlackChannelPicker.value
@@ -878,14 +875,11 @@ const chatSpaceFormPrimaryLabel = computed(() => {
   return chatSpaceFormSaving.value ? 'Saving' : 'Save'
 })
 const chatSpaceWebhookInput = computed(() => normalizeStringOrEmpty(chatSpaceForm.webhookUrl))
+// An edit may leave the webhook alone, so the stored one counts. The provider can no longer change
+// under it, which is what used to make a stored URL untrustworthy here.
 const chatSpaceFormHasWebhookForSave = computed(() => (
   chatSpaceWebhookInput.value.length > 0
-  // Only counts as already-configured while the provider is unchanged — switching an existing space
-  // from Google Chat to Slack keeps the old URL on the row, and letting that satisfy "has a webhook"
-  // would save a Slack space still pointing at chat.googleapis.com.
-  || (isChatSpaceEditing.value
-      && !!activeChatSpace.value?.webhookConfigured
-      && activeChatSpace.value?.chatProviderEnumId === chatSpaceForm.chatProviderEnumId)
+  || (isChatSpaceEditing.value && !!activeChatSpace.value?.webhookConfigured)
 ))
 const connectedSlackInstall = computed<SlackWorkspaceInstall | null>(() => slackInstalls.value[0] ?? null)
 const usesSlackChannelPicker = computed(() => (
@@ -909,19 +903,12 @@ const slackTokenSubmitDisabled = computed(() => (
   slackTokenSaving.value || !canEditTenantSettings.value
   || normalizeStringOrEmpty(slackTokenInput.value).length === 0
 ))
-const activeChatProviderLabel = computed(() => (
-  chatProviderOptions.find((option) => option.value === chatSpaceForm.chatProviderEnumId)?.label ?? 'this chat product'
+// `||` not `??`: a Slack bot space stores an empty webhook, and that must fall through to the
+// example URL rather than blanking the placeholder.
+const chatSpaceWebhookPlaceholder = computed(() => (
+  activeChatSpace.value?.webhookUrl
+  || chatProviderWebhookPlaceholders[chatSpaceForm.chatProviderEnumId]
 ))
-const chatSpaceProviderChangedOnEdit = computed(() => (
-  isChatSpaceEditing.value
-  && !!activeChatSpace.value
-  && activeChatSpace.value.chatProviderEnumId !== chatSpaceForm.chatProviderEnumId
-))
-const chatSpaceWebhookPlaceholder = computed(() => {
-  const unchangedProvider = activeChatSpace.value?.chatProviderEnumId === chatSpaceForm.chatProviderEnumId
-  if (unchangedProvider && activeChatSpace.value?.webhookUrl) return activeChatSpace.value.webhookUrl
-  return chatProviderWebhookPlaceholders[chatSpaceForm.chatProviderEnumId]
-})
 const chatSpaceFormSubmitDisabled = computed(() => {
   if (chatSpaceFormSaving.value || !canEditTenantSettings.value) return true
   if (currentChatSpaceFormStep.value.id === 'name') {

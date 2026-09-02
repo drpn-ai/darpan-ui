@@ -502,10 +502,10 @@ describe('TenantSettingsPage', () => {
     )
   })
 
-  it('will not save an edited space on its old webhook after the provider is switched', async () => {
-    // The existing row still carries a chat.googleapis.com URL. Treating that as "already
-    // configured" would save a Slack space pointing at Google Chat, which fails server-side with a
-    // message about the wrong host rather than telling the admin what they actually have to do.
+  // A space's provider decides which credential it carries and which address shape means anything.
+  // Changing it is not an edit of that space, it is a different destination — which is what delete
+  // and create already say. Offering the card invited a save that strands the old credential.
+  it('never asks for the provider when editing an existing space', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
     await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
@@ -515,17 +515,62 @@ describe('TenantSettingsPage', () => {
     await wrapper.get('[data-testid="tenant-chat-space-menu-edit"]').trigger('click')
     await flushPromises()
 
-    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
-    await wrapper.get('[data-testid="tenant-chat-provider-select"]').trigger('click')
-    await wrapper.get('[data-testid="app-select-option"][data-option-value="CHAT_PROV_SLACK"]').trigger('click')
-    await flushPromises()
+    // One Next from the name card lands on the destination card, not on a provider card.
     await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
 
-    expect(wrapper.get('[data-testid="chat-provider-changed-note"]').text()).toContain('Switching to Slack')
-    expect(wrapper.find('[data-testid="google-chat-webhook-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tenant-chat-provider-select"]').exists()).toBe(false)
+    expect(wrapper.find('input[name="webhookUrl"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save-tenant-chat-space"]').exists()).toBe(true)
+  })
+
+  it('sends the space its existing provider unchanged when edited', async () => {
+    const NEW_WEBHOOK = 'https://chat.googleapis.com/v1/spaces/OPS_MOVED/messages?key=k2&token=t2'
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-CS1"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-menu-edit"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    await wrapper.get('input[name="webhookUrl"]').setValue(NEW_WEBHOOK)
+    await wrapper.get('[data-testid="save-tenant-chat-space"]').trigger('click')
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenCalledWith(
+      {
+        chatSpaceId: 'CS1',
+        spaceName: 'Ops',
+        chatProviderEnumId: 'CHAT_PROV_GOOGLE',
+        webhookUrl: NEW_WEBHOOK,
+        isActive: true,
+      },
+      expect.anything(),
+    )
+  })
+
+  // Replaced the former "will not save an edited space on its old webhook after the provider is
+  // switched". That test guarded a mid-edit provider switch, which is no longer reachable: the card
+  // is gone from the edit path and save#TenantChatSpace refuses the change. What still matters is
+  // that the stored webhook shows and counts, so an edit that only renames does not demand a re-paste.
+  it('shows the stored webhook on edit and lets a rename save without re-pasting it', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-CS1"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tenant-chat-space-menu-edit"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('input[name="chatSpaceName"]').setValue('Ops renamed')
+    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="google-chat-webhook-status"]').exists()).toBe(true)
     expect(
       (wrapper.get('[data-testid="save-tenant-chat-space"]').element as HTMLButtonElement).disabled,
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('offers a Slack connection and sends the admin to the authorize URL', async () => {
@@ -822,7 +867,7 @@ describe('TenantSettingsPage', () => {
     await flushPromises()
 
     expect((wrapper.get('input[name="chatSpaceName"]').element as HTMLInputElement).value).toBe('Ops')
-    await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
+    // ONE Next, not two: editing skips the provider card, because a space cannot change chat product.
     await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
 
     expect(wrapper.get('[data-testid="google-chat-webhook-status"]').text()).toContain('Current webhook: https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t')
