@@ -918,7 +918,13 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="automation-chat-space-url"]').attributes('type')).toBe('password')
+    // NOT masked, matching TenantSettingsPage's webhook input since 3746a59. The column stopped
+    // being a secret on 2026-08-14 (encrypt="true" removed, entity description: reads "are no longer
+    // masked either"), so dots hid nothing here while making a URL truncated on paste impossible to
+    // catch by eye -- and this wizard is the one place a fresh webhook is pasted with no stored copy
+    // printed beneath it to check against. Not type="url": native constraint validation would gate
+    // submission ahead of the host pin that is the actual SSRF control.
+    expect(wrapper.get('[data-testid="automation-chat-space-url"]').attributes('type')).not.toBe('password')
     await wrapper.get('[data-testid="automation-chat-space-url"]').setValue('https://chat.googleapis.com/v1/spaces/AAA')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 

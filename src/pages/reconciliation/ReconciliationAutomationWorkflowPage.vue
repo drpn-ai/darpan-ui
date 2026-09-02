@@ -464,7 +464,10 @@
             name="newChatSpaceUrl"
             class="wizard-answer-control"
             data-testid="automation-chat-space-url"
-            type="password"
+            type="text"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
             :placeholder="chatProviderWebhookPlaceholders[newChatSpaceProvider]"
           />
         </label>
