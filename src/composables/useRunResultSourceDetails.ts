@@ -30,12 +30,17 @@ export interface UseRunResultSourceDetails {
   resetRunSourceDetails: () => void
 }
 
+const DAY_MILLIS = 24 * 60 * 60 * 1000
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function formatCalendarDay(day: Date): string {
+  return `${MONTH_NAMES[day.getMonth()]} ${day.getDate()}, ${day.getFullYear()}`
+}
+
 function formatRunSourceDate(value: string | undefined): string {
   const parsedDate = parseRunSourceDate(value)
   if (!parsedDate) return normalizeDisplayText(value)
-
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${monthNames[parsedDate.getMonth()]} ${parsedDate.getDate()}, ${parsedDate.getFullYear()}`
+  return formatCalendarDay(parsedDate)
 }
 
 // Full ISO timestamps are instants (the run wizard anchors windows at local midnight
@@ -53,6 +58,34 @@ function parseRunSourceDate(value: string | undefined): Date | null {
   return new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]))
 }
 
+function parseIsoInstant(value: string | undefined): Date | null {
+  const normalizedValue = normalizeDisplayText(value)
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(normalizedValue)) return null
+  const instant = new Date(normalizedValue)
+  return Number.isNaN(instant.getTime()) ? null : instant
+}
+
+// Not every window is anchored in the zone the viewer reads it in. An automation anchors its
+// window in its own windowTimeZone, whose default is UTC, so a UTC calendar day arrives as a pair
+// of exact UTC midnights — and resolving those instants in a display timezone behind UTC named the
+// previous day (a Sep 1 UTC run read "Aug 31" in America/Los_Angeles). Exact UTC midnights a whole
+// number of days apart ARE a UTC calendar window, which is the same test the backend uses to
+// recognise one (ReconciliationApiWindowSupport.isUtcMidnight + isWholeDayRange), so name the UTC
+// day rather than the viewer's. Every other window — the wizard's own local-midnight instants
+// among them — is not on a UTC midnight boundary and keeps resolving through the display timezone.
+function utcAnchoredCalendarWindow(start: string | undefined, end: string | undefined): { start: Date, end: Date } | null {
+  const startInstant = parseIsoInstant(start)
+  const endInstant = parseIsoInstant(end)
+  if (!startInstant || !endInstant) return null
+  if (startInstant.getTime() % DAY_MILLIS !== 0 || endInstant.getTime() % DAY_MILLIS !== 0) return null
+  const spanMillis = endInstant.getTime() - startInstant.getTime()
+  if (spanMillis <= 0 || spanMillis % DAY_MILLIS !== 0) return null
+  return {
+    start: new Date(startInstant.getUTCFullYear(), startInstant.getUTCMonth(), startInstant.getUTCDate()),
+    end: new Date(endInstant.getUTCFullYear(), endInstant.getUTCMonth(), endInstant.getUTCDate()),
+  }
+}
+
 // A single-day API run window is sent as an exclusive end boundary (end = start + 1 day),
 // e.g. start=2026-07-01, end=2026-07-02, which covers only July 1. Detect that convention
 // here so the range collapses to one date instead of reading as a two-day span.
@@ -64,6 +97,13 @@ function isExclusiveEndBoundary(start: string | undefined, end: string | undefin
 }
 
 function formatRunSourceDateRange(start: string | undefined, end: string | undefined): string {
+  const utcWindow = utcAnchoredCalendarWindow(start, end)
+  if (utcWindow) {
+    const formattedUtcStart = formatCalendarDay(utcWindow.start)
+    if (addDays(utcWindow.start, 1).getTime() === utcWindow.end.getTime()) return formattedUtcStart
+    return `${formattedUtcStart} to ${formatCalendarDay(utcWindow.end)}`
+  }
+
   const formattedStart = formatRunSourceDate(start)
   const formattedEnd = formatRunSourceDate(end)
   if (formattedStart && formattedEnd && formattedStart !== formattedEnd) {

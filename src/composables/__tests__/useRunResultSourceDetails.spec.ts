@@ -250,4 +250,46 @@ describe('useRunResultSourceDetails', () => {
     } as never
     expect(source.runSourceDateRangeLabel.value).toBe('Jul 29, 2026')
   })
+
+  it('names the UTC calendar day a UTC-anchored window covers, whatever zone the viewer reads it in', () => {
+    // Real prod run (RS_RETURNS, 2026-09-02). An automation anchors its window in its own
+    // windowTimeZone, which defaults to UTC, so the window arrives as exact UTC midnights --
+    // the artifact it produced is literally named oms-returns-1788220800000-1788307200000.
+    // Resolving that instant in a display zone behind UTC moved the label to the previous day.
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-09-01T00:00:00Z', end: '2026-09-02T00:00:00Z' },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeLabel.value).toBe('Sep 1, 2026')
+  })
+
+  it('keeps a multi-day UTC-anchored window on its own UTC days', () => {
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-09-01T00:00:00Z', end: '2026-09-04T00:00:00Z' },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeLabel.value).toBe('Sep 1, 2026 to Sep 4, 2026')
+  })
+
+  it('still resolves a window anchored off UTC midnight in the viewer display zone', () => {
+    // The wizard path is unchanged: a window anchored at the tenant's own midnight is not on a
+    // UTC midnight boundary, so it keeps resolving through the display zone as before.
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-07-28T18:30:00Z', end: '2026-07-29T18:30:00Z' },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeLabel.value).toBe('Jul 29, 2026')
+  })
 })
