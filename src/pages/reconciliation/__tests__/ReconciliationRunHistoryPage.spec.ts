@@ -301,6 +301,57 @@ describe('ReconciliationRunHistoryPage', () => {
     })
   }
 
+  function mockFailuresStarvingTheFirstPage() {
+    // Reproduces API Order Sync: five 504 failures at one minute, one older completed
+    // result, and a page size of six. The failures take five of the six slots, Most Recent
+    // consumes the only completed row left, and Previous Results is handed nothing.
+    listGeneratedOutputs.mockReset()
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 12, pageCount: 2 },
+      generatedOutputs: [
+        ...[1, 2, 3, 4, 5].map((n) => ({
+          ...buildFailedGeneratedOutput(),
+          reconciliationRunResultId: `RUN_RESULT_FAILED_${n}`,
+        })),
+        buildGeneratedOutput(26),
+      ],
+    })
+  }
+
+  it('keeps a way to older results when failures fill the whole first page', async () => {
+    mockFailuresStarvingTheFirstPage()
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="run-history-failed-tile"]')).toHaveLength(5)
+    expect(wrapper.find('[data-testid="run-history-featured-tile"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-history-result-tile"]').exists()).toBe(false)
+    // The only control that fetches an older page must not vanish with the empty list.
+    expect(wrapper.find('[data-testid="run-history-more"]').exists()).toBe(true)
+  })
+
+  it('reaches the older results through that button', async () => {
+    mockFailuresStarvingTheFirstPage()
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    listGeneratedOutputs.mockResolvedValueOnce({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 1, pageSize: 6, totalCount: 12, pageCount: 2 },
+      generatedOutputs: [buildGeneratedOutput(25), buildGeneratedOutput(24)],
+    })
+    await wrapper.get('[data-testid="run-history-more"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="run-history-result-tile"]').length).toBeGreaterThan(0)
+  })
+
   // Prod's Returns run compares two endpoint-level sources, so the labels stamped into its output
   // are endpoint descriptions. These tiles count records per SYSTEM, so they name the system.
   it('names the system rather than the endpoint on the difference-count tiles', async () => {

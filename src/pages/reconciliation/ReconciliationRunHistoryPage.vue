@@ -81,7 +81,12 @@
       <InlineValidation v-if="runSettingsError" tone="error" :message="runSettingsError" />
       <p v-if="showLoadingState" class="section-note" data-testid="run-history-loading">Loading saved results…</p>
       <InlineValidation v-else-if="loadError" tone="error" :message="loadError" />
-      <div v-else-if="visibleOtherGeneratedOutputs.length > 0" class="static-page-tile-grid run-history-grid" data-testid="run-history-results">
+      <!-- Rendered when there is anything to show OR anything left to fetch. The More
+           tile is the only control that reaches an older page, and keeping it inside a
+           branch gated on the list being non-empty took it off the screen exactly when a
+           burst of failures had starved that list — leaving no way to older history at
+           all. See DAR-UI-031. -->
+      <div v-else-if="visibleOtherGeneratedOutputs.length > 0 || hasMoreOtherOutputs" class="static-page-tile-grid run-history-grid" data-testid="run-history-results">
         <RouterLink
           v-for="output in visibleOtherGeneratedOutputs"
           :key="output.fileName"
@@ -298,19 +303,24 @@ const featuredOutput = computed(() => completedGeneratedOutputs.value[0] ?? null
 const otherGeneratedOutputs = computed(() => completedGeneratedOutputs.value.slice(1))
 const visibleOtherGeneratedOutputs = computed(() => otherGeneratedOutputs.value.slice(0, visibleOtherOutputCount.value))
 const showLoadingState = computed(() => loading.value && generatedOutputs.value.length === 0)
-const showHistorySection = computed(() =>
-  showLoadingState.value ||
-  Boolean(loadError.value) ||
-  Boolean(runSettingsError.value) ||
-  !featuredOutput.value ||
-  otherGeneratedOutputs.value.length > 0
-)
 const hasMoreLoadedOtherOutputs = computed(() => otherGeneratedOutputs.value.length > visibleOtherOutputCount.value)
 const hasMoreHistoryPages = computed(() => (
   cachePrimedWithoutFetch.value
   || lastLoadedPageIndex.value + 1 < pagination.value.pageCount
 ))
 const hasMoreOtherOutputs = computed(() => hasMoreLoadedOtherOutputs.value || hasMoreHistoryPages.value)
+
+const showHistorySection = computed(() =>
+  showLoadingState.value ||
+  Boolean(loadError.value) ||
+  Boolean(runSettingsError.value) ||
+  !featuredOutput.value ||
+  otherGeneratedOutputs.value.length > 0 ||
+  // Nothing loaded under Most Recent does not mean nothing exists: the fetch page holds
+  // running, failed and completed rows together, so failures can consume it and leave the
+  // completed list empty. Hiding the section then hides the way to page past them.
+  hasMoreOtherOutputs.value
+)
 
 // These tiles count records per SYSTEM, so they name the system rather than the endpoint the run
 // extracted: a run's stamped labels are endpoint descriptions ("Shopify Order Return References"),
