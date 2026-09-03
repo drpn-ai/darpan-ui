@@ -773,6 +773,13 @@ export interface GeneratedOutputSourceDetails {
   dateRange?: {
     start?: string
     end?: string
+    /**
+     * The zone the window was anchored in, as an IANA id. Two instants cannot say which
+     * calendar day they cover, so without this the UI resolves that day in the VIEWER's zone
+     * and two people read different days for one run. Absent on runs that predate the column
+     * on ReconciliationRunResult, which the screen reports rather than guessing at.
+     */
+    timeZone?: string
   }
   files?: GeneratedOutputSourceFile[]
 }

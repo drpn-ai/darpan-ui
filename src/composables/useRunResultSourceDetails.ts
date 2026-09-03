@@ -97,7 +97,28 @@ function isExclusiveEndBoundary(start: string | undefined, end: string | undefin
   return addDays(startOfLocalDay(startDate), 1).getTime() === startOfLocalDay(endDate).getTime()
 }
 
-function formatRunSourceDateRange(start: string | undefined, end: string | undefined): string {
+/** The calendar day an instant falls on IN a named zone, which is the only zone that can
+    answer "which day did this run cover" without asking who is looking. */
+function zonedCalendarDay(value: string | undefined, zone: string): Date | null {
+  const normalized = normalizeDisplayText(value)
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(normalized)) return null
+  const instant = new Date(normalized)
+  return Number.isNaN(instant.getTime()) ? null : displayCalendarDayOf(instant, zone)
+}
+
+function formatRunSourceDateRange(start: string | undefined, end: string | undefined, zone?: string): string {
+  // A recorded zone beats every heuristic below it: those exist precisely because the zone
+  // was missing, and guessing is what let two viewers read different days for one run.
+  if (zone) {
+    const zonedStart = zonedCalendarDay(start, zone)
+    const zonedEnd = zonedCalendarDay(end, zone)
+    if (zonedStart && zonedEnd) {
+      if (addDays(zonedStart, 1).getTime() === zonedEnd.getTime()) return formatCalendarDay(zonedStart)
+      return `${formatCalendarDay(zonedStart)} to ${formatCalendarDay(zonedEnd)}`
+    }
+    if (zonedStart) return formatCalendarDay(zonedStart)
+  }
+
   const utcWindow = utcAnchoredCalendarWindow(start, end)
   if (utcWindow) {
     const formattedUtcStart = formatCalendarDay(utcWindow.start)
@@ -120,12 +141,12 @@ const ENUM_TOKEN_LABEL = /^[A-Z][A-Z0-9_]*$/
 /**
  * The exact window, for the mascot to read back when somebody rests on the date range.
  *
- * The label above it is a CALENDAR DAY resolved in the viewer's own zone, so two people
- * in different zones read different days for one run (DAR-UI-025/026). The instants are
- * the only thing that settles that, and the only thing that answers "was this record
- * really outside the window" — so this names them, and names the zone it is showing them
- * in. Never empty: the body carries a {detail} token, and an unfilled slot would print
- * the store's timestamp fallback, which is the wrong sentence for a window.
+ * The label above it is a CALENDAR DAY, which two instants alone cannot name — so where the
+ * run recorded the zone it was anchored in, both the label and this answer resolve in THAT
+ * zone and read the same for everybody. Where it did not (runs older than the column), the
+ * day still falls back to the viewer's zone and this says the instants plainly rather than
+ * claiming a zone nobody stored. Never empty: the body carries a {detail} token, and an
+ * unfilled slot would print the store's timestamp fallback, which is wrong for a window.
  */
 /** ISO with an explicit zone: the only shape whose instant is unambiguous. */
 const ZONED_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/
@@ -147,10 +168,12 @@ function formatWallClock(match: RegExpMatchArray): string {
   return `${MONTH_NAMES[(month as number) - 1]} ${day}, ${year}, ${clockHour}:${String(minute).padStart(2, '0')}${seconds} ${suffix}`
 }
 
-function renderWindowBoundary(value: string): { text: string, zoned: boolean, at: Date | null } | null {
+function renderWindowBoundary(value: string, zone?: string): { text: string, zoned: boolean, at: Date | null } | null {
   if (ZONED_INSTANT.test(value)) {
     const instant = new Date(value)
-    if (!Number.isNaN(instant.getTime())) return { text: formatDateTime(instant), zoned: true, at: instant }
+    // Shown in the window's own zone when the run recorded one, so the answer is the same for
+    // everybody who reads it. Falls back to the viewer's zone only when nothing was recorded.
+    if (!Number.isNaN(instant.getTime())) return { text: formatDateTime(instant, zone ? { timeZone: zone } : {}), zoned: true, at: instant }
   }
   const wall = value.match(WALL_CLOCK)
   return wall ? { text: formatWallClock(wall), zoned: false, at: null } : null
@@ -165,19 +188,22 @@ function renderWindowBoundary(value: string): { text: string, zoned: boolean, at
  * an unfilled slot would print the store's timestamp fallback, which is the wrong
  * sentence for a window.
  */
-function describeRunSourceWindow(startValue: string, endValue: string, dayLabel: string): string {
+function describeRunSourceWindow(startValue: string, endValue: string, dayLabel: string, zone?: string): string {
   if (!startValue && !endValue) return 'no window was recorded for this run'
 
-  const start = renderWindowBoundary(startValue)
-  const end = renderWindowBoundary(endValue)
+  // A wall clock carries no zone of its own, so a recorded zone is deliberately NOT applied to
+  // one: the two would disagree, since the stamp was rendered in the server's zone rather than
+  // the window's. Only instants can be moved.
+  const start = renderWindowBoundary(startValue, zone)
+  const end = renderWindowBoundary(endValue, zone)
   // A zone code is appended only when every boundary shown carries one. On a mixed or
   // zone-less pair it would be a claim about a stamp that never had a zone.
   // Taken at the window's own instant, not at "now": a zone code has to survive a DST
   // boundary between the run and whoever is reading it back.
-  const zone = (start?.zoned ?? true) && (end?.zoned ?? true)
-    ? timeZoneCode(start?.at ?? end?.at ?? new Date(), getDefaultDisplayTimeZone())
+  const zoneCode = (start?.zoned ?? true) && (end?.zoned ?? true)
+    ? timeZoneCode(start?.at ?? end?.at ?? new Date(), zone || getDefaultDisplayTimeZone())
     : ''
-  const suffix = zone ? ` ${zone}` : ''
+  const suffix = zoneCode ? ` ${zoneCode}` : ''
 
   if (start && end) return `${start.text} to ${end.text}${suffix}`
   if (start) return `from ${start.text}${suffix}, with no end recorded`
@@ -243,11 +269,17 @@ export function useRunResultSourceDetails(deps: UseRunResultSourceDetailsDeps): 
     return mode.includes('api') || Boolean(runSourceDetails.value?.dateRange?.start || runSourceDetails.value?.dateRange?.end)
   })
   const runSourceModeLabel = computed(() => isApiRunSource.value ? 'API date range' : 'Source files')
-  const runSourceDateRangeLabel = computed(() => formatRunSourceDateRange(runSourceDetails.value?.dateRange?.start, runSourceDetails.value?.dateRange?.end))
+  const runSourceWindowTimeZone = computed(() => normalizeDisplayText(runSourceDetails.value?.dateRange?.timeZone) || undefined)
+  const runSourceDateRangeLabel = computed(() => formatRunSourceDateRange(
+    runSourceDetails.value?.dateRange?.start,
+    runSourceDetails.value?.dateRange?.end,
+    runSourceWindowTimeZone.value,
+  ))
   const runSourceDateRangeDetail = computed(() => describeRunSourceWindow(
     normalizeDisplayText(runSourceDetails.value?.dateRange?.start),
     normalizeDisplayText(runSourceDetails.value?.dateRange?.end),
     runSourceDateRangeLabel.value,
+    runSourceWindowTimeZone.value,
   ))
   const runSourceFilesLabel = computed(() => isApiRunSource.value ? 'Files compared' : 'Source files')
   const showRunSourceDetails = computed(() =>

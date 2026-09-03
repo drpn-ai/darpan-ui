@@ -200,6 +200,42 @@ describe('useRunResultSourceDetails', () => {
     expect(source.runSourceDateRangeDetail.value).toBe('May 1, 2026, 9:30 AM to May 3, 2026, 9:30 AM IST')
   })
 
+  it('shows the window in the zone it was anchored in, not the viewer\'s', () => {
+    // The instants are the same for everybody; the zone is what says which day they cover.
+    // Viewer pinned to Kolkata to prove the window's own zone wins rather than leaking through.
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: {
+        start: '2026-09-02T00:00:00Z',
+        end: '2026-09-03T00:00:00Z',
+        timeZone: 'America/Los_Angeles',
+      },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeDetail.value).toBe('Sep 1, 2026, 5:00 PM to Sep 2, 2026, 5:00 PM PDT')
+  })
+
+  it('names the calendar day in that zone too, so two viewers cannot disagree', () => {
+    // Read in Kolkata the same instants land on Sep 2; the window was anchored in Los Angeles,
+    // where it covers Sep 1. That disagreement is the whole reason the zone is now carried.
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: {
+        start: '2026-09-02T00:00:00Z',
+        end: '2026-09-03T00:00:00Z',
+        timeZone: 'America/Los_Angeles',
+      },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeLabel.value).toBe('Sep 1, 2026')
+  })
+
   it('reads a zone-less database timestamp, which is what the run row actually sends', () => {
     // windowStartDate is a date-time column and the backend serialises it with
     // Timestamp.toString(), so it arrives as "2026-09-01 00:00:00.0" — space separated,
