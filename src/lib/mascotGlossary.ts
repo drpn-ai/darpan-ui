@@ -213,6 +213,13 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Exclusions',
     body: 'rules for what a source leaves out when a run pulls its data. Excluded records never arrive, so they cannot show up as differences.',
   },
+  // The Automations page titles this list “Automation Runs”, which reads like a run
+  // history and is not one — every tile under it is a saved automation. Kept as its own
+  // entry rather than pointed at previousRuns for exactly that reason.
+  automations: {
+    title: 'Automations',
+    body: 'the saved runs set to go off on their own, one tile each. Open one for its schedule, its window, and what it has actually been doing.',
+  },
   previousRuns: {
     title: 'Previous runs',
     body: 'every execution of this automation, newest first. Each is a record of what was true when it went — re-run rather than editing one.',

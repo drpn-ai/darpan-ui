@@ -77,3 +77,81 @@ describe('the saved run page', () => {
     expect(resolveExplainTarget(value as HTMLElement)).toBeNull()
   })
 })
+
+/**
+ * Markup copied from ReconciliationAutomationsPage — hero, section heading, and one
+ * tile per saved automation. Nothing on this page is an execution, which is the whole
+ * point of the block below: a screenshot showed the mascot describing a run history
+ * over a list of automations.
+ */
+const AUTOMATIONS_PAGE = `
+  <h1>Automations</h1>
+  <section class="static-page-section">
+    <header class="static-page-section-head">
+      <h2 class="static-page-section-heading">Automation Runs</h2>
+    </header>
+    <div class="static-page-section-body">
+      <div class="static-page-tile-grid static-page-record-grid">
+        <a class="static-page-tile static-page-record-tile">
+          <span class="static-page-tile-title">Daily Order Reconciliation</span>
+        </a>
+      </div>
+    </div>
+  </section>
+`
+
+describe('the automations list page', () => {
+  function mountAutomations(): HTMLElement {
+    const host = document.createElement('div')
+    host.innerHTML = AUTOMATIONS_PAGE
+    document.body.appendChild(host)
+    return host
+  }
+
+  it('describes the automations it lists, not some other page’s run history', () => {
+    // Both headings sit over a grid of automation tiles. "Previous runs" belongs to the
+    // dashboard's own Previous Runs table and is false here in every particular.
+    const host = mountAutomations()
+
+    expect(termFor(host, 'h1', 'Automations')).toBe('automations')
+    expect(termFor(host, 'h2', 'Automation Runs')).toBe('automations')
+  })
+
+  it('says nothing about an automation’s name', () => {
+    // A tile title is this tenant's own data, not vocabulary.
+    const host = mountAutomations()
+    const title = host.querySelector('.static-page-tile-title')
+
+    expect(resolveExplainTarget(title)).toBeNull()
+  })
+})
+
+/**
+ * Three pages title a section "<something> Runs" over things that are not executions.
+ * The alias table was written from the wording rather than from what each heading sits
+ * over, so all three answered with the automation dashboard's run history.
+ */
+describe('headings that say "runs" over something that is not an execution', () => {
+  function headingTerm(html: string): string | undefined {
+    const host = document.createElement('div')
+    host.innerHTML = html
+    document.body.appendChild(host)
+    return resolveExplainTarget(host.querySelector('h2'))?.term
+  }
+
+  it('reads Other Runs on the home page as the saved runs it lists', () => {
+    // HomePage's Other Runs grid is otherFlowCards -> savedRunCards: setups you open,
+    // each of which executions are instances of. Nothing there has ever run.
+    expect(headingTerm('<h2 class="static-page-section-heading">Other Runs</h2>')).toBe('savedRuns')
+  })
+
+  it('reads Most Recent on the run history as a result, not a run', () => {
+    // featuredOutput is completedGeneratedOutputs[0] — the same list the sibling
+    // "Previous Results" section renders the rest of, and it links to a result route.
+    expect(headingTerm('<h2 class="static-page-section-heading">Most Recent</h2>')).toBe('previousResults')
+  })
+
+  it('still reads Previous Runs on the automation dashboard as the run history', () => {
+    expect(headingTerm('<h2 class="static-page-section-heading">Previous Runs</h2>')).toBe('previousRuns')
+  })
+})

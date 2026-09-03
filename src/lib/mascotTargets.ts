@@ -111,9 +111,13 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'exclusion': 'exclusions',
   'has exclusion': 'exclusions',
   'previous runs': 'previousRuns',
-  'automation runs': 'previousRuns',
-  'other runs': 'previousRuns',
-  'most recent': 'previousRuns',
+  // NOT previousRuns: the Automations page titles its list of saved automations
+  // "Automation Runs", so this label sits over automation tiles, never over executions.
+  'automation runs': 'automations',
+  // Same trap as "Automation Runs": HomePage's Other Runs grid holds saved runs, and
+  // the run history's Most Recent is one generated result — neither is an execution.
+  'other runs': 'savedRuns',
+  'most recent': 'previousResults',
   'previous results': 'previousResults',
   'results': 'previousResults',
   'saved schemas': 'savedSchemas',
@@ -130,7 +134,7 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'operations': 'operations',
   'auth': 'authType',
   'rule sets': 'ruleSet',
-  'automations': 'previousRuns',
+  'automations': 'automations',
 })
 
 /** Every glossary title is its own label, so a new entry is reachable the moment it exists. */
