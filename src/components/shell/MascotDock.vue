@@ -53,7 +53,7 @@ import { useMascotStore } from '../../stores/mascot'
 import { createDwellController, type DwellController } from '../../composables/useMascotDwell'
 import { createIdleHintController } from '../../composables/useIdleHints'
 import { resolveExplainTarget } from '../../lib/mascotTargets'
-import { hintsForRoute } from '../../lib/mascotHints'
+import { hintsFor } from '../../lib/mascotHints'
 
 /**
  * The route arrives as a prop rather than through useRoute(): the dock is shell furniture
@@ -189,7 +189,9 @@ function onPointerOut(event: PointerEvent): void {
    clicking, typing, editing — not moving the pointer while reading; counting movement
    would mean the hint only ever reached someone who had left the screen. */
 const idle = createIdleHintController({
-  getHints: () => hintsForRoute(props.routeName),
+  // Evaluated when the offer is due, not on arrival: a hint is filtered by what is on
+  // screen at that moment, so a page that finished loading meanwhile is read correctly.
+  getHints: () => hintsFor(props.routeName, document),
   // Never talk over an answer somebody asked for.
   canOffer: () => mascot.mode === 'idle',
   onOffer: (hint) => { mascot.offerTip(hint) },

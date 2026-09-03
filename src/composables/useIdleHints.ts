@@ -45,7 +45,13 @@ export function createIdleHintController(options: IdleHintOptions): IdleHintCont
   const visibleMs = options.visibleMs ?? HINT_VISIBLE_MS
   let timer: ReturnType<typeof setTimeout> | null = null
   let visibleTimer: ReturnType<typeof setTimeout> | null = null
-  let offered = 0
+  /**
+   * The lines already said, by text rather than by position. The hint list is filtered by
+   * what is on screen, so it changes underneath this controller: an index into it points
+   * at the wrong line the moment a control disappears, silently swallowing one hint and
+   * repeating another.
+   */
+  const offered = new Set<string>()
 
   function clearVisible(): void {
     if (visibleTimer !== null) {
@@ -63,17 +69,17 @@ export function createIdleHintController(options: IdleHintOptions): IdleHintCont
 
   function arm(): void {
     clear()
-    // Nothing left to say on this page: stop arming rather than waking up to find out.
-    if (offered >= options.getHints().length) return
+    // Nothing left to say on what is currently on screen: stop arming rather than waking
+    // up to find out. Activity re-arms, which is also when new controls have appeared.
+    if (options.getHints().every((hint) => offered.has(hint))) return
     timer = setTimeout(() => {
       timer = null
-      const hints = options.getHints()
-      const next = hints[offered]
+      const next = options.getHints().find((hint) => !offered.has(hint))
       if (next === undefined) return
       // Losing the turn is not losing the hint — it stays next in line for the following
       // idle stretch rather than being consumed while the mascot was busy.
       if (!options.canOffer()) return
-      offered += 1
+      offered.add(next)
       options.onOffer(next)
       // It retires on its own. Nobody asked for it, so it should not need dismissing.
       clearVisible()
@@ -86,7 +92,7 @@ export function createIdleHintController(options: IdleHintOptions): IdleHintCont
 
   return {
     enter(): void {
-      offered = 0
+      offered.clear()
       clearVisible()
       arm()
     },
@@ -99,7 +105,7 @@ export function createIdleHintController(options: IdleHintOptions): IdleHintCont
       clearVisible()
     },
     get offeredCount(): number {
-      return offered
+      return offered.size
     },
   }
 }

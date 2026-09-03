@@ -126,6 +126,44 @@ describe('createIdleHintController', () => {
     expect(onOffer).not.toHaveBeenCalled()
   })
 
+  it('tracks which lines it has used, not how many, so a changing page cannot skip one', () => {
+    // The list is filtered by what is on screen, so it changes underneath the controller.
+    // An index into it points at the wrong line the moment anything drops out.
+    let hints = ['first', 'second', 'third']
+    const onOffer = vi.fn()
+    const controller = createIdleHintController({ getHints: () => hints, canOffer: () => true, onOffer })
+    controller.enter()
+    vi.advanceTimersByTime(IDLE_HINT_MS)
+    expect(onOffer).toHaveBeenNthCalledWith(1, 'first')
+
+    // Whatever 'first' pointed at is no longer rendered.
+    hints = ['second', 'third']
+    controller.noteActivity()
+    vi.advanceTimersByTime(IDLE_HINT_MS)
+
+    expect(onOffer).toHaveBeenNthCalledWith(2, 'second')
+  })
+
+  it('does not repeat a line when its control comes back on screen', () => {
+    let hints = ['first', 'second']
+    const onOffer = vi.fn()
+    const controller = createIdleHintController({ getHints: () => hints, canOffer: () => true, onOffer })
+    controller.enter()
+    vi.advanceTimersByTime(IDLE_HINT_MS)
+
+    hints = ['second']
+    controller.noteActivity()
+    vi.advanceTimersByTime(IDLE_HINT_MS)
+    expect(onOffer).toHaveBeenNthCalledWith(2, 'second')
+
+    // Both back on screen, both already said. Nothing more to offer.
+    hints = ['first', 'second']
+    controller.noteActivity()
+    vi.advanceTimersByTime(IDLE_HINT_MS * 3)
+
+    expect(onOffer).toHaveBeenCalledTimes(2)
+  })
+
   it('starts a new page from the top of its list', () => {
     const { controller, onOffer } = setup(['first', 'second'])
     controller.enter()

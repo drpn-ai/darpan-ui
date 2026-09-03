@@ -661,6 +661,17 @@ describe('ReconciliationRunResultPage', () => {
     })
   })
 
+  it('offers a finished result nothing that belongs to a run still going', async () => {
+    const { hintsFor } = await import('../../../lib/mascotHints')
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    // Same component, other route name: none of the live controls are rendered here, so
+    // the live route's hints are all withheld rather than promising a Cancel that is gone.
+    expect(hintsFor('reconciliation-run-live', wrapper.element)).toEqual([])
+    expect(hintsFor('reconciliation-run-result', wrapper.element).length).toBeGreaterThan(0)
+  })
+
   it('renders API date range source details and downloads compared source files', async () => {
     const createObjectUrl = vi.fn(() => 'blob:source')
     const revokeObjectUrl = vi.fn()
@@ -1458,6 +1469,29 @@ describe('ReconciliationRunResultPage', () => {
     ;(route.params as Record<string, unknown>).runResultId = reconciliationRunResultId
     route.fullPath = `/reconciliation/run-live/RS_ORDER_CSV/${reconciliationRunResultId}`
   }
+
+  it('offers the live run only the hints whose controls this render actually has', async () => {
+    // The hint preconditions are selectors against THIS component. A synthetic fixture
+    // cannot catch a change to showCancelRun or showStepTimeline; a real render can.
+    const { hintsFor } = await import('../../../lib/mascotHints')
+    enterLiveRunRoute()
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      currentStage: 'EXTRACT_FILE2',
+      startedDate: 1784955159000,
+      steps: [{ stageCode: 'RESOLVE', stageSequence: 1, statusEnumId: 'AUT_STAT_SUCCESS', startedDate: 1784955159000, completedDate: 1784955160000 }],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    const offered = hintsFor('reconciliation-run-live', wrapper.element)
+
+    expect(offered.some((text) => text.startsWith('Cancel run'))).toBe(true)
+    expect(offered.some((text) => text.startsWith('Run steps'))).toBe(true)
+    // It has not failed, so the line about a failed step must not be offered.
+    expect(offered.some((text) => text.includes('step failed'))).toBe(false)
+  })
 
   it('shows completed, running, and remaining steps for a run still in progress', async () => {
     enterLiveRunRoute()
