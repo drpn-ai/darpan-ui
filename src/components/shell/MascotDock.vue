@@ -137,7 +137,6 @@ function hasFinePointer(): boolean {
 
 function stopWatching(): void {
   controller?.cancel()
-  hovered?.classList.remove('is-explainable-auto')
   controller = null
   hovered = null
 }
@@ -162,9 +161,10 @@ function onPointerOver(event: PointerEvent): void {
 
   stopWatching()
   hovered = target.el
-  // The only standing signal that a thing is askable. Applied on hover rather than at
-  // paint, so a page of headings is not permanently decorated with help cursors.
-  hovered.classList.add('is-explainable-auto')
+  // No standing mark is applied any more. When only a few counts answered, a help cursor
+  // was a useful signal; now that every value, heading and control does, it would follow
+  // the reader across the whole page and read as hesitancy rather than help. The bubble
+  // itself is the affordance.
   controller = createDwellController({
     onListen: () => mascot.listen(),
     onSpeak: () => mascot.explain(target.term, target.detail),
@@ -179,7 +179,6 @@ function onPointerOut(event: PointerEvent): void {
   const to = event.relatedTarget as Node | null
   if (to && hovered.contains(to)) return
   controller.leave()
-  hovered.classList.remove('is-explainable-auto')
   hovered = null
   controller = null
 }

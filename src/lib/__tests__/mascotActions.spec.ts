@@ -61,6 +61,17 @@ describe('explaining a control', () => {
     expect(lookupAction('remove gorjana_us')?.title).toBe('Remove')
   })
 
+  it('answers an icon action that navigates, which is an anchor and not a button', () => {
+    // The play beside the gear on a run history: same size, same row, same job to the
+    // person using it — and a RouterLink, so matching on the tag left it dead.
+    const play = render('<a class="app-icon-action" aria-label="Open run" title="Open run"><svg></svg></a>')
+    const tile = render('<a class="static-page-tile"><span class="static-page-tile-title">Daily Order Reconciliation</span></a>')
+
+    expect(resolveExplainTarget(play.querySelector('svg'))?.term).toBe('open run')
+    // A link with no name of its own is named by this tenant's data, so it stays silent.
+    expect(resolveExplainTarget(tile.querySelector('.static-page-tile-title'))).toBeNull()
+  })
+
   it('stays silent on a button nobody has written an answer for', () => {
     const host = render('<button type="button">Frobnicate</button>')
 
@@ -137,12 +148,21 @@ describe('every button in the app has an answer', () => {
     'pages/settings/TenantSettingsPage.vue': 'the AI tile is named by the selected provider',
   }
 
+  /**
+   * Not only <button>. Several icon actions are RouterLinks because they navigate — the
+   * play beside the gear on a run history is an anchor, and scoping this sweep to the
+   * literal tag left it a dead hover next to a working one. A link is included only when
+   * it carries an explicit name; a link named by its own content is named by data.
+   */
+  const CONTROL_TAGS = ['button', 'RouterLink', 'a ']
+
   function buttonTags(source: string): { tag: string, inner: string }[] {
     const found: { tag: string, inner: string }[] = []
+    for (const openTag of CONTROL_TAGS) {
     for (let i = 0; ;) {
-      const start = source.indexOf('<button', i)
+      const start = source.indexOf(`<${openTag}`, i)
       if (start === -1) break
-      let j = start + 7
+      let j = start + openTag.length + 1
       let quote: string | null = null
       while (j < source.length) {
         const char = source[j] as string
@@ -151,9 +171,16 @@ describe('every button in the app has an answer', () => {
         else if (char === '>') break
         j += 1
       }
-      const close = source.indexOf('</button>', j)
-      found.push({ tag: source.slice(start, j + 1), inner: close === -1 ? '' : source.slice(j + 1, close) })
+      const closeTag = openTag.trim() === 'button' ? '</button>' : `</${openTag.trim()}>`
+      const close = source.indexOf(closeTag, j)
+      const tag = source.slice(start, j + 1)
+      const named = /(?<![\w:-])(aria-label|title)="[^"]+"/.test(tag) || /:(aria-label|title)="[^"]+"/.test(tag)
+      // A link with no name of its own is named by what it contains, which is data.
+      if (openTag === 'button' || named) {
+        found.push({ tag, inner: close === -1 ? '' : source.slice(j + 1, close) })
+      }
       i = j + 1
+    }
     }
     return found
   }

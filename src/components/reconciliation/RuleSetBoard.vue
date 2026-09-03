@@ -1556,7 +1556,6 @@ onBeforeUnmount(() => {
   border: 0;
   background: none;
   padding: 0;
-  cursor: help;
   font-size: var(--type-table-head-size);
   letter-spacing: var(--type-table-head-tracking);
   text-transform: uppercase;

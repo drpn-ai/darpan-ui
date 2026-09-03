@@ -299,6 +299,44 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Automation is paused',
     body: 'no run will fire. Starting it again picks up from the next scheduled time; the ones it missed are not made up.',
   },
+  /* ── Icon actions that navigate, so they are links rather than buttons ──────── */
+  'open run': {
+    title: 'Open run',
+    body: 'the run wizard for this saved run, prefilled from it. Nothing is compared until you finish it and start the run.',
+  },
+  'view previous runs': {
+    title: 'View previous runs',
+    body: 'every execution of this saved run, newest first. Each one is a record of what was true when it went.',
+  },
+  'edit automation': {
+    title: 'Edit automation',
+    body: 'changes its schedule, window and saved run. It takes effect from the next fire and leaves finished runs alone.',
+  },
+  'back to automations': {
+    title: 'Back to Automations',
+    body: 'the list of every automation on this tenant. Nothing on this page is saved or discarded on the way.',
+  },
+  'open full config dashboard': {
+    title: 'Open full config dashboard',
+    body: 'the connection behind this side, with its endpoints and credentials. Changing it affects every run that uses it.',
+  },
+  'edit hotwax auth': {
+    title: 'Edit HotWax Auth',
+    body: 'the credentials this connection uses. Every run and automation pointing at it picks the change up on its next run.',
+  },
+  'edit shopify config': {
+    title: 'Edit Shopify Config',
+    body: 'the credentials and shop this connection uses. Every run pointing at it picks the change up on its next run.',
+  },
+  'back to hotwax settings': {
+    title: 'Back to HotWax Settings',
+    body: 'the list of HotWax connections. Nothing on this page is saved on the way out.',
+  },
+  'back to shopify settings': {
+    title: 'Back to Shopify Settings',
+    body: 'the list of Shopify connections. Nothing on this page is saved on the way out.',
+  },
+
   /* ── The shell, and controls that appear on many pages ──────────────────────── */
   cancel: {
     title: 'Cancel',

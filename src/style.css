@@ -1982,13 +1982,6 @@ label > span {
   padding: 0 var(--space-0);
 }
 
-/* Marks a value the mascot can explain. cursor: help is the only standing signal —
-   anything louder would decorate every counter in the product. */
-.is-explainable,
-.is-explainable-auto {
-  cursor: help;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .mascot-say {
     transition: none;

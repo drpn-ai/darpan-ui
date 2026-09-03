@@ -210,6 +210,13 @@ const LABEL_SELECTOR = [
   // 61 distinct names, and none reachable. Their answers live in MASCOT_ACTIONS because a
   // control's question is "what will this do", not "what is this".
   'button',
+  // And not only <button>. Several icon actions are RouterLinks because they navigate —
+  // the play beside the gear on a run history is an anchor, and matching the tag rather
+  // than the role left it dead next to a working one. Only links that carry a name of
+  // their own: a link named by its content is named by this tenant's data.
+  'a[aria-label]',
+  'a[title]',
+  '[role="button"]',
 ].join(', ')
 
 /**
@@ -254,12 +261,17 @@ function controlName(el: HTMLElement): string {
   return ownText(el)
 }
 
+/** Anything you press. The tag is not the test — a navigating icon action is an anchor. */
+function isControl(el: HTMLElement): boolean {
+  return el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button'
+}
+
 export function resolveExplainTarget(start: Element | null): ExplainTarget | null {
   if (!start) return null
 
   const label = start.closest<HTMLElement>(LABEL_SELECTOR)
   if (label) {
-    if (label.tagName === 'BUTTON') {
+    if (isControl(label)) {
       // The name IS the key: MASCOT_ACTIONS is keyed by what the control is called, so a
       // renamed button fails the coverage test rather than going quietly dead.
       const name = normalizeLabel(controlName(label))
