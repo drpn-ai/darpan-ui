@@ -21,15 +21,15 @@ export interface GlossaryEntry {
 export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.freeze({
   comparedCount: {
     title: 'Compared',
-    body: 'every record the run actually looked at, after exclusions. The overlap — not how many either system is hoarding.',
+    body: 'every record the run actually looked at, after exclusions. The overlap, not either system’s total — those are always bigger.',
   },
   differenceCount: {
     title: 'Differences',
-    body: 'records both systems have that don’t line up on a compared field. Counted per field, so yes — one record can show up twice. Sorry.',
+    body: 'records both systems have that don’t line up on a compared field. Counted per field, so one record with two bad fields lands twice. Everyone misreads this once.',
   },
   onlyInFile1Count: {
     title: 'Only in the first source',
-    body: 'records the first source turned up that the second has never heard of, inside this run’s window. Awkward.',
+    body: 'records the first source turned up that the second has never heard of, inside this run’s window. Check the window before chasing them — usually that is the answer.',
   },
   onlyInFile2Count: {
     title: 'Only in the second source',
@@ -44,7 +44,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   ruleSet: {
     title: 'Rule set',
-    body: 'which fields are matched, how records are keyed, and what is excluded. Change it and re-run; never edit a finished run. I will know.',
+    body: 'which fields are matched, how records are keyed, and what is excluded. Change it and re-run; a finished run records what was true then, not a draft.',
   },
   automationSchedule: {
     title: 'Schedule',
@@ -52,11 +52,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   automationWindow: {
     title: 'Window',
-    body: 'how far back each run reaches for records. A record dated just outside it looks missing even when both systems are holding it happily.',
+    body: 'how far back each run reaches for records. A record dated just outside it reads as missing when both systems have it. The most common false alarm here.',
   },
   runStatus: {
     title: 'Status',
-    body: 'where the run got to. A finished run can still be a disappointing one — read it next to the counts.',
+    body: 'where the run got to. Finished is not the same as clean — read it next to the counts.',
   },
   scheduledDate: {
     title: 'Scheduled',
