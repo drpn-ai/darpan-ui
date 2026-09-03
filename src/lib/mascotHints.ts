@@ -85,6 +85,17 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'Runs are a record of what was true when they ran. Re-run rather than editing one.' },
     { text: 'A burst of failures can bury the run you want — there is more here than the first page.', when: control('run-history-more') },
   ]),
+  // Schema surfaces. Written from what the components actually render — the editor's
+  // controls are all gated on canEditTarget, which is why a read-only view looks broken
+  // rather than restricted, and that is the line worth spending.
+  'schemas-library': Object.freeze([
+    { text: 'A schema is the shape a run expects its source data to have — open one to see the fields it pins.', when: control('schema-library-tile') },
+    { text: 'Create builds a new schema. Nothing already saved is touched.', when: control('schema-library-create') },
+  ]),
+  'schemas-editor': Object.freeze([
+    { text: 'Each row is a path into the source document — the placeholder shows the shape it wants.', when: control('schema-editor-add-row') },
+    { text: 'Without permission to edit tenant settings this is a read-only view, not a broken one.' },
+  ]),
   hub: Object.freeze([
     { text: 'Press ⌘K, or click me, to jump anywhere by name.' },
   ]),
