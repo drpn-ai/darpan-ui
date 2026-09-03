@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { MASCOT_ACTIONS } from '../mascotActions'
+import { MASCOT_HINTS } from '../mascotHints'
 
 /**
- * The mascot's voice, guarded across BOTH registries at once.
+ * The mascot's voice, guarded across all THREE registries at once.
  *
  * She is the only voiced surface in the app: the page is terse — labels, buttons and
  * empty states say the fewest words that survive removal — and she carries the framing
@@ -52,19 +53,33 @@ interface Line {
   readonly body: string
 }
 
+/**
+ * Every line she can say, from all three registries. Hints keep their copy under `text`
+ * rather than `body` — that difference is exactly why they went unguarded when this file
+ * first shipped, so the shape is normalised here rather than at each call site.
+ */
 function everyBody(): readonly Line[] {
   return [
     ...Object.entries(MASCOT_GLOSSARY).map(([key, e]) => ({ where: `glossary.${key}`, body: e.body })),
     ...Object.entries(MASCOT_ACTIONS).map(([key, e]) => ({ where: `actions['${key}']`, body: e.body })),
+    ...Object.entries(MASCOT_HINTS).flatMap(([route, hints]) =>
+      hints.map((hint, i) => ({ where: `hints.${route}[${i}]`, body: hint.text })),
+    ),
   ]
 }
 
 describe('the mascot speaks in her own voice', () => {
-  it('is actually reading both registries, not passing on an empty sweep', () => {
-    // Without this the two tests below pass just as happily against zero entries — the
-    // exact way a guard goes quietly dead. 140 is comfortably under today's 146 so that
-    // ordinary authoring does not trip it, and far above the zero that would matter.
-    expect(everyBody().length, 'the registries did not load').toBeGreaterThan(140)
+  it('is actually reading all three registries, not passing on an empty sweep', () => {
+    // Without this the tests below pass just as happily against zero entries — the exact
+    // way a guard goes quietly dead. Counted PER REGISTRY rather than in total, because a
+    // single total hides one of them vanishing: hints are the smallest by an order of
+    // magnitude, so the other two alone would clear any combined threshold worth setting.
+    const loaded = everyBody()
+    const count = (prefix: string) => loaded.filter((l) => l.where.startsWith(prefix)).length
+
+    expect(count('glossary.'), 'glossary did not load').toBeGreaterThan(50)
+    expect(count('actions['), 'actions did not load').toBeGreaterThan(70)
+    expect(count('hints.'), 'hints did not load').toBeGreaterThan(20)
   })
 
   it('never performs a mood it has not earned', () => {

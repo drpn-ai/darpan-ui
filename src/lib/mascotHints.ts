@@ -42,10 +42,10 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'Double-click a field to set what this source should leave out when it pulls.', when: control('ruleset-field-list-file1') },
     { text: 'Drag from a field on one side to a field on the other to pair them.', when: control('ruleset-editor-board') },
     { text: 'Not every source can filter at the pull — a side that cannot will say so.' },
-    { text: 'Keyboard: Enter on a field, then Enter on its partner, does the same pairing.', when: control('ruleset-editor-board') },
+    { text: 'Enter on a field, then Enter on its partner, pairs them without the drag.', when: control('ruleset-editor-board') },
   ]),
   'reconciliation-ruleset-manager': Object.freeze([
-    { text: 'The pencil beside Run and Rules opens each for editing.', when: control('ruleset-manager-edit-rules') },
+    { text: 'Edit Run or Rules with the pencil beside each — finished runs keep whatever they already compared.', when: control('ruleset-manager-edit-rules') },
     { text: 'Exclusions are per source — each side can leave out different records as it pulls.', when: control('ruleset-manager-exclusions') },
     { text: 'Run this rule set from here; its history is one step further on.', when: control('ruleset-manager-run-ruleset') },
   ]),
@@ -83,7 +83,7 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'A run still going shows its progress here rather than a result.', when: control('run-history-running-tile') },
     { text: 'A failed run kept its error — open it rather than re-running blind.', when: control('run-history-failed-tile') },
     { text: 'Runs are a record of what was true when they ran. Re-run rather than editing one.' },
-    { text: 'There is more history than the first page shows.', when: control('run-history-more') },
+    { text: 'A burst of failures can bury the run you want — there is more here than the first page.', when: control('run-history-more') },
   ]),
   hub: Object.freeze([
     { text: 'Press ⌘K, or click me, to jump anywhere by name.' },
