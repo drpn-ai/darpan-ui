@@ -1,3 +1,5 @@
+import { lookupAction } from './mascotActions'
+
 /**
  * What the mascot is allowed to explain.
  *
@@ -285,7 +287,12 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
 })
 
 /** Null rather than a throw: a missing phrase is a content gap, not a crash. */
+/**
+ * One lookup over two registries. Nouns are keyed by stable id, actions by the control's
+ * own name, so the two key spaces cannot collide and the caller does not have to know
+ * which kind of question it asked.
+ */
 export function lookupGlossary(term: string | null | undefined): GlossaryEntry | null {
   if (!term) return null
-  return MASCOT_GLOSSARY[term] ?? null
+  return MASCOT_GLOSSARY[term] ?? lookupAction(term)
 }

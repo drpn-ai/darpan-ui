@@ -1,4 +1,5 @@
 import { MASCOT_GLOSSARY } from './mascotGlossary'
+import { lookupAction } from './mascotActions'
 import { describeTimeZone } from './utils/date'
 
 /**
@@ -205,6 +206,10 @@ const LABEL_SELECTOR = [
   // Section eyebrows do the same job under a different word.
   '[class*="eyebrow"]',
   '[data-explain-label]',
+  // Controls, not values. Every button in the app was a dead hover until this: 94 of them,
+  // 61 distinct names, and none reachable. Their answers live in MASCOT_ACTIONS because a
+  // control's question is "what will this do", not "what is this".
+  'button',
 ].join(', ')
 
 /**
@@ -233,14 +238,41 @@ function ownText(el: Element): string {
   return (el.textContent ?? '').trim()
 }
 
+/**
+ * A control's accessible name, the way a screen reader would announce it: aria-label,
+ * else title, else what it shows. The one Darpan-specific step is the tile title — the
+ * settings and dashboard list tiles are buttons whose visible text is the title PLUS this
+ * tenant's own data ("Timezone Asia/Kolkata"), and the data half would swamp the name.
+ */
+function controlName(el: HTMLElement): string {
+  const aria = (el.getAttribute('aria-label') ?? '').trim()
+  if (aria) return aria
+  const title = (el.getAttribute('title') ?? '').trim()
+  if (title) return title
+  const tileTitle = (el.querySelector('.static-page-tile-title')?.textContent ?? '').trim()
+  if (tileTitle) return tileTitle
+  return ownText(el)
+}
+
 export function resolveExplainTarget(start: Element | null): ExplainTarget | null {
   if (!start) return null
 
   const label = start.closest<HTMLElement>(LABEL_SELECTOR)
   if (label) {
-    // A header cell wraps its text in a span; either way the label's own text is the name.
-    const term = lookupLabel(normalizeLabel(ownText(label)))
-    if (term) return { el: label, term, detail: null }
+    if (label.tagName === 'BUTTON') {
+      // The name IS the key: MASCOT_ACTIONS is keyed by what the control is called, so a
+      // renamed button fails the coverage test rather than going quietly dead.
+      const name = normalizeLabel(controlName(label))
+      if (lookupAction(name)) return { el: label, term: name, detail: null }
+      // A tile button can still be naming a concept rather than an action — the Timezone
+      // tile is a heading with a hit area. Fall through to the noun index for those.
+      const noun = lookupLabel(name)
+      if (noun) return { el: label, term: noun, detail: null }
+    } else {
+      // A header cell wraps its text in a span; either way the label's own text is the name.
+      const term = lookupLabel(normalizeLabel(ownText(label)))
+      if (term) return { el: label, term, detail: null }
+    }
   }
 
   const value = start.closest<HTMLElement>(VALUE_SELECTOR)
