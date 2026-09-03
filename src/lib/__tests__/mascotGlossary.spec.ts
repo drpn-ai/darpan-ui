@@ -28,7 +28,7 @@ describe('mascot glossary', () => {
   it('never leaves a {detail} slot unfilled in a body that has no filler', () => {
     // Only entries the caller supplies a detail for may carry the token; anything else
     // would render the literal "{detail}" to a user.
-    const allowed = new Set(['runStartedAt', 'completedDate', 'timestamp'])
+    const allowed = new Set(['runStartedAt', 'completedDate', 'timestamp', 'apiDateRange'])
     for (const [term, entry] of Object.entries(MASCOT_GLOSSARY)) {
       if (entry.body.includes('{detail}')) expect(allowed.has(term), term).toBe(true)
     }

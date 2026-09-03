@@ -186,6 +186,55 @@ describe('useRunResultSourceDetails', () => {
     expect(source.runSourceDateRangeLabel.value).toBe('yesterday')
   })
 
+  it('names the exact instants the window used, and the zone it is showing them in', () => {
+    // The label is a calendar day derived in the VIEWER's zone, so two people read
+    // different days for one run. The instants are the only thing that settles it.
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-05-01T04:00:00Z', end: '2026-05-03T04:00:00Z' },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeDetail.value).toBe('May 1, 2026, 9:30 AM to May 3, 2026, 9:30 AM IST')
+  })
+
+  it('says the time of day was never recorded rather than inventing midnight', () => {
+    // A bare YYYY-MM-DD carries no instant. Rendering it as midnight would manufacture
+    // precision the contract does not have — the very thing that makes viewers disagree.
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-05-01', end: '2026-05-01' },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeDetail.value).toBe('May 1, 2026, with no time of day recorded')
+  })
+
+  it('answers with one end when only one was given', () => {
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-05-01T04:00:00Z', end: '' },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeDetail.value).toBe('from May 1, 2026, 9:30 AM IST, with no end recorded')
+  })
+
+  it('never answers empty, so the bubble cannot render an unfilled slot', () => {
+    // The body carries a {detail} token; an empty detail would print the store's
+    // timestamp fallback, which is the wrong sentence for a window.
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = { mode: 'API', dateRange: {}, files: [] } as never
+
+    expect(source.runSourceDateRangeDetail.value).toBe('no window was recorded for this run')
+  })
+
   it('resolves UTC instants to the local calendar day the window covers', () => {
     const source = buildSourceDetails()
     // The run wizard anchors API windows at local midnight and serializes with

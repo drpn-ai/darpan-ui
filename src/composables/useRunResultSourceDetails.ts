@@ -2,7 +2,7 @@ import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { GeneratedOutputSourceDetails, GeneratedOutputSourceFile } from '../lib/api/types'
 import { fileNameFromPath, normalizeDisplayText, normalizeDisplayToken } from '../lib/reconciliationDisplay'
 import { darpanSystemNameFromLabel, darpanSystemNamePair } from '../lib/utils/darpanSystems'
-import { addDays, displayCalendarDayOf, startOfLocalDay } from '../lib/utils/date'
+import { addDays, displayCalendarDayOf, formatDateTime, getDefaultDisplayTimeZone, startOfLocalDay, timeZoneCode } from '../lib/utils/date'
 
 export interface RunSourceFileView {
   key: string
@@ -25,6 +25,7 @@ export interface UseRunResultSourceDetails {
   isApiRunSource: ComputedRef<boolean>
   runSourceModeLabel: ComputedRef<string>
   runSourceDateRangeLabel: ComputedRef<string>
+  runSourceDateRangeDetail: ComputedRef<string>
   runSourceFilesLabel: ComputedRef<string>
   showRunSourceDetails: ComputedRef<boolean>
   resetRunSourceDetails: () => void
@@ -116,6 +117,39 @@ function formatRunSourceDateRange(start: string | undefined, end: string | undef
 // SHOPIFY, OMS, AUT_SRC_API -- an id the backend stored, not something to show a person.
 const ENUM_TOKEN_LABEL = /^[A-Z][A-Z0-9_]*$/
 
+/**
+ * The exact window, for the mascot to read back when somebody rests on the date range.
+ *
+ * The label above it is a CALENDAR DAY resolved in the viewer's own zone, so two people
+ * in different zones read different days for one run (DAR-UI-025/026). The instants are
+ * the only thing that settles that, and the only thing that answers "was this record
+ * really outside the window" — so this names them, and names the zone it is showing them
+ * in. Never empty: the body carries a {detail} token, and an unfilled slot would print
+ * the store's timestamp fallback, which is the wrong sentence for a window.
+ */
+function instantOrNull(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(value)) return null
+  const instant = new Date(value)
+  return Number.isNaN(instant.getTime()) ? null : instant
+}
+
+function describeRunSourceWindow(startValue: string, endValue: string, dayLabel: string): string {
+  if (!startValue && !endValue) return 'no window was recorded for this run'
+
+  const start = instantOrNull(startValue)
+  const end = instantOrNull(endValue)
+  const zone = timeZoneCode(start ?? end ?? new Date(), getDefaultDisplayTimeZone())
+  const suffix = zone ? ` ${zone}` : ''
+
+  if (start && end) return `${formatDateTime(start)} to ${formatDateTime(end)}${suffix}`
+  if (start) return `from ${formatDateTime(start)}${suffix}, with no end recorded`
+  if (end) return `until ${formatDateTime(end)}${suffix}, with no start recorded`
+  // Bare YYYY-MM-DD: the contract carries no instant, and rendering one as midnight would
+  // manufacture precision it does not have — which is the very thing that makes two
+  // viewers disagree about which day a run covered.
+  return `${dayLabel}, with no time of day recorded`
+}
+
 export function useRunResultSourceDetails(deps: UseRunResultSourceDetailsDeps): UseRunResultSourceDetails {
   const runSourceDetails = ref<GeneratedOutputSourceDetails | null>(null)
 
@@ -173,6 +207,11 @@ export function useRunResultSourceDetails(deps: UseRunResultSourceDetailsDeps): 
   })
   const runSourceModeLabel = computed(() => isApiRunSource.value ? 'API date range' : 'Source files')
   const runSourceDateRangeLabel = computed(() => formatRunSourceDateRange(runSourceDetails.value?.dateRange?.start, runSourceDetails.value?.dateRange?.end))
+  const runSourceDateRangeDetail = computed(() => describeRunSourceWindow(
+    normalizeDisplayText(runSourceDetails.value?.dateRange?.start),
+    normalizeDisplayText(runSourceDetails.value?.dateRange?.end),
+    runSourceDateRangeLabel.value,
+  ))
   const runSourceFilesLabel = computed(() => isApiRunSource.value ? 'Files compared' : 'Source files')
   const showRunSourceDetails = computed(() =>
     runSourceFiles.value.length > 0 || Boolean(runSourceDateRangeLabel.value),
@@ -188,6 +227,7 @@ export function useRunResultSourceDetails(deps: UseRunResultSourceDetailsDeps): 
     isApiRunSource,
     runSourceModeLabel,
     runSourceDateRangeLabel,
+    runSourceDateRangeDetail,
     runSourceFilesLabel,
     showRunSourceDetails,
     resetRunSourceDetails,

@@ -745,6 +745,39 @@ describe('ReconciliationRunResultPage', () => {
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:source')
   })
 
+  it('answers the date range with the exact instants the run used', async () => {
+    // The label is a calendar day resolved in the viewer's zone, so on its own it cannot
+    // settle whether a record was really inside the window. The answer carries the pair
+    // of instants, and names the zone it is showing them in.
+    const { useMascotStore } = await import('../../../stores/mascot')
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences(defaultDiffDetails, {
+      sourceDetails: {
+        mode: 'API',
+        dateRange: { start: '2026-05-01T04:00:00Z', end: '2026-05-02T04:00:00Z' },
+        files: [],
+      },
+    }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    const range = wrapper.get('[data-testid="run-result-date-range"]')
+    expect(range.text()).toBe('May 1, 2026')
+
+    await range.trigger('focus')
+    const mascot = useMascotStore()
+    expect(mascot.entry?.title).toBe('API date range')
+    expect(mascot.entry?.body).toContain('May 1, 2026, 9:30 AM to May 2, 2026, 9:30 AM IST')
+    expect(mascot.entry?.body).not.toContain('{detail}')
+
+    // The eyebrow beside it answers the same question, so either half of the line works.
+    mascot.clear()
+    await wrapper.get('[data-testid="run-result-source-mode"]').trigger('focus')
+    expect(mascot.entry?.body).toContain('May 1, 2026, 9:30 AM to May 2, 2026, 9:30 AM IST')
+    setDefaultDisplayTimeZone(undefined)
+  })
+
   it('downloads the saved result on demand instead of retaining the loaded payload copy', async () => {
     const createObjectUrl = vi.fn(() => 'blob:result')
     const revokeObjectUrl = vi.fn()

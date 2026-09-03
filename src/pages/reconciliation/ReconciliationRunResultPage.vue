@@ -86,9 +86,22 @@
 
         <section v-else-if="savedOutput || liveRunResultId" class="reconciliation-diff-details">
           <section v-if="showRunSourceDetails" class="run-result-source-details" data-testid="run-result-source-details">
+            <!-- Both halves answer the same question. The label is only a calendar day,
+                 resolved in the viewer's own zone, so v-explain carries the exact pair of
+                 instants behind it — the part that settles whether a record was really
+                 inside the window. The index cannot infer those, which is what the
+                 directive is for. -->
             <div class="run-result-source-details__summary">
-              <span class="run-result-source-details__eyebrow">{{ runSourceModeLabel }}</span>
-              <strong v-if="runSourceDateRangeLabel">{{ runSourceDateRangeLabel }}</strong>
+              <span
+                v-explain="{ term: isApiRunSource ? 'apiDateRange' : 'sourceFiles', detail: runSourceDateRangeDetail }"
+                class="run-result-source-details__eyebrow"
+                data-testid="run-result-source-mode"
+              >{{ runSourceModeLabel }}</span>
+              <strong
+                v-if="runSourceDateRangeLabel"
+                v-explain="{ term: 'apiDateRange', detail: runSourceDateRangeDetail }"
+                data-testid="run-result-date-range"
+              >{{ runSourceDateRangeLabel }}</strong>
             </div>
             <div class="run-result-source-details__files" :aria-label="runSourceFilesLabel">
               <span v-if="isApiRunSource" class="run-result-source-details__files-label">Files compared</span>
@@ -470,6 +483,9 @@ import StatusBadge from '../../components/ui/StatusBadge.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
+// Imported rather than relied on from main.ts's global registration: this page's own
+// tests mount it standalone, where a globally registered directive does not exist.
+import { vExplain } from '../../directives/vExplain'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type {
   GeneratedOutput,
@@ -917,6 +933,7 @@ const {
   isApiRunSource,
   runSourceModeLabel,
   runSourceDateRangeLabel,
+  runSourceDateRangeDetail,
   runSourceFilesLabel,
   showRunSourceDetails,
   resetRunSourceDetails,
