@@ -105,6 +105,8 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'start': 'startDate',
   'updated': 'updatedAt',
   'remote attributes': 'remoteAttributes',
+  'files compared': 'sourceFiles',
+  'record id': 'primaryId',
 
   // Section headings, as the pages actually title them.
   'exclusions': 'exclusions',
@@ -137,6 +139,19 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'automations': 'automations',
 })
 
+/**
+ * Labels the product builds out of this tenant's own data, where no fixed phrase can
+ * ever match. Tried only after the exact index misses, and deliberately kept to almost
+ * nothing: a pattern that fires on something it did not mean is precisely the confident
+ * wrong answer the exact index exists to prevent.
+ */
+const LABEL_PATTERNS: readonly (readonly [RegExp, string])[] = Object.freeze([
+  // The diff buckets read "Missing from HotWax" / "Missing from Shopify" — the system
+  // names come from the run. The direction is already visible in the heading, so one
+  // direction-neutral answer serves both sides and cannot get the sides backwards.
+  [/^missing (from|in) .+$/, 'missingInSource'],
+] as const)
+
 /** Every glossary title is its own label, so a new entry is reachable the moment it exists. */
 function buildIndex(): Record<string, string> {
   const index: Record<string, string> = {}
@@ -148,6 +163,13 @@ function buildIndex(): Record<string, string> {
 }
 
 const LABEL_INDEX = buildIndex()
+
+function lookupLabel(text: string): string | null {
+  const exact = LABEL_INDEX[text]
+  if (exact) return exact
+  for (const [pattern, term] of LABEL_PATTERNS) if (pattern.test(text)) return term
+  return null
+}
 
 /**
  * Elements that carry a name rather than a value.
@@ -171,22 +193,28 @@ const LABEL_SELECTOR = [
   'h5',
   'h6',
   '.static-page-section-heading',
-  '.micro-label',
-  '.static-page-summary-label',
-  '.workflow-context-label',
-  '.workflow-choice-label',
-  '.ruleset-field-label',
-  '.connection-diagnostics-label',
-  '.option-label',
+  // Every label class in this app ends in "label" — .micro-label, .option-label,
+  // .static-page-summary-label, .workflow-context-label, and the page-local BEM ones
+  // (.reconciliation-diff-bucket__label, .run-result-source-file__label). Naming them
+  // one at a time is what left the run result page with NOTHING to hover: the list only
+  // ever grew for whichever page was being edited, and a sweep of that page — the one
+  // most of the glossary was written for — resolved zero elements. Matching the
+  // convention instead is safe because resolution is TEXT-driven: a label class over an
+  // unrecognised phrase still answers nothing.
+  '[class*="label"]',
+  // Section eyebrows do the same job under a different word.
+  '[class*="eyebrow"]',
   '[data-explain-label]',
 ].join(', ')
 
 /**
- * Elements that could carry one of our rendered timestamps. `span` is in the list only
- * because the pattern below is strict enough to carry it: a span whose ENTIRE text is
- * this app's date format is a timestamp, not a coincidence.
+ * Elements that could carry one of our rendered timestamps. `span` and `p` are in the
+ * list only because the pattern below is strict enough to carry them: an element whose
+ * ENTIRE text is this app's date format is a timestamp, not a coincidence. `p` earns its
+ * place on the run result page, where the run's own time is the hero's description
+ * paragraph rather than a table cell.
  */
-const VALUE_SELECTOR = 'td, dd, time, span'
+const VALUE_SELECTOR = 'td, dd, time, span, p'
 
 /**
  * Exactly what `formatDateTime` produces — "May 2, 2026, 1:00 PM" — and nothing else.
@@ -211,7 +239,7 @@ export function resolveExplainTarget(start: Element | null): ExplainTarget | nul
   const label = start.closest<HTMLElement>(LABEL_SELECTOR)
   if (label) {
     // A header cell wraps its text in a span; either way the label's own text is the name.
-    const term = LABEL_INDEX[normalizeLabel(ownText(label))]
+    const term = lookupLabel(normalizeLabel(ownText(label)))
     if (term) return { el: label, term, detail: null }
   }
 

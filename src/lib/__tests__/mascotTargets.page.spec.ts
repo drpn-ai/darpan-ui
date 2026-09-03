@@ -155,3 +155,98 @@ describe('headings that say "runs" over something that is not an execution', () 
     expect(headingTerm('<h2 class="static-page-section-heading">Previous Runs</h2>')).toBe('previousRuns')
   })
 })
+
+/**
+ * Markup lifted from a real mount of ReconciliationRunResultPage, not composed by hand:
+ * a sweep of that page resolved ZERO explainable elements, on the one page most of the
+ * glossary was written for. Everything it labels uses page-local BEM classes the
+ * selector list never named, so the index was looking at a page it could not see.
+ */
+const RUN_RESULT_PAGE = `
+  <div class="run-result-hero">
+    <h1 class="static-page-inline-edit-title">CSV Order Compare</h1>
+    <p class="static-page-section-description">Mar 31, 2026, 8:11 AM</p>
+  </div>
+  <section class="run-result-source-details">
+    <div class="run-result-source-details__summary">
+      <span class="run-result-source-details__eyebrow">Source files</span>
+    </div>
+    <div class="run-result-source-details__files">
+      <span class="run-result-source-details__files-label">Files compared</span>
+      <div class="run-result-source-file">
+        <span class="run-result-source-file__label">HotWax</span>
+        <span class="run-result-source-file__name">orders-1.csv</span>
+      </div>
+    </div>
+  </section>
+  <button type="button" class="run-result-step-timeline__toggle">
+    <span class="run-result-step-timeline__label micro-label">Run steps</span>
+  </button>
+  <div class="reconciliation-diff-details__bucket-grid">
+    <button type="button" class="reconciliation-diff-bucket">
+      <span class="reconciliation-diff-bucket__label">Missing from HotWax</span><strong>1</strong>
+    </button>
+    <button type="button" class="reconciliation-diff-bucket">
+      <span class="reconciliation-diff-bucket__label">Missing from Shopify</span><strong>0</strong>
+    </button>
+  </div>
+  <table><thead><tr><th><span>Record ID</span></th><th><span>Diff Detail</span></th></tr></thead></table>
+`
+
+describe('the run result page', () => {
+  function mountRunResult(): HTMLElement {
+    const host = document.createElement('div')
+    host.innerHTML = RUN_RESULT_PAGE
+    document.body.appendChild(host)
+    return host
+  }
+
+  it('explains the labels the page actually renders', () => {
+    const host = mountRunResult()
+
+    expect(termFor(host, 'span', 'Source files')).toBe('sourceFiles')
+    expect(termFor(host, 'span', 'Files compared')).toBe('sourceFiles')
+    expect(termFor(host, 'span', 'Run steps')).toBe('runSteps')
+    expect(termFor(host, 'th', 'Record ID')).toBe('primaryId')
+    expect(termFor(host, 'th', 'Diff Detail')).toBe('diffDetail')
+  })
+
+  it('answers both missing buckets, whatever the two systems are called', () => {
+    // The bucket label carries the tenant's own system names — "Missing from HotWax",
+    // "Missing from Shopify" — so no fixed phrase can match it. One direction-neutral
+    // answer beats two that have to know which side is which.
+    const host = mountRunResult()
+
+    expect(termFor(host, 'span', 'Missing from HotWax')).toBe('missingInSource')
+    expect(termFor(host, 'span', 'Missing from Shopify')).toBe('missingInSource')
+  })
+
+  it('reaches the run time in the hero, which is a paragraph rather than a cell', () => {
+    const host = mountRunResult()
+    const target = resolveExplainTarget(host.querySelector('.static-page-section-description'))
+
+    expect(target?.term).toBe('timestamp')
+    expect(target?.detail).toBeTruthy()
+  })
+
+  it('still says nothing about the values beside those labels', () => {
+    // Widening the selector must not turn data into vocabulary: the system name and the
+    // file name sit in label-classed spans and are still this tenant's own records.
+    const host = mountRunResult()
+    const system = host.querySelector('.run-result-source-file__label')
+    const file = host.querySelector('.run-result-source-file__name')
+    const title = host.querySelector('.static-page-inline-edit-title')
+
+    expect(resolveExplainTarget(system)).toBeNull()
+    expect(resolveExplainTarget(file)).toBeNull()
+    expect(resolveExplainTarget(title)).toBeNull()
+  })
+
+  it('explains the API date range on a run that pulled instead of uploading', () => {
+    const host = document.createElement('div')
+    host.innerHTML = '<span class="run-result-source-details__eyebrow">API date range</span>'
+    document.body.appendChild(host)
+
+    expect(resolveExplainTarget(host.querySelector('span'))?.term).toBe('apiDateRange')
+  })
+})

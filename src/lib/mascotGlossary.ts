@@ -220,6 +220,24 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Automations',
     body: 'the saved runs set to go off on their own, one tile each. Open one for its schedule, its window, and what it has actually been doing.',
   },
+  // The run result page's own vocabulary. These four existed nowhere, which is why a
+  // sweep of that page resolved nothing at all — see mascotTargets.page.spec.ts.
+  sourceFiles: {
+    title: 'Source files',
+    body: 'the two extracts this run compared, exactly as they arrived. Download one to check a record the run says is missing.',
+  },
+  apiDateRange: {
+    title: 'API date range',
+    body: 'the window this run pulled from both systems. Records dated outside it were never fetched, so they cannot be compared \u2014 only missed.',
+  },
+  runSteps: {
+    title: 'Run steps',
+    body: 'each stage this run went through and how it ended. A step that failed explains a count below it better than the count does.',
+  },
+  diffDetail: {
+    title: 'Diff detail',
+    body: 'what actually differs on this record \u2014 the fields, and what each side holds. The counts say how many; this says what.',
+  },
   previousRuns: {
     title: 'Previous runs',
     body: 'every execution of this automation, newest first. Each is a record of what was true when it went — re-run rather than editing one.',
