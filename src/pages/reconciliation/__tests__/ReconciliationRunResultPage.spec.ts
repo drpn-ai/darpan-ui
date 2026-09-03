@@ -778,6 +778,29 @@ describe('ReconciliationRunResultPage', () => {
     setDefaultDisplayTimeZone(undefined)
   })
 
+  it('reads back the zone-less stamps a real run row sends', async () => {
+    // The exact shape from the screenshot that reported this: windowStartDate serialised
+    // by Timestamp.toString(). It used to answer "with no time of day recorded".
+    const { useMascotStore } = await import('../../../stores/mascot')
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences(defaultDiffDetails, {
+      sourceDetails: {
+        mode: 'API',
+        dateRange: { start: '2026-09-01 00:00:00.0', end: '2026-09-02 00:00:00.0' },
+        files: [],
+      },
+    }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="run-result-date-range"]').trigger('focus')
+    const mascot = useMascotStore()
+
+    expect(mascot.entry?.body).toBe('the window this run pulled: Sep 1, 2026, 12:00 AM to Sep 2, 2026, 12:00 AM.')
+    setDefaultDisplayTimeZone(undefined)
+  })
+
   it('downloads the saved result on demand instead of retaining the loaded payload copy', async () => {
     const createObjectUrl = vi.fn(() => 'blob:result')
     const revokeObjectUrl = vi.fn()

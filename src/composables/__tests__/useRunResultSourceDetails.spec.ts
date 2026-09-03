@@ -200,6 +200,34 @@ describe('useRunResultSourceDetails', () => {
     expect(source.runSourceDateRangeDetail.value).toBe('May 1, 2026, 9:30 AM to May 3, 2026, 9:30 AM IST')
   })
 
+  it('reads a zone-less database timestamp, which is what the run row actually sends', () => {
+    // windowStartDate is a date-time column and the backend serialises it with
+    // Timestamp.toString(), so it arrives as "2026-09-01 00:00:00.0" — space separated,
+    // no T, no zone. Requiring an ISO T made every real API run report no time at all.
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-09-01 00:00:00.0', end: '2026-09-02 00:00:00.0' },
+      files: [],
+    } as never
+
+    // Shown exactly as recorded and NOT converted: the stamp carries no zone, so moving
+    // it into the viewer's would invent an offset the record does not have.
+    expect(source.runSourceDateRangeDetail.value).toBe('Sep 1, 2026, 12:00 AM to Sep 2, 2026, 12:00 AM')
+  })
+
+  it('keeps seconds when a window boundary has them', () => {
+    const source = buildSourceDetails()
+    source.runSourceDetails.value = {
+      mode: 'API',
+      dateRange: { start: '2026-09-01 06:15:30', end: '2026-09-02 18:45:00' },
+      files: [],
+    } as never
+
+    expect(source.runSourceDateRangeDetail.value).toBe('Sep 1, 2026, 6:15:30 AM to Sep 2, 2026, 6:45 PM')
+  })
+
   it('says the time of day was never recorded rather than inventing midnight', () => {
     // A bare YYYY-MM-DD carries no instant. Rendering it as midnight would manufacture
     // precision the contract does not have — the very thing that makes viewers disagree.

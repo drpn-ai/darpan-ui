@@ -233,7 +233,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     // {detail} is the exact pair of instants, filled by the page from the run's own
     // window. The label beside it is only a calendar day, resolved in the viewer's zone,
     // so the instants are the part that settles which records were really in scope.
-    body: 'the window this run pulled: {detail}. A record dated outside it was never fetched, so it can only be missed.',
+    body: 'the window this run pulled: {detail}.',
   },
   runSteps: {
     title: 'Run steps',

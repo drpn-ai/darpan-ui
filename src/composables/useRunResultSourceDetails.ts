@@ -127,26 +127,63 @@ const ENUM_TOKEN_LABEL = /^[A-Z][A-Z0-9_]*$/
  * in. Never empty: the body carries a {detail} token, and an unfilled slot would print
  * the store's timestamp fallback, which is the wrong sentence for a window.
  */
-function instantOrNull(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(value)) return null
-  const instant = new Date(value)
-  return Number.isNaN(instant.getTime()) ? null : instant
+/** ISO with an explicit zone: the only shape whose instant is unambiguous. */
+const ZONED_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/
+/**
+ * A wall clock with no zone on it. This is what the run row actually sends: windowStartDate
+ * is a date-time column and the backend serialises it with Timestamp.toString(), so it
+ * arrives as "2026-09-01 00:00:00.0" — space separated, no T, no offset. Requiring an ISO T
+ * made every real API run report that it had no time of day at all.
+ */
+const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/
+
+/** Rendered from its own parts, never through a Date: converting a stamp that carries no
+    zone into the viewer's would invent an offset the record does not have. */
+function formatWallClock(match: RegExpMatchArray): string {
+  const [, year, month, day, hour, minute, second] = match.map(Number) as number[]
+  const clockHour = (hour as number) % 12 || 12
+  const suffix = (hour as number) < 12 ? 'AM' : 'PM'
+  const seconds = second ? `:${String(second).padStart(2, '0')}` : ''
+  return `${MONTH_NAMES[(month as number) - 1]} ${day}, ${year}, ${clockHour}:${String(minute).padStart(2, '0')}${seconds} ${suffix}`
 }
 
+function renderWindowBoundary(value: string): { text: string, zoned: boolean, at: Date | null } | null {
+  if (ZONED_INSTANT.test(value)) {
+    const instant = new Date(value)
+    if (!Number.isNaN(instant.getTime())) return { text: formatDateTime(instant), zoned: true, at: instant }
+  }
+  const wall = value.match(WALL_CLOCK)
+  return wall ? { text: formatWallClock(wall), zoned: false, at: null } : null
+}
+
+/**
+ * The exact window, for the mascot to read back when somebody rests on the date range.
+ *
+ * The label above it is a CALENDAR DAY resolved in the viewer's own zone, so two people
+ * in different zones read different days for one run (DAR-UI-025/026). The instants are
+ * the only thing that settles that. Never empty: the body carries a {detail} token, and
+ * an unfilled slot would print the store's timestamp fallback, which is the wrong
+ * sentence for a window.
+ */
 function describeRunSourceWindow(startValue: string, endValue: string, dayLabel: string): string {
   if (!startValue && !endValue) return 'no window was recorded for this run'
 
-  const start = instantOrNull(startValue)
-  const end = instantOrNull(endValue)
-  const zone = timeZoneCode(start ?? end ?? new Date(), getDefaultDisplayTimeZone())
+  const start = renderWindowBoundary(startValue)
+  const end = renderWindowBoundary(endValue)
+  // A zone code is appended only when every boundary shown carries one. On a mixed or
+  // zone-less pair it would be a claim about a stamp that never had a zone.
+  // Taken at the window's own instant, not at "now": a zone code has to survive a DST
+  // boundary between the run and whoever is reading it back.
+  const zone = (start?.zoned ?? true) && (end?.zoned ?? true)
+    ? timeZoneCode(start?.at ?? end?.at ?? new Date(), getDefaultDisplayTimeZone())
+    : ''
   const suffix = zone ? ` ${zone}` : ''
 
-  if (start && end) return `${formatDateTime(start)} to ${formatDateTime(end)}${suffix}`
-  if (start) return `from ${formatDateTime(start)}${suffix}, with no end recorded`
-  if (end) return `until ${formatDateTime(end)}${suffix}, with no start recorded`
-  // Bare YYYY-MM-DD: the contract carries no instant, and rendering one as midnight would
-  // manufacture precision it does not have — which is the very thing that makes two
-  // viewers disagree about which day a run covered.
+  if (start && end) return `${start.text} to ${end.text}${suffix}`
+  if (start) return `from ${start.text}${suffix}, with no end recorded`
+  if (end) return `until ${end.text}${suffix}, with no start recorded`
+  // A bare YYYY-MM-DD carries no instant at all, and rendering one as midnight would
+  // manufacture precision the contract does not have.
   return `${dayLabel}, with no time of day recorded`
 }
 
