@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { MASCOT_HINTS, hintsFor } from '../mascotHints'
 
 function render(html: string): HTMLElement {
@@ -111,5 +113,43 @@ describe('every hint names a control that exists', () => {
     const source = sourceFor(entry as string)
     expect(source).toContain('run-result-cancel')
     expect(source).not.toContain('a-testid-nobody-wrote')
+  })
+})
+
+/**
+ * The route-component guard above is a SUBSTRING check, and that is a real hole for one
+ * testid in particular. `wizard-next` is bound at runtime from useWorkflowStepMachine
+ * (`primaryTestId`), but the literal also appears in WorkflowStepForm.vue as a CSS class
+ * — so the guard passes on the class even if the binding is renamed and the six settings
+ * create hints gated on it go silently dead. Nothing else would notice.
+ *
+ * This renders the control instead of reading for it, and pins both halves of the split:
+ * a mid-wizard step offers the create line, a save step offers the edit line and NOT the
+ * create one. That is what makes two routes over one component honest.
+ */
+describe('the settings wizard gates its hints on a control that really renders', () => {
+  function mountStep(primaryTestId: string, primaryActionVariant: 'default' | 'save') {
+    return mount(WorkflowStepForm, {
+      props: { question: 'Host', primaryTestId, primaryActionVariant, showPrimaryAction: true, primaryLabel: 'OK' },
+      attachTo: document.body,
+    })
+  }
+
+  it('offers the mid-wizard line only while a step before the last is on screen', () => {
+    const step = mountStep('wizard-next', 'default')
+
+    expect(step.find('[data-testid="wizard-next"]').exists(), 'wizard-next is not a real testid any more').toBe(true)
+    expect(hintsFor('settings-oms-create', document).length).toBeGreaterThan(0)
+
+    step.unmount()
+  })
+
+  it('switches to the edit line on a save step, and drops the create one', () => {
+    const step = mountStep('save-oms-rest-source', 'save')
+
+    expect(hintsFor('settings-oms-create', document)).toEqual([])
+    expect(hintsFor('settings-oms-edit', document).length).toBeGreaterThan(0)
+
+    step.unmount()
   })
 })

@@ -96,6 +96,98 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'Each row is a path into the source document — the placeholder shows the shape it wants.', when: control('schema-editor-add-row') },
     { text: 'Without permission to edit tenant settings this is a read-only view, not a broken one.' },
   ]),
+  /* ── Settings ──────────────────────────────────────────────────────────────────
+     Written from the components, not from the testid names. Three structural facts
+     shape every line here. A create/edit pair is TWO routes over ONE component, so the
+     route key already separates them and `when` is spent only on controls that are
+     conditional WITHIN a route. Every create action is gated on canEditTenantSettings,
+     so a hint naming one is silent for a reader who could not act on it anyway. And a
+     create wizard asks one question per card, saving only on the last — `wizard-next`
+     is on screen for exactly the steps before that. */
+
+  'settings-oms': Object.freeze([
+    { text: 'Each tile is one HotWax connection — open it to see its endpoints or test it.', when: control('oms-auth-tile') },
+    { text: 'An auth profile is the credentials only. The endpoints that use it live inside it.', when: control('oms-auth-create-action') },
+  ]),
+  'settings-oms-auth': Object.freeze([
+    { text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('oms-endpoint-tile') },
+    { text: 'Diagnostics reads and changes nothing — safe to run whenever you doubt a credential.', when: control('diagnose-oms-rest-source') },
+    { text: 'Delete is the one action here that nothing undoes.', when: control('delete-oms-rest-source') },
+  ]),
+  'settings-oms-create': Object.freeze([
+    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+  ]),
+  'settings-oms-edit': Object.freeze([
+    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-oms-rest-source') },
+  ]),
+
+  'settings-shopify': Object.freeze([
+    { text: 'Each tile is one Shopify connection — open it to see its endpoints or test it.', when: control('shopify-auth-tile') },
+    { text: 'Nothing saved yet. A config here is what every Shopify run signs in with.', when: control('shopify-empty-create-action') },
+  ]),
+  'settings-shopify-auth': Object.freeze([
+    { text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('shopify-endpoint-tile') },
+    { text: 'Diagnostics reads and changes nothing — safe to run whenever you doubt a credential.', when: control('diagnose-shopify-auth') },
+    { text: 'Delete is the one action here that nothing undoes.', when: control('delete-shopify-auth') },
+  ]),
+  'settings-shopify-create': Object.freeze([
+    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+  ]),
+  'settings-shopify-edit': Object.freeze([
+    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-shopify-auth') },
+  ]),
+
+  // NetSuite is the only settings page carrying two lists, and telling them apart is the
+  // whole job: auth is who you are, an endpoint is what you ask for.
+  'settings-netsuite': Object.freeze([
+    { text: 'Auth is who NetSuite thinks you are. An endpoint is what you ask it for — you need both.', when: control('netsuite-auth-tile') },
+    { text: 'Endpoints are listed separately below, and a run needs one of each.', when: control('netsuite-endpoint-tile') },
+  ]),
+  'settings-netsuite-auth-create': Object.freeze([
+    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { text: 'The eye shows what you pasted, so a stray space is visible before you save it.', when: control('toggle-client-id-visibility') },
+  ]),
+  'settings-netsuite-auth-edit': Object.freeze([
+    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-netsuite-auth') },
+    { text: 'The eye shows what you pasted, so a stray space is visible before you save it.', when: control('toggle-client-id-visibility') },
+  ]),
+  'settings-netsuite-endpoints-create': Object.freeze([
+    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+  ]),
+  'settings-netsuite-endpoints-edit': Object.freeze([
+    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-netsuite-endpoint') },
+  ]),
+
+  'settings-sftp': Object.freeze([
+    { text: 'Each server is somewhere a run can pick files up from or drop them off.', when: control('sftp-server-tile') },
+    { text: 'Nothing saved yet — a server here is what a file-based run reads from.', when: control('sftp-empty-create-action') },
+  ]),
+  'settings-sftp-create': Object.freeze([
+    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+  ]),
+  'settings-sftp-edit': Object.freeze([
+    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-sftp-server') },
+  ]),
+
+  // No create action anywhere on this page, and that is the thing worth saying: runs are
+  // made in the reconciliation flow and only edited here.
+  'settings-runs': Object.freeze([
+    { text: 'Runs are created in the reconciliation flow, not here — this page only edits saved ones.', when: control('run-tile') },
+    { text: 'Editing a saved run changes what it compares next time. Finished results are untouched.', when: control('saved-runs') },
+  ]),
+  'settings-runs-edit': Object.freeze([
+    { text: 'The two sources are what this run compares — change either and the next run answers differently.', when: control('run-source-1-row') },
+  ]),
+
+  'settings-tenant': Object.freeze([
+    { text: 'This zone is what schedules and windows are read in. Your own preference only changes how times display.', when: control('tenant-module-timezone') },
+    { text: 'A space set here is the default; an automation can still send its notice somewhere else.', when: control('tenant-module-notifications') },
+  ]),
+  'settings-user': Object.freeze([
+    { text: 'Your timezone changes how times read to you here — not when a scheduled automation fires.', when: control('user-timezone-card') },
+    { text: 'This is your own default. It does not change what anyone else is sent.', when: control('user-notification-default-card') },
+  ]),
+
   hub: Object.freeze([
     { text: 'Press ⌘K, or click me, to jump anywhere by name.' },
   ]),
