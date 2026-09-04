@@ -188,6 +188,39 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'This is your own default. It does not change what anyone else is sent.', when: control('user-notification-default-card') },
   ]),
 
+  /* ── Reconciliation and schema wizards ─────────────────────────────────────────
+     The automation page is create AND edit over one component, and every
+     `automation-edit-*` control sits inside `v-if="isEditMode"` — so those lines belong
+     to the edit route alone, not to both. Deliberately nothing gated on
+     automation-schedule-timezone: a concurrent session has it removed in the working
+     tree but present in HEAD, so a hint naming it would be dead on whichever of the two
+     lands. */
+
+  'reconciliation-create': Object.freeze([
+    { text: 'One question per card, and nothing is saved until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { text: 'Saving keeps this setup, so running it again is a click rather than a rebuild.', when: control('create-run-submit') },
+  ]),
+  'reconciliation-diff': Object.freeze([
+    { text: 'This side is a file, so the run compares what you upload — not whatever the system holds now.', when: control('file1-input') },
+    { text: 'The window decides which records are pulled at all. One dated just outside it reads as missing when both systems have it.', when: control('api-window-preset-previous-day') },
+    { text: 'The last result this setup produced — open it rather than re-running to see what it found.', when: control('latest-run-result') },
+  ]),
+  'reconciliation-automation-create': Object.freeze([
+    { text: 'One question per card, and nothing is scheduled until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { text: 'How far back each run reaches. How often it runs is the schedule, and the two are set separately.', when: control('automation-window-select') },
+  ]),
+  'reconciliation-automation-edit': Object.freeze([
+    // Rendered only when the automation has actually drifted, so this is never idle noise.
+    { text: 'Until you sync, this keeps running the setup it was built with rather than the run’s current one.', when: control('automation-edit-drift') },
+    { text: 'Sync replaces this automation’s source setup and exclusion filters with the run’s current ones.', when: control('automation-edit-sync') },
+    { text: 'Widening the window makes each run reach further back. It does not make runs happen more often.', when: control('automation-edit-window-fields') },
+    { text: 'This is where this automation’s own notice goes, whichever space the tenant defaults to.', when: control('automation-edit-chat-space-fields') },
+  ]),
+  'schemas-create': Object.freeze([
+    { text: 'One question per card, and nothing is saved until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { text: 'What you reviewed here is what every run will expect from this source.', when: control('save-schema') },
+  ]),
+
   hub: Object.freeze([
     { text: 'Press ⌘K, or click me, to jump anywhere by name.' },
   ]),
