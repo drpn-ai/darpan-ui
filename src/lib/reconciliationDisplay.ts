@@ -29,7 +29,9 @@ export const RUN_STAGE_SEQUENCE: readonly string[] = [
   'EXTRACT_FILE1',
   'EXTRACT_FILE2',
   'COMPARE',
-  'VERIFY',
+  'VERIFY_MISSING',
+  'VERIFY_EXCHANGE',
+  'VERIFY_RETURNS',
   'WRITE_OUTPUT',
   'NOTIFY',
 ]
@@ -38,14 +40,29 @@ const RUN_STAGE_LABELS: Record<string, string> = {
   RESOLVE: 'Preparing run',
   COMPARE: 'Comparing records',
   WRITE_OUTPUT: 'Writing results',
+  // VERIFY is retired as a stage a run can enter — one code per pass now — but rows recorded
+  // before the split still carry it, so it keeps the label it always had.
   VERIFY: 'Verifying differences',
+  VERIFY_MISSING: 'Verifying differences',
+  VERIFY_EXCHANGE: 'Verifying exchange pairs',
+  VERIFY_RETURNS: 'Verifying returns',
   NOTIFY: 'Sending notifications',
 }
 
-// Three separate verification passes (exchange pairs, missing-record lookups, returns presence)
-// share the VERIFY stage code, so a run that ran two of them showed two identical rows. Each pass
-// records the side labels it actually rechecked in its own metricsJson; resolve those to system
-// names here so the rows say which system each one covered.
+// What each verification pass is checking, appended to the systems it checked them on. Keyed by the
+// same codes as RUN_STAGE_LABELS above, whose values are the no-systems fallbacks.
+const VERIFY_STAGE_SUBJECTS: Record<string, string> = {
+  VERIFY: 'diffs',
+  VERIFY_MISSING: 'diffs',
+  VERIFY_EXCHANGE: 'exchange pairs',
+  VERIFY_RETURNS: 'returns',
+}
+
+// The three verification passes (missing-record lookups, exchange pairs, returns presence) each own
+// a stage code, which says WHICH check ran; each also records the side labels it actually rechecked
+// in its own metricsJson, which says on WHICH systems. Resolve those labels to system names here so
+// a row names both — they shared one code and one label until a run performing two of them rendered
+// two byte-identical rows.
 function verifiedSystemNames(metricsJson: unknown): string[] {
   const raw = normalizeDisplayText(metricsJson)
   if (!raw) return []
@@ -92,9 +109,10 @@ export function reconciliationStageLabel(
     if (code === 'EXTRACT_FILE1') return `Extracting ${normalizeDisplayText(systemNames.file1) || 'source 1'}`
     return `Extracting ${normalizeDisplayText(systemNames.file2) || 'source 2'}`
   }
-  if (code === 'VERIFY') {
+  const verifySubject = VERIFY_STAGE_SUBJECTS[code]
+  if (verifySubject) {
     const systemNames = joinSystemNames(verifiedSystemNames(metricsJson))
-    if (systemNames) return `Verifying ${systemNames}'s diffs`
+    if (systemNames) return `Verifying ${systemNames}'s ${verifySubject}`
   }
   return RUN_STAGE_LABELS[code] ?? code
 }

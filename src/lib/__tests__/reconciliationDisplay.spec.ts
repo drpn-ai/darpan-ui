@@ -52,6 +52,29 @@ describe('reconciliationStageLabel', () => {
       '{"verifiedSystems":["HotWax","Shopify"]}')).toBe("Verifying HotWax and Shopify's diffs")
   })
 
+  it('tells the three verification passes apart by their own stage codes', () => {
+    // The passes used to share one VERIFY code, so a run performing two of them rendered two rows
+    // reading exactly the same. The code says WHICH check ran; metricsJson says on which systems.
+    expect(reconciliationStageLabel('VERIFY_MISSING', 'HotWax', 'Shopify',
+      '{"verifiedSystems":["Shopify"]}')).toBe("Verifying Shopify's diffs")
+    expect(reconciliationStageLabel('VERIFY_EXCHANGE', 'HotWax', 'Shopify',
+      '{"verifiedSystems":["HotWax","Shopify"]}')).toBe("Verifying HotWax and Shopify's exchange pairs")
+    expect(reconciliationStageLabel('VERIFY_RETURNS', 'HotWax', 'Shopify',
+      '{"verifiedSystems":["HotWax","Shopify"]}')).toBe("Verifying HotWax and Shopify's returns")
+  })
+
+  it('names each verification pass even when it recorded no systems', () => {
+    expect(reconciliationStageLabel('VERIFY_MISSING')).toBe('Verifying differences')
+    expect(reconciliationStageLabel('VERIFY_EXCHANGE')).toBe('Verifying exchange pairs')
+    expect(reconciliationStageLabel('VERIFY_RETURNS')).toBe('Verifying returns')
+  })
+
+  it('still labels the retired shared code, which older runs stored', () => {
+    expect(reconciliationStageLabel('VERIFY')).toBe('Verifying differences')
+    expect(reconciliationStageLabel('VERIFY', 'HotWax', 'Shopify',
+      '{"verifiedSystems":["Shopify"]}')).toBe("Verifying Shopify's diffs")
+  })
+
   it('keeps the generic verify label when the step names no systems', () => {
     expect(reconciliationStageLabel('VERIFY')).toBe('Verifying differences')
     expect(reconciliationStageLabel('VERIFY', 'HotWax', 'Shopify', '{}')).toBe('Verifying differences')
@@ -69,9 +92,14 @@ describe('reconciliationStageLabel', () => {
 
 describe('RUN_STAGE_SEQUENCE', () => {
   it('verifies before writing results, so the written artifact is the verified one', () => {
-    expect(RUN_STAGE_SEQUENCE.indexOf('VERIFY')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('WRITE_OUTPUT'))
+    expect(RUN_STAGE_SEQUENCE.indexOf('VERIFY_MISSING')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('WRITE_OUTPUT'))
+    expect(RUN_STAGE_SEQUENCE.indexOf('VERIFY_EXCHANGE')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('WRITE_OUTPUT'))
+    expect(RUN_STAGE_SEQUENCE.indexOf('VERIFY_RETURNS')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('WRITE_OUTPUT'))
+    // The retired shared code is not a stage a new run can enter, so it must not be synthesized
+    // as a pending row on a live run.
+    expect(RUN_STAGE_SEQUENCE).not.toContain('VERIFY')
     expect(RUN_STAGE_SEQUENCE.indexOf('WRITE_OUTPUT')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('NOTIFY'))
-    expect(RUN_STAGE_SEQUENCE.indexOf('COMPARE')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('VERIFY'))
+    expect(RUN_STAGE_SEQUENCE.indexOf('COMPARE')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('VERIFY_MISSING'))
   })
 })
 
