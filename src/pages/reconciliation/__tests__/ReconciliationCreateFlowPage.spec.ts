@@ -1373,6 +1373,49 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(clearOrder).toBeLessThan(lastReseedOrder)
   })
 
+  it('never resumes an existing run\'s draft — "Create new run" always starts at card one', async () => {
+    // Seven existing-run surfaces (run settings list + workflow, ruleset manager, ruleset editor,
+    // run history, run result, automation dashboard) publish into this same sessionStorage-backed
+    // slot with resumeStepId 'ruleset-manager' — the wizard's LAST card — and none of them clear it
+    // on exit. Those drafts carry a savedRunId; the wizard's own activeDraft never does. Without the
+    // gate, merely clicking into a saved run's settings makes the next "Create new run" open on the
+    // rules board wearing that run's answers.
+    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
+      { ...apiToApiDraft, savedRunId: 'RS_EXISTING_RUN' },
+      'ruleset-manager',
+    )
+    window.history.replaceState({}, '', '/reconciliation/create')
+
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+
+    expect((wrapper.get('input[name="runName"]').element as HTMLInputElement).value).toBe('')
+    expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(false)
+  })
+
+  it('discards an existing run\'s draft on mount so its rules cannot ride into the new run', async () => {
+    // Skipping hydration is not enough on its own: boardDraftExtras() reads the SAME slot for
+    // rules and exclusion filters, so a foreign draft merely ignored would still hand them to the
+    // run this wizard goes on to create.
+    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
+      {
+        ...apiToApiDraft,
+        savedRunId: 'RS_EXISTING_RUN',
+        rules: [{ file1FieldPath: 'name', file2FieldPath: 'externalId', operator: '=', sequenceNum: 1 }],
+      },
+      'ruleset-manager',
+    )
+    window.history.replaceState({}, '', '/reconciliation/create')
+
+    mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+
+    expect(draftStoreState.clearRuleSetDraft).toHaveBeenCalledTimes(1)
+    // Card one publishes nothing, so any setRuleSetDraft here would mean the foreign draft was
+    // adopted as the wizard's own rather than thrown away.
+    expect(draftStoreState.setRuleSetDraft).not.toHaveBeenCalled()
+  })
+
   it('discards all draft state when the user exits mid-creation', async () => {
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()

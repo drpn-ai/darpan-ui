@@ -1585,6 +1585,20 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   const draftState = draftStore.ruleSetDraftState
   if (!draftState) return
 
+  // The draft slot is shared with every EXISTING-run surface -- run settings (list and workflow),
+  // the Ruleset Manager, the rules editor, run history, a run result, the automation dashboard --
+  // each of which publishes with resumeStepId 'ruleset-manager', the last card here, and none of
+  // which clear it on exit. It is sessionStorage-backed, so it outlives the navigation: without
+  // this gate, clicking into a saved run's settings makes the next "Create new run" open on the
+  // rules board wearing that run's answers. Those drafts carry a savedRunId; this wizard's own
+  // activeDraft never sets one, so a populated savedRunId is an exact test for "belongs elsewhere".
+  // Discard rather than ignore -- boardDraftExtras() reads the same slot, so a foreign draft left
+  // in place would still hand its rules and exclusion filters to the run created here.
+  if (draftState.draft.savedRunId) {
+    draftStore.clearRuleSetDraft()
+    return
+  }
+
   runName.value = draftState.draft.runName
   description.value = draftState.draft.description ?? ''
   file1SystemEnumId.value = draftState.draft.file1SystemEnumId
