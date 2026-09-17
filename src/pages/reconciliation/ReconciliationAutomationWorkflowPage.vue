@@ -305,10 +305,18 @@
             />
           </div>
 
-          <div class="automation-schedule-field">
+          <label class="automation-schedule-field">
             <span class="automation-schedule-label">Timezone</span>
-            <span class="automation-schedule-static" data-testid="automation-schedule-timezone">{{ scheduleTimeZone }}</span>
-          </div>
+            <AppSelect
+              v-model="scheduleTimeZone"
+              class="automation-schedule-select"
+              test-id="automation-schedule-timezone"
+              :options="timezoneOptions"
+              :disabled="saving || loadingOptions"
+              searchable
+              search-placeholder="Search timezones"
+            />
+          </label>
         </div>
       </template>
 
@@ -438,10 +446,17 @@
             />
           </div>
 
-          <div class="automation-schedule-field">
+          <label class="automation-schedule-field">
             <span class="automation-schedule-label">Timezone</span>
-            <span class="automation-schedule-static" data-testid="automation-schedule-timezone">{{ scheduleTimeZone }}</span>
-          </div>
+            <AppSelect
+              v-model="scheduleTimeZone"
+              class="automation-schedule-select"
+              test-id="automation-schedule-timezone"
+              :options="timezoneOptions"
+              searchable
+              search-placeholder="Search timezones"
+            />
+          </label>
         </div>
       </template>
 
@@ -492,6 +507,7 @@ import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'v
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
+import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import WorkflowSelect, { type WorkflowSelectOption } from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
@@ -535,7 +551,7 @@ import {
 } from '../../lib/reconciliationAutomationDraft'
 import { useAuthStore } from '../../stores/auth'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { normalizeTimezoneId } from '../../lib/timezones'
+import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
 import { useCronExpression, SCHEDULE_WEEKDAY_OPTIONS, type SchedulePreset } from '../../composables/useCronExpression'
 import { useAutomationSourceDraft, type ApiSourceSelectOption } from '../../composables/useAutomationSourceDraft'
 
@@ -603,7 +619,22 @@ const isActive = ref(true)
  * fire time -- so this is the scheduled time, not a label on top of a UTC one.
  */
 const tenantTimeZone = computed(() => normalizeTimezoneId(authStore.sessionInfo?.tenantTimeZone) || '')
-const scheduleTimeZone = computed(() => windowTimeZone.value || tenantTimeZone.value || 'UTC')
+
+/**
+ * Settable, but never on its own. The getter keeps the pin described above -- a stored zone always
+ * wins the tenant's -- so nothing moves unless someone picks a new zone here. Read-only was the
+ * original shape and it made a wrong zone PERMANENT: an automation saved before the tenant zone was
+ * set reads UTC forever, and re-saving rewrote UTC, because a non-empty stored value always won the
+ * fallback chain. Pinning a schedule against silent drift and letting an operator correct it are
+ * separate guarantees; this keeps the first and restores the second.
+ */
+const scheduleTimeZone = computed({
+  get: () => windowTimeZone.value || tenantTimeZone.value || 'UTC',
+  set: (value: string) => {
+    windowTimeZone.value = normalizeTimezoneId(value)
+  },
+})
+const timezoneOptions = computed<AppSelectOption[]>(() => buildTimezoneOptions(scheduleTimeZone.value))
 
 const returnLabel = ref('')
 const returnPath = ref('')

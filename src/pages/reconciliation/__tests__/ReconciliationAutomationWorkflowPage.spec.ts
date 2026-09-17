@@ -218,6 +218,12 @@ async function chooseWorkflowOption(wrapper: ReturnType<typeof mount>, testId: s
   await wrapper.get(`[data-testid="workflow-select-option"][data-option-value="${value}"]`).trigger('click')
 }
 
+async function chooseAppSelectOption(wrapper: ReturnType<typeof mount>, testId: string, value: string): Promise<void> {
+  await wrapper.get(`[data-testid="${testId}"]`).trigger('click')
+  await wrapper.get('[data-testid="app-select-search"]').setValue(value)
+  await wrapper.get(`[data-testid="app-select-option"][data-option-value="${value}"]`).trigger('click')
+}
+
 function scheduleFieldLabels(wrapper: ReturnType<typeof mount>): string[] {
   return wrapper.findAll('.automation-schedule-field > .automation-schedule-label').map((label) => label.text())
 }
@@ -695,9 +701,12 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.text()).not.toContain('API Source')
     expect(wrapper.find('[data-testid="automation-window-select"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="automation-schedule-preset"]').exists()).toBe(true)
+    // A picker, not a free-text field: the zone has to stay one of the known ids. It is editable
+    // so a wrong stored zone can be corrected; it still never changes on its own (see the
+    // scheduleTimeZone setter and its two specs below).
     expect(wrapper.find('input[data-testid="automation-schedule-timezone"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="automation-schedule-timezone"]').element.tagName).toBe('SPAN')
-    expect(wrapper.get('[data-testid="automation-schedule-timezone"]').text()).toBe('UTC')
+    expect(wrapper.get('[data-testid="automation-schedule-timezone"]').element.tagName).toBe('BUTTON')
+    expect(wrapper.get('[data-testid="automation-schedule-timezone"]').text()).toContain('UTC')
     expect(wrapper.find('[data-testid="cancel-automation-edit"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="save-automation"]').attributes('aria-label')).toBe('Save Automation')
     expect(wrapper.get('[data-testid="save-automation"]').attributes('disabled')).toBeUndefined()
@@ -1330,6 +1339,41 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
       expect(saveAutomation).toHaveBeenCalledWith(
         expect.objectContaining({ windowTimeZone: 'Asia/Kolkata' }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    // Pinning the saved zone stops a schedule MOVING on its own; it must not also make a wrong
+    // zone permanent. An automation saved before the tenant zone was set reads UTC forever, and
+    // re-saving rewrote UTC because a non-empty stored value always won the fallback chain.
+    it('lets an operator correct the timezone the automation was saved with', async () => {
+      authStoreState.sessionInfo = { tenantTimeZone: 'America/Los_Angeles' }
+      saveAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: { automationId: 'AUT_ORDER_SYNC' } })
+      const wrapper = await mountEdit('UTC')
+
+      expect(wrapper.get('[data-testid="automation-schedule-timezone"]').text()).toContain('UTC')
+      await chooseAppSelectOption(wrapper, 'automation-schedule-timezone', 'America/Los_Angeles')
+      await wrapper.get('[data-testid="save-automation"]').trigger('click')
+      await flushPromises()
+
+      expect(saveAutomation).toHaveBeenCalledWith(
+        expect.objectContaining({ windowTimeZone: 'America/Los_Angeles' }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    // The other half of the same guarantee: making it settable must not make it drift. An untouched
+    // form still sends back exactly the zone it loaded, tenant setting notwithstanding.
+    it('keeps the saved timezone when the operator does not touch the picker', async () => {
+      authStoreState.sessionInfo = { tenantTimeZone: 'America/Los_Angeles' }
+      saveAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: { automationId: 'AUT_ORDER_SYNC' } })
+      const wrapper = await mountEdit('UTC')
+
+      await wrapper.get('[data-testid="save-automation"]').trigger('click')
+      await flushPromises()
+
+      expect(saveAutomation).toHaveBeenCalledWith(
+        expect.objectContaining({ windowTimeZone: 'UTC' }),
         expect.any(AbortSignal),
       )
     })
