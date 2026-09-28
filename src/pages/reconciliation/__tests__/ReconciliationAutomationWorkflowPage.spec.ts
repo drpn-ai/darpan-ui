@@ -1448,8 +1448,11 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       const raised = useMascotStore().warnings.find((w) => w.id === 'automation-drift')
 
       expect(raised).toBeDefined()
-      // Promoted from the deleted mascotHints entry: it names the consequence, not the state.
-      expect(raised?.body).toContain('keeps running the setup it was built with')
+      // The prompt asks; the body answers "what state am I in, and what does yes do". The title
+      // above them already names the condition, so the body no longer repeats it.
+      expect(raised?.prompt).toBe('Sync this automation with its run?')
+      expect(raised?.body).toContain('runs the setup it was built with')
+      expect(raised?.body).toContain('replaces this automation’s source setup and filters')
       // RAISED, NOT OPENED. Drift found on load announces itself through the burst and the held
       // posture; the bubble waits to be hovered or clicked. Only the Sync BUTTON opens it, because
       // there the operator asked a question and is owed the answer — see the in-sync test below.

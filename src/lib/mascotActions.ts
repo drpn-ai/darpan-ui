@@ -140,6 +140,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   // Keyed on the words themselves rather than on a control name, because the same two phrases
   // appear in three places: the mode dropdown's trigger, its options, and the sr-only text on a
   // pill that already carries a filter. One answer serves all three.
+  'next ›': {
+    title: 'Next',
+    body: 'moves to the next thing standing. It does not answer this one — the warning you are on is still there when you come back round.',
+  },
   'exclude these values': {
     title: 'Exclude these values',
     body: 'the source leaves out records whose value is one you listed. A record carrying no value for this field is kept.',

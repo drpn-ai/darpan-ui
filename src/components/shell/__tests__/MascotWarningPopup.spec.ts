@@ -25,7 +25,15 @@ describe('MascotWarningPopup', () => {
   const drift = {
     id: 'automation-drift',
     title: 'Out of date',
-    body: 'Until you sync, this keeps running the setup it was built with.',
+    prompt: 'Sync this automation with its run?',
+    body: 'It currently runs the setup it was built with.',
+    actions: [],
+  }
+  const chat = {
+    id: 'chat',
+    title: 'Chat space is inactive',
+    prompt: 'Outlet Ops is no longer active.',
+    body: 'This automation’s results will not reach anyone there.',
     actions: [],
   }
 
@@ -43,33 +51,101 @@ describe('MascotWarningPopup', () => {
     expect(document.querySelector('[data-testid="mascot-warning-popup"]')).toBeNull()
   })
 
-  it('shows every standing warning with its title and body once opened', async () => {
+  it('shows the title, the prompt and the detail at their three sizes', async () => {
     const wrapper = mountPopup()
     const mascot = useMascotStore()
     mascot.raise(drift)
-    mascot.raise({ id: 'chat', title: 'Chat space is inactive', body: 'nothing lands there', actions: [] })
     mascot.openWarnings()
     await wrapper.vm.$nextTick()
 
-    const popup = document.querySelector('[data-testid="mascot-warning-popup"]')
-    expect(popup).not.toBeNull()
-    expect(popup?.textContent).toContain('Out of date')
-    expect(popup?.textContent).toContain('keeps running the setup')
-    // One page really can raise two; open, it must carry both rather than only the first.
-    expect(popup?.textContent).toContain('Chat space is inactive')
+    expect(document.querySelector('[data-testid="mascot-warning"]')?.textContent).toContain('Out of date')
+    // The focal line, set by the shell at --popup-workflow-prompt-size.
+    expect(document.querySelector('[data-testid="mascot-warning-prompt"]')?.textContent)
+      .toContain('Sync this automation with its run?')
+    expect(document.querySelector('[data-testid="mascot-warning-detail"]')?.textContent)
+      .toContain('runs the setup it was built with')
+    // The prompt sits in the shipped question shell, which is where the size comes from.
+    expect(document.querySelector('.wizard-question-shell.workflow-form--popup-compact')).not.toBeNull()
   })
 
-  it('puts every action in one row with Dismiss, and an acknowledge-only warning adds none', async () => {
+  it('shows one warning at a time, with a counter, never two prompts at once', async () => {
+    // Two lines at prompt size is two focal lines, which is none.
+    const wrapper = mountPopup()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    mascot.raise(chat)
+    mascot.openWarnings()
+    await wrapper.vm.$nextTick()
+
+    expect(document.querySelectorAll('[data-testid="mascot-warning-prompt"]')).toHaveLength(1)
+    expect(document.querySelector('[data-testid="mascot-warning-counter"]')?.textContent).toBe('1 of 2')
+    const popup = document.querySelector('[data-testid="mascot-warning-popup"]')
+    expect(popup?.textContent).toContain('Out of date')
+    expect(popup?.textContent).not.toContain('Chat space is inactive')
+  })
+
+  it('pages to the next warning', async () => {
+    const wrapper = mountPopup()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    mascot.raise(chat)
+    mascot.openWarnings()
+    await wrapper.vm.$nextTick()
+
+    document.querySelector<HTMLButtonElement>('[data-testid="mascot-warning-next"]')?.click()
+    await wrapper.vm.$nextTick()
+
+    expect(document.querySelector('[data-testid="mascot-warning-counter"]')?.textContent).toBe('2 of 2')
+    expect(document.querySelector('[data-testid="mascot-warning-prompt"]')?.textContent)
+      .toContain('Outlet Ops is no longer active')
+  })
+
+  it('hides the counter and the pager when only one stands', async () => {
+    const wrapper = mountPopup()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    mascot.openWarnings()
+    await wrapper.vm.$nextTick()
+
+    expect(document.querySelector('[data-testid="mascot-warning-counter"]')).toBeNull()
+    expect(document.querySelector('[data-testid="mascot-warning-next"]')).toBeNull()
+  })
+
+  it('dismisses only the warning on screen and stays open for the next', async () => {
+    // The bug this replaces: one Dismiss silenced every standing condition, including ones the
+    // operator had never been shown.
+    const wrapper = mountPopup()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    mascot.raise(chat)
+    mascot.openWarnings()
+    await wrapper.vm.$nextTick()
+
+    document.querySelector<HTMLButtonElement>('[data-testid="mascot-warning-dismiss"]')?.click()
+    await wrapper.vm.$nextTick()
+
+    expect(mascot.warnings.map((w) => w.id)).toEqual(['chat'])
+    expect(mascot.popupOpen).toBe(true)
+    expect(document.querySelector('[data-testid="mascot-warning-prompt"]')?.textContent)
+      .toContain('Outlet Ops is no longer active')
+  })
+
+  it('shows only the current warning’s actions, so a button cannot answer the wrong one', async () => {
     const wrapper = mountPopup()
     const mascot = useMascotStore()
     mascot.raise({ ...drift, actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: vi.fn() }] })
-    mascot.raise({ id: 'chat', title: 'Chat space is inactive', body: 'nothing lands there', actions: [] })
+    mascot.raise(chat)
     mascot.openWarnings()
     await wrapper.vm.$nextTick()
 
     const row = document.querySelector('[data-testid="mascot-warning-actions"]')
     expect([...(row?.querySelectorAll('button') ?? [])].map((b) => b.textContent?.trim()))
-      .toEqual(['Sync', 'Dismiss'])
+      .toEqual(['Sync', 'Dismiss', 'Next ›'])
+
+    // Paging to the acknowledge-only warning leaves no Sync behind to press.
+    document.querySelector<HTMLButtonElement>('[data-testid="mascot-warning-next"]')?.click()
+    await wrapper.vm.$nextTick()
+    expect(document.querySelector('[data-testid="mascot-warning-action-sync"]')).toBeNull()
   })
 
   it('runs an action when it is pressed', async () => {

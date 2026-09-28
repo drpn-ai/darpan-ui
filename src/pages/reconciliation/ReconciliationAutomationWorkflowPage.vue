@@ -1624,7 +1624,10 @@ function hydrateAutomation(automation: AutomationRecord): void {
  * decide between them.
  */
 const driftBody = computed<string>(() => {
-  const standing = 'Until you sync, this keeps running the setup it was built with rather than the run\u2019s current one.'
+  // The prompt now asks the question, so this says only what the reader needs to answer it: the
+  // state they are in, then what saying yes does. It used to open by naming the condition, which
+  // the title above it already does.
+  const standing = 'It currently runs the setup it was built with, not the run\u2019s current one.'
   return `${standing} ${syncConfirmMessage.value}`
 })
 
@@ -1639,7 +1642,10 @@ function syncWarnings(): void {
     mascot.raise({
       id: 'automation-saved-run-missing',
       title: 'Saved run is gone',
-      body: 'The run this automation was built from no longer exists, so it cannot be synced. It keeps running the setup it already holds.',
+      // No action, so nothing to ask: the prompt states the condition and the detail says what
+      // follows from it.
+      prompt: 'The run this automation was built from no longer exists.',
+      body: 'It cannot be synced, and keeps running the setup it already holds.',
       // No action: a deleted run cannot be synced, and a button that always fails is worse
       // than no button at all.
       actions: [],
@@ -1650,6 +1656,9 @@ function syncWarnings(): void {
       mascot.raise({
         id: 'automation-drift',
         title: 'Out of date',
+        // The shell is a question shell everywhere else in the product; this uses it as one, and
+        // Sync / Dismiss are its answers.
+        prompt: 'Sync this automation with its run?',
         body: driftBody.value,
         actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: () => syncFromSavedRun() }],
       })
@@ -1662,7 +1671,8 @@ function syncWarnings(): void {
     mascot.raise({
       id: 'automation-chat-space-inactive',
       title: 'Chat space is inactive',
-      body: `${automationChatSpaceName.value} is no longer active, so this automation\u2019s results will not reach anyone there.`,
+      prompt: `${automationChatSpaceName.value} is no longer active.`,
+      body: 'This automation\u2019s results will not reach anyone there.',
       actions: [],
     })
   } else {
@@ -1686,6 +1696,7 @@ function openSyncWarning(): void {
     mascot.raise({
       id: 'automation-sync-confirm',
       title: 'Sync with the run',
+      prompt: 'Sync this automation with its run?',
       body: syncConfirmMessage.value,
       actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: () => syncFromSavedRun() }],
     })

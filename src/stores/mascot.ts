@@ -36,7 +36,13 @@ export interface MascotWarning {
   id: string
   /** Also the hover line while this warning stands — it announces where the click goes. */
   title: string
-  /** The sentence that used to sit on the page. Mascot voice, not page voice. */
+  /**
+   * The popup's focal line, set at --popup-workflow-prompt-size. Short: it is a question where the
+   * warning has an action to offer ("Sync this automation with its run?") and a statement where it
+   * can only be acknowledged, because there is nothing to ask.
+   */
+  prompt: string
+  /** The detail beneath the prompt, at answer size. Mascot voice, not page voice. */
   body: string
   /** Empty is legal and load-bearing: some warnings can only be acknowledged. */
   actions: MascotWarningAction[]
@@ -84,8 +90,44 @@ export const useMascotStore = defineStore('mascot', () => {
     if (!warnings.value.length) popupOpen.value = false
   }
 
+  /* The popup shows ONE warning at a time, so the store owns which. Reset on open rather than
+     remembered: coming back to a page is a fresh look, and resuming at number two would hide the
+     first one behind a control nobody knows to press. */
+  const warningIndex = ref(0)
+  const currentWarning = computed<MascotWarning | null>(() => warnings.value[warningIndex.value] ?? null)
+
   function openWarnings(): void {
-    if (hasWarnings.value) popupOpen.value = true
+    if (!hasWarnings.value) return
+    warningIndex.value = 0
+    popupOpen.value = true
+  }
+
+  /* Wraps. Two warnings and a Next that stops working reads as broken rather than as finished. */
+  function nextWarning(): void {
+    if (!warnings.value.length) return
+    warningIndex.value = (warningIndex.value + 1) % warnings.value.length
+  }
+
+  function prevWarning(): void {
+    if (!warnings.value.length) return
+    warningIndex.value = (warningIndex.value - 1 + warnings.value.length) % warnings.value.length
+  }
+
+  /**
+   * Acknowledge the ONE being looked at. dismiss() clears everything, which is right for "I am done
+   * with all of this" but wrong as the button under a single warning — it silenced conditions
+   * nobody had addressed. The index stays inside the list so dismissing the last one lands on its
+   * predecessor rather than past the end.
+   */
+  function dismissCurrent(): void {
+    const at = warningIndex.value
+    warnings.value = warnings.value.filter((_, index) => index !== at)
+    if (!warnings.value.length) {
+      warningIndex.value = 0
+      popupOpen.value = false
+      return
+    }
+    warningIndex.value = Math.min(at, warnings.value.length - 1)
   }
 
   /**
@@ -170,6 +212,11 @@ export const useMascotStore = defineStore('mascot', () => {
     drop,
     openWarnings,
     closeWarnings,
+    warningIndex,
+    currentWarning,
+    nextWarning,
+    prevWarning,
+    dismissCurrent,
     dismiss,
     mode,
     term,

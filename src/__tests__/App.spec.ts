@@ -1183,7 +1183,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     await flushPromises()
 
     const mascot = useMascotStore()
-    mascot.raise({ id: 'drift', title: 'Out of date', body: 'it drifted', actions: [] })
+    mascot.raise({ id: 'drift', title: 'Out of date', prompt: 'Sync this automation with its run?', body: 'it drifted', actions: [] })
     mascot.openWarnings()
     await flushPromises()
 

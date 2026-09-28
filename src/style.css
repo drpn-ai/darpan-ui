@@ -1758,33 +1758,60 @@ label > span {
 
 /* The warning dialog's CONTENT only. Its surface, position, wash and the page blur behind it all
    come from .popup-workflow-overlay / .popup-workflow-modal, shared with every other popup. */
-/* NOTHING about the surface, spacing or type is set here. .workflow-panel supplies the grid and
-   its --space-3 gap, .popup-workflow-modal the width, border and shadow, and
-   .popup-workflow-modal .workflow-panel-header h2 the title size at weight 400. Overriding that
-   gap to --space-2 is exactly what made this popup's title sit flush against its body while every
-   other popup in the product breathed. */
+/* The warning dialog's CONTENT only. Surface, width, border, shadow and the panel's own grid gap
+   come from .popup-workflow-modal / .workflow-panel; the type scale comes from
+   .wizard-question-shell.workflow-form--popup-compact, the same shell every other popup's question
+   uses. Setting sizes here is what produced a popup whose largest text was 0.875rem. */
 
-/* One row, because they are one choice. Matches .ruleset-rule-popover-actions, the sibling popup
-   on the rules board. */
-.mascot-warning-actions {
-  display: flex;
-  gap: var(--space-1-5);
-  align-items: center;
+.mascot-warning-counter {
+  margin: 0;
+  font-size: var(--workflow-form-context-label-size, 0.68rem);
+  color: color-mix(in oklab, var(--text) 55%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Answer size, matching the shell's own --workflow-form-answer-size. */
+.mascot-warning-detail {
+  margin: 0;
+  font-size: var(--workflow-form-answer-size, 0.95rem);
+  color: var(--text-soft);
 }
 
 .mascot-warning-action {
-  border: 0;
-  background: none;
   color: var(--text);
-  padding: 0;
-  font: inherit;
-  text-decoration: underline;
+  background: none;
   cursor: pointer;
+  font: inherit;
+  font-size: var(--workflow-form-answer-size, 0.95rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.mascot-warning-action:hover {
+  border-color: var(--text-dim);
+  background: var(--surface-2);
+}
+
+/* Dismiss and Next are not the answer to the question — they carry no border until reached. */
+.mascot-warning-action--quiet {
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.mascot-warning-action--quiet:hover {
+  border-color: var(--border-soft);
 }
 
 .mascot-warning-action:focus-visible {
   outline: 1px solid color-mix(in oklab, var(--text) 40%, transparent);
   outline-offset: 2px;
+}
+
+/* Paging sits apart from the two answers: it moves between warnings rather than answering one. */
+.mascot-warning-next {
+  margin-left: auto;
 }
 
 .command-overlay {

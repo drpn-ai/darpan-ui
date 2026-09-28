@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useMascotStore, type MascotWarning } from '../mascot'
 
 function warning(id: string, overrides: Partial<MascotWarning> = {}): MascotWarning {
-  return { id, title: `Title ${id}`, body: `Body ${id}`, actions: [], ...overrides }
+  return { id, title: `Title ${id}`, prompt: `Prompt ${id}`, body: `Body ${id}`, actions: [], ...overrides }
 }
 
 describe('mascot store — warnings', () => {
@@ -62,6 +62,77 @@ describe('mascot store — warnings', () => {
     expect(mascot.warnings).toEqual([])
     expect(mascot.popupOpen).toBe(false)
     expect(mascot.hasWarnings).toBe(false)
+  })
+
+  it('pages through warnings one at a time', () => {
+    // The popup shows one warning at a time (M4), so the store owns which one.
+    const mascot = useMascotStore()
+    mascot.raise(warning('a'))
+    mascot.raise(warning('b'))
+    mascot.openWarnings()
+
+    expect(mascot.warningIndex).toBe(0)
+    expect(mascot.currentWarning?.id).toBe('a')
+
+    mascot.nextWarning()
+    expect(mascot.currentWarning?.id).toBe('b')
+
+    // Wraps rather than dead-ends: two warnings and a Next button that stops working reads broken.
+    mascot.nextWarning()
+    expect(mascot.currentWarning?.id).toBe('a')
+  })
+
+  it('dismisses only the warning being looked at, and shows the next one', () => {
+    // The whole reason paging is worth having: acknowledging the chat-space notice must not
+    // silence a drift warning nobody addressed.
+    const mascot = useMascotStore()
+    mascot.raise(warning('a'))
+    mascot.raise(warning('b'))
+    mascot.openWarnings()
+
+    mascot.dismissCurrent()
+
+    expect(mascot.warnings.map((w) => w.id)).toEqual(['b'])
+    expect(mascot.currentWarning?.id).toBe('b')
+    expect(mascot.popupOpen).toBe(true)
+  })
+
+  it('closes once the last warning is dismissed', () => {
+    const mascot = useMascotStore()
+    mascot.raise(warning('a'))
+    mascot.openWarnings()
+
+    mascot.dismissCurrent()
+
+    expect(mascot.hasWarnings).toBe(false)
+    expect(mascot.popupOpen).toBe(false)
+  })
+
+  it('keeps the index inside the list when the last one is dismissed', () => {
+    // Standing on the final warning and dismissing it must not leave the index past the end.
+    const mascot = useMascotStore()
+    mascot.raise(warning('a'))
+    mascot.raise(warning('b'))
+    mascot.openWarnings()
+    mascot.nextWarning()
+
+    mascot.dismissCurrent()
+
+    expect(mascot.warnings.map((w) => w.id)).toEqual(['a'])
+    expect(mascot.currentWarning?.id).toBe('a')
+  })
+
+  it('reopens on the first warning rather than where it was left', () => {
+    const mascot = useMascotStore()
+    mascot.raise(warning('a'))
+    mascot.raise(warning('b'))
+    mascot.openWarnings()
+    mascot.nextWarning()
+    mascot.closeWarnings()
+
+    mascot.openWarnings()
+
+    expect(mascot.currentWarning?.id).toBe('a')
   })
 
   // clear() runs on Escape and on pointer-leave of the bubble. Neither is an acknowledgement,

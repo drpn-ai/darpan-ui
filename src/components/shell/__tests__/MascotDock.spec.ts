@@ -118,7 +118,8 @@ describe('MascotDock warnings', () => {
   const drift = {
     id: 'automation-drift',
     title: 'Out of date',
-    body: 'Until you sync, this keeps running the setup it was built with.',
+    prompt: 'Sync this automation with its run?',
+    body: 'It currently runs the setup it was built with.',
     actions: [],
   }
 
