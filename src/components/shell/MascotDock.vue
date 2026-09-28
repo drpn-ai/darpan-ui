@@ -16,13 +16,44 @@
       @pointerenter="onBubbleEnter"
       @pointerleave="onBubbleLeave"
     >
-      <template v-if="mascot.mode === 'hint'">
-        <!-- While a warning stands the face does something else, so the slot that exists to
-             announce the click's destination announces the new one. -->
-        <template v-if="mascot.hasWarnings">{{ mascot.warnings[0]?.title }}</template>
-        <template v-else>
-          Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.
-        </template>
+      <!-- A warning speaks in the same bubble as everything else: one surface in the corner,
+           so there is still one place to look. Closed it is the sentence; clicking the face
+           adds the actions to the same bubble rather than opening a second thing. -->
+      <template v-if="warningSpeaking">
+        <span
+          v-for="warning in visibleWarnings"
+          :key="warning.id"
+          class="mascot-say-warning"
+          data-testid="mascot-warning"
+        >
+          <span class="mascot-say-lead">{{ warning.title }}</span> — {{ warning.body }}
+        </span>
+        <!-- One row, because they are one choice. Dismiss sits beside the actions rather than
+             under them: "sync or dismiss" is the question, and stacking it read as two. -->
+        <span
+          v-if="mascot.popupOpen"
+          class="mascot-say-actions"
+          data-testid="mascot-warning-actions"
+        >
+          <button
+            v-for="action in openActions"
+            :key="action.testId"
+            type="button"
+            class="mascot-say-action"
+            :data-testid="action.testId"
+            @click="void action.run()"
+          >{{ action.label }}</button>
+          <button
+            ref="dismissEl"
+            type="button"
+            class="mascot-say-action"
+            data-testid="mascot-warning-dismiss"
+            @click="void dismissWarnings()"
+          >Dismiss</button>
+        </span>
+      </template>
+      <template v-else-if="mascot.mode === 'hint'">
+        Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.
       </template>
       <template v-else-if="mascot.mode === 'tip'">
         {{ mascot.tipText }}
@@ -55,12 +86,6 @@
       />
     </button>
 
-    <MascotWarningPopup
-      v-if="mascot.popupOpen"
-      :warnings="mascot.warnings"
-      @dismiss="void dismissWarnings()"
-    />
-
     <!-- The jump is the signal for people who can see it. This is the same signal for people
          who cannot: without it a warning would be announced by nothing at all. -->
     <p class="sr-only" role="status" aria-live="polite">{{ liveAnnouncement }}</p>
@@ -70,7 +95,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import DarpanMascot from './DarpanMascot.vue'
-import MascotWarningPopup from './MascotWarningPopup.vue'
 import { useMascotStore } from '../../stores/mascot'
 import { createDwellController, type DwellController } from '../../composables/useMascotDwell'
 import { createIdleHintController } from '../../composables/useIdleHints'
@@ -140,6 +164,16 @@ function onFaceClick(): void {
   emit('open')
 }
 
+const dismissEl = ref<HTMLButtonElement | null>(null)
+
+/* Focus lands on the acknowledgement when the actions appear, never on an action: Sync
+   replaces the automation's whole source setup and must not be one stray Enter away. */
+watch(() => mascot.popupOpen, async (open) => {
+  if (!open) return
+  await nextTick()
+  dismissEl.value?.focus()
+})
+
 /* Dismissing must not drop focus onto the document body: a keyboard reader would be
    returned to the top of the page having lost their place. */
 async function dismissWarnings(): Promise<void> {
@@ -148,7 +182,22 @@ async function dismissWarnings(): Promise<void> {
   dockEl.value?.querySelector<HTMLButtonElement>('.mascot-fab')?.focus()
 }
 
-const bubbleText = computed(() => mascot.mode !== 'idle')
+/* An answer somebody asked for still outranks a warning — that is the whole reason warnings
+   are orthogonal to `mode` rather than a fifth one. Everything else yields to the warning. */
+const warningSpeaking = computed(() => mascot.hasWarnings && mascot.mode !== 'explain')
+
+/* Closed, the bubble carries the first warning; open, it carries all of them with their
+   actions. One page really can raise two, so the open state cannot show only one. */
+const visibleWarnings = computed(() =>
+  mascot.popupOpen ? mascot.warnings : mascot.warnings.slice(0, 1),
+)
+
+/* Every standing warning's actions, in one row with Dismiss. A warning that can only be
+   acknowledged contributes nothing here, which is what `actions: []` is for. */
+const openActions = computed(() => mascot.warnings.flatMap((warning) => warning.actions))
+
+/* A standing warning speaks unprompted, so the bubble is up even at idle. */
+const bubbleText = computed(() => mascot.mode !== 'idle' || warningSpeaking.value)
 
 const leadText = computed(() => (mascot.isStumped ? 'Drawing a blank' : (mascot.entry?.title ?? '')))
 const bodyText = computed(() =>

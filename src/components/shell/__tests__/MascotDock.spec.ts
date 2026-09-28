@@ -160,16 +160,47 @@ describe('MascotDock warnings', () => {
     matchMedia.mockRestore()
   })
 
-  it('announces the warning on hover instead of the shortcut, so the click is not a surprise', async () => {
+  it('speaks the warning in the same bubble as a hint, unprompted', async () => {
     const wrapper = mountDock()
     useMascotStore().raise(drift)
     await wrapper.vm.$nextTick()
 
-    await wrapper.get('.mascot-fab').trigger('pointerenter', { pointerType: 'mouse' })
-
+    // No hover needed: a warning is the one thing the bubble says on its own.
     const say = wrapper.get('.mascot-say')
     expect(say.text()).toContain('Out of date')
+    expect(say.text()).toContain('keeps running the setup')
     expect(say.text()).not.toContain('in a hurry')
+    // Closed, it is the sentence only -- the actions wait for a click.
+    expect(wrapper.find('[data-testid="mascot-warning-dismiss"]').exists()).toBe(false)
+  })
+
+  it('keeps the shortcut label once the warning is gone', async () => {
+    const wrapper = mountDock()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    await wrapper.vm.$nextTick()
+    mascot.dismiss()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.mascot-fab').trigger('pointerenter', { pointerType: 'mouse' })
+
+    expect(wrapper.get('.mascot-say').text()).toContain('in a hurry')
+  })
+
+  // The reason warnings are orthogonal to `mode` rather than a fifth one.
+  it('yields the bubble to an explanation somebody asked for', async () => {
+    const wrapper = mountDock()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    await wrapper.vm.$nextTick()
+
+    mascot.explain('differenceCount')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.mascot-say').text()).not.toContain('Out of date')
+    // ...and the warning is still standing underneath it.
+    expect(mascot.hasWarnings).toBe(true)
+    expect(wrapper.get('.mascot').classes()).toContain('mascot--alerted')
   })
 
   it('routes the click to the warning rather than the launcher while one stands', async () => {
@@ -182,7 +213,41 @@ describe('MascotDock warnings', () => {
 
     expect(mascot.popupOpen).toBe(true)
     expect(wrapper.emitted('open')).toBeUndefined()
-    expect(wrapper.find('[data-testid="mascot-warning-popup"]').exists()).toBe(true)
+    // The actions join the bubble that was already speaking, rather than opening a second surface.
+    expect(wrapper.findAll('.mascot-say')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="mascot-warning-dismiss"]').exists()).toBe(true)
+  })
+
+  it('shows both warnings and their actions once opened', async () => {
+    const wrapper = mountDock()
+    const mascot = useMascotStore()
+    mascot.raise({ ...drift, actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: vi.fn() }] })
+    mascot.raise({ id: 'chat', title: 'Chat space is inactive', body: 'nothing lands there', actions: [] })
+    await wrapper.vm.$nextTick()
+    // Closed, the bubble carries only the first.
+    expect(wrapper.findAll('[data-testid="mascot-warning"]')).toHaveLength(1)
+
+    await wrapper.get('.mascot-fab').trigger('click')
+
+    expect(wrapper.findAll('[data-testid="mascot-warning"]')).toHaveLength(2)
+    // Sync and Dismiss are one choice, so they share one row -- and the acknowledge-only
+    // warning contributes no button to it.
+    const actions = wrapper.get('[data-testid="mascot-warning-actions"]')
+    expect(actions.findAll('button').map((b) => b.text())).toEqual(['Sync', 'Dismiss'])
+    expect(wrapper.findAll('[data-testid="mascot-warning-actions"]')).toHaveLength(1)
+  })
+
+  it('runs the action the page handed over', async () => {
+    const run = vi.fn()
+    const wrapper = mountDock()
+    const mascot = useMascotStore()
+    mascot.raise({ ...drift, actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run }] })
+    await wrapper.vm.$nextTick()
+    await wrapper.get('.mascot-fab').trigger('click')
+
+    await wrapper.get('[data-testid="mascot-warning-action-sync"]').trigger('click')
+
+    expect(run).toHaveBeenCalledTimes(1)
   })
 
   it('gives the launcher back once the warning is dismissed', async () => {
