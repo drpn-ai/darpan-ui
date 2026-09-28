@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { ApiCallError } from '../../../lib/api/client'
 import { installLocalStorageStub } from '../../../test/localStorage'
 import { addDays, formatDateInputValue, setDefaultDisplayTimeZone, todayInDisplayTimeZone } from '../../../lib/utils/date'
@@ -43,6 +44,7 @@ vi.mock('../../../stores/permissions', () => ({
 }))
 
 import ReconciliationDiffPage from '../ReconciliationDiffPage.vue'
+import { useReconciliationDraftStore } from '../../../stores/reconciliationDraft'
 
 const savedRunResponse = {
   ok: true,
@@ -197,6 +199,7 @@ async function chooseWorkflowOption(
 
 describe('ReconciliationDiffPage', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     installLocalStorageStub()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 4, 17, 12, 0, 0))
@@ -361,7 +364,12 @@ describe('ReconciliationDiffPage', () => {
         file2SystemLabel: 'SHOPIFY',
       },
     })
-    expect(JSON.parse(wrapper.get('[data-testid="view-all-run-results"]').attributes('data-to') ?? '{}')).toEqual({
+    const history = wrapper.get('[data-testid="view-all-run-results"]')
+    expect(history.attributes('aria-label')).toBe('View previous runs')
+    expect(history.text()).toBe('')
+    expect(wrapper.text()).not.toContain('View all previous runs')
+    expect(history.element.closest('.reconciliation-run-actions')).not.toBeNull()
+    expect(JSON.parse(history.attributes('data-to') ?? '{}')).toEqual({
       name: 'reconciliation-run-history',
       params: {
         savedRunId: 'RS_ORDER_CSV',
@@ -372,6 +380,48 @@ describe('ReconciliationDiffPage', () => {
         file2SystemLabel: 'SHOPIFY',
       },
     })
+  })
+
+  it('opens run settings for the selected run from the action bar', async () => {
+    route.query = { savedRunId: 'RS_ORDER_CSV' }
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    const settings = wrapper.get('[data-testid="run-workflow-open-settings"]')
+    expect(settings.attributes('aria-label')).toBe('Run settings')
+    expect(settings.element.closest('.reconciliation-run-actions')).not.toBeNull()
+
+    await settings.trigger('click')
+    await flushPromises()
+
+    const draftStore = useReconciliationDraftStore()
+    // The fixture's system options carry no primary-id expression, so no ruleset draft can be
+    // built and the editor route falls back to the run's own settings page.
+    expect(draftStore.ruleSetDraftState).toBeNull()
+    expect(draftStore.workflowOrigin?.label).toBe('Run')
+    expect(push).toHaveBeenCalledWith({
+      name: 'settings-runs-edit',
+      params: { reconciliationMappingId: 'RS_ORDER_CSV' },
+    })
+  })
+
+  it('hides run settings when the user cannot edit tenant settings', async () => {
+    permissionState.canEditTenantSettings = false
+    route.query = { savedRunId: 'RS_ORDER_CSV' }
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="run-workflow-open-settings"]').exists()).toBe(false)
+  })
+
+  it('pins the run action bar to the mascot midline and centres it on the page', () => {
+    const source = readFileSync('src/pages/reconciliation/ReconciliationDiffPage.vue', 'utf8')
+
+    expect(source).toMatch(
+      /\.reconciliation-run-actions\s*\{[^}]*position: fixed;[^}]*bottom: var\(--floating-actions-bottom-offset\);[^}]*height: var\(--floating-mascot-size\);[^}]*align-items: center;[^}]*justify-content: center;/s,
+    )
   })
 
   it('uses the two-step upload workflow and navigates to the static result page after a successful run', async () => {

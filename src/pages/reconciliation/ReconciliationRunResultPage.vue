@@ -514,7 +514,7 @@ import {
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
-import { listIconPath, playIconPath, playIconTransform } from '../../lib/iconPaths'
+import { listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -577,8 +577,6 @@ const liveRunResultId = computed(() =>
 )
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
-const settingsIconPath =
-  'M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.3a2 2 0 0 1-4 0V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3 14H2.7a2 2 0 0 1 0-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6v-.3a2 2 0 0 1 4 0V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1A1.7 1.7 0 0 0 21 10h.3a2 2 0 0 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z'
 const routeRunName = computed(() => (typeof route.query.runName === 'string' && route.query.runName.trim() ? route.query.runName.trim() : 'Selected Run'))
 
 const {

@@ -221,15 +221,45 @@
               </dl>
             </RouterLink>
           </template>
-          <RouterLink
-            v-if="latestSavedOutput && runHistoryRoute"
-            class="reconciliation-run-history-link"
-            data-testid="view-all-run-results"
-            :to="runHistoryRoute"
-          >
-            View all previous runs
-          </RouterLink>
         </section>
+      </div>
+
+      <div v-if="showRunActions" class="reconciliation-run-actions">
+        <RouterLink
+          v-if="latestSavedOutput && runHistoryRoute"
+          class="app-icon-action app-icon-action--large"
+          data-testid="view-all-run-results"
+          aria-label="View previous runs"
+          title="View previous runs"
+          :to="runHistoryRoute"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path :d="listIconPath" fill="currentColor" />
+          </svg>
+        </RouterLink>
+        <button
+          v-if="canOpenRunSettings"
+          type="button"
+          class="app-icon-action app-icon-action--large"
+          data-testid="run-workflow-open-settings"
+          aria-label="Run settings"
+          title="Run settings"
+          @click="void openRunSettings()"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path :d="settingsIconPath" />
+          </svg>
+        </button>
       </div>
     </template>
   </WorkflowPage>
@@ -270,9 +300,12 @@ import {
   todayInDisplayTimeZone,
 } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
+import { listIconPath, settingsIconPath } from '../../lib/iconPaths'
+import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { useCalendarWidget, type CalendarRange } from '../../composables/useCalendarWidget'
 import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
 import { usePermissionsStore } from '../../stores/permissions'
+import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
 
 interface UploadStep {
@@ -306,6 +339,7 @@ const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const route = useRoute()
 const router = useRouter()
 const permissionsStore = usePermissionsStore()
+const draftStore = useReconciliationDraftStore()
 
 const diff = useReconciliationDiff()
 const {
@@ -467,6 +501,8 @@ const runHistoryRoute = computed<RouteLocationRaw | null>(() => {
     ? buildReconciliationRunHistoryRoute(reconciliationRunRouteContext.value)
     : null
 })
+const canOpenRunSettings = computed(() => permissionsStore.canEditTenantSettings && Boolean(selectedSavedRun.value))
+const showRunActions = computed(() => Boolean(latestSavedOutput.value && runHistoryRoute.value) || canOpenRunSettings.value)
 const activeSystemValue = computed({
   get: () => (currentStep.value.id === 'system-1' ? file1SystemEnumId.value : file2SystemEnumId.value),
   set: (value: string) => {
@@ -833,6 +869,21 @@ async function loadSavedRuns(): Promise<void> {
     selectedSavedRunId.value = requestedSavedRunId.value
   }
   syncSelectedSystems(selectedSavedRun.value)
+}
+
+// The selected run is already the full saved-run summary, so unlike Run Result there is no
+// lookup to wait on before handing the editor its draft.
+async function openRunSettings(): Promise<void> {
+  const savedRun = selectedSavedRun.value
+  if (!canOpenRunSettings.value || !savedRun) return
+
+  draftStore.setWorkflowOrigin('Run', route.fullPath)
+  if (savedRun.runType === 'ruleset') {
+    const draft = buildRuleSetDraft(savedRun)
+    if (draft) draftStore.setRuleSetDraft(draft, 'ruleset-manager')
+  }
+
+  await router.push(buildSavedRunEditorRoute(savedRun))
 }
 
 function loadLatestSavedOutput(savedRunId: string): Promise<void> {
@@ -1512,6 +1563,27 @@ onMounted(() => {
 .reconciliation-run-history-card__metrics dd {
   margin: 0;
   font-size: var(--type-tile-size);
+}
+
+/* Shares the mascot's box — same bottom offset, same height — so centring inside it puts the
+   buttons on the mascot's midline. The bar spans the viewport to centre on the page; only the
+   buttons take clicks, so the strip never shadows content or the mascot beside it. */
+.reconciliation-run-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--floating-actions-bottom-offset);
+  height: var(--floating-mascot-size);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+.reconciliation-run-actions > * {
+  pointer-events: auto;
 }
 
 .reconciliation-run-history-link {
