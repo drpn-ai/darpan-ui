@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { mount } from '@vue/test-utils'
@@ -64,8 +65,8 @@ describe('MascotWarningPopup', () => {
       .toContain('Sync this automation with its run?')
     expect(document.querySelector('[data-testid="mascot-warning-detail"]')?.textContent)
       .toContain('runs the setup it was built with')
-    // The prompt sits in the shipped question shell, which is where the size comes from.
-    expect(document.querySelector('.wizard-question-shell.workflow-form--popup-compact')).not.toBeNull()
+    // The prompt carries this component's own class, whose global rule consumes the popup token.
+    expect(document.querySelector('.mascot-warning-prompt')).not.toBeNull()
   })
 
   it('shows one warning at a time, with a counter, never two prompts at once', async () => {
@@ -241,6 +242,30 @@ describe('MascotWarningPopup', () => {
     // No gap override: the panel's own --space-3 must survive, which is what keeps the title off
     // the body the way every other popup does.
     expect(panel?.getAttribute('style')).toBeNull()
+  })
+
+  it('styles its own classes globally, because WorkflowStepForm\u2019s are scoped', async () => {
+    // The failure this guards: the template carried .wizard-question / .wizard-actions, which live
+    // in WorkflowStepForm's <style scoped> block and therefore never reached this component. The
+    // names read as reuse, the prompt got no size at all, and the actions sat hard against the copy.
+    const styleSource = readFileSync('src/style.css', 'utf8')
+
+    expect(styleSource).toContain('.mascot-warning-prompt {')
+    expect(styleSource).toContain('font-size: var(--popup-workflow-prompt-size);')
+    expect(styleSource).toContain('.mascot-warning-actions {')
+    expect(styleSource).toContain('margin-top: 0.85rem;')
+
+    const wrapper = mountPopup()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    mascot.openWarnings()
+    await wrapper.vm.$nextTick()
+
+    // And the template must not reach for a scoped class it cannot have.
+    const popup = document.querySelector('[data-testid="mascot-warning-popup"]')
+    expect(popup?.querySelector('.wizard-question')).toBeNull()
+    expect(popup?.querySelector('.wizard-actions')).toBeNull()
+    expect(popup?.querySelector('.mascot-warning-prompt')).not.toBeNull()
   })
 
   it('is a labelled dialog', async () => {

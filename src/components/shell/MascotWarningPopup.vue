@@ -33,15 +33,19 @@
           <h2 :id="titleId">{{ current.title }}</h2>
         </header>
 
-        <div class="wizard-question-shell workflow-form--popup-compact">
-          <div class="wizard-prompt-row">
-            <p class="wizard-question" data-testid="mascot-warning-prompt">{{ current.prompt }}</p>
-          </div>
+        <!--
+          These are this component's OWN classes, not WorkflowStepForm's. Its .wizard-question rules
+          live in a <style scoped> block, so borrowing the names gave a template that read like reuse
+          and delivered nothing: no size on the prompt, and no margin above the actions. The sizes
+          come from --popup-workflow-* instead, which ARE global and are inherited from the panel.
+        -->
+        <div class="mascot-warning-shell">
+          <p class="mascot-warning-prompt" data-testid="mascot-warning-prompt">{{ current.prompt }}</p>
           <p class="mascot-warning-detail" data-testid="mascot-warning-detail">{{ current.body }}</p>
 
           <!-- One row, because they are one choice. Next sits apart from them: it moves between
                warnings rather than answering this one. -->
-          <div class="wizard-actions" data-testid="mascot-warning-actions">
+          <div class="mascot-warning-actions" data-testid="mascot-warning-actions">
             <button
               v-for="action in current.actions"
               :key="action.testId"

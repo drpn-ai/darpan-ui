@@ -1763,18 +1763,52 @@ label > span {
    .wizard-question-shell.workflow-form--popup-compact, the same shell every other popup's question
    uses. Setting sizes here is what produced a popup whose largest text was 0.875rem. */
 
+/* The shell and its type. WorkflowStepForm's equivalents are <style scoped>, so they are not
+   reachable from here — only the --popup-workflow-* custom properties are, and those are inherited
+   from .popup-workflow-modal.workflow-panel above. */
+.mascot-warning-shell {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+/* The popup's focal line, at the same size every other popup's question uses. */
+.mascot-warning-prompt {
+  margin: 0;
+  font-size: var(--popup-workflow-prompt-size);
+  line-height: 1.22;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  text-wrap: balance;
+}
+
+/* Eyebrow size: the counter is a label about the dialog, not content in it. The DS token rather
+   than the 0.68rem literal WorkflowStepForm uses — the stylelint gate requires a token here, and
+   is right to: a raw size is how a surface drifts off the ramp one declaration at a time. */
 .mascot-warning-counter {
   margin: 0;
-  font-size: var(--workflow-form-context-label-size, 0.68rem);
+  font-size: var(--type-eyebrow-size);
   color: color-mix(in oklab, var(--text) 55%, transparent);
   font-variant-numeric: tabular-nums;
 }
 
-/* Answer size, matching the shell's own --workflow-form-answer-size. */
+/* Answer size. The literal, not var(--workflow-form-answer-size): that property is declared inside
+   WorkflowStepForm's scoped block and never reaches this component, so the fallback was doing all
+   the work while looking like a token reference. */
 .mascot-warning-detail {
   margin: 0;
-  font-size: var(--workflow-form-answer-size, 0.95rem);
+  font-size: clamp(0.88rem, 0.95vw, 0.98rem);
   color: var(--text-soft);
+}
+
+/* One row, and it needs its own top margin: .wizard-actions is scoped to WorkflowStepForm, so the
+   0.85rem that separates actions from copy there does not apply here. Without this the buttons sit
+   hard against the last line of the detail. */
+.mascot-warning-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 0.85rem;
 }
 
 .mascot-warning-action {
@@ -1782,7 +1816,7 @@ label > span {
   background: none;
   cursor: pointer;
   font: inherit;
-  font-size: var(--workflow-form-answer-size, 0.95rem);
+  font-size: clamp(0.88rem, 0.95vw, 0.98rem);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
