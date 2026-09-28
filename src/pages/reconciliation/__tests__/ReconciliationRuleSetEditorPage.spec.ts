@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import {
   buildReconciliationRuleSetDraftState,
   type ReconciliationRuleSetDraftRule,
@@ -887,6 +887,13 @@ describe('ReconciliationRuleSetEditorPage', () => {
     // has no getter at all — they exercised a control the backend could never honour. They now run on
     // an API-backed draft whose FILE_1 side is OMS (declares the parameter) and whose FILE_2 side is
     // Shopify (does not), so both the offered and the withheld case are covered by construction.
+    // AppSelect is a button plus a menu, not a native <select>, so a mode is chosen by opening
+    // the trigger and clicking the option — the same gesture AppSelect.spec uses.
+    async function chooseFilterMode(wrapper: VueWrapper, value: string): Promise<void> {
+      await wrapper.get('[data-testid="ruleset-exclusion-mode"]').trigger('click')
+      await wrapper.get(`[data-testid="app-select-option"][data-option-value="${value}"]`).trigger('click')
+    }
+
     const EXCLUDED_FIELD_PATH = '$.records[*].salesChannelEnumId'
     const EXCLUDE_MARK = '[data-testid="ruleset-field-exclude-file1-6"]'
     const EXCLUDE_PILL = '[data-testid="ruleset-field-file1-6"]'
@@ -1294,8 +1301,8 @@ describe('ReconciliationRuleSetEditorPage', () => {
       await flushPromises()
       await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
 
-      expect((wrapper.get('[data-testid="ruleset-exclusion-mode"]').element as HTMLSelectElement).value)
-        .toBe('INCLUDE_IN')
+      expect(wrapper.get('[data-testid="ruleset-exclusion-mode"]').text())
+        .toContain('Only these values')
     })
 
     it('saves the operator the dropdown is set to', async () => {
@@ -1303,7 +1310,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       await flushPromises()
 
       await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
-      await wrapper.get('[data-testid="ruleset-exclusion-mode"]').setValue('INCLUDE_IN')
+      await chooseFilterMode(wrapper, 'INCLUDE_IN')
       await wrapper.get('[data-testid="ruleset-exclusion-value-input"]').setValue('WEB_SALES_CHANNEL')
       await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
       await flushPromises()
@@ -1330,15 +1337,15 @@ describe('ReconciliationRuleSetEditorPage', () => {
       await flushPromises()
 
       await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
-      await wrapper.get('[data-testid="ruleset-exclusion-mode"]').setValue('INCLUDE_IN')
+      await chooseFilterMode(wrapper, 'INCLUDE_IN')
       await wrapper.get('[data-testid="ruleset-exclusion-value-input"]').setValue('WEB_SALES_CHANNEL')
       await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
       await flushPromises()
 
       await wrapper.get('[data-testid="ruleset-field-file1-5"]').trigger('dblclick')
 
-      expect((wrapper.get('[data-testid="ruleset-exclusion-mode"]').element as HTMLSelectElement).value)
-        .toBe('EXCLUDE_IN')
+      expect(wrapper.get('[data-testid="ruleset-exclusion-mode"]').text())
+        .toContain('Exclude these values')
     })
 
     it('still deletes the exclusion when Delete is clicked with text left in the input', async () => {

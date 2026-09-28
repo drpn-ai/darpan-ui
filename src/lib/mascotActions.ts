@@ -137,9 +137,20 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Delete filter',
     body: 'the source stops filtering at the pull, so every record it was holding back arrives and can start showing up as differences.',
   },
-  'filter mode': {
-    title: 'Filter mode',
-    body: 'whether the values below are the ones to leave out or the only ones to keep. Keeping only what you list also drops records carrying no value for this field at all.',
+  // Keyed on the words themselves rather than on a control name, because the same two phrases
+  // appear in three places: the mode dropdown's trigger, its options, and the sr-only text on a
+  // pill that already carries a filter. One answer serves all three.
+  'exclude these values': {
+    title: 'Exclude these values',
+    body: 'the source leaves out records whose value is one you listed. A record carrying no value for this field is kept.',
+  },
+  'excludes values': {
+    title: 'Excludes values',
+    body: 'the source leaves out records whose value is one you listed. A record carrying no value for this field is kept.',
+  },
+  'only these values': {
+    title: 'Only these values',
+    body: 'the source keeps records whose value is one you listed and drops the rest — including any record carrying no value for this field at all.',
   },
   operator: {
     title: 'Operator',

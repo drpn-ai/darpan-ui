@@ -116,9 +116,6 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   // words operators read changed when filters gained a second direction (DAR-BE-054).
   'filters': 'exclusions',
   'filter': 'exclusions',
-  // The board's sr-only mode announcements, so a screen-reader user can ask about the mark.
-  'excludes values': 'exclusions',
-  'only these values': 'exclusions',
   'previous runs': 'previousRuns',
   // NOT previousRuns: the Automations page titles its list of saved automations
   // "Automation Runs", so this label sits over automation tiles, never over executions.

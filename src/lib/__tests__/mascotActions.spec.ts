@@ -264,7 +264,20 @@ describe('filter mode actions (DAR-BE-054)', () => {
   it('explains the renamed filter actions', () => {
     expect(lookupAction('save filter')).toBeTruthy()
     expect(lookupAction('delete filter')).toBeTruthy()
-    expect(lookupAction('filter mode')).toBeTruthy()
+  })
+
+  it('answers both mode phrases wherever they appear', () => {
+    // AppSelect's trigger is a button whose accessible name is its own text, so these phrases are
+    // the reachable name in three places: the trigger, its options, and a pill's sr-only status.
+    expect(lookupAction('exclude these values')?.body).toContain('is kept')
+    expect(lookupAction('excludes values')?.body).toContain('is kept')
+    expect(lookupAction('only these values')?.body).toContain('drops the rest')
+  })
+
+  it('has no key for a control name that no longer exists', () => {
+    // The mode control carried aria-label="Filter mode" while it was a native <select>. AppSelect
+    // has no aria-label, so that key would be a hint that can never fire.
+    expect(lookupAction('filter mode')).toBeNull()
   })
 
   it('no longer answers to the exclude-era action names', () => {
@@ -272,10 +285,9 @@ describe('filter mode actions (DAR-BE-054)', () => {
     expect(lookupAction('delete exclusion')).toBeNull()
   })
 
-  it('keeps the comparison-rule operator entry distinct from filter mode', () => {
-    // A filter's direction and a compare rule's operator are different concepts. The dropdown is
-    // deliberately labelled "Filter mode", not "Operator", so these two never collide on one key.
+  it('keeps the comparison-rule operator entry distinct from the filter phrases', () => {
+    // A filter's direction and a compare rule's operator are different concepts sharing one board.
     expect(MASCOT_ACTIONS.operator?.title).toBe('Operator')
-    expect(MASCOT_ACTIONS['filter mode']?.title).not.toBe('Operator')
+    expect(MASCOT_ACTIONS['only these values']?.title).not.toBe('Operator')
   })
 })

@@ -352,18 +352,20 @@
           <input :value="editingExclusion.fieldPath" readonly data-testid="ruleset-exclusion-field" />
         </label>
         <!--
-          The dropdown IS the label for the input beneath it. Two controls both spelling out the
-          mode can drift apart visually; one cannot. The input keeps an accessible name of its own
-          because a <select> is not programmatically a label for what follows it.
+          AppSelect, not a bare <select>: a native one renders the OS menu — system font, blue
+          highlight, tick glyph — none of which this product's monochrome, border-driven surfaces
+          use, and none of which CSS can reach. Every other choice control in the app is already
+          this component; there are no native selects anywhere else.
+
+          The trigger doubles as the label for the input beneath it, which is why it carries no
+          label of its own: it reads back the current mode as a sentence. The input keeps its own
+          aria-label because a button is not programmatically a label for what follows it.
         -->
-        <select
+        <AppSelect
           v-model="editingExclusionOperator"
-          aria-label="Filter mode"
-          data-testid="ruleset-exclusion-mode"
-        >
-          <option :value="EXCLUDE_FILTER_OPERATOR">Exclude these values</option>
-          <option :value="INCLUDE_FILTER_OPERATOR">Only these values</option>
-        </select>
+          :options="exclusionModeOptions"
+          test-id="ruleset-exclusion-mode"
+        />
         <input
           v-model="pendingExclusionValue"
           type="text"
@@ -561,6 +563,11 @@ const editingExclusion = ref<{ side: RuleSide; fieldPath: string } | null>(null)
 const editingExclusionValues = ref<string[]>([])
 const pendingExclusionValue = ref('')
 const editingExclusionOperator = ref<string>(EXCLUDE_FILTER_OPERATOR)
+/** Wording matches the != and = marks on the board, so the editor and the pill teach each other. */
+const exclusionModeOptions: AppSelectOption[] = [
+  { value: EXCLUDE_FILTER_OPERATOR, label: 'Exclude these values' },
+  { value: INCLUDE_FILTER_OPERATOR, label: 'Only these values' },
+]
 const exclusionUnavailable = ref<{ side: RuleSide; fieldPath: string; message: string } | null>(null)
 let longPressTimer: number | null = null
 let generatedRuleCounter = 0
