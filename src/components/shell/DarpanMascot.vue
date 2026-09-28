@@ -60,6 +60,26 @@
     <path class="mascot-stripe" d="M42.6 40.2c.6 3.8 2 7 3.8 9.4l2.4-1.4c-1.9-2.6-3.2-6-3.7-9.6z" />
 
     <!--
+      Brows. Drawn the way the nose and mouth are — a filled path in the ground colour, no stroke,
+      because the mark has none anywhere and a stroked brow would need its weight re-tuned at every
+      size. They sit at y 27-29, clear of the lash fan below (29.4 down); the two must not touch or
+      the upper-outer corner turns to mud at dock scale.
+
+      TAPERED, thick at the outer end and thinning inward, so the brow carries an angle before
+      anything rotates it — a level bar of even weight needs a bigger rotation to read, and there is
+      not much room to rotate at 58px.
+
+      The two are true mirrors about x=32 (19.9 <-> 44.1, 27.1 <-> 36.9). That makes them the one
+      handed pair on the face: "inner end up" is a NEGATIVE rotation on the left and a POSITIVE one
+      on the right, and getting a sign wrong reads as a drawing error rather than an expression.
+      There is a test pinning both.
+    -->
+    <template v-if="detail >= 2">
+      <path class="mascot-brow mascot-brow--l" d="M19.9 27.9 Q23.5 25.9 27.1 27.1 Q23.5 27.3 19.9 28.9 Z" />
+      <path class="mascot-brow mascot-brow--r" d="M44.1 27.9 Q40.5 25.9 36.9 27.1 Q40.5 27.3 44.1 28.9 Z" />
+    </template>
+
+    <!--
       Lashes. Drawn in the ground colour, not the ink, and that inversion is forced by the
       construction rather than chosen: the head is a solid currentColor fill and each eye is
       punched out of it, so a dark lash would be dark-on-dark the instant it left the patch.
@@ -246,7 +266,8 @@ onBeforeUnmount(() => {
 .mascot-eye-shut,
 .mascot-lash,
 .mascot-nose,
-.mascot-mouth {
+.mascot-mouth,
+.mascot-brow {
   fill: var(--mascot-ground, var(--bg));
 }
 
@@ -285,6 +306,14 @@ onBeforeUnmount(() => {
   transition: transform 160ms ease;
 }
 
+/* Rotates about its own middle, so an angled brow pivots where a real one hinges rather than
+   swinging from the face's centre line. */
+.mascot-brow {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 200ms ease;
+}
+
 .mascot--speaking .mascot-mouth {
   transform: scaleY(2.1);
 }
@@ -317,27 +346,44 @@ onBeforeUnmount(() => {
   animation-iteration-count: 3;
 }
 
-/* Built only from transforms on shapes the face already has, so the posture cannot drift away
-   from the drawing. Deliberately unlike .mascot--listening's -6deg head tilt: listening means
-   "I am about to answer you", this means "I need you", and the two must not read alike. The
-   ears go up and OUT rather than in, and the mouth opens — neither is anything listening does. */
+/* Built only from transforms on shapes the face already has, so the posture cannot drift away from
+   the drawing. Deliberately unlike .mascot--listening's -6deg head tilt: listening means "I am
+   about to answer you", this means "I need you", and the two must not read alike.
+
+   The ears now go DOWN and back rather than up and out. Up-and-out ears are alert, interested,
+   even pleased — the previous posture pointed the wrong way, and no amount of it would have read
+   as distress. Down is the one animal posture nobody has to learn, and it changes the SILHOUETTE,
+   which is what survives at 58px where an interior change of one unit does not. */
 .mascot--alerted .mascot-ear--l {
-  transform: rotate(-16deg) translateY(-6%);
+  transform: rotate(14deg) translateY(6%);
 }
 
 .mascot--alerted .mascot-ear--r {
-  transform: rotate(16deg) translateY(-6%);
+  transform: rotate(-14deg) translateY(6%);
 }
 
+/* Inner ends UP. Handed: negative on the left, positive on the right — see the mirror note on the
+   shapes. */
+.mascot--alerted .mascot-brow--l {
+  transform: rotate(-15deg);
+}
+
+.mascot--alerted .mascot-brow--r {
+  transform: rotate(15deg);
+}
+
+/* Pinched narrow rather than opened. An open mouth reads as surprise; this is closer to a face
+   holding something in. */
 .mascot--alerted .mascot-mouth {
-  transform: scaleY(1.9);
+  transform: scaleX(0.6);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .mascot,
   .mascot-glint,
   .mascot-ear,
-  .mascot-mouth {
+  .mascot-mouth,
+  .mascot-brow {
     transition: none;
   }
 

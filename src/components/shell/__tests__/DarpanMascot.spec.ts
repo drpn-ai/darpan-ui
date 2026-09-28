@@ -292,6 +292,75 @@ function blocksFor(css: string, needle: string): string[] {
     .map((match) => match[2] ?? '')
 }
 
+describe('DarpanMascot brows', () => {
+  function brows(detail: 1 | 2 | 3) {
+    return mount(DarpanMascot, { props: { detail } }).findAll('.mascot-brow')
+  }
+
+  it('draws one over each eye, and none at the smallest detail', () => {
+    expect(brows(3)).toHaveLength(2)
+    expect(brows(2)).toHaveLength(2)
+    // d1 is the mark at its smallest; a brow there is a smudge, like the lashes.
+    expect(brows(1)).toHaveLength(0)
+  })
+
+  it('mirrors the two about the centre line, so the face cannot go crooked', () => {
+    const [left, right] = brows(3).map((node) => node.attributes('d') ?? '')
+    expect(mirrorKey(left as string)).toBe(selfKey(right as string))
+  })
+
+  it('tapers: thick at the outer end, meeting at the inner one', () => {
+    // The whole reason this shape was chosen over a level bar — it carries an angle before
+    // anything rotates it, which is what lets 15deg read at 58px.
+    const left = brows(3)[0]?.attributes('d') ?? ''
+    const points = pointsOf(left)
+    const xs = points.map(([x]) => x)
+    const outer = Math.min(...xs)
+    const inner = Math.max(...xs)
+
+    expect(xs.filter((x) => x === outer)).toHaveLength(2)
+    expect(xs.filter((x) => x === inner)).toHaveLength(1)
+  })
+
+  it('clears the lash fan below it, so the corner does not turn to mud', () => {
+    const wrapper = mount(DarpanMascot, { props: { detail: 3 } })
+    const browBottom = Math.max(
+      ...wrapper.findAll('.mascot-brow').flatMap((n) => pointsOf(n.attributes('d') ?? '').map(([, y]) => y)),
+    )
+    const lashTop = Math.min(
+      ...wrapper.findAll('.mascot-lash').flatMap((n) => pointsOf(n.attributes('d') ?? '').map(([, y]) => y)),
+    )
+
+    expect(browBottom).toBeLessThan(lashTop)
+  })
+
+  it('leaves the resting face neutral — no brow transform without a warning', () => {
+    // Adding brows changes the character permanently. The face must not look cross on an
+    // ordinary page, so every brow rotation is scoped to .mascot--alerted.
+    const source = faceCss()
+    const browRules = [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter((match) => (match[1] ?? '').includes('.mascot-brow'))
+      .filter((match) => /transform:\s*rotate/.test(match[2] ?? ''))
+
+    expect(browRules.length).toBeGreaterThan(0)
+    for (const rule of browRules) {
+      expect(rule[1]).toContain('.mascot--alerted')
+    }
+  })
+
+  it('turns the inner ends UP, with the sign handed correctly per side', () => {
+    // The one handed pair on the face. A wrong sign reads as a drawing error rather than an
+    // expression, and it is invisible in a diff.
+    const source = faceCss()
+    const ruleFor = (side: string) =>
+      [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .find((m) => (m[1] ?? '').includes(`.mascot--alerted .mascot-brow--${side}`))?.[2] ?? ''
+
+    expect(ruleFor('l')).toMatch(/rotate\(-\d/)
+    expect(ruleFor('r')).toMatch(/rotate\(\d/)
+  })
+})
+
 describe('DarpanMascot warning posture', () => {
   it('is absent at rest, so nothing new animates on an ordinary page', () => {
     const wrapper = mount(DarpanMascot)
