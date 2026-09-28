@@ -187,6 +187,24 @@ describe('MascotDock warnings', () => {
     expect(wrapper.get('.mascot-say').text()).toContain('in a hurry')
   })
 
+  it('does not style a standing warning as a one-line hint label when the face is hovered', async () => {
+    // .mascot-say--hint is white-space: nowrap, written for the face's own short label. A warning
+    // is prose. Hovering the face sets mode 'hint', and warningSpeaking only steps aside for
+    // 'explain' — so the bubble kept rendering the warning while wearing the nowrap label style,
+    // and a paragraph was laid out on a single line.
+    const wrapper = mountDock()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.mascot-fab').trigger('pointerenter', { pointerType: 'mouse' })
+    await wrapper.vm.$nextTick()
+
+    const say = wrapper.get('.mascot-say')
+    expect(say.text()).toContain('Out of date')
+    expect(say.classes()).not.toContain('mascot-say--hint')
+  })
+
   // The reason warnings are orthogonal to `mode` rather than a fifth one.
   it('yields the bubble to an explanation somebody asked for', async () => {
     const wrapper = mountDock()

@@ -11,7 +11,7 @@
     <p
       v-if="bubbleText"
       class="mascot-say"
-      :class="{ 'mascot-say--going': mascot.releasing, 'mascot-say--hint': mascot.mode === 'hint' }"
+      :class="{ 'mascot-say--going': mascot.releasing, 'mascot-say--hint': hintLabelStyling }"
       role="status"
       @pointerenter="onBubbleEnter"
       @pointerleave="onBubbleLeave"
@@ -198,6 +198,13 @@ const openActions = computed(() => mascot.warnings.flatMap((warning) => warning.
 
 /* A standing warning speaks unprompted, so the bubble is up even at idle. */
 const bubbleText = computed(() => mascot.mode !== 'idle' || warningSpeaking.value)
+
+/* .mascot-say--hint is white-space: nowrap, written for the face's own short label. It is a claim
+   about the bubble's CONTENT, not about the mode — so it must not ride along when a warning owns
+   the content. Hovering the face sets mode 'hint' while warningSpeaking stays true (it steps aside
+   only for 'explain'), which laid a whole warning paragraph out on one line. The warning keeps the
+   bubble on hover, by design; it just no longer wears a label's styling. */
+const hintLabelStyling = computed(() => mascot.mode === 'hint' && !warningSpeaking.value)
 
 const leadText = computed(() => (mascot.isStumped ? 'Drawing a blank' : (mascot.entry?.title ?? '')))
 const bodyText = computed(() =>
