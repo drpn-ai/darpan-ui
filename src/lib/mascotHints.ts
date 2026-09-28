@@ -36,7 +36,7 @@ function control(testId: string): string {
 }
 
 export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.freeze({
-  // RuleSetBoard: @dblclick opens the exclusion editor, pointerdown/up draws a pairing,
+  // RuleSetBoard: @dblclick opens the filter editor, pointerdown/up draws a pairing,
   // and Enter is the keyboard equivalent of the drag.
   'reconciliation-ruleset-editor': Object.freeze([
     { text: 'Double-click a field to set what this source should leave out when it pulls.', when: control('ruleset-field-list-file1') },
@@ -46,7 +46,7 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
   ]),
   'reconciliation-ruleset-manager': Object.freeze([
     { text: 'Edit Run or Rules with the pencil beside each — finished runs keep whatever they already compared.', when: control('ruleset-manager-edit-rules') },
-    { text: 'Exclusions are per source — each side can leave out different records as it pulls.', when: control('ruleset-manager-exclusions') },
+    { text: 'Filters are per source — each side can leave out different records as it pulls.', when: control('ruleset-manager-exclusions') },
     { text: 'Run this rule set from here; its history is one step further on.', when: control('ruleset-manager-run-ruleset') },
   ]),
   'reconciliation-automations': Object.freeze([
@@ -210,7 +210,7 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'How far back each run reaches. How often it runs is the schedule, and the two are set separately.', when: control('automation-window-select') },
   ]),
   'reconciliation-automation-edit': Object.freeze([
-    { text: 'Sync replaces this automation’s source setup and exclusion filters with the run’s current ones.', when: control('automation-edit-sync') },
+    { text: 'Sync replaces this automation’s source setup and filters with the run’s current ones.', when: control('automation-edit-sync') },
     { text: 'Widening the window makes each run reach further back. It does not make runs happen more often.', when: control('automation-edit-window-fields') },
     { text: 'This is where this automation’s own notice goes, whichever space the tenant defaults to.', when: control('automation-edit-chat-space-fields') },
   ]),

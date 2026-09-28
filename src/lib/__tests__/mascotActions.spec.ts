@@ -255,3 +255,27 @@ describe('every button in the app has an answer', () => {
     expect(unanswered, `buttons with no answer:\n${unanswered.join('\n')}`).toEqual([])
   })
 })
+
+describe('filter mode actions (DAR-BE-054)', () => {
+  // The sweep below only reads raw <button> tags, so it covers "Delete filter" but cannot see
+  // "Save filter" (an AppSaveAction component) or "Filter mode" (a <select>). These three name
+  // those aria-labels directly, because the mascot matches them as plain strings and a rename
+  // without a rekey is a hint that silently never fires.
+  it('explains the renamed filter actions', () => {
+    expect(lookupAction('save filter')).toBeTruthy()
+    expect(lookupAction('delete filter')).toBeTruthy()
+    expect(lookupAction('filter mode')).toBeTruthy()
+  })
+
+  it('no longer answers to the exclude-era action names', () => {
+    expect(lookupAction('save exclusion')).toBeNull()
+    expect(lookupAction('delete exclusion')).toBeNull()
+  })
+
+  it('keeps the comparison-rule operator entry distinct from filter mode', () => {
+    // A filter's direction and a compare rule's operator are different concepts. The dropdown is
+    // deliberately labelled "Filter mode", not "Operator", so these two never collide on one key.
+    expect(MASCOT_ACTIONS.operator?.title).toBe('Operator')
+    expect(MASCOT_ACTIONS['filter mode']?.title).not.toBe('Operator')
+  })
+})

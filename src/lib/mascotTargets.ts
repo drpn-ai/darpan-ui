@@ -112,7 +112,13 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   // Section headings, as the pages actually title them.
   'exclusions': 'exclusions',
   'exclusion': 'exclusions',
-  'has exclusion': 'exclusions',
+  // The glossary key stays `exclusions` because other surfaces already point at it; only the
+  // words operators read changed when filters gained a second direction (DAR-BE-054).
+  'filters': 'exclusions',
+  'filter': 'exclusions',
+  // The board's sr-only mode announcements, so a screen-reader user can ask about the mark.
+  'excludes values': 'exclusions',
+  'only these values': 'exclusions',
   'previous runs': 'previousRuns',
   // NOT previousRuns: the Automations page titles its list of saved automations
   // "Automation Runs", so this label sits over automation tiles, never over executions.

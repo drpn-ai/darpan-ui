@@ -133,9 +133,13 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Delete rule',
     body: 'removes this pairing. Both fields stay on their sides; they simply stop being compared to each other.',
   },
-  'delete exclusion': {
-    title: 'Delete exclusion',
-    body: 'the source stops filtering those records out at the pull, so they arrive and can start showing up as differences.',
+  'delete filter': {
+    title: 'Delete filter',
+    body: 'the source stops filtering at the pull, so every record it was holding back arrives and can start showing up as differences.',
+  },
+  'filter mode': {
+    title: 'Filter mode',
+    body: 'whether the values below are the ones to leave out or the only ones to keep. Keeping only what you list also drops records carrying no value for this field at all.',
   },
   operator: {
     title: 'Operator',
@@ -283,9 +287,9 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Save rule',
     body: 'the pairing applies from the next run onward. It does not re-grade a run that has already finished.',
   },
-  'save exclusion': {
-    title: 'Save exclusion',
-    body: 'the source stops fetching those records from the next run. Finished runs keep whatever they compared.',
+  'save filter': {
+    title: 'Save filter',
+    body: 'the source changes what it fetches from the next run. Finished runs keep whatever they compared.',
   },
   'save user settings': {
     title: 'Save user settings',

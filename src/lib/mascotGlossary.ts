@@ -208,12 +208,12 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
      The first thing anybody lost on a page reads is the heading over the region, so
      it is the cheapest possible place to answer "what am I looking at". ───────── */
   exclusions: {
-    // Not a filter on the comparison: exclusions are pushed to the connector as filter
-    // parameters, so excluded records are never fetched in the first place. A side that
-    // cannot filter at the source has no exclusions at all, which is why the board says
-    // so when you try — see RuleSetBoard's "cannot filter records at the source".
-    title: 'Exclusions',
-    body: 'rules for what a source leaves out when a run pulls its data. Excluded records never arrive, so they cannot show up as differences.',
+    // Not a filter on the comparison: these are pushed to the connector as filter parameters,
+    // so filtered records are never fetched in the first place. A side that cannot filter at
+    // the source has none at all, which is why the board says so when you try — see
+    // RuleSetBoard's "cannot filter records at the source".
+    title: 'Filters',
+    body: 'rules for which records a source pulls at all — either excluding the values you list or keeping only those. What a filter leaves out never arrives, so it cannot show up as a difference.',
   },
   // The Automations page titles this list “Automation Runs”, which reads like a run
   // history and is not one — every tile under it is a saved automation. Kept as its own
