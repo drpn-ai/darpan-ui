@@ -13,6 +13,35 @@ import { lookupGlossary, type GlossaryEntry } from '../lib/mascotGlossary'
  */
 export type MascotMode = 'idle' | 'hint' | 'explain' | 'tip'
 
+/**
+ * A warning-level condition a page has raised.
+ *
+ * Deliberately NOT a MascotMode. The modes are mutually exclusive by construction — explain()
+ * clears the tip, offerTip() refuses while explaining, showHint() the same — and a warning is
+ * exclusive with none of them: while a warning is held, resting on a value must still explain
+ * it. Modelling it as a mode would force either "a warning suppresses explanations" or a new
+ * precedence rule in every branch that reads `mode`.
+ *
+ * See docs/superpowers/specs/2026-09-28-mascot-warning-channel-design.md D1.
+ */
+export interface MascotWarningAction {
+  /** Reads as the button. */
+  label: string
+  testId: string
+  run: () => void | Promise<void>
+}
+
+export interface MascotWarning {
+  /** Stable per condition, so a page re-raising on reload replaces rather than stacks. */
+  id: string
+  /** Also the hover line while this warning stands — it announces where the click goes. */
+  title: string
+  /** The sentence that used to sit on the page. Mascot voice, not page voice. */
+  body: string
+  /** Empty is legal and load-bearing: some warnings can only be acknowledged. */
+  actions: MascotWarningAction[]
+}
+
 export const useMascotStore = defineStore('mascot', () => {
   const mode = ref<MascotMode>('idle')
   const term = ref<string | null>(null)
@@ -35,6 +64,35 @@ export const useMascotStore = defineStore('mascot', () => {
   /** A term with no phrase written for it: say so rather than open an empty bubble. */
   const isStumped = computed(() => mode.value === 'explain' && entry.value === null)
   const isSpeaking = computed(() => mode.value === 'explain' || mode.value === 'tip')
+
+  /* ── Warnings ──────────────────────────────────────────────────────────────────
+     Orthogonal to `mode` on purpose (see MascotWarning). Lifetime is per-visit and
+     nothing is persisted anywhere: pages raise on load and the dock drops on route
+     change, so returning to a page re-raises whatever is still true. */
+  const warnings = ref<MascotWarning[]>([])
+  const popupOpen = ref(false)
+  const hasWarnings = computed(() => warnings.value.length > 0)
+
+  function raise(warning: MascotWarning): void {
+    const at = warnings.value.findIndex((held) => held.id === warning.id)
+    if (at === -1) warnings.value = [...warnings.value, warning]
+    else warnings.value = warnings.value.map((held, index) => (index === at ? warning : held))
+  }
+
+  function drop(id: string): void {
+    warnings.value = warnings.value.filter((held) => held.id !== id)
+    if (!warnings.value.length) popupOpen.value = false
+  }
+
+  function openWarnings(): void {
+    if (hasWarnings.value) popupOpen.value = true
+  }
+
+  /** The acknowledgement. Per-visit only — nothing is written anywhere, so a return re-raises. */
+  function dismiss(): void {
+    warnings.value = []
+    popupOpen.value = false
+  }
 
   /** The unprompted offer. Never interrupts an answer already on screen. */
   const tipText = ref<string | null>(null)
@@ -95,6 +153,13 @@ export const useMascotStore = defineStore('mascot', () => {
   }
 
   return {
+    warnings,
+    popupOpen,
+    hasWarnings,
+    raise,
+    drop,
+    openWarnings,
+    dismiss,
     mode,
     term,
     detail,
