@@ -16,7 +16,12 @@
   -->
   <svg
     class="mascot"
-    :class="[`mascot--d${detail}`, { 'mascot--listening': listening, 'mascot--speaking': speaking }]"
+    :class="[`mascot--d${detail}`, {
+      'mascot--listening': listening,
+      'mascot--speaking': speaking,
+      'mascot--alerting': alerting,
+      'mascot--alerted': alerted,
+    }]"
     viewBox="-6 -9 76 76"
     focusable="false"
     aria-hidden="true"
@@ -145,8 +150,12 @@ withDefaults(
     detail?: 1 | 2 | 3
     listening?: boolean
     speaking?: boolean
+    /** The bounded burst. Transient — the dock clears it once the hops are over. */
+    alerting?: boolean
+    /** The held posture. Persists until the warning is dismissed. */
+    alerted?: boolean
   }>(),
-  { detail: 3, listening: false, speaking: false },
+  { detail: 3, listening: false, speaking: false, alerting: false, alerted: false },
 )
 
 const blinking = ref(false)
@@ -283,12 +292,59 @@ onBeforeUnmount(() => {
 /* The states still land, they just stop being animated into — same treatment the ears and
    mouth already had. A tilt that snaps is still a tilt; one that sweeps is motion someone
    has explicitly asked not to see. */
+/* The burst. Same bargain the blink strikes with the at-rest rule above: punctuation, not
+   motion. Three hops and it is over for good — nothing re-triggers it while the warning
+   stands, because what persists afterwards is .mascot--alerted, which does not move. */
+@keyframes mascot-alert-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  40% {
+    transform: translateY(-14%);
+  }
+
+  70% {
+    transform: translateY(-4%);
+  }
+}
+
+.mascot--alerting {
+  animation-name: mascot-alert-hop;
+  animation-duration: 500ms;
+  animation-timing-function: ease;
+  animation-iteration-count: 3;
+}
+
+/* Built only from transforms on shapes the face already has, so the posture cannot drift away
+   from the drawing. Deliberately unlike .mascot--listening's -6deg head tilt: listening means
+   "I am about to answer you", this means "I need you", and the two must not read alike. The
+   ears go up and OUT rather than in, and the mouth opens — neither is anything listening does. */
+.mascot--alerted .mascot-ear--l {
+  transform: rotate(-16deg) translateY(-6%);
+}
+
+.mascot--alerted .mascot-ear--r {
+  transform: rotate(16deg) translateY(-6%);
+}
+
+.mascot--alerted .mascot-mouth {
+  transform: scaleY(1.9);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mascot,
   .mascot-glint,
   .mascot-ear,
   .mascot-mouth {
     transition: none;
+  }
+
+  /* Only the hops go. The posture is static, so it costs a reduced-motion reader nothing
+     and carries the whole signal for them. */
+  .mascot--alerting {
+    animation: none;
   }
 }
 </style>

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
@@ -271,5 +272,84 @@ describe('DarpanMascot blinking', () => {
     wrapper.unmount()
 
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+/** The face's own scoped stylesheet — its rules are colocated with the drawing, not in
+ *  style.css, which owns only the dock chrome around it. */
+function faceCss(): string {
+  const source = readFileSync('src/components/shell/DarpanMascot.vue', 'utf8')
+  // Comments are stripped so these assertions read CSS rather than prose: the rules below
+  // explain themselves by naming .mascot--listening, which a raw text match cannot tell
+  // apart from an actual shared selector list.
+  return source.slice(source.indexOf('<style scoped>')).replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
+/** Every rule block whose selector mentions `needle`, bodies only. */
+function blocksFor(css: string, needle: string): string[] {
+  return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter((match) => (match[1] ?? '').includes(needle))
+    .map((match) => match[2] ?? '')
+}
+
+describe('DarpanMascot warning posture', () => {
+  it('is absent at rest, so nothing new animates on an ordinary page', () => {
+    const wrapper = mount(DarpanMascot)
+
+    expect(wrapper.get('.mascot').classes()).not.toContain('mascot--alerting')
+    expect(wrapper.get('.mascot').classes()).not.toContain('mascot--alerted')
+  })
+
+  it('carries the burst and the held posture as separate classes', () => {
+    const bursting = mount(DarpanMascot, { props: { alerting: true, alerted: true } })
+    const held = mount(DarpanMascot, { props: { alerting: false, alerted: true } })
+
+    expect(bursting.get('.mascot').classes()).toContain('mascot--alerting')
+    expect(bursting.get('.mascot').classes()).toContain('mascot--alerted')
+    // Reduced motion needs the posture WITHOUT the burst, so one prop could not express it.
+    expect(held.get('.mascot').classes()).not.toContain('mascot--alerting')
+    expect(held.get('.mascot').classes()).toContain('mascot--alerted')
+  })
+
+  /* jsdom computes nothing from style.css, so the stylesheet is asserted as source -- the same
+     way App.spec.ts pins the floating-actions gap and the static-page tile contract. */
+  it('bursts a bounded number of times and never loops', () => {
+    const source = faceCss()
+    const burst = blocksFor(source, '.mascot--alerting').join('\n')
+
+    expect(source).toContain('@keyframes mascot-alert-hop')
+    expect(burst).toContain('animation-iteration-count: 3;')
+    // The rule the burst is allowed to bend once, and must never bend continuously:
+    // DarpanMascot.vue -- "Anything continuous still does not belong here."
+    expect(burst).not.toContain('infinite')
+  })
+
+  it('holds the posture without motion, so a missed burst still leaves something to see', () => {
+    const source = faceCss()
+    const held = blocksFor(source, '.mascot--alerted')
+
+    expect(held.length).toBeGreaterThan(0)
+    for (const body of held) expect(body).not.toContain('animation')
+  })
+
+  it('drops the burst under reduced motion but keeps the posture at full strength', () => {
+    const source = faceCss()
+    const reduced = source.slice(source.indexOf('@media (prefers-reduced-motion: reduce)'))
+
+    expect(blocksFor(reduced, '.mascot--alerting').join('\n')).toContain('animation: none;')
+    // The posture is static, so reduced motion costs it nothing and it is not disabled here.
+    expect(blocksFor(reduced, '.mascot--alerted')).toHaveLength(0)
+  })
+
+  /* Listening already transforms the head and both ears. Two postures built from the same three
+     transforms converge by accident unless something forbids it, and they mean opposite things:
+     listening is "I am about to answer you", alerted is "I need you". */
+  it('does not reuse the listening posture for a warning', () => {
+    const source = faceCss()
+    const shared = [...source.matchAll(/([^{}]+)\{[^{}]*\}/g)]
+      .map((match) => match[1] ?? '')
+      .filter((selector) => selector.includes('.mascot--alerted') && selector.includes('.mascot--listening'))
+
+    expect(shared).toEqual([])
   })
 })
