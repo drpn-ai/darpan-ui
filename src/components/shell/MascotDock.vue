@@ -17,7 +17,12 @@
       @pointerleave="onBubbleLeave"
     >
       <template v-if="mascot.mode === 'hint'">
-        Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.
+        <!-- While a warning stands the face does something else, so the slot that exists to
+             announce the click's destination announces the new one. -->
+        <template v-if="mascot.hasWarnings">{{ mascot.warnings[0]?.title }}</template>
+        <template v-else>
+          Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.
+        </template>
       </template>
       <template v-else-if="mascot.mode === 'tip'">
         {{ mascot.tipText }}
@@ -31,7 +36,7 @@
       type="button"
       class="mascot-fab"
       :aria-label="fabLabel"
-      @click="emit('open')"
+      @click="onFaceClick"
       @pointerenter="onFaceEnter"
       @pointerleave="onFaceLeave"
       @focus="mascot.showHint()"
@@ -41,14 +46,31 @@
            ~82px, where dropping the mouth is not a simplification, just a face missing a feature.
            It also had a side effect worth naming: .mascot--speaking animates the mouth, so while
            the dock rendered detail 2 the speaking state had nothing to move. -->
-      <DarpanMascot :detail="3" :listening="mascot.listening" :speaking="mascot.isSpeaking" />
+      <DarpanMascot
+        :detail="3"
+        :listening="mascot.listening"
+        :speaking="mascot.isSpeaking"
+        :alerting="bursting"
+        :alerted="mascot.hasWarnings"
+      />
     </button>
+
+    <MascotWarningPopup
+      v-if="mascot.popupOpen"
+      :warnings="mascot.warnings"
+      @dismiss="void dismissWarnings()"
+    />
+
+    <!-- The jump is the signal for people who can see it. This is the same signal for people
+         who cannot: without it a warning would be announced by nothing at all. -->
+    <p class="sr-only" role="status" aria-live="polite">{{ liveAnnouncement }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import DarpanMascot from './DarpanMascot.vue'
+import MascotWarningPopup from './MascotWarningPopup.vue'
 import { useMascotStore } from '../../stores/mascot'
 import { createDwellController, type DwellController } from '../../composables/useMascotDwell'
 import { createIdleHintController } from '../../composables/useIdleHints'
@@ -70,7 +92,61 @@ const emit = defineEmits<{ (event: 'open'): void }>()
 const mascot = useMascotStore()
 const dockEl = ref<HTMLElement | null>(null)
 
-const fabLabel = 'Ask Darpan: search, or rest on a value to have it explained'
+/* The announced destination has to be true for a screen reader too, not only on hover. */
+const fabLabel = computed(() =>
+  mascot.hasWarnings
+    ? `${mascot.warnings[0]?.title} — open the warning`
+    : 'Ask Darpan: search, or rest on a value to have it explained',
+)
+
+const liveAnnouncement = computed(() =>
+  mascot.hasWarnings ? `${mascot.warnings[0]?.title}. ${mascot.warnings[0]?.body}` : '',
+)
+
+/* ── Warnings ──────────────────────────────────────────────────────────────────
+   Three hops at 500ms; held a little past the last frame so the class outlives it. */
+const BURST_MS = 1600
+const bursting = ref(false)
+let burstTimer: ReturnType<typeof setTimeout> | null = null
+
+/** No matchMedia (jsdom, SSR) reads as "motion is fine", matching DarpanMascot's own blink. */
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+/* Fires on the EDGE into "some warning stands", not per warning: a page raising two
+   conditions at once is one event to the reader, and hopping twice reads as a stutter. */
+watch(() => mascot.hasWarnings, (standing, wasStanding) => {
+  if (!standing) {
+    bursting.value = false
+    return
+  }
+  if (wasStanding || prefersReducedMotion()) return
+  bursting.value = true
+  if (burstTimer) clearTimeout(burstTimer)
+  burstTimer = setTimeout(() => { bursting.value = false }, BURST_MS)
+})
+
+/* One target, mode-dependent. The posture and the hover line have already announced the
+   change of destination, which is how a button that changed its label differentiates itself
+   rather than how two buttons do. CMD-K is untouched in App.vue, so navigation is never
+   actually removed -- only the pointer route to it is occupied while a warning stands. */
+function onFaceClick(): void {
+  if (mascot.hasWarnings) {
+    mascot.openWarnings()
+    return
+  }
+  emit('open')
+}
+
+/* Dismissing must not drop focus onto the document body: a keyboard reader would be
+   returned to the top of the page having lost their place. */
+async function dismissWarnings(): Promise<void> {
+  mascot.dismiss()
+  await nextTick()
+  dockEl.value?.querySelector<HTMLButtonElement>('.mascot-fab')?.focus()
+}
 
 const bubbleText = computed(() => mascot.mode !== 'idle')
 
@@ -117,7 +193,10 @@ function trackGaze(event: PointerEvent): void {
 }
 
 function onEscape(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && mascot.mode !== 'idle') mascot.clear()
+  if (event.key !== 'Escape') return
+  // The popup outranks the bubble: it is the thing with focus in it.
+  if (mascot.popupOpen) { void dismissWarnings(); return }
+  if (mascot.mode !== 'idle') mascot.clear()
 }
 
 /* ── App-wide hover help ───────────────────────────────────────────────────────
@@ -197,7 +276,12 @@ const idle = createIdleHintController({
   onExpire: () => { mascot.clearTip() },
 })
 
-function noteActivity(): void {
+function noteActivity(event?: Event): void {
+  // A pointer down anywhere outside the dock is a decision to attend to something else.
+  if (mascot.popupOpen && event?.type === 'pointerdown') {
+    const target = event.target as Node | null
+    if (target && dockEl.value && !dockEl.value.contains(target)) void dismissWarnings()
+  }
   // Acting is also how you dismiss the offer — it has been answered by doing.
   mascot.clearTip()
   idle.noteActivity()
@@ -205,6 +289,9 @@ function noteActivity(): void {
 
 watch(() => props.routeKey, () => {
   mascot.clearTip()
+  // Per-visit lifetime, for free: the page raises again on its next mount, so nothing
+  // anywhere has to remember that this was dismissed.
+  mascot.dismiss()
   idle.enter()
 })
 
@@ -220,6 +307,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (burstTimer) clearTimeout(burstTimer)
   window.removeEventListener('pointermove', trackGaze)
   window.removeEventListener('keydown', onEscape)
   document.removeEventListener('pointerover', onPointerOver)

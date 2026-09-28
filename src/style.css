@@ -1886,6 +1886,9 @@ label > span {
    with those gone there is nothing left to shove, and laying it out properly is the only
    way the two are actually centred on each other at any bubble height. */
 .mascot-dock {
+  /* The warning popup positions against this, so it grows up and left out of the corner
+     rather than being centred over the page it is asking about. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
