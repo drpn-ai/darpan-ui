@@ -210,8 +210,6 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'How far back each run reaches. How often it runs is the schedule, and the two are set separately.', when: control('automation-window-select') },
   ]),
   'reconciliation-automation-edit': Object.freeze([
-    // Rendered only when the automation has actually drifted, so this is never idle noise.
-    { text: 'Until you sync, this keeps running the setup it was built with rather than the run’s current one.', when: control('automation-edit-drift') },
     { text: 'Sync replaces this automation’s source setup and exclusion filters with the run’s current ones.', when: control('automation-edit-sync') },
     { text: 'Widening the window makes each run reach further back. It does not make runs happen more often.', when: control('automation-edit-window-fields') },
     { text: 'This is where this automation’s own notice goes, whichever space the tenant defaults to.', when: control('automation-edit-chat-space-fields') },

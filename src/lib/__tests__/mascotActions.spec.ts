@@ -137,6 +137,7 @@ describe('every button in the app has an answer', () => {
     'components/ui/AppSelect.vue': 'the trigger shows the selected value and each option IS a value, not vocabulary',
     'components/ui/EmptyState.vue': 'the caller supplies action.label; the caller is where the entry belongs',
     'components/ui/ErrorState.vue': 'the caller supplies action.label; the caller is where the entry belongs',
+    'components/shell/MascotWarningPopup.vue': 'the page raising the warning supplies action.label; the caller is where the entry belongs, and Dismiss is entered',
     'components/shell/CommandPalette.vue': 'rows are named by the command list, and are navigation rather than an action on data',
     'components/shell/MascotDock.vue': 'the mascot itself: hovering it shows its own label, not an explanation of it',
     'components/workflow/WorkflowSelect.vue': 'ariaLabel is supplied per caller; its chip button is covered by the remove pattern',

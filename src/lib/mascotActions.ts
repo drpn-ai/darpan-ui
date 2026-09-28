@@ -173,6 +173,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Delete automation',
     body: 'stops the schedule for good. Every run it already made is kept and stays readable.',
   },
+  dismiss: {
+    title: 'Dismiss',
+    body: 'quiets the warning for this visit only. Nothing is fixed and nothing is remembered — it comes back next time the page loads.',
+  },
   sync: {
     title: 'Sync',
     body: 'copies the saved run’s current setup into this automation. What it compares changes from the next run onward.',

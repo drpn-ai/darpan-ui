@@ -68,6 +68,7 @@ vi.mock('../../../stores/auth', () => ({
 }))
 
 import ReconciliationAutomationWorkflowPage from '../ReconciliationAutomationWorkflowPage.vue'
+import { useMascotStore } from '../../../stores/mascot'
 
 function optionsResponse() {
   return {
@@ -240,6 +241,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     getUserNotificationDefault.mockReset()
     listTenantChatSpaces.mockReset()
     saveTenantChatSpace.mockReset()
+    syncAutomation.mockReset()
     authStoreState.sessionInfo = null
     draftStoreState.workflowOrigin = null
     draftStoreState.ruleSetDraftState = null
@@ -1136,7 +1138,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('Ops')
-    expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
+    expect(useMascotStore().warnings.map((w) => w.id)).not.toContain('automation-chat-space-inactive')
 
     await chooseWorkflowOption(wrapper, 'automation-chat-space-select', '')
     expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('No notifications')
@@ -1193,7 +1195,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('Ops')
-    expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(true)
+    expect(useMascotStore().warnings.map((w) => w.id)).toContain('automation-chat-space-inactive')
   })
 
   it('shows no inactive note when no chat space is linked, even if chatSpaceActive is false', async () => {
@@ -1244,7 +1246,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
+    expect(useMascotStore().warnings.map((w) => w.id)).not.toContain('automation-chat-space-inactive')
     expect(wrapper.get('[data-testid="automation-chat-space-select"]').text()).toBe('No notifications')
   })
 
@@ -1437,47 +1439,90 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       return wrapper
     }
 
-    it('shows the drift line only when the snapshot is out of date', async () => {
+    it('raises drift as a mascot warning rather than a line on the page', async () => {
       const clean = await mountEditWithSyncStatus(inSync)
-      expect(clean.find('[data-testid="automation-edit-drift"]').exists()).toBe(false)
+      expect(useMascotStore().warnings.map((w) => w.id)).not.toContain('automation-drift')
+      clean.unmount()
 
-      const stale = await mountEditWithSyncStatus(drifted)
-      expect(stale.find('[data-testid="automation-edit-drift"]').exists()).toBe(true)
+      await mountEditWithSyncStatus(drifted)
+      const raised = useMascotStore().warnings.find((w) => w.id === 'automation-drift')
+
+      expect(raised).toBeDefined()
+      // Promoted from the deleted mascotHints entry: it names the consequence, not the state.
+      expect(raised?.body).toContain('keeps running the setup it was built with')
     })
 
-    it('confirms before syncing and does not call the facade until confirmed', async () => {
-      syncAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], changedFields: [] })
+    it('no longer renders the drift or chat-space prose the mascot now carries', async () => {
       const wrapper = await mountEditWithSyncStatus(drifted)
 
-      await wrapper.get('[data-testid="automation-edit-sync"]').trigger('click')
-      expect(syncAutomation).not.toHaveBeenCalled()
-      expect(wrapper.find('[data-testid="automation-edit-sync-confirm"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="automation-edit-drift"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
+      // The hint that survives in mascotHints gates on this, so it must stay rendered.
+      expect(wrapper.find('[data-testid="automation-edit-sync"]').exists()).toBe(true)
+      // The inline confirm is gone: the popup IS the double-check now.
+      expect(wrapper.find('[data-testid="automation-edit-sync-confirm"]').exists()).toBe(false)
+    })
 
-      await wrapper.get('[data-testid="automation-edit-sync-confirm-yes"]').trigger('click')
+    it('syncs from the popup action and does not call the facade until it is pressed', async () => {
+      syncAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], changedFields: [] })
+      await mountEditWithSyncStatus(drifted)
+      const action = useMascotStore().warnings
+        .find((w) => w.id === 'automation-drift')?.actions
+        .find((a) => a.testId === 'mascot-warning-action-sync')
+
+      expect(syncAutomation).not.toHaveBeenCalled()
+      await action?.run()
       await flushPromises()
+
       expect(syncAutomation).toHaveBeenCalledWith({ automationId: 'AUT_ORDER_SYNC' }, expect.any(AbortSignal))
     })
 
-    it('warns in the confirm when the input mode is about to change', async () => {
-      const wrapper = await mountEditWithSyncStatus({
+    it('warns in the warning body when the input mode is about to change', async () => {
+      await mountEditWithSyncStatus({
         inSync: false,
         changedFields: ['inputMode'],
         inputModeChanging: true,
         savedRunMissing: false,
       })
-      await wrapper.get('[data-testid="automation-edit-sync"]').trigger('click')
-      expect(wrapper.get('[data-testid="automation-edit-sync-confirm"]').text()).toContain('schedule')
+
+      expect(useMascotStore().warnings.find((w) => w.id === 'automation-drift')?.body).toContain('schedule')
     })
 
-    it('disables sync and explains when the saved run is unavailable', async () => {
+    it('offers no sync action at all when the saved run is gone', async () => {
       const wrapper = await mountEditWithSyncStatus({
         inSync: true,
         changedFields: [],
         inputModeChanging: false,
         savedRunMissing: true,
       })
+      const raised = useMascotStore().warnings.find((w) => w.id === 'automation-saved-run-missing')
+
       expect(wrapper.get('[data-testid="automation-edit-sync"]').attributes('disabled')).toBeDefined()
-      expect(wrapper.find('[data-testid="automation-edit-drift"]').exists()).toBe(true)
+      expect(raised).toBeDefined()
+      // A deleted run cannot be synced, so an action here would be a button that always fails.
+      expect(raised?.actions).toEqual([])
+    })
+
+    it('still double-checks when Sync is pressed on an automation that has not drifted', async () => {
+      // syncWarnings() drops the drift warning when nothing drifted, so without an on-demand
+      // confirm the button would open an empty popup and read as broken.
+      const wrapper = await mountEditWithSyncStatus(inSync)
+
+      await wrapper.get('[data-testid="automation-edit-sync"]').trigger('click')
+      const mascot = useMascotStore()
+
+      expect(mascot.popupOpen).toBe(true)
+      expect(mascot.warnings.map((w) => w.id)).toEqual(['automation-sync-confirm'])
+      expect(syncAutomation).not.toHaveBeenCalled()
+    })
+
+    it('drops its warnings on unmount so they do not follow you to the next page', async () => {
+      const wrapper = await mountEditWithSyncStatus(drifted)
+      expect(useMascotStore().warnings).not.toEqual([])
+
+      wrapper.unmount()
+
+      expect(useMascotStore().warnings).toEqual([])
     })
 
     it('leaves the create wizard free to choose a saved run', async () => {

@@ -54,47 +54,14 @@
                 data-testid="automation-edit-saved-run-name"
               >{{ selectedSavedRun?.runName ?? '—' }}</span>
               <button
-                v-if="!syncConfirming"
                 type="button"
                 class="automation-edit-saved-run__sync"
                 data-testid="automation-edit-sync"
                 :disabled="saving || syncing || loadingOptions || automationSyncStatus?.savedRunMissing"
-                @click="syncConfirming = true"
+                @click="openSyncWarning"
               >
                 {{ syncing ? 'Syncing…' : 'Sync' }}
               </button>
-            </div>
-            <span
-              v-if="driftMessage"
-              class="section-note"
-              data-testid="automation-edit-drift"
-            >{{ driftMessage }}</span>
-            <div
-              v-if="syncConfirming"
-              class="automation-edit-saved-run__confirm"
-              data-testid="automation-edit-sync-confirm"
-            >
-              <span class="section-note">{{ syncConfirmMessage }}</span>
-              <div class="automation-edit-saved-run__row">
-                <button
-                  type="button"
-                  class="automation-edit-saved-run__sync"
-                  data-testid="automation-edit-sync-confirm-yes"
-                  :disabled="syncing"
-                  @click="void syncFromSavedRun()"
-                >
-                  Sync now
-                </button>
-                <button
-                  type="button"
-                  class="automation-edit-saved-run__sync"
-                  data-testid="automation-edit-sync-confirm-no"
-                  :disabled="syncing"
-                  @click="syncConfirming = false"
-                >
-                  Keep as is
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -232,9 +199,6 @@
                 placeholder="Select chat space..."
               />
             </label>
-            <p v-if="automationChatSpaceInactive" class="section-note" data-testid="automation-chat-space-inactive-note">
-              {{ automationChatSpaceName }} is no longer active.
-            </p>
           </div>
         </div>
 
@@ -551,6 +515,7 @@ import {
 } from '../../lib/reconciliationAutomationDraft'
 import { useAuthStore } from '../../stores/auth'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
+import { useMascotStore } from '../../stores/mascot'
 import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
 import { useCronExpression, SCHEDULE_WEEKDAY_OPTIONS, type SchedulePreset } from '../../composables/useCronExpression'
 import { useAutomationSourceDraft, type ApiSourceSelectOption } from '../../composables/useAutomationSourceDraft'
@@ -576,8 +541,8 @@ const draftStore = useReconciliationDraftStore()
 const loadingOptions = ref(false)
 const saving = ref(false)
 const pageError = ref<string | null>(null)
+const mascot = useMascotStore()
 const automationSyncStatus = ref<AutomationSyncStatus | null>(null)
-const syncConfirming = ref(false)
 const syncing = ref(false)
 const currentStepIndex = ref(0)
 const handoffSavedRun = ref<SavedRunSummary | null>(null)
@@ -1504,6 +1469,13 @@ let submitController: AbortController | null = null
 onBeforeUnmount(() => {
   pageAbortController.abort()
   submitController?.abort()
+  // The dock also drops on route change; this covers an unmount that is not a navigation.
+  for (const id of [
+    'automation-drift',
+    'automation-saved-run-missing',
+    'automation-chat-space-inactive',
+    'automation-sync-confirm',
+  ]) mascot.drop(id)
 })
 
 async function saveAutomationSetup(): Promise<void> {
@@ -1645,13 +1617,81 @@ function hydrateAutomation(automation: AutomationRecord): void {
   automationChatSpaceInactive.value = Boolean(automation.chatSpaceId) && automation.chatSpaceActive === false
 }
 
-const driftMessage = computed<string>(() => {
-  const status = automationSyncStatus.value
-  if (!status) return ''
-  if (status.savedRunMissing) return 'This automation\u2019s saved run is no longer available, so it cannot be synced.'
-  if (status.inSync) return ''
-  return 'Out of date \u2014 the run changed after this automation last synced.'
+/**
+ * The drift body, promoted out of mascotHints.ts when the line it gated on was removed. It
+ * says what the old driftMessage did not: the CONSEQUENCE of leaving it, not merely that
+ * something is out of date. The sync consequence follows, because the reader is about to
+ * decide between them.
+ */
+const driftBody = computed<string>(() => {
+  const standing = 'Until you sync, this keeps running the setup it was built with rather than the run\u2019s current one.'
+  return `${standing} ${syncConfirmMessage.value}`
 })
+
+/** Re-derived after every load, so a warning cannot outlive the condition that raised it. */
+function syncWarnings(): void {
+  const status = automationSyncStatus.value
+  // Raised on demand by the Sync button only; a reload must never resurrect one.
+  mascot.drop('automation-sync-confirm')
+
+  if (status?.savedRunMissing) {
+    mascot.drop('automation-drift')
+    mascot.raise({
+      id: 'automation-saved-run-missing',
+      title: 'Saved run is gone',
+      body: 'The run this automation was built from no longer exists, so it cannot be synced. It keeps running the setup it already holds.',
+      // No action: a deleted run cannot be synced, and a button that always fails is worse
+      // than no button at all.
+      actions: [],
+    })
+  } else {
+    mascot.drop('automation-saved-run-missing')
+    if (status && !status.inSync) {
+      mascot.raise({
+        id: 'automation-drift',
+        title: 'Out of date',
+        body: driftBody.value,
+        actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: () => syncFromSavedRun() }],
+      })
+    } else {
+      mascot.drop('automation-drift')
+    }
+  }
+
+  if (automationChatSpaceInactive.value) {
+    mascot.raise({
+      id: 'automation-chat-space-inactive',
+      title: 'Chat space is inactive',
+      body: `${automationChatSpaceName.value} is no longer active, so this automation\u2019s results will not reach anyone there.`,
+      actions: [],
+    })
+  } else {
+    mascot.drop('automation-chat-space-inactive')
+  }
+}
+
+/**
+ * The row's Sync button and the jumping face lead to the same popup — the popup IS the
+ * double-check now, so there is one confirmation path rather than two.
+ *
+ * The in-sync branch is load-bearing rather than defensive: syncWarnings() drops the drift
+ * warning when nothing has drifted, so without raising a confirm here openWarnings() would
+ * find an empty set and the button would silently do nothing. Syncing an up-to-date
+ * automation is still a real action with a real consequence.
+ */
+function openSyncWarning(): void {
+  syncWarnings()
+  const status = automationSyncStatus.value
+  if (status && status.inSync && !status.savedRunMissing) {
+    mascot.raise({
+      id: 'automation-sync-confirm',
+      title: 'Sync with the run',
+      body: syncConfirmMessage.value,
+      actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: () => syncFromSavedRun() }],
+    })
+  }
+  mascot.openWarnings()
+}
 
 const syncConfirmMessage = computed<string>(() => {
   const base = 'Sync replaces this automation\u2019s source setup and exclusion filters with the run\u2019s current ones.'
@@ -1670,7 +1710,6 @@ async function syncFromSavedRun(): Promise<void> {
       pageError.value = response.errors?.[0] ?? 'Unable to sync this automation with its saved run.'
       return
     }
-    syncConfirming.value = false
     await loadAutomationForEdit()
   } catch (syncError) {
     if ((syncError as { name?: string })?.name === 'AbortError') return
@@ -1694,6 +1733,7 @@ async function loadAutomationForEdit(): Promise<boolean> {
     }
     hydrateAutomation(response.automation)
     automationSyncStatus.value = response.syncStatus ?? null
+    syncWarnings()
     return true
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return false

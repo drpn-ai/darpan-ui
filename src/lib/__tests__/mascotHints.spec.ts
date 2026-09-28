@@ -152,4 +152,16 @@ describe('the settings wizard gates its hints on a control that really renders',
 
     step.unmount()
   })
+
+  /* Deleted with the span it gated on, rather than left behind. A hint whose `when` selector
+     never matches passes every test in this file and fires never -- the exact failure this
+     module's preconditions exist to prevent ("No control, no hint, structurally"). Its text
+     was the better sentence and is now the drift warning's body on the automation edit page. */
+  it('no longer gates a hint on the removed drift line', () => {
+    const all = Object.values(MASCOT_HINTS).flat()
+
+    expect(all.some((hint) => hint.when === '[data-testid="automation-edit-drift"]')).toBe(false)
+    // Its sibling gates on a control that survived, so it stays.
+    expect(all.some((hint) => hint.when === '[data-testid="automation-edit-sync"]')).toBe(true)
+  })
 })

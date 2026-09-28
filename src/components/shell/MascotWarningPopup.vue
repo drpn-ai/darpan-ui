@@ -22,7 +22,9 @@
         :id="index === 0 ? titleId : undefined"
         class="mascot-warning__title"
         data-testid="mascot-warning-title"
-      >{{ warning.title }}</h2>
+      >
+        {{ warning.title }}
+      </h2>
       <p class="mascot-warning__body">{{ warning.body }}</p>
 
       <!-- Empty actions is legal and load-bearing: a deleted saved run cannot be synced, and a
