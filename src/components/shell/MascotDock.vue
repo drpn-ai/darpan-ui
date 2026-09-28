@@ -11,49 +11,18 @@
     <p
       v-if="bubbleText"
       class="mascot-say"
-      :class="{ 'mascot-say--going': mascot.releasing, 'mascot-say--hint': hintLabelStyling }"
+      :class="{ 'mascot-say--going': mascot.releasing, 'mascot-say--hint': mascot.mode === 'hint' }"
       role="status"
       @pointerenter="onBubbleEnter"
       @pointerleave="onBubbleLeave"
     >
-      <!-- A warning speaks in the same bubble as everything else: one surface in the corner,
-           so there is still one place to look. Closed it is the sentence; clicking the face
-           adds the actions to the same bubble rather than opening a second thing. -->
-      <template v-if="warningSpeaking">
-        <span
-          v-for="warning in visibleWarnings"
-          :key="warning.id"
-          class="mascot-say-warning"
-          data-testid="mascot-warning"
-        >
-          <span class="mascot-say-lead">{{ warning.title }}</span> — {{ warning.body }}
-        </span>
-        <!-- One row, because they are one choice. Dismiss sits beside the actions rather than
-             under them: "sync or dismiss" is the question, and stacking it read as two. -->
-        <span
-          v-if="mascot.popupOpen"
-          class="mascot-say-actions"
-          data-testid="mascot-warning-actions"
-        >
-          <button
-            v-for="action in openActions"
-            :key="action.testId"
-            type="button"
-            class="mascot-say-action"
-            :data-testid="action.testId"
-            @click="void action.run()"
-          >{{ action.label }}</button>
-          <button
-            ref="dismissEl"
-            type="button"
-            class="mascot-say-action"
-            data-testid="mascot-warning-dismiss"
-            @click="void dismissWarnings()"
-          >Dismiss</button>
-        </span>
-      </template>
-      <template v-else-if="mascot.mode === 'hint'">
-        Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.
+      <!-- A warning's prose and its actions live in MascotWarningPopup, not here. This bubble is
+           for labels and explanations, and a condition you must act on is neither — sharing the
+           surface made the two look identical. What a warning gets here is ONE LINE naming it,
+           which is exactly what this bubble is sized and styled for. -->
+      <template v-if="mascot.mode === 'hint'">
+        <template v-if="warningHintLine">{{ warningHintLine }}</template>
+        <template v-else>Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.</template>
       </template>
       <template v-else-if="mascot.mode === 'tip'">
         {{ mascot.tipText }}
@@ -62,6 +31,8 @@
         <span class="mascot-say-lead">{{ leadText }}</span> {{ bodyText }}
       </template>
     </p>
+
+    <MascotWarningPopup />
 
     <button
       type="button"
@@ -93,8 +64,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import DarpanMascot from './DarpanMascot.vue'
+import MascotWarningPopup from './MascotWarningPopup.vue'
 import { useMascotStore } from '../../stores/mascot'
 import { createDwellController, type DwellController } from '../../composables/useMascotDwell'
 import { createIdleHintController } from '../../composables/useIdleHints'
@@ -164,53 +136,16 @@ function onFaceClick(): void {
   emit('open')
 }
 
-const dismissEl = ref<HTMLButtonElement | null>(null)
-
-/* Focus lands on the acknowledgement when the actions appear, never on an action: Sync
-   replaces the automation's whole source setup and must not be one stray Enter away. */
-watch(() => mascot.popupOpen, async (open) => {
-  if (!open) return
-  await nextTick()
-  dismissEl.value?.focus()
-})
-
-/* Dismissing must not drop focus onto the document body: a keyboard reader would be
-   returned to the top of the page having lost their place. */
-async function dismissWarnings(): Promise<void> {
-  mascot.dismiss()
-  await nextTick()
-  dockEl.value?.querySelector<HTMLButtonElement>('.mascot-fab')?.focus()
-}
-
-/* An answer somebody asked for still outranks a warning — that is the whole reason warnings
-   are orthogonal to `mode` rather than a fifth one. Everything else yields to the warning. */
-/* A standing warning waits to be asked. The jump on arrival and the held `alerted` posture are
-   the announcement; the bubble is the answer to "what is it?" (hover) and then "what do I do?"
-   (click). It used to speak unprompted, which left a paragraph sitting open over the page for as
-   long as the condition stood. Still yields to an explanation somebody asked for. */
-const warningSpeaking = computed(() =>
-  mascot.hasWarnings && mascot.mode !== 'explain' && (mascot.popupOpen || mascot.mode === 'hint'),
+/* The one line a warning gets in the bubble: what it is, and where the rest of it lives. It
+   names the first warning rather than counting them, because "2 warnings" says nothing a person
+   can act on and the posture already said that something stands. */
+const warningHintLine = computed(() =>
+  mascot.hasWarnings ? `${mascot.warnings[0]?.title} — click to see` : '',
 )
 
-/* Closed, the bubble carries the first warning; open, it carries all of them with their
-   actions. One page really can raise two, so the open state cannot show only one. */
-const visibleWarnings = computed(() =>
-  mascot.popupOpen ? mascot.warnings : mascot.warnings.slice(0, 1),
-)
-
-/* Every standing warning's actions, in one row with Dismiss. A warning that can only be
-   acknowledged contributes nothing here, which is what `actions: []` is for. */
-const openActions = computed(() => mascot.warnings.flatMap((warning) => warning.actions))
-
-/* A standing warning speaks unprompted, so the bubble is up even at idle. */
-const bubbleText = computed(() => mascot.mode !== 'idle' || warningSpeaking.value)
-
-/* .mascot-say--hint is white-space: nowrap, written for the face's own short label. It is a claim
-   about the bubble's CONTENT, not about the mode — so it must not ride along when a warning owns
-   the content. Hovering the face sets mode 'hint' while warningSpeaking stays true (it steps aside
-   only for 'explain'), which laid a whole warning paragraph out on one line. The warning keeps the
-   bubble on hover, by design; it just no longer wears a label's styling. */
-const hintLabelStyling = computed(() => mascot.mode === 'hint' && !warningSpeaking.value)
+/* The bubble is only ever a label or an explanation now, so it follows `mode` alone. A standing
+   warning shows nothing here until hovered — the burst and the held posture are its announcement. */
+const bubbleText = computed(() => mascot.mode !== 'idle')
 
 const leadText = computed(() => (mascot.isStumped ? 'Drawing a blank' : (mascot.entry?.title ?? '')))
 const bodyText = computed(() =>
@@ -256,8 +191,9 @@ function trackGaze(event: PointerEvent): void {
 
 function onEscape(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return
-  // The popup outranks the bubble: it is the thing with focus in it.
-  if (mascot.popupOpen) { void dismissWarnings(); return }
+  // The popup outranks the bubble and owns its own Escape — it closes without acknowledging,
+  // which the dock cannot express. Leave it alone entirely rather than racing it.
+  if (mascot.popupOpen) return
   if (mascot.mode !== 'idle') mascot.clear()
 }
 
@@ -338,13 +274,11 @@ const idle = createIdleHintController({
   onExpire: () => { mascot.clearTip() },
 })
 
-function noteActivity(event?: Event): void {
-  // A pointer down anywhere outside the dock is a decision to attend to something else.
-  if (mascot.popupOpen && event?.type === 'pointerdown') {
-    const target = event.target as Node | null
-    if (target && dockEl.value && !dockEl.value.contains(target)) void dismissWarnings()
-  }
-  // Acting is also how you dismiss the offer — it has been answered by doing.
+function noteActivity(): void {
+  // Nothing here reads the event any more: an outside click is handled by the popup's own
+  // backdrop, which CLOSES without acknowledging. Dismissing here would have cleared a warning
+  // nobody acted on, turning "I looked away" into "done".
+  // Acting is how you dismiss the offer — it has been answered by doing.
   mascot.clearTip()
   idle.noteActivity()
 }

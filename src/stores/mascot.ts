@@ -88,6 +88,16 @@ export const useMascotStore = defineStore('mascot', () => {
     if (hasWarnings.value) popupOpen.value = true
   }
 
+  /**
+   * Put the dialog away WITHOUT acknowledging anything — Escape, or a click outside it. The
+   * condition still stands and the face keeps its posture; only dismiss() clears the warnings.
+   * The two were the same action while warnings lived in the speech bubble, and conflating them
+   * would turn "I have read this" into "this no longer applies".
+   */
+  function closeWarnings(): void {
+    popupOpen.value = false
+  }
+
   /** The acknowledgement. Per-visit only — nothing is written anywhere, so a return re-raises. */
   function dismiss(): void {
     warnings.value = []
@@ -159,6 +169,7 @@ export const useMascotStore = defineStore('mascot', () => {
     raise,
     drop,
     openWarnings,
+    closeWarnings,
     dismiss,
     mode,
     term,

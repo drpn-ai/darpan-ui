@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import MascotDock from '../MascotDock.vue'
@@ -113,6 +113,7 @@ describe('MascotDock', () => {
 
 describe('MascotDock warnings', () => {
   beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => { document.body.innerHTML = '' })
 
   const drift = {
     id: 'automation-drift',
@@ -120,6 +121,10 @@ describe('MascotDock warnings', () => {
     body: 'Until you sync, this keeps running the setup it was built with.',
     actions: [],
   }
+
+  /* The dock's whole job for a warning is now: burst, hold the posture, name it in one line on
+     hover, and open the dialog on click. What is INSIDE the dialog — the prose, the actions,
+     Dismiss, focus, Escape — belongs to MascotWarningPopup.spec, because that is where it lives. */
 
   it('bursts once when a warning is raised, then stops on its own', async () => {
     vi.useFakeTimers()
@@ -133,8 +138,8 @@ describe('MascotDock warnings', () => {
     vi.advanceTimersByTime(2000)
     await wrapper.vm.$nextTick()
     expect(wrapper.get('.mascot').classes()).not.toContain('mascot--alerting')
-    // The posture is what survives the motion -- with no marker left on the page it is the
-    // only thing a reader who looked away during the hops has to find.
+    // The posture is what survives the motion -- with nothing on screen it is the only thing a
+    // reader who looked away during the hops has to find.
     expect(wrapper.get('.mascot').classes()).toContain('mascot--alerted')
     vi.useRealTimers()
   })
@@ -160,18 +165,17 @@ describe('MascotDock warnings', () => {
     matchMedia.mockRestore()
   })
 
-  // The four states of a standing warning, one test each. The bubble used to speak unprompted;
-  // it now waits to be asked, and the jump plus the held posture carry the announcement.
   it('says nothing at idle — the posture carries it', async () => {
     const wrapper = mountDock()
     useMascotStore().raise(drift)
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('.mascot-say').exists()).toBe(false)
+    expect(document.querySelector('[data-testid="mascot-warning-popup"]')).toBeNull()
     expect(wrapper.get('.mascot').classes()).toContain('mascot--alerted')
   })
 
-  it('speaks the warning on hover, without the actions', async () => {
+  it('names the warning in one line on hover, and sends you to the dialog for the rest', async () => {
     const wrapper = mountDock()
     useMascotStore().raise(drift)
     await wrapper.vm.$nextTick()
@@ -180,140 +184,36 @@ describe('MascotDock warnings', () => {
     await wrapper.vm.$nextTick()
 
     const say = wrapper.get('.mascot-say')
-    expect(say.text()).toContain('Out of date')
-    expect(say.text()).toContain('keeps running the setup')
-    // The warning takes the slot the shortcut label would have had.
-    expect(say.text()).not.toContain('in a hurry')
-    // Hovering asks what it is, not what to do about it.
-    expect(wrapper.find('[data-testid="mascot-warning-dismiss"]').exists()).toBe(false)
+    // A label, which is what this bubble is for. The prose lives in the dialog.
+    expect(say.text()).toBe('Out of date — click to see')
+    expect(say.text()).not.toContain('keeps running the setup')
+    // It IS a one-liner now, so the nowrap label styling is correct again — the gate that used to
+    // withhold it went away with the warning that made it necessary.
+    expect(say.classes()).toContain('mascot-say--hint')
   })
 
-  it('adds the actions once the face is clicked', async () => {
+  it('gives the shortcut label back on hover once nothing stands', async () => {
     const wrapper = mountDock()
-    useMascotStore().raise({ ...drift, actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: vi.fn() }] })
-    await wrapper.vm.$nextTick()
-
-    await wrapper.get('.mascot-fab').trigger('click')
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.get('.mascot-say').text()).toContain('Out of date')
-    expect(wrapper.find('[data-testid="mascot-warning-action-sync"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="mascot-warning-dismiss"]').exists()).toBe(true)
-  })
-
-  it('keeps an opened warning up after the pointer leaves', async () => {
-    // A popup someone opened deliberately must not evaporate on mouse-out; only Dismiss or a
-    // click outside closes it.
-    const wrapper = mountDock()
-    useMascotStore().raise(drift)
-    await wrapper.vm.$nextTick()
-    await wrapper.get('.mascot-fab').trigger('click')
-    await wrapper.vm.$nextTick()
-
-    await wrapper.get('.mascot-fab').trigger('pointerleave', { pointerType: 'mouse' })
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.get('.mascot-say').text()).toContain('Out of date')
-  })
-
-  it('keeps the shortcut label once the warning is gone', async () => {
-    const wrapper = mountDock()
-    const mascot = useMascotStore()
-    mascot.raise(drift)
-    await wrapper.vm.$nextTick()
-    mascot.dismiss()
-    await wrapper.vm.$nextTick()
-
     await wrapper.get('.mascot-fab').trigger('pointerenter', { pointerType: 'mouse' })
+    await wrapper.vm.$nextTick()
 
     expect(wrapper.get('.mascot-say').text()).toContain('in a hurry')
   })
 
-  it('does not style a standing warning as a one-line hint label when the face is hovered', async () => {
-    // .mascot-say--hint is white-space: nowrap, written for the face's own short label. A warning
-    // is prose. Hovering the face sets mode 'hint', and warningSpeaking only steps aside for
-    // 'explain' — so the bubble kept rendering the warning while wearing the nowrap label style,
-    // and a paragraph was laid out on a single line.
-    const wrapper = mountDock()
-    const mascot = useMascotStore()
-    mascot.raise(drift)
-    await wrapper.vm.$nextTick()
-
-    await wrapper.get('.mascot-fab').trigger('pointerenter', { pointerType: 'mouse' })
-    await wrapper.vm.$nextTick()
-
-    const say = wrapper.get('.mascot-say')
-    expect(say.text()).toContain('Out of date')
-    expect(say.classes()).not.toContain('mascot-say--hint')
-  })
-
-  // The reason warnings are orthogonal to `mode` rather than a fifth one.
-  it('yields the bubble to an explanation somebody asked for', async () => {
-    const wrapper = mountDock()
-    const mascot = useMascotStore()
-    mascot.raise(drift)
-    await wrapper.vm.$nextTick()
-
-    mascot.explain('differenceCount')
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.get('.mascot-say').text()).not.toContain('Out of date')
-    // ...and the warning is still standing underneath it.
-    expect(mascot.hasWarnings).toBe(true)
-    expect(wrapper.get('.mascot').classes()).toContain('mascot--alerted')
-  })
-
-  it('routes the click to the warning rather than the launcher while one stands', async () => {
-    const wrapper = mountDock()
+  it('routes the click to the dialog rather than the launcher while one stands', async () => {
+    const wrapper = mountDock({ attachTo: document.body })
     const mascot = useMascotStore()
     mascot.raise(drift)
     await wrapper.vm.$nextTick()
 
     await wrapper.get('.mascot-fab').trigger('click')
+    await wrapper.vm.$nextTick()
 
     expect(mascot.popupOpen).toBe(true)
     expect(wrapper.emitted('open')).toBeUndefined()
-    // The actions join the bubble that was already speaking, rather than opening a second surface.
-    expect(wrapper.findAll('.mascot-say')).toHaveLength(1)
-    expect(wrapper.find('[data-testid="mascot-warning-dismiss"]').exists()).toBe(true)
-  })
-
-  it('shows both warnings and their actions once opened', async () => {
-    const wrapper = mountDock()
-    const mascot = useMascotStore()
-    mascot.raise({ ...drift, actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: vi.fn() }] })
-    mascot.raise({ id: 'chat', title: 'Chat space is inactive', body: 'nothing lands there', actions: [] })
-    await wrapper.vm.$nextTick()
-    // Closed is now silent entirely — no bubble, the posture carries it.
-    expect(wrapper.findAll('[data-testid="mascot-warning"]')).toHaveLength(0)
-
-    // Hovered but not opened, the bubble still carries only the first: "what is it?" is answered
-    // by the one that matters most, not by a list.
-    await wrapper.get('.mascot-fab').trigger('pointerenter', { pointerType: 'mouse' })
-    await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('[data-testid="mascot-warning"]')).toHaveLength(1)
-
-    await wrapper.get('.mascot-fab').trigger('click')
-
-    expect(wrapper.findAll('[data-testid="mascot-warning"]')).toHaveLength(2)
-    // Sync and Dismiss are one choice, so they share one row -- and the acknowledge-only
-    // warning contributes no button to it.
-    const actions = wrapper.get('[data-testid="mascot-warning-actions"]')
-    expect(actions.findAll('button').map((b) => b.text())).toEqual(['Sync', 'Dismiss'])
-    expect(wrapper.findAll('[data-testid="mascot-warning-actions"]')).toHaveLength(1)
-  })
-
-  it('runs the action the page handed over', async () => {
-    const run = vi.fn()
-    const wrapper = mountDock()
-    const mascot = useMascotStore()
-    mascot.raise({ ...drift, actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run }] })
-    await wrapper.vm.$nextTick()
-    await wrapper.get('.mascot-fab').trigger('click')
-
-    await wrapper.get('[data-testid="mascot-warning-action-sync"]').trigger('click')
-
-    expect(run).toHaveBeenCalledTimes(1)
+    // What opens is the dialog, not more bubble.
+    expect(document.querySelector('[data-testid="mascot-warning-popup"]')).not.toBeNull()
+    wrapper.unmount()
   })
 
   it('gives the launcher back once the warning is dismissed', async () => {
@@ -323,57 +223,21 @@ describe('MascotDock warnings', () => {
     await wrapper.vm.$nextTick()
     await wrapper.get('.mascot-fab').trigger('click')
 
-    await wrapper.get('[data-testid="mascot-warning-dismiss"]').trigger('click')
+    mascot.dismiss()
+    await wrapper.vm.$nextTick()
     await wrapper.get('.mascot-fab').trigger('click')
 
     expect(wrapper.emitted('open')).toHaveLength(1)
     expect(wrapper.get('.mascot').classes()).not.toContain('mascot--alerted')
   })
 
-  it('tells a screen reader the click has changed destination too', async () => {
+  it('announces the warning to a screen reader without waiting for a hover', async () => {
     const wrapper = mountDock()
     useMascotStore().raise(drift)
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('.mascot-fab').attributes('aria-label')).toContain('Out of date')
-  })
-
-  it('announces the warning to a screen reader, which the jump reaches not at all', async () => {
-    const wrapper = mountDock()
-    useMascotStore().raise(drift)
-    await wrapper.vm.$nextTick()
-
-    const live = wrapper.get('[aria-live="polite"]')
-    expect(live.text()).toContain('Out of date')
-    expect(live.text()).toContain('keeps running the setup')
-  })
-
-  it('returns focus to the face on dismiss rather than dropping it on the body', async () => {
-    const wrapper = mountDock({ attachTo: document.body })
-    const mascot = useMascotStore()
-    mascot.raise(drift)
-    await wrapper.vm.$nextTick()
-    await wrapper.get('.mascot-fab').trigger('click')
-
-    await wrapper.get('[data-testid="mascot-warning-dismiss"]').trigger('click')
-    await wrapper.vm.$nextTick()
-    await wrapper.vm.$nextTick()
-
-    expect(document.activeElement).toBe(wrapper.get('.mascot-fab').element)
-    wrapper.unmount()
-  })
-
-  // Per-visit lifetime, delivered by the watcher that already resets tips -- and therefore
-  // by no storage at all.
-  it('drops warnings when the route changes', async () => {
-    const wrapper = mountDock()
-    const mascot = useMascotStore()
-    mascot.raise(drift)
-    await wrapper.vm.$nextTick()
-
-    await wrapper.setProps({ routeKey: '/somewhere/else' })
-
-    expect(mascot.warnings).toEqual([])
-    expect(wrapper.get('.mascot').classes()).not.toContain('mascot--alerted')
+    // Nothing is drawn at idle, so the live region is the only thing carrying it for a reader
+    // who cannot see the posture.
+    expect(wrapper.get('p.sr-only[aria-live="polite"]').text()).toContain('Out of date')
   })
 })
