@@ -1698,7 +1698,7 @@ function openSyncWarning(): void {
 }
 
 const syncConfirmMessage = computed<string>(() => {
-  const base = 'Sync replaces this automation\u2019s source setup and exclusion filters with the run\u2019s current ones.'
+  const base = 'Sync replaces this automation\u2019s source setup and filters with the run\u2019s current ones.'
   return automationSyncStatus.value?.inputModeChanging
     ? `${base} The run now uses a different kind of source, so the schedule shape changes and the current window settings stop applying.`
     : base
