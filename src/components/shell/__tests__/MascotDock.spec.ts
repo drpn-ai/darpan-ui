@@ -160,18 +160,60 @@ describe('MascotDock warnings', () => {
     matchMedia.mockRestore()
   })
 
-  it('speaks the warning in the same bubble as a hint, unprompted', async () => {
+  // The four states of a standing warning, one test each. The bubble used to speak unprompted;
+  // it now waits to be asked, and the jump plus the held posture carry the announcement.
+  it('says nothing at idle — the posture carries it', async () => {
     const wrapper = mountDock()
     useMascotStore().raise(drift)
     await wrapper.vm.$nextTick()
 
-    // No hover needed: a warning is the one thing the bubble says on its own.
+    expect(wrapper.find('.mascot-say').exists()).toBe(false)
+    expect(wrapper.get('.mascot').classes()).toContain('mascot--alerted')
+  })
+
+  it('speaks the warning on hover, without the actions', async () => {
+    const wrapper = mountDock()
+    useMascotStore().raise(drift)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.mascot-fab').trigger('pointerenter', { pointerType: 'mouse' })
+    await wrapper.vm.$nextTick()
+
     const say = wrapper.get('.mascot-say')
     expect(say.text()).toContain('Out of date')
     expect(say.text()).toContain('keeps running the setup')
+    // The warning takes the slot the shortcut label would have had.
     expect(say.text()).not.toContain('in a hurry')
-    // Closed, it is the sentence only -- the actions wait for a click.
+    // Hovering asks what it is, not what to do about it.
     expect(wrapper.find('[data-testid="mascot-warning-dismiss"]').exists()).toBe(false)
+  })
+
+  it('adds the actions once the face is clicked', async () => {
+    const wrapper = mountDock()
+    useMascotStore().raise({ ...drift, actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: vi.fn() }] })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.mascot-fab').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.mascot-say').text()).toContain('Out of date')
+    expect(wrapper.find('[data-testid="mascot-warning-action-sync"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="mascot-warning-dismiss"]').exists()).toBe(true)
+  })
+
+  it('keeps an opened warning up after the pointer leaves', async () => {
+    // A popup someone opened deliberately must not evaporate on mouse-out; only Dismiss or a
+    // click outside closes it.
+    const wrapper = mountDock()
+    useMascotStore().raise(drift)
+    await wrapper.vm.$nextTick()
+    await wrapper.get('.mascot-fab').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.mascot-fab').trigger('pointerleave', { pointerType: 'mouse' })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.mascot-say').text()).toContain('Out of date')
   })
 
   it('keeps the shortcut label once the warning is gone', async () => {
@@ -242,7 +284,13 @@ describe('MascotDock warnings', () => {
     mascot.raise({ ...drift, actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: vi.fn() }] })
     mascot.raise({ id: 'chat', title: 'Chat space is inactive', body: 'nothing lands there', actions: [] })
     await wrapper.vm.$nextTick()
-    // Closed, the bubble carries only the first.
+    // Closed is now silent entirely — no bubble, the posture carries it.
+    expect(wrapper.findAll('[data-testid="mascot-warning"]')).toHaveLength(0)
+
+    // Hovered but not opened, the bubble still carries only the first: "what is it?" is answered
+    // by the one that matters most, not by a list.
+    await wrapper.get('.mascot-fab').trigger('pointerenter', { pointerType: 'mouse' })
+    await wrapper.vm.$nextTick()
     expect(wrapper.findAll('[data-testid="mascot-warning"]')).toHaveLength(1)
 
     await wrapper.get('.mascot-fab').trigger('click')

@@ -1450,6 +1450,10 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       expect(raised).toBeDefined()
       // Promoted from the deleted mascotHints entry: it names the consequence, not the state.
       expect(raised?.body).toContain('keeps running the setup it was built with')
+      // RAISED, NOT OPENED. Drift found on load announces itself through the burst and the held
+      // posture; the bubble waits to be hovered or clicked. Only the Sync BUTTON opens it, because
+      // there the operator asked a question and is owed the answer — see the in-sync test below.
+      expect(useMascotStore().popupOpen).toBe(false)
     })
 
     it('no longer renders the drift or chat-space prose the mascot now carries', async () => {

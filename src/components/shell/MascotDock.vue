@@ -184,7 +184,13 @@ async function dismissWarnings(): Promise<void> {
 
 /* An answer somebody asked for still outranks a warning — that is the whole reason warnings
    are orthogonal to `mode` rather than a fifth one. Everything else yields to the warning. */
-const warningSpeaking = computed(() => mascot.hasWarnings && mascot.mode !== 'explain')
+/* A standing warning waits to be asked. The jump on arrival and the held `alerted` posture are
+   the announcement; the bubble is the answer to "what is it?" (hover) and then "what do I do?"
+   (click). It used to speak unprompted, which left a paragraph sitting open over the page for as
+   long as the condition stood. Still yields to an explanation somebody asked for. */
+const warningSpeaking = computed(() =>
+  mascot.hasWarnings && mascot.mode !== 'explain' && (mascot.popupOpen || mascot.mode === 'hint'),
+)
 
 /* Closed, the bubble carries the first warning; open, it carries all of them with their
    actions. One page really can raise two, so the open state cannot show only one. */

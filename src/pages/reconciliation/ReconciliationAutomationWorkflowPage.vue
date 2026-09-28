@@ -1690,6 +1690,10 @@ function openSyncWarning(): void {
       actions: [{ label: 'Sync', testId: 'mascot-warning-action-sync', run: () => syncFromSavedRun() }],
     })
   }
+  // Opened deliberately, and only here. This is the Sync BUTTON's handler: the operator asked a
+  // question and is owed the answer with its actions, not a mascot to go hunting for. A warning
+  // that merely stands (drift found on load) is raised by syncWarnings() and never opened — the
+  // burst and the held posture announce it, and the bubble waits to be hovered or clicked.
   mascot.openWarnings()
 }
 
