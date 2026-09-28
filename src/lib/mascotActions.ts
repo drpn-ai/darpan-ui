@@ -336,6 +336,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Back to Shopify Settings',
     body: 'the list of Shopify connections. Nothing on this page is saved on the way out.',
   },
+  'back to run editor': {
+    title: 'Back to Run Editor',
+    body: 'the list of saved runs on this tenant. Nothing here is saved on the way out, and the run it was showing is not discarded either.',
+  },
 
   /* ── The shell, and controls that appear on many pages ──────────────────────── */
   cancel: {

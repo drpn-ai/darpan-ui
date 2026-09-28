@@ -940,6 +940,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
 
     const footerActions = wrapper.findAll('.ruleset-manager-footer-row > *')
     expect(footerActions.map((action) => action.attributes('data-testid'))).toEqual([
+      'back-run-editor',
       'ruleset-manager-run-ruleset',
       'ruleset-manager-view-history',
       'ruleset-manager-delete-run',
@@ -965,11 +966,93 @@ describe('ReconciliationRuleSetManagerPage', () => {
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
+    // What is banned is the retired edit surface's IN-BOARD block: a "Back to Run Editor" text
+    // link sitting next to a "Create Basic Diff Run" tile inside the page body. The footer
+    // icon action asserted below is a different affordance on a different pattern, so this
+    // guard stays literal about the markup it is retiring.
     expect(wrapper.text()).not.toContain('Create Basic Diff Run')
     expect(wrapper.text()).not.toContain('Back to Run Editor')
     expect(wrapper.find('.ruleset-manager-actions').exists()).toBe(false)
     expect(wrapper.find('[data-testid="ruleset-manager-back"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="ruleset-manager-create"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="back-run-editor"]').element.closest('.static-page-board')).toBeNull()
+  })
+
+  it('returns to the Run Editor from the first footer action', async () => {
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const back = wrapper.get('[data-testid="back-run-editor"]')
+    expect(back.attributes('data-to')).toBe('/settings/runs')
+    expect(back.attributes('aria-label')).toBe('Back to Run Editor')
+    expect(back.classes()).toContain('app-icon-action')
+    expect(back.classes()).toContain('app-icon-action--large')
+    expect(back.classes()).not.toContain('app-icon-action--danger')
+    expect(back.element.closest('.ruleset-manager-footer-row')).not.toBeNull()
+    expect(back.element.closest('.static-page-actions')).not.toBeNull()
+    expect(back.element.closest('.static-page-board')).toBeNull()
+
+    // First in the row, matching the three sibling detail pages.
+    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual([
+      'back-run-editor',
+      'ruleset-manager-run-ruleset',
+      'ruleset-manager-view-history',
+      'ruleset-manager-delete-run',
+    ])
+  })
+
+  it('still offers the way back when no other footer action is available', async () => {
+    // An unsaved draft (no savedRunId, so no run history) held by a user who can neither run nor
+    // edit: every other footer action is gone. This is the case the old permission gate on the
+    // whole #actions slot swallowed, which is precisely when someone is most stuck on the page.
+    permissionState.canRunActiveTenantReconciliation = false
+    permissionState.canEditTenantSettings = false
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
+      {
+        savedRunId: '',
+        runName: 'Unsaved Draft',
+        file1SystemEnumId: 'OMS',
+        file1SystemLabel: 'OMS',
+        file1FileTypeEnumId: 'DftJson',
+        file1JsonSchemaId: 'schema-oms-orders',
+        file1SchemaFileName: 'test-oms-orders.schema.json',
+        file1PrimaryIdExpression: ['$.orders[0].order_id'],
+        file2SystemEnumId: 'SHOPIFY',
+        file2SystemLabel: 'SHOPIFY',
+        file2FileTypeEnumId: 'DftJson',
+        file2JsonSchemaId: 'schema-shopify-orders',
+        file2SchemaFileName: 'test-shopify-orders.schema.json',
+        file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
+      },
+      'ruleset-manager',
+    )
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual([
+      'back-run-editor',
+    ])
+  })
+
+  it('still offers the way back when there is no draft to show', async () => {
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = null
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No run basics defined yet')
+    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual([
+      'back-run-editor',
+    ])
   })
 
   it('deletes a saved run from the bottom trash action after confirmation', async () => {

@@ -172,10 +172,21 @@
       </template>
     </StaticPageSection>
 
-    <template v-if="draft && (canRunActiveTenantReconciliation || canViewRunHistory || canEditTenantSettings)" #actions>
+    <template #actions>
       <div class="action-row ruleset-manager-footer-row">
+        <RouterLink
+          to="/settings/runs"
+          class="app-icon-action app-icon-action--large ruleset-manager-back-action"
+          data-testid="back-run-editor"
+          aria-label="Back to Run Editor"
+          title="Back to Run Editor"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path :d="backIconPath" fill="currentColor" />
+          </svg>
+        </RouterLink>
         <button
-          v-if="canRunActiveTenantReconciliation"
+          v-if="draft && canRunActiveTenantReconciliation"
           type="button"
           class="app-icon-action app-icon-action--large ruleset-manager-run-action"
           data-testid="ruleset-manager-run-ruleset"
@@ -199,7 +210,7 @@
           </svg>
         </RouterLink>
         <button
-          v-if="canEditTenantSettings"
+          v-if="draft && canEditTenantSettings"
           type="button"
           class="app-icon-action app-icon-action--large app-icon-action--danger ruleset-manager-delete-action"
           data-testid="ruleset-manager-delete-run"
@@ -293,7 +304,7 @@ import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { editIconPath, listIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
+import { backIconPath, editIconPath, listIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
   formatReconciliationFieldKey,
   type ReconciliationRuleSetDraft,
