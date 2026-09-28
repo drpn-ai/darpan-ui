@@ -1,6 +1,7 @@
 import type { CreateRuleSetRunPayload } from './api/facadeTypes'
 
 export const EXCLUDE_FILTER_OPERATOR = 'EXCLUDE_IN'
+export const INCLUDE_FILTER_OPERATOR = 'INCLUDE_IN'
 
 export interface SourceExcludeFilter {
   fieldExpression: string

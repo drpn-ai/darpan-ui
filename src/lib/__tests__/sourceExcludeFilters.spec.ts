@@ -66,3 +66,21 @@ describe('excludeFilterPayloadFields', () => {
     expect(excludeFilterPayloadFields(undefined, 'file1')).toEqual({})
   })
 })
+
+describe('include mode', () => {
+  it('keeps an include operator through normalization', () => {
+    expect(
+      normalizeExcludeFilters([
+        { fieldExpression: '$.records[*].status', operator: 'INCLUDE_IN', values: ['A'] },
+      ]),
+    ).toEqual([{ fieldExpression: '$.records[*].status', operator: 'INCLUDE_IN', values: ['A'] }])
+  })
+
+  it('still stamps EXCLUDE_IN when a draft carries no operator', () => {
+    // Every draft saved before DAR-BE-054 submitted no operator at all. If this default drifts,
+    // those rule sets silently change direction on upgrade.
+    expect(
+      normalizeExcludeFilters([{ fieldExpression: '$.records[*].status', values: ['A'] }])[0]?.operator,
+    ).toBe('EXCLUDE_IN')
+  })
+})

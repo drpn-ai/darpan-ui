@@ -995,7 +995,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
       expect(wrapper.find(EXCLUDE_MARK).exists()).toBe(true)
     })
 
-    it('extends the pill accessible name with a screen-reader-only "Has exclusion" signal', async () => {
+    it('extends the pill accessible name with a screen-reader-only mode signal', async () => {
       // Before the double-click rework, the mark was a real <button> whose own accessible name
       // ("Edit exclusion on X" vs "Add exclusion on X") let a screen-reader user tell which
       // fields already carried an exclusion. The mark is now aria-hidden and the pill absorbed
@@ -1010,8 +1010,10 @@ describe('ReconciliationRuleSetEditorPage', () => {
 
       const status = wrapper.get('[data-testid="ruleset-field-exclude-status-file1-6"]')
       expect(status.classes()).toContain('sr-only')
-      expect(status.text()).toBe('Has exclusion')
-      expect(wrapper.get(EXCLUDE_PILL).text()).toContain('Has exclusion')
+      // DAR-BE-054 made this say WHICH direction rather than merely that one exists: the visible
+      // mark is aria-hidden, so this string is all a screen-reader user gets about the mode.
+      expect(status.text()).toBe('Excludes values')
+      expect(wrapper.get(EXCLUDE_PILL).text()).toContain('Excludes values')
     })
 
     it('adds no accessible-name signal on a field with no exclusion', async () => {
@@ -1265,6 +1267,78 @@ describe('ReconciliationRuleSetEditorPage', () => {
         }),
         expect.any(AbortSignal),
       )
+    })
+
+    it('marks an exclude filter with != and an include filter with =', async () => {
+      // The two directions must be tellable apart on the board without opening each one.
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, operator: 'INCLUDE_IN', values: ['WEB_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.get(EXCLUDE_MARK).text()).toBe('=')
+      expect(wrapper.get('[data-testid="ruleset-field-exclude-status-file1-6"]').text())
+        .toBe('Only these values')
+    })
+
+    it('opens the editor on the operator the filter already has', async () => {
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, operator: 'INCLUDE_IN', values: ['WEB_SALES_CHANNEL'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
+
+      expect((wrapper.get('[data-testid="ruleset-exclusion-mode"]').element as HTMLSelectElement).value)
+        .toBe('INCLUDE_IN')
+    })
+
+    it('saves the operator the dropdown is set to', async () => {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
+      await wrapper.get('[data-testid="ruleset-exclusion-mode"]').setValue('INCLUDE_IN')
+      await wrapper.get('[data-testid="ruleset-exclusion-value-input"]').setValue('WEB_SALES_CHANNEL')
+      await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get(EXCLUDE_MARK).text()).toBe('=')
+
+      await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      expect(saveRuleSetRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file1ExcludeFilters: [
+            { fieldExpression: EXCLUDED_FIELD_PATH, operator: 'INCLUDE_IN', values: ['WEB_SALES_CHANNEL'] },
+          ],
+        }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    it('defaults a brand-new filter to exclude, not to whichever mode was last used', async () => {
+      // The editor is reused across pills; a mode left over from the previous one would silently
+      // invert a filter the operator never touched the dropdown for.
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get(EXCLUDE_PILL).trigger('dblclick')
+      await wrapper.get('[data-testid="ruleset-exclusion-mode"]').setValue('INCLUDE_IN')
+      await wrapper.get('[data-testid="ruleset-exclusion-value-input"]').setValue('WEB_SALES_CHANNEL')
+      await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-file1-5"]').trigger('dblclick')
+
+      expect((wrapper.get('[data-testid="ruleset-exclusion-mode"]').element as HTMLSelectElement).value)
+        .toBe('EXCLUDE_IN')
     })
 
     it('still deletes the exclusion when Delete is clicked with text left in the input', async () => {

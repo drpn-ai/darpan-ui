@@ -96,13 +96,13 @@
             class="ruleset-field-exclude"
             :data-testid="`ruleset-field-exclude-file1-${index}`"
             aria-hidden="true"
-          >⊘</span>
+          >{{ excludeFilterMark('file1', field.fieldPath) }}</span>
           <!-- The mark above is decorative and aria-hidden, so a screen-reader user tabbing
                through fields has no way to tell this one already carries an exclusion. This
                sr-only span (same pattern as CommandPalette.vue's search label) restores that
                signal by extending the pill's own accessible name, without touching the visible
                capability gate. -->
-          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file1-${index}`">Has exclusion</span>
+          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file1-${index}`">{{ excludeFilterStatusLabel('file1', field.fieldPath) }}</span>
         </template>
 
         <!-- See the matching note on the file2 column below. -->
@@ -157,9 +157,9 @@
             class="ruleset-field-exclude"
             :data-testid="`ruleset-field-exclude-file2-${index}`"
             aria-hidden="true"
-          >⊘</span>
+          >{{ excludeFilterMark('file2', field.fieldPath) }}</span>
           <!-- See the matching comment on the file1 column above. -->
-          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file2-${index}`">Has exclusion</span>
+          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file2-${index}`">{{ excludeFilterStatusLabel('file2', field.fieldPath) }}</span>
         </template>
 
         <!--
@@ -343,24 +343,35 @@
         ref="exclusionPopoverRef"
         class="popup-workflow-modal workflow-panel ruleset-exclusion-popup"
         role="dialog"
-        aria-label="Edit exclusion"
+        aria-label="Edit filter"
         data-testid="ruleset-exclusion-popover"
         @keydown.enter.stop.prevent="applyExclusionEdit"
       >
         <label>
-          <span>Exclude on</span>
+          <span>Filter on</span>
           <input :value="editingExclusion.fieldPath" readonly data-testid="ruleset-exclusion-field" />
         </label>
-        <label>
-          <span>Values to exclude</span>
-          <input
-            v-model="pendingExclusionValue"
-            type="text"
-            placeholder="Type a value, press Enter"
-            data-testid="ruleset-exclusion-value-input"
-            @keydown.enter.prevent.stop="commitPendingExclusionValue"
-          />
-        </label>
+        <!--
+          The dropdown IS the label for the input beneath it. Two controls both spelling out the
+          mode can drift apart visually; one cannot. The input keeps an accessible name of its own
+          because a <select> is not programmatically a label for what follows it.
+        -->
+        <select
+          v-model="editingExclusionOperator"
+          aria-label="Filter mode"
+          data-testid="ruleset-exclusion-mode"
+        >
+          <option :value="EXCLUDE_FILTER_OPERATOR">Exclude these values</option>
+          <option :value="INCLUDE_FILTER_OPERATOR">Only these values</option>
+        </select>
+        <input
+          v-model="pendingExclusionValue"
+          type="text"
+          placeholder="Type a value, press Enter"
+          :aria-label="editingExclusionOperator === INCLUDE_FILTER_OPERATOR ? 'Values to keep' : 'Values to exclude'"
+          data-testid="ruleset-exclusion-value-input"
+          @keydown.enter.prevent.stop="commitPendingExclusionValue"
+        />
         <div v-if="editingExclusionValues.length" class="workflow-select-chip-row">
           <span v-for="value in editingExclusionValues" :key="value" class="workflow-select-chip">
             {{ value }}
@@ -373,12 +384,12 @@
           </span>
         </div>
         <div class="ruleset-rule-popover-actions">
-          <AppSaveAction label="Save exclusion" test-id="ruleset-exclusion-apply" @click="applyExclusionEdit" />
+          <AppSaveAction label="Save filter" test-id="ruleset-exclusion-apply" @click="applyExclusionEdit" />
           <button
             type="button"
             class="app-icon-action app-icon-action--large app-icon-action--danger"
             data-testid="ruleset-exclusion-delete"
-            aria-label="Delete exclusion"
+            aria-label="Delete filter"
             @click="deleteEditingExclusion"
           >
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -406,7 +417,13 @@ import type {
 } from '../../lib/api/types'
 import { darpanSystemIdsMatch } from '../../lib/utils/darpanSystems'
 import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
-import { normalizeExcludeFilters, parseExcludeFilterValues, type SourceExcludeFilter } from '../../lib/sourceExcludeFilters'
+import {
+  EXCLUDE_FILTER_OPERATOR,
+  INCLUDE_FILTER_OPERATOR,
+  normalizeExcludeFilters,
+  parseExcludeFilterValues,
+  type SourceExcludeFilter,
+} from '../../lib/sourceExcludeFilters'
 import {
   buildReconciliationFieldPathAliases,
   fieldsReferenceSamePath,
@@ -543,6 +560,7 @@ const editingSequence = ref(1)
 const editingExclusion = ref<{ side: RuleSide; fieldPath: string } | null>(null)
 const editingExclusionValues = ref<string[]>([])
 const pendingExclusionValue = ref('')
+const editingExclusionOperator = ref<string>(EXCLUDE_FILTER_OPERATOR)
 const exclusionUnavailable = ref<{ side: RuleSide; fieldPath: string; message: string } | null>(null)
 let longPressTimer: number | null = null
 let generatedRuleCounter = 0
@@ -1056,10 +1074,27 @@ function hasExclusion(side: RuleSide, fieldPath: string): boolean {
   return !!filter && filter.values.length > 0
 }
 
+/**
+ * != and = rather than one circle-slash: the two directions have to be tellable apart on the board
+ * itself, and a matched pair teaches the semantics without a legend. Both render at the pill edge
+ * in Plex Mono without changing the mark's 1.55rem box.
+ */
+function excludeFilterMark(side: RuleSide, fieldPath: string): string {
+  return excludeFilterFor(side, fieldPath)?.operator === INCLUDE_FILTER_OPERATOR ? '=' : '≠'
+}
+
+/** The mark is aria-hidden, so this is the only thing a screen reader hears about the mode. */
+function excludeFilterStatusLabel(side: RuleSide, fieldPath: string): string {
+  return excludeFilterFor(side, fieldPath)?.operator === INCLUDE_FILTER_OPERATOR
+    ? 'Only these values'
+    : 'Excludes values'
+}
+
 function closeExclusionEditor(): void {
   editingExclusion.value = null
   editingExclusionValues.value = []
   pendingExclusionValue.value = ''
+  editingExclusionOperator.value = EXCLUDE_FILTER_OPERATOR
 }
 
 /**
@@ -1077,9 +1112,9 @@ function explainExclusionsUnavailable(side: RuleSide, fieldPath: string): void {
     message: sourceUsesApi(side)
       // The connector declares no filterParameterName, so the getter has no parameter to push a
       // filter into. Name the system: "this side" alone leaves the operator guessing which.
-      ? `${sideTitle(side)} cannot filter records at the source, so exclusions do not apply to this side.`
+      ? `${sideTitle(side)} cannot filter records at the source, so filters do not apply to this side.`
       // CSV/SFTP: there is no connector at all, and Darpan reads whatever the file contains.
-      : 'Exclusions apply only to API sources. This side reads a file.',
+      : 'Filters apply only to API sources. This side reads a file.',
   }
 }
 
@@ -1103,6 +1138,7 @@ function openExclusionEditor(side: RuleSide, fieldPath: string): void {
   closeRuleEditor()
   editingExclusion.value = { side, fieldPath }
   editingExclusionValues.value = [...(excludeFilterFor(side, fieldPath)?.values ?? [])]
+  editingExclusionOperator.value = excludeFilterFor(side, fieldPath)?.operator ?? EXCLUDE_FILTER_OPERATOR
   pendingExclusionValue.value = ''
 }
 
@@ -1162,7 +1198,7 @@ function applyExclusionEdit(): void {
 
   const others = excludeFiltersFor(editing.side).filter((filter) => !sameField(filter.fieldExpression, editing.fieldPath))
   const next = editingExclusionValues.value.length
-    ? [...others, { fieldExpression: editing.fieldPath, operator: 'EXCLUDE_IN', values: [...editingExclusionValues.value] }]
+    ? [...others, { fieldExpression: editing.fieldPath, operator: editingExclusionOperator.value, values: [...editingExclusionValues.value] }]
     : others
   // Always assign the side, never leave it undefined: undefined means "no opinion" to the backend
   // and would leave stale rows in place after the operator cleared them here.
