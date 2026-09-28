@@ -154,10 +154,17 @@ describe('MascotWarningPopup', () => {
     mascot.openWarnings()
     await wrapper.vm.$nextTick()
 
-    expect(document.querySelector('.popup-workflow-overlay')).not.toBeNull()
-    const panel = document.querySelector('[data-testid="mascot-warning-popup"]')
+    // The shipped contract splits these: the OVERLAY is the dialog and carries the labelling, the
+    // inner section wears the panel classes. ConnectionDiagnosticsPopup and the ruleset-manager
+    // auth popup are both built this way.
+    const overlay = document.querySelector('[data-testid="mascot-warning-popup"]')
+    expect(overlay?.classList.contains('popup-workflow-overlay')).toBe(true)
+    const panel = overlay?.querySelector('section')
     expect(panel?.classList.contains('popup-workflow-modal')).toBe(true)
     expect(panel?.classList.contains('workflow-panel')).toBe(true)
+    // No gap override: the panel's own --space-3 must survive, which is what keeps the title off
+    // the body the way every other popup does.
+    expect(panel?.getAttribute('style')).toBeNull()
   })
 
   it('is a labelled dialog', async () => {
@@ -170,6 +177,10 @@ describe('MascotWarningPopup', () => {
     const dialog = document.querySelector('[data-testid="mascot-warning-popup"]')
     expect(dialog?.getAttribute('role')).toBe('dialog')
     expect(dialog?.getAttribute('aria-modal')).toBe('true')
-    expect(dialog?.getAttribute('aria-label')).toBeTruthy()
+    // Labelled BY the heading it draws, not by a string assembled beside it — so the accessible
+    // name cannot drift from what is on screen.
+    const labelledBy = dialog?.getAttribute('aria-labelledby')
+    expect(labelledBy).toBeTruthy()
+    expect(document.getElementById(labelledBy as string)?.textContent).toContain('Out of date')
   })
 })

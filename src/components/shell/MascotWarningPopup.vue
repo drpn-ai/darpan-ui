@@ -1,41 +1,30 @@
 <template>
   <!--
-    The warning's own surface. It used to share .mascot-say with hints and explanations, which
-    made a label and a condition-you-must-act-on look identical — and left a paragraph sitting in
-    a bubble sized for one line. This is a dialog instead, on the same mechanism CMD-K already
-    uses: teleported to the body, a transparent backdrop that closes on an outside click, Escape
-    to leave.
+    The warning's own surface, built to the shipped popup contract rather than a bespoke one:
+    role and labelling on the OVERLAY, a .workflow-panel-header with an h2 for the title, body copy
+    as .section-note, and NO gap override — .workflow-panel already sets grid gap --space-3, and
+    overriding it to --space-2 is what made the title sit flush against the body.
 
-    It uses .popup-workflow-overlay / .popup-workflow-modal — the pair six other surfaces already
-    use, including the exclusion editor on the rules board — so it lands viewport-centred at the
-    same size, with the same faint wash and the same blurred page behind it as every other popup
-    in the product. A bespoke overlay anchored at the mascot is what made this read as one more
-    bubble in the corner rather than something that had opened.
+    Modelled on ConnectionDiagnosticsPopup and the ruleset-manager auth popup, which is also how
+    the exclusion editor on the rules board is built.
   -->
   <Teleport to="body">
     <div
       v-if="mascot.popupOpen && mascot.hasWarnings"
       class="popup-workflow-overlay"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      data-testid="mascot-warning-popup"
       @click.self="close"
     >
-      <section
-        ref="panel"
-        class="popup-workflow-modal workflow-panel mascot-warning-popup"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="dialogLabel"
-        data-testid="mascot-warning-popup"
-        @keydown.escape.prevent="close"
-      >
-        <article
-          v-for="warning in mascot.warnings"
-          :key="warning.id"
-          class="mascot-warning-item"
-          data-testid="mascot-warning"
-        >
-          <h2 class="mascot-warning-title">{{ warning.title }}</h2>
-          <p class="mascot-warning-body">{{ warning.body }}</p>
-        </article>
+      <section class="popup-workflow-modal workflow-panel mascot-warning-popup">
+        <template v-for="(warning, index) in mascot.warnings" :key="warning.id">
+          <header class="workflow-panel-header section-header-row" data-testid="mascot-warning">
+            <h2 :id="index === 0 ? titleId : undefined">{{ warning.title }}</h2>
+          </header>
+          <p class="section-note">{{ warning.body }}</p>
+        </template>
 
         <!-- One row, because they are one choice. Dismiss sits beside the actions rather than
              under them: "sync or dismiss" is the question, and stacking it read as two. -->
@@ -70,14 +59,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useMascotStore } from '../../stores/mascot'
 
 const mascot = useMascotStore()
-const panel = ref<HTMLElement | null>(null)
 const dismissEl = ref<HTMLButtonElement | null>(null)
 
-/* Names the conditions rather than saying "Warnings", so a screen-reader user knows what opened
-   before tabbing into it. Two warnings really can stand at once. */
-const dialogLabel = computed(() =>
-  mascot.warnings.map((warning) => warning.title).join(', ') || 'Warning',
-)
+/* The dialog is labelled BY its first heading, the way every other popup here is, rather than by a
+   string built beside it — so the accessible name cannot drift from what is drawn. */
+const titleId = 'mascot-warning-title'
 
 /* Every standing warning's actions, in one row with Dismiss. A warning that can only be
    acknowledged contributes nothing here, which is what `actions: []` is for. */

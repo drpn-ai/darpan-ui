@@ -1758,35 +1758,17 @@ label > span {
 
 /* The warning dialog's CONTENT only. Its surface, position, wash and the page blur behind it all
    come from .popup-workflow-overlay / .popup-workflow-modal, shared with every other popup. */
-.mascot-warning-popup {
-  display: grid;
-  gap: var(--space-2);
-  font-size: var(--type-mono-copy-size);
-  line-height: 1.5;
-}
+/* NOTHING about the surface, spacing or type is set here. .workflow-panel supplies the grid and
+   its --space-3 gap, .popup-workflow-modal the width, border and shadow, and
+   .popup-workflow-modal .workflow-panel-header h2 the title size at weight 400. Overriding that
+   gap to --space-2 is exactly what made this popup's title sit flush against its body while every
+   other popup in the product breathed. */
 
-.mascot-warning-item {
-  display: grid;
-  gap: var(--space-00);
-}
-
-/* Weight 400 like everything else — the title separates itself by colour, never by being heavier. */
-.mascot-warning-title {
-  margin: 0;
-  color: var(--text);
-  font-size: var(--type-mono-copy-size);
-  font-weight: 400;
-}
-
-.mascot-warning-body {
-  margin: 0;
-  color: var(--text-soft);
-}
-
-/* One row, because they are one choice. */
+/* One row, because they are one choice. Matches .ruleset-rule-popover-actions, the sibling popup
+   on the rules board. */
 .mascot-warning-actions {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1-5);
   align-items: center;
 }
 
