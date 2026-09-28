@@ -1756,27 +1756,11 @@ label > span {
   background: transparent;
 }
 
-/* The warning dialog. Anchored at the mascot rather than centred like the command palette: it
-   belongs to the face you just clicked, and help layers open beside the thing they explain. The
-   overlay itself is transparent (.app-popup-backdrop) and exists only to catch the outside click. */
-.mascot-warning-overlay {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: flex-end end;
-  padding: var(--space-3);
-  padding-bottom: calc(var(--floating-actions-bottom-offset) + var(--space-7));
-  z-index: 60;
-}
-
+/* The warning dialog's CONTENT only. Its surface, position, wash and the page blur behind it all
+   come from .popup-workflow-overlay / .popup-workflow-modal, shared with every other popup. */
 .mascot-warning-popup {
-  width: min(28rem, calc(100vw - var(--space-5)));
   display: grid;
   gap: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  padding: var(--space-2);
   font-size: var(--type-mono-copy-size);
   line-height: 1.5;
 }
@@ -1786,8 +1770,7 @@ label > span {
   gap: var(--space-00);
 }
 
-/* Weight 400 like everything else — the title separates itself by colour, the way the bubble's
-   own lead does, never by being heavier. */
+/* Weight 400 like everything else — the title separates itself by colour, never by being heavier. */
 .mascot-warning-title {
   margin: 0;
   color: var(--text);

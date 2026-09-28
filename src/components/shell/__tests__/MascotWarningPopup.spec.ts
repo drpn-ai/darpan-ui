@@ -144,6 +144,22 @@ describe('MascotWarningPopup', () => {
       .toBe(document.querySelector('[data-testid="mascot-warning-dismiss"]'))
   })
 
+  it('wears the app-wide popup classes rather than a surface of its own', async () => {
+    // Six other surfaces already use .popup-workflow-overlay / .popup-workflow-modal — the
+    // exclusion editor on this very board among them. A bespoke overlay is how this ended up
+    // reading as a corner bubble instead of a popup.
+    const wrapper = mountPopup()
+    const mascot = useMascotStore()
+    mascot.raise(drift)
+    mascot.openWarnings()
+    await wrapper.vm.$nextTick()
+
+    expect(document.querySelector('.popup-workflow-overlay')).not.toBeNull()
+    const panel = document.querySelector('[data-testid="mascot-warning-popup"]')
+    expect(panel?.classList.contains('popup-workflow-modal')).toBe(true)
+    expect(panel?.classList.contains('workflow-panel')).toBe(true)
+  })
+
   it('is a labelled dialog', async () => {
     const wrapper = mountPopup()
     const mascot = useMascotStore()

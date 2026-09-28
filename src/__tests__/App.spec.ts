@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { useMascotStore } from '../stores/mascot'
 import { installLocalStorageStub } from '../test/localStorage'
 import { DISMISS_INLINE_MENUS_EVENT, WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../lib/uiEvents'
 
@@ -1172,6 +1173,24 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     wrapper.findComponent({ name: 'CommandPalette' }).vm.$emit('close')
     await flushPromises()
 
+    expect(wrapper.find('.app-shell').classes()).not.toContain('app-shell--popup-open')
+  })
+
+  it('dims the page for a warning popup too, not only for the launcher', async () => {
+    // A warning popup is a popup: same wash, same blurred page behind it. Without this it read
+    // as a bubble in the corner rather than something that had opened over the page.
+    const wrapper = mountApp()
+    await flushPromises()
+
+    const mascot = useMascotStore()
+    mascot.raise({ id: 'drift', title: 'Out of date', body: 'it drifted', actions: [] })
+    mascot.openWarnings()
+    await flushPromises()
+
+    expect(wrapper.find('.app-shell').classes()).toContain('app-shell--popup-open')
+
+    mascot.closeWarnings()
+    await flushPromises()
     expect(wrapper.find('.app-shell').classes()).not.toContain('app-shell--popup-open')
   })
 

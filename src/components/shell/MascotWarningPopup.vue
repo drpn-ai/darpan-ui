@@ -6,18 +6,21 @@
     uses: teleported to the body, a transparent backdrop that closes on an outside click, Escape
     to leave.
 
-    Anchored at the mascot rather than centred like the palette, because it belongs to the face
-    you just clicked — help layers open beside the thing they explain, never on top of it.
+    It uses .popup-workflow-overlay / .popup-workflow-modal — the pair six other surfaces already
+    use, including the exclusion editor on the rules board — so it lands viewport-centred at the
+    same size, with the same faint wash and the same blurred page behind it as every other popup
+    in the product. A bespoke overlay anchored at the mascot is what made this read as one more
+    bubble in the corner rather than something that had opened.
   -->
   <Teleport to="body">
     <div
       v-if="mascot.popupOpen && mascot.hasWarnings"
-      class="mascot-warning-overlay app-popup-backdrop"
+      class="popup-workflow-overlay"
       @click.self="close"
     >
       <section
         ref="panel"
-        class="mascot-warning-popup"
+        class="popup-workflow-modal workflow-panel mascot-warning-popup"
         role="dialog"
         aria-modal="true"
         :aria-label="dialogLabel"

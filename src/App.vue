@@ -7,7 +7,7 @@
     :class="[
       'app-shell',
       `app-shell--${surfaceMode}`,
-      { 'app-shell--popup-open': isCommandPaletteOpen },
+      { 'app-shell--popup-open': isCommandPaletteOpen || mascot.popupOpen },
       { 'app-shell--notice-open': workflowHint !== null && surfaceMode === 'static' },
     ]"
   >
@@ -60,6 +60,7 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { buildAuthRedirect, useAuthStore } from './stores/auth'
 import { usePermissionsStore } from './stores/permissions'
+import { useMascotStore } from './stores/mascot'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
 import { setAuthRequiredHandler, type AuthRequiredDetail } from './lib/api/client'
 import { handleAuthExpiry } from './lib/api/sessionExpiry'
@@ -95,6 +96,8 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const permissions = usePermissionsStore()
+// The warning popup is a popup: the shell blurs behind it exactly as it does for the launcher.
+const mascot = useMascotStore()
 const draftStore = useReconciliationDraftStore()
 const { setTheme } = useTheme()
 const { resolveUserDisplayName } = useUserDisplayNamePreference()
