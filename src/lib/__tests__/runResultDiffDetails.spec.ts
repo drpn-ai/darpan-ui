@@ -139,3 +139,44 @@ describe('runResultDiffDetails', () => {
     })
   })
 })
+
+
+describe('buildPageRow contradiction brief', () => {
+  // A state-contradiction run writes the reason INTO the record (contradiction + contradictionBrief),
+  // frozen at run time. The row carries it so the table can show it under the record id without
+  // expanding the JSON — 57 findings otherwise look identical until each one is opened.
+  it('lifts the written brief onto the row', () => {
+    const row = buildPageRow({
+      rowKey: 'r1',
+      recordId: '77986655',
+      bucket: 'file-1',
+      ruleFilterKey: 'base',
+      ruleId: '',
+      ruleLabel: '',
+      record: {
+        data: JSON.stringify({
+          internalId: '77986655',
+          status: 'G',
+          contradiction: 'NOT_SHIPPED',
+          contradictionBrief: 'Status expects a shipment; none recorded',
+        }),
+      },
+    } as never)
+
+    expect(row.contradictionBrief).toBe('Status expects a shipment; none recorded')
+  })
+
+  it('leaves the brief undefined on a run that writes none', () => {
+    const row = buildPageRow({
+      rowKey: 'r1',
+      recordId: '1001',
+      bucket: 'file-1',
+      ruleFilterKey: 'base',
+      ruleId: '',
+      ruleLabel: '',
+      record: { data: JSON.stringify({ orderId: '1001' }) },
+    } as never)
+
+    expect(row.contradictionBrief).toBeUndefined()
+  })
+})

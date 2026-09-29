@@ -376,6 +376,36 @@ function simulateDifferences(document: Rec, outputFileOverrides: Record<string, 
   }
 }
 
+const singleSidedDiffDetails = {
+  metadata: {
+    timestamp: '2026-09-29 15:22:34.662',
+    file1Label: 'NetSuite SuiteQL',
+    // Null, exactly as a single-sided run writes it — this is the signal, and the only one that
+    // survives the page's own label fallbacks.
+    file2Label: null,
+    savedRunId: 'NS_ORDERS_NO_FULFILLMENT_RS',
+    savedRunName: 'NetSuite chain \u2014 Orders that never shipped',
+    savedRunType: 'ruleset',
+    ruleSetId: 'NS_ORDERS_NO_FULFILLMENT_RS',
+    compareScopeId: 'NS_ORDERS_NO_FULFILLMENT_SCOPE',
+  },
+  summary: {
+    totalDifferences: 4,
+    onlyInFile1Count: null,
+    onlyInFile2Count: null,
+  },
+  differences: [
+    {
+      type: 'FINDING',
+      id: '77993238',
+      presentIn: 'NetSuite SuiteQL',
+      missingIn: '',
+      data: '{"internalId":"77993238","orderId":"M772118","status":"B"}',
+      note: 'Orders that never shipped',
+    },
+  ],
+}
+
 const defaultDiffDetails = {
   metadata: {
     timestamp: '2026-03-31 08:11:06.134',
@@ -659,6 +689,39 @@ describe('ReconciliationRunResultPage', () => {
       savedRunId: 'RS_ORDER_CSV',
       runName: 'CSV Order Compare Revised',
     })
+  })
+
+  // A single-sided run has no second system, so "Missing from <system>" describes nothing. The run
+  // document already says so — file2Label is null, the onlyIn* counts are null, and every row is
+  // typed FINDING — but the page resolved a label through a route-query fallback ("System 2") and
+  // captioned 4 real findings as missing from a system that does not exist.
+  it('shows findings rather than a phantom second system on a single-sided run', async () => {
+    getGeneratedOutputDifferences.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      ...singleSidedDiffDetails,
+      pagination: { pageIndex: 0, pageSize: 50, totalCount: 1, pageCount: 1 },
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Missing from')
+    expect(wrapper.text()).not.toContain('System 2')
+    const findings = wrapper.get('[data-testid="diff-bucket-findings"]')
+    expect(findings.text()).toContain('Findings')
+    expect(findings.text()).toContain('4')
+    expect(wrapper.find('[data-testid="diff-bucket-file-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="diff-bucket-file-2"]').exists()).toBe(false)
+  })
+
+  it('keeps both missing-from buckets on a two-sided run', async () => {
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Missing from')
+    expect(wrapper.find('[data-testid="diff-bucket-findings"]').exists()).toBe(false)
   })
 
   it('offers a finished result nothing that belongs to a run still going', async () => {

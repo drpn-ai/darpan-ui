@@ -99,6 +99,80 @@ describe('buildRuleSetDraft', () => {
     expect(draft?.file2PrimaryIdExpression).toEqual(['shopify_order_id'])
   })
 
+  // A single-sided run (scopeMode EVALUATE, DAR-BE-049) has one source and no FILE_2. Requiring a
+  // second side made this return null, and a null draft is what sent the settings gear down
+  // buildSavedRunEditorRoute's mapping branch, where it asked for a ReconciliationMapping that has
+  // never existed and rendered "Mapping '<ruleSetId>' was not found."
+  it('builds a one-sided draft when scopeMode is EVALUATE', () => {
+    const row = createSavedRun({
+      scopeMode: 'EVALUATE',
+      systemOptions: [
+        createSystemOption({
+          enumId: 'NETSUITE_SUITEQL',
+          fileSide: 'FILE_1',
+          idFieldExpression: 'internalId',
+        }),
+      ],
+    })
+
+    const draft = buildRuleSetDraft(row)
+
+    expect(draft).not.toBeNull()
+    expect(draft?.file1SystemEnumId).toBe('NETSUITE_SUITEQL')
+    expect(draft?.file1PrimaryIdExpression).toEqual(['internalId'])
+    expect(draft?.scopeMode).toBe('EVALUATE')
+  })
+
+  it('leaves every file2 field empty on a one-sided draft rather than echoing file1', () => {
+    const row = createSavedRun({
+      scopeMode: 'EVALUATE',
+      systemOptions: [
+        createSystemOption({ enumId: 'NETSUITE_SUITEQL', fileSide: 'FILE_1', idFieldExpression: 'internalId' }),
+      ],
+    })
+
+    const draft = buildRuleSetDraft(row)
+
+    expect(draft?.file2SystemEnumId).toBe('')
+    expect(draft?.file2PrimaryIdExpression).toEqual([])
+    expect(draft?.file2SourceConfigId).toBeUndefined()
+  })
+
+  // The whole reason scopeMode had to reach the wire rather than be inferred from the option count.
+  // "One system option" is also what a two-sided run looks like when its FILE_2 has gone missing,
+  // and rendering that as a valid one-sided run turns a loud failure into a silent wrong answer.
+  it('returns null for a single source when scopeMode is not EVALUATE', () => {
+    const row = createSavedRun({
+      scopeMode: 'COMPARE',
+      systemOptions: [
+        createSystemOption({ enumId: 'OMS', fileSide: 'FILE_1', idFieldExpression: 'order_id' }),
+      ],
+    })
+
+    expect(buildRuleSetDraft(row)).toBeNull()
+  })
+
+  it('returns null for a single source when scopeMode is absent', () => {
+    const row = createSavedRun({
+      systemOptions: [
+        createSystemOption({ enumId: 'OMS', fileSide: 'FILE_1', idFieldExpression: 'order_id' }),
+      ],
+    })
+
+    expect(buildRuleSetDraft(row)).toBeNull()
+  })
+
+  it('still requires a primary id on the one side an EVALUATE run does have', () => {
+    const row = createSavedRun({
+      scopeMode: 'EVALUATE',
+      systemOptions: [
+        createSystemOption({ enumId: 'NETSUITE_SUITEQL', fileSide: 'FILE_1', idFieldExpression: undefined }),
+      ],
+    })
+
+    expect(buildRuleSetDraft(row)).toBeNull()
+  })
+
   it('returns null when a side has neither idFieldExpression nor idFieldExpressions', () => {
     const row = createSavedRun({
       systemOptions: [

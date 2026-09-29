@@ -58,6 +58,12 @@ export interface NormalizedDiffDetailRow {
   ruleFilterKey: string
   ruleId: string
   ruleLabel: string
+  /**
+   * The disagreement in words, as the QUERY wrote it (STATE_CONTRADICTION). Lifted out of the record
+   * so the table can show it beside the id: without it 57 findings render as identical rows and the
+   * reason only appears once the JSON is expanded. Absent on every other kind of run.
+   */
+  contradictionBrief?: string
 }
 
 export interface RuleSelectorOption {
@@ -139,6 +145,19 @@ export function buildDiffDetailPayload(record: DiffDetailsRecord, parsedData: un
 
 // The server already classified each page row (bucket / rule descriptor / record id); the client only
 // rebuilds the presentational detail payload it renders. See backend DiffDetailClassifier (audit #21).
+/**
+ * The written brief, if this run wrote one. Narrowed rather than cast: parseDiffData returns whatever
+ * the record held, and asserting a shape onto it would turn a malformed payload into a render error
+ * instead of an absent brief.
+ */
+function briefFromRecord(parsedData: unknown): { contradictionBrief?: string } {
+  if (!parsedData || typeof parsedData !== 'object') return {}
+  const value = (parsedData as Record<string, unknown>).contradictionBrief
+  if (typeof value !== 'string') return {}
+  const trimmed = value.trim()
+  return trimmed ? { contradictionBrief: trimmed } : {}
+}
+
 export function buildPageRow(serverRow: GeneratedOutputDifferenceRow): NormalizedDiffDetailRow {
   const record = (serverRow.record ?? {}) as DiffDetailsRecord
   const parsedData = parseDiffData((record as Record<string, unknown>).data)
@@ -150,6 +169,7 @@ export function buildPageRow(serverRow: GeneratedOutputDifferenceRow): Normalize
     ruleFilterKey: serverRow.ruleFilterKey,
     ruleId: serverRow.ruleId,
     ruleLabel: serverRow.ruleLabel,
+    ...briefFromRecord(parsedData),
   }
 }
 

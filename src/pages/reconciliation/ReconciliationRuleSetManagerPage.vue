@@ -69,7 +69,10 @@
           </article>
         </div>
 
-        <div class="ruleset-manager-schema-row" data-testid="ruleset-manager-schema-row-file2">
+        <!-- A single-sided run (scopeMode EVALUATE) has no second source. Rendering the row anyway
+             filled it with placeholders - a "System 2" card and a "Field pending" primary id - which
+             describe a source that does not exist. -->
+        <div v-if="!isSingleSided" class="ruleset-manager-schema-row" data-testid="ruleset-manager-schema-row-file2">
           <button
             v-if="file2SystemConfig"
             type="button"
@@ -140,7 +143,7 @@
             <span class="static-page-summary-label">Exclusions</span>
             <ul class="ruleset-manager-exclusion-list" data-testid="ruleset-manager-exclusion-list">
               <li data-testid="ruleset-exclusions-file1">{{ file1Exclusions }}</li>
-              <li data-testid="ruleset-exclusions-file2">{{ file2Exclusions }}</li>
+              <li v-if="!isSingleSided" data-testid="ruleset-exclusions-file2">{{ file2Exclusions }}</li>
             </ul>
           </section>
 
@@ -390,12 +393,24 @@ const runHistoryRoute = computed(() => buildReconciliationRunHistoryRoute({
   file1SystemLabel: file1Title.value,
   file2SystemLabel: file2Title.value,
 }))
+// Read from the draft's scopeMode, which buildRuleSetDraft copies off the wire. Never inferred from
+// an empty file2: that shape is also what a two-sided run looks like when its FILE_2 has gone
+// missing, and quietly relabelling that as single-sided would hide a broken run instead of showing
+// it. SavedRunSummary.scopeMode exists for exactly this distinction.
+const isSingleSided = computed(() => (draft.value?.scopeMode ?? '').toUpperCase() === 'EVALUATE')
 const comparisonPreview = computed(() => {
   if (!draft.value) return 'Select fields to draft a comparison'
+  // Not "no rules yet": a single-sided run is not waiting to be configured. Its predicate lives in
+  // the extractor, so the rows it returns ARE its findings (DAR-BE-049).
+  if (isSingleSided.value) return 'Every record this source returns is a finding.'
   return `${file1PrimaryId.value} = ${file2PrimaryId.value}`
 })
 const basicDiffRule = computed<ReconciliationRuleSetDraftRule | null>(() => {
   if (!draft.value) return null
+  // The basic diff rule is "file1's key equals file2's key". On a single-sided run there is no
+  // second key, so synthesizing it rendered "#0 internalId = Field pending" - a comparison against
+  // nothing, numbered as though it were configured.
+  if (isSingleSided.value) return null
 
   const storedBasicDiffRule = (draft.value.rules ?? []).find((rule) => rule.sequenceNum === 0)
   if (storedBasicDiffRule) return storedBasicDiffRule

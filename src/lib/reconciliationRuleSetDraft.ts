@@ -59,6 +59,12 @@ export interface ReconciliationRuleSetDraftRule {
 
 export interface ReconciliationRuleSetDraft {
   savedRunId?: string
+  /**
+   * COMPARE (default) or EVALUATE. Carried on the draft so every surface hydrated from a saved run
+   * knows whether the empty file2 fields below mean "single-sided" or "not filled in yet" — the
+   * board, the wizard and the save payload all read them and cannot tell those apart on shape alone.
+   */
+  scopeMode?: string
   runName: string
   description?: string
   file1SystemEnumId: string

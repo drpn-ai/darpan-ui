@@ -358,13 +358,53 @@ describe('NetSuiteAuthWorkflowPage', () => {
     )
     expect(wrapper.get('input[name="clientId"]').attributes('type')).toBe('password')
     expect(wrapper.get('input[name="clientId"]').attributes('autocomplete')).toBe('off')
-    expect(wrapper.findAll('.workflow-form-grid--two')).toHaveLength(1)
+    // Two paired rows now: identity (Auth Config ID + Description) and posture (Auth Type + Active).
+    expect(wrapper.findAll('.workflow-form-grid--two')).toHaveLength(2)
     expect(wrapper.find('.workflow-form-grid--compact').exists()).toBe(false)
     expect(wrapper.get('[data-testid="netsuite-auth-scope-group"]').text()).toContain('RESTlets')
     expect(wrapper.get('[data-testid="netsuite-auth-scope-group"]').text()).toContain('REST Web Services')
     expect(wrapper.get('[data-testid="netsuite-auth-is-active"]').text()).toContain('No')
     expect(wrapper.get('[data-testid="netsuite-auth-type"]').element.closest('.wizard-answer-control')).toBeNull()
     expect(wrapper.get('[data-testid="netsuite-auth-is-active"]').element.closest('.wizard-answer-control')).toBeNull()
+  })
+
+  // Edit surfaces pair related fields rather than stacking one per row (the same convention the
+  // Auth Type / Active row already follows). Asserting they share a grid, not merely that two grids
+  // exist, is what stops a later edit from splitting them again while the count stays right.
+  it('pairs Auth Config ID with Description on one row', async () => {
+    route.params = { nsAuthConfigId: 'auth-primary' }
+    route.name = 'settings-netsuite-auth-edit'
+    route.fullPath = '/settings/netsuite/auth/edit/auth-primary'
+    listNsAuthConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      authConfigs: [
+        {
+          nsAuthConfigId: 'auth-primary',
+          description: 'Primary Auth',
+          companyUserGroupId: 'KREWE',
+          authType: 'OAUTH2_M2M_JWT',
+          tokenUrl: 'https://netsuite.example.com/token',
+          clientId: 'client-id',
+          certId: 'cert-id',
+          scope: 'restlets rest_webservices',
+          isActive: 'Y',
+          hasPassword: false,
+          hasApiToken: false,
+          hasPrivateKeyPem: true,
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+
+    const wrapper = mount(NetSuiteAuthWorkflowPage)
+    await flushPromises()
+
+    const identityRow = wrapper.findAll('.workflow-form-grid--two')[0]
+    expect(identityRow).toBeDefined()
+    expect(identityRow?.find('input[name="nsAuthConfigId"]').exists()).toBe(true)
+    expect(identityRow?.find('input[name="description"]').exists()).toBe(true)
   })
 
   it('shows an X cancel action on edit and returns to the NetSuite dashboard without saving', async () => {

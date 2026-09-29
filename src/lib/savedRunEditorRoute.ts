@@ -58,12 +58,24 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
   const file1PrimaryIdExpression = effectivePrimaryIdExpression(file1Option)
   const file2PrimaryIdExpression = effectivePrimaryIdExpression(file2Option)
 
-  if (!file1Option?.enumId || !file1PrimaryIdExpression.length || !file2Option?.enumId || !file2PrimaryIdExpression.length) {
-    return null
-  }
+  // A single-sided run (DAR-BE-049) has one source and no FILE_2, so demanding a second side
+  // returned null for a perfectly valid run — and a null draft is not inert: buildSavedRunEditorRoute
+  // below reads it as "not a rule set after all" and falls through to the mapping editor, which then
+  // asks for a ReconciliationMapping that never existed. That is the whole "Mapping '<ruleSetId>' was
+  // not found" path.
+  //
+  // scopeMode is read from the WIRE and never inferred from the option count. One system option is
+  // also what a two-sided run looks like when its FILE_2 row has gone missing; treating that as
+  // single-sided would render a broken run as a working one, which is strictly worse than the loud
+  // failure it replaces.
+  const isSingleSided = normalizeStringOrEmpty(row.scopeMode).toUpperCase() === 'EVALUATE'
+
+  if (!file1Option?.enumId || !file1PrimaryIdExpression.length) return null
+  if (!isSingleSided && (!file2Option?.enumId || !file2PrimaryIdExpression.length)) return null
 
   return {
     savedRunId: row.savedRunId,
+    scopeMode: row.scopeMode,
     runName: savedRunName(row),
     description: row.description,
     file1SystemEnumId: file1Option.enumId,
@@ -79,18 +91,21 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
     file1FileTypeEnumId: file1Option.fileTypeEnumId || 'DftCsv',
     file1SchemaFileName: file1Option.schemaFileName,
     file1PrimaryIdExpression,
-    file2SystemEnumId: file2Option.enumId,
-    file2SystemLabel: file2Option.label || file2Option.description || file2Option.enumCode,
-    file2SystemParentLabel: file2Option.systemParentLabel,
-    file2SourceTypeEnumId: file2Option.sourceTypeEnumId,
-    file2SystemMessageRemoteId: file2Option.systemMessageRemoteId,
-    file2SystemMessageRemoteLabel: file2Option.systemMessageRemoteLabel,
-    file2NsRestletConfigId: file2Option.nsRestletConfigId,
-    file2NsRestletConfigLabel: file2Option.nsRestletConfigLabel,
-    file2SourceConfigId: file2Option.sourceConfigId,
-    file2SourceConfigType: file2Option.sourceConfigType,
-    file2FileTypeEnumId: file2Option.fileTypeEnumId || 'DftCsv',
-    file2SchemaFileName: file2Option.schemaFileName,
+    // On a single-sided run these stay empty rather than echoing file1. An empty second side is
+    // what every consumer already reads as "there isn't one"; copying file1 across would make the
+    // board and the save payload describe a run comparing a source with itself.
+    file2SystemEnumId: file2Option?.enumId ?? '',
+    file2SystemLabel: file2Option ? (file2Option.label || file2Option.description || file2Option.enumCode) : '',
+    file2SystemParentLabel: file2Option?.systemParentLabel,
+    file2SourceTypeEnumId: file2Option?.sourceTypeEnumId,
+    file2SystemMessageRemoteId: file2Option?.systemMessageRemoteId,
+    file2SystemMessageRemoteLabel: file2Option?.systemMessageRemoteLabel,
+    file2NsRestletConfigId: file2Option?.nsRestletConfigId,
+    file2NsRestletConfigLabel: file2Option?.nsRestletConfigLabel,
+    file2SourceConfigId: file2Option?.sourceConfigId,
+    file2SourceConfigType: file2Option?.sourceConfigType,
+    file2FileTypeEnumId: file2Option ? (file2Option.fileTypeEnumId || 'DftCsv') : '',
+    file2SchemaFileName: file2Option?.schemaFileName,
     file2PrimaryIdExpression,
     rules: row.rules?.map((rule, index) => {
       const directPreActions = normalizePreActions(rule.preActions)

@@ -516,6 +516,11 @@ export interface SavedRunSummary {
   reconciliationMappingId?: string
   ruleSetId?: string
   compareScopeId?: string
+  // COMPARE (two sources diffed) or EVALUATE (one source whose rows ARE the findings, DAR-BE-049).
+  // Absent reads as COMPARE, matching the backend default. It is on the wire rather than inferred
+  // from systemOptions.length because one option is ALSO what a two-sided run looks like when its
+  // FILE_2 has gone missing — inferring would render a broken run as a working single-sided one.
+  scopeMode?: string
   requiresSystemSelection: boolean
   defaultFile1SystemEnumId?: string
   defaultFile2SystemEnumId?: string

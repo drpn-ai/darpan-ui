@@ -27,28 +27,32 @@
       @cancel="cancelEdit"
     >
       <template v-if="isEditing">
-        <label class="wizard-input-shell">
-          <span class="workflow-context-label">Auth Config ID</span>
-          <input
-            name="nsAuthConfigId"
-            v-model="form.nsAuthConfigId"
-            class="wizard-answer-control"
-            type="text"
-            :maxlength="CONFIG_ID_MAX_LENGTH"
-            placeholder="auth_primary"
-          />
-        </label>
+        <!-- Identity pair. Both name the same thing — one for the system, one for a person — so they
+             share a row, the way Auth Type and Active do below. -->
+        <div class="workflow-form-grid workflow-form-grid--two">
+          <label class="wizard-input-shell">
+            <span class="workflow-context-label">Auth Config ID</span>
+            <input
+              name="nsAuthConfigId"
+              v-model="form.nsAuthConfigId"
+              class="wizard-answer-control"
+              type="text"
+              :maxlength="CONFIG_ID_MAX_LENGTH"
+              placeholder="auth_primary"
+            />
+          </label>
 
-        <label class="wizard-input-shell">
-          <span class="workflow-context-label">Description</span>
-          <input
-            name="description"
-            v-model="form.description"
-            class="wizard-answer-control"
-            type="text"
-            placeholder="Primary Auth"
-          />
-        </label>
+          <label class="wizard-input-shell">
+            <span class="workflow-context-label">Description</span>
+            <input
+              name="description"
+              v-model="form.description"
+              class="wizard-answer-control"
+              type="text"
+              placeholder="Primary Auth"
+            />
+          </label>
+        </div>
 
         <div class="workflow-form-grid workflow-form-grid--two">
           <label class="wizard-input-shell">

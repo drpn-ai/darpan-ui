@@ -62,17 +62,22 @@
         </div>
         <dl class="run-history-metrics run-history-metrics--featured">
           <div>
-            <dt>Total differences</dt>
+            <dt>{{ isSingleSided(featuredOutput) ? 'Findings' : 'Total differences' }}</dt>
             <dd>{{ featuredOutput.totalDifferences ?? 0 }}</dd>
           </div>
-          <div>
-            <dt>Missing from {{ sourceSystemNames(featuredOutput).file1 }}</dt>
-            <dd>{{ featuredOutput.onlyInFile2Count ?? 0 }}</dd>
-          </div>
-          <div>
-            <dt>Missing from {{ sourceSystemNames(featuredOutput).file2 }}</dt>
-            <dd>{{ featuredOutput.onlyInFile1Count ?? 0 }}</dd>
-          </div>
+          <!-- A single-sided run has no second system: its findings sit in totalDifferences and BOTH
+               onlyIn* counts are null, so the two "Missing from" entries rendered 0 and 0 beside a
+               non-zero total. One population, one figure. -->
+          <template v-if="!isSingleSided(featuredOutput)">
+            <div>
+              <dt>Missing from {{ sourceSystemNames(featuredOutput).file1 }}</dt>
+              <dd>{{ featuredOutput.onlyInFile2Count ?? 0 }}</dd>
+            </div>
+            <div>
+              <dt>Missing from {{ sourceSystemNames(featuredOutput).file2 }}</dt>
+              <dd>{{ featuredOutput.onlyInFile1Count ?? 0 }}</dd>
+            </div>
+          </template>
         </dl>
       </RouterLink>
     </StaticPageSection>
@@ -99,17 +104,19 @@
           </div>
           <dl class="run-history-metrics">
             <div>
-              <dt>Total differences</dt>
+              <dt>{{ isSingleSided(output) ? 'Findings' : 'Total differences' }}</dt>
               <dd>{{ output.totalDifferences ?? 0 }}</dd>
             </div>
-            <div>
-              <dt>Missing from {{ sourceSystemNames(output).file1 }}</dt>
-              <dd>{{ output.onlyInFile2Count ?? 0 }}</dd>
-            </div>
-            <div>
-              <dt>Missing from {{ sourceSystemNames(output).file2 }}</dt>
-              <dd>{{ output.onlyInFile1Count ?? 0 }}</dd>
-            </div>
+            <template v-if="!isSingleSided(output)">
+              <div>
+                <dt>Missing from {{ sourceSystemNames(output).file1 }}</dt>
+                <dd>{{ output.onlyInFile2Count ?? 0 }}</dd>
+              </div>
+              <div>
+                <dt>Missing from {{ sourceSystemNames(output).file2 }}</dt>
+                <dd>{{ output.onlyInFile1Count ?? 0 }}</dd>
+              </div>
+            </template>
           </dl>
         </RouterLink>
         <button
@@ -324,6 +331,15 @@ const showHistorySection = computed(() =>
 // extracted: a run's stamped labels are endpoint descriptions ("Shopify Order Return References"),
 // which read as noise above a difference count. Same-system runs keep the endpoint labels — see
 // darpanSystemNamePair.
+/**
+ * A run with no second side. Read from the stored counts rather than the label: sourceSystemNames
+ * below falls back to the route query for a missing file2Label, so the label is never empty and
+ * cannot answer this. A two-sided run always writes both counts, even when they are zero.
+ */
+function isSingleSided(output: GeneratedOutput): boolean {
+  return output.onlyInFile1Count == null && output.onlyInFile2Count == null
+}
+
 function sourceSystemNames(output: GeneratedOutput): { file1: string, file2: string } {
   return darpanSystemNamePair(
     output.file1Label || file1SystemLabel.value,

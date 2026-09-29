@@ -107,6 +107,28 @@ function createDraftState() {
   )
 }
 
+function createSingleSidedDraftState() {
+  return buildReconciliationRuleSetDraftState(
+    {
+      savedRunId: 'NS_ORDERS_NO_FULFILLMENT_RS',
+      runName: 'Orders that never shipped',
+      scopeMode: 'EVALUATE',
+      file1SystemEnumId: 'NETSUITE_SUITEQL',
+      file1SystemLabel: 'NetSuite',
+      file1SourceTypeEnumId: 'AUT_SRC_API',
+      file1SourceConfigId: 'NS_ORDERS_NO_FULFILLMENT',
+      file1FileTypeEnumId: 'DftJson',
+      file1PrimaryIdExpression: ['internalId'],
+      // Exactly what buildRuleSetDraft now produces for a one-sided run: present but empty.
+      file2SystemEnumId: '',
+      file2SystemLabel: '',
+      file2FileTypeEnumId: '',
+      file2PrimaryIdExpression: [],
+    },
+    'ruleset-manager',
+  )
+}
+
 function createSavedRunReopenDraftState(rules: ReconciliationRuleSetDraftRule[] = []) {
   return buildReconciliationRuleSetDraftState(
     {
@@ -305,6 +327,64 @@ describe('ReconciliationRuleSetManagerPage', () => {
       },
     })
 
+  })
+
+  // A single-sided run (scopeMode EVALUATE) has no second source. Before the board read scopeMode it
+  // rendered the two-sided layout anyway and filled the empty half with placeholders -- a "System 2"
+  // card, a "Field pending" primary id, an exclusion slot and a synthesized "#0 internalId = Field
+  // pending" rule. None of those describe anything that exists, and a page that invents a source is
+  // worse than the loud error it replaced.
+  it('renders no second source for a single-sided run', async () => {
+    draftStoreState.ruleSetDraftState = createSingleSidedDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ruleset-manager-schema-row-file2"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('System 2')
+    expect(wrapper.text()).not.toContain('Field pending')
+    // The one side it does have is still fully rendered.
+    expect(wrapper.find('[data-testid="ruleset-manager-schema-row-file1"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('NetSuite')
+    expect(wrapper.text()).toContain('internalId')
+  })
+
+  it('lists exclusions for the only side a single-sided run has', async () => {
+    draftStoreState.ruleSetDraftState = createSingleSidedDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ruleset-exclusions-file1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ruleset-exclusions-file2"]').exists()).toBe(false)
+  })
+
+  // The synthesized primary-key rule compares file1's key to file2's. With no second side there is
+  // nothing to compare, and the findings are the rows the source returns -- so the section says that
+  // rather than showing a comparison against an empty field.
+  it('replaces the comparison preview with the single-sided explanation', async () => {
+    draftStoreState.ruleSetDraftState = createSingleSidedDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ruleset-manager-rule-list"]').exists()).toBe(false)
+    expect(wrapper.get('.ruleset-manager-preview-line').text())
+      .toBe('Every record this source returns is a finding.')
+  })
+
+  it('still renders both sides for a two-sided run', async () => {
+    draftStoreState.ruleSetDraftState = createDraftState()
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ruleset-manager-schema-row-file2"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ruleset-exclusions-file2"]').exists()).toBe(true)
   })
 
   it('renders the draft-backed run summary and static equation', async () => {

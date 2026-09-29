@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
 import { setDefaultDisplayTimeZone } from '../../../lib/utils/date'
 
@@ -168,6 +168,16 @@ function mockExecutions() {
 }
 
 describe('ReconciliationAutomationDashboardPage', () => {
+  // The page polls executions on a 5s setInterval that only onUnmounted clears. 31 tests here mount
+  // the page and 2 unmounted it, so 29 live components kept calling listAutomationExecutions on
+  // REAL wall-clock time for the rest of the file — and the call-count assertions in the timer
+  // tests below then saw those phantom calls on top of their own.
+  //
+  // That made the failure a function of how long the SUITE takes rather than of anything the page
+  // does: green when this file runs alone, red in a full run, and red on a different test each
+  // time. Adding 16 tests elsewhere in the repo was enough to tip it (2026-09-29).
+  enableAutoUnmount(afterEach)
+
   beforeEach(() => {
     setDefaultDisplayTimeZone('America/Los_Angeles')
     route.params = { automationId: 'AUT_ACTIVE_API' }

@@ -413,15 +413,24 @@ const requiresSystemSelection = computed(() => selectedSavedRun.value?.requiresS
 const shouldSkipMappingStep = computed(
   () => requestedSavedRunId.value.length > 0 && selectedSavedRun.value?.savedRunId === requestedSavedRunId.value,
 )
+// A single-sided run (scopeMode EVALUATE, DAR-BE-049) has one source. Read from the wire rather than
+// inferred from a missing FILE_2 option: that shape is also what a two-sided run looks like when its
+// FILE_2 row has gone missing, and skipping the card for THAT would quietly run half a comparison.
+const isSingleSidedRun = computed(() => (selectedSavedRun.value?.scopeMode ?? '').toUpperCase() === 'EVALUATE')
 const workflowSteps = computed<UploadStep[]>(() => {
   const steps: UploadStep[] = [{ id: 'run' }]
-  if (requiresSystemSelection.value) {
+  if (requiresSystemSelection.value && !isSingleSidedRun.value) {
     steps.push({ id: 'system-1' }, { id: 'system-2' })
+  } else if (requiresSystemSelection.value) {
+    steps.push({ id: 'system-1' })
   }
   if (hasApiSource.value) steps.push({ id: 'api-window' })
   if (hasApiSource.value && apiWindowPreset.value === 'custom') steps.push({ id: 'api-window-custom' })
   if (!file1UsesApi.value) steps.push({ id: 'file-1' })
-  if (!file2UsesApi.value) steps.push({ id: 'file-2' })
+  // Without this guard the wizard asked for a System 2 file that has no source behind it, and the
+  // run could never be started: file2UsesApi is false when there is no FILE_2 option at all, so the
+  // "not an API source, therefore upload one" branch fired for a side that does not exist.
+  if (!file2UsesApi.value && !isSingleSidedRun.value) steps.push({ id: 'file-2' })
   return shouldSkipMappingStep.value ? steps.filter((step) => step.id !== 'run') : steps
 })
 const currentStep = computed<UploadStep>(() => workflowSteps.value[currentStepIndex.value] ?? workflowSteps.value[0]!)
@@ -1011,7 +1020,10 @@ async function runDiff(): Promise<void> {
     runError.value = `Upload the ${file1PromptSystemName.value} file before running the diff.`
     return
   }
-  if (!file2UsesApi.value && !file2.value) {
+  // Third and last place the second side is assumed. The step list and the upload payload were both
+  // guarded first; this precondition still blocked the run, and only pressing Execute in a browser
+  // showed it - the wizard reached its final card with Execute enabled either way.
+  if (!file2UsesApi.value && !file2.value && !isSingleSidedRun.value) {
     runError.value = `Upload the ${file2PromptSystemName.value} file before running the diff.`
     return
   }
@@ -1020,7 +1032,14 @@ async function runDiff(): Promise<void> {
     runError.value = 'Choose a valid API time period before running the diff.'
     return
   }
-  if (!file1SystemEnumId.value || !file2SystemEnumId.value || file1SystemEnumId.value === file2SystemEnumId.value) {
+  // Fourth place. A single-sided run has one system and nothing to be different from; the two-system
+  // rule is a property of a comparison, not of every run.
+  if (isSingleSidedRun.value) {
+    if (!file1SystemEnumId.value) {
+      runError.value = 'Choose a system before running.'
+      return
+    }
+  } else if (!file1SystemEnumId.value || !file2SystemEnumId.value || file1SystemEnumId.value === file2SystemEnumId.value) {
     runError.value = 'Choose two different systems before running the diff.'
     return
   }
@@ -1028,10 +1047,16 @@ async function runDiff(): Promise<void> {
   pendingSubmittedRun.value = null
   let pendingRun: PendingReconciliationRun | null = null
 
+  // The system ids are an OVERRIDE of the saved run's defaults, and run#SavedRunDiff requires them
+  // in a pair ("file1SystemEnumId and file2SystemEnumId must be provided together"). A single-sided
+  // run has nothing to override and no second id to pair with, so it sends neither and lets the
+  // compare scope name its own source. Sending file1 alone trips that rule; sending file2 as an
+  // empty string makes a blank id look like a deliberate choice.
   const payload: RunSavedRunDiffPayload = {
     savedRunId: selectedSavedRun.value.savedRunId,
-    file1SystemEnumId: file1SystemEnumId.value,
-    file2SystemEnumId: file2SystemEnumId.value,
+    ...(isSingleSidedRun.value
+      ? {}
+      : { file1SystemEnumId: file1SystemEnumId.value, file2SystemEnumId: file2SystemEnumId.value }),
     hasHeader: true,
   }
 
@@ -1052,7 +1077,9 @@ async function runDiff(): Promise<void> {
           systemName: file1PromptSystemName.value,
           expectedFileType: file1ExpectedFileType.value,
         }),
-    file2UsesApi.value
+    // Same condition as the step above, for the same reason: no second side means nothing to read,
+    // and readUploadSourcePayload on a null file reports "choose a file" for a card never shown.
+    file2UsesApi.value || isSingleSidedRun.value
       ? Promise.resolve({ error: null, payload: {} })
       : readUploadSourcePayload({
           file: file2.value,

@@ -348,8 +348,20 @@
               </button>
             </template>
 
+            <!-- The id, and under it what is wrong with it. A state-contradiction run writes the
+                 brief into the record at run time; every other run has none and this renders exactly
+                 as before. It sits here rather than in a new column because the id column already has
+                 the width (13rem) and the two belong together — this order, and this is what is
+                 wrong with it. -->
             <template #cell-recordId="{ row }">
-              <strong>{{ row.recordId }}</strong>
+              <div class="run-result-record-cell">
+                <strong>{{ row.recordId }}</strong>
+                <span
+                  v-if="row.contradictionBrief"
+                  class="run-result-record-cell__brief"
+                  data-testid="diff-details-brief"
+                >{{ row.contradictionBrief }}</span>
+              </div>
             </template>
 
             <template #cell-detailText="{ row }">
@@ -561,6 +573,12 @@ const openingRunSettings = ref(false)
 const runSettingsError = ref<string | null>(null)
 const savedOutput = ref<GeneratedOutput | null>(null)
 const diffDetailsMeta = ref<DiffDetailsMetadata>({})
+// Captured from the RAW response metadata, before buildGeneratedOutputFromSummary launders it. That
+// builder falls back file2Label -> route query -> 'File 2', so a single-sided run's null second side
+// is already gone by the time it reaches diffDetailsMeta, and the fallback happens to resolve to the
+// route's "System 2" placeholder — which is how 4 findings came to be captioned "Missing from
+// System 2". null = not loaded yet, and is deliberately NOT the same as false.
+const documentHasSecondSide = ref<boolean | null>(null)
 const diffDetailsSummary = ref<DiffDetailsSummary>({})
 
 const savedRunId = computed(() =>
@@ -985,10 +1003,30 @@ const {
   },
 })
 
+// A single-sided run (scopeMode EVALUATE) has no second system, so "Missing from <system>" names
+// nothing. Read from the run DOCUMENT rather than the resolved label: diffDetailsFile2Label falls
+// back through the route query, which carries file2SystemLabel=System+2, so it is never empty and
+// cannot be the signal. The document writes file2Label null and both onlyIn* counts null.
+// The DOCUMENT being rendered is the authority. Until it has loaded the answer is "unknown", which
+// renders as two-sided — the shape every existing run has.
+const isSingleSidedResult = computed(() => documentHasSecondSide.value === false)
+
 const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
   const ruleDifferenceCount =
     diffDetailsSummary.value.ruleDifferenceCount ??
     diffDetailBucketCounts.value.rule
+
+  // One population, one tile. No "screened out" count beside it: the rows that did not survive the
+  // extractor's own gate are not findings, and putting them back on screen re-opens the question the
+  // gate exists to settle.
+  if (isSingleSidedResult.value) {
+    return [{
+      key: 'findings',
+      label: 'Findings',
+      count: diffDetailsSummary.value.totalDifferences ?? diffTotalCount.value,
+      testId: 'diff-bucket-findings',
+    }]
+  }
 
   return [
     {
@@ -1073,6 +1111,7 @@ function resetDiffDetailsState(): void {
   resetDownloadState()
   resetRunNameState()
   diffDetailsMeta.value = {}
+  documentHasSecondSide.value = null
   diffDetailsSummary.value = {}
   resetDifferencesState()
 }
@@ -1167,6 +1206,7 @@ async function loadSavedResult(): Promise<void> {
       file2Label: descriptor.file2Label,
       timestamp: metadata.timestamp,
     }
+    documentHasSecondSide.value = Boolean(normalizeDisplayText(metadata.file2Label))
     diffDetailsSummary.value = {
       totalDifferences: descriptor.totalDifferences,
       onlyInFile1Count: descriptor.onlyInFile1Count,
@@ -1611,6 +1651,19 @@ watch([savedRunId, outputFileName], () => {
   /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 1.9rem;
   line-height: 1;
+}
+
+.run-result-record-cell {
+  display: grid;
+  gap: var(--space-00);
+}
+
+/* Quieter than the id it explains: the id is what the operator looks up, the brief is why the row is
+   here. Wrapping rather than truncating — a clipped reason is worse than a two-line cell. */
+.run-result-record-cell__brief {
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+  line-height: 1.3;
 }
 
 .reconciliation-diff-details__toolbar {

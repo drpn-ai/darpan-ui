@@ -81,6 +81,38 @@ const savedRunResponse = {
   ],
 }
 
+const singleSidedSavedRunResponse = {
+  ok: true,
+  messages: [],
+  errors: [],
+  pagination: { pageIndex: 0, pageSize: 50, totalCount: 1, pageCount: 1 },
+  savedRuns: [
+    {
+      savedRunId: 'NS_ORDERS_NO_FULFILLMENT_RS',
+      runName: 'Orders that never shipped',
+      description: 'A line that could still ship, and no fulfilment against it',
+      runType: 'ruleset',
+      ruleSetId: 'NS_ORDERS_NO_FULFILLMENT_RS',
+      compareScopeId: 'NS_ORDERS_NO_FULFILLMENT_SCOPE',
+      scopeMode: 'EVALUATE',
+      requiresSystemSelection: false,
+      defaultFile1SystemEnumId: 'NETSUITE_SUITEQL',
+      systemOptions: [
+        {
+          enumId: 'NETSUITE_SUITEQL',
+          label: 'NetSuite',
+          fileSide: 'FILE_1',
+          sourceTypeEnumId: 'AUT_SRC_API',
+          sourceConfigId: 'NS_ORDERS_NO_FULFILLMENT',
+          fileTypeEnumId: 'DftJson',
+          fileTypeLabel: 'JSON',
+          idFieldExpression: 'internalId',
+        },
+      ],
+    },
+  ],
+}
+
 const apiSavedRunResponse = {
   ok: true,
   messages: [],
@@ -259,6 +291,82 @@ describe('ReconciliationDiffPage', () => {
     expect(wrapper.find('[data-testid="file1-input"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="file2-input"]').exists()).toBe(false)
     expect(wrapper.find('.reconciliation-run-history-board').exists()).toBe(false)
+  })
+
+  // A single-sided run has one source. The wizard asked for a System 2 file anyway and left Execute
+  // disabled, so the run could never be started from the UI (DAR-BE-049).
+  it('never asks for a second file on a single-sided run', async () => {
+    listSavedRuns.mockResolvedValue(singleSidedSavedRunResponse)
+    runSavedRunDiff.mockResolvedValue({
+      ok: true,
+      messages: ['Generated orders-that-never-shipped-20260929.json.'],
+      errors: [],
+      runResult: {
+        savedRunId: 'NS_ORDERS_NO_FULFILLMENT_RS',
+        runName: 'Orders that never shipped',
+        runType: 'ruleset',
+        ruleSetId: 'NS_ORDERS_NO_FULFILLMENT_RS',
+      },
+    })
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="saved-run-select"]').trigger('click')
+    await wrapper.get('[data-testid="workflow-select-option"][data-option-value="NS_ORDERS_NO_FULFILLMENT_RS"]').trigger('click')
+    await flushPromises()
+
+    // Walk to the LAST card rather than stopping at the first one. Asserting "no file2 input" while
+    // still on the window card passes whether or not the step exists, which is how a test like this
+    // goes permanently green against a broken wizard.
+    const seen: string[] = []
+    for (let click = 0; click < 6; click += 1) {
+      seen.push(wrapper.text())
+      expect(wrapper.find('[data-testid="file2-input"]').exists()).toBe(false)
+      if (wrapper.get('[data-testid="reconciliation-step-primary"]').text() !== 'Next') break
+      await wrapper.get('[data-testid="reconciliation-step-primary"]').trigger('click')
+      await flushPromises()
+    }
+
+    // The final card offers the run action, not another upload.
+    expect(wrapper.get('[data-testid="reconciliation-step-primary"]').text()).toBe('Execute')
+    expect(wrapper.find('[data-testid="file2-input"]').exists()).toBe(false)
+    expect(seen.join(' ')).not.toContain('System 2')
+    // The window card is still in the sequence - it asks about dates, not about sides.
+    expect(seen.join(' ')).toContain('time period')
+
+    // Pick a window, the way an operator must.
+    await wrapper.get('[data-testid="api-window-preset-previous-day"]').trigger('click')
+    await flushPromises()
+
+    // PRESS Execute. Reaching an enabled Execute is not the same as running: runDiff carried its own
+    // "upload the System 2 file" precondition AND a "choose two different systems" one, so the
+    // wizard looked fixed and still refused. Only clicking through reaches those guards.
+    await wrapper.get('[data-testid="reconciliation-step-primary"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('before running the diff')
+    expect(runSavedRunDiff).toHaveBeenCalled()
+    const submitted = runSavedRunDiff.mock.calls.at(-1)?.[0] ?? {}
+    expect(submitted).not.toHaveProperty('file2Name')
+    expect(submitted).not.toHaveProperty('file2Text')
+    // run#SavedRunDiff requires the two system ids together or not at all; a single-sided run
+    // overrides nothing, so it must send neither.
+    expect(submitted).not.toHaveProperty('file1SystemEnumId')
+    expect(submitted).not.toHaveProperty('file2SystemEnumId')
+  })
+
+  it('still asks for both files on a two-sided run', async () => {
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="saved-run-select"]').trigger('click')
+    await wrapper.get('[data-testid="workflow-select-option"][data-option-value="RS_ORDER_CSV"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="reconciliation-step-primary"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="file1-input"]').exists()).toBe(true)
   })
 
   it('shows the API error when saved-run lookup fails', async () => {
