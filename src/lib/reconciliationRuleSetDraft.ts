@@ -15,6 +15,8 @@ const RULESET_SOURCE_TYPE_API = 'AUT_SRC_API'
 export type ReconciliationCreateFlowStepId =
   | 'run-name'
   | 'description'
+  // DAR-BE-058: the kind of run, which decides whether a second arm exists at all.
+  | 'run-shape'
   | 'file1-system'
   | 'file1-source'
   | 'file1-endpoint'
@@ -193,16 +195,21 @@ export function readReconciliationRuleExpressionPreActions(expression: string | 
 
 export function buildCreateRuleSetRunPayload(draft: ReconciliationRuleSetDraft): CreateRuleSetRunPayload {
   const rules = buildRuleSetRulePayloads(draft)
+  // A single-sided run sends NO second side. Not an empty one — the backend decides whether to
+  // create a FILE_2 compare source from scopeMode, and a blank source row would make every
+  // surface that asks "is this two-sided" answer yes and then render a comparison against nothing.
+  const singleSided = (draft.scopeMode ?? '').toUpperCase() === 'EVALUATE'
   return {
     ...buildSideSourceFields('file1', draft),
-    ...buildSideSourceFields('file2', draft),
+    ...(singleSided ? {} : buildSideSourceFields('file2', draft)),
     ...excludeFilterPayloadFields(draft.file1ExcludeFilters, 'file1'),
-    ...excludeFilterPayloadFields(draft.file2ExcludeFilters, 'file2'),
+    ...(singleSided ? {} : excludeFilterPayloadFields(draft.file2ExcludeFilters, 'file2')),
     ...(rules.length ? { rules } : {}),
+    ...(singleSided ? { scopeMode: 'EVALUATE' } : {}),
     runName: draft.runName.trim(),
     description: draft.description?.trim() || undefined,
     file1SystemEnumId: draft.file1SystemEnumId,
-    file2SystemEnumId: draft.file2SystemEnumId,
+    ...(singleSided ? {} : { file2SystemEnumId: draft.file2SystemEnumId }),
   }
 }
 

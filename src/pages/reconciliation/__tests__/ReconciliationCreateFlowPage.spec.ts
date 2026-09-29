@@ -145,6 +145,8 @@ async function advanceToFinalPrimaryIdStep(wrapper: ReturnType<typeof mount>): P
 
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+  // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
   await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -178,6 +180,8 @@ async function advanceToFile1PrimaryIdStep(
 
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+  // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
   await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -502,6 +506,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('input[name="description"]').setValue('HotWax API against Shopify upload')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -595,6 +601,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS_TRANSFER_ORDERS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -648,6 +656,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -729,6 +739,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -821,6 +833,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="file1-system-select"]').trigger('click')
     expect(wrapper.find('[data-testid="workflow-select-option"][data-option-value="DarSysOms"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="workflow-select-option"][data-option-value="DarSysShopify"]').exists()).toBe(false)
@@ -877,6 +891,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -907,6 +923,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -996,6 +1014,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'NETSUITE')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1071,6 +1091,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'NETSUITE')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1106,6 +1128,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1157,6 +1181,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1196,6 +1222,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1227,6 +1255,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
@@ -1284,6 +1314,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1310,6 +1342,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1443,6 +1477,8 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await wrapper.get('input[name="runName"]').setValue('Automation run')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1680,6 +1716,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="file1-system-select"]').trigger('click')
       const optionValues = wrapper
         .findAll('[data-testid="workflow-select-option"]')
@@ -1697,6 +1735,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1728,6 +1768,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
@@ -1756,6 +1798,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1792,6 +1836,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1865,6 +1911,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1910,6 +1958,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -2017,6 +2067,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -2087,6 +2139,8 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSourceOptions()
       const wrapper = await startFlow('Ordering Test')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -2098,6 +2152,8 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSourceOptions()
       const wrapper = await startFlow('File Branch Wording')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
@@ -2110,6 +2166,8 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSourceOptions()
       const wrapper = await startFlow('Shopify No Config')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2131,6 +2189,8 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSourceOptions()
       const wrapper = await startFlow('HotWax No Config')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2148,6 +2208,8 @@ describe('ReconciliationCreateFlowPage', () => {
       })
       const wrapper = await startFlow('Shopify With Config')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2160,6 +2222,8 @@ describe('ReconciliationCreateFlowPage', () => {
     it('keeps the answers so far when leaving to build a schema', async () => {
       const wrapper = await startFlow('Schema Detour')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
@@ -2202,6 +2266,8 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       readings.push(readProgress(wrapper))
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       readings.push(readProgress(wrapper))
@@ -2247,6 +2313,8 @@ describe('ReconciliationCreateFlowPage', () => {
         mockSourceOptions(TWO_CONFIG_FIXTURE)
         const wrapper = await startFlow('Config First')
 
+        // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2259,6 +2327,8 @@ describe('ReconciliationCreateFlowPage', () => {
         mockSourceOptions(TWO_CONFIG_FIXTURE)
         const wrapper = await startFlow('Scoped Endpoints')
 
+        // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2277,6 +2347,8 @@ describe('ReconciliationCreateFlowPage', () => {
         mockSourceOptions(TWO_CONFIG_FIXTURE)
         const wrapper = await startFlow('Sole Endpoint')
 
+        // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2333,6 +2405,8 @@ describe('ReconciliationCreateFlowPage', () => {
         })
         const wrapper = await startFlow('Returns Type')
 
+        // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2408,6 +2482,8 @@ describe('ReconciliationCreateFlowPage', () => {
 
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 

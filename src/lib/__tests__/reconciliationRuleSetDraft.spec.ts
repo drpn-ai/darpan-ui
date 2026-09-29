@@ -170,3 +170,47 @@ describe('reconciliationRuleSetDraft', () => {
     expect(fieldSharesRecordRoot('$.appeasements[*].product_id', '$.returns[*].return_id')).toBe(false)
   })
 })
+
+describe('single-sided runs (DAR-BE-058)', () => {
+  const singleSided = {
+    runName: 'NetSuite chain — Pending Billing',
+    scopeMode: 'EVALUATE',
+    file1SystemEnumId: 'NETSUITE_SUITEQL',
+    file1SourceTypeEnumId: 'AUT_SRC_API',
+    file1SourceConfigId: 'NS_PENDING_BILLING',
+    file1SourceConfigType: 'NETSUITE_SUITEQL',
+    file1PrimaryIdExpression: ['internalId'],
+    file2SystemEnumId: 'SHOPIFY',
+    file2SourceTypeEnumId: 'AUT_SRC_API',
+    file2PrimaryIdExpression: ['id'],
+  } as ReconciliationRuleSetDraft
+
+  it('sends scopeMode so the backend builds an EVALUATE scope', () => {
+    expect(buildCreateRuleSetRunPayload(singleSided).scopeMode).toBe('EVALUATE')
+  })
+
+  /**
+   * The draft can still be CARRYING a second side — the operator may have picked one, then gone
+   * back and changed the run kind. Sending it would create a FILE_2 compare source, and every
+   * surface that asks "is this two-sided" reads whether that row exists.
+   */
+  it('sends no second side even when the draft still holds one', () => {
+    const payload = buildCreateRuleSetRunPayload(singleSided) as unknown as Record<string, unknown>
+
+    expect(payload.file2SystemEnumId).toBeUndefined()
+    expect(Object.keys(payload).filter((k) => k.startsWith('file2'))).toEqual([])
+  })
+
+  it('leaves two-sided runs exactly as they were', () => {
+    const payload = buildCreateRuleSetRunPayload({ ...singleSided, scopeMode: undefined })
+
+    expect(payload.scopeMode).toBeUndefined()
+    expect(payload.file2SystemEnumId).toBe('SHOPIFY')
+  })
+
+  it('treats the mode case-insensitively, since it round-trips through the backend', () => {
+    expect(buildCreateRuleSetRunPayload({ ...singleSided, scopeMode: 'evaluate' }).scopeMode)
+      .toBe('EVALUATE')
+  })
+})
+

@@ -715,7 +715,16 @@ describe('ReconciliationAutomationDashboardPage', () => {
     await flushPromises()
   })
 
+  /**
+   * Fake timers because this test asserts EXACT call counts while the page has two real clocks
+   * running: the 5s executions interval and, after run-now, the 900ms registration poll. Both
+   * call listAutomationExecutions. On wall-clock those are a race against how long the test takes
+   * — fine when this file runs alone, lost when the whole suite is loaded. flushPromises drains
+   * microtasks and is unaffected, so the assertions below are unchanged.
+   */
   it('refetches automation and executions after a successful run-now, adding the new row immediately', async () => {
+    vi.useFakeTimers()
+    try {
     const wrapper = mount(ReconciliationAutomationDashboardPage)
     await flushPromises()
 
@@ -764,6 +773,9 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(listAutomationExecutions).toHaveBeenCalledTimes(2)
     expect(wrapper.findAll('[data-testid="automation-execution-row"]')).toHaveLength(3)
     expect(wrapper.text()).toContain('Pending')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('polls while an execution is active and stops once it turns terminal', async () => {

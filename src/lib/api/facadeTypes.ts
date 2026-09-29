@@ -289,8 +289,11 @@ export interface RuleSetRulePayload {
 export interface CreateRuleSetRunPayload {
   runName: string
   description?: string
+  /** COMPARE (default) or EVALUATE. EVALUATE builds a single-sided run and sends no second side. */
+  scopeMode?: string
   file1SystemEnumId: string
-  file2SystemEnumId: string
+  /** Absent on a single-sided run: there is no second system to name. */
+  file2SystemEnumId?: string
   file1SourceTypeEnumId?: string
   file1SystemMessageRemoteId?: string
   file1NsRestletConfigId?: string
