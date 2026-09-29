@@ -347,4 +347,99 @@ describe('CommandPalette', () => {
       expect(wrapper.findAll('.command-item')[0]?.text()).toContain('Open AI Settings')
     })
   })
+
+  describe('mixed Navigate and Data results', () => {
+    // Ranking is group-blind, so a Data hit can outrank a Navigate hit and land between two of
+    // them. The DOM then buckets them back into groups, which is a different order.
+    const mixedActions: CommandAction[] = [
+      {
+        id: 'navigate-alpha-page',
+        label: 'Alpha Page',
+        description: 'A navigation target.',
+        group: 'Navigate',
+        to: '/alpha',
+        aliases: [],
+      },
+      {
+        id: 'navigate-zzz',
+        label: 'Zzz Alpha',
+        description: 'Another navigation target.',
+        group: 'Navigate',
+        to: '/zzz',
+        aliases: [],
+      },
+      {
+        id: 'data-alpha',
+        label: 'Alpha',
+        description: 'A saved record.',
+        group: 'Data',
+        to: '/data/alpha',
+        aliases: [],
+      },
+      {
+        id: 'data-alpha-two-long-label',
+        label: 'Alpha Two Extra Long Label',
+        description: 'Another saved record.',
+        group: 'Data',
+        to: '/data/alpha-two',
+        aliases: [],
+      },
+    ]
+
+    function mountMixed() {
+      return mount(CommandPalette, {
+        attachTo: document.body,
+        global: { stubs: { teleport: true } },
+        props: { open: true, actions: mixedActions },
+      })
+    }
+
+    function activeId(wrapper: ReturnType<typeof mountMixed>): string | undefined {
+      return wrapper.get('#command-palette-search').attributes('aria-activedescendant')
+    }
+
+    it('scrolls to the row it highlights when both groups are on screen', async () => {
+      const scrolledInto: HTMLElement[] = []
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+        configurable: true,
+        writable: true,
+        value: function scrollIntoViewSpy(this: HTMLElement) {
+          scrolledInto.push(this)
+        },
+      })
+
+      const wrapper = mountMixed()
+      await wrapper.get('#command-palette-search').setValue('alpha')
+      await wrapper.vm.$nextTick()
+
+      // Both groups render, so DOM order and rank order can disagree.
+      expect(wrapper.findAll('.command-group-label').map((label) => label.text())).toEqual(['Data', 'Navigate'])
+
+      for (let step = 0; step < 4; step += 1) {
+        await triggerSearchKey(wrapper, 'ArrowDown')
+        await wrapper.vm.$nextTick()
+        await wrapper.vm.$nextTick()
+
+        const activeItem = wrapper.get('.command-item--active').element
+        expect(scrolledInto[scrolledInto.length - 1], `step ${step + 1} scrolled to the wrong row`).toBe(activeItem)
+      }
+    })
+
+    it('walks the results in the order they are drawn', async () => {
+      const wrapper = mountMixed()
+      await wrapper.get('#command-palette-search').setValue('alpha')
+      await wrapper.vm.$nextTick()
+
+      const domIds = wrapper.findAll('.command-item').map((item) => item.attributes('id'))
+      expect(domIds).toHaveLength(4)
+
+      const walked: Array<string | undefined> = [activeId(wrapper)]
+      for (let step = 0; step < 3; step += 1) {
+        await triggerSearchKey(wrapper, 'ArrowDown')
+        walked.push(activeId(wrapper))
+      }
+
+      expect(walked).toEqual(domIds)
+    })
+  })
 })

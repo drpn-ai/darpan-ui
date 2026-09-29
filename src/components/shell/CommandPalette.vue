@@ -127,7 +127,12 @@ const slashResolution = computed(() =>
 const isSlashMode = computed(() => slashResolution.value.isSlashQuery)
 const slashNotice = computed(() => (isSlashMode.value ? slashResolution.value.notice : null))
 
-const rows = computed<PaletteRow[]>(() => {
+/**
+ * Ranked, but NOT the order anything is drawn in: rankCommandActions scores rows without regard
+ * to their group, so a Data hit can land between two Navigate hits. Grouping below is what the
+ * operator actually sees, so grouping is what keyboard navigation counts in.
+ */
+const rankedRows = computed<PaletteRow[]>(() => {
   if (isSlashMode.value) {
     return slashResolution.value.rows.map((slashRow) => ({
       id: slashRow.id,
@@ -151,13 +156,10 @@ const rows = computed<PaletteRow[]>(() => {
   }))
 })
 
-const activeActionId = computed(() => rows.value[activeIndex.value]?.id ?? null)
-const activeActionDomId = computed(() => (activeActionId.value ? getActionDomId(activeActionId.value) : undefined))
-
 const grouped = computed(() => {
   const groups: Array<{ name: string; rows: PaletteRow[] }> = []
 
-  for (const row of rows.value) {
+  for (const row of rankedRows.value) {
     const existing = groups.find((item) => item.name === row.group)
     if (existing) {
       existing.rows.push(row)
@@ -168,6 +170,17 @@ const grouped = computed(() => {
 
   return groups
 })
+
+/**
+ * The one order that counts. activeIndex indexes this, and actionRefs is filled in render order,
+ * so the two must be the same list or the arrow keys scroll to a row other than the highlighted
+ * one. Reading it back out of the groups is what keeps them the same list. The leading group is
+ * the one holding the top-ranked row, so rows[0] is still the best match.
+ */
+const rows = computed<PaletteRow[]>(() => grouped.value.flatMap((group) => group.rows))
+
+const activeActionId = computed(() => rows.value[activeIndex.value]?.id ?? null)
+const activeActionDomId = computed(() => (activeActionId.value ? getActionDomId(activeActionId.value) : undefined))
 
 const showGroupLabels = computed(() => grouped.value.length > 1)
 const showDataSearchLoading = computed(
