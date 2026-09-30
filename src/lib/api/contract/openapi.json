@@ -2,8 +2,8 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Darpan Facade API",
-        "version": "1.4.0",
-        "x-darpan-contract-version": 2,
+        "version": "1.5.1",
+        "x-darpan-contract-version": 3,
         "description": "GENERATED from the facade service XML \u2014 do not edit by hand. Regenerate with ./gradlew :runtime:component:darpan:generateApiContract.\n\nTransport: JSON-RPC 2.0 over POST /rpc/json. Auth channels: browser SPA uses the HttpOnly darpan_login_key cookie + CSRF token (canonical); integration callers and no-credentialed-CORS fallbacks use the login_key header (in-memory only, never query params). HTTP status is 200 for every dispatched call; distinguish outcomes by shape. JSON-RPC error object: protocol failures (-32700 parse, -32600 invalid request, -32601 method not found, -32602 invalid params), unhandled service errors (code 500), authorization denial (code 403). Facade business validation instead returns a success envelope with result.ok=false and result.errors[]."
     },
     "servers": [
@@ -55,6 +55,9 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/GetAdminSessionInfoRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/GetScheduleBoardRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/CreateTenantRequest"
@@ -168,6 +171,21 @@
                                         "$ref": "#/components/schemas/ValidateJsonTextAgainstSchemaRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/GetNsSuiteQlSourceQueryRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/ListNsSuiteQlSourceQueriesRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/ArchiveAutomationRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/ArchiveSavedRunRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/CancelReconciliationRunRequest"
                                     },
                                     {
@@ -187,6 +205,12 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/DeleteSavedRunRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/DisableSavedRunRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/EnableSavedRunRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/GetAutomationRequest"
@@ -226,6 +250,12 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/ReprocessAutomationExecutionRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/RestoreAutomationRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/RestoreSavedRunRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/ResumeAutomationRequest"
@@ -368,6 +398,7 @@
                                         "admin.MigrationAdminServices.run#PendingMigrations": "#/components/schemas/RunPendingMigrationsRequest",
                                         "admin.MigrationAdminServices.set#MigrationEnabled": "#/components/schemas/SetMigrationEnabledRequest",
                                         "admin.ObserveAdminServices.get#AdminSessionInfo": "#/components/schemas/GetAdminSessionInfoRequest",
+                                        "admin.ScheduleAdminServices.get#ScheduleBoard": "#/components/schemas/GetScheduleBoardRequest",
                                         "admin.TenantAdminServices.create#Tenant": "#/components/schemas/CreateTenantRequest",
                                         "admin.TenantAdminServices.deactivate#Tenant": "#/components/schemas/DeactivateTenantRequest",
                                         "admin.TenantAdminServices.get#TenantDetail": "#/components/schemas/GetTenantDetailRequest",
@@ -405,6 +436,11 @@
                                         "facade.JsonSchemaFacadeServices.save#JsonSchemaText": "#/components/schemas/SaveJsonSchemaTextRequest",
                                         "facade.JsonSchemaFacadeServices.save#RefinedSchema": "#/components/schemas/SaveRefinedSchemaRequest",
                                         "facade.JsonSchemaFacadeServices.validate#JsonTextAgainstSchema": "#/components/schemas/ValidateJsonTextAgainstSchemaRequest",
+                                        "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery": "#/components/schemas/GetNsSuiteQlSourceQueryRequest",
+                                        "facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries": "#/components/schemas/ListNsSuiteQlSourceQueriesRequest",
+                                        "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery": "#/components/schemas/SaveNsSuiteQlSourceQueryRequest",
+                                        "facade.ReconciliationFacadeServices.archive#Automation": "#/components/schemas/ArchiveAutomationRequest",
+                                        "facade.ReconciliationFacadeServices.archive#SavedRun": "#/components/schemas/ArchiveSavedRunRequest",
                                         "facade.ReconciliationFacadeServices.cancel#ReconciliationRun": "#/components/schemas/CancelReconciliationRunRequest",
                                         "facade.ReconciliationFacadeServices.create#CsvRun": "#/components/schemas/CreateCsvRunRequest",
                                         "facade.ReconciliationFacadeServices.create#Mapping": "#/components/schemas/CreateMappingRequest",
@@ -412,6 +448,8 @@
                                         "facade.ReconciliationFacadeServices.delete#Automation": "#/components/schemas/DeleteAutomationRequest",
                                         "facade.ReconciliationFacadeServices.delete#GeneratedOutput": "#/components/schemas/DeleteGeneratedOutputRequest",
                                         "facade.ReconciliationFacadeServices.delete#SavedRun": "#/components/schemas/DeleteSavedRunRequest",
+                                        "facade.ReconciliationFacadeServices.disable#SavedRun": "#/components/schemas/DisableSavedRunRequest",
+                                        "facade.ReconciliationFacadeServices.enable#SavedRun": "#/components/schemas/EnableSavedRunRequest",
                                         "facade.ReconciliationFacadeServices.get#Automation": "#/components/schemas/GetAutomationRequest",
                                         "facade.ReconciliationFacadeServices.get#GeneratedOutput": "#/components/schemas/GetGeneratedOutputRequest",
                                         "facade.ReconciliationFacadeServices.get#GeneratedOutputDifferences": "#/components/schemas/GetGeneratedOutputDifferencesRequest",
@@ -425,6 +463,8 @@
                                         "facade.ReconciliationFacadeServices.list#SavedRuns": "#/components/schemas/ListSavedRunsRequest",
                                         "facade.ReconciliationFacadeServices.pause#Automation": "#/components/schemas/PauseAutomationRequest",
                                         "facade.ReconciliationFacadeServices.reprocess#AutomationExecution": "#/components/schemas/ReprocessAutomationExecutionRequest",
+                                        "facade.ReconciliationFacadeServices.restore#Automation": "#/components/schemas/RestoreAutomationRequest",
+                                        "facade.ReconciliationFacadeServices.restore#SavedRun": "#/components/schemas/RestoreSavedRunRequest",
                                         "facade.ReconciliationFacadeServices.resume#Automation": "#/components/schemas/ResumeAutomationRequest",
                                         "facade.ReconciliationFacadeServices.run#AutomationNow": "#/components/schemas/RunAutomationNowRequest",
                                         "facade.ReconciliationFacadeServices.run#GenericDiff": "#/components/schemas/RunGenericDiffRequest",
@@ -515,6 +555,9 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/GetAdminSessionInfoResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/GetScheduleBoardResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/CreateTenantResponse"
@@ -628,6 +671,21 @@
                                             "$ref": "#/components/schemas/ValidateJsonTextAgainstSchemaResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/GetNsSuiteQlSourceQueryResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/ListNsSuiteQlSourceQueriesResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/ArchiveAutomationResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/ArchiveSavedRunResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/CancelReconciliationRunResponse"
                                         },
                                         {
@@ -647,6 +705,12 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/DeleteSavedRunResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/DisableSavedRunResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/EnableSavedRunResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/GetAutomationResponse"
@@ -686,6 +750,12 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/ReprocessAutomationExecutionResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/RestoreAutomationResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/RestoreSavedRunResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/ResumeAutomationResponse"
@@ -2011,6 +2081,125 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/GetAdminSessionInfoResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "GetScheduleBoardParams": {
+                "type": "object",
+                "properties": {
+                    "horizonHours": {
+                        "type": "integer",
+                        "description": "How far forward to project. Defaults to 24 hours."
+                    }
+                },
+                "description": "Every tenant's scheduled automations on one instance-wide timeline, ordered by the\n            moment the scheduler will actually submit them, for deployment and load management.\n\n            Only the first fire per automation is authoritative \u2014 it is the stored nextScheduledFireTime\n            the scanner owns. Later entries are projected from scheduleExpr and assume the automation is\n            not paused, edited, or deferred by the concurrency cap before it gets there.\n\n            Fire times are absolute instants; submitsAt snaps each one up to the next\n            scan_ReconciliationAutomations_5m tick (\"0 0/5 * * * ?\"), because nothing is submitted\n            between ticks. concurrentAtTick counts the fires sharing a tick, to be read against\n            inFlightCap (darpan.reconciliation.automation.maxConcurrentExecutions)."
+            },
+            "GetScheduleBoardResult": {
+                "type": "object",
+                "properties": {
+                    "scheduleBoard": {
+                        "type": "object",
+                        "properties": {
+                            "generatedAt": {
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "number"
+                                    }
+                                ],
+                                "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds"
+                            },
+                            "horizonHours": {
+                                "type": "integer"
+                            },
+                            "inFlightCap": {
+                                "type": "integer",
+                                "description": "Global cap on executions in flight at once, not a per-tenant cap."
+                            },
+                            "inFlight": {
+                                "type": "array",
+                                "items": {
+                                    
+                                },
+                                "description": "Executions started but not finished, oldest first."
+                            },
+                            "fires": {
+                                "type": "array",
+                                "items": {
+                                    
+                                },
+                                "description": "Projected submissions across the horizon, earliest first."
+                            },
+                            "paused": {
+                                "type": "array",
+                                "items": {
+                                    
+                                },
+                                "description": "Inactive automations \u2014 listed for inventory, never projected."
+                            }
+                        }
+                    }
+                }
+            },
+            "GetScheduleBoardRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for admin.ScheduleAdminServices.get#ScheduleBoard",
+                "x-darpan-method": "admin.ScheduleAdminServices.get#ScheduleBoard",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "admin.ScheduleAdminServices.get#ScheduleBoard"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetScheduleBoardParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetScheduleBoardResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for admin.ScheduleAdminServices.get#ScheduleBoard. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetScheduleBoardResult"
                     }
                 },
                 "required": [
@@ -5454,6 +5643,9 @@
                                 "readTimeoutSeconds": {
                                     "type": "integer"
                                 },
+                                "returnsPageSize": {
+                                    "type": "integer"
+                                },
                                 "isActive": {
                                     "type": "string"
                                 },
@@ -5591,6 +5783,10 @@
                     "readTimeoutSeconds": {
                         "type": "integer"
                     },
+                    "returnsPageSize": {
+                        "type": "integer",
+                        "description": "Rows per page requested from the OMS reconciliationReturns endpoint, 1..1000. Omit to keep the stored value; unset means the 500 default. Lower it when OMS cannot build a full page inside its gateway timeout."
+                    },
                     "isActive": {
                         "type": "boolean"
                     },
@@ -5665,6 +5861,9 @@
                                 "type": "integer"
                             },
                             "readTimeoutSeconds": {
+                                "type": "integer"
+                            },
+                            "returnsPageSize": {
                                 "type": "integer"
                             },
                             "isActive": {
@@ -6873,6 +7072,601 @@
                     "result"
                 ]
             },
+            "GetNsSuiteQlSourceQueryParams": {
+                "type": "object",
+                "properties": {
+                    "nsSuiteQlSourceQueryId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "nsSuiteQlSourceQueryId"
+                ],
+                "description": "One check definition with its full column projection, for editing."
+            },
+            "GetNsSuiteQlSourceQueryResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "query": {
+                        "type": "object"
+                    }
+                }
+            },
+            "GetNsSuiteQlSourceQueryRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery",
+                "x-darpan-method": "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetNsSuiteQlSourceQueryParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetNsSuiteQlSourceQueryResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetNsSuiteQlSourceQueryResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "ListNsSuiteQlSourceQueriesParams": {
+                "type": "object",
+                "properties": {
+                    
+                },
+                "description": "Every NetSuite SuiteQL check definition the active tenant can see."
+            },
+            "ListNsSuiteQlSourceQueriesResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "queries": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "object",
+                                    "properties": {
+                                        "nsSuiteQlSourceQueryId": {
+                                            "type": "string"
+                                        },
+                                        "nsAuthConfigId": {
+                                            "type": "string"
+                                        },
+                                        "description": {
+                                            "type": "string"
+                                        },
+                                        "recordType": {
+                                            "type": "string"
+                                        },
+                                        "queryTemplate": {
+                                            "type": "string"
+                                        },
+                                        "isActive": {
+                                            "type": "string"
+                                        },
+                                        "fieldCount": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ListNsSuiteQlSourceQueriesRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries",
+                "x-darpan-method": "facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ListNsSuiteQlSourceQueriesParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ListNsSuiteQlSourceQueriesResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ListNsSuiteQlSourceQueriesResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "SaveNsSuiteQlSourceQueryParams": {
+                "type": "object",
+                "properties": {
+                    "nsSuiteQlSourceQueryId": {
+                        "type": "string"
+                    },
+                    "nsAuthConfigId": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "recordType": {
+                        "type": "string"
+                    },
+                    "fromTable": {
+                        "type": "string"
+                    },
+                    "dateColumn": {
+                        "type": "string"
+                    },
+                    "queryTemplate": {
+                        "type": "string"
+                    },
+                    "absentChildRecordType": {
+                        "type": "string"
+                    },
+                    "presentChildRecordType": {
+                        "type": "string"
+                    },
+                    "requireFulfillableOpenLine": {
+                        "type": "boolean"
+                    },
+                    "requireOverdueShipDate": {
+                        "type": "boolean"
+                    },
+                    "pendingStates": {
+                        "type": "string"
+                    },
+                    "statesExpectingShipment": {
+                        "type": "string"
+                    },
+                    "statesExpectingInvoice": {
+                        "type": "string"
+                    },
+                    "disallowedStates": {
+                        "type": "string"
+                    },
+                    "overdueExcludedShipMethods": {
+                        "type": "string"
+                    },
+                    "requireParentRecordType": {
+                        "type": "string"
+                    },
+                    "amountColumn": {
+                        "type": "string"
+                    },
+                    "minAmount": {
+                        "type": "string"
+                    },
+                    "joinKeyFieldName": {
+                        "type": "string"
+                    },
+                    "originFieldName": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    },
+                    "fields": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field": {
+                                    "type": "object",
+                                    "properties": {
+                                        "recordFieldName": {
+                                            "type": "string"
+                                        },
+                                        "sourceColumn": {
+                                            "type": "string"
+                                        },
+                                        "sequenceNum": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "nsSuiteQlSourceQueryId",
+                    "nsAuthConfigId",
+                    "recordType",
+                    "fields"
+                ],
+                "description": "Create or update a NetSuite SuiteQL check definition and its column projection.\n\n            Rejects anything the extractor would reject, by running the extractor's own\n            normalizeSpec over the submitted values before writing a row."
+            },
+            "SaveNsSuiteQlSourceQueryResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "savedQuery": {
+                        "type": "object"
+                    }
+                }
+            },
+            "SaveNsSuiteQlSourceQueryRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery",
+                "x-darpan-method": "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "SaveNsSuiteQlSourceQueryResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "ArchiveAutomationParams": {
+                "type": "object",
+                "properties": {
+                    "automationId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "automationId"
+                ],
+                "description": "Archived one tenant-scoped automation by setting isArchived to Y.\n\n            DAR-BE-061. What the trash can on the automation dashboard does: the automation leaves the list and stops firing, so it feels removed.\n\n            NOT the same switch as pause. isActive is pause \u2014 a paused automation stays on the\n            list, visibly not running, because pausing is something you undo on Monday. Archiving\n            takes it off the list. Overloading isActive for both would have made pausing an\n            automation delete it from view."
+            },
+            "ArchiveAutomationResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "automationId": {
+                        "type": "string"
+                    },
+                    "isArchived": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "ArchiveAutomationRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ReconciliationFacadeServices.archive#Automation",
+                "x-darpan-method": "facade.ReconciliationFacadeServices.archive#Automation",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ReconciliationFacadeServices.archive#Automation"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ArchiveAutomationParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ArchiveAutomationResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ReconciliationFacadeServices.archive#Automation. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ArchiveAutomationResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "ArchiveSavedRunParams": {
+                "type": "object",
+                "properties": {
+                    "savedRunId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "savedRunId"
+                ],
+                "description": "Archived one tenant-scoped saved run by setting RuleSet.isArchived to Y.\n\n            DAR-BE-061: the trash can. It leaves Home and the runs list and stops running, so pressing a trash can feels like the run went away.\n\n            Nothing is deleted. A run owns its results, diff documents and automation executions \u2014\n            the record of what was reconciled and when."
+            },
+            "ArchiveSavedRunResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "savedRunId": {
+                        "type": "string"
+                    },
+                    "isArchived": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "ArchiveSavedRunRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ReconciliationFacadeServices.archive#SavedRun",
+                "x-darpan-method": "facade.ReconciliationFacadeServices.archive#SavedRun",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ReconciliationFacadeServices.archive#SavedRun"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ArchiveSavedRunParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ArchiveSavedRunResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ReconciliationFacadeServices.archive#SavedRun. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ArchiveSavedRunResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "CancelReconciliationRunParams": {
                 "type": "object",
                 "properties": {
@@ -7046,6 +7840,12 @@
                             },
                             "compareScopeId": {
                                 "type": "string"
+                            },
+                            "scopeMode": {
+                                "type": "string"
+                            },
+                            "isActive": {
+                                "type": "boolean"
                             },
                             "requiresSystemSelection": {
                                 "type": "boolean"
@@ -7343,6 +8143,9 @@
                     "description": {
                         "type": "string"
                     },
+                    "scopeMode": {
+                        "type": "string"
+                    },
                     "file1SystemEnumId": {
                         "type": "string"
                     },
@@ -7502,8 +8305,7 @@
                 },
                 "required": [
                     "runName",
-                    "file1SystemEnumId",
-                    "file2SystemEnumId"
+                    "file1SystemEnumId"
                 ],
                 "description": "Create a tenant-scoped saved run backed by one RuleSet compare scope and zero or more initial rules."
             },
@@ -7551,6 +8353,12 @@
                             },
                             "compareScopeId": {
                                 "type": "string"
+                            },
+                            "scopeMode": {
+                                "type": "string"
+                            },
+                            "isActive": {
+                                "type": "boolean"
                             },
                             "requiresSystemSelection": {
                                 "type": "boolean"
@@ -8122,6 +8930,202 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/DeleteSavedRunResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "DisableSavedRunParams": {
+                "type": "object",
+                "properties": {
+                    "savedRunId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "savedRunId"
+                ],
+                "description": "Disabled one tenant-scoped saved run by setting RuleSet.isActive to N.\n\n            DAR-BE-060: runs are retired by disabling, never by deleting. A run owns its results,\n            diff documents and automation executions \u2014 deleting it to tidy a list would delete the\n            record of what was reconciled and when.\n\n            A disabled run stays readable and editable, or it could never be turned back on. What\n            it cannot do is RUN, on either path: the manual runner and the automation executor are\n            gated separately."
+            },
+            "DisableSavedRunResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "savedRunId": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "DisableSavedRunRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ReconciliationFacadeServices.disable#SavedRun",
+                "x-darpan-method": "facade.ReconciliationFacadeServices.disable#SavedRun",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ReconciliationFacadeServices.disable#SavedRun"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/DisableSavedRunParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "DisableSavedRunResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ReconciliationFacadeServices.disable#SavedRun. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/DisableSavedRunResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "EnableSavedRunParams": {
+                "type": "object",
+                "properties": {
+                    "savedRunId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "savedRunId"
+                ],
+                "description": "Enabled one tenant-scoped saved run by setting RuleSet.isActive to Y.\n\n            DAR-BE-060: runs are retired by disabling, never by deleting. A run owns its results,\n            diff documents and automation executions \u2014 deleting it to tidy a list would delete the\n            record of what was reconciled and when.\n\n            A disabled run stays readable and editable, or it could never be turned back on. What\n            it cannot do is RUN, on either path: the manual runner and the automation executor are\n            gated separately."
+            },
+            "EnableSavedRunResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "savedRunId": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "EnableSavedRunRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ReconciliationFacadeServices.enable#SavedRun",
+                "x-darpan-method": "facade.ReconciliationFacadeServices.enable#SavedRun",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ReconciliationFacadeServices.enable#SavedRun"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/EnableSavedRunParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "EnableSavedRunResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ReconciliationFacadeServices.enable#SavedRun. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/EnableSavedRunResult"
                     }
                 },
                 "required": [
@@ -10081,6 +11085,9 @@
                     },
                     "pageSize": {
                         "type": "integer"
+                    },
+                    "includeArchived": {
+                        "type": "boolean"
                     }
                 },
                 "description": "List saved runs across legacy mappings and RuleSet-backed CSV runs."
@@ -10157,6 +11164,15 @@
                                 },
                                 "compareScopeId": {
                                     "type": "string"
+                                },
+                                "scopeMode": {
+                                    "type": "string"
+                                },
+                                "isActive": {
+                                    "type": "boolean"
+                                },
+                                "isArchived": {
+                                    "type": "boolean"
                                 },
                                 "requiresSystemSelection": {
                                     "type": "boolean"
@@ -10607,6 +11623,202 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/ReprocessAutomationExecutionResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "RestoreAutomationParams": {
+                "type": "object",
+                "properties": {
+                    "automationId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "automationId"
+                ],
+                "description": "Restored one tenant-scoped automation by setting isArchived to N.\n\n            DAR-BE-061. Brings an automation back from Show archived, with its execution history intact.\n\n            NOT the same switch as pause. isActive is pause \u2014 a paused automation stays on the\n            list, visibly not running, because pausing is something you undo on Monday. Archiving\n            takes it off the list. Overloading isActive for both would have made pausing an\n            automation delete it from view."
+            },
+            "RestoreAutomationResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "automationId": {
+                        "type": "string"
+                    },
+                    "isArchived": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "RestoreAutomationRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ReconciliationFacadeServices.restore#Automation",
+                "x-darpan-method": "facade.ReconciliationFacadeServices.restore#Automation",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ReconciliationFacadeServices.restore#Automation"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/RestoreAutomationParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "RestoreAutomationResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ReconciliationFacadeServices.restore#Automation. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/RestoreAutomationResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "RestoreSavedRunParams": {
+                "type": "object",
+                "properties": {
+                    "savedRunId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "savedRunId"
+                ],
+                "description": "Restored one tenant-scoped saved run by setting RuleSet.isArchived to N.\n\n            DAR-BE-061: the trash can. Brings a run back from Show archived, with its history intact.\n\n            Nothing is deleted. A run owns its results, diff documents and automation executions \u2014\n            the record of what was reconciled and when."
+            },
+            "RestoreSavedRunResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "savedRunId": {
+                        "type": "string"
+                    },
+                    "isArchived": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "RestoreSavedRunRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ReconciliationFacadeServices.restore#SavedRun",
+                "x-darpan-method": "facade.ReconciliationFacadeServices.restore#SavedRun",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ReconciliationFacadeServices.restore#SavedRun"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/RestoreSavedRunParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "RestoreSavedRunResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ReconciliationFacadeServices.restore#SavedRun. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/RestoreSavedRunResult"
                     }
                 },
                 "required": [
@@ -12298,6 +13510,12 @@
                             "compareScopeId": {
                                 "type": "string"
                             },
+                            "scopeMode": {
+                                "type": "string"
+                            },
+                            "isActive": {
+                                "type": "boolean"
+                            },
                             "requiresSystemSelection": {
                                 "type": "boolean"
                             },
@@ -12616,6 +13834,12 @@
                             },
                             "compareScopeId": {
                                 "type": "string"
+                            },
+                            "scopeMode": {
+                                "type": "string"
+                            },
+                            "isActive": {
+                                "type": "boolean"
                             },
                             "requiresSystemSelection": {
                                 "type": "boolean"
@@ -16852,6 +18076,7 @@
         "admin.MigrationAdminServices.run#PendingMigrations": "RunPendingMigrations",
         "admin.MigrationAdminServices.set#MigrationEnabled": "SetMigrationEnabled",
         "admin.ObserveAdminServices.get#AdminSessionInfo": "GetAdminSessionInfo",
+        "admin.ScheduleAdminServices.get#ScheduleBoard": "GetScheduleBoard",
         "admin.TenantAdminServices.create#Tenant": "CreateTenant",
         "admin.TenantAdminServices.deactivate#Tenant": "DeactivateTenant",
         "admin.TenantAdminServices.get#TenantDetail": "GetTenantDetail",
@@ -16889,6 +18114,11 @@
         "facade.JsonSchemaFacadeServices.save#JsonSchemaText": "SaveJsonSchemaText",
         "facade.JsonSchemaFacadeServices.save#RefinedSchema": "SaveRefinedSchema",
         "facade.JsonSchemaFacadeServices.validate#JsonTextAgainstSchema": "ValidateJsonTextAgainstSchema",
+        "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery": "GetNsSuiteQlSourceQuery",
+        "facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries": "ListNsSuiteQlSourceQueries",
+        "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery": "SaveNsSuiteQlSourceQuery",
+        "facade.ReconciliationFacadeServices.archive#Automation": "ArchiveAutomation",
+        "facade.ReconciliationFacadeServices.archive#SavedRun": "ArchiveSavedRun",
         "facade.ReconciliationFacadeServices.cancel#ReconciliationRun": "CancelReconciliationRun",
         "facade.ReconciliationFacadeServices.create#CsvRun": "CreateCsvRun",
         "facade.ReconciliationFacadeServices.create#Mapping": "CreateMapping",
@@ -16896,6 +18126,8 @@
         "facade.ReconciliationFacadeServices.delete#Automation": "DeleteAutomation",
         "facade.ReconciliationFacadeServices.delete#GeneratedOutput": "DeleteGeneratedOutput",
         "facade.ReconciliationFacadeServices.delete#SavedRun": "DeleteSavedRun",
+        "facade.ReconciliationFacadeServices.disable#SavedRun": "DisableSavedRun",
+        "facade.ReconciliationFacadeServices.enable#SavedRun": "EnableSavedRun",
         "facade.ReconciliationFacadeServices.get#Automation": "GetAutomation",
         "facade.ReconciliationFacadeServices.get#GeneratedOutput": "GetGeneratedOutput",
         "facade.ReconciliationFacadeServices.get#GeneratedOutputDifferences": "GetGeneratedOutputDifferences",
@@ -16909,6 +18141,8 @@
         "facade.ReconciliationFacadeServices.list#SavedRuns": "ListSavedRuns",
         "facade.ReconciliationFacadeServices.pause#Automation": "PauseAutomation",
         "facade.ReconciliationFacadeServices.reprocess#AutomationExecution": "ReprocessAutomationExecution",
+        "facade.ReconciliationFacadeServices.restore#Automation": "RestoreAutomation",
+        "facade.ReconciliationFacadeServices.restore#SavedRun": "RestoreSavedRun",
         "facade.ReconciliationFacadeServices.resume#Automation": "ResumeAutomation",
         "facade.ReconciliationFacadeServices.run#AutomationNow": "RunAutomationNow",
         "facade.ReconciliationFacadeServices.run#GenericDiff": "RunGenericDiff",

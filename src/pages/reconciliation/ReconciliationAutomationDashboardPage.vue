@@ -174,10 +174,25 @@
           </svg>
         </button>
 
-        <!-- DAR-BE-060: no delete affordance. Darpan retires things by disabling them — the
-             active toggle above does it, and it is reversible. An automation owns its execution
-             history, which is the record of what ran and when; deleting it to tidy a list would
-             delete that record. -->
+        <!-- DAR-BE-061. The trash can is back, and it ARCHIVES. Nothing is deleted: the
+             automation leaves the list and stops firing, which is what pressing a bin should
+             feel like, but its execution history survives and Show archived brings it back.
+
+             Not the same switch as the toggle above. That one is PAUSE — it keeps the automation
+             on the list, visibly stopped, because pausing is something you undo on Monday. -->
+        <button
+          v-if="canArchiveAutomation"
+          type="button"
+          class="app-icon-action app-icon-action--large app-icon-action--danger settings-dashboard-footer-action"
+          data-testid="automation-delete-action"
+          aria-label="Delete automation"
+          :disabled="actionInFlight"
+          @click="archiveAutomation"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
+          </svg>
+        </button>
       </div>
     </template>
   </StaticPageFrame>
@@ -218,7 +233,7 @@ import {
 import { useListPagination } from '../../lib/listPagination'
 import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
-import { backIconPath, editIconPath } from '../../lib/iconPaths'
+import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { describeTimeZone as describeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
@@ -251,6 +266,7 @@ const runNowInFlight = ref(false)
 // Separate from actionInFlight so the switch can report aria-busy for its own change only,
 // while still being disabled by any other action in flight.
 const activeToggleInFlight = ref(false)
+const canArchiveAutomation = computed(() => canEditTenantSettings.value && automation.value?.permissions?.canDelete === true)
 const error = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const weekdayLabels: Record<string, string> = {
@@ -766,6 +782,26 @@ async function runNow(): Promise<void> {
     registrationController.abort()
     actionInFlight.value = false
     runNowInFlight.value = false
+  }
+}
+
+/**
+ * The trash can. Archives rather than deletes, and then leaves the page — the operator pressed a
+ * bin and should see the automation gone, not sitting there greyed out. It is recoverable from
+ * Show archived, which is why the confirm does not promise that this is permanent.
+ */
+async function archiveAutomation(): Promise<void> {
+  if (!automation.value || !canArchiveAutomation.value || actionInFlight.value) return
+  if (!window.confirm(`Delete automation "${automation.value.automationName}"?`)) return
+  actionInFlight.value = true
+  actionError.value = null
+  try {
+    await reconciliationFacade.archiveAutomation({ automationId: automation.value.automationId })
+    await router.push('/reconciliation/automations')
+  } catch (archiveError) {
+    actionError.value = archiveError instanceof ApiCallError ? archiveError.message : 'Unable to delete automation.'
+  } finally {
+    actionInFlight.value = false
   }
 }
 

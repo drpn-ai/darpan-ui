@@ -456,6 +456,57 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetAdminSessionInfoResult"];
         };
+        /**
+         * @description Every tenant's scheduled automations on one instance-wide timeline, ordered by the
+         *                 moment the scheduler will actually submit them, for deployment and load management.
+         *
+         *                 Only the first fire per automation is authoritative — it is the stored nextScheduledFireTime
+         *                 the scanner owns. Later entries are projected from scheduleExpr and assume the automation is
+         *                 not paused, edited, or deferred by the concurrency cap before it gets there.
+         *
+         *                 Fire times are absolute instants; submitsAt snaps each one up to the next
+         *                 scan_ReconciliationAutomations_5m tick ("0 0/5 * * * ?"), because nothing is submitted
+         *                 between ticks. concurrentAtTick counts the fires sharing a tick, to be read against
+         *                 inFlightCap (darpan.reconciliation.automation.maxConcurrentExecutions).
+         */
+        GetScheduleBoardParams: {
+            /** @description How far forward to project. Defaults to 24 hours. */
+            horizonHours?: number;
+        };
+        GetScheduleBoardResult: {
+            scheduleBoard?: {
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                generatedAt?: string | number;
+                horizonHours?: number;
+                /** @description Global cap on executions in flight at once, not a per-tenant cap. */
+                inFlightCap?: number;
+                /** @description Executions started but not finished, oldest first. */
+                inFlight?: unknown[];
+                /** @description Projected submissions across the horizon, earliest first. */
+                fires?: unknown[];
+                /** @description Inactive automations — listed for inventory, never projected. */
+                paused?: unknown[];
+            };
+        };
+        /** @description JSON-RPC request envelope for admin.ScheduleAdminServices.get#ScheduleBoard */
+        GetScheduleBoardRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.ScheduleAdminServices.get#ScheduleBoard";
+            params?: components["schemas"]["GetScheduleBoardParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.ScheduleAdminServices.get#ScheduleBoard. Check result.ok / result.errors for business failures. */
+        GetScheduleBoardResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetScheduleBoardResult"];
+        };
         /** @description Create a Darpan tenant: UserGroup (UgtDarpanCompany) + TenantSetting in one transaction. */
         CreateTenantParams: {
             /** @description Uppercase tenant id, e.g. KREWE. */
@@ -1632,6 +1683,7 @@ export interface components {
                 customHeaderNames?: unknown[];
                 connectTimeoutSeconds?: number;
                 readTimeoutSeconds?: number;
+                returnsPageSize?: number;
                 isActive?: string;
                 canReadOrders?: boolean;
                 createdDate?: string;
@@ -1679,6 +1731,8 @@ export interface components {
             headersJson?: string;
             connectTimeoutSeconds?: number;
             readTimeoutSeconds?: number;
+            /** @description Rows per page requested from the OMS reconciliationReturns endpoint, 1..1000. Omit to keep the stored value; unset means the 500 default. Lower it when OMS cannot build a full page inside its gateway timeout. */
+            returnsPageSize?: number;
             isActive?: boolean;
             canReadOrders?: boolean;
         };
@@ -1700,6 +1754,7 @@ export interface components {
                 customHeaderNames?: unknown[];
                 connectTimeoutSeconds?: number;
                 readTimeoutSeconds?: number;
+                returnsPageSize?: number;
                 isActive?: string;
                 canReadOrders?: boolean;
                 createdDate?: string;
@@ -2071,6 +2126,210 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ValidateJsonTextAgainstSchemaResult"];
         };
+        /** @description One check definition with its full column projection, for editing. */
+        GetNsSuiteQlSourceQueryParams: {
+            nsSuiteQlSourceQueryId: string;
+        };
+        GetNsSuiteQlSourceQueryResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            query?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery */
+        GetNsSuiteQlSourceQueryRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery";
+            params?: components["schemas"]["GetNsSuiteQlSourceQueryParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery. Check result.ok / result.errors for business failures. */
+        GetNsSuiteQlSourceQueryResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetNsSuiteQlSourceQueryResult"];
+        };
+        /** @description Every NetSuite SuiteQL check definition the active tenant can see. */
+        ListNsSuiteQlSourceQueriesParams: Record<string, never>;
+        ListNsSuiteQlSourceQueriesResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            queries?: {
+                query?: {
+                    nsSuiteQlSourceQueryId?: string;
+                    nsAuthConfigId?: string;
+                    description?: string;
+                    recordType?: string;
+                    queryTemplate?: string;
+                    isActive?: string;
+                    fieldCount?: number;
+                };
+            }[];
+        };
+        /** @description JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries */
+        ListNsSuiteQlSourceQueriesRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries";
+            params?: components["schemas"]["ListNsSuiteQlSourceQueriesParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries. Check result.ok / result.errors for business failures. */
+        ListNsSuiteQlSourceQueriesResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListNsSuiteQlSourceQueriesResult"];
+        };
+        /**
+         * @description Create or update a NetSuite SuiteQL check definition and its column projection.
+         *
+         *                 Rejects anything the extractor would reject, by running the extractor's own
+         *                 normalizeSpec over the submitted values before writing a row.
+         */
+        SaveNsSuiteQlSourceQueryParams: {
+            nsSuiteQlSourceQueryId: string;
+            nsAuthConfigId: string;
+            description?: string;
+            recordType: string;
+            fromTable?: string;
+            dateColumn?: string;
+            queryTemplate?: string;
+            absentChildRecordType?: string;
+            presentChildRecordType?: string;
+            requireFulfillableOpenLine?: boolean;
+            requireOverdueShipDate?: boolean;
+            pendingStates?: string;
+            statesExpectingShipment?: string;
+            statesExpectingInvoice?: string;
+            disallowedStates?: string;
+            overdueExcludedShipMethods?: string;
+            requireParentRecordType?: string;
+            amountColumn?: string;
+            minAmount?: string;
+            joinKeyFieldName?: string;
+            originFieldName?: string;
+            isActive?: boolean;
+            fields: {
+                field?: {
+                    recordFieldName?: string;
+                    sourceColumn?: string;
+                    sequenceNum?: number;
+                };
+            }[];
+        };
+        SaveNsSuiteQlSourceQueryResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            savedQuery?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery */
+        SaveNsSuiteQlSourceQueryRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery";
+            params?: components["schemas"]["SaveNsSuiteQlSourceQueryParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery. Check result.ok / result.errors for business failures. */
+        SaveNsSuiteQlSourceQueryResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveNsSuiteQlSourceQueryResult"];
+        };
+        /**
+         * @description Archived one tenant-scoped automation by setting isArchived to Y.
+         *
+         *                 DAR-BE-061. What the trash can on the automation dashboard does: the automation leaves the list and stops firing, so it feels removed.
+         *
+         *                 NOT the same switch as pause. isActive is pause — a paused automation stays on the
+         *                 list, visibly not running, because pausing is something you undo on Monday. Archiving
+         *                 takes it off the list. Overloading isActive for both would have made pausing an
+         *                 automation delete it from view.
+         */
+        ArchiveAutomationParams: {
+            automationId: string;
+        };
+        ArchiveAutomationResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            automationId?: string;
+            isArchived?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.archive#Automation */
+        ArchiveAutomationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.archive#Automation";
+            params?: components["schemas"]["ArchiveAutomationParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.archive#Automation. Check result.ok / result.errors for business failures. */
+        ArchiveAutomationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ArchiveAutomationResult"];
+        };
+        /**
+         * @description Archived one tenant-scoped saved run by setting RuleSet.isArchived to Y.
+         *
+         *                 DAR-BE-061: the trash can. It leaves Home and the runs list and stops running, so pressing a trash can feels like the run went away.
+         *
+         *                 Nothing is deleted. A run owns its results, diff documents and automation executions —
+         *                 the record of what was reconciled and when.
+         */
+        ArchiveSavedRunParams: {
+            savedRunId: string;
+        };
+        ArchiveSavedRunResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            savedRunId?: string;
+            isArchived?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.archive#SavedRun */
+        ArchiveSavedRunRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.archive#SavedRun";
+            params?: components["schemas"]["ArchiveSavedRunParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.archive#SavedRun. Check result.ok / result.errors for business failures. */
+        ArchiveSavedRunResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ArchiveSavedRunResult"];
+        };
         /**
          * @description Ask a running reconciliation to stop. Tenant-gated. Cancellation is cooperative: this
          *                 records the request and the run ends itself AUT_STAT_CANCELLED at its next checkpoint
@@ -2128,6 +2387,8 @@ export interface components {
                 runType?: string;
                 ruleSetId?: string;
                 compareScopeId?: string;
+                scopeMode?: string;
+                isActive?: boolean;
                 requiresSystemSelection?: boolean;
                 defaultFile1SystemEnumId?: string;
                 defaultFile2SystemEnumId?: string;
@@ -2222,6 +2483,7 @@ export interface components {
         CreateRuleSetRunParams: {
             runName: string;
             description?: string;
+            scopeMode?: string;
             file1SystemEnumId: string;
             file1SourceTypeEnumId?: string;
             file1SystemMessageRemoteId?: string;
@@ -2233,7 +2495,7 @@ export interface components {
             file1RecordRootExpression?: string;
             file1PrimaryIdExpression?: string;
             file1PrimaryIdExpressions?: unknown[];
-            file2SystemEnumId: string;
+            file2SystemEnumId?: string;
             file2SourceTypeEnumId?: string;
             file2SystemMessageRemoteId?: string;
             file2NsRestletConfigId?: string;
@@ -2290,6 +2552,8 @@ export interface components {
                 runType?: string;
                 ruleSetId?: string;
                 compareScopeId?: string;
+                scopeMode?: string;
+                isActive?: boolean;
                 requiresSystemSelection?: boolean;
                 defaultFile1SystemEnumId?: string;
                 defaultFile2SystemEnumId?: string;
@@ -2468,6 +2732,86 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["DeleteSavedRunResult"];
+        };
+        /**
+         * @description Disabled one tenant-scoped saved run by setting RuleSet.isActive to N.
+         *
+         *                 DAR-BE-060: runs are retired by disabling, never by deleting. A run owns its results,
+         *                 diff documents and automation executions — deleting it to tidy a list would delete the
+         *                 record of what was reconciled and when.
+         *
+         *                 A disabled run stays readable and editable, or it could never be turned back on. What
+         *                 it cannot do is RUN, on either path: the manual runner and the automation executor are
+         *                 gated separately.
+         */
+        DisableSavedRunParams: {
+            savedRunId: string;
+        };
+        DisableSavedRunResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            savedRunId?: string;
+            isActive?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.disable#SavedRun */
+        DisableSavedRunRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.disable#SavedRun";
+            params?: components["schemas"]["DisableSavedRunParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.disable#SavedRun. Check result.ok / result.errors for business failures. */
+        DisableSavedRunResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DisableSavedRunResult"];
+        };
+        /**
+         * @description Enabled one tenant-scoped saved run by setting RuleSet.isActive to Y.
+         *
+         *                 DAR-BE-060: runs are retired by disabling, never by deleting. A run owns its results,
+         *                 diff documents and automation executions — deleting it to tidy a list would delete the
+         *                 record of what was reconciled and when.
+         *
+         *                 A disabled run stays readable and editable, or it could never be turned back on. What
+         *                 it cannot do is RUN, on either path: the manual runner and the automation executor are
+         *                 gated separately.
+         */
+        EnableSavedRunParams: {
+            savedRunId: string;
+        };
+        EnableSavedRunResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            savedRunId?: string;
+            isActive?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.enable#SavedRun */
+        EnableSavedRunRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.enable#SavedRun";
+            params?: components["schemas"]["EnableSavedRunParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.enable#SavedRun. Check result.ok / result.errors for business failures. */
+        EnableSavedRunResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["EnableSavedRunResult"];
         };
         /** @description Get one tenant-scoped automation with editable source rows and dashboard summary fields. */
         GetAutomationParams: {
@@ -3068,6 +3412,7 @@ export interface components {
             query?: string;
             pageIndex?: number;
             pageSize?: number;
+            includeArchived?: boolean;
         };
         ListSavedRunsResult: {
             ok?: boolean;
@@ -3090,6 +3435,9 @@ export interface components {
                 reconciliationMappingId?: string;
                 ruleSetId?: string;
                 compareScopeId?: string;
+                scopeMode?: string;
+                isActive?: boolean;
+                isArchived?: boolean;
                 requiresSystemSelection?: boolean;
                 defaultFile1SystemEnumId?: string;
                 defaultFile2SystemEnumId?: string;
@@ -3230,6 +3578,82 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["ReprocessAutomationExecutionResult"];
+        };
+        /**
+         * @description Restored one tenant-scoped automation by setting isArchived to N.
+         *
+         *                 DAR-BE-061. Brings an automation back from Show archived, with its execution history intact.
+         *
+         *                 NOT the same switch as pause. isActive is pause — a paused automation stays on the
+         *                 list, visibly not running, because pausing is something you undo on Monday. Archiving
+         *                 takes it off the list. Overloading isActive for both would have made pausing an
+         *                 automation delete it from view.
+         */
+        RestoreAutomationParams: {
+            automationId: string;
+        };
+        RestoreAutomationResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            automationId?: string;
+            isArchived?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.restore#Automation */
+        RestoreAutomationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.restore#Automation";
+            params?: components["schemas"]["RestoreAutomationParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.restore#Automation. Check result.ok / result.errors for business failures. */
+        RestoreAutomationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RestoreAutomationResult"];
+        };
+        /**
+         * @description Restored one tenant-scoped saved run by setting RuleSet.isArchived to N.
+         *
+         *                 DAR-BE-061: the trash can. Brings a run back from Show archived, with its history intact.
+         *
+         *                 Nothing is deleted. A run owns its results, diff documents and automation executions —
+         *                 the record of what was reconciled and when.
+         */
+        RestoreSavedRunParams: {
+            savedRunId: string;
+        };
+        RestoreSavedRunResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            savedRunId?: string;
+            isArchived?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.restore#SavedRun */
+        RestoreSavedRunRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.restore#SavedRun";
+            params?: components["schemas"]["RestoreSavedRunParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.restore#SavedRun. Check result.ok / result.errors for business failures. */
+        RestoreSavedRunResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RestoreSavedRunResult"];
         };
         /** @description Resume one tenant-scoped automation by setting isActive to Y. */
         ResumeAutomationParams: {
@@ -3738,6 +4162,8 @@ export interface components {
                 runType?: string;
                 ruleSetId?: string;
                 compareScopeId?: string;
+                scopeMode?: string;
+                isActive?: boolean;
                 requiresSystemSelection?: boolean;
                 defaultFile1SystemEnumId?: string;
                 defaultFile2SystemEnumId?: string;
@@ -3836,6 +4262,8 @@ export interface components {
                 reconciliationMappingId?: string;
                 ruleSetId?: string;
                 compareScopeId?: string;
+                scopeMode?: string;
+                isActive?: boolean;
                 requiresSystemSelection?: boolean;
                 defaultFile1SystemEnumId?: string;
                 defaultFile2SystemEnumId?: string;
@@ -5229,7 +5657,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"];
+                "application/json": components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"];
             };
         };
         responses: {
@@ -5239,7 +5667,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"];
                 };
             };
         };

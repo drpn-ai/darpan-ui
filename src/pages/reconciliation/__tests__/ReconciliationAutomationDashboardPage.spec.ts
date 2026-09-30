@@ -12,6 +12,7 @@ const getAutomation = vi.hoisted(() => vi.fn())
 const listAutomationExecutions = vi.hoisted(() => vi.fn())
 const runAutomationNow = vi.hoisted(() => vi.fn())
 const deleteAutomation = vi.hoisted(() => vi.fn())
+const archiveAutomation = vi.hoisted(() => vi.fn())
 const pauseAutomation = vi.hoisted(() => vi.fn())
 const resumeAutomation = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
@@ -41,6 +42,7 @@ vi.mock('../../../lib/api/facade', () => ({
     listAutomationExecutions,
     runAutomationNow,
     deleteAutomation,
+    archiveAutomation,
     pauseAutomation,
     resumeAutomation,
   },
@@ -190,6 +192,7 @@ describe('ReconciliationAutomationDashboardPage', () => {
     listAutomationExecutions.mockReset()
     runAutomationNow.mockReset()
     deleteAutomation.mockReset()
+    archiveAutomation.mockReset()
     pauseAutomation.mockReset()
     resumeAutomation.mockReset()
     vi.restoreAllMocks()
@@ -208,6 +211,7 @@ describe('ReconciliationAutomationDashboardPage', () => {
     })
     runAutomationNow.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation() })
     deleteAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], deleted: true, deletedAutomationId: 'AUT_ACTIVE_API' })
+    archiveAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automationId: 'AUT_ACTIVE_API', isArchived: true })
     pauseAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation(false) })
     resumeAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation(true) })
   })
@@ -687,13 +691,25 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(wrapper.find('[data-testid="automation-pause-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="automation-resume-action"]').exists()).toBe(false)
 
-    // DAR-BE-060: there is no delete affordance, and this asserts its ABSENCE rather than
-    // simply not exercising it — an absent-node assertion that nobody checks goes permanently
-    // green, so the reversible control that replaced it is asserted present in the same breath.
-    expect(wrapper.find('[data-testid="automation-delete-action"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="automation-active-toggle"]').exists()).toBe(true)
+    // DAR-BE-061. The bin reads as a delete and behaves as one — confirm, gone from the page —
+    // but it ARCHIVES. The two assertions that matter are that the hard delete is never called
+    // and that the operator still ends up back on the list.
+    await wrapper.get('[data-testid="automation-delete-action"]').trigger('click')
+    await flushPromises()
+
+    expect(confirmSpy).toHaveBeenCalledWith('Delete automation "Daily API orders"?')
+    expect(archiveAutomation).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
     expect(deleteAutomation).not.toHaveBeenCalled()
-    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(push).toHaveBeenCalledWith('/reconciliation/automations')
+  })
+
+  /** Pause and archive are different switches, and both have to be reachable. */
+  it('keeps the pause toggle alongside the bin', async () => {
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="automation-active-toggle"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="automation-delete-action"]').exists()).toBe(true)
   })
 
   it('does not show the run-now status line while the active toggle is in flight', async () => {

@@ -523,6 +523,8 @@ export interface SavedRunSummary {
   scopeMode?: string
   /** DAR-BE-060. Absent reads as enabled — every run predating the flag has no value. */
   isActive?: boolean
+  /** DAR-BE-061. In the bin: off Home and the runs list, and it will not run. Reversible. */
+  isArchived?: boolean
   requiresSystemSelection: boolean
   defaultFile1SystemEnumId?: string
   defaultFile2SystemEnumId?: string
@@ -809,6 +811,13 @@ export interface ListShopifyAuthConfigsResponse extends PaginatedResponse {
 
 export interface ListOmsRestSourceConfigsResponse extends PaginatedResponse {
   omsRestSourceConfigs: OmsRestSourceConfigRecord[]
+}
+
+/** DAR-BE-061. archive/restore on a run or an automation; the flag is echoed back. */
+export interface ArchiveResponse extends ApiEnvelope {
+  savedRunId?: string
+  automationId?: string
+  isArchived?: boolean
 }
 
 export interface ListSavedRunsResponse extends PaginatedResponse {

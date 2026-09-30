@@ -64,6 +64,7 @@ import type {
   RunAutomationNowResponse,
   RunSavedRunDiffResponse,
   PauseAutomationResponse,
+  ArchiveResponse,
   ResumeAutomationResponse,
   SaveAutomationResponse,
   SaveJsonSchemaTextResponse,
@@ -241,6 +242,12 @@ const RECONCILIATION = {
   runAutomationNow: 'facade.ReconciliationFacadeServices.run#AutomationNow',
   pauseAutomation: 'facade.ReconciliationFacadeServices.pause#Automation',
   resumeAutomation: 'facade.ReconciliationFacadeServices.resume#Automation',
+  // DAR-BE-061. The trash can, which archives rather than deletes. Distinct from pause: pausing
+  // keeps an automation on the list, archiving takes it off.
+  archiveAutomation: 'facade.ReconciliationFacadeServices.archive#Automation',
+  restoreAutomation: 'facade.ReconciliationFacadeServices.restore#Automation',
+  archiveSavedRun: 'facade.ReconciliationFacadeServices.archive#SavedRun',
+  restoreSavedRun: 'facade.ReconciliationFacadeServices.restore#SavedRun',
   listAutomationExecutions: 'facade.ReconciliationFacadeServices.list#AutomationExecutions',
   listAutomationSourceOptions: 'facade.ReconciliationFacadeServices.list#AutomationSourceOptions',
   subscribeRunNotification: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
@@ -475,6 +482,18 @@ export const reconciliationFacade = {
   },
   runAutomationNow(payload: RunAutomationNowPayload, signal?: AbortSignal): Promise<RunAutomationNowResponse> {
     return callService<RunAutomationNowResponse>(RECONCILIATION.runAutomationNow, payload, signal)
+  },
+  archiveAutomation(payload: { automationId: string }, signal?: AbortSignal): Promise<ArchiveResponse> {
+    return callService<ArchiveResponse>(RECONCILIATION.archiveAutomation, payload, signal)
+  },
+  restoreAutomation(payload: { automationId: string }, signal?: AbortSignal): Promise<ArchiveResponse> {
+    return callService<ArchiveResponse>(RECONCILIATION.restoreAutomation, payload, signal)
+  },
+  archiveSavedRun(payload: { savedRunId: string }, signal?: AbortSignal): Promise<ArchiveResponse> {
+    return callService<ArchiveResponse>(RECONCILIATION.archiveSavedRun, payload, signal)
+  },
+  restoreSavedRun(payload: { savedRunId: string }, signal?: AbortSignal): Promise<ArchiveResponse> {
+    return callService<ArchiveResponse>(RECONCILIATION.restoreSavedRun, payload, signal)
   },
   pauseAutomation(payload: PauseAutomationPayload, signal?: AbortSignal): Promise<PauseAutomationResponse> {
     return callService<PauseAutomationResponse>(RECONCILIATION.pauseAutomation, payload, signal)
