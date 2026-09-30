@@ -50,6 +50,9 @@ const draftStoreState = vi.hoisted(() => ({
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),
   clearAutomationDraft: vi.fn(),
+  // DAR-UI-044: RuleSetBoard takes the run result page's pending exclusion on load.
+  setPendingExclusion: vi.fn(),
+  takePendingExclusion: vi.fn(() => null),
 }))
 
 vi.mock('../../../stores/reconciliationDraft', () => ({
