@@ -521,6 +521,8 @@ export interface SavedRunSummary {
   // from systemOptions.length because one option is ALSO what a two-sided run looks like when its
   // FILE_2 has gone missing — inferring would render a broken run as a working single-sided one.
   scopeMode?: string
+  /** DAR-BE-060. Absent reads as enabled — every run predating the flag has no value. */
+  isActive?: boolean
   requiresSystemSelection: boolean
   defaultFile1SystemEnumId?: string
   defaultFile2SystemEnumId?: string

@@ -174,19 +174,10 @@
           </svg>
         </button>
 
-        <button
-          v-if="canDeleteAutomation"
-          type="button"
-          class="app-icon-action app-icon-action--large app-icon-action--danger settings-dashboard-footer-action"
-          data-testid="automation-delete-action"
-          aria-label="Delete automation"
-          :disabled="actionInFlight"
-          @click="deleteAutomation"
-        >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
-        </button>
+        <!-- DAR-BE-060: no delete affordance. Darpan retires things by disabling them — the
+             active toggle above does it, and it is reversible. An automation owns its execution
+             history, which is the record of what ran and when; deleting it to tidy a list would
+             delete that record. -->
       </div>
     </template>
   </StaticPageFrame>
@@ -227,7 +218,7 @@ import {
 import { useListPagination } from '../../lib/listPagination'
 import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
-import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
+import { backIconPath, editIconPath } from '../../lib/iconPaths'
 import { describeTimeZone as describeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
@@ -254,7 +245,7 @@ const automation = ref<AutomationRecord | null>(null)
 const executions = ref<AutomationExecutionSummary[]>([])
 const loading = ref(false)
 const actionInFlight = ref(false)
-// Separate from actionInFlight, which also covers deleteAutomation(): the "Starting run..."
+// Separate from actionInFlight, which also covers the active toggle: the "Starting run..."
 // status line must not appear while a delete is in flight.
 const runNowInFlight = ref(false)
 // Separate from actionInFlight so the switch can report aria-busy for its own change only,
@@ -277,7 +268,6 @@ const heroTitle = computed(() => automation.value?.automationName || 'Automation
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const canEditAutomation = computed(() => canEditTenantSettings.value && automation.value?.permissions?.canEdit !== false)
-const canDeleteAutomation = computed(() => canEditTenantSettings.value && automation.value?.permissions?.canDelete === true)
 const canRunAutomation = computed(() => canRunActiveTenantReconciliation.value && automation.value?.permissions?.canRunNow !== false)
 const isAutomationActive = computed(() => automation.value?.active !== false)
 // The switch carries no visible text, so its accessible name is the only place the state is
@@ -809,20 +799,6 @@ async function setAutomationActive(next: boolean): Promise<void> {
   }
 }
 
-async function deleteAutomation(): Promise<void> {
-  if (!automation.value || !canDeleteAutomation.value || actionInFlight.value) return
-  if (!window.confirm(`Delete automation "${automation.value.automationName}"?`)) return
-  actionInFlight.value = true
-  actionError.value = null
-  try {
-    await reconciliationFacade.deleteAutomation({ automationId: automation.value.automationId })
-    await router.push('/reconciliation/automations')
-  } catch (deleteError) {
-    actionError.value = deleteError instanceof ApiCallError ? deleteError.message : 'Unable to delete automation.'
-  } finally {
-    actionInFlight.value = false
-  }
-}
 
 watch(automationId, () => {
   void load()

@@ -687,31 +687,32 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(wrapper.find('[data-testid="automation-pause-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="automation-resume-action"]').exists()).toBe(false)
 
-    await wrapper.get('[data-testid="automation-delete-action"]').trigger('click')
-    await flushPromises()
-
-    expect(confirmSpy).toHaveBeenCalledWith('Delete automation "Daily API orders"?')
-    expect(deleteAutomation).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
-    expect(push).toHaveBeenCalledWith('/reconciliation/automations')
+    // DAR-BE-060: there is no delete affordance, and this asserts its ABSENCE rather than
+    // simply not exercising it — an absent-node assertion that nobody checks goes permanently
+    // green, so the reversible control that replaced it is asserted present in the same breath.
+    expect(wrapper.find('[data-testid="automation-delete-action"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="automation-active-toggle"]').exists()).toBe(true)
+    expect(deleteAutomation).not.toHaveBeenCalled()
+    expect(confirmSpy).not.toHaveBeenCalled()
   })
 
-  it('does not show the run-now status line while a delete is in flight', async () => {
-    // Fix round 1 (review finding, minor 1): the status line used to key off actionInFlight,
-    // which deleteAutomation() also sets — confirm + Delete showed "Starting run..." for the
-    // duration of the delete. It now keys off a run-specific flag instead.
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('does not show the run-now status line while the active toggle is in flight', async () => {
+    // The original bug: the status line keyed off actionInFlight, which the delete handler also
+    // set, so pressing Delete showed "Starting run..." for the duration. Delete is gone
+    // (DAR-BE-060), but actionInFlight is still shared — the active toggle sets it too — so the
+    // concern is live and this test now guards it on the control that remains.
     const wrapper = mount(ReconciliationAutomationDashboardPage)
     await flushPromises()
 
-    let resolveDelete: (value: unknown) => void = () => {}
-    deleteAutomation.mockReturnValueOnce(new Promise((resolve) => { resolveDelete = resolve }))
+    let resolveToggle: (value: unknown) => void = () => {}
+    pauseAutomation.mockReturnValueOnce(new Promise((resolve) => { resolveToggle = resolve }))
 
-    await wrapper.get('[data-testid="automation-delete-action"]').trigger('click')
+    await wrapper.get('[data-testid="automation-active-toggle"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[data-testid="automation-run-now-status"]').exists()).toBe(false)
 
-    resolveDelete({ ok: true, messages: [], errors: [], deleted: true, deletedAutomationId: 'AUT_ACTIVE_API' })
+    resolveToggle({ ok: true, messages: [], errors: [], automation: mockAutomation(false) })
     await flushPromises()
   })
 
@@ -769,8 +770,14 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(runAutomationNow).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
     // Refetched (not just read off runAutomationNow's own response) -- Previous Run/Next
     // Run and the table both need the same authoritative post-run state.
-    expect(getAutomation).toHaveBeenCalledTimes(2)
-    expect(listAutomationExecutions).toHaveBeenCalledTimes(2)
+    //
+    // AT LEAST twice, not exactly twice. The page also polls, so the exact count is a function
+    // of how many microtask turns the click takes to settle — which is a function of how loaded
+    // the machine is, and made this test fail roughly one full-suite run in three while passing
+    // alone every time. "Refetched" is the claim; "refetched precisely once more" never was.
+    // The row assertions below are what actually pin the behaviour this test is named for.
+    expect(getAutomation.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(listAutomationExecutions.mock.calls.length).toBeGreaterThanOrEqual(2)
     expect(wrapper.findAll('[data-testid="automation-execution-row"]')).toHaveLength(3)
     expect(wrapper.text()).toContain('Pending')
     } finally {
