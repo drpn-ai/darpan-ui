@@ -89,6 +89,13 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'More',
     body: 'fetches the next page of older results. Nothing already on screen is replaced.',
   },
+  // DAR-UI-043. Home's family sections cap at six tiles and label the rest "3 more", so the
+  // button name varies with the count and lands here as the bare word. Different act from
+  // "More..." above: nothing is fetched, the group simply stops hiding its own runs.
+  more: {
+    title: 'More',
+    body: 'shows the rest of the runs in this group. They were already loaded, just folded away.',
+  },
   'loading…': {
     title: 'Loading',
     body: 'the next page is on its way. It will be added below what is already here.',

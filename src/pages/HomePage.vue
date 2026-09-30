@@ -24,16 +24,20 @@
       </div>
     </StaticPageSection>
 
-    <StaticPageSection title="Other Runs">
+    <StaticPageSection
+      v-for="group in runGroups"
+      :key="group.key"
+      :title="group.title"
+    >
       <div
-        :class="['static-page-drop-zone', { 'static-page-drop-zone--compact': !hasOtherRuns }]"
-        data-testid="other-runs"
+        class="static-page-drop-zone"
+        :data-testid="`run-group-${group.key}`"
         @dragover.prevent
         @drop="handleDrop('other', $event)"
       >
-        <div v-if="hasOtherRuns" class="static-page-tile-grid">
+        <div class="static-page-tile-grid">
           <RouterLink
-            v-for="flow in visibleOtherFlowCards"
+            v-for="flow in group.visible"
             :key="flow.id"
             class="static-page-tile"
             :data-flow-id="flow.id"
@@ -45,17 +49,21 @@
             <span class="static-page-tile-title">{{ flow.title }}</span>
           </RouterLink>
           <button
-            v-if="hasMoreOtherRuns"
+            v-if="group.hidden > 0"
             type="button"
             class="static-page-control-tile"
-            data-testid="other-runs-more"
-            @click="showAllOtherRuns = true"
+            :data-testid="`run-group-${group.key}-more`"
+            @click="expandedGroupKeys.add(group.key)"
           >
-            More...
+            {{ group.hidden }} more
           </button>
         </div>
+      </div>
+    </StaticPageSection>
+
+    <StaticPageSection v-if="!hasOtherRuns" title="Other Runs">
+      <div class="static-page-drop-zone static-page-drop-zone--compact" data-testid="other-runs" @dragover.prevent @drop="handleDrop('other', $event)">
         <RouterLink
-          v-else
           class="static-page-action-tile static-page-action-tile--inline"
           data-testid="other-runs-empty-action"
           :to="createFlowRoute"
@@ -65,6 +73,10 @@
         </RouterLink>
       </div>
     </StaticPageSection>
+
+    <p v-if="truncatedRunCount > 0" class="static-page-section-description" data-testid="runs-truncated">
+      Showing {{ savedRuns.length }} of {{ totalRunCount }} runs. Group counts cover what is shown.
+    </p>
 
     <RouterLink v-if="hasOtherRuns" class="static-page-action-tile" data-testid="dashboard-create-action" :to="createFlowRoute" @click="setDashboardOrigin">
       Create Run
@@ -87,6 +99,7 @@ interface DashboardFlowCard {
   id: string
   savedRunId: string
   title: string
+  groupTitle: string
   to: RouteLocationRaw
 }
 
@@ -127,13 +140,51 @@ function resolveSystemLabel(savedRun: SavedRunSummary, enumId?: string): string 
   return option?.label || option?.description || option?.enumCode || option?.enumId || ''
 }
 
+/**
+ * DAR-UI-043. Which system FAMILY a run belongs to, and therefore which section it sits in.
+ *
+ * systemParentLabel is the field for exactly this — "the system FAMILY an endpoint-level option
+ * belongs to" (SHOPIFY_RETURN_REFS -> Shopify) — and is absent on the family enums themselves,
+ * whose own label already IS the family name. So parent-or-self, never an inference from the run
+ * name: "NetSuite chain — ..." happens to start with a system name today, and a title-prefix
+ * grouping would silently regroup every run the moment someone renamed one.
+ */
+function resolveSystemFamily(savedRun: SavedRunSummary, enumId?: string): string {
+  if (!enumId) return ''
+  const option = savedRun.systemOptions.find((systemOption) => systemOption.enumId === enumId)
+  if (!option) return ''
+  return option.systemParentLabel || option.label || option.enumCode || option.enumId
+}
+
+/**
+ * A single-sided run is named by the one system it interrogates; a two-sided one by the pair.
+ * scopeMode is read rather than systemOptions.length, because one option is also what a BROKEN
+ * two-sided run looks like — inferring would file a broken run under the wrong heading and make
+ * it look deliberate.
+ */
+function resolveRunGroupTitle(savedRun: SavedRunSummary): string {
+  const file1 = resolveSystemFamily(savedRun, savedRun.defaultFile1SystemEnumId)
+  const singleSided = (savedRun.scopeMode ?? '').toUpperCase() === 'EVALUATE'
+  if (singleSided) return file1 || 'Other Runs'
+  const file2 = resolveSystemFamily(savedRun, savedRun.defaultFile2SystemEnumId)
+  // The PAIR is the family, so the label is order-independent. Against real data the naive
+  // version produced "HotWax ↔ Shopify · 1" and "Shopify ↔ Hotwax · 3" as two sections for one
+  // pairing — an operator reading those sees two families and a stray, when it is four runs
+  // over the same two systems. Direction still matters to a run and its own name carries it.
+  if (file1 && file2) return [file1, file2].sort((a, b) => a.localeCompare(b)).join(' ↔ ')
+  return file1 || file2 || 'Other Runs'
+}
+
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const draftStore = useReconciliationDraftStore()
 const savedRuns = ref<SavedRunSummary[]>([])
 const pinnedSavedRunIds = ref<string[]>([])
-const showAllOtherRuns = ref(false)
+// Per group, not one flag for the page: expanding NetSuite should not also expand every other
+// family, which is what a single showAllOtherRuns did once there was more than one section.
+const expandedGroupKeys = ref<Set<string>>(new Set())
+const totalRunCount = ref(0)
 const createFlowRoute: RouteLocationRaw = { name: 'reconciliation-create' }
 
 const pageAbortController = new AbortController()
@@ -149,6 +200,7 @@ const savedRunCards = computed<DashboardFlowCard[]>(() =>
       id: `saved-run:${savedRun.savedRunId}`,
       savedRunId: savedRun.savedRunId,
       title,
+      groupTitle: resolveRunGroupTitle(savedRun),
       to: buildReconciliationDiffRoute(
         {
           savedRunId: savedRun.savedRunId,
@@ -175,15 +227,56 @@ const otherFlowCards = computed<DashboardFlowCard[]>(() => {
   return flowCards.value.filter((card) => !pinnedSet.has(card.savedRunId))
 })
 
-const visibleOtherFlowCards = computed<DashboardFlowCard[]>(() => {
-  return showAllOtherRuns.value ? otherFlowCards.value : otherFlowCards.value.slice(0, 5)
+const GROUP_TILE_LIMIT = 6
+
+interface DashboardRunGroup {
+  key: string
+  title: string
+  visible: DashboardFlowCard[]
+  hidden: number
+}
+
+/**
+ * One section per system family, alphabetical.
+ *
+ * Alphabetical rather than by size: a count-ordered list reshuffles itself whenever a run is
+ * added or pinned, so the section an operator reaches for moves under them. Order that never
+ * changes is worth more here than order that is briefly more relevant.
+ *
+ * The count rides in the heading, which is also what answers "a group of one looks like a
+ * mistake" — "OMS ↔ Shopify · 1" reads as deliberate where a lone unlabelled tile reads as a bug.
+ */
+const runGroups = computed<DashboardRunGroup[]>(() => {
+  const byTitle = new Map<string, DashboardFlowCard[]>()
+  otherFlowCards.value.forEach((card) => {
+    const bucket = byTitle.get(card.groupTitle)
+    if (bucket) bucket.push(card)
+    else byTitle.set(card.groupTitle, [card])
+  })
+
+  return [...byTitle.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([title, cards]) => {
+      const key = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'other'
+      const expanded = expandedGroupKeys.value.has(key)
+      const visible = expanded ? cards : cards.slice(0, GROUP_TILE_LIMIT)
+      return {
+        key,
+        title: `${title} · ${cards.length}`,
+        visible,
+        hidden: cards.length - visible.length,
+      }
+    })
 })
 
-const hasMoreOtherRuns = computed(() => {
-  return otherFlowCards.value.length > 5 && !showAllOtherRuns.value
-})
-
+/**
+ * How many runs the tenant has that this page did not fetch. Surfaced rather than swallowed: a
+ * heading reading "NetSuite · 9" while the page holds a subset is a confidently wrong number,
+ * and a wrong count is worse than an admitted partial one.
+ */
 const hasOtherRuns = computed(() => otherFlowCards.value.length > 0)
+
+const truncatedRunCount = computed(() => Math.max(0, totalRunCount.value - savedRuns.value.length))
 
 function handleDragStart(flowId: string, event: DragEvent): void {
   if (!event.dataTransfer) return
@@ -230,22 +323,29 @@ async function loadDashboard(): Promise<void> {
     return
   }
 
-  showAllOtherRuns.value = false
+  expandedGroupKeys.value = new Set()
+  totalRunCount.value = 0
   pinnedSavedRunIds.value = []
   savedRuns.value = []
 
   try {
+    // 12 was enough while Home showed five tiles and a More.... Grouping puts a COUNT in every
+    // heading, so the page has to hold the runs it is counting: gorjana alone has nine NetSuite
+    // checks beside its two-sided ones. totalCount comes back regardless, so whatever is still
+    // beyond this is admitted rather than mis-grouped.
     const response = await reconciliationFacade.listSavedRuns({
       pageIndex: 0,
-      pageSize: 12,
+      pageSize: 100,
       query: '',
     }, pageAbortController.signal)
     pinnedSavedRunIds.value = response.pinnedSavedRunIds ?? []
     savedRuns.value = response.savedRuns ?? []
+    totalRunCount.value = response.pagination?.totalCount ?? (response.savedRuns?.length ?? 0)
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     pinnedSavedRunIds.value = []
     savedRuns.value = []
+    totalRunCount.value = 0
   }
 }
 
