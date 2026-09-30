@@ -1412,6 +1412,11 @@ label > span {
   border-color: color-mix(in oklab, var(--warning) 42%, var(--border));
 }
 
+/* DAR-UI-044: dashed = empty. The Unexplained conclusion: Darpan could not name this finding. */
+.status-badge.status-badge--empty {
+  border-style: dashed;
+}
+
 .status-badge.danger {
   color: var(--danger);
   border-color: color-mix(in oklab, var(--danger) 42%, var(--border));

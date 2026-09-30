@@ -101,6 +101,14 @@ describe('RUN_STAGE_SEQUENCE', () => {
     expect(RUN_STAGE_SEQUENCE.indexOf('WRITE_OUTPUT')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('NOTIFY'))
     expect(RUN_STAGE_SEQUENCE.indexOf('COMPARE')).toBeLessThan(RUN_STAGE_SEQUENCE.indexOf('VERIFY_MISSING'))
   })
+
+  // DAR-UI-044. Paired with RunObservability.STAGE_SEQUENCE (CONCLUDE = 8): conclusions read the
+  // VERIFIED findings and the written artifact is the concluded one.
+  it('concludes after the last verification pass and before writing results', () => {
+    expect(RUN_STAGE_SEQUENCE.indexOf('CONCLUDE')).toBe(RUN_STAGE_SEQUENCE.indexOf('VERIFY_RETURNS') + 1)
+    expect(RUN_STAGE_SEQUENCE.indexOf('CONCLUDE')).toBe(RUN_STAGE_SEQUENCE.indexOf('WRITE_OUTPUT') - 1)
+    expect(reconciliationStageLabel('CONCLUDE')).toBe('Drawing conclusions')
+  })
 })
 
 describe('formatRunStepDuration', () => {

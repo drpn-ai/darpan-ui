@@ -1553,8 +1553,26 @@ watch([orderedRules, file1Fields, file2Fields], () => {
 
 watch(rules, syncRulesToDraft, { deep: true })
 
+/**
+ * DAR-UI-044: a run result's "Stop flagging in rules board" arrives here as a pending exclusion. It
+ * opens the editor pre-filled once the fields have loaded; nothing is written until the operator
+ * applies it, so the filter is seen and confirmed where every other filter lives.
+ */
+function openPendingExclusion(): void {
+  const pending = draftStore.takePendingExclusion()
+  if (!pending) return
+  const side: RuleSide = pending.fileSide === 'FILE_2' ? 'file2' : 'file1'
+  if (!supportsExclusions(side)) {
+    explainExclusionsUnavailable(side, pending.fieldExpression)
+    return
+  }
+  openExclusionEditor(side, pending.fieldExpression)
+  editingExclusionOperator.value = pending.operator
+  editingExclusionValues.value = [...pending.values]
+}
+
 onMounted(() => {
-  void loadEditorData()
+  void loadEditorData().then(openPendingExclusion)
   window.addEventListener('resize', updateLineLayout)
   window.addEventListener('pointerdown', handleWindowPointerDown)
 })

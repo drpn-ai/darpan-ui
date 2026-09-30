@@ -179,4 +179,35 @@ describe('buildPageRow contradiction brief', () => {
 
     expect(row.contradictionBrief).toBeUndefined()
   })
+
+  // DAR-UI-044
+  it('lifts a well-formed conclusion onto the row', () => {
+    const conclusion = { code: 'CONC_NS_BACKORDERED', label: 'Backordered in NetSuite', systems: [], checks: [], question: null }
+    const row = buildPageRow({
+      rowKey: 'k', recordId: 'M1', bucket: 'file-2', ruleFilterKey: 'base-diff', ruleId: '', ruleLabel: '',
+      record: { conclusion },
+    } as unknown as GeneratedOutputDifferenceRow)
+    expect(row.conclusion?.label).toBe('Backordered in NetSuite')
+  })
+
+  it('ignores a malformed conclusion rather than rendering garbage', () => {
+    const row = buildPageRow({
+      rowKey: 'k', recordId: 'M1', bucket: 'file-2', ruleFilterKey: 'base-diff', ruleId: '', ruleLabel: '',
+      record: { conclusion: 'x' },
+    } as unknown as GeneratedOutputDifferenceRow)
+    expect(row.conclusion).toBeUndefined()
+    const noLabel = buildPageRow({
+      rowKey: 'k', recordId: 'M1', bucket: 'file-2', ruleFilterKey: 'base-diff', ruleId: '', ruleLabel: '',
+      record: { conclusion: { code: 'X' } },
+    } as unknown as GeneratedOutputDifferenceRow)
+    expect(noLabel.conclusion).toBeUndefined()
+  })
+
+  it('lifts the order name for the collapsed row from the present side\'s record', () => {
+    const row = buildPageRow({
+      rowKey: 'k', recordId: 'M1', bucket: 'file-2', ruleFilterKey: 'base-diff', ruleId: '', ruleLabel: '',
+      record: { data: '{"omsOrderName":"#GOR197263793"}' },
+    } as unknown as GeneratedOutputDifferenceRow)
+    expect(row.orderName).toBe('#GOR197263793')
+  })
 })

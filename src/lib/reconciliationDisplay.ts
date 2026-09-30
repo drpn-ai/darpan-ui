@@ -32,6 +32,9 @@ export const RUN_STAGE_SEQUENCE: readonly string[] = [
   'VERIFY_MISSING',
   'VERIFY_EXCHANGE',
   'VERIFY_RETURNS',
+  // DAR-UI-044: paired with RunObservability.STAGE_SEQUENCE (CONCLUDE = 8). Only runs whose scope has
+  // conclusion rules open it; like VERIFY it drops out of the synthesized remainder otherwise.
+  'CONCLUDE',
   'WRITE_OUTPUT',
   'NOTIFY',
 ]
@@ -46,6 +49,7 @@ const RUN_STAGE_LABELS: Record<string, string> = {
   VERIFY_MISSING: 'Verifying differences',
   VERIFY_EXCHANGE: 'Verifying exchange pairs',
   VERIFY_RETURNS: 'Verifying returns',
+  CONCLUDE: 'Drawing conclusions',
   NOTIFY: 'Sending notifications',
 }
 

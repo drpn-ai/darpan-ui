@@ -65,6 +65,28 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Clear record search',
     body: 'empties the box and puts every record back in the table. Nothing is re-run.',
   },
+
+  /* ── Conclusions (DAR-UI-044) ───────────────────────────────────────────────── */
+  'show evidence': {
+    title: 'Show evidence',
+    body: 'opens what each system held for this record and the checks that named it — as the run saw them, not as they stand now.',
+  },
+  'hide evidence': {
+    title: 'Hide evidence',
+    body: 'folds it away. Only one row opens at a time, so opening another would have closed this one anyway.',
+  },
+  'stop flagging in rules board ›': {
+    title: 'Stop flagging in rules board',
+    body: 'opens the rules board with the exclusion already filled in. Nothing changes until you apply it there, and only future runs skip these.',
+  },
+  'keep flagging': {
+    title: 'Keep flagging',
+    body: 'hides the question for now and records nothing. The same findings, and the same question, come back on the next run.',
+  },
+  'raw record ›': {
+    title: 'Raw record',
+    body: 'the record exactly as the run extracted it — the ground truth under the conclusion, useful when the conclusion itself looks wrong.',
+  },
   all: {
     title: 'All',
     body: 'drops the rule filter, so every difference is listed again whichever rule found it.',

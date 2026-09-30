@@ -242,7 +242,30 @@
             </div>
           </div>
 
-          <div v-if="savedOutput" class="reconciliation-diff-details__bucket-grid">
+          <!-- DAR-UI-044: a run that drew conclusions summarises by conclusion, not by missing side. -->
+          <div
+            v-if="savedOutput && conclusionsEnabled"
+            class="reconciliation-diff-details__bucket-grid reconciliation-diff-details__bucket-grid--conclusions"
+          >
+            <button
+              v-for="tile in conclusionTiles"
+              :key="tile.code"
+              type="button"
+              class="reconciliation-diff-bucket"
+              :class="{
+                'reconciliation-diff-bucket--active': selectedConclusionCode === tile.code,
+                'reconciliation-diff-bucket--empty': tile.count === 0,
+              }"
+              :data-testid="`conclusion-tile-${tile.code}`"
+              :aria-pressed="selectedConclusionCode === tile.code ? 'true' : 'false'"
+              @click="selectConclusion(tile.code)"
+            >
+              <span class="reconciliation-diff-bucket__label">{{ tile.label }}</span>
+              <strong>{{ tile.count }}</strong>
+            </button>
+          </div>
+
+          <div v-else-if="savedOutput" class="reconciliation-diff-details__bucket-grid">
             <template
               v-for="bucket in diffDetailBuckets"
               :key="bucket.key"
@@ -324,10 +347,11 @@
           <InlineValidation v-if="resultDownloadError" tone="error" :message="resultDownloadError" />
           <AppTableFrame
             v-if="savedOutput && diffDetailRows.length > 0"
-            :columns="diffDetailColumns"
+            :columns="activeDiffDetailColumns"
             :rows="pagedDiffDetailRowsAsRows"
             row-key="rowKey"
             row-test-id="diff-details-row"
+            :expanded-row-keys="expandedRowKeys"
           >
             <template #header-actions>
               <button
@@ -357,7 +381,12 @@
               <div class="run-result-record-cell">
                 <strong>{{ row.recordId }}</strong>
                 <span
-                  v-if="row.contradictionBrief"
+                  v-if="conclusionsEnabled && row.orderName"
+                  class="run-result-record-cell__brief"
+                  data-testid="diff-details-order-name"
+                >{{ row.orderName }}</span>
+                <span
+                  v-if="!conclusionsEnabled && row.contradictionBrief"
                   class="run-result-record-cell__brief"
                   data-testid="diff-details-brief"
                 >{{ row.contradictionBrief }}</span>
@@ -373,8 +402,40 @@
               <pre v-else class="run-result-table__json">{{ row.detailText }}</pre>
             </template>
 
-            <template #cell-actions>
-              <span aria-hidden="true"></span>
+            <template #cell-conclusion="{ row }">
+              <StatusBadge
+                v-if="conclusionOf(row)"
+                :label="conclusionOf(row)!.label"
+                tone="neutral"
+                :class="{ 'status-badge--empty': conclusionOf(row)!.code === 'UNEXPLAINED' }"
+              />
+            </template>
+
+            <template #cell-actions="{ row, index }">
+              <button
+                v-if="conclusionsEnabled && conclusionOf(row)"
+                type="button"
+                class="run-result-expand"
+                :class="{ 'run-result-expand--open': isExpanded(row) }"
+                :data-testid="`diff-details-expand-${index}`"
+                :aria-expanded="isExpanded(row) ? 'true' : 'false'"
+                :aria-label="isExpanded(row) ? 'Hide evidence' : 'Show evidence'"
+                @click="toggleExpanded(row)"
+              >
+                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <path d="M5 7.5 10 12.5l5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+              <span v-else aria-hidden="true"></span>
+            </template>
+
+            <template #row-detail="{ row }">
+              <RunResultConclusionEvidence
+                v-if="conclusionOf(row)"
+                :conclusion="conclusionOf(row)!"
+                :raw-value="row.detailValue"
+                @stop-flagging="(question) => void openRulesBoardWithExclusion(question)"
+              />
             </template>
           </AppTableFrame>
           <p v-else-if="savedOutput" data-testid="diff-details-empty" class="section-note">
@@ -492,6 +553,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
+import RunResultConclusionEvidence from '../../components/reconciliation/RunResultConclusionEvidence.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
@@ -504,6 +566,10 @@ import type {
   GeneratedOutputDifferencesMetadata,
   GeneratedOutputDifferencesSummary,
   ReconciliationRunStep,
+  RunConclusion,
+  RunConclusionCount,
+  RunConclusionQuestion,
+  RunConclusionSuggestedFilter,
   TenantChatSpace,
 } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -996,6 +1062,8 @@ const {
   toggleDiffBucket,
   toggleRuleSelectorCollapsed,
   selectRuleFilter,
+  selectedConclusionCode,
+  selectConclusion,
 } = useRunResultDifferences({
   outputFileName,
   onLoadError: (message) => {
@@ -1010,6 +1078,36 @@ const {
 // The DOCUMENT being rendered is the authority. Until it has loaded the answer is "unknown", which
 // renders as two-sided — the shape every existing run has.
 const isSingleSidedResult = computed(() => documentHasSecondSide.value === false)
+
+// DAR-UI-044. A run whose scope had conclusion rules wrote summary.conclusions; every other run
+// (all of them before this, and scopes with no rules) keeps the page exactly as it was.
+const conclusionsEnabled = computed(() => diffDetailsSummary.value.conclusions?.enabled === true)
+const conclusionTiles = computed<RunConclusionCount[]>(() => {
+  const counts = diffDetailsSummary.value.conclusions?.counts ?? []
+  // Unexplained is always shown and always last: it is the list of what Darpan could not name.
+  return [...counts.filter((c) => c.code !== 'UNEXPLAINED'), ...counts.filter((c) => c.code === 'UNEXPLAINED')]
+})
+const activeDiffDetailColumns = computed(() =>
+  conclusionsEnabled.value
+    ? diffDetailColumns.map((column) => (column.key === 'detailText' ? { key: 'conclusion', label: 'Conclusion' } : column))
+    : diffDetailColumns,
+)
+
+// One row open at a time, keyed by rowKey, and closed whenever the page's rows change so a row
+// never shows another row's evidence.
+const expandedRowKeys = ref<string[]>([])
+watch(diffDetailRows, () => {
+  expandedRowKeys.value = []
+})
+function conclusionOf(row: Record<string, unknown>): RunConclusion | undefined {
+  return row.conclusion as RunConclusion | undefined
+}
+function isExpanded(row: Record<string, unknown>): boolean {
+  return expandedRowKeys.value.includes(String(row.rowKey))
+}
+function toggleExpanded(row: Record<string, unknown>): void {
+  expandedRowKeys.value = isExpanded(row) ? [] : [String(row.rowKey)]
+}
 
 const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
   const ruleDifferenceCount =
@@ -1077,7 +1175,20 @@ const diffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
   ]
 })
 
-async function openRunSettings(): Promise<void> {
+function openRunSettings(): Promise<void> {
+  return openRunEditor(null)
+}
+
+/**
+ * DAR-UI-044: "Stop flagging in rules board" opens the same rule-set draft run settings does, hands
+ * the board the suggested exclusion, and lands on the board itself. Nothing is saved here; the
+ * operator confirms the filter where every other filter lives.
+ */
+function openRulesBoardWithExclusion(question: RunConclusionQuestion): Promise<void> {
+  return openRunEditor(question.suggestedFilter ?? null)
+}
+
+async function openRunEditor(pendingExclusion: RunConclusionSuggestedFilter | null): Promise<void> {
   const targetId = runSettingsId.value
   if (!canOpenRunSettings.value || !targetId || openingRunSettings.value) return
 
@@ -1092,11 +1203,14 @@ async function openRunSettings(): Promise<void> {
       return
     }
 
-    if (savedRun.runType === 'ruleset') {
-      const draft = buildRuleSetDraft(savedRun)
-      if (draft) draftStore.setRuleSetDraft(draft, 'ruleset-manager')
-    }
+    const draft = savedRun.runType === 'ruleset' ? buildRuleSetDraft(savedRun) : null
+    if (draft) draftStore.setRuleSetDraft(draft, 'ruleset-manager')
 
+    if (draft && pendingExclusion) {
+      draftStore.setPendingExclusion(pendingExclusion)
+      await router.push({ name: 'reconciliation-ruleset-editor' })
+      return
+    }
     await router.push(buildSavedRunEditorRoute(savedRun))
   } catch (error) {
     runSettingsError.value = error instanceof ApiCallError ? error.message : 'Unable to open run settings.'
@@ -1213,6 +1327,7 @@ async function loadSavedResult(): Promise<void> {
       onlyInFile2Count: descriptor.onlyInFile2Count,
       ruleDifferenceCount: summary.ruleDifferenceCount ?? undefined,
       missingObjectDifferenceCount: summary.missingObjectDifferenceCount ?? undefined,
+      conclusions: summary.conclusions,
     }
     applyDifferencesResponse(response, true)
     diffControlsReady.value = true
@@ -1651,6 +1766,45 @@ watch([savedRunId, outputFileName], () => {
   /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
   font-size: 1.9rem;
   line-height: 1;
+}
+
+.reconciliation-diff-details__bucket-grid--conclusions {
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+/* Dashed = empty: a conclusion no finding reached, e.g. Unexplained at 0. */
+.reconciliation-diff-bucket--empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.run-result-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.95rem;
+  min-height: 1.95rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.run-result-expand:hover,
+.run-result-expand--open {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.run-result-expand svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.run-result-expand--open svg {
+  transform: rotate(180deg);
 }
 
 .run-result-record-cell {

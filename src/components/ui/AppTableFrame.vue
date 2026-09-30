@@ -23,23 +23,29 @@
         </tr>
       </thead>
       <tbody>
-        <tr
-          v-for="(row, index) in rows"
-          :key="resolveRowKey(row)"
-          :data-testid="rowTestId"
-          :class="{ 'app-table__row--action': isRowActionable(row, index) }"
-          :role="isRowActionable(row, index) ? 'link' : undefined"
-          :tabindex="isRowActionable(row, index) ? 0 : undefined"
-          :aria-label="resolveRowActionLabel(row, index) ?? undefined"
-          @click="triggerRowAction(row, index)"
-          @keydown="handleRowActionKeydown($event, row, index)"
-        >
-          <td v-for="column in columns" :key="column.key" :class="column.cellClass">
-            <slot :name="`cell-${column.key}`" :row="row" :column="column" :index="index">
-              {{ String(row[column.key] ?? '') }}
-            </slot>
-          </td>
-        </tr>
+        <template v-for="(row, index) in rows" :key="resolveRowKey(row)">
+          <tr
+            :data-testid="rowTestId"
+            :class="{ 'app-table__row--action': isRowActionable(row, index) }"
+            :role="isRowActionable(row, index) ? 'link' : undefined"
+            :tabindex="isRowActionable(row, index) ? 0 : undefined"
+            :aria-label="resolveRowActionLabel(row, index) ?? undefined"
+            @click="triggerRowAction(row, index)"
+            @keydown="handleRowActionKeydown($event, row, index)"
+          >
+            <td v-for="column in columns" :key="column.key" :class="column.cellClass">
+              <slot :name="`cell-${column.key}`" :row="row" :column="column" :index="index">
+                {{ String(row[column.key] ?? '') }}
+              </slot>
+            </td>
+          </tr>
+          <!-- A row expanded in place (DAR-UI-044): one full-width row directly beneath it. -->
+          <tr v-if="isRowExpanded(row)" class="app-table__detail-row">
+            <td :colspan="columns.length">
+              <slot name="row-detail" :row="row" :index="index" :column-count="columns.length" />
+            </td>
+          </tr>
+        </template>
         <slot name="append-row" :column-count="columns.length" :row-count="rows.length" />
       </tbody>
     </table>
@@ -73,6 +79,8 @@ const props = defineProps<{
   rowKey?: string
   rowTestId?: string
   rowActionLabel?: (row: Record<string, unknown>, index: number) => string | null | undefined
+  /** Row keys (by rowKey) whose row-detail slot renders beneath them. */
+  expandedRowKeys?: string[]
 }>()
 const emit = defineEmits<{
   rowAction: [payload: { row: Record<string, unknown>, index: number }]
@@ -81,6 +89,11 @@ const emit = defineEmits<{
 const showColGroup = computed(() => props.columns.some((column) => Boolean(column.colClass || column.colStyle)))
 const fallbackRowKeys = new WeakMap<Record<string, unknown>, string>()
 let nextFallbackRowKey = 0
+
+function isRowExpanded(row: Record<string, unknown>): boolean {
+  const keys = props.expandedRowKeys
+  return Boolean(keys && keys.length > 0 && keys.includes(resolveRowKey(row)))
+}
 
 function resolveRowKey(row: Record<string, unknown>): string {
   if (props.rowKey) {

@@ -15,11 +15,21 @@ vi.mock('../../../lib/api/facade', () => ({
   },
 }))
 
-const draftStoreState = vi.hoisted(() => ({
-  ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
-  setRuleSetDraft: vi.fn(),
-  clearRuleSetDraft: vi.fn(),
-}))
+const draftStoreState = vi.hoisted(() => {
+  const state = {
+    ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
+    setRuleSetDraft: vi.fn(),
+    clearRuleSetDraft: vi.fn(),
+    // DAR-UI-044: the one-shot exclusion "Stop flagging in rules board" hands over.
+    pendingExclusion: null as null | Record<string, unknown>,
+    takePendingExclusion: () => {
+      const pending = state.pendingExclusion
+      state.pendingExclusion = null
+      return pending
+    },
+  }
+  return state
+})
 
 vi.mock('../../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => draftStoreState,
@@ -146,5 +156,46 @@ describe('RuleSetBoard with CSV column lists', () => {
     expect(wrapper.text()).toContain('HotWax')
 
     wrapper.unmount()
+  })
+
+  // DAR-UI-044: "Stop flagging in rules board" opens the exclusion editor pre-filled. Nothing is
+  // saved until the operator applies it — the board is where the filter is seen and confirmed.
+  it('opens the exclusion editor pre-filled from a pending exclusion and saves nothing', async () => {
+    listAutomationSourceOptions.mockResolvedValue({
+      ok: true,
+      nsRestletConfigs: [],
+      systemRemotes: [{
+        optionKey: 'gorjana_prod',
+        systemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        sourceConfigId: 'gorjana_prod',
+        systemEnumId: 'OMS_ORDER_ITEMS',
+        supportsExcludeFilters: true,
+        fieldOptions: [{ fieldPath: 'facilityId' }, { fieldPath: 'omsOrderId' }],
+      }],
+    })
+    const draft = {
+      runName: 'Order sync',
+      file1SystemEnumId: 'OMS_ORDER_ITEMS',
+      file1SourceTypeEnumId: 'AUT_SRC_API',
+      file1SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+      file1SourceConfigId: 'gorjana_prod',
+      file1PrimaryIdExpression: ['omsOrderId'],
+      file1ExcludeFilters: [],
+      file2SystemEnumId: 'NETSUITE_SUITEQL',
+      file2SourceTypeEnumId: 'AUT_SRC_API',
+      file2PrimaryIdExpression: ['orderId'],
+      rules: [],
+    }
+    draftStoreState.ruleSetDraftState = { resumeStepId: null, draft }
+    draftStoreState.pendingExclusion = { fileSide: 'FILE_1', fieldExpression: 'facilityId', operator: 'EXCLUDE_IN', values: ['_NA_'] }
+
+    const wrapper = mount(RuleSetBoard)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
+    expect((wrapper.get('[data-testid="ruleset-exclusion-field"]').element as HTMLInputElement).value).toBe('facilityId')
+    expect(wrapper.get('[data-testid="ruleset-exclusion-popover"]').text()).toContain('_NA_')
+    expect(draft.file1ExcludeFilters).toEqual([])
+    expect(draftStoreState.pendingExclusion).toBeNull()
   })
 })

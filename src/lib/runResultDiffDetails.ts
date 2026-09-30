@@ -1,4 +1,4 @@
-import type { GeneratedOutputDifferenceRow, GeneratedOutputDifferencesRuleOption } from './api/types'
+import type { GeneratedOutputDifferenceRow, GeneratedOutputDifferencesRuleOption, RunConclusion, RunConclusionCount } from './api/types'
 import { DEFAULT_LIST_PAGE_SIZE } from './listPagination'
 import { normalizeDisplayText } from './reconciliationDisplay'
 
@@ -28,6 +28,8 @@ export interface DiffDetailsSummary {
   onlyInFile2Count?: number
   missingObjectDifferenceCount?: number
   ruleDifferenceCount?: number
+  /** DAR-UI-044: present only when the run's scope had conclusion rules. */
+  conclusions?: { enabled: boolean; counts: RunConclusionCount[] }
 }
 
 export interface DiffDetailsRecord {
@@ -64,6 +66,10 @@ export interface NormalizedDiffDetailRow {
    * reason only appears once the JSON is expanded. Absent on every other kind of run.
    */
   contradictionBrief?: string
+  /** DAR-UI-044: what the run concluded about this finding. Absent on runs without conclusion rules. */
+  conclusion?: RunConclusion
+  /** The present side's order name, shown under the record id on a conclusion row. */
+  orderName?: string
 }
 
 export interface RuleSelectorOption {
@@ -158,6 +164,34 @@ function briefFromRecord(parsedData: unknown): { contradictionBrief?: string } {
   return trimmed ? { contradictionBrief: trimmed } : {}
 }
 
+/** Narrowed like the brief: a conclusion without a code and a label is not rendered at all. */
+function conclusionFromRecord(record: Record<string, unknown>): { conclusion?: RunConclusion } {
+  const value = record.conclusion
+  if (!value || typeof value !== 'object') return {}
+  const candidate = value as Partial<RunConclusion>
+  if (typeof candidate.code !== 'string' || typeof candidate.label !== 'string') return {}
+  return {
+    conclusion: {
+      code: candidate.code,
+      label: candidate.label,
+      systems: Array.isArray(candidate.systems) ? candidate.systems : [],
+      checks: Array.isArray(candidate.checks) ? candidate.checks : [],
+      question: candidate.question ?? null,
+    },
+  }
+}
+
+const ORDER_NAME_FIELDS = ['omsOrderName', 'shopifyOrderName', 'orderName'] as const
+
+function orderNameFromData(parsedData: unknown): { orderName?: string } {
+  if (!parsedData || typeof parsedData !== 'object') return {}
+  for (const field of ORDER_NAME_FIELDS) {
+    const value = (parsedData as Record<string, unknown>)[field]
+    if (typeof value === 'string' && value.trim()) return { orderName: value.trim() }
+  }
+  return {}
+}
+
 export function buildPageRow(serverRow: GeneratedOutputDifferenceRow): NormalizedDiffDetailRow {
   const record = (serverRow.record ?? {}) as DiffDetailsRecord
   const parsedData = parseDiffData((record as Record<string, unknown>).data)
@@ -170,6 +204,8 @@ export function buildPageRow(serverRow: GeneratedOutputDifferenceRow): Normalize
     ruleId: serverRow.ruleId,
     ruleLabel: serverRow.ruleLabel,
     ...briefFromRecord(parsedData),
+    ...conclusionFromRecord(record as Record<string, unknown>),
+    ...orderNameFromData(parsedData),
   }
 }
 

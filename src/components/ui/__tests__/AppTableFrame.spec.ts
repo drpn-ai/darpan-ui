@@ -104,4 +104,32 @@ describe('AppTableFrame', () => {
       [{ row: { id: 'linked', name: 'Linked row' }, index: 0 }],
     ])
   })
+
+  // DAR-UI-044: a row can expand in place into a full-width detail row directly beneath it.
+  describe('row-detail', () => {
+    const detailColumns = [{ key: 'id', label: 'Id' }, { key: 'name', label: 'Name' }]
+    const detailRows = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }]
+
+    it('renders a detail row only under the listed keys, in order, spanning every column', () => {
+      const wrapper = mount(AppTableFrame, {
+        props: { columns: detailColumns, rows: detailRows, rowKey: 'id', expandedRowKeys: ['b'] },
+        slots: { 'row-detail': '<template #row-detail="{ row }"><p class="detail">detail {{ row.name }}</p></template>' },
+      })
+      const trs = wrapper.findAll('tbody tr')
+      expect(trs.map((tr) => tr.classes().includes('app-table__detail-row'))).toEqual([false, false, true, false])
+      const detail = trs.at(2)
+      if (!detail) throw new Error('the detail row did not render')
+      expect(detail.text()).toBe('detail B')
+      expect(detail.get('td').attributes('colspan')).toBe('2')
+    })
+
+    it('renders exactly the old markup when nothing is expanded', () => {
+      const plain = mount(AppTableFrame, { props: { columns: detailColumns, rows: detailRows, rowKey: 'id' } })
+      const empty = mount(AppTableFrame, {
+        props: { columns: detailColumns, rows: detailRows, rowKey: 'id', expandedRowKeys: [] },
+        slots: { 'row-detail': '<p>x</p>' },
+      })
+      expect(empty.html()).toBe(plain.html())
+    })
+  })
 })

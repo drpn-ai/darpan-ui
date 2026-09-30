@@ -963,12 +963,57 @@ export interface GeneratedOutputDifferencesMetadata {
   compareScopeId?: string
 }
 
+// DAR-UI-044. What the run concluded about each finding, written once at run time by STAGE_CONCLUDE.
+export interface RunConclusionSystem {
+  side: 'FILE_1' | 'FILE_2'
+  system: string
+  /** EXCLUDED: the record exists but the run's own filter dropped it. UNKNOWN: absence could not be checked. */
+  presence: 'KEPT' | 'EXCLUDED' | 'ABSENT' | 'UNKNOWN'
+  state: string | null
+  facts: string[]
+}
+
+export interface RunConclusionCheck {
+  label: string
+  value: string | null
+  passed: boolean
+}
+
+export interface RunConclusionSuggestedFilter {
+  fileSide: 'FILE_1' | 'FILE_2'
+  fieldExpression: string
+  operator: 'EXCLUDE_IN' | 'INCLUDE_IN'
+  values: string[]
+}
+
+export interface RunConclusionQuestion {
+  text: string
+  count?: number
+  suggestedFilter?: RunConclusionSuggestedFilter | null
+}
+
+export interface RunConclusion {
+  code: string
+  label: string
+  systems: RunConclusionSystem[]
+  checks: RunConclusionCheck[]
+  question: RunConclusionQuestion | null
+}
+
+export interface RunConclusionCount {
+  code: string
+  label: string
+  count: number
+}
+
 export interface GeneratedOutputDifferencesSummary {
   totalDifferences?: number
   onlyInFile1Count?: number
   onlyInFile2Count?: number
   ruleDifferenceCount?: number | null
   missingObjectDifferenceCount?: number | null
+  /** Present only when the run's scope had conclusion rules; its absence means the legacy page. */
+  conclusions?: { enabled: boolean; counts: RunConclusionCount[] }
 }
 
 export interface GeneratedOutputDifferenceRow {
@@ -1002,6 +1047,8 @@ export interface GetGeneratedOutputDifferencesResponse extends ApiEnvelope {
   metadata?: GeneratedOutputDifferencesMetadata
   summary?: GeneratedOutputDifferencesSummary
   bucketCounts?: Record<string, number>
+  /** Whole-document count per conclusion code, ignoring the conclusion filter itself. */
+  conclusionCounts?: Record<string, number>
   ruleOptions?: GeneratedOutputDifferencesRuleOption[]
   differences?: GeneratedOutputDifferenceRow[]
   pageIndex?: number

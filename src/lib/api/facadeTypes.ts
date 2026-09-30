@@ -388,6 +388,7 @@ export interface GetGeneratedOutputDifferencesPayload {
   ruleFilterKey?: string
   search?: string
   includeFacets?: boolean
+  conclusionCode?: string
 }
 
 export interface ListAutomationsPayload {

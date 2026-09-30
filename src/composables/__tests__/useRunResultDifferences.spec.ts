@@ -338,4 +338,41 @@ describe('useRunResultDifferences', () => {
 
     expect(capturedSignal?.aborted).toBe(true)
   })
+
+  // DAR-UI-044
+  it('stores conclusion facets from the initial load', () => {
+    const { differences } = mountDifferences()
+    differences.applyDifferencesResponse(serverResponse({ conclusionCounts: { CONC_NS_BACKORDERED: 4, UNEXPLAINED: 0 } }), true)
+    expect(differences.conclusionCounts.value).toEqual({ CONC_NS_BACKORDERED: 4, UNEXPLAINED: 0 })
+  })
+
+  it('selecting a conclusion refetches page 0 filtered by it, and reselecting clears it', async () => {
+    getGeneratedOutputDifferences.mockResolvedValue(serverResponse())
+    const { differences } = mountDifferences()
+    differences.applyDifferencesResponse(serverResponse(), true)
+    differences.diffControlsReady.value = true
+
+    differences.selectConclusion('CONC_NS_BACKORDERED')
+    await nextTick()
+    await flushPromises()
+    expect(getGeneratedOutputDifferences).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pageIndex: 0, conclusionCode: 'CONC_NS_BACKORDERED' }),
+      expect.any(AbortSignal),
+    )
+
+    differences.selectConclusion('CONC_NS_BACKORDERED')
+    await nextTick()
+    await flushPromises()
+    expect(differences.selectedConclusionCode.value).toBeNull()
+    expect(getGeneratedOutputDifferences.mock.calls.at(-1)?.[0]).not.toHaveProperty('conclusionCode')
+  })
+
+  it('resetDifferencesState clears the conclusion selection and facets', () => {
+    const { differences } = mountDifferences()
+    differences.applyDifferencesResponse(serverResponse({ conclusionCounts: { A: 1 } }), true)
+    differences.selectConclusion('A')
+    differences.resetDifferencesState()
+    expect(differences.selectedConclusionCode.value).toBeNull()
+    expect(differences.conclusionCounts.value).toEqual({})
+  })
 })

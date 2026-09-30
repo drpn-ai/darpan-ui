@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import type { RunConclusionSuggestedFilter } from '../lib/api/types'
 import type { SavedRunSummary } from '../lib/api/types'
 import type {
   ReconciliationAutomationDraft,
@@ -50,6 +51,9 @@ export const useReconciliationDraftStore = defineStore('reconciliationDraft', ()
   const _automationDraftState = ref<ReconciliationAutomationDraftState | null>(persisted?.automationDraftState ?? null)
   const _ruleSetDraftState = ref<ReconciliationRuleSetDraftState | null>(persisted?.ruleSetDraftState ?? null)
   const _workflowOrigin = ref<WorkflowOrigin | null>(null)
+  // DAR-UI-044: the exclusion a run result's "Stop flagging in rules board" hands to the board. One-shot
+  // and deliberately NOT persisted: a reload must not reopen an editor the operator already left.
+  const _pendingExclusion = ref<RunConclusionSuggestedFilter | null>(null)
 
   const automationDraftState = computed(() => _automationDraftState.value)
   const ruleSetDraftState = computed(() => _ruleSetDraftState.value)
@@ -98,6 +102,17 @@ export const useReconciliationDraftStore = defineStore('reconciliationDraft', ()
     _workflowOrigin.value = { label, path }
   }
 
+  function setPendingExclusion(exclusion: RunConclusionSuggestedFilter | null): void {
+    _pendingExclusion.value = exclusion
+  }
+
+  /** Returns the pending exclusion and clears it, so the board opens it exactly once. */
+  function takePendingExclusion(): RunConclusionSuggestedFilter | null {
+    const pending = _pendingExclusion.value
+    _pendingExclusion.value = null
+    return pending
+  }
+
   // resetAll() clears every in-memory draft and the persisted sessionStorage payload. Called on
   // logout / tenant switch via main.ts setApiCacheReset; without this, a draft created in tenant A
   // (with its savedRun summary) is re-hydrated into tenant B's context. Cross-tenant data leak.
@@ -105,6 +120,7 @@ export const useReconciliationDraftStore = defineStore('reconciliationDraft', ()
     _automationDraftState.value = null
     _ruleSetDraftState.value = null
     _workflowOrigin.value = null
+    _pendingExclusion.value = null
     if (typeof window !== 'undefined') {
       try { window.sessionStorage.removeItem(SESSION_KEY) } catch { /* storage unavailable */ }
     }
@@ -119,6 +135,8 @@ export const useReconciliationDraftStore = defineStore('reconciliationDraft', ()
     setRuleSetDraft,
     clearRuleSetDraft,
     setWorkflowOrigin,
+    setPendingExclusion,
+    takePendingExclusion,
     resetAll,
   }
 })

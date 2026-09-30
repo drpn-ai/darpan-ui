@@ -108,8 +108,11 @@ vi.mock('../../../stores/permissions', () => ({
   usePermissionsStore: () => permissionsShape,
 }))
 
+const setPendingExclusion = vi.hoisted(() => vi.fn())
+
 vi.mock('../../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => ({
+    setPendingExclusion,
     workflowOrigin: null,
     ruleSetDraftState: null,
     automationDraftState: null,
@@ -309,6 +312,7 @@ function sEffectiveSummary(document: Rec, file1Label: string, file2Label: string
     onlyInFile1Count: fileSummary.onlyInFile1Count != null ? fileSummary.onlyInFile1Count : onlyInFile1Count,
     onlyInFile2Count: fileSummary.onlyInFile2Count != null ? fileSummary.onlyInFile2Count : onlyInFile2Count,
     ruleDifferenceCount: fileSummary.ruleDifferenceCount ?? null,
+    ...(fileSummary.conclusions ? { conclusions: fileSummary.conclusions } : {}),
     missingObjectDifferenceCount: fileSummary.missingObjectDifferenceCount ?? null,
   }
 }
@@ -321,6 +325,7 @@ interface DifferencesQuery {
   ruleFilterKey?: string
   search?: string
   includeFacets?: boolean
+  conclusionCode?: string
 }
 
 function simulateDifferences(document: Rec, outputFileOverrides: Record<string, unknown> = {}) {
@@ -336,7 +341,15 @@ function simulateDifferences(document: Rec, outputFileOverrides: Record<string, 
     const ruleKey = sNormalizeText(payload.ruleFilterKey) || ALL_RULE_FILTER_KEY
     const search = (payload.search ?? '').trim().toLowerCase()
 
+    // DAR-UI-044: mirrors DiffDetailClassifier — the conclusion filter, and facets that ignore it.
+    const conclusionOf = (row: ReturnType<typeof sClassify>) => ((row.record as Rec).conclusion as Rec | undefined)?.code as string | undefined
+    const conclusionCounts: Record<string, number> = {}
+    classified.forEach((row) => {
+      const code = conclusionOf(row)
+      if (code) conclusionCounts[code] = (conclusionCounts[code] ?? 0) + 1
+    })
     const filtered = classified.filter((row) => {
+      if (payload.conclusionCode && conclusionOf(row) !== payload.conclusionCode) return false
       if (!activeBuckets.includes(row.bucket)) return false
       if (ruleKey !== ALL_RULE_FILTER_KEY && row.ruleFilterKey !== ruleKey) return false
       if (search && !row.recordId.toLowerCase().includes(search)) return false
@@ -357,7 +370,7 @@ function simulateDifferences(document: Rec, outputFileOverrides: Record<string, 
       errors: [],
       metadata,
       summary: sEffectiveSummary(document, file1Label, file2Label),
-      ...(includeFacets ? { bucketCounts: sBucketCounts(classified), ruleOptions: sRuleOptions(classified) } : {}),
+      ...(includeFacets ? { bucketCounts: sBucketCounts(classified), ruleOptions: sRuleOptions(classified), conclusionCounts } : {}),
       differences: pageRows,
       pageIndex,
       pageSize,
@@ -374,6 +387,61 @@ function simulateDifferences(document: Rec, outputFileOverrides: Record<string, 
       },
     }
   }
+}
+
+// DAR-UI-044: run C (HotWax vs NetSuite line fulfilment) as the conclude stage writes it.
+function conclusionRow(orderId: string, seq: string, orderName: string, code: string, label: string, extra: Rec = {}) {
+  return {
+    diffType: 'missing_in_NetSuite',
+    primaryId: `${orderId}\u001F${seq}`,
+    presentIn: 'HotWax',
+    missingIn: 'NetSuite',
+    data: JSON.stringify({ omsOrderId: orderId, orderItemSeqId: seq, omsOrderName: orderName }),
+    conclusion: {
+      code,
+      label,
+      systems: [
+        { side: 'FILE_1', system: 'HotWax', presence: 'KEPT', state: 'Completed', facts: ['217', seq] },
+        code === 'UNEXPLAINED'
+          ? { side: 'FILE_2', system: 'NetSuite', presence: 'ABSENT', state: null, facts: [] }
+          : { side: 'FILE_2', system: 'NetSuite', presence: 'EXCLUDED', state: 'Pending Fulfillment', facts: [seq, '0', '1'] },
+      ],
+      checks: code === 'UNEXPLAINED' ? [] : [{ label: 'Nothing shipped, on backorder', value: '1', passed: true }],
+      question: null,
+      ...extra,
+    },
+  }
+}
+
+function conclusionDocument(options: { rows?: number; withQuestion?: boolean } = {}): Rec {
+  const backordered = Array.from({ length: options.rows ?? 4 }, (_, i) =>
+    conclusionRow('M1017565', String(i + 1).padStart(2, '0'), '#GOR197263793', 'CONC_NS_BACKORDERED', 'Backordered in NetSuite',
+      options.withQuestion && i === 0
+        ? { question: { text: 'Should gift-card-only orders reach NetSuite?', count: 37,
+            suggestedFilter: { fileSide: 'FILE_1', fieldExpression: 'facilityId', operator: 'EXCLUDE_IN', values: ['_NA_'] } } }
+        : {}))
+  const rows = [...backordered, conclusionRow('M9', '01', '#GOR9', 'UNEXPLAINED', 'Unexplained')]
+  return {
+    // The mocked saved-run list holds RS_ORDER_CSV; naming it here lets "Stop flagging" resolve the run.
+    metadata: { file1Label: 'HotWax', file2Label: 'NetSuite', savedRunId: 'RS_ORDER_CSV', ruleSetId: 'RS_ORDER_CSV' },
+    summary: {
+      totalDifferences: rows.length,
+      onlyInFile1Count: rows.length,
+      onlyInFile2Count: 0,
+      conclusions: {
+        enabled: true,
+        counts: [
+          { code: 'CONC_NS_BACKORDERED', label: 'Backordered in NetSuite', count: backordered.length },
+          { code: 'UNEXPLAINED', label: 'Unexplained', count: 1 },
+        ],
+      },
+    },
+    differences: rows,
+  }
+}
+
+function useConclusionDocument(options: { rows?: number; withQuestion?: boolean } = {}) {
+  getGeneratedOutputDifferences.mockImplementation(simulateDifferences(conclusionDocument(options)))
 }
 
 const singleSidedDiffDetails = {
@@ -1948,5 +2016,94 @@ describe('ReconciliationRunResultPage', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="run-result-notify-me"]').exists()).toBe(false)
+  })
+
+  describe('conclusions (DAR-UI-044)', () => {
+    it('replaces the missing tiles with conclusion tiles, Unexplained last', async () => {
+      useConclusionDocument()
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(wrapper.find('[data-testid="diff-bucket-file-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="diff-bucket-file-2"]').exists()).toBe(false)
+      const tiles = wrapper.findAll('[data-testid^="conclusion-tile-"]')
+      expect(tiles.map((t) => [t.get('.reconciliation-diff-bucket__label').text(), t.get('strong').text()])).toEqual([
+        ['Backordered in NetSuite', '4'],
+        ['Unexplained', '1'],
+      ])
+    })
+
+    it('a collapsed row is the id, the order name and the badge only', async () => {
+      useConclusionDocument()
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      const row = wrapper.get('[data-testid="diff-details-row"]')
+      expect(row.text()).toContain('#GOR197263793')
+      expect(row.get('.status-badge').text()).toBe('Backordered in NetSuite')
+      expect(row.find('[data-testid="diff-details-brief"]').exists()).toBe(false)
+      expect(row.find('.json-collapse-viewer').exists()).toBe(false)
+    })
+
+    it('Unexplained renders as an empty (dashed) badge', async () => {
+      useConclusionDocument()
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      const rows = wrapper.findAll('[data-testid="diff-details-row"]')
+      expect(rows.at(-1)?.get('.status-badge').classes()).toContain('status-badge--empty')
+    })
+
+    it('selecting a tile filters the table and marks the tile active', async () => {
+      useConclusionDocument()
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="conclusion-tile-UNEXPLAINED"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid="diff-details-row"]').length).toBe(1)
+      expect(wrapper.get('[data-testid="conclusion-tile-UNEXPLAINED"]').attributes('aria-pressed')).toBe('true')
+    })
+
+    it('expands a row in place with systems, checks and the raw record', async () => {
+      useConclusionDocument()
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      const toggle = wrapper.get('[data-testid="diff-details-expand-0"]')
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      await toggle.trigger('click')
+      const detail = wrapper.get('.app-table__detail-row')
+      expect(detail.text()).toContain('How Darpan concluded')
+      expect(detail.findAll('[data-testid="conclusion-system"]').length).toBe(2)
+      expect(wrapper.get('[data-testid="diff-details-expand-0"]').attributes('aria-expanded')).toBe('true')
+    })
+
+    it('only one row is open at a time, and a page change closes it', async () => {
+      useConclusionDocument({ rows: 6 })
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="diff-details-expand-0"]').trigger('click')
+      await wrapper.get('[data-testid="diff-details-expand-1"]').trigger('click')
+      expect(wrapper.findAll('.app-table__detail-row').length).toBe(1)
+      await wrapper.get('[data-testid="diff-page-next"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('.app-table__detail-row').exists()).toBe(false)
+    })
+
+    it('Stop flagging opens the rules board with the suggested filter pending', async () => {
+      useConclusionDocument({ withQuestion: true })
+      setPendingExclusion.mockReset()
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="diff-details-expand-0"]').trigger('click')
+      await wrapper.get('[data-testid="conclusion-stop-flagging"]').trigger('click')
+      await flushPromises()
+      expect(setPendingExclusion).toHaveBeenCalledWith({ fileSide: 'FILE_1', fieldExpression: 'facilityId', operator: 'EXCLUDE_IN', values: ['_NA_'] })
+      expect(routerPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reconciliation-ruleset-editor' }))
+    })
+
+    it('a document without conclusions renders the legacy page unchanged', async () => {
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(wrapper.find('[data-testid="diff-bucket-file-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid^="conclusion-tile-"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="diff-details-expand-0"]').exists()).toBe(false)
+    })
   })
 })

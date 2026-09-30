@@ -55,6 +55,9 @@ export interface UseRunResultDifferences {
   toggleDiffBucket: (bucket: DiffBucketKey) => void
   toggleRuleSelectorCollapsed: () => void
   selectRuleFilter: (nextRuleFilterKey: string) => void
+  selectedConclusionCode: Ref<string | null>
+  conclusionCounts: Ref<Record<string, number>>
+  selectConclusion: (code: string | null) => void
 }
 
 export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseRunResultDifferences {
@@ -73,6 +76,9 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
   const diffPageCount = ref(1)
   const diffControlsReady = ref(false)
   const differencesLoading = ref(false)
+  // DAR-UI-044: conclusion tiles filter the table; their counts are whole-document facets.
+  const selectedConclusionCode = ref<string | null>(null)
+  const conclusionCounts = ref<Record<string, number>>({})
 
   let differencesController: AbortController | null = null
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -130,6 +136,7 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
     if (includeFacets) {
       serverBucketCounts.value = normalizeServerBucketCounts(response.bucketCounts)
       serverRuleOptions.value = (response.ruleOptions ?? []).map(normalizeServerRuleOption)
+      conclusionCounts.value = { ...(response.conclusionCounts ?? {}) }
     }
   }
 
@@ -147,6 +154,8 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
     diffPageCount.value = 1
     diffControlsReady.value = false
     differencesLoading.value = false
+    selectedConclusionCode.value = null
+    conclusionCounts.value = {}
   }
 
   function currentDifferencesQuery(pageIndex: number, includeFacets: boolean) {
@@ -158,6 +167,7 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
       ruleFilterKey: selectedRuleFilterKey.value,
       search: diffDetailsSearch.value.trim(),
       includeFacets,
+      ...(selectedConclusionCode.value ? { conclusionCode: selectedConclusionCode.value } : {}),
     }
   }
 
@@ -221,6 +231,11 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
     ruleSelectorCollapsed.value = !ruleSelectorCollapsed.value
   }
 
+  /** Selecting the selected conclusion again clears it, like a bucket toggle. */
+  function selectConclusion(code: string | null): void {
+    selectedConclusionCode.value = code && code !== selectedConclusionCode.value ? code : null
+  }
+
   function selectRuleFilter(nextRuleFilterKey: string): void {
     selectedRuleFilterKey.value = nextRuleFilterKey
 
@@ -235,7 +250,7 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
   }
 
   // Bucket / rule selection re-fetches page 0 from the server (facets are already loaded and constant).
-  watch([selectedDiffBuckets, selectedRuleFilterKey], () => {
+  watch([selectedDiffBuckets, selectedRuleFilterKey, selectedConclusionCode], () => {
     if (!diffControlsReady.value) return
     void loadDifferencesPage(0, false)
   }, { deep: true })
@@ -263,6 +278,9 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
   })
 
   return {
+    selectedConclusionCode,
+    conclusionCounts,
+    selectConclusion,
     diffDetailRows,
     selectedDiffBuckets,
     selectedRuleFilterKey,
