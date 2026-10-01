@@ -10,7 +10,7 @@
       <input v-model="windowStart" type="date" data-testid="flowchart-window-start" aria-label="From" />
       <input v-model="windowEnd" type="date" data-testid="flowchart-window-end" aria-label="To" />
       <button v-if="!hasStart && !running" type="button" class="wizard-back" data-testid="flowchart-add-top" @click="openNew(null, null)">Add question</button>
-      <button type="button" class="wizard-next" :disabled="running || !questions.length" data-testid="flowchart-run-button" @click="startRun">Run chart</button>
+      <button type="button" class="wizard-next" :disabled="running || starting || !questions.length" data-testid="flowchart-run-button" @click="startRun">Run chart</button>
       <span v-if="pollCeilingHit" data-testid="flowchart-poll-ceiling">Still waiting on this run. Check its questions below.</span>
     </div>
 
@@ -31,7 +31,8 @@
         :rules="rules"
         :draft="editing.draft"
         :heading="editing.heading"
-        :can-delete="Boolean(editing.questionId)"
+        :can-delete="Boolean(editing.questionId) && !editing.isStart"
+        :is-start="editing.isStart"
         :error="editorError"
         :busy="saving"
         @save="saveEditing"
@@ -63,7 +64,7 @@ import {
   buildRunPayload, defaultWindowDays, isExecutionDone, POLL_INTERVAL_MS, questionStates, shouldKeepPolling, windowFromDays,
 } from '../../lib/flowchart/flowchartRunState'
 import { buildReconciliationRunLiveRoute } from '../../lib/reconciliationRoutes'
-import { formatDateInputValue, parseDateInput } from '../../lib/utils/date'
+import { addDays, formatDateInputValue, parseDateInput } from '../../lib/utils/date'
 
 // DAR-UI-048. One run's chart: build it from existing rules (spec A7), run it, watch each question.
 const route = useRoute()
@@ -80,11 +81,14 @@ const windowStart = ref('')
 const windowEnd = ref('')
 const executionRows = ref<FlowchartExecutionRow[]>([])
 const running = ref(false)
+// Set before the Run request goes out, so a double click cannot start a second walk (review I4).
+const starting = ref(false)
 const pollCeilingHit = ref(false)
-let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+let unmounted = false
 let mediaQuery: MediaQueryList | null = null
 
-interface Editing { questionId: string | null; parentId: string | null; branch: FlowchartBranch | null; heading: string; draft: FlowchartQuestionDraft }
+interface Editing { questionId: string | null; parentId: string | null; branch: FlowchartBranch | null; heading: string; isStart: boolean; draft: FlowchartQuestionDraft }
 const editing = ref<Editing | null>(null)
 
 const ruleNames = computed(() => Object.fromEntries(rules.value.map((r) => [r.savedRunId, r.runName || r.savedRunId])))
@@ -100,9 +104,10 @@ function labelOf(id: string): string {
 const liveLinks = computed(() => {
   const s = states.value
   if (!s) return []
-  return walkable.value.filter((id) => s[id]?.state === 'running' && s[id]?.row).map((id) => {
+  // Every question that has a row links to its run, finished ones too: a failed question's cause is there (review I6).
+  return walkable.value.filter((id) => s[id]?.row).map((id) => {
     const q = questions.value.find((x) => x.reconciliationRunId === id)!
-    return { questionId: id, label: `${labelOf(id)}: live`, to: buildReconciliationRunLiveRoute({ savedRunId: q.ruleSetId, runName: labelOf(id), file1SystemLabel: '', file2SystemLabel: '' }, s[id]!.row!.reconciliationRunResultId) }
+    return { questionId: id, label: `${labelOf(id)}: ${s[id]!.state.replace('-', ' ')}`, to: buildReconciliationRunLiveRoute({ savedRunId: q.ruleSetId, runName: labelOf(id), file1SystemLabel: '', file2SystemLabel: '' }, s[id]!.row!.reconciliationRunResultId) }
   })
 })
 
@@ -121,7 +126,8 @@ async function load() {
     if (!windowStart.value) {
       const w = windowFromDays(defaultWindowDays(run.value?.defaultTimeWindow))
       windowStart.value = formatDateInputValue(w.startDate)
-      windowEnd.value = formatDateInputValue(w.endExclusiveDate)
+      // "To" is inclusive on screen, as on the single-run page; the run's end is the day after it (review I3).
+      windowEnd.value = formatDateInputValue(addDays(w.endExclusiveDate, -1))
     }
   } catch (error) {
     pageError.value = message(error)
@@ -133,13 +139,14 @@ function openExisting(id: string) {
   if (!q) return
   editorError.value = null
   editing.value = { questionId: id, parentId: q.parentReconciliationRunId ?? null, branch: q.parentBranch ?? null, heading: labelOf(id),
+    isStart: q.questionRole === 'START',
     draft: { ruleSetId: q.ruleSetId, runName: q.runName ?? '', noOutcomeLabel: q.noOutcomeLabel ?? '' } }
 }
 
 function openNew(parentId: string | null, branch: FlowchartBranch | null) {
   editorError.value = null
   const heading = parentId ? `${branch === 'YES' ? 'After yes on' : 'After no on'}: ${labelOf(parentId)}` : 'New question'
-  editing.value = { questionId: null, parentId, branch, heading, draft: { ruleSetId: '', runName: '', noOutcomeLabel: '' } }
+  editing.value = { questionId: null, parentId, branch, heading, isStart: false, draft: { ruleSetId: '', runName: '', noOutcomeLabel: '' } }
 }
 
 function closeEditor() { editing.value = null; editorError.value = null }
@@ -187,37 +194,50 @@ async function deleteEditing() {
   }
 }
 
-function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null } }
+function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null } }
 
 async function startRun() {
+  if (running.value || starting.value) return
   const start = parseDateInput(windowStart.value)
-  const end = parseDateInput(windowEnd.value)
-  if (!start || !end) { pageError.value = 'Choose a window.'; return }
+  const lastDay = parseDateInput(windowEnd.value)
+  if (!start || !lastDay) { pageError.value = 'Choose a window.'; return }
+  if (start.getTime() > lastDay.getTime()) { pageError.value = 'From must be on or before To.'; return }
   pageError.value = null
   pollCeilingHit.value = false
   executionRows.value = []
+  starting.value = true
   try {
     const { reconciliationExecutionId } = await reconciliationFacade.runReconciliation(
-      buildRunPayload(reconciliationId.value, { startDate: start, endExclusiveDate: end }))
+      buildRunPayload(reconciliationId.value, { startDate: start, endExclusiveDate: addDays(lastDay, 1) }))
+    if (unmounted) return
     running.value = true
     const startedAt = Date.now()
-    stopPolling()
-    pollTimer = setInterval(async () => {
+    // A timeout chain, not an interval: the next poll is scheduled only after this one answered, so a slow
+    // response can never land after a newer one and leave a question stuck on "running" (review I4).
+    const poll = async () => {
+      if (unmounted) return
       try {
         const { results } = await reconciliationFacade.getReconciliationExecution({ reconciliationExecutionId })
+        if (unmounted) return
         executionRows.value = results ?? []
       } catch (error) {
         pageError.value = message(error)
       }
       const done = isExecutionDone(walkable.value, executionRows.value)
       if (!shouldKeepPolling(startedAt, Date.now(), done)) {
-        stopPolling()
+        pollTimer = null
         running.value = false
         pollCeilingHit.value = !done
+        return
       }
-    }, POLL_INTERVAL_MS)
+      pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
+    }
+    stopPolling()
+    pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
   } catch (error) {
     pageError.value = message(error)
+  } finally {
+    starting.value = false
   }
 }
 
@@ -231,6 +251,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  unmounted = true
   stopPolling()
   mediaQuery?.removeEventListener('change', onMedia)
 })

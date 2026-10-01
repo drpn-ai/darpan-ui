@@ -61,4 +61,34 @@ describe('RunFlowchartBoard', () => {
     const w = mount(RunFlowchartBoard, { props: { questions, ruleNames, editable: true, narrow: false, selectedId: 'A' } })
     expect(w.get('[data-testid="flowchart-box-A"]').classes()).toContain('flowchart-box--selected')
   })
+
+  it('puts "+ next question" right-aligned, off the "no" arrow lane (review I2)', () => {
+    const w = mount(RunFlowchartBoard, { props: { questions, ruleNames, editable: true, narrow: true } })
+    expect(w.get('[data-testid="flowchart-add-next-A"]').attributes('style')).toContain('translateX(-100%)')
+  })
+
+  it('hides "+ next question" under a top-level one-source question when the run has no start (review I5)', () => {
+    const loose = [
+      { reconciliationRunId: 'T', ruleSetId: 'EV', scopeMode: 'EVALUATE' as const },
+      { reconciliationRunId: 'U', ruleSetId: 'CMP', scopeMode: 'COMPARE' as const },
+    ]
+    const w = mount(RunFlowchartBoard, { props: { questions: loose, ruleNames: {}, editable: true, narrow: false } })
+    expect(w.find('[data-testid="flowchart-add-next-T"]').exists()).toBe(false)
+    expect(w.find('[data-testid="flowchart-add-next-U"]').exists()).toBe(true)
+    expect(w.find('[data-testid="flowchart-add-why-T"]').exists()).toBe(true)
+  })
+
+  it('shows why a question failed or did not run (review I6)', () => {
+    const w = mount(RunFlowchartBoard, {
+      props: {
+        questions, ruleNames, editable: false, narrow: false,
+        states: {
+          A: { state: 'failed', row: { reconciliationRunResultId: '2', errorMessage: 'This question could not run: boom' } },
+          B: { state: 'not-run', row: { reconciliationRunResultId: '3', errorMessage: 'A question above this one did not finish.' } },
+        },
+      },
+    })
+    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('could not run: boom')
+    expect(w.get('[data-testid="flowchart-state-B"]').text()).toContain('did not finish')
+  })
 })

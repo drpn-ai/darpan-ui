@@ -112,4 +112,78 @@ describe('RunFlowchartPage', () => {
     await vi.advanceTimersByTimeAsync(9000)
     expect(f.getReconciliationExecution.mock.calls.length).toBe(calls)
   })
+
+  it('the To date is inclusive: the run ends the day after it (review I3)', async () => {
+    vi.setSystemTime(new Date(2026, 7, 17, 12))
+    f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E1' } as never)
+    f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect((w.get('[data-testid="flowchart-window-start"]').element as HTMLInputElement).value).toBe('2026-08-14')
+    expect((w.get('[data-testid="flowchart-window-end"]').element as HTMLInputElement).value).toBe('2026-08-16')
+    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
+    await flushPromises()
+    expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ windowStartLocalDate: '2026-08-14', windowEndLocalDate: '2026-08-17' }))
+    w.unmount()
+  })
+
+  it('refuses a window whose start is after its end (review I3)', async () => {
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    await w.get('[data-testid="flowchart-window-start"]').setValue('2026-08-20')
+    await w.get('[data-testid="flowchart-window-end"]').setValue('2026-08-16')
+    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('From must be on or before To.')
+    expect(f.runReconciliation).not.toHaveBeenCalled()
+  })
+
+  it('a double click starts one walk (review I4)', async () => {
+    let resolve: (v: unknown) => void = () => {}
+    f.runReconciliation.mockReturnValue(new Promise((r) => { resolve = r }) as never)
+    f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
+    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
+    resolve({ reconciliationExecutionId: 'E1' })
+    await flushPromises()
+    expect(f.runReconciliation).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
+  it('leaving the page while Run is in flight never starts polling (review I4)', async () => {
+    let resolve: (v: unknown) => void = () => {}
+    f.runReconciliation.mockReturnValue(new Promise((r) => { resolve = r }) as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
+    w.unmount()
+    resolve({ reconciliationExecutionId: 'E1' })
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(f.getReconciliationExecution).not.toHaveBeenCalled()
+  })
+
+  it('the start cannot be deleted (review I5)', async () => {
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    await w.get('[data-testid="flowchart-box-S"]').trigger('click')
+    expect(w.find('[data-testid="flowchart-editor-delete"]').exists()).toBe(false)
+  })
+
+  it('every question with a row links to its run, finished ones too (review I6)', async () => {
+    f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E1' } as never)
+    f.getReconciliationExecution.mockResolvedValue({ results: [
+      { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 2 },
+      { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_FAILED', errorMessage: 'boom' },
+    ] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(w.find('[data-testid="flowchart-live-link-S"]').exists()).toBe(true)
+    expect(w.find('[data-testid="flowchart-live-link-A"]').exists()).toBe(true)
+  })
 })

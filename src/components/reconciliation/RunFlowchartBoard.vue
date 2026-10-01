@@ -44,7 +44,7 @@
           {{ findingLabel(box.questionId) }}<template v-if="noCount(box.questionId) !== null"> · {{ formatCount(noCount(box.questionId)!) }}</template>
         </div>
         <button
-          v-if="editable && box.kind !== 'finding'"
+          v-if="editable && box.kind !== 'finding' && canAddNext(box.questionId)"
           type="button"
           class="flowchart-add"
           :style="addNextStyle(box)"
@@ -98,7 +98,17 @@ function formatCount(n: number): string { return countFormat.format(n) }
 function boxStyle(box: FlowchartBox) {
   return { left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, height: `${box.height}px` }
 }
-function addNextStyle(box: FlowchartBox) { return { left: `${box.x}px`, top: `${box.y + box.height + 4}px` } }
+// Right-aligned under the question, ending left of the narrow yes lane: off the "no" arrow at the left edge.
+function addNextStyle(box: FlowchartBox) {
+  return { left: `${box.x + box.width - 24}px`, top: `${box.y + box.height + 4}px`, transform: 'translateX(-100%)' }
+}
+const hasStart = computed(() => props.questions.some((q) => q.questionRole === 'START'))
+// A top-level one-source question in a run with no start has no list of records that passed (spec A2),
+// so the server refuses a yes child under it; do not offer one.
+function canAddNext(id: string): boolean {
+  const q = byId.value.get(id)
+  return !(q && !hasStart.value && !q.parentReconciliationRunId && q.questionRole !== 'START' && q.scopeMode === 'EVALUATE')
+}
 function addWhyStyle(box: FlowchartBox) { return { left: `${box.x}px`, top: `${box.y + box.height + 4}px` } }
 function questionLabel(id: string): string {
   const q = byId.value.get(id)
@@ -113,7 +123,10 @@ function stateLabel(id: string): string {
   const s = props.states?.[id]
   if (!s) return ''
   const yes = s.row?.yesCount
-  return s.state === 'done' && typeof yes === 'number' ? `yes · ${formatCount(yes)}` : s.state.replace('-', ' ')
+  if (s.state === 'done' && typeof yes === 'number') return `yes · ${formatCount(yes)}`
+  const why = s.row?.errorMessage?.trim()
+  // A question that failed, did not run or was cancelled says why (review I6); the row carries the sentence.
+  return why && ['failed', 'not-run', 'cancelled'].includes(s.state) ? `${s.state.replace('-', ' ')}: ${why}` : s.state.replace('-', ' ')
 }
 function edgeLabel(edge: FlowchartEdge): string {
   if (edge.kind === 'no') return 'no'

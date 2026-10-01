@@ -11,6 +11,8 @@ export const COLUMN_GAP = 48
 export const ROW_GAP = 72
 
 const COLUMN_WIDTH = QUESTION_WIDTH + COLUMN_GAP
+// Narrow mode's yes lane: right of the finding below the question, inside the question's own width.
+export const YES_LANE = QUESTION_WIDTH - 12
 const PAD = 16
 
 export interface FlowchartBox {
@@ -104,9 +106,12 @@ export function layoutFlowchart(questions: FlowchartQuestion[], options: { narro
     for (const child of (kids.get(id) ?? []).filter((c) => c.parentBranch !== 'NO')) {
       const childX = PAD + cursor * COLUMN_WIDTH
       const childY = PAD + (row + 1) * rowHeight
+      // Narrow: the finding sits under the question, so the yes arrow leaves from the question's right
+      // side, clear of the finding (FINDING_WIDTH < YES_LANE), or it would read as a "why" link.
+      const lane = narrow ? YES_LANE : QUESTION_WIDTH / 2
       edges.push({ id: `yes:${child.reconciliationRunId}`, kind: 'yes', fromId: id, toId: child.reconciliationRunId,
-        d: vertical(x + QUESTION_WIDTH / 2, y + QUESTION_HEIGHT, childX + QUESTION_WIDTH / 2, childY),
-        labelX: (x + childX) / 2 + QUESTION_WIDTH / 2 + 6, labelY: y + QUESTION_HEIGHT + ROW_GAP / 2 })
+        d: vertical(x + lane, y + QUESTION_HEIGHT, childX + lane, childY),
+        labelX: (x + childX) / 2 + lane + 6, labelY: y + QUESTION_HEIGHT + (narrow ? 40 : ROW_GAP / 2) })
       cursor += place(child, cursor, row + 1)
     }
     if (finding) {

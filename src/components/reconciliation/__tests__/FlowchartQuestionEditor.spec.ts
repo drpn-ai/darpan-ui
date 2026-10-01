@@ -41,4 +41,15 @@ describe('FlowchartQuestionEditor', () => {
     expect(shown.find('[data-testid="flowchart-editor-delete"]').exists()).toBe(true)
     expect(hidden.find('[data-testid="flowchart-editor-delete"]').exists()).toBe(false)
   })
+
+  it('a start has no "no" and only offers one-source rules (review I5)', () => {
+    const mixed = [
+      { savedRunId: 'POP', runName: 'Population', scopeMode: 'EVALUATE', requiresSystemSelection: false, systemOptions: [] },
+      { savedRunId: 'CMP', runName: 'Compare', scopeMode: 'COMPARE', requiresSystemSelection: false, systemOptions: [] },
+    ] as never[]
+    const w = mount(FlowchartQuestionEditor, { props: { rules: mixed, draft: { ruleSetId: 'POP', runName: '', noOutcomeLabel: '' }, heading: 'Start', canDelete: false, isStart: true } })
+    expect(w.find('[data-testid="flowchart-editor-no"]').exists()).toBe(false)
+    const options = (w.findComponent({ name: 'WorkflowSelect' }).props('options') as { value: string }[]).map((o) => o.value)
+    expect(options).toEqual(['POP'])
+  })
 })

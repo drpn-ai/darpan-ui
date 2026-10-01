@@ -9,7 +9,7 @@
       <span>Question</span>
       <input v-model="local.runName" type="text" data-testid="flowchart-editor-wording" />
     </label>
-    <label class="flowchart-editor-field">
+    <label v-if="!isStart" class="flowchart-editor-field">
       <span>When the answer is no</span>
       <input v-model="local.noOutcomeLabel" type="text" data-testid="flowchart-editor-no" />
     </label>
@@ -39,6 +39,8 @@ const props = defineProps<{
   canDelete: boolean
   error?: string | null
   busy?: boolean
+  /** The START question: every record it returns is a yes, so it has no "no", and it must be a one-source rule. */
+  isStart?: boolean
 }>()
 
 const emit = defineEmits<{ save: [draft: FlowchartQuestionDraft]; delete: []; cancel: [] }>()
@@ -48,7 +50,8 @@ const local = reactive<FlowchartQuestionDraft>({ ...props.draft })
 watch(() => props.draft, (next) => Object.assign(local, next))
 
 const ruleOptions = computed(() =>
-  props.rules.filter((r) => !r.isArchived).map((r) => ({ value: r.savedRunId, label: r.runName || r.savedRunId })))
+  props.rules.filter((r) => !r.isArchived && (!props.isStart || r.scopeMode === 'EVALUATE'))
+    .map((r) => ({ value: r.savedRunId, label: r.runName || r.savedRunId })))
 </script>
 
 <style scoped>

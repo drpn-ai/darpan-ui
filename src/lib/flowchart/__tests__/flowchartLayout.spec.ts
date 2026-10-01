@@ -90,6 +90,23 @@ describe('layoutFlowchart', () => {
   })
 })
 
+describe('arrows and labels (plan 2 review I2)', () => {
+  for (const narrow of [false, true]) {
+    it(`${narrow ? 'narrow' : 'wide'}: a yes arrow clears its question's finding and no label sits inside a box`, () => {
+      const { boxes, edges } = layoutFlowchart(chain(), { narrow })
+      for (const e of edges.filter((x) => x.kind === 'yes')) {
+        const x1 = Number(e.d.replace(/[MCL]/g, ' ').trim().split(/\s+/)[0])
+        const finding = boxes.find((b) => b.id === `finding:${e.fromId}`)
+        if (finding && narrow) expect(x1, e.id).toBeGreaterThan(finding.x + finding.width)
+      }
+      for (const e of edges)
+        for (const b of boxes)
+          expect(e.labelX >= b.x && e.labelX <= b.x + b.width && e.labelY >= b.y && e.labelY <= b.y + b.height,
+            `${e.id} label inside ${b.id}`).toBe(false)
+    })
+  }
+})
+
 describe('walkableQuestionIds', () => {
   it('matches the backend walk order', () => {
     expect(walkableQuestionIds(chain())).toEqual(['S', 'A', 'A1', 'W', 'B'])
