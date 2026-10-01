@@ -159,6 +159,17 @@ import type {
   ValidateJsonTextPayload,
   VerifyOwnPasswordPayload,
 } from './facadeTypes'
+import type {
+  GetFlowchartExecutionResponse,
+  GetFlowchartRunResponse,
+  ListFlowchartRunsResponse,
+  RunFlowchartPayload,
+  RunFlowchartResponse,
+  SaveFlowchartQuestionPayload,
+  SaveFlowchartQuestionResponse,
+  SaveFlowchartRunPayload,
+  SaveFlowchartRunResponse,
+} from './flowchartTypes'
 
 const AUTH = {
   loginSession: 'facade.AuthFacadeServices.login#Session',
@@ -234,6 +245,14 @@ const RECONCILIATION = {
   getGeneratedOutput: 'facade.ReconciliationFacadeServices.get#GeneratedOutput',
   getGeneratedOutputDifferences: 'facade.ReconciliationFacadeServices.get#GeneratedOutputDifferences',
   getReconciliationRunStatus: 'facade.ReconciliationFacadeServices.get#ReconciliationRunStatus',
+  // DAR-UI-048: the run flowchart.
+  listReconciliations: 'facade.ReconciliationFacadeServices.list#Reconciliations',
+  saveReconciliation: 'facade.ReconciliationFacadeServices.save#Reconciliation',
+  getReconciliation: 'facade.ReconciliationFacadeServices.get#Reconciliation',
+  saveReconciliationQuestion: 'facade.ReconciliationFacadeServices.save#ReconciliationQuestion',
+  deleteReconciliationQuestion: 'facade.ReconciliationFacadeServices.delete#ReconciliationQuestion',
+  runReconciliation: 'facade.ReconciliationFacadeServices.run#Reconciliation',
+  getReconciliationExecution: 'facade.ReconciliationFacadeServices.get#ReconciliationExecution',
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
@@ -458,6 +477,27 @@ export const reconciliationFacade = {
     signal?: AbortSignal,
   ): Promise<GetReconciliationRunStatusResponse> {
     return callService<GetReconciliationRunStatusResponse>(RECONCILIATION.getReconciliationRunStatus, payload, signal)
+  },
+  listReconciliations(signal?: AbortSignal): Promise<ListFlowchartRunsResponse> {
+    return callService<ListFlowchartRunsResponse>(RECONCILIATION.listReconciliations, {}, signal)
+  },
+  saveReconciliation(payload: SaveFlowchartRunPayload, signal?: AbortSignal): Promise<SaveFlowchartRunResponse> {
+    return callService<SaveFlowchartRunResponse>(RECONCILIATION.saveReconciliation, payload, signal)
+  },
+  getReconciliation(payload: { reconciliationId: string }, signal?: AbortSignal): Promise<GetFlowchartRunResponse> {
+    return callService<GetFlowchartRunResponse>(RECONCILIATION.getReconciliation, payload, signal)
+  },
+  saveReconciliationQuestion(payload: SaveFlowchartQuestionPayload, signal?: AbortSignal): Promise<SaveFlowchartQuestionResponse> {
+    return callService<SaveFlowchartQuestionResponse>(RECONCILIATION.saveReconciliationQuestion, payload, signal)
+  },
+  deleteReconciliationQuestion(payload: { reconciliationRunId: string }, signal?: AbortSignal): Promise<{ ok?: boolean }> {
+    return callService<{ ok?: boolean }>(RECONCILIATION.deleteReconciliationQuestion, payload, signal)
+  },
+  runReconciliation(payload: RunFlowchartPayload, signal?: AbortSignal): Promise<RunFlowchartResponse> {
+    return callService<RunFlowchartResponse>(RECONCILIATION.runReconciliation, payload, signal)
+  },
+  getReconciliationExecution(payload: { reconciliationExecutionId: string }, signal?: AbortSignal): Promise<GetFlowchartExecutionResponse> {
+    return callService<GetFlowchartExecutionResponse>(RECONCILIATION.getReconciliationExecution, payload, signal)
   },
   getGeneratedOutputDifferences(
     payload: GetGeneratedOutputDifferencesPayload,
