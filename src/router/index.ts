@@ -55,6 +55,24 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
+    path: '/reconciliation/runs',
+    name: 'reconciliation-run-flowcharts',
+    component: () => import('../pages/reconciliation/RunFlowchartListPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Runs' },
+  },
+  {
+    path: '/reconciliation/runs/create',
+    name: 'reconciliation-run-flowchart-create',
+    component: () => import('../pages/reconciliation/RunFlowchartCreatePage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
+    path: '/reconciliation/runs/:reconciliationId',
+    name: 'reconciliation-run-flowchart',
+    component: () => import('../pages/reconciliation/RunFlowchartPage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Run' },
+  },
+  {
     path: '/reconciliation/ruleset-manager',
     name: 'reconciliation-ruleset-manager',
     component: () => import('../pages/reconciliation/ReconciliationRuleSetManagerPage.vue'),

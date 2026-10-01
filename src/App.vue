@@ -184,6 +184,7 @@ const commandActions = computed<CommandAction[]>(() => [
     if (
       action.id === 'navigate-schema-infer'
       || action.id === 'navigate-create-reconciliation'
+      || action.id === 'navigate-create-run-flowchart'
     ) {
       return canEditTenantSettings.value
     }
@@ -290,6 +291,22 @@ const staticCommandActions: CommandAction[] = [
     group: 'Navigate',
     to: '/reconciliation/create',
     aliases: ['new reconciliation', 'create compare flow', 'new workflow', 'match setup'],
+  },
+  {
+    id: 'navigate-run-flowcharts',
+    label: 'Runs',
+    description: 'Charts of yes/no questions over your rules.',
+    group: 'Navigate',
+    to: '/reconciliation/runs',
+    aliases: ['flowchart', 'chart', 'question chart', 'runs'],
+  },
+  {
+    id: 'navigate-create-run-flowchart',
+    label: 'Create Run',
+    description: 'Start a chart of yes/no questions.',
+    group: 'Navigate',
+    to: '/reconciliation/runs/create',
+    aliases: ['new run', 'new flowchart', 'new chart'],
   },
   {
     id: 'navigate-run-reconciliation',
