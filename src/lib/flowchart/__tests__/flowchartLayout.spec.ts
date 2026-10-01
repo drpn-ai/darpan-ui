@@ -60,7 +60,7 @@ describe('layoutFlowchart', () => {
       const { boxes } = layoutFlowchart(qs, { narrow })
       for (let i = 0; i < boxes.length; i++)
         for (let j = i + 1; j < boxes.length; j++)
-          expect(overlap(boxes[i], boxes[j]), `${boxes[i].id} overlaps ${boxes[j].id}`).toBe(false)
+          expect(overlap(boxes[i]!, boxes[j]!), `${boxes[i]!.id} overlaps ${boxes[j]!.id}`).toBe(false)
     }
   })
 
