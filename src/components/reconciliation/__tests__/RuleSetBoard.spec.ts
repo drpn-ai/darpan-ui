@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 
 const flattenJsonSchema = vi.hoisted(() => vi.fn())
 const getJsonSchema = vi.hoisted(() => vi.fn())
@@ -36,6 +36,10 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 }))
 
 import RuleSetBoard from '../RuleSetBoard.vue'
+import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../../lib/uiEvents'
+
+// The board listens on document, so a board left mounted by one test would answer another test's events.
+enableAutoUnmount(afterEach)
 
 describe('RuleSetBoard with CSV column lists', () => {
   beforeEach(() => {
@@ -197,5 +201,86 @@ describe('RuleSetBoard with CSV column lists', () => {
     expect(wrapper.get('[data-testid="ruleset-exclusion-popover"]').text()).toContain('_NA_')
     expect(draft.file1ExcludeFilters).toEqual([])
     expect(draftStoreState.pendingExclusion).toBeNull()
+  })
+})
+
+// DAR-UI-047: Escape on an open popover must close the popover, not abort the create-run workflow (which
+// discarded the whole draft). App.vue dispatches this cancelable request before aborting; the board claims it.
+describe('RuleSetBoard and the workflow Escape', () => {
+  const apiDraft = () => ({
+    runName: 'Order sync',
+    file1SystemEnumId: 'OMS_ORDER_ITEMS',
+    file1SourceTypeEnumId: 'AUT_SRC_API',
+    file1SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+    file1SourceConfigId: 'gorjana_prod',
+    file1PrimaryIdExpression: ['omsOrderId'],
+    file1ExcludeFilters: [],
+    file2SystemEnumId: 'NETSUITE_SUITEQL',
+    file2SourceTypeEnumId: 'AUT_SRC_API',
+    file2PrimaryIdExpression: ['orderId'],
+    rules: [{ id: 'r1', ruleId: 'r1', sequenceNum: 1, file1FieldPath: 'omsOrderId', file2FieldPath: 'orderId', operator: '=', preActions: [] }],
+  })
+
+  beforeEach(() => {
+    listAutomationSourceOptions.mockReset()
+    listAutomationSourceOptions.mockResolvedValue({
+      ok: true,
+      nsRestletConfigs: [],
+      systemRemotes: [{
+        optionKey: 'gorjana_prod',
+        systemMessageRemoteId: 'HOTWAX_ORDERS_API',
+        sourceConfigId: 'gorjana_prod',
+        systemEnumId: 'OMS_ORDER_ITEMS',
+        supportsExcludeFilters: true,
+        fieldOptions: [{ fieldPath: 'facilityId' }, { fieldPath: 'omsOrderId' }],
+      }],
+    })
+    draftStoreState.pendingExclusion = null
+  })
+
+  function requestCancel(): Event {
+    const request = new Event(WORKFLOW_CANCEL_REQUEST_EVENT, { cancelable: true })
+    document.dispatchEvent(request)
+    return request
+  }
+
+  it('closes an open filter popover and claims the Escape', async () => {
+    draftStoreState.ruleSetDraftState = { resumeStepId: null, draft: apiDraft() }
+    draftStoreState.pendingExclusion = { fileSide: 'FILE_1', fieldExpression: 'facilityId', operator: 'EXCLUDE_IN', values: ['_NA_'] }
+    const wrapper = mount(RuleSetBoard, { attachTo: document.body })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(true)
+
+    const later = vi.fn()
+    document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, later)
+    const request = requestCancel()
+    await flushPromises()
+
+    expect(request.defaultPrevented).toBe(true)
+    expect(later).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="ruleset-exclusion-popover"]').exists()).toBe(false)
+    document.removeEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, later)
+  })
+
+  it('closes an open rule editor and claims the Escape', async () => {
+    draftStoreState.ruleSetDraftState = { resumeStepId: null, draft: apiDraft() }
+    const wrapper = mount(RuleSetBoard, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-testid="ruleset-rule-operator-r1"]').trigger('click')
+    expect(wrapper.find('.ruleset-rule-popover').exists()).toBe(true)
+
+    const request = requestCancel()
+    await flushPromises()
+
+    expect(request.defaultPrevented).toBe(true)
+    expect(wrapper.find('.ruleset-rule-popover').exists()).toBe(false)
+  })
+
+  it('leaves the Escape to the workflow when no popover is open', async () => {
+    draftStoreState.ruleSetDraftState = { resumeStepId: null, draft: apiDraft() }
+    mount(RuleSetBoard, { attachTo: document.body })
+    await flushPromises()
+
+    expect(requestCancel().defaultPrevented).toBe(false)
   })
 })

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import {
   buildReconciliationRuleSetDraftState,
   type ReconciliationRuleSetDraftRule,
@@ -9,6 +9,10 @@ import { buildRuleSetDraft } from '../../../lib/savedRunEditorRoute'
 import type { SavedRunSummary } from '../../../lib/api/types'
 import type { SourceExcludeFilter } from '../../../lib/sourceExcludeFilters'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../../lib/uiEvents'
+
+// DAR-UI-047: RuleSetBoard claims workflow cancel requests while a popover is open, so a page left mounted by
+// one test (popover open) would answer another test's Escape. Every wrapper is unmounted after its test.
+enableAutoUnmount(afterEach)
 
 const getJsonSchema = vi.hoisted(() => vi.fn())
 const flattenJsonSchema = vi.hoisted(() => vi.fn())

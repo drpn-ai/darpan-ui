@@ -438,6 +438,7 @@ import {
   reconciliationSystemTitle,
 } from '../../lib/reconciliationRuleSetDraft'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
+import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 
 // This board takes no props and emits nothing: it reads and writes the shared reconciliation
 // draft store directly. That is what makes it droppable both into the standalone rule-set editor
@@ -1571,16 +1572,33 @@ function openPendingExclusion(): void {
   editingExclusionValues.value = [...pending.values]
 }
 
+/**
+ * DAR-UI-047: Escape on an open rule or filter popover closes that popover. App.vue aborts the whole
+ * workflow on a plain Escape — on the create flow that discarded the entire draft — unless something
+ * claims its cancelable WORKFLOW_CANCEL_REQUEST_EVENT first. Registered in the CAPTURE phase and stopped
+ * immediately, because sibling consumers (WorkflowStepForm) do not check defaultPrevented. With no
+ * popover open the request is left alone, so Escape still leaves the workflow.
+ */
+function handleWorkflowCancelRequest(event: Event): void {
+  if (!editingRule.value && !editingExclusion.value) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  closeRuleEditor()
+  closeExclusionEditor()
+}
+
 onMounted(() => {
   void loadEditorData().then(openPendingExclusion)
   window.addEventListener('resize', updateLineLayout)
   window.addEventListener('pointerdown', handleWindowPointerDown)
+  document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleWorkflowCancelRequest, { capture: true })
 })
 
 onBeforeUnmount(() => {
   clearLongPressTimer()
   window.removeEventListener('resize', updateLineLayout)
   window.removeEventListener('pointerdown', handleWindowPointerDown)
+  document.removeEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleWorkflowCancelRequest, { capture: true })
   loadAbortController.abort()
 })
 </script>
