@@ -3,6 +3,7 @@
     <div class="workflow-step-wrapper">
       <WorkflowStepForm
         v-if="step === 'start'"
+        class="flowchart-create-choice-step"
         question="Where does this run start?"
         :show-primary-action="false"
         :show-enter-hint="false"
@@ -137,3 +138,12 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+/* The choice grid caps itself at 34rem (WorkflowShortcutChoiceCards) inside the 720px question column, so
+   the cards sat left of centre. Sizing this step to the grid's own width centres question, cards and Back
+   as one block; the input steps keep the full-width answer line. */
+.flowchart-create-choice-step {
+  width: min(34rem, 100%);
+}
+</style>
