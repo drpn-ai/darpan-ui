@@ -10,7 +10,7 @@
       <input v-model="windowStart" type="date" data-testid="flowchart-window-start" aria-label="From" />
       <input v-model="windowEnd" type="date" data-testid="flowchart-window-end" aria-label="To" />
       <button v-if="!hasStart && !running" type="button" class="wizard-back" data-testid="flowchart-add-top" @click="openNew(null, null)">Add question</button>
-      <button type="button" class="wizard-next" :disabled="running || !questions.length" data-testid="flowchart-run-button" @click="startRun">Run</button>
+      <button type="button" class="wizard-next" :disabled="running || !questions.length" data-testid="flowchart-run-button" @click="startRun">Run chart</button>
       <span v-if="pollCeilingHit" data-testid="flowchart-poll-ceiling">Still waiting on this run. Check its questions below.</span>
     </div>
 

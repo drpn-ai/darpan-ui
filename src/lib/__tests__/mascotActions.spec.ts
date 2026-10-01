@@ -147,6 +147,7 @@ describe('every button in the app has an answer', () => {
     'pages/reconciliation/ReconciliationDiffPage.vue': 'a calendar cell is a date',
     'pages/settings/UserSettingsPage.vue': 'a tenant tile is named by the tenant',
     'pages/settings/TenantSettingsPage.vue': 'the AI tile is named by the selected provider',
+    'components/reconciliation/RunFlowchartBoard.vue': 'a question box is named by its question, which is data; its + buttons are entered',
   }
 
   /**

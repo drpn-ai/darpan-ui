@@ -16,7 +16,7 @@
     <InlineValidation v-if="error" tone="error" :message="error" />
     <div class="flowchart-editor-actions">
       <button type="button" class="wizard-next" :disabled="!local.ruleSetId || busy" data-testid="flowchart-editor-save" @click="emit('save', { ...local })">Save</button>
-      <button v-if="canDelete" type="button" class="wizard-back" :disabled="busy" data-testid="flowchart-editor-delete" @click="emit('delete')">Delete</button>
+      <button v-if="canDelete" type="button" class="wizard-back" :disabled="busy" data-testid="flowchart-editor-delete" @click="emit('delete')">Delete question</button>
       <button type="button" class="wizard-back" data-testid="flowchart-editor-cancel" @click="emit('cancel')">Cancel</button>
     </div>
   </aside>

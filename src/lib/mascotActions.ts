@@ -198,6 +198,28 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'the steps applied to both values before this rule compares them. They change the comparison, never the stored record.',
   },
 
+  /* ── The run flowchart (DAR-UI-048) ─────────────────────────────────────────── */
+  'run chart': {
+    title: 'Run chart',
+    body: 'starts every question over the window beside it, parent first. Each question is still its own rule run, with its own result.',
+  },
+  'add question': {
+    title: 'Add question',
+    body: 'puts a question at the top of the chart. It asks about every record its rule fetches, not only the ones another question passed.',
+  },
+  '+ next question': {
+    title: 'Next question',
+    body: 'asks about only the records this question answered yes for. Nothing already saved changes.',
+  },
+  '+ ask why': {
+    title: 'Ask why',
+    body: 'explains a finding: the new question sees only the records this one answered no for. The finding keeps its count.',
+  },
+  'delete question': {
+    title: 'Delete question',
+    body: 'takes it off the chart. Its rule and its past results stay. A question with questions under it has to lose those first.',
+  },
+
   /* ── The run window ─────────────────────────────────────────────────────────── */
   start: {
     title: 'Start',
