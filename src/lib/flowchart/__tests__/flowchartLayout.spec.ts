@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FlowchartQuestion } from '../../api/flowchartTypes'
-import { layoutFlowchart, walkableQuestionIds, type FlowchartBox } from '../flowchartLayout'
+import { ADD_SIZE, layoutFlowchart, walkableQuestionIds, type FlowchartBox } from '../flowchartLayout'
 
 function q(id: string, extra: Partial<FlowchartQuestion> = {}): FlowchartQuestion {
   return { reconciliationRunId: id, ruleSetId: `${id}_RS`, ...extra }
@@ -111,4 +111,20 @@ describe('walkableQuestionIds', () => {
   it('matches the backend walk order', () => {
     expect(walkableQuestionIds(chain())).toEqual(['S', 'A', 'A1', 'W', 'B'])
   })
+})
+
+describe('add actions (design system: app-icon-action "+", 2.8rem)', () => {
+  for (const narrow of [false, true]) {
+    it(`${narrow ? 'narrow' : 'wide'}: every question gets a next action and every finding an ask-why action, clear of every box`, () => {
+      const { boxes, affordances } = layoutFlowchart(chain(), { narrow })
+      const questions = boxes.filter((b) => b.kind !== 'finding')
+      const findings = boxes.filter((b) => b.kind === 'finding')
+      expect(affordances.filter((a) => a.kind === 'next').map((a) => a.questionId).sort()).toEqual(questions.map((b) => b.questionId).sort())
+      expect(affordances.filter((a) => a.kind === 'why').map((a) => a.questionId).sort()).toEqual(findings.map((b) => b.questionId).sort())
+      for (const a of affordances) {
+        const box = { id: `+${a.kind}:${a.questionId}`, kind: 'finding' as const, questionId: a.questionId, x: a.x, y: a.y, width: ADD_SIZE, height: ADD_SIZE }
+        for (const b of boxes) expect(overlap(box, b), `${box.id} overlaps ${b.id}`).toBe(false)
+      }
+    })
+  }
 })

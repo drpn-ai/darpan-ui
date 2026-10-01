@@ -53,18 +53,23 @@ describe('RunFlowchartBoard', () => {
         },
       },
     })
-    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('running')
-    expect(w.get('[data-testid="flowchart-state-S"]').text()).toContain('18,321')
+    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('Running')
+    expect(w.get('[data-testid="flowchart-state-S"]').text()).toContain('Done')
+    // The yes count rides on the arrow out of the question (one-line pills have no room for it).
+    expect(w.get('[data-testid="flowchart-edges"]').text()).toContain('yes 18,321')
   })
 
   it('marks the selected question', () => {
     const w = mount(RunFlowchartBoard, { props: { questions, ruleNames, editable: true, narrow: false, selectedId: 'A' } })
-    expect(w.get('[data-testid="flowchart-box-A"]').classes()).toContain('flowchart-box--selected')
+    expect(w.get('[data-testid="flowchart-box-A"]').classes()).toContain('flowchart-node--selected')
   })
 
-  it('puts "+ next question" right-aligned, off the "no" arrow lane (review I2)', () => {
+  it('the "+" actions are the design system\'s icon action, named for what they add', () => {
     const w = mount(RunFlowchartBoard, { props: { questions, ruleNames, editable: true, narrow: true } })
-    expect(w.get('[data-testid="flowchart-add-next-A"]').attributes('style')).toContain('translateX(-100%)')
+    const next = w.get('[data-testid="flowchart-add-next-A"]')
+    expect(next.classes()).toContain('app-icon-action')
+    expect(next.attributes('aria-label')).toBe('Add next question')
+    expect(w.get('[data-testid="flowchart-add-why-A"]').attributes('aria-label')).toBe('Ask why')
   })
 
   it('hides "+ next question" under a top-level one-source question when the run has no start (review I5)', () => {
@@ -88,7 +93,8 @@ describe('RunFlowchartBoard', () => {
         },
       },
     })
-    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('could not run: boom')
-    expect(w.get('[data-testid="flowchart-state-B"]').text()).toContain('did not finish')
+    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('Failed')
+    expect(w.get('[data-testid="flowchart-box-A"]').attributes('title')).toContain('could not run: boom')
+    expect(w.get('[data-testid="flowchart-box-B"]').attributes('title')).toContain('did not finish')
   })
 })

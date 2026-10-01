@@ -10,7 +10,7 @@ const rules = [
 describe('FlowchartQuestionEditor', () => {
   it('offers only rules that are not archived', () => {
     const w = mount(FlowchartQuestionEditor, { props: { rules, draft: { ruleSetId: '', runName: '', noOutcomeLabel: '' }, heading: 'First question', canDelete: false } })
-    const options = (w.findComponent({ name: 'WorkflowSelect' }).props('options') as { value: string }[]).map((o) => o.value)
+    const options = (w.findComponent({ name: 'AppSelect' }).props('options') as { value: string }[]).map((o) => o.value)
     expect(options).toEqual(['SHIP'])
   })
 
@@ -49,7 +49,7 @@ describe('FlowchartQuestionEditor', () => {
     ] as never[]
     const w = mount(FlowchartQuestionEditor, { props: { rules: mixed, draft: { ruleSetId: 'POP', runName: '', noOutcomeLabel: '' }, heading: 'Start', canDelete: false, isStart: true } })
     expect(w.find('[data-testid="flowchart-editor-no"]').exists()).toBe(false)
-    const options = (w.findComponent({ name: 'WorkflowSelect' }).props('options') as { value: string }[]).map((o) => o.value)
+    const options = (w.findComponent({ name: 'AppSelect' }).props('options') as { value: string }[]).map((o) => o.value)
     expect(options).toEqual(['POP'])
   })
 })

@@ -23,6 +23,6 @@ describe('RunFlowchartListPage', () => {
     vi.mocked(reconciliationFacade.listReconciliations).mockResolvedValue({ reconciliations: [] } as never)
     const w = mount(RunFlowchartListPage, { global: { stubs: { RouterLink: true } } })
     await flushPromises()
-    expect(w.text()).toContain('No runs yet')
+    expect(w.text()).toContain('No runs')
   })
 })

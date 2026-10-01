@@ -107,35 +107,24 @@ describe('RunFlowchartPage', () => {
     expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ reconciliationId: 'R1', windowStartLocalDate: expect.any(String) }))
     await vi.advanceTimersByTimeAsync(3000)
     await vi.advanceTimersByTimeAsync(3000)
-    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('yes · 9')
+    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('Done')
+    expect(w.get('[data-testid="flowchart-live-link-A"]').text()).toContain('yes 9 · no 1')
     const calls = f.getReconciliationExecution.mock.calls.length
     await vi.advanceTimersByTimeAsync(9000)
     expect(f.getReconciliationExecution.mock.calls.length).toBe(calls)
   })
 
-  it('the To date is inclusive: the run ends the day after it (review I3)', async () => {
+  it('the window note names the last day covered; the run ends the day after it (review I3)', async () => {
     vi.setSystemTime(new Date(2026, 7, 17, 12))
     f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E1' } as never)
     f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
     const w = mount(RunFlowchartPage)
     await flushPromises()
-    expect((w.get('[data-testid="flowchart-window-start"]').element as HTMLInputElement).value).toBe('2026-08-14')
-    expect((w.get('[data-testid="flowchart-window-end"]').element as HTMLInputElement).value).toBe('2026-08-16')
+    expect(w.get('[data-testid="flowchart-window-dates"]').text()).toBe('Aug 14, 2026 – Aug 16, 2026')
     await w.get('[data-testid="flowchart-run-button"]').trigger('click')
     await flushPromises()
     expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ windowStartLocalDate: '2026-08-14', windowEndLocalDate: '2026-08-17' }))
     w.unmount()
-  })
-
-  it('refuses a window whose start is after its end (review I3)', async () => {
-    const w = mount(RunFlowchartPage)
-    await flushPromises()
-    await w.get('[data-testid="flowchart-window-start"]').setValue('2026-08-20')
-    await w.get('[data-testid="flowchart-window-end"]').setValue('2026-08-16')
-    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-    await flushPromises()
-    expect(w.text()).toContain('From must be on or before To.')
-    expect(f.runReconciliation).not.toHaveBeenCalled()
   })
 
   it('a double click starts one walk (review I4)', async () => {

@@ -29,11 +29,9 @@ async function submit(w: ReturnType<typeof mount>) {
 }
 
 describe('RunFlowchartCreatePage', () => {
-  it('creates a run with a start and lands on its chart', async () => {
+  it('asks where it starts, the starting rule, the look-back, and the name last, then lands on the chart', async () => {
     const w = mount(RunFlowchartCreatePage)
     await flushPromises()
-    await w.get('[data-testid="flowchart-create-name"]').setValue('NetSuite order chain')
-    await submit(w)
     await w.get('[data-testid="flowchart-start-choice-records"]').trigger('click')
     await flushPromises()
     const starting = (w.findComponent({ name: 'WorkflowSelect' }).props('options') as { value: string }[]).map((o) => o.value)
@@ -41,6 +39,9 @@ describe('RunFlowchartCreatePage', () => {
     w.findComponent({ name: 'WorkflowSelect' }).vm.$emit('update:modelValue', 'POP')
     await submit(w)
     await w.get('[data-testid="flowchart-create-days"]').setValue('3')
+    await submit(w)
+    expect(w.text()).toContain('What should we call this run?')
+    await w.get('[data-testid="flowchart-create-name"]').setValue('NetSuite order chain')
     await submit(w)
     expect(f.saveReconciliation).toHaveBeenCalledWith({ reconciliationName: 'NetSuite order chain', defaultTimeWindow: '3d' })
     expect(f.saveReconciliationQuestion).toHaveBeenCalledWith(expect.objectContaining({ reconciliationId: 'R9', ruleSetId: 'POP', questionRole: 'START' }))
@@ -50,12 +51,12 @@ describe('RunFlowchartCreatePage', () => {
   it('creates a run with no start', async () => {
     const w = mount(RunFlowchartCreatePage)
     await flushPromises()
-    await w.get('[data-testid="flowchart-create-name"]').setValue('Loose checks')
-    await submit(w)
     await w.get('[data-testid="flowchart-start-choice-none"]').trigger('click')
     await flushPromises()
     await submit(w)
+    await w.get('[data-testid="flowchart-create-name"]').setValue('Loose checks')
+    await submit(w)
     expect(f.saveReconciliationQuestion).not.toHaveBeenCalled()
-    expect(push).toHaveBeenCalled()
+    expect(push).toHaveBeenCalledWith({ name: 'reconciliation-run-flowchart', params: { reconciliationId: 'R9' } })
   })
 })

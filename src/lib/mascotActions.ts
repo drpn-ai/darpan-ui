@@ -207,13 +207,25 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Add question',
     body: 'puts a question at the top of the chart. It asks about every record its rule fetches, not only the ones another question passed.',
   },
-  '+ next question': {
-    title: 'Next question',
-    body: 'asks about only the records this question answered yes for. Nothing already saved changes.',
+  'add next question': {
+    title: 'Add next question',
+    body: 'opens a question that sees only the records this one answered yes for. Nothing already saved changes.',
   },
-  '+ ask why': {
+  'ask why': {
     title: 'Ask why',
     body: 'explains a finding: the new question sees only the records this one answered no for. The finding keeps its count.',
+  },
+  'save question': {
+    title: 'Save question',
+    body: 'keeps it in the chart. The next run asks it; runs that already finished are not re-asked.',
+  },
+  'close question editor': {
+    title: 'Close',
+    body: 'leaves the question as it was saved. Anything typed since is dropped.',
+  },
+  'back to runs': {
+    title: 'Back to Runs',
+    body: 'returns to every saved run. A run in progress keeps going; its questions finish without this page.',
   },
   'delete question': {
     title: 'Delete question',
