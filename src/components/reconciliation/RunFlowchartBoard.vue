@@ -37,16 +37,20 @@
             <StatusBadge :label="stateBadge(box.questionId).label" :tone="stateBadge(box.questionId).tone" />
           </span>
         </button>
-        <div
+        <component
+          :is="openable(box.questionId) ? 'button' : 'div'"
           v-else
+          v-bind="openable(box.questionId) ? { type: 'button' } : {}"
           class="flowchart-finding"
+          :class="{ 'flowchart-finding--open': openable(box.questionId) }"
           :style="boxStyle(box)"
           :title="findingLabel(box.questionId)"
           :data-testid="`flowchart-finding-${box.questionId}`"
+          @click="openable(box.questionId) && emit('open-finding', box.questionId)"
         >
           <span class="flowchart-finding-label">{{ findingLabel(box.questionId) }}</span>
           <span v-if="noCount(box.questionId) !== null" class="flowchart-finding-count">{{ formatCount(noCount(box.questionId)!) }}</span>
-        </div>
+        </component>
       </template>
 
       <template v-if="editable">
@@ -84,13 +88,18 @@ const props = defineProps<{
   narrow: boolean
   selectedId?: string | null
   states?: Record<string, { state: QuestionRunState; row?: FlowchartExecutionRow }>
+  /** Question ids whose finding has records to open (a finished question with a result file). */
+  openableFindings?: string[]
 }>()
 
 const emit = defineEmits<{
   select: [questionId: string]
   'add-next': [questionId: string]
   'add-why': [questionId: string]
+  'open-finding': [questionId: string]
 }>()
+
+const openable = (id: string) => props.openableFindings?.includes(id) ?? false
 
 const layout = computed(() => layoutFlowchart(props.questions, { narrow: props.narrow }))
 const byId = computed(() => new Map(props.questions.map((q) => [q.reconciliationRunId, q])))
@@ -209,6 +218,16 @@ function edgeLabel(edge: FlowchartEdge): string {
   color: var(--text-muted);
   font-size: var(--type-table-head-size);
 }
+.flowchart-finding--open {
+  /* The box is sized by the layout; the global button min-height would stretch it. */
+  min-height: 0;
+}
+
+.flowchart-finding--open:hover {
+  border-color: color-mix(in oklab, var(--border) 70%, var(--accent));
+  background: color-mix(in oklab, var(--surface-2) 88%, var(--accent));
+}
+
 .flowchart-finding-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flowchart-finding-count { flex: none; color: var(--text); font-variant-numeric: tabular-nums; }
 

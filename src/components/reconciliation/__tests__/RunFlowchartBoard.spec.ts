@@ -37,6 +37,17 @@ describe('RunFlowchartBoard', () => {
     expect(w.emitted('add-why')?.[0]).toEqual(['A'])
   })
 
+  it('only openable findings are buttons, and they say which finding to open', async () => {
+    const w = mount(RunFlowchartBoard, { props: { questions, ruleNames, editable: false, narrow: false, openableFindings: ['A'] } })
+    const a = w.get('[data-testid="flowchart-finding-A"]')
+    expect(a.element.tagName).toBe('BUTTON')
+    expect(a.attributes('type')).toBe('button')
+    expect(w.get('[data-testid="flowchart-finding-B"]').element.tagName).toBe('DIV')
+    await a.trigger('click')
+    await w.get('[data-testid="flowchart-finding-B"]').trigger('click')
+    expect(w.emitted('open-finding')).toEqual([['A']])
+  })
+
   it('hides the + buttons when not editable', () => {
     const w = mount(RunFlowchartBoard, { props: { questions, ruleNames, editable: false, narrow: false } })
     expect(w.find('[data-testid^="flowchart-add-"]').exists()).toBe(false)
