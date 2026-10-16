@@ -6,6 +6,8 @@ const replace = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const listSavedRuns = vi.hoisted(() => vi.fn())
 const saveDashboardPinnedSavedRuns = vi.hoisted(() => vi.fn())
 const listReconciliations = vi.hoisted(() => vi.fn())
+const importNetSuiteChecksAsRuns = vi.hoisted(() => vi.fn())
+const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 const route = vi.hoisted(() => ({
   name: 'hub',
   path: '/',
@@ -34,6 +36,8 @@ vi.mock('../../stores/auth', () => ({
   }),
 }))
 
+vi.mock('../../stores/permissions', () => ({ usePermissionsStore: () => permissions }))
+
 vi.mock('../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => ({
     workflowOrigin: null,
@@ -52,6 +56,7 @@ vi.mock('../../lib/api/facade', () => ({
     listSavedRuns,
     listReconciliations,
     saveDashboardPinnedSavedRuns,
+    importNetSuiteChecksAsRuns,
   },
 }))
 
@@ -86,6 +91,8 @@ describe('HomePage', () => {
     saveDashboardPinnedSavedRuns.mockReset()
     listReconciliations.mockReset()
     listReconciliations.mockResolvedValue({ reconciliations: [] })
+    importNetSuiteChecksAsRuns.mockReset()
+    permissions.canEditTenantSettings = true
 
     listSavedRuns.mockResolvedValue({
       pinnedSavedRunIds: ['RS8'],
@@ -393,5 +400,73 @@ describe('HomePage', () => {
     await flushPromises()
 
     expect(JSON.parse(wrapper.get('[data-testid="dashboard-create-action"]').attributes('data-to') ?? '{}')).toEqual({ name: 'run-create' })
+  })
+
+  // DAR-UI-048 plan 3. The NetSuite checks a tenant already has become Lifecycle runs.
+  describe('Import NetSuite Checks', () => {
+    const netsuiteCheck = () => ({
+      ...buildSavedRun(0),
+      savedRunId: 'NS1',
+      runName: 'Pending Billing',
+      scopeMode: 'EVALUATE',
+      defaultFile1SystemEnumId: 'NETSUITE_SUITEQL',
+      defaultFile2SystemEnumId: undefined,
+      systemOptions: [{ enumId: 'NETSUITE_SUITEQL', label: 'NetSuite SuiteQL', systemParentLabel: 'NetSuite', fileSide: 'FILE_1', sourceConfigType: 'NETSUITE_SUITEQL' }],
+    })
+
+    it('imports, says what it did, and lists the runs it made', async () => {
+      listSavedRuns.mockResolvedValue({ pinnedSavedRunIds: [], savedRuns: [netsuiteCheck(), buildSavedRun(1)] })
+      importNetSuiteChecksAsRuns.mockResolvedValue({ runs: [{ reconciliationId: 'R1', reconciliationName: 'NetSuite checks: sales orders', questionCount: 3 }], imported: 2, skipped: 0 })
+      const wrapper = mount(HomePage)
+      await flushPromises()
+      await wrapper.get('[data-testid="dashboard-import-netsuite-checks"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="dashboard-import-result"]').text()).toBe('Imported 2 checks into 1 run.')
+      expect(listReconciliations).toHaveBeenCalledTimes(2)
+    })
+
+    it('names the skips, and says so when there is nothing new', async () => {
+      listSavedRuns.mockResolvedValue({ pinnedSavedRunIds: [], savedRuns: [netsuiteCheck()] })
+      importNetSuiteChecksAsRuns
+        .mockResolvedValueOnce({
+          runs: [{ reconciliationId: 'R1', reconciliationName: 'a', questionCount: 2 }, { reconciliationId: 'R2', reconciliationName: 'b', questionCount: 6 }],
+          imported: 7,
+          skipped: 1,
+          messages: ["Check 'Late invoices' was not imported: its query has no column for the key field tranId, so a start could not list its records."],
+        })
+        .mockResolvedValueOnce({ runs: [], imported: 0, skipped: 0 })
+      const wrapper = mount(HomePage)
+      await flushPromises()
+      await wrapper.get('[data-testid="dashboard-import-netsuite-checks"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="dashboard-import-result"]').text()).toBe('Imported 7 checks into 2 runs. 1 check was skipped.')
+      expect(wrapper.get('[data-testid="dashboard-import-skips"]').text()).toContain("Check 'Late invoices' was not imported")
+      await wrapper.get('[data-testid="dashboard-import-netsuite-checks"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="dashboard-import-result"]').text()).toBe('No new NetSuite checks to import.')
+    })
+
+    it('a refused import shows why', async () => {
+      listSavedRuns.mockResolvedValue({ pinnedSavedRunIds: [], savedRuns: [netsuiteCheck()] })
+      importNetSuiteChecksAsRuns.mockRejectedValue(new Error('Your active tenant only has view access for runs.'))
+      const wrapper = mount(HomePage)
+      await flushPromises()
+      await wrapper.get('[data-testid="dashboard-import-netsuite-checks"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.text()).toContain('only has view access')
+      expect(wrapper.find('[data-testid="dashboard-import-result"]').exists()).toBe(false)
+    })
+
+    it('is offered only to an editor whose tenant has a NetSuite check', async () => {
+      const wrapper = mount(HomePage)
+      await flushPromises()
+      expect(wrapper.find('[data-testid="dashboard-import-netsuite-checks"]').exists()).toBe(false)
+
+      listSavedRuns.mockResolvedValue({ pinnedSavedRunIds: [], savedRuns: [netsuiteCheck()] })
+      permissions.canEditTenantSettings = false
+      const viewer = mount(HomePage)
+      await flushPromises()
+      expect(viewer.find('[data-testid="dashboard-import-netsuite-checks"]').exists()).toBe(false)
+    })
   })
 })

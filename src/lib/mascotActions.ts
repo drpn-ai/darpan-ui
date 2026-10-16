@@ -227,6 +227,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Back to Home',
     body: 'returns to every saved run, Sync and Lifecycle alike. A run in progress keeps going; its questions finish without this page.',
   },
+  'import netsuite checks': {
+    title: 'Import NetSuite Checks',
+    body: 'turns each NetSuite check not yet in a Lifecycle run into a question under a start that lists its records. Safe to repeat.',
+  },
   'delete question': {
     title: 'Delete question',
     body: 'takes it off the chart. Its rule and its past results stay. A question with questions under it has to lose those first.',

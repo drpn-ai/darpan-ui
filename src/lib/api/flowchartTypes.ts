@@ -88,4 +88,10 @@ export interface FlowchartExecutionSummary {
 export interface ListFlowchartExecutionsResponse { executions: FlowchartExecutionSummary[] }
 
 export interface ImportedFlowchartRun { reconciliationId: string; reconciliationName: string; questionCount: number }
-export interface ImportNetSuiteChecksResponse { runs: ImportedFlowchartRun[]; imported: number; skipped: number }
+export interface ImportNetSuiteChecksResponse {
+  runs: ImportedFlowchartRun[]
+  imported: number
+  skipped: number
+  /** One sentence per skipped check, naming it and why (NetSuiteCheckImportSupport). */
+  messages?: string[]
+}

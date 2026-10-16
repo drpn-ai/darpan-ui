@@ -80,9 +80,24 @@
       Showing {{ savedRuns.length }} of {{ totalRunCount }} runs. Group counts cover what is shown.
     </p>
 
-    <RouterLink v-if="hasOtherRuns" class="static-page-action-tile" data-testid="dashboard-create-action" :to="createFlowRoute" @click="setDashboardOrigin">
-      Create Run
-    </RouterLink>
+    <div v-if="hasOtherRuns" class="action-row">
+      <RouterLink class="static-page-action-tile" data-testid="dashboard-create-action" :to="createFlowRoute" @click="setDashboardOrigin">
+        Create Run
+      </RouterLink>
+      <button
+        v-if="canImportNetSuiteChecks"
+        type="button"
+        class="static-page-action-tile"
+        data-testid="dashboard-import-netsuite-checks"
+        :disabled="importing"
+        @click="importNetSuiteChecks"
+      >
+        Import NetSuite Checks
+      </button>
+    </div>
+    <InlineValidation v-if="importError" tone="error" :message="importError" data-testid="dashboard-import-error" />
+    <p v-if="importResult" class="section-note" data-testid="dashboard-import-result">{{ importResult }}</p>
+    <p v-for="(skip, index) in importSkips" :key="index" class="section-note" data-testid="dashboard-import-skips">{{ skip }}</p>
   </StaticPageFrame>
 </template>
 
@@ -91,9 +106,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import StaticPageFrame from '../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../components/ui/StaticPageSection.vue'
+import InlineValidation from '../components/ui/InlineValidation.vue'
 import RunTypeBadge from '../components/ui/RunTypeBadge.vue'
 import { useAuthStore, buildAuthRedirect } from '../stores/auth'
 import { useReconciliationDraftStore } from '../stores/reconciliationDraft'
+import { usePermissionsStore } from '../stores/permissions'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { SavedRunSummary } from '../lib/api/types'
 import type { FlowchartRun } from '../lib/api/flowchartTypes'
@@ -192,6 +209,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const draftStore = useReconciliationDraftStore()
+const permissionsStore = usePermissionsStore()
 const savedRuns = ref<SavedRunSummary[]>([])
 const lifecycleRuns = ref<FlowchartRun[]>([])
 const pinnedSavedRunIds = ref<string[]>([])
@@ -346,6 +364,53 @@ async function handleDrop(target: 'pinned' | 'other', event: DragEvent): Promise
   await savePinnedRuns(nextPinnedSavedRunIds, previousPinnedSavedRunIds)
 }
 
+// DAR-UI-048 plan 3. Offered where it can do something: an editor, on a tenant that has a NetSuite check,
+// read the way import#NetSuiteChecksAsRuns reads one: a one-source run over a NETSUITE_SUITEQL source.
+// Repeating it is safe; the backend adds only checks not yet in a run.
+const canImportNetSuiteChecks = computed(() => permissionsStore.canEditTenantSettings && savedRuns.value.some((savedRun) =>
+  (savedRun.scopeMode ?? '').toUpperCase() === 'EVALUATE'
+  && savedRun.systemOptions.some((option) => option.fileSide === 'FILE_1' && option.sourceConfigType === 'NETSUITE_SUITEQL')))
+const importing = ref(false)
+const importResult = ref<string | null>(null)
+const importSkips = ref<string[]>([])
+const importError = ref<string | null>(null)
+
+function plural(count: number, noun: string): string {
+  return `${count.toLocaleString('en-US')} ${noun}${count === 1 ? '' : 's'}`
+}
+
+async function importNetSuiteChecks(): Promise<void> {
+  if (importing.value) return
+  importing.value = true
+  importResult.value = null
+  importSkips.value = []
+  importError.value = null
+  try {
+    const response = await reconciliationFacade.importNetSuiteChecksAsRuns(pageAbortController.signal)
+    const imported = response.imported ?? 0
+    const skipped = response.skipped ?? 0
+    const outcome = imported
+      ? `Imported ${plural(imported, 'check')} into ${plural(response.runs?.length ?? 0, 'run')}.`
+      : 'No new NetSuite checks to import.'
+    const skips = skipped ? ` ${plural(skipped, 'check')} ${skipped === 1 ? 'was' : 'were'} skipped.` : ''
+    importResult.value = `${outcome}${skips}`
+    importSkips.value = skipped ? (response.messages ?? []) : []
+    lifecycleRuns.value = await loadLifecycleRuns()
+  } catch (error) {
+    if ((error as { name?: string })?.name === 'AbortError') return
+    importError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    importing.value = false
+  }
+}
+
+// Independent of the sync list: a failure here costs the Lifecycle section, never the page.
+function loadLifecycleRuns(): Promise<FlowchartRun[]> {
+  return reconciliationFacade.listReconciliations(pageAbortController.signal)
+    .then((response) => (response.reconciliations ?? []).filter((run) => run.isArchived !== 'Y'))
+    .catch(() => [])
+}
+
 function setDashboardOrigin(): void {
   draftStore.setWorkflowOrigin('Dashboard', '/')
 }
@@ -363,10 +428,7 @@ async function loadDashboard(): Promise<void> {
   savedRuns.value = []
   lifecycleRuns.value = []
 
-  // Independent of the sync list: a failure here costs the Lifecycle section, never the page.
-  void reconciliationFacade.listReconciliations(pageAbortController.signal)
-    .then((response) => { lifecycleRuns.value = (response.reconciliations ?? []).filter((run) => run.isArchived !== 'Y') })
-    .catch(() => { lifecycleRuns.value = [] })
+  void loadLifecycleRuns().then((runs) => { lifecycleRuns.value = runs })
 
   try {
     // 12 was enough while Home showed five tiles and a More.... Grouping puts a COUNT in every
