@@ -74,3 +74,18 @@ export interface GetFlowchartRunResponse { reconciliation: FlowchartRun; questio
 export interface SaveFlowchartQuestionResponse { question: FlowchartQuestion }
 export interface RunFlowchartResponse { reconciliationExecutionId: string }
 export interface GetFlowchartExecutionResponse { results: FlowchartExecutionRow[] }
+
+/** One press of Run, rolled up across its questions' result rows (list#ReconciliationExecutions). */
+export interface FlowchartExecutionSummary {
+  reconciliationExecutionId: string
+  startedDate?: string | number | null
+  windowStartDate?: string | number | null
+  windowEndDate?: string | number | null
+  statusEnumId?: string | null
+  questionCount?: number
+}
+
+export interface ListFlowchartExecutionsResponse { executions: FlowchartExecutionSummary[] }
+
+export interface ImportedFlowchartRun { reconciliationId: string; reconciliationName: string; questionCount: number }
+export interface ImportNetSuiteChecksResponse { runs: ImportedFlowchartRun[]; imported: number; skipped: number }

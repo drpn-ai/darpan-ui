@@ -13,7 +13,7 @@ const call = vi.mocked(callService)
 describe('flowchart facade methods', () => {
   beforeEach(() => call.mockReset().mockResolvedValue({ ok: true }))
 
-  it('names the seven services exactly', async () => {
+  it('names the nine services exactly', async () => {
     await reconciliationFacade.listReconciliations()
     await reconciliationFacade.saveReconciliation({ reconciliationName: 'Chain' })
     await reconciliationFacade.getReconciliation({ reconciliationId: 'R1' })
@@ -21,6 +21,8 @@ describe('flowchart facade methods', () => {
     await reconciliationFacade.deleteReconciliationQuestion({ reconciliationRunId: 'Q1' })
     await reconciliationFacade.runReconciliation({ reconciliationId: 'R1', windowStartDate: 'a', windowEndDate: 'b' })
     await reconciliationFacade.getReconciliationExecution({ reconciliationExecutionId: 'E1' })
+    await reconciliationFacade.listReconciliationExecutions({ reconciliationId: 'R1' })
+    await reconciliationFacade.importNetSuiteChecksAsRuns()
     expect(call.mock.calls.map((c) => c[0])).toEqual([
       'facade.ReconciliationFacadeServices.list#Reconciliations',
       'facade.ReconciliationFacadeServices.save#Reconciliation',
@@ -29,7 +31,10 @@ describe('flowchart facade methods', () => {
       'facade.ReconciliationFacadeServices.delete#ReconciliationQuestion',
       'facade.ReconciliationFacadeServices.run#Reconciliation',
       'facade.ReconciliationFacadeServices.get#ReconciliationExecution',
+      'facade.ReconciliationFacadeServices.list#ReconciliationExecutions',
+      'facade.ReconciliationFacadeServices.import#NetSuiteChecksAsRuns',
     ])
+    expect(call.mock.calls[8]?.[1]).toEqual({})
     expect(call.mock.calls[3]?.[1]).toEqual({ reconciliationId: 'R1', ruleSetId: 'RS1' })
   })
 })

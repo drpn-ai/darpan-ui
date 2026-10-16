@@ -162,6 +162,8 @@ import type {
 import type {
   GetFlowchartExecutionResponse,
   GetFlowchartRunResponse,
+  ImportNetSuiteChecksResponse,
+  ListFlowchartExecutionsResponse,
   ListFlowchartRunsResponse,
   RunFlowchartPayload,
   RunFlowchartResponse,
@@ -253,6 +255,8 @@ const RECONCILIATION = {
   deleteReconciliationQuestion: 'facade.ReconciliationFacadeServices.delete#ReconciliationQuestion',
   runReconciliation: 'facade.ReconciliationFacadeServices.run#Reconciliation',
   getReconciliationExecution: 'facade.ReconciliationFacadeServices.get#ReconciliationExecution',
+  listReconciliationExecutions: 'facade.ReconciliationFacadeServices.list#ReconciliationExecutions',
+  importNetSuiteChecksAsRuns: 'facade.ReconciliationFacadeServices.import#NetSuiteChecksAsRuns',
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
@@ -498,6 +502,12 @@ export const reconciliationFacade = {
   },
   getReconciliationExecution(payload: { reconciliationExecutionId: string }, signal?: AbortSignal): Promise<GetFlowchartExecutionResponse> {
     return callService<GetFlowchartExecutionResponse>(RECONCILIATION.getReconciliationExecution, payload, signal)
+  },
+  listReconciliationExecutions(payload: { reconciliationId: string }, signal?: AbortSignal): Promise<ListFlowchartExecutionsResponse> {
+    return callService<ListFlowchartExecutionsResponse>(RECONCILIATION.listReconciliationExecutions, payload, signal)
+  },
+  importNetSuiteChecksAsRuns(signal?: AbortSignal): Promise<ImportNetSuiteChecksResponse> {
+    return callService<ImportNetSuiteChecksResponse>(RECONCILIATION.importNetSuiteChecksAsRuns, {}, signal)
   },
   getGeneratedOutputDifferences(
     payload: GetGeneratedOutputDifferencesPayload,
