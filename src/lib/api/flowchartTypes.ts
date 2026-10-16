@@ -10,6 +10,10 @@ export interface FlowchartRun {
   isArchived?: string | null
   companyUserGroupId?: string | null
   questionCount?: number
+  /** DAR-UI-050. STAGES = built by the lifecycle builder; the run page shows where records stopped. */
+  buildMode?: 'STAGES' | null
+  /** DAR-UI-050. Records younger than this many days are not judged yet. */
+  lateAfterDays?: number | null
 }
 
 export interface FlowchartQuestion {
@@ -21,6 +25,8 @@ export interface FlowchartQuestion {
   isActive?: string | null
   runName?: string | null
   noOutcomeLabel?: string | null
+  /** DAR-UI-050. The place's name when nothing hangs on this question's "yes". */
+  yesOutcomeLabel?: string | null
   ruleSetId: string
   scopeMode?: 'COMPARE' | 'EVALUATE'
 }
@@ -95,3 +101,32 @@ export interface ImportNetSuiteChecksResponse {
   /** One sentence per skipped check, naming it and why (NetSuiteCheckImportSupport). */
   messages?: string[]
 }
+
+// DAR-UI-050. The lifecycle builder: every input is a dropdown filled from the account's own data.
+export interface LifecycleRecordTypeOption { recordType: string; label: string; count: number }
+export interface LifecycleStageOption {
+  recordType: string
+  label: string
+  past: string
+  /** Records in the sample that reached this stage, and that as a share of the sample. */
+  reached: number
+  rate: number
+  /** Median days from the record to its first follower of this type. */
+  typicalDays: number
+  /** Share of those that reached it that had done so by each day. */
+  coverage: { days: number; percent: number }[]
+}
+export interface GetLifecycleOptionsResponse {
+  recordTypes: LifecycleRecordTypeOption[]
+  stages: LifecycleStageOption[]
+  sampleSize?: number | null
+  sampleFrom?: string | null
+  sampleThru?: string | null
+}
+export interface SaveLifecyclePayload {
+  nsAuthConfigId: string
+  recordType: string
+  stageRecordTypes: string[]
+  lateAfterDays?: number
+}
+export interface SaveLifecycleResponse { reconciliationId: string; reconciliationName: string }

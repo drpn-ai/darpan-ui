@@ -145,6 +145,43 @@ describe('RunFlowchartPage', () => {
     w.unmount()
   })
 
+  // DAR-UI-050
+  describe('a lifecycle built from stages', () => {
+    const stagesRun = { ...run, reconciliationName: 'Sales orders: shipped → billed', buildMode: 'STAGES', lateAfterDays: 2 }
+    const stageQuestions = [
+      { reconciliationRunId: 'S', ruleSetId: 'R0', questionRole: 'START', runName: 'Sales orders' },
+      { reconciliationRunId: 'A', ruleSetId: 'R1', parentReconciliationRunId: 'S', parentBranch: 'YES', runName: 'Fulfillment' },
+      { reconciliationRunId: 'B', ruleSetId: 'R2', parentReconciliationRunId: 'A', parentBranch: 'YES', runName: 'Invoice',
+        noOutcomeLabel: 'Shipped, never billed', yesOutcomeLabel: 'Shipped and billed' },
+      { reconciliationRunId: 'W', ruleSetId: 'R3', parentReconciliationRunId: 'A', parentBranch: 'NO', runName: 'Invoice',
+        yesOutcomeLabel: 'Billed, never shipped', noOutcomeLabel: 'Never shipped, never billed' },
+    ]
+    beforeEach(() => { f.getReconciliation.mockResolvedValue({ reconciliation: stagesRun, questions: stageQuestions } as never) })
+
+    it('shows where records stopped instead of the question chart', async () => {
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(w.find('[data-testid="lifecycle-board"]').exists()).toBe(true)
+      expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(false)
+      expect(w.text()).toContain('Billed, never shipped')
+      expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 2 stages · last 3 days')
+    })
+
+    it('judges only records old enough: the window ends late-after days back', async () => {
+      vi.setSystemTime(new Date(2026, 7, 17, 12))
+      f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E1' } as never)
+      f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(w.get('[data-testid="flowchart-window-dates"]').text()).toBe('Aug 12, 2026 – Aug 14, 2026')
+      expect(w.get('[data-testid="flowchart-window-late"]').text()).toBe('Not judged yet: the last 2 days')
+      await w.get('[data-testid="flowchart-run-button"]').trigger('click')
+      await flushPromises()
+      expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ windowStartLocalDate: '2026-08-12', windowEndLocalDate: '2026-08-15' }))
+      w.unmount()
+    })
+  })
+
   it('a double click starts one walk (review I4)', async () => {
     let resolve: (v: unknown) => void = () => {}
     f.runReconciliation.mockReturnValue(new Promise((r) => { resolve = r }) as never)

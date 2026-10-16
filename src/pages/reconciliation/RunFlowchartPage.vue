@@ -9,7 +9,10 @@
     <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="flowchart-page-error" />
 
     <template v-if="run">
-      <StaticPageSection title="Questions">
+      <StaticPageSection v-if="isStages" title="Where Records Stopped">
+        <LifecycleBoard :board="board" :narrow="narrow" :can-open="canOpenPlace" @open="openPlace" />
+      </StaticPageSection>
+      <StaticPageSection v-else title="Questions">
         <RunFlowchartBoard
           :questions="questions"
           :rule-names="ruleNames"
@@ -67,10 +70,11 @@
           <AppSelect v-model="windowDays" :options="windowOptions" test-id="flowchart-window-preset" />
         </label>
         <p class="section-note" data-testid="flowchart-window-dates">{{ windowSummary }}</p>
+        <p v-if="lateAfterDays" class="section-note" data-testid="flowchart-window-late">Not judged yet: the last {{ lateAfterDays === 1 ? 'day' : `${lateAfterDays} days` }}</p>
         <p v-if="pollCeilingHit" class="section-note" data-testid="flowchart-poll-ceiling">Still waiting on this run. Check its questions below.</p>
       </StaticPageSection>
 
-      <StaticPageSection v-if="questionRuns.length" title="Question Runs">
+      <StaticPageSection v-if="questionRuns.length && !isStages" title="Question Runs">
         <div class="static-page-tile-grid static-page-record-grid">
           <RouterLink
             v-for="item in questionRuns"
@@ -136,6 +140,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import FlowchartQuestionEditor, { type FlowchartQuestionDraft } from '../../components/reconciliation/FlowchartQuestionEditor.vue'
+import LifecycleBoard from '../../components/reconciliation/LifecycleBoard.vue'
 import RunFlowchartBoard from '../../components/reconciliation/RunFlowchartBoard.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -154,8 +159,9 @@ import {
 } from '../../lib/flowchart/flowchartRunState'
 import { backIconPath, playIconPath, playIconTransform } from '../../lib/iconPaths'
 import { buildReconciliationRunLiveRoute, buildReconciliationRunResultRoute } from '../../lib/reconciliationRoutes'
+import { lifecycleBoard, type LifecyclePlace } from '../../lib/lifecycleBoard'
 import { lookBackLabel, questionCountLabel } from '../../lib/runTypes'
-import { addDays, displayCalendarDayOf, formatDateTime } from '../../lib/utils/date'
+import { addDays, displayCalendarDayOf, formatDateTime, todayInDisplayTimeZone } from '../../lib/utils/date'
 
 // DAR-UI-048. One run's chart, on a static board: build it from existing rules (spec A7), run it over a
 // look-back window, and follow each question. Editing opens the design system's static-page popup.
@@ -166,8 +172,12 @@ const reconciliationId = computed(() => String(route.params.reconciliationId ?? 
 const run = ref<FlowchartRun | null>(null)
 const questions = ref<FlowchartQuestion[]>([])
 // The START rule is drawn as the start box, not asked as a question, so it is not counted.
-const typeDetail = computed(() =>
-  `${questionCountLabel(questions.value.filter((q) => q.questionRole !== 'START').length)} · ${lookBackLabel(run.value?.defaultTimeWindow)}`)
+const typeDetail = computed(() => {
+  const what = isStages.value
+    ? `${board.value.stages.length} ${board.value.stages.length === 1 ? 'stage' : 'stages'}`
+    : questionCountLabel(questions.value.filter((q) => q.questionRole !== 'START').length)
+  return `${what} · ${lookBackLabel(run.value?.defaultTimeWindow)}`
+})
 const rules = ref<SavedRunSummary[]>([])
 const loading = ref(true)
 const pageError = ref<string | null>(null)
@@ -201,7 +211,13 @@ const windowOptions = computed(() => {
   const days = [...new Set([defaultWindowDays(run.value?.defaultTimeWindow), 1, 7, 30])].sort((a, b) => a - b)
   return days.map((d) => ({ value: String(d), label: d === 1 ? 'Previous day' : `Last ${d} days` }))
 })
-const selectedWindow = computed(() => windowFromDays(Number.parseInt(windowDays.value, 10) || 1))
+// DAR-UI-050. A lifecycle built from stages judges only records old enough to have finished: its window
+// ends lateAfterDays before today.
+const isStages = computed(() => run.value?.buildMode === 'STAGES')
+const lateAfterDays = computed(() => (isStages.value ? Number(run.value?.lateAfterDays ?? 0) : 0))
+const selectedWindow = computed(() => windowFromDays(Number.parseInt(windowDays.value, 10) || 1,
+  addDays(todayInDisplayTimeZone(), -lateAfterDays.value)))
+const board = computed(() => lifecycleBoard(questions.value, executionRows.value))
 // The window's end is exclusive; the note names the last day it covers (review I3).
 const windowSummary = computed(() =>
   `${dateFormat.format(selectedWindow.value.startDate)} – ${dateFormat.format(addDays(selectedWindow.value.endExclusiveDate, -1))}`)
@@ -246,6 +262,12 @@ function resultRouteFor(id: string): RouteLocationRaw | null {
   if (!q || !path || !entry || entry.state === 'waiting' || entry.state === 'running') return null
   return buildReconciliationRunResultRoute(routeContextFor(q, id), path)
 }
+
+// A "no" place's records are its question's result rows; a "yes" place is only a count.
+function canOpenPlace(place: LifecyclePlace): boolean {
+  return place.branch === 'NO' && (place.count ?? 0) > 0 && Boolean(resultRouteFor(place.questionId))
+}
+function openPlace(place: LifecyclePlace) { if (canOpenPlace(place)) openFinding(place.questionId) }
 
 const openableFindings = computed(() =>
   walkable.value.filter((id) => questions.value.find((q) => q.reconciliationRunId === id)?.questionRole !== 'START' && resultRouteFor(id)))
@@ -293,9 +315,12 @@ const summary = computed(() => {
   const word = running.value ? 'Running' : rollupWord(executionRows.value.map((r) => r.statusEnumId))
   const listed = executions.value.find((e) => e.reconciliationExecutionId === activeExecutionId.value)
   const starts = new Set(questions.value.filter((q) => q.questionRole === 'START').map((q) => q.reconciliationRunId))
-  const findings = executionRows.value
-    .filter((r) => !starts.has(r.reconciliationRunId ?? ''))
-    .reduce((sum, r) => sum + (r.noCount ?? 0), 0)
+  // A lifecycle's findings are its places' records (each record is in one); a chart's are its "no" counts.
+  const findings = isStages.value
+    ? board.value.stages.flatMap((st) => st.places).reduce((sum, p) => sum + (p.count ?? 0), 0)
+    : executionRows.value
+      .filter((r) => !starts.has(r.reconciliationRunId ?? ''))
+      .reduce((sum, r) => sum + (r.noCount ?? 0), 0)
   return {
     status: { label: word, tone: STATUS_TONES[word] ?? 'neutral' },
     window: listed ? windowText(listed.windowStartDate, listed.windowEndDate) : startedWindowText.value ?? '-',

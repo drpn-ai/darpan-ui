@@ -163,6 +163,9 @@ import type {
   GetFlowchartExecutionResponse,
   GetFlowchartRunResponse,
   ImportNetSuiteChecksResponse,
+  GetLifecycleOptionsResponse,
+  SaveLifecyclePayload,
+  SaveLifecycleResponse,
   ListFlowchartExecutionsResponse,
   ListFlowchartRunsResponse,
   RunFlowchartPayload,
@@ -257,6 +260,9 @@ const RECONCILIATION = {
   getReconciliationExecution: 'facade.ReconciliationFacadeServices.get#ReconciliationExecution',
   listReconciliationExecutions: 'facade.ReconciliationFacadeServices.list#ReconciliationExecutions',
   importNetSuiteChecksAsRuns: 'facade.ReconciliationFacadeServices.import#NetSuiteChecksAsRuns',
+  // DAR-UI-050: the lifecycle builder.
+  getLifecycleOptions: 'facade.NetSuiteLifecycleFacadeServices.get#LifecycleOptions',
+  saveLifecycle: 'facade.ReconciliationFacadeServices.save#Lifecycle',
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
@@ -508,6 +514,12 @@ export const reconciliationFacade = {
   },
   importNetSuiteChecksAsRuns(signal?: AbortSignal): Promise<ImportNetSuiteChecksResponse> {
     return callService<ImportNetSuiteChecksResponse>(RECONCILIATION.importNetSuiteChecksAsRuns, {}, signal)
+  },
+  getLifecycleOptions(payload: { nsAuthConfigId: string; recordType?: string }, signal?: AbortSignal): Promise<GetLifecycleOptionsResponse> {
+    return callService<GetLifecycleOptionsResponse>(RECONCILIATION.getLifecycleOptions, payload, signal)
+  },
+  saveLifecycle(payload: SaveLifecyclePayload, signal?: AbortSignal): Promise<SaveLifecycleResponse> {
+    return callService<SaveLifecycleResponse>(RECONCILIATION.saveLifecycle, payload, signal)
   },
   getGeneratedOutputDifferences(
     payload: GetGeneratedOutputDifferencesPayload,

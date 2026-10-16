@@ -1,69 +1,83 @@
 <template>
-  <WorkflowPage :progress-percent="progress" aria-label="Create a run" center-stage>
+  <WorkflowPage :progress-percent="progress" aria-label="Create a lifecycle" center-stage>
     <div class="workflow-step-wrapper">
       <WorkflowStepForm
-        v-if="step === 'start'"
-        class="flowchart-create-choice-step"
-        question="Where does this run start?"
-        :show-primary-action="false"
-        :show-enter-hint="false"
+        v-if="step === 'account'"
+        question="Which account?"
+        :submit-disabled="!accountId"
+        :allow-select-enter="true"
         :show-back="true"
         @back="backToTypeChoice"
+        @submit="goToRecords"
       >
-        <WorkflowShortcutChoiceCards
-          :options="startOptions"
-          :selected-value="startChoice"
-          test-id-prefix="flowchart-start-choice"
-          @choose="chooseStart"
-        />
+        <div class="wizard-input-shell">
+          <WorkflowSelect
+            v-model="accountId"
+            :options="accountOptions"
+            :disabled="loadingAccounts"
+            :placeholder="loadingAccounts ? 'Loading...' : 'pick an account'"
+            test-id="lifecycle-create-account"
+          />
+        </div>
+        <InlineValidation v-if="error" tone="error" :message="error" />
       </WorkflowStepForm>
 
       <WorkflowStepForm
-        v-else-if="step === 'rule'"
-        question="Which rule lists the starting records?"
-        :submit-disabled="!startRuleId"
+        v-else-if="step === 'records'"
+        question="Which records?"
+        :submit-disabled="!recordType || loadingStages"
+        :allow-select-enter="true"
         :show-back="true"
-        @back="step = 'start'"
-        @submit="step = 'days'"
+        @back="backFromRecords"
+        @submit="goToStages"
       >
         <div class="wizard-input-shell">
-          <WorkflowSelect v-model="startRuleId" :options="startRuleOptions" placeholder="pick a rule" test-id="flowchart-create-rule" />
+          <WorkflowSelect
+            v-model="recordType"
+            :options="recordTypeOptions"
+            :disabled="loadingRecordTypes || loadingStages"
+            :placeholder="loadingRecordTypes ? `Reading ${accountLabel}...` : loadingStages ? `Reading what follows them...` : 'pick records'"
+            test-id="lifecycle-create-records"
+          />
         </div>
+        <InlineValidation v-if="error" tone="error" :message="error" />
       </WorkflowStepForm>
 
       <WorkflowStepForm
-        v-else-if="step === 'days'"
-        question="How many days should a run look back?"
-        :submit-disabled="days < 1"
+        v-else-if="step === 'stages'"
+        :question="`What happens to ${recordWordOne}?`"
+        :submit-disabled="!chosenStages.length"
         :show-back="true"
-        @back="step = startChoice === 'records' ? 'rule' : 'start'"
-        @submit="step = 'name'"
+        @back="step = 'records'"
+        @submit="goToLate"
       >
         <div class="wizard-input-shell">
-          <input v-model.number="days" type="number" min="1" inputmode="numeric" class="wizard-answer-control" data-testid="flowchart-create-days" />
+          <WorkflowSelect
+            v-model="chosenStages"
+            multiple
+            :options="stageOptions"
+            :placeholder="stageOptions.length ? 'pick what happens next' : 'nothing follows these records here'"
+            test-id="lifecycle-create-stages"
+          />
         </div>
+        <InlineValidation v-if="error" tone="error" :message="error" />
       </WorkflowStepForm>
 
       <WorkflowStepForm
         v-else
-        question="What should we call this run?"
+        :question="`When is ${recordWordOne} late?`"
         primary-action-variant="save"
-        primary-label="Save run"
-        :submit-disabled="saving || !name.trim()"
+        primary-label="Save lifecycle"
+        :submit-disabled="saving || lateAfter === ''"
+        :allow-select-enter="true"
         :show-back="true"
         :show-cancel-action="true"
-        @back="step = 'days'"
+        @back="step = 'stages'"
         @cancel="cancel"
         @submit="create"
       >
         <div class="wizard-input-shell">
-          <input
-            v-model="name"
-            type="text"
-            :class="['wizard-answer-control', { empty: !name }]"
-            placeholder="NetSuite order chain"
-            data-testid="flowchart-create-name"
-          />
+          <WorkflowSelect v-model="lateAfter" :options="lateOptions" placeholder="pick a day" test-id="lifecycle-create-late" />
         </div>
         <InlineValidation v-if="error" tone="error" :message="error" />
       </WorkflowStepForm>
@@ -77,55 +91,98 @@ import { useRouter } from 'vue-router'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
-import WorkflowShortcutChoiceCards from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
-import { reconciliationFacade } from '../../lib/api/facade'
-import type { SavedRunSummary } from '../../lib/api/types'
+import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
+import type { LifecycleRecordTypeOption, LifecycleStageOption } from '../../lib/api/flowchartTypes'
+import { orderedStages, lateAfterOptions, defaultLateAfter, stageOptionLabel } from '../../lib/lifecycleOptions'
 
-// DAR-UI-048. A workflow flow, one question per step, the record name on the last step (design system
-// rule 5): where it starts, the starting rule, the look-back, then the name.
-type Step = 'start' | 'rule' | 'days' | 'name'
+// DAR-UI-050. A lifecycle in four dropdowns, one per step. Every option is read from the account itself
+// (get#LifecycleOptions), with its evidence in the label, so nothing is typed and nothing is offered that
+// the data does not contain. The name, the stage order and every place name are made by the backend.
+type Step = 'account' | 'records' | 'stages' | 'late'
 const router = useRouter()
-const step = ref<Step>('start')
-const name = ref('')
-const startChoice = ref<'records' | 'none' | ''>('')
-const startRuleId = ref('')
-const days = ref(1)
-const rules = ref<SavedRunSummary[]>([])
+const step = ref<Step>('account')
+const accounts = ref<{ id: string; label: string }[]>([])
+const accountId = ref('')
+const recordTypes = ref<LifecycleRecordTypeOption[]>([])
+const recordType = ref('')
+const stages = ref<LifecycleStageOption[]>([])
+const chosenStages = ref<string[]>([])
+const lateAfter = ref('')
+const loadingAccounts = ref(true)
+const loadingRecordTypes = ref(false)
+const loadingStages = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
+// One account skips its card, so Back from records goes to the type choice instead.
+const skippedAccount = ref(false)
 
-const startOptions = [
-  { value: 'records', label: 'From a list of records', shortcutKey: 'A', description: 'Every record the rule lists is asked the first question' },
-  { value: 'none', label: 'No start', shortcutKey: 'B', description: 'Each question asks about the records its own rule fetches' },
-]
-const startRuleOptions = computed(() => rules.value
-  .filter((r) => r.scopeMode === 'EVALUATE' && !r.isArchived)
-  .map((r) => ({ value: r.savedRunId, label: r.runName || r.savedRunId })))
-const progress = computed(() => ({ start: 0, rule: 25, days: 50, name: 75 })[step.value])
-
-function chooseStart(value: string) {
-  startChoice.value = value as 'records' | 'none'
-  step.value = value === 'records' ? 'rule' : 'days'
-}
+const accountOptions = computed(() => accounts.value.map((a) => ({ value: a.id, label: a.label })))
+const accountLabel = computed(() => accounts.value.find((a) => a.id === accountId.value)?.label ?? 'the account')
+const recordTypeOptions = computed(() => recordTypes.value.map((r) => ({
+  value: r.recordType, label: `${r.label} · ${r.count.toLocaleString()} in the last 30 days`,
+})))
+const recordWordOne = computed(() => {
+  const label = recordTypes.value.find((r) => r.recordType === recordType.value)?.label ?? 'a record'
+  return `a ${label.replace(/s$/, '').toLowerCase()}`
+})
+const stageOptions = computed(() => stages.value.map((s) => ({ value: s.recordType, label: stageOptionLabel(s) })))
+const chosenInOrder = computed(() => orderedStages(stages.value, chosenStages.value))
+const lateOptions = computed(() => lateAfterOptions(chosenInOrder.value))
+const progress = computed(() => ({ account: 0, records: 25, stages: 50, late: 75 })[step.value])
 
 function backToTypeChoice() { void router.push({ name: 'run-create' }) }
+function backFromRecords() { if (skippedAccount.value) backToTypeChoice(); else step.value = 'account' }
 function cancel() { void router.push({ name: 'hub' }) }
+function message(caught: unknown) { return caught instanceof Error ? caught.message : String(caught) }
+
+async function goToRecords() {
+  error.value = null
+  step.value = 'records'
+  recordType.value = ''
+  loadingRecordTypes.value = true
+  try {
+    recordTypes.value = (await reconciliationFacade.getLifecycleOptions({ nsAuthConfigId: accountId.value })).recordTypes ?? []
+  } catch (caught) {
+    error.value = message(caught)
+  } finally {
+    loadingRecordTypes.value = false
+  }
+}
+
+async function goToStages() {
+  error.value = null
+  loadingStages.value = true
+  try {
+    stages.value = (await reconciliationFacade.getLifecycleOptions({ nsAuthConfigId: accountId.value, recordType: recordType.value })).stages ?? []
+    // Data-driven default: what at least half of these records go on to.
+    chosenStages.value = stages.value.filter((s) => s.rate >= 50).map((s) => s.recordType)
+    step.value = 'stages'
+  } catch (caught) {
+    error.value = message(caught)
+  } finally {
+    loadingStages.value = false
+  }
+}
+
+function goToLate() {
+  lateAfter.value = defaultLateAfter(chosenInOrder.value)
+  step.value = 'late'
+}
 
 async function create() {
   saving.value = true
   error.value = null
   try {
-    const { reconciliation } = await reconciliationFacade.saveReconciliation({ reconciliationName: name.value.trim(), defaultTimeWindow: `${days.value}d` })
-    if (startChoice.value === 'records' && startRuleId.value) {
-      const rule = rules.value.find((r) => r.savedRunId === startRuleId.value)
-      await reconciliationFacade.saveReconciliationQuestion({
-        reconciliationId: reconciliation.reconciliationId, ruleSetId: startRuleId.value, questionRole: 'START', runName: rule?.runName ?? undefined,
-      })
-    }
-    await router.push({ name: 'reconciliation-run-flowchart', params: { reconciliationId: reconciliation.reconciliationId } })
+    const saved = await reconciliationFacade.saveLifecycle({
+      nsAuthConfigId: accountId.value,
+      recordType: recordType.value,
+      stageRecordTypes: chosenInOrder.value.map((s) => s.recordType),
+      lateAfterDays: Number(lateAfter.value),
+    })
+    await router.push({ name: 'reconciliation-run-flowchart', params: { reconciliationId: saved.reconciliationId } })
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught)
+    error.value = message(caught)
   } finally {
     saving.value = false
   }
@@ -133,18 +190,17 @@ async function create() {
 
 onMounted(async () => {
   try {
-    rules.value = (await reconciliationFacade.listSavedRuns({ pageIndex: 0, pageSize: 200 })).savedRuns ?? []
+    const response = await settingsFacade.listNsAuthConfigs({ pageIndex: 0, pageSize: 100 })
+    accounts.value = (response.authConfigs ?? []).map((c) => ({ id: c.nsAuthConfigId, label: c.description || c.nsAuthConfigId }))
+    if (accounts.value.length === 1) {
+      accountId.value = accounts.value[0]!.id
+      skippedAccount.value = true
+      await goToRecords()
+    }
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught)
+    error.value = message(caught)
+  } finally {
+    loadingAccounts.value = false
   }
 })
 </script>
-
-<style scoped>
-/* The choice grid caps itself at 34rem (WorkflowShortcutChoiceCards) inside the 720px question column, so
-   the cards sat left of centre. Sizing this step to the grid's own width centres question, cards and Back
-   as one block; the input steps keep the full-width answer line. */
-.flowchart-create-choice-step {
-  width: min(34rem, 100%);
-}
-</style>
