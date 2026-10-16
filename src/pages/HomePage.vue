@@ -13,11 +13,12 @@
             class="static-page-tile"
             :data-flow-id="flow.id"
             :to="flow.to"
-            draggable="true"
+            :draggable="flow.pinnable ? 'true' : 'false'"
             @click="setDashboardOrigin"
             @dragstart="handleDragStart(flow.id, $event)"
           >
             <span class="static-page-tile-title">{{ flow.title }}</span>
+            <RunTypeBadge :type="flow.runTypeId" :detail="flow.typeDetail" />
           </RouterLink>
         </div>
         <div v-else class="static-page-drop-hint" data-testid="pinned-empty-state">drag and drop runs to pin</div>
@@ -42,11 +43,12 @@
             class="static-page-tile"
             :data-flow-id="flow.id"
             :to="flow.to"
-            draggable="true"
+            :draggable="flow.pinnable ? 'true' : 'false'"
             @click="setDashboardOrigin"
             @dragstart="handleDragStart(flow.id, $event)"
           >
             <span class="static-page-tile-title">{{ flow.title }}</span>
+            <RunTypeBadge :type="flow.runTypeId" :detail="flow.typeDetail" />
           </RouterLink>
           <button
             v-if="group.hidden > 0"
@@ -89,18 +91,29 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import StaticPageFrame from '../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../components/ui/StaticPageSection.vue'
+import RunTypeBadge from '../components/ui/RunTypeBadge.vue'
 import { useAuthStore, buildAuthRedirect } from '../stores/auth'
 import { useReconciliationDraftStore } from '../stores/reconciliationDraft'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { SavedRunSummary } from '../lib/api/types'
+import type { FlowchartRun } from '../lib/api/flowchartTypes'
+import { RUN_TYPES, lookBackLabel, questionCountLabel, type RunTypeId } from '../lib/runTypes'
 import { buildReconciliationDiffRoute } from '../lib/reconciliationRoutes'
 
 interface DashboardFlowCard {
   id: string
+  /** The id the pin preference stores. */
   savedRunId: string
   title: string
   groupTitle: string
   to: RouteLocationRaw
+  runTypeId: RunTypeId
+  typeDetail?: string
+  /**
+   * save#DashboardPinnedSavedRuns validates pins against RuleSet ids only, so a lifecycle pin
+   * would be dropped server-side and silently vanish. Lifecycle tiles stay put until it widens.
+   */
+  pinnable: boolean
 }
 
 const savedRunTitleOverrides: Record<string, string> = {
@@ -180,12 +193,13 @@ const router = useRouter()
 const authStore = useAuthStore()
 const draftStore = useReconciliationDraftStore()
 const savedRuns = ref<SavedRunSummary[]>([])
+const lifecycleRuns = ref<FlowchartRun[]>([])
 const pinnedSavedRunIds = ref<string[]>([])
 // Per group, not one flag for the page: expanding NetSuite should not also expand every other
 // family, which is what a single showAllOtherRuns did once there was more than one section.
 const expandedGroupKeys = ref<Set<string>>(new Set())
 const totalRunCount = ref(0)
-const createFlowRoute: RouteLocationRaw = { name: 'reconciliation-create' }
+const createFlowRoute: RouteLocationRaw = { name: 'run-create' }
 
 const pageAbortController = new AbortController()
 
@@ -209,11 +223,28 @@ const savedRunCards = computed<DashboardFlowCard[]>(() =>
           file2SystemLabel: resolveSystemLabel(savedRun, savedRun.defaultFile2SystemEnumId),
         },
       ),
+      runTypeId: 'sync' as const,
+      pinnable: true,
     }
   }),
 )
 
-const flowCards = computed<DashboardFlowCard[]>(() => savedRunCards.value)
+// DAR-UI-049. Lifecycle runs carry no system pair, so they share one section named for their type.
+// Prefixed ids: Reconciliation and RuleSet are numbered independently and both start at 100000.
+const lifecycleRunCards = computed<DashboardFlowCard[]>(() =>
+  lifecycleRuns.value.map((run) => ({
+    id: `lifecycle:${run.reconciliationId}`,
+    savedRunId: `lifecycle:${run.reconciliationId}`,
+    title: resolveSavedRunTitle(run.reconciliationName || run.reconciliationId),
+    groupTitle: RUN_TYPES.lifecycle.label,
+    to: { name: 'reconciliation-run-flowchart', params: { reconciliationId: run.reconciliationId } },
+    runTypeId: 'lifecycle' as const,
+    typeDetail: `${questionCountLabel(run.questionCount ?? 0)} · ${lookBackLabel(run.defaultTimeWindow)}`,
+    pinnable: false,
+  })),
+)
+
+const flowCards = computed<DashboardFlowCard[]>(() => [...savedRunCards.value, ...lifecycleRunCards.value])
 
 const pinnedFlowCards = computed<DashboardFlowCard[]>(() => {
   const flowCardMap = new Map(flowCards.value.map((card) => [card.savedRunId, card]))
@@ -254,8 +285,11 @@ const runGroups = computed<DashboardRunGroup[]>(() => {
     else byTitle.set(card.groupTitle, [card])
   })
 
+  // The type section is a different axis from the system families, so it follows them all
+  // instead of sorting in among them.
+  const lifecycleTitle = RUN_TYPES.lifecycle.label
   return [...byTitle.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => (a === lifecycleTitle ? 1 : 0) - (b === lifecycleTitle ? 1 : 0) || a.localeCompare(b))
     .map(([title, cards]) => {
       const key = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'other'
       const expanded = expandedGroupKeys.value.has(key)
@@ -301,7 +335,7 @@ async function handleDrop(target: 'pinned' | 'other', event: DragEvent): Promise
   const droppedFlowId = event.dataTransfer?.getData('text/plain')?.trim()
   if (!droppedFlowId) return
   const droppedCard = flowCards.value.find((card) => card.id === droppedFlowId)
-  if (!droppedCard) return
+  if (!droppedCard?.pinnable) return
 
   const previousPinnedSavedRunIds = [...pinnedSavedRunIds.value]
   const nextPinnedSavedRunIds =
@@ -327,6 +361,12 @@ async function loadDashboard(): Promise<void> {
   totalRunCount.value = 0
   pinnedSavedRunIds.value = []
   savedRuns.value = []
+  lifecycleRuns.value = []
+
+  // Independent of the sync list: a failure here costs the Lifecycle section, never the page.
+  void reconciliationFacade.listReconciliations(pageAbortController.signal)
+    .then((response) => { lifecycleRuns.value = (response.reconciliations ?? []).filter((run) => run.isArchived !== 'Y') })
+    .catch(() => { lifecycleRuns.value = [] })
 
   try {
     // 12 was enough while Home showed five tiles and a More.... Grouping puts a COUNT in every

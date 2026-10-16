@@ -59,4 +59,16 @@ describe('RunFlowchartCreatePage', () => {
     expect(f.saveReconciliationQuestion).not.toHaveBeenCalled()
     expect(push).toHaveBeenCalledWith({ name: 'reconciliation-run-flowchart', params: { reconciliationId: 'R9' } })
   })
+  // DAR-UI-049. Back on the first step returns to the type choice; Cancel leaves for Home.
+  it('goes back to the run-type choice from its first step, and home on cancel', async () => {
+    const w = mount(RunFlowchartCreatePage)
+    await flushPromises()
+    w.findComponent({ name: 'WorkflowStepForm' }).vm.$emit('back')
+    expect(push).toHaveBeenLastCalledWith({ name: 'run-create' })
+    await w.get('[data-testid="flowchart-start-choice-none"]').trigger('click')
+    await flushPromises()
+    await submit(w)
+    w.findComponent({ name: 'WorkflowStepForm' }).vm.$emit('cancel')
+    expect(push).toHaveBeenLastCalledWith({ name: 'hub' })
+  })
 })

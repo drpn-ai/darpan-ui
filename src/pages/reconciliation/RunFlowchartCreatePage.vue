@@ -8,7 +8,7 @@
         :show-primary-action="false"
         :show-enter-hint="false"
         :show-back="true"
-        @back="cancel"
+        @back="backToTypeChoice"
       >
         <WorkflowShortcutChoiceCards
           :options="startOptions"
@@ -109,7 +109,8 @@ function chooseStart(value: string) {
   step.value = value === 'records' ? 'rule' : 'days'
 }
 
-function cancel() { void router.push({ name: 'reconciliation-run-flowcharts' }) }
+function backToTypeChoice() { void router.push({ name: 'run-create' }) }
+function cancel() { void router.push({ name: 'hub' }) }
 
 async function create() {
   saving.value = true

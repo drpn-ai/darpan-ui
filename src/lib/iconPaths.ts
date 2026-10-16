@@ -26,3 +26,11 @@ export const playIconTransform = 'translate(0 1.5)'
 // weight as the other single-path glyphs in this set.
 export const diagnosticsIconPath =
   'M2.75 10h2.9l1.7-4.6a.75.75 0 0 1 1.42.06l2.2 8 1.66-5.2a.75.75 0 0 1 1.4-.08l.9 1.82h2.32'
+
+// DAR-UI-049 run types — both stroked on a 24-unit viewBox. Sync is the two-way arrow pair.
+// Lifecycle is the flowchart in miniature (three stages, a side exit), deliberately NOT the
+// circular-arrows lifecycle glyph, which reads as sync/refresh beside the Sync icon.
+export const syncIconPath = 'M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4'
+
+export const lifecycleIconPath =
+  'M10 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM10 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM10 20a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 6v4M8 14v4M10 12h9M16 9l3 3-3 3'

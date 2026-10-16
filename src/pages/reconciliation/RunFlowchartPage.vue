@@ -2,6 +2,7 @@
   <StaticPageFrame :class="{ 'static-page-frame--popup-open': Boolean(editing) }">
     <template #hero>
       <h1>{{ run?.reconciliationName || 'Run' }}</h1>
+      <RunTypeBadge v-if="run" type="lifecycle" :detail="typeDetail" />
     </template>
 
     <p v-if="loading" class="section-note">Loading run...</p>
@@ -60,9 +61,9 @@
     <template #actions>
       <div class="action-row">
         <RouterLink
-          :to="{ name: 'reconciliation-run-flowcharts' }"
+          :to="{ name: 'hub' }"
           class="app-icon-action app-icon-action--large"
-          aria-label="Back to Runs"
+          aria-label="Back to Home"
           data-testid="flowchart-back"
         >
           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -109,6 +110,7 @@ import FlowchartQuestionEditor, { type FlowchartQuestionDraft } from '../../comp
 import RunFlowchartBoard from '../../components/reconciliation/RunFlowchartBoard.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
@@ -120,6 +122,7 @@ import {
 } from '../../lib/flowchart/flowchartRunState'
 import { backIconPath, playIconPath, playIconTransform } from '../../lib/iconPaths'
 import { buildReconciliationRunLiveRoute } from '../../lib/reconciliationRoutes'
+import { lookBackLabel, questionCountLabel } from '../../lib/runTypes'
 import { addDays } from '../../lib/utils/date'
 
 // DAR-UI-048. One run's chart, on a static board: build it from existing rules (spec A7), run it over a
@@ -129,6 +132,9 @@ const reconciliationId = computed(() => String(route.params.reconciliationId ?? 
 
 const run = ref<FlowchartRun | null>(null)
 const questions = ref<FlowchartQuestion[]>([])
+// The START rule is drawn as the start box, not asked as a question, so it is not counted.
+const typeDetail = computed(() =>
+  `${questionCountLabel(questions.value.filter((q) => q.questionRole !== 'START').length)} · ${lookBackLabel(run.value?.defaultTimeWindow)}`)
 const rules = ref<SavedRunSummary[]>([])
 const loading = ref(true)
 const pageError = ref<string | null>(null)

@@ -55,10 +55,17 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
+    // DAR-UI-049. One Create Run: pick Sync or Lifecycle, then the create flow for that type.
+    path: '/reconciliation/new',
+    name: 'run-create',
+    component: () => import('../pages/reconciliation/RunCreateTypePage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
+    // DAR-UI-049. Lifecycle runs are listed on Home beside Sync runs; the separate list retired.
     path: '/reconciliation/runs',
     name: 'reconciliation-run-flowcharts',
-    component: () => import('../pages/reconciliation/RunFlowchartListPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Runs' },
+    redirect: { name: 'hub' },
   },
   {
     path: '/reconciliation/runs/create',

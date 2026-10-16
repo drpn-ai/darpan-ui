@@ -275,6 +275,14 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Localization',
     body: 'how this tenant reads dates and times. Set it before the first automated run, or the team reads timestamps in the wrong zone.',
   },
+  runTypeSync: {
+    title: 'Sync run',
+    body: 'checks that two systems hold the same records. Healthy is zero — anything it finds is a record that never made it across, or arrived wrong.',
+  },
+  runTypeLifecycle: {
+    title: 'Lifecycle run',
+    body: 'follows records through a chain of questions and names where each one stalls. Never zero — watch which stall grows.',
+  },
   pinnedRuns: {
     title: 'Pinned runs',
     body: 'the runs you asked to keep at the top. Pinning changes what you see first, never what a run does.',

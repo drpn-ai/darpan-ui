@@ -223,9 +223,9 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Close',
     body: 'leaves the question as it was saved. Anything typed since is dropped.',
   },
-  'back to runs': {
-    title: 'Back to Runs',
-    body: 'returns to every saved run. A run in progress keeps going; its questions finish without this page.',
+  'back to home': {
+    title: 'Back to Home',
+    body: 'returns to every saved run, Sync and Lifecycle alike. A run in progress keeps going; its questions finish without this page.',
   },
   'delete question': {
     title: 'Delete question',

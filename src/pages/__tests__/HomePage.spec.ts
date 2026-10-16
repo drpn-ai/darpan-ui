@@ -5,6 +5,7 @@ const ensureAuthenticated = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const replace = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const listSavedRuns = vi.hoisted(() => vi.fn())
 const saveDashboardPinnedSavedRuns = vi.hoisted(() => vi.fn())
+const listReconciliations = vi.hoisted(() => vi.fn())
 const route = vi.hoisted(() => ({
   name: 'hub',
   path: '/',
@@ -49,6 +50,7 @@ vi.mock('../../stores/reconciliationDraft', () => ({
 vi.mock('../../lib/api/facade', () => ({
   reconciliationFacade: {
     listSavedRuns,
+    listReconciliations,
     saveDashboardPinnedSavedRuns,
   },
 }))
@@ -82,6 +84,8 @@ describe('HomePage', () => {
     replace.mockClear()
     listSavedRuns.mockReset()
     saveDashboardPinnedSavedRuns.mockReset()
+    listReconciliations.mockReset()
+    listReconciliations.mockResolvedValue({ reconciliations: [] })
 
     listSavedRuns.mockResolvedValue({
       pinnedSavedRunIds: ['RS8'],
@@ -280,7 +284,7 @@ describe('HomePage', () => {
     await flushPromises()
 
     const runTile = wrapper.get('[data-flow-id="saved-run:RS_GORJANA_ORDERS_SYNC"]')
-    expect(runTile.text()).toBe('Gorjana Orders Sync')
+    expect(runTile.get('.static-page-tile-title').text()).toBe('Gorjana Orders Sync')
     expect(JSON.parse(runTile.attributes('data-to') ?? '{}')).toMatchObject({
       query: {
         runName: 'Gorjana Orders Sync',
@@ -325,8 +329,69 @@ describe('HomePage', () => {
     expect(wrapper.find('[data-testid="dashboard-create-action"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="other-runs-empty-action"]').text()).toBe('Create Run')
     expect(JSON.parse(wrapper.get('[data-testid="other-runs-empty-action"]').attributes('data-to') ?? '{}')).toEqual({
-      name: 'reconciliation-create',
+      name: 'run-create',
     })
     expect(wrapper.findAll('[data-testid="other-runs"] .static-page-tile')).toHaveLength(0)
+  })
+  // DAR-UI-049. Everything is a run; the type tells them apart.
+  it('lists lifecycle runs beside sync runs, each wearing its type', async () => {
+    listReconciliations.mockResolvedValue({
+      reconciliations: [
+        { reconciliationId: 'R2', reconciliationName: 'Return chain', defaultTimeWindow: '1d', questionCount: 1 },
+        { reconciliationId: 'R1', reconciliationName: 'NetSuite order chain', defaultTimeWindow: '7d', questionCount: 4 },
+      ],
+    })
+
+    const wrapper = mount(HomePage)
+    await flushPromises()
+
+    const lifecycle = wrapper.get('[data-testid="run-group-lifecycle"]')
+    expect(wrapper.text()).toContain('Lifecycle · 2')
+    expect(lifecycle.findAll('.static-page-tile')).toHaveLength(2)
+
+    const chain = wrapper.get('[data-flow-id="lifecycle:R1"]')
+    expect(chain.text()).toContain('NetSuite order chain')
+    expect(chain.text()).toContain('Lifecycle · 4 questions · last 7 days')
+    expect(JSON.parse(chain.attributes('data-to') ?? '{}')).toEqual({
+      name: 'reconciliation-run-flowchart',
+      params: { reconciliationId: 'R1' },
+    })
+
+    expect(wrapper.get('[data-flow-id="saved-run:RS1"]').text()).toContain('Sync')
+    expect(wrapper.get('[data-flow-id="saved-run:RS1"] [data-run-type]').attributes('data-run-type')).toBe('sync')
+    // The type section follows every system-family section rather than sorting in among them.
+    const titles = wrapper.findAll('.static-page-section').map((section) => section.text())
+    expect(titles.findIndex((t) => t.startsWith('Lifecycle'))).toBe(titles.length - 1)
+  })
+
+  it('does not offer to pin a lifecycle run, since the server keeps only sync-run pins today', async () => {
+    // save#DashboardPinnedSavedRuns validates against RuleSet ids, so a dragged lifecycle run
+    // would be dropped by the server and silently un-pin. Not draggable beats a pin that vanishes.
+    listReconciliations.mockResolvedValue({
+      reconciliations: [{ reconciliationId: 'R1', reconciliationName: 'NetSuite order chain', defaultTimeWindow: '7d', questionCount: 4 }],
+    })
+
+    const wrapper = mount(HomePage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-flow-id="lifecycle:R1"]').attributes('draggable')).toBe('false')
+    expect(wrapper.get('[data-flow-id="saved-run:RS1"]').attributes('draggable')).toBe('true')
+  })
+
+  it('still shows sync runs when lifecycle runs fail to load', async () => {
+    listReconciliations.mockRejectedValue(new Error('boom'))
+
+    const wrapper = mount(HomePage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('OMS ↔ SHOPIFY · 7')
+    expect(wrapper.find('[data-testid="run-group-lifecycle"]').exists()).toBe(false)
+  })
+
+  it('creates a run through the type choice', async () => {
+    const wrapper = mount(HomePage)
+    await flushPromises()
+
+    expect(JSON.parse(wrapper.get('[data-testid="dashboard-create-action"]').attributes('data-to') ?? '{}')).toEqual({ name: 'run-create' })
   })
 })

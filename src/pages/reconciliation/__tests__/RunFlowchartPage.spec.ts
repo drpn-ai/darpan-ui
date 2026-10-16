@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { reconciliationId: 'R1' } }), useRouter: () => ({ push: vi.fn() }), RouterLink: { template: '<a><slot /></a>' } }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { reconciliationId: 'R1' } }), useRouter: () => ({ push: vi.fn() }), RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } }))
 vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
     getReconciliation: vi.fn(), listSavedRuns: vi.fn(), saveReconciliationQuestion: vi.fn(),
@@ -34,6 +34,14 @@ describe('RunFlowchartPage', () => {
     await flushPromises()
     expect(w.text()).toContain('Order chain')
     expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(true)
+  })
+
+  // DAR-UI-049
+  it('says it is a Lifecycle run, and goes back to Home where every run is listed', async () => {
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 1 question · last 3 days')
+    expect(JSON.parse(w.get('[data-testid="flowchart-back"]').attributes('data-to') ?? '{}')).toEqual({ name: 'hub' })
   })
 
   it('a run with no start offers "Add question" and saves a question with no parent', async () => {
