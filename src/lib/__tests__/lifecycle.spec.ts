@@ -13,10 +13,9 @@ const ship: LifecycleStageOption = {
 }
 
 describe('lifecycle options', () => {
-  it('puts the evidence in the option label', () => {
-    expect(stageOptionLabel(invoice)).toBe('Invoice · 96% · usually the same day')
-    expect(stageOptionLabel(ship)).toBe('Fulfillment · 97% · usually 1 day later')
-    expect(stageOptionLabel({ ...ship, typicalDays: 18 })).toBe('Fulfillment · 97% · usually 18 days later')
+  it('labels a stage by its name alone', () => {
+    expect(stageOptionLabel(invoice)).toBe('Invoice')
+    expect(stageOptionLabel(ship)).toBe('Fulfillment')
   })
 
   it('keeps the data order, not the click order', () => {
@@ -25,9 +24,7 @@ describe('lifecycle options', () => {
 
   it('offers late-after days from the last stage, defaulting to the first past 90%', () => {
     const opts = lateAfterOptions([invoice, ship])
-    expect(opts.map((o) => o.label)).toEqual([
-      'Same day · 10% done by then', '1 day · 80% done by then', '2 days · 91% done by then', '5 days · 99% done by then',
-    ])
+    expect(opts.map((o) => o.label)).toEqual(['Same day', '1 day', '2 days', '5 days'])
     expect(defaultLateAfter([invoice, ship])).toBe('2')
     expect(defaultLateAfter([])).toBe('')
   })
@@ -70,3 +67,33 @@ describe('lifecycle board', () => {
     expect(board.largest).toBe(1621)
   })
 })
+
+// save#Lifecycle's tree since every place became its own question: Sales orders → Invoice → Fulfillment.
+const perPlace: FlowchartQuestion[] = [
+  q('S', { questionRole: 'START', runName: 'Sales orders', runSequence: 1 }),
+  q('I', { parentReconciliationRunId: 'S', parentBranch: 'YES', runName: 'Invoice', runSequence: 2 }),
+  q('F', { parentReconciliationRunId: 'I', parentBranch: 'YES', runName: 'Fulfillment', noOutcomeLabel: 'Billed, never shipped', runSequence: 3 }),
+  q('D', { parentReconciliationRunId: 'I', parentBranch: 'YES', runName: 'Fulfillment', noOutcomeLabel: 'Billed and shipped', runSequence: 4 }),
+  q('H', { parentReconciliationRunId: 'I', parentBranch: 'NO', runName: 'Fulfillment', noOutcomeLabel: 'Shipped, never billed', runSequence: 5 }),
+  q('N', { parentReconciliationRunId: 'I', parentBranch: 'NO', runName: 'Fulfillment', noOutcomeLabel: 'Never billed, never shipped', runSequence: 6 }),
+]
+
+describe('lifecycle board, one question per place', () => {
+  it('every place, complete included, is a question\'s findings, so every one can open', () => {
+    const rows: FlowchartExecutionRow[] = [
+      { reconciliationRunResultId: 'r1', reconciliationRunId: 'S', yesCount: 10585 },
+      { reconciliationRunResultId: 'r2', reconciliationRunId: 'I', yesCount: 9848, noCount: 737 },
+      { reconciliationRunResultId: 'r3', reconciliationRunId: 'F', yesCount: 9716, noCount: 132 },
+      { reconciliationRunResultId: 'r4', reconciliationRunId: 'D', yesCount: 132, noCount: 9716 },
+      { reconciliationRunResultId: 'r5', reconciliationRunId: 'H', yesCount: 381, noCount: 356 },
+      { reconciliationRunResultId: 'r6', reconciliationRunId: 'N', yesCount: 356, noCount: 381 },
+    ]
+    const board = lifecycleBoard(perPlace, rows)
+    expect(board.stages.map((st) => [st.label, st.count])).toEqual([['Invoice', 9848], ['Fulfillment', 9716]])
+    expect(board.stages[0]!.places.map((p) => [p.label, p.count, p.branch])).toEqual([
+      ['Shipped, never billed', 356, 'NO'], ['Never billed, never shipped', 381, 'NO']])
+    expect(board.stages[1]!.places.map((p) => [p.label, p.count, p.branch])).toEqual([['Billed, never shipped', 132, 'NO']])
+    expect([board.complete?.label, board.complete?.count, board.complete?.branch]).toEqual(['Billed and shipped', 9716, 'NO'])
+  })
+})
+

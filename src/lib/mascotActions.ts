@@ -223,6 +223,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Close',
     body: 'leaves the question as it was saved. Anything typed since is dropped.',
   },
+  'back to run': {
+    title: 'Back to the run',
+    body: 'returns to this lifecycle’s page: its most recent result and the ones before. This result stays where it is.',
+  },
   'back to home': {
     title: 'Back to Home',
     body: 'returns to every saved run, Sync and Lifecycle alike. A run in progress keeps going; its questions finish without this page.',
@@ -230,6 +234,46 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   'import netsuite checks': {
     title: 'Import NetSuite Checks',
     body: 'turns each NetSuite check not yet in a Lifecycle run into a question under a start that lists its records. Safe to repeat.',
+  },
+  'add filter': {
+    title: 'Add filter',
+    body: 'leaves some of the starting records out of the whole lifecycle, by a field NetSuite holds on them. A left-out record is in no place at all.',
+  },
+  'add this filter': {
+    title: 'Add',
+    body: 'puts the filter on the line. Nothing is saved until Save; the next run is the first to use it.',
+  },
+  'add this exception': {
+    title: 'Add',
+    body: 'puts the exception on the gap into this stage. Nothing is saved until Save; the next run is the first to use it.',
+  },
+  'stop editing': {
+    title: 'Stop editing',
+    body: 'closes the row and leaves the line as it read. Rules already on the line stay as they are.',
+  },
+  'change this filter': {
+    title: 'Change',
+    body: 'puts the changed filter back on its line. Nothing is saved until Save; the next run is the first to use it.',
+  },
+  'change this exception': {
+    title: 'Change',
+    body: 'puts the changed exception back on its line. Nothing is saved until Save; the next run is the first to use it.',
+  },
+  'show a field': {
+    title: 'Show a field',
+    body: 'adds a field NetSuite holds, like HC Order Id or eTail Order Id, to every record this lifecycle finds, beside its order, date, status, customer, total, shipping method and reference.',
+  },
+  'show this field': {
+    title: 'Add',
+    body: 'puts the field on the line. Records found by the next run show it; runs already made keep what they showed.',
+  },
+  'add exception': {
+    title: 'Add exception',
+    body: 'says a stage is not expected of some records: Store Pickup orders never ship, so they count as past Fulfillment rather than stuck before it.',
+  },
+  'add rule': {
+    title: 'Add Rule',
+    body: 'leaves records out by a field NetSuite holds on them, a sales channel say, picked from what the account actually has.',
   },
   'delete question': {
     title: 'Delete question',
@@ -482,6 +526,18 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^remove .+$/, {
     title: 'Remove',
     body: 'takes this one off the list. Nothing changes for anybody else until the form is saved.',
+  }],
+  [/^move .+ (up|down)$/, {
+    title: 'Move stage',
+    body: 'changes the order records should reach the stages in. Saving rebuilds the checks; past runs keep the order they ran with.',
+  }],
+  [/^change (rule|exception) .+$/, {
+    title: 'Change',
+    body: 'opens this line where it stands, as the field and value it says. Nothing is saved until Save.',
+  }],
+  [/^stop showing .+$/, {
+    title: 'Stop showing',
+    body: 'takes this field off what each record shows. Records from runs already made keep it.',
   }],
   [/^edit rule .+$/, {
     title: 'Edit rule',

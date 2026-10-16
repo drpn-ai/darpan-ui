@@ -49,6 +49,8 @@ export interface SaveFlowchartRunPayload {
   reconciliationName?: string
   description?: string
   defaultTimeWindow?: string
+  /** DAR-UI-050. A lifecycle built from stages: records younger than this are not judged yet. */
+  lateAfterDays?: number
   isActive?: string
   isArchived?: string
 }
@@ -76,7 +78,22 @@ export interface RunFlowchartPayload {
 
 export interface ListFlowchartRunsResponse { reconciliations: FlowchartRun[] }
 export interface SaveFlowchartRunResponse { reconciliation: FlowchartRun }
-export interface GetFlowchartRunResponse { reconciliation: FlowchartRun; questions: FlowchartQuestion[] }
+export interface GetFlowchartRunResponse {
+  reconciliation: FlowchartRun
+  questions: FlowchartQuestion[]
+  /** DAR-UI-050. A lifecycle built from stages: the records its rules leave out. */
+  rules?: LifecycleRule[] | null
+  /** DAR-UI-050. A lifecycle built from stages: its stages in order, and the records a stage is not expected of. */
+  stages?: { recordType: string; label: string }[] | null
+  exceptions?: LifecycleStageException[] | null
+  /** DAR-UI-050. A lifecycle built from stages: what its start reads, for the rule dropdowns. */
+  lifecycle?: { nsAuthConfigId: string; recordType: string; recordLabel: string } | null
+  /** DAR-UI-050. The custom fields a lifecycle's records show beside the standard columns, in order. */
+  details?: LifecycleDetail[] | null
+}
+
+/** DAR-UI-050. A custom field a lifecycle's records show, and its key on each record. */
+export interface LifecycleDetail { fieldId: string; key?: string }
 export interface SaveFlowchartQuestionResponse { question: FlowchartQuestion }
 export interface RunFlowchartResponse { reconciliationExecutionId: string }
 export interface GetFlowchartExecutionResponse { results: FlowchartExecutionRow[] }
@@ -128,5 +145,17 @@ export interface SaveLifecyclePayload {
   recordType: string
   stageRecordTypes: string[]
   lateAfterDays?: number
+  rules?: { fieldId: string; fieldLabel: string; value: string }[]
 }
 export interface SaveLifecycleResponse { reconciliationId: string; reconciliationName: string }
+
+/** One rule: leave out the start's records whose field has this value (NO_VALUE = has no value). */
+export interface LifecycleRule { fieldId: string; fieldLabel: string; value: string; valueLabel: string }
+export interface LifecycleRuleOptionsResponse {
+  fields: { fieldId: string; label: string }[]
+  values?: { value: string; label: string }[]
+}
+export interface LifecycleRulesResponse { rules: LifecycleRule[] }
+/** A stage not expected of a record whose field has this value, e.g. Fulfillment when Shipping Method is Store Pickup. */
+export interface LifecycleStageException { stageRecordType: string; stageLabel: string; fieldId: string; fieldLabel: string; value: string }
+export interface LifecycleStageExceptionsResponse { exceptions: LifecycleStageException[] }

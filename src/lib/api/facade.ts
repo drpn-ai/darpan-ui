@@ -166,6 +166,12 @@ import type {
   GetLifecycleOptionsResponse,
   SaveLifecyclePayload,
   SaveLifecycleResponse,
+  LifecycleRule,
+  LifecycleRuleOptionsResponse,
+  LifecycleRulesResponse,
+  LifecycleStageException,
+  LifecycleStageExceptionsResponse,
+  LifecycleDetail,
   ListFlowchartExecutionsResponse,
   ListFlowchartRunsResponse,
   RunFlowchartPayload,
@@ -263,6 +269,13 @@ const RECONCILIATION = {
   // DAR-UI-050: the lifecycle builder.
   getLifecycleOptions: 'facade.NetSuiteLifecycleFacadeServices.get#LifecycleOptions',
   saveLifecycle: 'facade.ReconciliationFacadeServices.save#Lifecycle',
+  getLifecycleRuleOptions: 'facade.NetSuiteLifecycleFacadeServices.get#LifecycleRuleOptions',
+  saveLifecycleRule: 'facade.ReconciliationFacadeServices.save#LifecycleRule',
+  deleteLifecycleRule: 'facade.ReconciliationFacadeServices.delete#LifecycleRule',
+  saveLifecycleStageException: 'facade.ReconciliationFacadeServices.save#LifecycleStageException',
+  saveLifecycleDetails: 'facade.ReconciliationFacadeServices.save#LifecycleDetails',
+  deleteLifecycleStageException: 'facade.ReconciliationFacadeServices.delete#LifecycleStageException',
+  saveLifecycleStages: 'facade.ReconciliationFacadeServices.save#LifecycleStages',
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
@@ -520,6 +533,27 @@ export const reconciliationFacade = {
   },
   saveLifecycle(payload: SaveLifecyclePayload, signal?: AbortSignal): Promise<SaveLifecycleResponse> {
     return callService<SaveLifecycleResponse>(RECONCILIATION.saveLifecycle, payload, signal)
+  },
+  getLifecycleRuleOptions(payload: { nsAuthConfigId: string; recordType: string; fieldId?: string; scope?: 'STAGE' }, signal?: AbortSignal): Promise<LifecycleRuleOptionsResponse> {
+    return callService<LifecycleRuleOptionsResponse>(RECONCILIATION.getLifecycleRuleOptions, payload, signal)
+  },
+  saveLifecycleRule(payload: { reconciliationId: string } & Omit<LifecycleRule, 'valueLabel'>, signal?: AbortSignal): Promise<LifecycleRulesResponse> {
+    return callService<LifecycleRulesResponse>(RECONCILIATION.saveLifecycleRule, payload, signal)
+  },
+  deleteLifecycleRule(payload: { reconciliationId: string; fieldId: string; value: string }, signal?: AbortSignal): Promise<LifecycleRulesResponse> {
+    return callService<LifecycleRulesResponse>(RECONCILIATION.deleteLifecycleRule, payload, signal)
+  },
+  saveLifecycleDetails(payload: { reconciliationId: string; details: { fieldId: string; label: string }[] }, signal?: AbortSignal): Promise<{ details?: LifecycleDetail[] }> {
+    return callService<{ details?: LifecycleDetail[] }>(RECONCILIATION.saveLifecycleDetails, payload, signal)
+  },
+  saveLifecycleStageException(payload: { reconciliationId: string } & Omit<LifecycleStageException, 'stageLabel'>, signal?: AbortSignal): Promise<LifecycleStageExceptionsResponse> {
+    return callService<LifecycleStageExceptionsResponse>(RECONCILIATION.saveLifecycleStageException, payload, signal)
+  },
+  saveLifecycleStages(payload: { reconciliationId: string; stageRecordTypes: string[] }, signal?: AbortSignal): Promise<{ reconciliationName?: string }> {
+    return callService<{ reconciliationName?: string }>(RECONCILIATION.saveLifecycleStages, payload, signal)
+  },
+  deleteLifecycleStageException(payload: { reconciliationId: string; stageRecordType: string; fieldId?: string; value: string }, signal?: AbortSignal): Promise<LifecycleStageExceptionsResponse> {
+    return callService<LifecycleStageExceptionsResponse>(RECONCILIATION.deleteLifecycleStageException, payload, signal)
   },
   getGeneratedOutputDifferences(
     payload: GetGeneratedOutputDifferencesPayload,

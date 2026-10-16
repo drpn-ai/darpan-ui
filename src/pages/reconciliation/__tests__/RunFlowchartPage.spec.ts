@@ -11,7 +11,7 @@ vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
     getReconciliation: vi.fn(), listSavedRuns: vi.fn(), saveReconciliationQuestion: vi.fn(),
     deleteReconciliationQuestion: vi.fn(), runReconciliation: vi.fn(), getReconciliationExecution: vi.fn(),
-    listReconciliationExecutions: vi.fn(),
+    listReconciliationExecutions: vi.fn(), getLifecycleRuleOptions: vi.fn(), saveLifecycleRule: vi.fn(), deleteLifecycleRule: vi.fn(),
   },
 }))
 
@@ -47,11 +47,11 @@ describe('RunFlowchartPage', () => {
   })
 
   // DAR-UI-049
-  it('says it is a Lifecycle run, and goes back to Home where every run is listed', async () => {
+  it('says it is a Lifecycle run; its own page keeps play, not back, as a Sync run\'s does', async () => {
     const w = mount(RunFlowchartPage)
     await flushPromises()
     expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 1 question · last 3 days')
-    expect(JSON.parse(w.get('[data-testid="flowchart-back"]').attributes('data-to') ?? '{}')).toEqual({ name: 'hub' })
+    expect(w.find('[data-testid="flowchart-back"]').exists()).toBe(false)
   })
 
   it('a run with no start offers "Add question" and saves a question with no parent', async () => {
@@ -110,44 +110,9 @@ describe('RunFlowchartPage', () => {
     expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(true)
   })
 
-  it('runs over the default window and polls until every question has finished', async () => {
-    f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E1' } as never)
-    f.getReconciliationExecution
-      .mockResolvedValueOnce({ results: [{ reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_RUNNING' }] } as never)
-      .mockResolvedValue({ results: [
-        { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 10 },
-        { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 9, noCount: 1 },
-      ] } as never)
-    const w = mount(RunFlowchartPage)
-    await flushPromises()
-    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-    await flushPromises()
-    expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ reconciliationId: 'R1', windowStartLocalDate: expect.any(String) }))
-    await vi.advanceTimersByTimeAsync(3000)
-    await vi.advanceTimersByTimeAsync(3000)
-    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('Done')
-    expect(w.get('[data-testid="flowchart-live-link-A"]').text()).toContain('yes 9 · no 1')
-    const calls = f.getReconciliationExecution.mock.calls.length
-    await vi.advanceTimersByTimeAsync(9000)
-    expect(f.getReconciliationExecution.mock.calls.length).toBe(calls)
-  })
-
-  it('the window note names the last day covered; the run ends the day after it (review I3)', async () => {
-    vi.setSystemTime(new Date(2026, 7, 17, 12))
-    f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E1' } as never)
-    f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
-    const w = mount(RunFlowchartPage)
-    await flushPromises()
-    expect(w.get('[data-testid="flowchart-window-dates"]').text()).toBe('Aug 14, 2026 – Aug 16, 2026')
-    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-    await flushPromises()
-    expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ windowStartLocalDate: '2026-08-14', windowEndLocalDate: '2026-08-17' }))
-    w.unmount()
-  })
-
   // DAR-UI-050
   describe('a lifecycle built from stages', () => {
-    const stagesRun = { ...run, reconciliationName: 'Sales orders: shipped → billed', buildMode: 'STAGES', lateAfterDays: 2 }
+    const stagesRun = { ...run, reconciliationName: 'Sales Orders', buildMode: 'STAGES', lateAfterDays: 2 }
     const stageQuestions = [
       { reconciliationRunId: 'S', ruleSetId: 'R0', questionRole: 'START', runName: 'Sales orders' },
       { reconciliationRunId: 'A', ruleSetId: 'R1', parentReconciliationRunId: 'S', parentBranch: 'YES', runName: 'Fulfillment' },
@@ -158,7 +123,18 @@ describe('RunFlowchartPage', () => {
     ]
     beforeEach(() => { f.getReconciliation.mockResolvedValue({ reconciliation: stagesRun, questions: stageQuestions } as never) })
 
-    it('shows where records stopped instead of the question chart', async () => {
+    // DAR-UI-050: rules are set up in the lifecycle's settings, beside play, as a Sync run's are; not on this page.
+    it('keeps rules off the page and links to its settings', async () => {
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(w.find('[data-testid="lifecycle-rules"]').exists()).toBe(false)
+      expect(JSON.parse(w.get('[data-testid="flowchart-settings"]').attributes('data-to') ?? '{}')).toEqual(
+        { name: 'reconciliation-run-flowchart-settings', params: { reconciliationId: 'R1' } })
+    })
+
+    it("a run's result shows where records stopped instead of the question chart", async () => {
+      routeParams.reconciliationExecutionId = 'E7'
+      f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
       const w = mount(RunFlowchartPage)
       await flushPromises()
       expect(w.find('[data-testid="lifecycle-board"]').exists()).toBe(true)
@@ -167,46 +143,13 @@ describe('RunFlowchartPage', () => {
       expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 2 stages · last 3 days')
     })
 
-    it('judges only records old enough: the window ends late-after days back', async () => {
-      vi.setSystemTime(new Date(2026, 7, 17, 12))
-      f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E1' } as never)
-      f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
+    it("the lifecycle's own page is its history, with no result board", async () => {
       const w = mount(RunFlowchartPage)
       await flushPromises()
-      expect(w.get('[data-testid="flowchart-window-dates"]').text()).toBe('Aug 12, 2026 – Aug 14, 2026')
-      expect(w.get('[data-testid="flowchart-window-late"]').text()).toBe('Not judged yet: the last 2 days')
-      await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-      await flushPromises()
-      expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ windowStartLocalDate: '2026-08-12', windowEndLocalDate: '2026-08-15' }))
-      w.unmount()
+      expect(w.find('[data-testid="lifecycle-board"]').exists()).toBe(false)
+      expect(w.find('[data-testid="flowchart-history-empty"]').exists()).toBe(true)
+      expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(false)
     })
-  })
-
-  it('a double click starts one walk (review I4)', async () => {
-    let resolve: (v: unknown) => void = () => {}
-    f.runReconciliation.mockReturnValue(new Promise((r) => { resolve = r }) as never)
-    f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
-    const w = mount(RunFlowchartPage)
-    await flushPromises()
-    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-    resolve({ reconciliationExecutionId: 'E1' })
-    await flushPromises()
-    expect(f.runReconciliation).toHaveBeenCalledTimes(1)
-    w.unmount()
-  })
-
-  it('leaving the page while Run is in flight never starts polling (review I4)', async () => {
-    let resolve: (v: unknown) => void = () => {}
-    f.runReconciliation.mockReturnValue(new Promise((r) => { resolve = r }) as never)
-    const w = mount(RunFlowchartPage)
-    await flushPromises()
-    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-    w.unmount()
-    resolve({ reconciliationExecutionId: 'E1' })
-    await flushPromises()
-    await vi.advanceTimersByTimeAsync(10000)
-    expect(f.getReconciliationExecution).not.toHaveBeenCalled()
   })
 
   it('the start cannot be deleted (review I5)', async () => {
@@ -217,16 +160,13 @@ describe('RunFlowchartPage', () => {
   })
 
   it('every question with a row links to its run, finished ones too (review I6)', async () => {
-    f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E1' } as never)
     f.getReconciliationExecution.mockResolvedValue({ results: [
       { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 2 },
       { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_FAILED', errorMessage: 'boom' },
     ] } as never)
+    routeParams.reconciliationExecutionId = 'E1'
     const w = mount(RunFlowchartPage)
     await flushPromises()
-    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-    await flushPromises()
-    await vi.advanceTimersByTimeAsync(3000)
     expect(w.find('[data-testid="flowchart-live-link-S"]').exists()).toBe(true)
     expect(w.find('[data-testid="flowchart-live-link-A"]').exists()).toBe(true)
   })
@@ -243,7 +183,55 @@ describe('RunFlowchartPage', () => {
     expect(f.getReconciliationExecution).toHaveBeenCalledWith({ reconciliationExecutionId: 'E7' })
     expect(w.get('[data-testid="flowchart-summary-status"]').text()).toContain('Done')
     expect(w.get('[data-testid="flowchart-summary-findings"]').text()).toContain('3')
-    expect(w.find('[data-testid="flowchart-history-select"]').exists()).toBe(true)
+    // As the run result page: when it started under the title, and This Run above the results.
+    expect(w.get('[data-testid="flowchart-shown-started"]').text()).not.toBe('')
+    const html = w.html()
+    expect(html.indexOf('flowchart-summary-status')).toBeLessThan(html.indexOf('flowchart-box-A'))
+    // A run's result shows that run alone; its history is on the run's own page, where back leads.
+    expect(w.find('[data-testid="flowchart-history"]').exists()).toBe(false)
+    expect(JSON.parse(w.get('[data-testid="flowchart-back"]').attributes('data-to') ?? '{}')).toEqual(
+      { name: 'reconciliation-run-flowchart', params: { reconciliationId: 'R1' } })
+  })
+
+  it("the run's own page is its results as tiles, as a Sync run's: most recent, then the ones before", async () => {
+    const at = (id: string, day: number, statusEnumId = 'AUT_STAT_SUCCESS') =>
+      ({ reconciliationExecutionId: id, statusEnumId, startedDate: `2026-08-${day}T10:00:00Z`, windowStartDate: '2026-08-10T00:00:00Z', windowEndDate: '2026-08-13T00:00:00Z' })
+    f.listReconciliationExecutions.mockResolvedValue({ executions: [
+      at('E9', 19, 'AUT_STAT_RUNNING'), at('E8', 18), at('E7', 17, 'AUT_STAT_FAILED'),
+      ...[16, 15, 14, 13, 12, 11, 10].map((d) => at(`E${d}`, d)),
+    ] } as never)
+    f.getReconciliationExecution.mockResolvedValue({ results: [
+      { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 10, noCount: 0 },
+      { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 7, noCount: 3 },
+    ] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect(w.get('[data-testid="flowchart-history-running"]').text()).toContain('Running')
+    // The newest settled run is the featured tile, its whole box one link to its result, with its figures.
+    const featured = w.get('[data-testid="flowchart-history-featured"]')
+    expect(JSON.parse(featured.attributes('data-to') ?? '{}')).toEqual(
+      { name: 'reconciliation-run-flowchart', params: { reconciliationId: 'R1', reconciliationExecutionId: 'E8' } })
+    expect(featured.text()).toContain('Findings')
+    expect(featured.text()).toContain('3')
+    expect(featured.text()).toContain('Days')
+    // The ones before are tiles too, six at a time; a failed one says so.
+    const previous = () => w.get('[data-testid="flowchart-history"]').findAll('[data-testid^="flowchart-history-tile-"]')
+    expect(previous().map((t) => t.attributes('data-testid'))).toEqual(
+      ['E7', 'E16', 'E15', 'E14', 'E13', 'E12'].map((id) => `flowchart-history-tile-${id}`))
+    expect(previous()[0]!.text()).toContain('Failed')
+    await w.get('[data-testid="flowchart-history-more"]').trigger('click')
+    expect(previous()).toHaveLength(8)
+    expect(w.find('[data-testid="flowchart-history-more"]').exists()).toBe(false)
+  })
+
+  // DAR-UI-050: the window is chosen when the run starts, in a workflow, as a Sync run's is.
+  it('keeps no window on the page; play opens the run workflow', async () => {
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect(w.find('[data-testid="flowchart-window-preset"]').exists()).toBe(false)
+    expect(JSON.parse(w.get('[data-testid="flowchart-run-button"]').attributes('data-to') ?? '{}')).toEqual(
+      { name: 'reconciliation-run-flowchart-start', params: { reconciliationId: 'R1' } })
+    expect(w.get('[data-testid="flowchart-history-empty"]').text()).toBe('Not run yet.')
   })
 
   it('a finished finding opens its result page', async () => {
@@ -256,11 +244,13 @@ describe('RunFlowchartPage', () => {
     await flushPromises()
     await w.get('[data-testid="flowchart-finding-A"]').trigger('click')
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: 'reconciliation-run-result', params: expect.objectContaining({ outputFileName: 'runs/a.json' }) }))
+    // The result page leads back to this run, not to the check behind the place.
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ query: expect.objectContaining({ fromLifecycle: 'R1', fromLifecycleRun: 'E7' }) }))
     const tile = JSON.parse(w.get('[data-testid="flowchart-live-link-A"]').attributes('data-to') ?? '{}')
     expect(tile.name).toBe('reconciliation-run-result')
   })
 
-  it('an execution still running is followed', async () => {
+  it('an execution still running is followed until every question has finished', async () => {
     routeParams.reconciliationExecutionId = 'E8'
     f.getReconciliationExecution
       .mockResolvedValueOnce({ results: [{ reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_RUNNING' }] } as never)
@@ -274,6 +264,43 @@ describe('RunFlowchartPage', () => {
     await vi.advanceTimersByTimeAsync(3000)
     expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('Done')
     expect(w.get('[data-testid="flowchart-summary-status"]').text()).toContain('Done')
+    const calls = f.getReconciliationExecution.mock.calls.length
+    await vi.advanceTimersByTimeAsync(9000)
+    expect(f.getReconciliationExecution.mock.calls.length).toBe(calls)
+    w.unmount()
+  })
+
+  // DAR-UI-050: a run the run workflow just started is followed until every question is done, even between
+  // questions, when every row so far has finished and the next question's row does not exist yet.
+  it('a run just started by the run workflow is followed past the gap between questions', async () => {
+    routeParams.reconciliationExecutionId = 'E5'
+    window.history.replaceState({ startedRun: 'E5' }, '')
+    f.getReconciliationExecution
+      .mockResolvedValueOnce({ results: [{ reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 4 }] } as never)
+      .mockResolvedValueOnce({ results: [{ reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 4 }] } as never)
+      .mockResolvedValue({ results: [
+        { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 4 },
+        { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 3, noCount: 1 },
+      ] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('Done')
+    expect(f.listReconciliationExecutions.mock.calls.length).toBeGreaterThan(1)
+    window.history.replaceState(null, '')
+    w.unmount()
+  })
+
+  it('a failed run says why in This Run', async () => {
+    routeParams.reconciliationExecutionId = 'E4'
+    f.getReconciliationExecution.mockResolvedValue({ results: [
+      { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_FAILED', errorMessage: 'internalId cannot be resolved' },
+      { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_NOT_RUN', errorMessage: 'parent failed' },
+    ] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect(w.findAll('[data-testid="flowchart-failure"]').map((n) => n.text())).toEqual(['internalId cannot be resolved'])
     w.unmount()
   })
 
@@ -291,14 +318,4 @@ describe('RunFlowchartPage', () => {
     w.unmount()
   })
 
-  it('Run moves the address to the new execution', async () => {
-    f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E9' } as never)
-    f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
-    const w = mount(RunFlowchartPage)
-    await flushPromises()
-    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
-    await flushPromises()
-    expect(replace).toHaveBeenCalledWith({ name: 'reconciliation-run-flowchart', params: { reconciliationId: 'R1', reconciliationExecutionId: 'E9' } })
-    w.unmount()
-  })
 })

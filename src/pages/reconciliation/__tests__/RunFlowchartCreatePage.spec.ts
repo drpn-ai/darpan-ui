@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const push = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }), useRoute: () => ({ query: {} }) }))
 vi.mock('../../../lib/api/facade', () => ({
-  reconciliationFacade: { getLifecycleOptions: vi.fn(), saveLifecycle: vi.fn() },
+  reconciliationFacade: { getLifecycleOptions: vi.fn(), saveLifecycle: vi.fn(), getLifecycleRuleOptions: vi.fn() },
   settingsFacade: { listNsAuthConfigs: vi.fn() },
 }))
 
@@ -27,12 +27,16 @@ beforeEach(() => {
   push.mockReset()
   f.getLifecycleOptions.mockReset()
   f.saveLifecycle.mockReset()
+  f.getLifecycleRuleOptions.mockReset()
+  f.getLifecycleRuleOptions.mockImplementation((async (p: { fieldId?: string }) => (p.fieldId
+    ? { fields: [], values: [{ value: 'POS Channel', label: 'POS Channel' }, { value: 'Shopify Draft Order', label: 'Shopify Draft Order' }] }
+    : { fields: [{ fieldId: 'custbody_hc_sales_channel', label: 'HC Sales Channel' }] })) as never)
   settings.listNsAuthConfigs.mockReset()
   settings.listNsAuthConfigs.mockResolvedValue({ authConfigs: [{ nsAuthConfigId: 'gorjana_prod', description: 'gorjana_prod', authType: 'OAUTH2_M2M_JWT' }] } as never)
   f.getLifecycleOptions.mockImplementation((async (p: { recordType?: string }) => (p.recordType
     ? { recordTypes: [], stages: STAGES }
     : { recordTypes: [{ recordType: 'SalesOrd', label: 'Sales orders', count: 24310 }, { recordType: 'RtnAuth', label: 'Return authorizations', count: 1904 }], stages: [] })) as never)
-  f.saveLifecycle.mockResolvedValue({ reconciliationId: 'R9', reconciliationName: 'Sales orders: billed → shipped' } as never)
+  f.saveLifecycle.mockResolvedValue({ reconciliationId: 'R9', reconciliationName: 'Sales Orders' } as never)
 })
 
 async function submit(w: ReturnType<typeof mount>) {
@@ -50,26 +54,40 @@ describe('RunFlowchartCreatePage (lifecycle builder)', () => {
 
     // One account: its card is skipped.
     expect(w.text()).toContain('Which records?')
-    expect(labels(w)).toEqual(['Sales orders · 24,310 in the last 30 days', 'Return authorizations · 1,904 in the last 30 days'])
+    expect(labels(w)).toEqual(['Sales orders', 'Return authorizations'])
     select(w).vm.$emit('update:modelValue', 'SalesOrd')
     await submit(w)
 
     expect(w.text()).toContain('What happens to a sales order?')
     expect(f.getLifecycleOptions).toHaveBeenLastCalledWith({ nsAuthConfigId: 'gorjana_prod', recordType: 'SalesOrd' })
-    expect(labels(w)).toEqual(['Invoice · 96% · usually the same day', 'Fulfillment · 97% · usually 1 day later',
-      'Return authorization · 3% · usually 18 days later'])
+    expect(labels(w)).toEqual(['Invoice', 'Fulfillment', 'Return authorization'])
     // What at least half of these records go on to is chosen already.
     expect(select(w).props('modelValue')).toEqual(['CustInvc', 'ItemShip'])
     await submit(w)
 
+    // Leave-out rules are part of setting it up: a field, then a value, until "Nothing else".
+    expect(w.text()).toContain('Leave out any sales orders?')
+    expect(labels(w)).toEqual(['Nothing', 'HC Sales Channel'])
+    select(w).vm.$emit('update:modelValue', 'custbody_hc_sales_channel')
+    await submit(w)
+    expect(w.text()).toContain('Leave out where HC Sales Channel is')
+    expect(labels(w)).toEqual(['POS Channel', 'Shopify Draft Order'])
+    select(w).vm.$emit('update:modelValue', 'Shopify Draft Order')
+    await submit(w)
+    expect(w.text()).toContain('Leave out any other sales orders?')
+    expect(w.text()).toContain('Leaving out where HC Sales Channel is Shopify Draft Order')
+    expect(labels(w)[0]).toBe('Nothing else')
+    await submit(w)
+
     expect(w.text()).toContain('When is a sales order late?')
     // Measured to the last stage, defaulting to the first day past 90%.
-    expect(labels(w)).toEqual(['Same day · 10% done by then', '1 day · 80% done by then', '2 days · 91% done by then'])
+    expect(labels(w)).toEqual(['Same day', '1 day', '2 days'])
     expect(select(w).props('modelValue')).toBe('2')
     await submit(w)
 
     expect(f.saveLifecycle).toHaveBeenCalledWith({
       nsAuthConfigId: 'gorjana_prod', recordType: 'SalesOrd', stageRecordTypes: ['CustInvc', 'ItemShip'], lateAfterDays: 2,
+      rules: [{ fieldId: 'custbody_hc_sales_channel', fieldLabel: 'HC Sales Channel', value: 'Shopify Draft Order' }],
     })
     expect(push).toHaveBeenCalledWith({ name: 'reconciliation-run-flowchart', params: { reconciliationId: 'R9' } })
   })
@@ -77,7 +95,7 @@ describe('RunFlowchartCreatePage (lifecycle builder)', () => {
   it('has no text inputs anywhere in the flow', async () => {
     const w = mount(RunFlowchartCreatePage)
     await flushPromises()
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       expect(w.findAll('input, textarea')).toHaveLength(0)
       if (i === 0) select(w).vm.$emit('update:modelValue', 'SalesOrd')
       await submit(w)

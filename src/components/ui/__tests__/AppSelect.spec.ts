@@ -4,6 +4,42 @@ import AppSelect from '../AppSelect.vue'
 import { DISMISS_INLINE_MENUS_EVENT } from '../../../lib/uiEvents'
 
 describe('AppSelect', () => {
+  // The menu stays on screen: it ends no lower than the mascot's bottom, and opens above when below is too short.
+  describe('on screen', () => {
+    const rect = (top: number, bottom: number) => ({ top, bottom, height: bottom - top, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) }) as DOMRect
+    const options = Array.from({ length: 30 }, (_, i) => ({ value: `v${i}`, label: `Option ${i}` }))
+    function openAt(triggerTop: number, mascotBottom: number) {
+      const dock = document.createElement('div')
+      dock.className = 'mascot-dock'
+      dock.getBoundingClientRect = () => rect(mascotBottom - 60, mascotBottom)
+      document.body.appendChild(dock)
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
+      const wrapper = mount(AppSelect, { props: { modelValue: '', options, testId: 's' }, attachTo: document.body })
+      wrapper.get('[data-testid="s"]').element.getBoundingClientRect = () => rect(triggerTop, triggerTop + 40)
+      return { wrapper, cleanup: () => { wrapper.unmount(); dock.remove() } }
+    }
+
+    it('ends at the mascot\'s bottom edge', async () => {
+      const { wrapper, cleanup } = openAt(200, 776)
+      await wrapper.get('[data-testid="s"]').trigger('click')
+      await flushPromises()
+      expect((wrapper.get('.app-select-menu').element as HTMLElement).style.maxHeight).toBe(`${776 - 240 - 7}px`)
+      cleanup()
+    })
+
+    it('opens above when there is too little room below', async () => {
+      const { wrapper, cleanup } = openAt(700, 776)
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 300 })
+      await wrapper.get('[data-testid="s"]').trigger('click')
+      await flushPromises()
+      const style = (wrapper.get('.app-select-menu').element as HTMLElement).style
+      expect(style.top).toBe('auto')
+      expect(style.maxHeight).toBe(`${700 - 7 - 8}px`)
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight
+      cleanup()
+    })
+  })
+
   it('renders a stroked chevron icon instead of a filled triangle glyph', () => {
     const wrapper = mount(AppSelect, {
       props: {

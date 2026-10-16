@@ -763,6 +763,22 @@ describe('ReconciliationRunResultPage', () => {
   // document already says so — file2Label is null, the onlyIn* counts are null, and every row is
   // typed FINDING — but the page resolved a label through a route-query fallback ("System 2") and
   // captioned 4 real findings as missing from a system that does not exist.
+  // DAR-UI-050: a Lifecycle place's records lead back to the lifecycle run they came from, not to the check behind it.
+  it('opened from a Lifecycle run, leads back to it', async () => {
+    Object.assign(route.query, { fromLifecycle: '100153', fromLifecycleRun: 'E7' })
+    try {
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      const actions = wrapper.findAll('.static-page-actions .action-row > *')
+      expect(actions.map((a) => a.attributes('data-testid'))).toEqual(['run-result-back-to-lifecycle'])
+      expect(JSON.parse(actions[0]!.attributes('data-to') ?? '{}')).toEqual(
+        { name: 'reconciliation-run-flowchart', params: { reconciliationId: '100153', reconciliationExecutionId: 'E7' } })
+    } finally {
+      delete (route.query as Record<string, string>).fromLifecycle
+      delete (route.query as Record<string, string>).fromLifecycleRun
+    }
+  })
+
   it('shows findings rather than a phantom second system on a single-sided run', async () => {
     getGeneratedOutputDifferences.mockResolvedValue({
       ok: true,

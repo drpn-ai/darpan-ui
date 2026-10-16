@@ -1,8 +1,9 @@
 import type { FlowchartBranch, FlowchartExecutionRow, FlowchartQuestion } from './api/flowchartTypes'
 
-// DAR-UI-050. A lifecycle built from stages, read back as places: the stages run down the spine (each on the
-// previous one's "yes"), and every named ending under a stage's "no" is a place beside that stage. The last
-// stage's "yes" is the complete place. Counts come from one execution's rows; with none, counts are null.
+// DAR-UI-050. A lifecycle built from stages, read back as places: the stages run down the spine (each the first
+// question on the previous one's "yes"), and every named ending under a stage's "no" is a place beside that stage.
+// The complete place is the named question beside the last stage (or, in the first shape, the last stage's named
+// "yes"). Counts come from one execution's rows; with none, counts are null.
 
 export interface LifecyclePlace {
   label: string
@@ -50,6 +51,7 @@ export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartEx
   const stages: LifecycleStage[] = []
   let complete: LifecyclePlace | null = null
   let current = startQ ? childrenOf(startQ.reconciliationRunId, 'YES')[0] : undefined
+  let parentOfCurrent = startQ
   while (current) {
     const here = current
     const row = rowOf(here.reconciliationRunId)
@@ -60,7 +62,13 @@ export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartEx
       places: here.noOutcomeLabel ? [place(here, 'NO', here.noOutcomeLabel)] : childrenOf(here.reconciliationRunId, 'NO').flatMap(endings),
     })
     if (here.yesOutcomeLabel) complete = place(here, 'YES', here.yesOutcomeLabel)
-    current = childrenOf(here.reconciliationRunId, 'YES')[0]
+    const next = childrenOf(here.reconciliationRunId, 'YES')[0]
+    if (!next && parentOfCurrent) {
+      const beside = childrenOf(parentOfCurrent.reconciliationRunId, 'YES').find((q) => q !== here && q.noOutcomeLabel)
+      if (beside) complete = place(beside, 'NO', beside.noOutcomeLabel!)
+    }
+    parentOfCurrent = here
+    current = next
   }
   const counts = stages.flatMap((s) => s.places.map((p) => p.count ?? 0))
   return {

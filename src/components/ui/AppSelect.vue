@@ -34,7 +34,9 @@
 
     <div
       v-if="isOpen"
+      ref="menu"
       class="app-select-menu"
+      :style="menuStyle"
       @mousedown.stop
     >
       <input
@@ -88,6 +90,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useInlineSelect, type InlineSelectOption } from '../../lib/useInlineSelect'
+import { useScreenAwareMenu } from '../../lib/useScreenAwareMenu'
 
 export type AppSelectOption = InlineSelectOption
 
@@ -156,6 +159,10 @@ const {
   disabled: () => props.disabled,
   emitValue: (value) => emit('update:modelValue', value),
 })
+
+// The menu stays on screen, ending no lower than the mascot; it scrolls within, or opens above when below is too short.
+const menu = ref<HTMLElement | null>(null)
+const { menuStyle } = useScreenAwareMenu(trigger, menu, isOpen)
 
 watch(isOpen, async (open) => {
   if (!open) {
@@ -253,7 +260,9 @@ async function handleTriggerEnter(): Promise<void> {
   left: 0;
   right: 0;
   z-index: 70;
-  display: grid;
+  /* A column whose options shrink and scroll when the menu is held to the room on screen (useScreenAwareMenu). */
+  display: flex;
+  flex-direction: column;
   gap: var(--space-00);
   padding: var(--space-1);
   border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
@@ -264,6 +273,7 @@ async function handleTriggerEnter(): Promise<void> {
 }
 
 .app-select-search {
+  flex: none;
   min-height: 2.35rem;
   padding: var(--space-1-5) var(--space-2);
   border-radius: calc(var(--radius-sm) - 0.02rem);
@@ -276,6 +286,8 @@ async function handleTriggerEnter(): Promise<void> {
 
 .app-select-options {
   display: grid;
+  flex: 0 1 auto;
+  min-height: 0;
   gap: var(--space-00);
   max-height: min(18rem, 48vh);
   overflow: auto;

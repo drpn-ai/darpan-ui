@@ -445,7 +445,22 @@
       </StaticPageSection>
 
       <template v-if="savedOutput || liveRunResultId" #actions>
-        <div class="action-row">
+        <!-- A Lifecycle place's records: back to the lifecycle run they came from. The check behind the place is the
+             lifecycle's own, so its play, history and settings are the lifecycle's, on that page. -->
+        <div v-if="lifecycleBackRoute" class="action-row">
+          <RouterLink
+            class="app-icon-action app-icon-action--large"
+            data-testid="run-result-back-to-lifecycle"
+            aria-label="Back to run"
+            title="Back to run"
+            :to="lifecycleBackRoute"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path :d="backIconPath" fill="currentColor" />
+            </svg>
+          </RouterLink>
+        </div>
+        <div v-else class="action-row">
           <RouterLink
             v-if="canRunActiveTenantReconciliation"
             class="app-icon-action app-icon-action--large"
@@ -592,7 +607,7 @@ import {
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
-import { listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
+import { backIconPath, listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -711,6 +726,14 @@ const reconciliationRunRouteContext = computed<ReconciliationRunRouteContext>(()
 const workflowRoute = computed<RouteLocationRaw>(() =>
   buildReconciliationDiffRoute(reconciliationRunRouteContext.value),
 )
+// Opened from a Lifecycle run (RunFlowchartPage marks the link): back leads to that run.
+const lifecycleBackRoute = computed<RouteLocationRaw | null>(() => {
+  const id = typeof route.query.fromLifecycle === 'string' ? route.query.fromLifecycle.trim() : ''
+  if (!id) return null
+  const run = typeof route.query.fromLifecycleRun === 'string' ? route.query.fromLifecycleRun.trim() : ''
+  return { name: 'reconciliation-run-flowchart', params: { reconciliationId: id, ...(run ? { reconciliationExecutionId: run } : {}) } }
+})
+
 const runHistoryRoute = computed<RouteLocationRaw>(() =>
   buildReconciliationRunHistoryRoute(reconciliationRunRouteContext.value),
 )
@@ -851,7 +874,10 @@ watch([liveRunStatusEnumId, liveRunResultId], ([statusEnumId]) => {
   if (statusEnumId !== 'AUT_STAT_SUCCESS') return
   const resultFileName = normalizeDisplayText(runStatus.value?.resultFileName)
   if (!resultFileName) return
-  void router.replace(buildReconciliationRunResultRoute(reconciliationRunRouteContext.value, resultFileName))
+  // Keeps where it was opened from: a Lifecycle place's live run still leads back to that lifecycle once it finishes.
+  const next = buildReconciliationRunResultRoute(reconciliationRunRouteContext.value, resultFileName)
+  const from = Object.fromEntries(['fromLifecycle', 'fromLifecycleRun'].filter((k) => typeof route.query[k] === 'string').map((k) => [k, route.query[k]]))
+  void router.replace(typeof next === 'string' || !('query' in next) ? next : { ...next, query: { ...next.query, ...from } })
 }, { immediate: true })
 
 // Notify-me (Task 12): subscribe/unsubscribe the current user to chat notifications

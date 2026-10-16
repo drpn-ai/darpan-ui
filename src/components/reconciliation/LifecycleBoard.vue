@@ -1,46 +1,50 @@
 <template>
-  <div class="lifecycle-board" :class="{ 'lifecycle-board--narrow': narrow }" data-testid="lifecycle-board">
-    <div v-if="board.start" class="lifecycle-row">
-      <div class="lifecycle-stage lifecycle-stage--start" data-testid="lifecycle-start">
-        <span class="lifecycle-stage-label">{{ board.start.label }}</span>
-        <span v-if="board.start.count !== null" class="lifecycle-count">{{ format(board.start.count) }}</span>
+  <!-- The same line as the lifecycle's settings, with counts: the starting records, each stage with how many reached
+       it, and under each stage the places records stopped there. The complete place closes the line. -->
+  <div class="lifecycle-line" data-testid="lifecycle-board">
+    <div v-if="board.start" class="lifecycle-line-group">
+      <div class="lifecycle-line-node lifecycle-line-node--start" data-testid="lifecycle-start">
+        <span class="lifecycle-line-name">{{ board.start.label }}</span>
+        <span v-if="board.start.count !== null" class="lifecycle-line-count">{{ format(board.start.count) }}</span>
       </div>
     </div>
 
-    <div v-for="stage in board.stages" :key="stage.questionId" class="lifecycle-row">
-      <div class="lifecycle-stage" :data-testid="`lifecycle-stage-${stage.questionId}`">
-        <span class="lifecycle-stage-label">{{ stage.label }}</span>
-        <span v-if="stage.count !== null" class="lifecycle-count">{{ format(stage.count) }}</span>
+    <div v-for="stage in board.stages" :key="stage.questionId" class="lifecycle-line-group">
+      <div class="lifecycle-line-node" :data-testid="`lifecycle-stage-${stage.questionId}`">
+        <span class="lifecycle-line-name">{{ stage.label }}</span>
+        <span v-if="stage.count !== null" class="lifecycle-line-count">{{ format(stage.count) }}</span>
       </div>
-      <div class="lifecycle-places">
+      <div class="lifecycle-line-gap">
         <component
           :is="openable(place) ? 'button' : 'div'"
           v-for="place in stage.places"
           :key="`${place.questionId}-${place.branch}`"
           :type="openable(place) ? 'button' : undefined"
-          class="lifecycle-place"
-          :class="{
-            'lifecycle-place--held': (place.count ?? 0) > 0,
-            'lifecycle-place--empty': place.count === 0,
-            'lifecycle-place--open': openable(place),
-          }"
+          :aria-label="openable(place) ? `Open ${place.label}` : undefined"
+          class="lifecycle-line-place"
+          :class="{ 'lifecycle-line-place--empty': place.count === 0, 'lifecycle-line-place--open': openable(place) }"
           :data-testid="`lifecycle-place-${place.questionId}-${place.branch}`"
           @click="openable(place) && emit('open', place)"
         >
-          <span class="lifecycle-place-label">{{ place.label }}</span>
-          <span class="lifecycle-count">{{ place.count === null ? '' : format(place.count) }}</span>
-          <span v-if="place.count !== null && board.largest > 0" class="lifecycle-meter" aria-hidden="true">
-            <i :style="{ width: `${Math.round(((place.count ?? 0) / board.largest) * 100)}%` }" />
-          </span>
+          <span class="lifecycle-line-place-label">{{ place.label }}</span>
+          <span class="lifecycle-line-count">{{ place.count === null ? '' : format(place.count) }}</span>
         </component>
       </div>
     </div>
 
-    <div v-if="board.complete" class="lifecycle-row">
-      <div class="lifecycle-stage lifecycle-stage--complete" data-testid="lifecycle-complete">
-        <span class="lifecycle-stage-label">{{ board.complete.label }}</span>
-        <span v-if="board.complete.count !== null" class="lifecycle-count">{{ format(board.complete.count) }}</span>
-      </div>
+    <div v-if="board.complete" class="lifecycle-line-group">
+      <component
+        :is="openable(board.complete) ? 'button' : 'div'"
+        :type="openable(board.complete) ? 'button' : undefined"
+        :aria-label="openable(board.complete) ? `Open ${board.complete.label}` : undefined"
+        class="lifecycle-line-node lifecycle-line-node--complete"
+        :class="{ 'lifecycle-line-place--open': openable(board.complete) }"
+        data-testid="lifecycle-complete"
+        @click="board.complete && openable(board.complete) && emit('open', board.complete)"
+      >
+        <span class="lifecycle-line-name">{{ board.complete.label }}</span>
+        <span v-if="board.complete.count !== null" class="lifecycle-line-count">{{ format(board.complete.count) }}</span>
+      </component>
     </div>
   </div>
 </template>
@@ -48,9 +52,9 @@
 <script setup lang="ts">
 import type { LifecycleBoard, LifecyclePlace } from '../../lib/lifecycleBoard'
 
-// DAR-UI-050. Where records stopped: stages down the left, the places a record can stop at beside the stage
-// where it stopped. A place holding records is bordered solid, an empty one dashed (design system: solid =
-// attention, dashed = empty). A "no" place with a result opens its records.
+// DAR-UI-050. Where records stopped, drawn as the lifecycle's own line (the settings page's spine): a dot per stage
+// with how many reached it, the places a record stopped at listed under the stage where it stopped, the complete
+// place last. Monochrome; an empty place is dimmed; a place with records opens them, underlined on approach.
 const props = defineProps<{ board: LifecycleBoard; narrow?: boolean; canOpen: (place: LifecyclePlace) => boolean }>()
 const emit = defineEmits<{ open: [place: LifecyclePlace] }>()
 const countFormat = new Intl.NumberFormat('en-US')
@@ -60,60 +64,76 @@ function openable(place: LifecyclePlace): boolean { return props.canOpen(place) 
 </script>
 
 <style scoped>
-.lifecycle-board { display: grid; gap: var(--space-2); }
-.lifecycle-row {
-  display: grid;
-  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: start;
-}
-.lifecycle-board--narrow .lifecycle-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1-5); }
-
-/* Stage: the rules board's field pill, as the question node draws it. */
-.lifecycle-stage {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-1-5) var(--space-2);
-  border: 1px solid color-mix(in oklab, var(--border) 80%, var(--text) 20%);
-  border-radius: var(--radius-pill);
-  background: color-mix(in oklab, var(--surface-2) 88%, var(--surface));
-  color: var(--text);
-}
-.lifecycle-stage--complete { border-color: var(--border-soft); background: var(--surface); color: var(--text-muted); }
-.lifecycle-stage-label { min-width: 0; overflow: hidden; font-size: var(--type-heading-size); text-overflow: ellipsis; white-space: nowrap; }
-
-/* Places: the flowchart's finding box, stacked beside their stage. */
-.lifecycle-places {
-  display: grid;
-  gap: var(--space-1-5);
-  padding-left: var(--space-2);
-  border-left: 1px dashed var(--border);
-}
-.lifecycle-board--narrow .lifecycle-places { margin-left: var(--space-3); }
-.lifecycle-place {
+.lifecycle-line { display: flex; flex-direction: column; max-width: 40rem; }
+.lifecycle-line-group { position: relative; }
+.lifecycle-line-node {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-0) var(--space-2);
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
   min-height: 0;
-  padding: var(--space-1-5) var(--space-2);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: var(--type-table-head-size);
+  padding: 0 0 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--text);
   text-align: left;
+  font-size: var(--type-tile-size);
 }
-.lifecycle-place--held { border-color: color-mix(in oklab, var(--border) 50%, var(--text) 50%); color: var(--text); }
-.lifecycle-place--empty { border-style: dashed; }
-.lifecycle-place--open:hover {
-  border-color: color-mix(in oklab, var(--border) 70%, var(--accent));
-  background: color-mix(in oklab, var(--surface-2) 88%, var(--accent));
+.lifecycle-line-node::before {
+  content: "";
+  position: absolute;
+  left: 0.2rem;
+  top: 0.45rem;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1.5px solid var(--text);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
 }
-.lifecycle-place-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lifecycle-count { flex: none; color: var(--text); font-variant-numeric: tabular-nums; }
-.lifecycle-meter { grid-column: 1 / -1; height: 2px; background: var(--border-soft); }
-.lifecycle-meter i { display: block; height: 100%; background: var(--text-muted); }
+.lifecycle-line-node--start::before,
+.lifecycle-line-node--complete::before { background: var(--text); }
+.lifecycle-line-name { min-width: 0; }
+.lifecycle-line-count { color: var(--text); font-variant-numeric: tabular-nums; }
+/* The rule line runs down the left between the dots, through each stage's places. */
+.lifecycle-line-gap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+  padding: var(--space-1-5) 0 var(--space-2) var(--space-4);
+}
+.lifecycle-line-gap::before,
+.lifecycle-line-group:first-child::after {
+  content: "";
+  position: absolute;
+  left: 0.55rem;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--border);
+}
+.lifecycle-line-group:first-child { padding-bottom: var(--space-2); }
+.lifecycle-line-group:first-child::after { top: 1.3rem; }
+.lifecycle-line-place {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 0;
+  padding: var(--space-00) 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  text-align: left;
+  font-size: var(--type-muted-size);
+}
+.lifecycle-line-place-label { min-width: 0; }
+.lifecycle-line-place--empty,
+.lifecycle-line-place--empty .lifecycle-line-count { color: var(--text-dim); }
+.lifecycle-line-place--open { cursor: pointer; }
+.lifecycle-line-place--open:hover .lifecycle-line-place-label,
+.lifecycle-line-place--open:hover .lifecycle-line-name { text-decoration: underline; text-underline-offset: 3px; }
 </style>

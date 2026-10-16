@@ -74,6 +74,20 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
+    // DAR-UI-050. A lifecycle's settings (what it leaves out, when a record is late), as a Sync run's settings.
+    path: '/reconciliation/runs/:reconciliationId/settings',
+    name: 'reconciliation-run-flowchart-settings',
+    component: () => import('../pages/reconciliation/RunFlowchartSettingsPage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
+    // DAR-UI-050. Play opens a workflow for the run's window, as a Sync run's play does.
+    path: '/reconciliation/runs/:reconciliationId/run',
+    name: 'reconciliation-run-flowchart-start',
+    component: () => import('../pages/reconciliation/RunFlowchartStartPage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
     path: '/reconciliation/runs/:reconciliationId/:reconciliationExecutionId?',
     name: 'reconciliation-run-flowchart',
     component: () => import('../pages/reconciliation/RunFlowchartPage.vue'),
