@@ -17,7 +17,9 @@
           :narrow="narrow"
           :selected-id="editing?.questionId ?? null"
           :states="states"
+          :openable-findings="openableFindings"
           @select="openExisting"
+          @open-finding="openFinding"
           @add-next="(id) => openNew(id, 'YES')"
           @add-why="(id) => openNew(id, 'NO')"
         />
@@ -30,6 +32,33 @@
         >
           Add Question
         </button>
+      </StaticPageSection>
+
+      <StaticPageSection v-if="historyOptions.length || summary">
+        <template #header>
+          <div class="static-page-section-header-row">
+            <h2 class="static-page-section-heading">Run History</h2>
+            <AppSelect v-model="historySelection" :options="historyOptions" placeholder="Choose a run" test-id="flowchart-history-select" />
+          </div>
+        </template>
+        <div v-if="summary" class="static-page-summary-grid">
+          <article class="static-page-summary-card">
+            <span class="static-page-summary-label">Status</span>
+            <span data-testid="flowchart-summary-status"><StatusBadge :label="summary.status.label" :tone="summary.status.tone" /></span>
+          </article>
+          <article class="static-page-summary-card">
+            <span class="static-page-summary-label">Window</span>
+            <span data-testid="flowchart-summary-window">{{ summary.window }}</span>
+          </article>
+          <article class="static-page-summary-card">
+            <span class="static-page-summary-label">Questions</span>
+            <span>{{ summary.questions }}</span>
+          </article>
+          <article class="static-page-summary-card">
+            <span class="static-page-summary-label">Findings</span>
+            <span data-testid="flowchart-summary-findings">{{ summary.findings }}</span>
+          </article>
+        </div>
       </StaticPageSection>
 
       <StaticPageSection title="Run Window">
@@ -104,30 +133,34 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import FlowchartQuestionEditor, { type FlowchartQuestionDraft } from '../../components/reconciliation/FlowchartQuestionEditor.vue'
 import RunFlowchartBoard from '../../components/reconciliation/RunFlowchartBoard.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
+import StatusBadge from '../../components/ui/StatusBadge.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
-import type { FlowchartBranch, FlowchartExecutionRow, FlowchartQuestion, FlowchartRun } from '../../lib/api/flowchartTypes'
+import type {
+  FlowchartBranch, FlowchartExecutionRow, FlowchartExecutionSummary, FlowchartQuestion, FlowchartRun,
+} from '../../lib/api/flowchartTypes'
 import type { SavedRunSummary } from '../../lib/api/types'
 import { walkableQuestionIds } from '../../lib/flowchart/flowchartLayout'
 import {
   buildRunPayload, defaultWindowDays, isExecutionDone, POLL_INTERVAL_MS, questionStates, shouldKeepPolling, windowFromDays,
 } from '../../lib/flowchart/flowchartRunState'
 import { backIconPath, playIconPath, playIconTransform } from '../../lib/iconPaths'
-import { buildReconciliationRunLiveRoute } from '../../lib/reconciliationRoutes'
+import { buildReconciliationRunLiveRoute, buildReconciliationRunResultRoute } from '../../lib/reconciliationRoutes'
 import { lookBackLabel, questionCountLabel } from '../../lib/runTypes'
-import { addDays } from '../../lib/utils/date'
+import { addDays, displayCalendarDayOf, formatDateTime } from '../../lib/utils/date'
 
 // DAR-UI-048. One run's chart, on a static board: build it from existing rules (spec A7), run it over a
 // look-back window, and follow each question. Editing opens the design system's static-page popup.
 const route = useRoute()
+const router = useRouter()
 const reconciliationId = computed(() => String(route.params.reconciliationId ?? ''))
 
 const run = ref<FlowchartRun | null>(null)
@@ -147,6 +180,9 @@ const running = ref(false)
 // Set before the Run request goes out, so a double click cannot start a second walk (review I4).
 const starting = ref(false)
 const pollCeilingHit = ref(false)
+// Plan 3: the execution on screen (from the route, or one just started here), and the run's past ones.
+const activeExecutionId = ref<string | null>(null)
+const executions = ref<FlowchartExecutionSummary[]>([])
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 let unmounted = false
 let mediaQuery: MediaQueryList | null = null
@@ -193,10 +229,82 @@ const questionRuns = computed(() => {
       questionId: id,
       title: labelOf(id),
       meta: `${STATE_WORDS[entry.state] ?? entry.state}${counts}${reason}`,
-      to: buildReconciliationRunLiveRoute({ savedRunId: q.ruleSetId, runName: labelOf(id), file1SystemLabel: '', file2SystemLabel: '' }, row.reconciliationRunResultId),
+      to: resultRouteFor(id) ?? buildReconciliationRunLiveRoute(routeContextFor(q, id), row.reconciliationRunResultId),
     }
   })
 })
+
+function routeContextFor(q: FlowchartQuestion, id: string) {
+  return { savedRunId: q.ruleSetId, runName: labelOf(id), file1SystemLabel: '', file2SystemLabel: '' }
+}
+
+// A finished question's records live in its result file; one still going (or never reached) has none yet.
+function resultRouteFor(id: string): RouteLocationRaw | null {
+  const entry = states.value?.[id]
+  const path = entry?.row?.resultDataManagerPath?.trim()
+  const q = questions.value.find((x) => x.reconciliationRunId === id)
+  if (!q || !path || !entry || entry.state === 'waiting' || entry.state === 'running') return null
+  return buildReconciliationRunResultRoute(routeContextFor(q, id), path)
+}
+
+const openableFindings = computed(() =>
+  walkable.value.filter((id) => questions.value.find((q) => q.reconciliationRunId === id)?.questionRole !== 'START' && resultRouteFor(id)))
+
+function openFinding(id: string) {
+  const to = resultRouteFor(id)
+  if (to) void router.push(to)
+}
+
+const ACTIVE_STATUSES = ['AUT_STAT_PENDING', 'AUT_STAT_RUNNING']
+const STATUS_TONES: Record<string, 'success' | 'danger' | 'warning' | 'neutral'> = {
+  Done: 'success', Failed: 'danger', Cancelled: 'warning', Running: 'neutral',
+}
+// The backend's rollup (RunFlowchartSupport.rollupStatus), in words: running, then cancelled, then failed.
+function rollupWord(statuses: Array<string | null | undefined>): string {
+  if (statuses.some((st) => ACTIVE_STATUSES.includes(st ?? ''))) return 'Running'
+  if (statuses.includes('AUT_STAT_CANCELLED')) return 'Cancelled'
+  if (statuses.includes('AUT_STAT_FAILED')) return 'Failed'
+  return 'Done'
+}
+
+function windowText(start?: string | number | null, endExclusive?: string | number | null): string {
+  if (start == null || endExclusive == null) return '-'
+  const first = displayCalendarDayOf(new Date(start))
+  const last = addDays(displayCalendarDayOf(new Date(endExclusive)), -1)
+  return `${dateFormat.format(first)} – ${dateFormat.format(last)}`
+}
+
+const historyOptions = computed(() => executions.value.map((e) => ({
+  value: e.reconciliationExecutionId,
+  label: `${formatDateTime(e.startedDate, { locale: 'en-US' })} · ${rollupWord([e.statusEnumId])}`,
+})))
+
+const historySelection = computed({
+  get: () => activeExecutionId.value ?? '',
+  set: (id: string) => {
+    if (id && id !== activeExecutionId.value) {
+      void router.push({ name: 'reconciliation-run-flowchart', params: { reconciliationId: reconciliationId.value, reconciliationExecutionId: id } })
+    }
+  },
+})
+
+const summary = computed(() => {
+  if (!activeExecutionId.value || !states.value) return null
+  const word = running.value ? 'Running' : rollupWord(executionRows.value.map((r) => r.statusEnumId))
+  const listed = executions.value.find((e) => e.reconciliationExecutionId === activeExecutionId.value)
+  const starts = new Set(questions.value.filter((q) => q.questionRole === 'START').map((q) => q.reconciliationRunId))
+  const findings = executionRows.value
+    .filter((r) => !starts.has(r.reconciliationRunId ?? ''))
+    .reduce((sum, r) => sum + (r.noCount ?? 0), 0)
+  return {
+    status: { label: word, tone: STATUS_TONES[word] ?? 'neutral' },
+    window: listed ? windowText(listed.windowStartDate, listed.windowEndDate) : startedWindowText.value ?? '-',
+    questions: countFormat.format(walkable.value.filter((id) => !starts.has(id)).length),
+    findings: countFormat.format(findings),
+  }
+})
+// The window of a run started on this page, until the executions list has caught up with it.
+const startedWindowText = ref<string | null>(null)
 
 function message(error: unknown): string { return error instanceof Error ? error.message : String(error) }
 
@@ -281,6 +389,72 @@ async function deleteEditing() {
 
 function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null } }
 
+async function loadExecutions() {
+  try {
+    const response = await reconciliationFacade.listReconciliationExecutions({ reconciliationId: reconciliationId.value })
+    if (!unmounted) executions.value = response?.executions ?? []
+  } catch {
+    // History is a convenience: failing to list it costs the picker, never the chart.
+    executions.value = []
+  }
+}
+
+/**
+ * Polls one execution until it is over. A run started here is over when every question on the chart has
+ * finished. A past one is over when no row is still active: questions added to the chart since it ran
+ * have no row in it and never will, so "every question finished" would poll it to the ceiling.
+ */
+function followExecution(executionId: string, startedHere: boolean) {
+  stopPolling()
+  running.value = true
+  pollCeilingHit.value = false
+  const startedAt = Date.now()
+  const isOver = () => (startedHere
+    ? isExecutionDone(walkable.value, executionRows.value)
+    : executionRows.value.length > 0 && !executionRows.value.some((r) => ACTIVE_STATUSES.includes(r.statusEnumId ?? '')))
+  // A timeout chain, not an interval: the next poll is scheduled only after this one answered, so a slow
+  // response can never land after a newer one and leave a question stuck on "running" (review I4).
+  const poll = async () => {
+    if (unmounted || activeExecutionId.value !== executionId) return
+    try {
+      const { results } = await reconciliationFacade.getReconciliationExecution({ reconciliationExecutionId: executionId })
+      if (unmounted || activeExecutionId.value !== executionId) return
+      executionRows.value = results ?? []
+    } catch (error) {
+      pageError.value = message(error)
+    }
+    const done = isOver()
+    if (!shouldKeepPolling(startedAt, Date.now(), done)) {
+      pollTimer = null
+      running.value = false
+      pollCeilingHit.value = !done
+      void loadExecutions()
+      return
+    }
+    pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
+  }
+  pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
+}
+
+async function loadExecution(executionId: string) {
+  stopPolling()
+  running.value = false
+  pollCeilingHit.value = false
+  activeExecutionId.value = executionId
+  executionRows.value = []
+  try {
+    const { results } = await reconciliationFacade.getReconciliationExecution({ reconciliationExecutionId: executionId })
+    if (unmounted || activeExecutionId.value !== executionId) return
+    executionRows.value = results ?? []
+  } catch (error) {
+    pageError.value = message(error)
+    return
+  }
+  if (!executionRows.value.length || executionRows.value.some((r) => ACTIVE_STATUSES.includes(r.statusEnumId ?? ''))) {
+    followExecution(executionId, false)
+  }
+}
+
 async function startRun() {
   if (running.value || starting.value) return
   pageError.value = null
@@ -291,30 +465,12 @@ async function startRun() {
     const { reconciliationExecutionId } = await reconciliationFacade.runReconciliation(
       buildRunPayload(reconciliationId.value, selectedWindow.value))
     if (unmounted) return
-    running.value = true
-    const startedAt = Date.now()
-    // A timeout chain, not an interval: the next poll is scheduled only after this one answered, so a slow
-    // response can never land after a newer one and leave a question stuck on "running" (review I4).
-    const poll = async () => {
-      if (unmounted) return
-      try {
-        const { results } = await reconciliationFacade.getReconciliationExecution({ reconciliationExecutionId })
-        if (unmounted) return
-        executionRows.value = results ?? []
-      } catch (error) {
-        pageError.value = message(error)
-      }
-      const done = isExecutionDone(walkable.value, executionRows.value)
-      if (!shouldKeepPolling(startedAt, Date.now(), done)) {
-        pollTimer = null
-        running.value = false
-        pollCeilingHit.value = !done
-        return
-      }
-      pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
-    }
-    stopPolling()
-    pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
+    // Set before the address moves, so the route watch sees this execution as already on screen.
+    activeExecutionId.value = reconciliationExecutionId
+    startedWindowText.value = windowSummary.value
+    void router.replace({ name: 'reconciliation-run-flowchart', params: { reconciliationId: reconciliationId.value, reconciliationExecutionId } })
+    followExecution(reconciliationExecutionId, true)
+    void loadExecutions()
   } catch (error) {
     pageError.value = message(error)
   } finally {
@@ -328,7 +484,18 @@ onMounted(() => {
   mediaQuery = window.matchMedia('(max-width: 899px)')
   narrow.value = mediaQuery.matches
   mediaQuery.addEventListener('change', onMedia)
-  void load()
+  void (async () => {
+    // The chart first: whether an execution is over depends on which questions it has.
+    await load()
+    if (unmounted) return
+    void loadExecutions()
+    const fromRoute = route.params.reconciliationExecutionId
+    if (fromRoute) await loadExecution(String(fromRoute))
+  })()
+})
+
+watch(() => route.params.reconciliationExecutionId, (id) => {
+  if (id && String(id) !== activeExecutionId.value) void loadExecution(String(id))
 })
 
 onBeforeUnmount(() => {

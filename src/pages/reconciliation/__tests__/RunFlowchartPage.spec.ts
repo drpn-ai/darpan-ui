@@ -1,11 +1,17 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { reconciliationId: 'R1' } }), useRouter: () => ({ push: vi.fn() }), RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } }))
+const { routeParams, push, replace } = vi.hoisted(() => ({
+  routeParams: { reconciliationId: 'R1' } as Record<string, string | undefined>,
+  push: vi.fn(),
+  replace: vi.fn(),
+}))
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: routeParams }), useRouter: () => ({ push, replace }), RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } }))
 vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
     getReconciliation: vi.fn(), listSavedRuns: vi.fn(), saveReconciliationQuestion: vi.fn(),
     deleteReconciliationQuestion: vi.fn(), runReconciliation: vi.fn(), getReconciliationExecution: vi.fn(),
+    listReconciliationExecutions: vi.fn(),
   },
 }))
 
@@ -22,6 +28,10 @@ const questions = [
 beforeEach(() => {
   vi.useFakeTimers()
   Object.values(f).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockReset())
+  push.mockReset()
+  replace.mockReset()
+  delete routeParams.reconciliationExecutionId
+  f.listReconciliationExecutions.mockResolvedValue({ executions: [] } as never)
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })
   f.getReconciliation.mockResolvedValue({ reconciliation: run, questions } as never)
   f.listSavedRuns.mockResolvedValue({ savedRuns: [{ savedRunId: 'SHIP', runName: 'Has a fulfillment', requiresSystemSelection: false, systemOptions: [] }] } as never)
@@ -182,5 +192,76 @@ describe('RunFlowchartPage', () => {
     await vi.advanceTimersByTimeAsync(3000)
     expect(w.find('[data-testid="flowchart-live-link-S"]').exists()).toBe(true)
     expect(w.find('[data-testid="flowchart-live-link-A"]').exists()).toBe(true)
+  })
+
+  it('opens a past run from the route and shows its summary', async () => {
+    routeParams.reconciliationExecutionId = 'E7'
+    f.listReconciliationExecutions.mockResolvedValue({ executions: [{ reconciliationExecutionId: 'E7', statusEnumId: 'AUT_STAT_SUCCESS', startedDate: '2026-08-17T10:00:00Z' }] } as never)
+    f.getReconciliationExecution.mockResolvedValue({ results: [
+      { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 10, noCount: 0, resultDataManagerPath: 'runs/s.json' },
+      { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 7, noCount: 3, resultDataManagerPath: 'runs/a.json' },
+    ] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect(f.getReconciliationExecution).toHaveBeenCalledWith({ reconciliationExecutionId: 'E7' })
+    expect(w.get('[data-testid="flowchart-summary-status"]').text()).toContain('Done')
+    expect(w.get('[data-testid="flowchart-summary-findings"]').text()).toContain('3')
+    expect(w.find('[data-testid="flowchart-history-select"]').exists()).toBe(true)
+  })
+
+  it('a finished finding opens its result page', async () => {
+    routeParams.reconciliationExecutionId = 'E7'
+    f.getReconciliationExecution.mockResolvedValue({ results: [
+      { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 10, noCount: 0 },
+      { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 7, noCount: 3, resultDataManagerPath: 'runs/a.json' },
+    ] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    await w.get('[data-testid="flowchart-finding-A"]').trigger('click')
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: 'reconciliation-run-result', params: expect.objectContaining({ outputFileName: 'runs/a.json' }) }))
+    const tile = JSON.parse(w.get('[data-testid="flowchart-live-link-A"]').attributes('data-to') ?? '{}')
+    expect(tile.name).toBe('reconciliation-run-result')
+  })
+
+  it('an execution still running is followed', async () => {
+    routeParams.reconciliationExecutionId = 'E8'
+    f.getReconciliationExecution
+      .mockResolvedValueOnce({ results: [{ reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_RUNNING' }] } as never)
+      .mockResolvedValue({ results: [
+        { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 1 },
+        { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 1, noCount: 0 },
+      ] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect(w.get('[data-testid="flowchart-summary-status"]').text()).toContain('Running')
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(w.get('[data-testid="flowchart-state-A"]').text()).toContain('Done')
+    expect(w.get('[data-testid="flowchart-summary-status"]').text()).toContain('Done')
+    w.unmount()
+  })
+
+  it('a finished past run is not followed when the chart has grown since', async () => {
+    routeParams.reconciliationExecutionId = 'E6'
+    // A was added to the chart after E6 ran, so E6 has no row for it and never will.
+    f.getReconciliationExecution.mockResolvedValue({ results: [
+      { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 4 },
+    ] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect(w.get('[data-testid="flowchart-summary-status"]').text()).toContain('Done')
+    await vi.advanceTimersByTimeAsync(9000)
+    expect(f.getReconciliationExecution).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
+  it('Run moves the address to the new execution', async () => {
+    f.runReconciliation.mockResolvedValue({ reconciliationExecutionId: 'E9' } as never)
+    f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    await w.get('[data-testid="flowchart-run-button"]').trigger('click')
+    await flushPromises()
+    expect(replace).toHaveBeenCalledWith({ name: 'reconciliation-run-flowchart', params: { reconciliationId: 'R1', reconciliationExecutionId: 'E9' } })
+    w.unmount()
   })
 })

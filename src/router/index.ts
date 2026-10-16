@@ -74,7 +74,7 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
-    path: '/reconciliation/runs/:reconciliationId',
+    path: '/reconciliation/runs/:reconciliationId/:reconciliationExecutionId?',
     name: 'reconciliation-run-flowchart',
     component: () => import('../pages/reconciliation/RunFlowchartPage.vue'),
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Run' },
