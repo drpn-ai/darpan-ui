@@ -59,7 +59,7 @@ describe('darpanSystems', () => {
     { value: 'NETSUITE', label: 'NetSuite' },
     { value: 'SAPI', label: 'SAPI' },
     { value: 'DATABASE', label: 'Database' },
-    { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax Transfer Orders', parentEnumId: 'OMS' },
+    { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders', parentEnumId: 'OMS' },
     { value: 'OMS_RECON_ORDERS', label: 'HotWax Orders (Reconciliation API)', parentEnumId: 'OMS' },
     { value: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
     { value: 'SHOPIFY_RETURN_REFS', label: 'Shopify Order Return References', parentEnumId: 'SHOPIFY' },
@@ -81,22 +81,22 @@ describe('darpanSystems', () => {
   it('builds step 2 endpoint options with the parent as its own default endpoint', () => {
     const omsEndpoints = darpanSystemEndpointOptions('OMS', 'HotWax', SYSTEM_AND_ENDPOINT_OPTIONS)
     expect(omsEndpoints).toEqual([
-      { value: 'OMS', label: 'HotWax Orders' },
-      { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax Transfer Orders' },
+      { value: 'OMS', label: 'HotWax orders' },
+      { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders' },
       { value: 'OMS_RECON_ORDERS', label: 'HotWax Orders (Reconciliation API)' },
       { value: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)' },
     ])
 
     const shopifyEndpoints = darpanSystemEndpointOptions('SHOPIFY', 'Shopify', SYSTEM_AND_ENDPOINT_OPTIONS)
     expect(shopifyEndpoints).toEqual([
-      { value: 'SHOPIFY', label: 'Shopify Orders' },
+      { value: 'SHOPIFY', label: 'Shopify orders' },
       { value: 'SHOPIFY_RETURN_REFS', label: 'Shopify Order Return References' },
     ])
 
     // A system with no children still returns a single default-endpoint option (callers use
     // darpanSystemHasEndpointOptions to decide whether to show step 2 at all).
     expect(darpanSystemEndpointOptions('NETSUITE', 'NetSuite', SYSTEM_AND_ENDPOINT_OPTIONS)).toEqual([
-      { value: 'NETSUITE', label: 'NetSuite Orders' },
+      { value: 'NETSUITE', label: 'NetSuite orders' },
     ])
 
     expect(darpanSystemEndpointOptions('', 'HotWax', SYSTEM_AND_ENDPOINT_OPTIONS)).toEqual([])
@@ -108,19 +108,19 @@ describe('darpanSystems', () => {
     // API" in the label the operator reads.
     const omsEndpoints = darpanSystemEndpointOptions('OMS', 'HotWax', SYSTEM_AND_ENDPOINT_OPTIONS)
     expect(excludeApiOnlyEndpointOptions(omsEndpoints)).toEqual([
-      { value: 'OMS', label: 'HotWax Orders' },
-      { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax Transfer Orders' },
+      { value: 'OMS', label: 'HotWax orders' },
+      { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders' },
     ])
 
     // Every Shopify endpoint under the parent is an API pull, so only the system itself is left.
     const shopifyEndpoints = darpanSystemEndpointOptions('SHOPIFY', 'Shopify', SYSTEM_AND_ENDPOINT_OPTIONS)
     expect(excludeApiOnlyEndpointOptions(shopifyEndpoints)).toEqual([
-      { value: 'SHOPIFY', label: 'Shopify Orders' },
+      { value: 'SHOPIFY', label: 'Shopify orders' },
     ])
 
     // Systems with no endpoints at all are untouched.
     expect(excludeApiOnlyEndpointOptions(darpanSystemEndpointOptions('NETSUITE', 'NetSuite', SYSTEM_AND_ENDPOINT_OPTIONS)))
-      .toEqual([{ value: 'NETSUITE', label: 'NetSuite Orders' }])
+      .toEqual([{ value: 'NETSUITE', label: 'NetSuite orders' }])
   })
 
   it('resolves the owning parent for a concrete stored systemEnumId, for edit pre-selection', () => {
@@ -146,7 +146,7 @@ describe('system names for result count labels', () => {
     expect(darpanSystemNameFromLabel('Shopify Order Return References')).toBe('Shopify')
     expect(darpanSystemNameFromLabel('HotWax Returns (Reconciliation API)')).toBe('HotWax')
     expect(darpanSystemNameFromLabel('HotWax Orders (Reconciliation API)')).toBe('HotWax')
-    expect(darpanSystemNameFromLabel('HotWax Transfer Orders')).toBe('HotWax')
+    expect(darpanSystemNameFromLabel('HotWax transfer orders')).toBe('HotWax')
   })
 
   it('normalizes system labels stamped as raw enum ids or codes', () => {
@@ -176,9 +176,9 @@ describe('system names for result count labels', () => {
   // Two endpoints of one system would both render "Missing from HotWax", making the two counts
   // indistinguishable — so that pairing keeps the endpoint labels.
   it('keeps endpoint labels when both sides are the same system', () => {
-    expect(darpanSystemNamePair('HotWax Returns (Reconciliation API)', 'HotWax Transfer Orders')).toEqual({
+    expect(darpanSystemNamePair('HotWax Returns (Reconciliation API)', 'HotWax transfer orders')).toEqual({
       file1: 'HotWax Returns (Reconciliation API)',
-      file2: 'HotWax Transfer Orders',
+      file2: 'HotWax transfer orders',
     })
   })
 

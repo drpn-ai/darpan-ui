@@ -14,6 +14,6 @@ describe('transfer-order system canonicalization', () => {
   })
 
   it('has a display label', () => {
-    expect(darpanSystemDisplayLabel('OMS_TRANSFER_ORDERS')).toBe('HotWax Transfer Orders')
+    expect(darpanSystemDisplayLabel('OMS_TRANSFER_ORDERS')).toBe('HotWax transfer orders')
   })
 })

@@ -1688,7 +1688,7 @@ describe('ReconciliationCreateFlowPage', () => {
     // parentEnumId and have nothing grouped under them, so they keep today's single-step behaviour.
     const SYSTEM_OPTIONS_WITH_OMS_ENDPOINT = [
       ...SYSTEM_OPTIONS,
-      { enumId: 'OMS_TRANSFER_ORDERS', label: 'HotWax Transfer Orders', parentEnumId: 'OMS' },
+      { enumId: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders', parentEnumId: 'OMS' },
       { enumId: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
     ]
 
@@ -1761,7 +1761,7 @@ describe('ReconciliationCreateFlowPage', () => {
     // The rule set board titles its columns from file{n}SystemParentLabel. The wizard is the only
     // producer of a draft for a NEW run -- nothing here comes back from the backend -- so if it does
     // not carry the family name, the board falls back to the endpoint label and asks the operator to
-    // compare "HotWax Transfer Orders" with something, when the question is about systems.
+    // compare "HotWax transfer orders" with something, when the question is about systems.
     it('carries the system family name onto the draft when an endpoint was chosen', async () => {
       mockSystemsWithOmsEndpoint()
       const wrapper = mount(ReconciliationCreateFlowPage)
@@ -1785,7 +1785,7 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledWith(
         expect.objectContaining({
           file1SystemEnumId: 'OMS_TRANSFER_ORDERS',
-          file1SystemLabel: 'HotWax Transfer Orders',
+          file1SystemLabel: 'HotWax transfer orders',
           file1SystemParentLabel: 'HotWax',
         }),
         'file1-schema',
@@ -2004,7 +2004,7 @@ describe('ReconciliationCreateFlowPage', () => {
       const draft: ReconciliationRuleSetDraft = {
         runName: 'Returns Resume Test',
         file1SystemEnumId: 'OMS_TRANSFER_ORDERS',
-        file1SystemLabel: 'HotWax Transfer Orders',
+        file1SystemLabel: 'HotWax transfer orders',
         file1FileTypeEnumId: 'DftJson',
         file1JsonSchemaId: 'schema-oms-orders',
         file1PrimaryIdExpression: ['$.orders[0].order_id'],
@@ -2025,7 +2025,7 @@ describe('ReconciliationCreateFlowPage', () => {
         await flushPromises()
         guard += 1
       }
-      expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax Transfer Orders')
+      expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax transfer orders')
 
       // Two cards back, not one: file1-source now sits between the endpoint and the system.
       await wrapper.get('.wizard-back').trigger('click')
@@ -2102,7 +2102,7 @@ describe('ReconciliationCreateFlowPage', () => {
     // one is what keeps the endpoint card on screen for the wording assertions below.
     const SYSTEMS_WITH_OMS_ENDPOINT = [
       ...SYSTEM_OPTIONS,
-      { enumId: 'OMS_TRANSFER_ORDERS', label: 'HotWax Transfer Orders', parentEnumId: 'OMS' },
+      { enumId: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders', parentEnumId: 'OMS' },
       { enumId: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
     ]
 

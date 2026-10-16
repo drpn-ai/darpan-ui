@@ -47,7 +47,7 @@ const CANONICAL_SYSTEM_LABELS: Record<string, string> = {
   SHOPIFY: 'Shopify',
   NETSUITE: 'NetSuite',
   SAPI: 'SAPI',
-  OMS_TRANSFER_ORDERS: 'HotWax Transfer Orders',
+  OMS_TRANSFER_ORDERS: 'HotWax transfer orders',
 }
 
 export function canonicalDarpanSystemEnumId(systemEnumId: string | null | undefined): string {
@@ -161,7 +161,7 @@ export function darpanSystemEndpointOptions<T extends DarpanSystemValueOption>(
     Boolean(option.parentEnumId?.trim()) && darpanSystemIdsMatch(option.parentEnumId, trimmedParentEnumId),
   )
   const parentLabel = darpanSystemDisplayLabel(trimmedParentEnumId, parentFallbackLabel)
-  const defaultOption: DarpanSystemEndpointOption = { value: trimmedParentEnumId, label: `${parentLabel} Orders` }
+  const defaultOption: DarpanSystemEndpointOption = { value: trimmedParentEnumId, label: `${parentLabel} orders` }
 
   return [
     defaultOption,
