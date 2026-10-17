@@ -1,4 +1,5 @@
 import type { ApiEnvelope, AuthTokenContract } from './types'
+import { invalidateReadCache } from './readCache'
 import { isIdempotentReadMethod, retryRead } from './retry'
 
 interface JsonRpcRequest {
@@ -704,9 +705,18 @@ async function dispatchWithAuthRecovery<T>(method: string, params: object, signa
 
 export async function callService<T>(method: string, params: object = {}, signal?: AbortSignal): Promise<T> {
   const doRequest = () => dispatchWithAuthRecovery<T>(method, params, signal)
-  return isIdempotentReadMethod(method)
-    ? retryRead(doRequest, { shouldRetry: isTransientNetworkError }) // reads: retry transient network errors only
-    : doRequest()                                                      // writes: exactly once, apart from the auth replay above
+  if (isIdempotentReadMethod(method)) {
+    return retryRead(doRequest, { shouldRetry: isTransientNetworkError }) // reads: retry transient network errors only
+  }
+  // DAR-UI-051: a write can change anything a page has cached, so it drops the lot, before (reads already in
+  // flight must not store) and after (reads started during it may hold the old state). A failed write too:
+  // it may have half-applied.
+  invalidateReadCache()
+  try {
+    return await doRequest() // writes: exactly once, apart from the auth replay above
+  } finally {
+    invalidateReadCache()
+  }
 }
 
 export function getRpcUrl(): string {

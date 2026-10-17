@@ -109,6 +109,7 @@ import { useAuthStore, buildAuthRedirect } from '../stores/auth'
 import { useReconciliationDraftStore } from '../stores/reconciliationDraft'
 import { usePermissionsStore } from '../stores/permissions'
 import { reconciliationFacade } from '../lib/api/facade'
+import { cachedRead } from '../lib/api/readCache'
 import type { SavedRunSummary } from '../lib/api/types'
 import type { FlowchartRun } from '../lib/api/flowchartTypes'
 import { RUN_TYPES } from '../lib/runTypes'
@@ -387,7 +388,7 @@ async function importNetSuiteChecks(): Promise<void> {
     const skips = skipped ? ` ${plural(skipped, 'check')} ${skipped === 1 ? 'was' : 'were'} skipped.` : ''
     importResult.value = `${outcome}${skips}`
     importSkips.value = skipped ? (response.messages ?? []) : []
-    lifecycleRuns.value = await loadLifecycleRuns()
+    await loadLifecycleRuns()
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     importError.value = error instanceof Error ? error.message : String(error)
@@ -397,10 +398,12 @@ async function importNetSuiteChecks(): Promise<void> {
 }
 
 // Independent of the sync list: a failure here costs the Lifecycle section, never the page.
-function loadLifecycleRuns(): Promise<FlowchartRun[]> {
-  return reconciliationFacade.listReconciliations(pageAbortController.signal)
-    .then((response) => (response.reconciliations ?? []).filter((run) => run.isArchived !== 'Y'))
-    .catch(() => [])
+function loadLifecycleRuns(): Promise<void> {
+  return cachedRead(
+    'home.listReconciliations',
+    () => reconciliationFacade.listReconciliations(pageAbortController.signal),
+    (response) => { lifecycleRuns.value = (response.reconciliations ?? []).filter((run) => run.isArchived !== 'Y') },
+  ).then(() => {}, () => { lifecycleRuns.value = [] })
 }
 
 function setDashboardOrigin(): void {
@@ -408,7 +411,9 @@ function setDashboardOrigin(): void {
 }
 
 async function loadDashboard(): Promise<void> {
-  const authenticated = await authStore.ensureAuthenticated(true)
+  // DAR-UI-051: not forced. The router guard has already verified the session, and re-verifies a stale one in
+  // the background; forcing get#SessionInfo here put a full round-trip in front of every Home visit.
+  const authenticated = await authStore.ensureAuthenticated()
   if (!authenticated) {
     await router.replace(buildAuthRedirect(route.fullPath))
     return
@@ -420,21 +425,22 @@ async function loadDashboard(): Promise<void> {
   savedRuns.value = []
   lifecycleRuns.value = []
 
-  void loadLifecycleRuns().then((runs) => { lifecycleRuns.value = runs })
+  void loadLifecycleRuns()
 
   try {
     // 12 was enough while Home showed five tiles and a More.... Grouping puts a COUNT in every
     // heading, so the page has to hold the runs it is counting: gorjana alone has nine NetSuite
     // checks beside its two-sided ones. totalCount comes back regardless, so whatever is still
     // beyond this is admitted rather than mis-grouped.
-    const response = await reconciliationFacade.listSavedRuns({
-      pageIndex: 0,
-      pageSize: 100,
-      query: '',
-    }, pageAbortController.signal)
-    pinnedSavedRunIds.value = response.pinnedSavedRunIds ?? []
-    savedRuns.value = response.savedRuns ?? []
-    totalRunCount.value = response.pagination?.totalCount ?? (response.savedRuns?.length ?? 0)
+    await cachedRead(
+      'home.listSavedRuns',
+      () => reconciliationFacade.listSavedRuns({ pageIndex: 0, pageSize: 100, query: '' }, pageAbortController.signal),
+      (response) => {
+        pinnedSavedRunIds.value = response.pinnedSavedRunIds ?? []
+        savedRuns.value = response.savedRuns ?? []
+        totalRunCount.value = response.pagination?.totalCount ?? (response.savedRuns?.length ?? 0)
+      },
+    )
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     pinnedSavedRunIds.value = []

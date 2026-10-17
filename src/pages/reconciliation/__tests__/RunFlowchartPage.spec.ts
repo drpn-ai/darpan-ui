@@ -16,8 +16,9 @@ vi.mock('../../../lib/api/facade', () => ({
   },
 }))
 
-import { reconciliationFacade } from '../../../lib/api/facade'
+import { reconciliationFacade, settingsFacade } from '../../../lib/api/facade'
 import RunFlowchartPage from '../RunFlowchartPage.vue'
+import { invalidateReadCache } from '../../../lib/api/readCache'
 
 const f = vi.mocked(reconciliationFacade)
 const run = { reconciliationId: 'R1', reconciliationName: 'Order chain', defaultTimeWindow: '3d' }
@@ -27,6 +28,7 @@ const questions = [
 ]
 
 beforeEach(() => {
+  invalidateReadCache()
   vi.useFakeTimers()
   Object.values(f).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockReset())
   push.mockReset()
@@ -401,4 +403,47 @@ describe('RunFlowchartPage', () => {
     w.unmount()
   })
 
+  describe('loads without waiting on itself (DAR-UI-051)', () => {
+    it('asks for the chart, the account list, the history and the run on show at once', async () => {
+      routeParams.reconciliationExecutionId = 'E7'
+      f.getReconciliation.mockReturnValue(new Promise(() => {}))
+      vi.mocked(settingsFacade.listNsAuthConfigs).mockClear()
+      f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(settingsFacade.listNsAuthConfigs).toHaveBeenCalled()
+      expect(f.listReconciliationExecutions).toHaveBeenCalled()
+      expect(f.getReconciliationExecution).toHaveBeenCalledWith({ reconciliationExecutionId: 'E7' })
+      w.unmount()
+    })
+
+    it('a live run is not followed until the chart says which questions it has', async () => {
+      routeParams.reconciliationExecutionId = 'E7'
+      let chartArrives!: (value: unknown) => void
+      f.getReconciliation.mockReturnValue(new Promise((resolve) => { chartArrives = resolve }) as never)
+      f.getReconciliationExecution.mockResolvedValue({ results: [{ reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_RUNNING' }] } as never)
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(f.getReconciliationExecution).toHaveBeenCalledTimes(1)
+      chartArrives({ reconciliation: run, questions })
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(f.getReconciliationExecution.mock.calls.length).toBeGreaterThan(1)
+      w.unmount()
+    })
+
+    it('a revisit draws the last chart before the network answers', async () => {
+      mount(RunFlowchartPage).unmount()
+      await flushPromises()
+      f.getReconciliation.mockReturnValue(new Promise(() => {}))
+      f.listSavedRuns.mockReturnValue(new Promise(() => {}))
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(w.text()).toContain('Order chain')
+      expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(true)
+      expect(w.text()).not.toContain('Loading run...')
+      w.unmount()
+    })
+  })
 })

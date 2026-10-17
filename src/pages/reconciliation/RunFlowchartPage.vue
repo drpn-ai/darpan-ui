@@ -258,6 +258,7 @@ import StatusBadge from '../../components/ui/StatusBadge.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type {
   FlowchartBranch, FlowchartExecutionRow, FlowchartExecutionSummary, FlowchartQuestion, FlowchartRun, LifecycleRule,
   LifecycleStageException,
@@ -270,7 +271,7 @@ import {
 import { backIconPath, playIconPath, playIconTransform, settingsIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { buildReconciliationRunLiveRoute, buildReconciliationRunResultRoute } from '../../lib/reconciliationRoutes'
 import { lifecycleBoard, notFindingPlacesOf, type LifecyclePlace } from '../../lib/lifecycleBoard'
-import { nsAccountLabel } from '../../lib/nsAccountLabel'
+import { accountLabelOf, nsAccountLabels } from '../../lib/nsAccountLabel'
 import { questionCountLabel } from '../../lib/runTypes'
 import { addDays, displayCalendarDayOf, formatDateTime } from '../../lib/utils/date'
 
@@ -518,23 +519,40 @@ async function deleteRun() {
   }
 }
 
+// DAR-UI-051: the account list is fetched beside the lifecycle that names the account, not after it.
+async function fetchChart() {
+  const [got, accountLabels] = await Promise.all([
+    reconciliationFacade.getReconciliation({ reconciliationId: reconciliationId.value }),
+    nsAccountLabels(),
+  ])
+  return { got, accountLabels }
+}
+
+function applyChart({ got, accountLabels }: Awaited<ReturnType<typeof fetchChart>>) {
+  run.value = got.reconciliation
+  questions.value = got.questions ?? []
+  definition.value = got.lifecycle ? {
+    recordLabel: got.lifecycle.recordLabel, account: accountLabelOf(accountLabels, got.lifecycle.nsAuthConfigId), rules: got.rules ?? [],
+    stages: got.stages ?? [], exceptions: got.exceptions ?? [], lateAfterDays: got.reconciliation?.lateAfterDays ?? 0,
+  } : null
+  const byStage: Record<string, string[]> = {}
+  for (const e of got.exceptions ?? []) (byStage[e.stageLabel ?? ''] ??= []).push(e.value)
+  excusedNames.value = Object.fromEntries(Object.entries(byStage).map(([stage, values]) => [stage, values.join(' or ')]))
+  // A cached chart is drawn at once: "Loading" is only for a page with nothing to show.
+  loading.value = false
+}
+
 async function load() {
   pageError.value = null
   try {
-    const [got, saved] = await Promise.all([
-      reconciliationFacade.getReconciliation({ reconciliationId: reconciliationId.value }),
-      rules.value.length ? Promise.resolve(null) : reconciliationFacade.listSavedRuns({ pageIndex: 0, pageSize: 200 }),
+    await Promise.all([
+      cachedRead(`lifecycle.chart:${reconciliationId.value}`, fetchChart, applyChart),
+      rules.value.length ? null : cachedRead(
+        'lifecycle.listSavedRuns',
+        () => reconciliationFacade.listSavedRuns({ pageIndex: 0, pageSize: 200 }),
+        (saved) => { rules.value = saved.savedRuns ?? [] },
+      ),
     ])
-    run.value = got.reconciliation
-    questions.value = got.questions ?? []
-    definition.value = got.lifecycle ? {
-      recordLabel: got.lifecycle.recordLabel, account: await nsAccountLabel(got.lifecycle.nsAuthConfigId), rules: got.rules ?? [],
-      stages: got.stages ?? [], exceptions: got.exceptions ?? [], lateAfterDays: got.reconciliation?.lateAfterDays ?? 0,
-    } : null
-    const byStage: Record<string, string[]> = {}
-    for (const e of got.exceptions ?? []) (byStage[e.stageLabel ?? ''] ??= []).push(e.value)
-    excusedNames.value = Object.fromEntries(Object.entries(byStage).map(([stage, values]) => [stage, values.join(' or ')]))
-    if (saved) rules.value = saved.savedRuns ?? []
   } catch (error) {
     pageError.value = message(error)
   } finally {
@@ -607,8 +625,11 @@ function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = n
 
 async function loadExecutions() {
   try {
-    const response = await reconciliationFacade.listReconciliationExecutions({ reconciliationId: reconciliationId.value })
-    if (!unmounted) executions.value = response?.executions ?? []
+    await cachedRead(
+      `lifecycle.executions:${reconciliationId.value}`,
+      () => reconciliationFacade.listReconciliationExecutions({ reconciliationId: reconciliationId.value }),
+      (response) => { if (!unmounted) executions.value = response?.executions ?? [] },
+    )
   } catch {
     // History is a convenience: failing to list it costs the picker, never the chart.
     executions.value = []
@@ -654,16 +675,21 @@ function followExecution(executionId: string, startedHere: boolean) {
   pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
 }
 
-async function loadExecution(executionId: string) {
+/** `chartLoaded` gates only the decision to follow: whether an execution is over depends on which questions it has. */
+async function loadExecution(executionId: string, chartLoaded: Promise<unknown> = Promise.resolve()) {
   stopPolling()
   running.value = false
   pollCeilingHit.value = false
   activeExecutionId.value = executionId
   executionRows.value = []
   try {
-    const { results } = await reconciliationFacade.getReconciliationExecution({ reconciliationExecutionId: executionId })
+    await cachedRead(
+      `lifecycle.execution:${executionId}`,
+      () => reconciliationFacade.getReconciliationExecution({ reconciliationExecutionId: executionId }),
+      ({ results }) => { if (!unmounted && activeExecutionId.value === executionId) executionRows.value = results ?? [] },
+    )
+    await chartLoaded
     if (unmounted || activeExecutionId.value !== executionId) return
-    executionRows.value = results ?? []
   } catch (error) {
     pageError.value = message(error)
     return
@@ -682,14 +708,11 @@ onMounted(() => {
   mediaQuery = window.matchMedia('(max-width: 899px)')
   narrow.value = mediaQuery.matches
   mediaQuery.addEventListener('change', onMedia)
-  void (async () => {
-    // The chart first: whether an execution is over depends on which questions it has.
-    await load()
-    if (unmounted) return
-    void loadExecutions()
-    const fromRoute = route.params.reconciliationExecutionId
-    if (fromRoute) await loadExecution(String(fromRoute))
-  })()
+  // DAR-UI-051: the chart, its history and the run on show are fetched together, not one after another.
+  const chartLoaded = load()
+  void loadExecutions()
+  const fromRoute = route.params.reconciliationExecutionId
+  if (fromRoute) void loadExecution(String(fromRoute), chartLoaded)
 })
 
 watch(() => route.params.reconciliationExecutionId, (id) => {

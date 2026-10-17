@@ -61,6 +61,7 @@ vi.mock('../../lib/api/facade', () => ({
 }))
 
 import HomePage from '../HomePage.vue'
+import { invalidateReadCache } from '../../lib/api/readCache'
 
 const GROUP = '[data-testid="run-group-oms-shopify"]'
 const GROUP_MORE = '[data-testid="run-group-oms-shopify-more"]'
@@ -85,6 +86,7 @@ function buildSavedRun(index: number) {
 
 describe('HomePage', () => {
   beforeEach(() => {
+    invalidateReadCache()
     ensureAuthenticated.mockClear()
     replace.mockClear()
     listSavedRuns.mockReset()
@@ -104,6 +106,26 @@ describe('HomePage', () => {
       errors: [],
       pinnedSavedRunIds,
     }))
+  })
+
+  it('relies on the router-verified session instead of forcing a check (DAR-UI-051)', async () => {
+    mount(HomePage)
+    await flushPromises()
+    expect(ensureAuthenticated).toHaveBeenCalledTimes(1)
+    expect(ensureAuthenticated).not.toHaveBeenCalledWith(true)
+  })
+
+  it('shows the last visit\'s runs at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    mount(HomePage).unmount()
+    await flushPromises()
+
+    listSavedRuns.mockReturnValue(new Promise(() => {}))
+    listReconciliations.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(HomePage)
+    await flushPromises()
+
+    expect(revisit.find('[data-testid="pinned-runs"]').text()).toContain('Reconciliation 8')
+    expect(revisit.text()).toContain('OMS ↔ SHOPIFY · 7')
   })
 
   it('groups runs into one section per system family, counted', async () => {

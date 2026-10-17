@@ -561,3 +561,53 @@ describe('callService auth recovery', () => {
     setAuthRequiredHandler(null)
   })
 })
+
+describe('callService read-cache invalidation (DAR-UI-051)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+    installLocalStorageStub()
+  })
+
+  function okResponse(): Response {
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [] } }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  async function primedCache() {
+    const { cachedRead } = await import('../readCache')
+    await cachedRead('runs', () => Promise.resolve('cached'), () => {})
+    return async () => {
+      const apply = vi.fn()
+      await cachedRead('runs', () => Promise.resolve('fresh'), apply)
+      return apply.mock.calls.map(([value]) => value)
+    }
+  }
+
+  it('drops every cached read when a write succeeds', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(okResponse())))
+    const { callService } = await import('../client')
+    const readAgain = await primedCache()
+    await callService('facade.ReconciliationFacadeServices.save#Reconciliation', {})
+    expect(await readAgain()).toEqual(['fresh'])
+  })
+
+  it('drops every cached read when a write fails, since it may have half-applied', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('not json', { status: 500 }))))
+    const { callService } = await import('../client')
+    const readAgain = await primedCache()
+    await expect(callService('facade.ReconciliationFacadeServices.delete#Question', {})).rejects.toThrow()
+    expect(await readAgain()).toEqual(['fresh'])
+  })
+
+  it('leaves cached reads alone for a read', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(okResponse())))
+    const { callService } = await import('../client')
+    const readAgain = await primedCache()
+    await callService('facade.ReconciliationFacadeServices.list#SavedRuns', {})
+    expect(await readAgain()).toEqual(['cached', 'fresh'])
+  })
+})
