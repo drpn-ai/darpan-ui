@@ -395,7 +395,7 @@ describe('RunsSettingsWorkflowPage', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="run-source-1-row"]').findAll('[data-testid="workflow-select-chip"]')).toHaveLength(2)
-    expect(wrapper.text()).toContain('Source 1 supports a single ID field.')
+    expect(wrapper.text()).toContain('HotWax supports a single ID field.')
 
     await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
     await flushPromises()
@@ -403,7 +403,7 @@ describe('RunsSettingsWorkflowPage', () => {
 
     await removeWorkflowSelectChip(wrapper, 'run-source-1-row', 1)
     await flushPromises()
-    expect(wrapper.text()).not.toContain('Source 1 supports a single ID field.')
+    expect(wrapper.text()).not.toContain('HotWax supports a single ID field.')
 
     await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
     await flushPromises()
@@ -557,12 +557,14 @@ describe('RunsSettingsWorkflowPage', () => {
 
     expect(getMapping).not.toHaveBeenCalled()
     expect(listAutomationSourceOptions).toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Source 1 API Config')
-    expect(wrapper.text()).toContain('Source 1 Endpoint')
-    expect(wrapper.text()).toContain('Source 1 Primary ID')
-    expect(wrapper.text()).toContain('Source 2 API Config')
-    expect(wrapper.text()).toContain('Source 2 Endpoint')
-    expect(wrapper.text()).toContain('Source 2 Primary ID')
+    // DAR-UI-053: each side is named by the system it reads, never "Source 1" / "Source 2".
+    expect(wrapper.text()).toContain('HotWax API Config')
+    expect(wrapper.text()).toContain('HotWax Endpoint')
+    expect(wrapper.text()).toContain('HotWax Primary ID')
+    expect(wrapper.text()).toContain('Shopify API Config')
+    expect(wrapper.text()).toContain('Shopify Endpoint')
+    expect(wrapper.text()).toContain('Shopify Primary ID')
+    expect(wrapper.text()).not.toMatch(/source [12]/i)
     expect(wrapper.find('[data-testid="run-schema-1"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-schema-2"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="run-api-config-1"]').text()).toContain('Krewe OMS')

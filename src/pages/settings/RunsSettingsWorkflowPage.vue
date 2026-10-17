@@ -35,35 +35,35 @@
       <div class="workflow-form-grid workflow-form-grid--two" data-testid="run-source-1-row">
         <template v-if="source1UsesApi">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 1 API Config</span>
+            <span class="workflow-context-label">{{ sourceNames.source1 }} API Config</span>
             <AppSelect
               v-model="source1ApiConfigValue"
               :disabled="!canEditTenantSettings || loading"
               :options="source1ApiConfigOptions"
-              placeholder="Select source 1 API config"
+              :placeholder="`Select ${sourceNames.source1} API config`"
               test-id="run-api-config-1"
             />
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 1 Endpoint</span>
+            <span class="workflow-context-label">{{ sourceNames.source1 }} Endpoint</span>
             <AppSelect
               v-model="source1ApiEndpointValue"
               :disabled="!canEditTenantSettings || loading || source1ApiEndpointOptions.length === 0"
               :options="source1ApiEndpointOptions"
-              :placeholder="form.source1.sourceConfigId ? 'Select source 1 endpoint' : 'Choose an API config first'"
+              :placeholder="form.source1.sourceConfigId ? `Select ${sourceNames.source1} endpoint` : 'Choose an API config first'"
               test-id="run-api-endpoint-1"
             />
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 1 Primary ID</span>
+            <span class="workflow-context-label">{{ sourceNames.source1 }} Primary ID</span>
             <WorkflowSelect
               v-model="form.source1.fieldPaths"
               multiple
               :disabled="!canEditTenantSettings || loading || activeSource1ApiFieldOptions.length === 0"
               :options="activeSource1ApiFieldOptions"
-              :placeholder="source1ApiEndpointValue ? 'Select source 1 primary ID' : 'Choose an endpoint first'"
+              :placeholder="source1ApiEndpointValue ? `Select ${sourceNames.source1} primary ID` : 'Choose an endpoint first'"
               test-id="run-api-field-1"
             />
           </label>
@@ -71,24 +71,24 @@
 
         <template v-else>
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 1 Schema</span>
+            <span class="workflow-context-label">{{ sourceNames.source1 }} Schema</span>
             <AppSelect
               v-model="form.source1.schemaId"
               :disabled="!canEditTenantSettings || loading"
               :options="schemaOptions"
-              placeholder="Select source 1 schema"
+              :placeholder="`Select ${sourceNames.source1} schema`"
               test-id="run-schema-1"
             />
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 1 Field</span>
+            <span class="workflow-context-label">{{ sourceNames.source1 }} Field</span>
             <WorkflowSelect
               v-model="form.source1.fieldPaths"
               multiple
               :disabled="!canEditTenantSettings || loading || activeFieldOptions1.length === 0"
               :options="activeFieldOptions1"
-              :placeholder="form.source1.schemaId ? 'Select source 1 field' : 'Choose a schema first'"
+              :placeholder="form.source1.schemaId ? `Select ${sourceNames.source1} field` : 'Choose a schema first'"
               test-id="run-field-1"
             />
           </label>
@@ -98,35 +98,35 @@
       <div class="workflow-form-grid workflow-form-grid--two" data-testid="run-source-2-row">
         <template v-if="source2UsesApi">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 2 API Config</span>
+            <span class="workflow-context-label">{{ sourceNames.source2 }} API Config</span>
             <AppSelect
               v-model="source2ApiConfigValue"
               :disabled="!canEditTenantSettings || loading"
               :options="source2ApiConfigOptions"
-              placeholder="Select source 2 API config"
+              :placeholder="`Select ${sourceNames.source2} API config`"
               test-id="run-api-config-2"
             />
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 2 Endpoint</span>
+            <span class="workflow-context-label">{{ sourceNames.source2 }} Endpoint</span>
             <AppSelect
               v-model="source2ApiEndpointValue"
               :disabled="!canEditTenantSettings || loading || source2ApiEndpointOptions.length === 0"
               :options="source2ApiEndpointOptions"
-              :placeholder="form.source2.sourceConfigId ? 'Select source 2 endpoint' : 'Choose an API config first'"
+              :placeholder="form.source2.sourceConfigId ? `Select ${sourceNames.source2} endpoint` : 'Choose an API config first'"
               test-id="run-api-endpoint-2"
             />
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 2 Primary ID</span>
+            <span class="workflow-context-label">{{ sourceNames.source2 }} Primary ID</span>
             <WorkflowSelect
               v-model="form.source2.fieldPaths"
               multiple
               :disabled="!canEditTenantSettings || loading || activeSource2ApiFieldOptions.length === 0"
               :options="activeSource2ApiFieldOptions"
-              :placeholder="source2ApiEndpointValue ? 'Select source 2 primary ID' : 'Choose an endpoint first'"
+              :placeholder="source2ApiEndpointValue ? `Select ${sourceNames.source2} primary ID` : 'Choose an endpoint first'"
               test-id="run-api-field-2"
             />
           </label>
@@ -134,24 +134,24 @@
 
         <template v-else>
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 2 Schema</span>
+            <span class="workflow-context-label">{{ sourceNames.source2 }} Schema</span>
             <AppSelect
               v-model="form.source2.schemaId"
               :disabled="!canEditTenantSettings || loading"
               :options="schemaOptions"
-              placeholder="Select source 2 schema"
+              :placeholder="`Select ${sourceNames.source2} schema`"
               test-id="run-schema-2"
             />
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Source 2 Field</span>
+            <span class="workflow-context-label">{{ sourceNames.source2 }} Field</span>
             <WorkflowSelect
               v-model="form.source2.fieldPaths"
               multiple
               :disabled="!canEditTenantSettings || loading || activeFieldOptions2.length === 0"
               :options="activeFieldOptions2"
-              :placeholder="form.source2.schemaId ? 'Select source 2 field' : 'Choose a schema first'"
+              :placeholder="form.source2.schemaId ? `Select ${sourceNames.source2} field` : 'Choose a schema first'"
               test-id="run-field-2"
             />
           </label>
@@ -185,9 +185,10 @@ import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import {
   fieldSharesRecordRoot,
   primaryIdExpressionPayloadFields,
+  reconciliationSystemTitle,
   type ReconciliationRuleSetDraft,
 } from '../../lib/reconciliationRuleSetDraft'
-import { darpanSystemIdsMatch } from '../../lib/utils/darpanSystems'
+import { darpanSystemDisplayLabel, darpanSystemIdsMatch, darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
 
@@ -279,10 +280,16 @@ const validationMessage = computed(() => {
   const source2Validation = validateSource('source2')
   if (source2Validation) return source2Validation
   if (!sourceSystemEnumId('source1') || !sourceSystemEnumId('source2')) return 'Both sources need an assigned reconciliation system.'
-  if (darpanSystemIdsMatch(sourceSystemEnumId('source1'), sourceSystemEnumId('source2'))) return 'Source 2 must use a different system than source 1.'
+  if (darpanSystemIdsMatch(sourceSystemEnumId('source1'), sourceSystemEnumId('source2'))) return 'Both sides use the same system.'
   return null
 })
 const submitDisabled = computed(() => !canEditTenantSettings.value || loading.value || !!validationMessage.value)
+// Each side is named by the system it reads ("HotWax" / "Shopify"), as the rules board titles its
+// columns. Two endpoints of the same system keep their endpoint labels so the sides stay distinct.
+const sourceNames = computed<Record<SourceKey, string>>(() => {
+  const names = darpanSystemNamePair(sourceSystemName('source1'), sourceSystemName('source2'))
+  return { source1: names.file1 || 'Source 1', source2: names.file2 || 'Source 2' }
+})
 
 type SourceKey = 'source1' | 'source2'
 
@@ -294,6 +301,12 @@ function formatSchemaLabel(schema: JsonSchemaSummary): string {
   const systemLabel = schema.systemLabel?.trim() || schema.systemEnumId?.trim() || ''
 
   return systemLabel ? `${schemaLabel} - ${systemLabel}` : schemaLabel
+}
+
+function sourceSystemName(sourceKey: SourceKey): string {
+  if (ruleSetDraft.value) return reconciliationSystemTitle(ruleSetDraft.value, sourceKey === 'source1' ? 'file1' : 'file2', 'Source')
+  const schema = sourceKey === 'source1' ? source1Schema.value : source2Schema.value
+  return schema ? darpanSystemDisplayLabel(schema.systemEnumId, schema.systemLabel) : ''
 }
 
 function sourceUsesApi(sourceKey: SourceKey): boolean {
@@ -481,7 +494,7 @@ function resolveSelectedSourceConfigType(sourceKey: SourceKey): string {
 function validateSource(sourceKey: SourceKey): string | null {
   const source = sourceForm(sourceKey)
   if (sourceUsesApi(sourceKey)) {
-    const sourceLabel = sourceKey === 'source1' ? 'Source 1' : 'Source 2'
+    const sourceLabel = sourceNames.value[sourceKey]
     if (!source.sourceConfigId) return `${sourceLabel} needs an API config.`
     if (!selectedApiEndpointValue(sourceKey)) return `${sourceLabel} needs an API endpoint.`
     if (!source.fieldPaths.length) return `${sourceLabel} needs a primary ID field.`
@@ -493,7 +506,7 @@ function validateSource(sourceKey: SourceKey): string | null {
   // Legacy mapping runs (no rule-set draft) save through saveMapping, which only
   // carries one field per side — block extra chips instead of silently dropping them.
   if (!ruleSetDraft.value && source.fieldPaths.length > 1) {
-    return `${sourceKey === 'source1' ? 'Source 1' : 'Source 2'} supports a single ID field.`
+    return `${sourceNames.value[sourceKey]} supports a single ID field.`
   }
   return null
 }
