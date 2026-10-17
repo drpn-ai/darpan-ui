@@ -65,6 +65,17 @@ describe('RunFlowchartStartPage', () => {
     expect(f.runReconciliation).toHaveBeenCalledTimes(1)
   })
 
+  it('a revisit offers the last visit\'s days at once, before the network answers (DAR-UI-051)', async () => {
+    mount(RunFlowchartStartPage).unmount()
+    await flushPromises()
+    f.getReconciliation.mockReturnValue(new Promise(() => {}))
+    const w = mount(RunFlowchartStartPage)
+    await flushPromises()
+    expect(select(w).props('modelValue')).toBe('3')
+    expect(select(w).props('placeholder')).not.toBe('Loading...')
+    expect((select(w).props('options') as unknown[]).length).toBe(4)
+  })
+
   it('Back returns to the run page without running', async () => {
     const w = mount(RunFlowchartStartPage)
     await flushPromises()

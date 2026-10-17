@@ -214,6 +214,7 @@ import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type { AutomationExecutionSummary, AutomationRecord } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import {
@@ -718,18 +719,33 @@ async function load(): Promise<void> {
   loadController = new AbortController()
   const signal = loadController.signal
 
+  const id = automationId.value
   loading.value = true
   error.value = null
   automation.value = null
   executions.value = []
   try {
-    const loadedAutomation = await fetchAutomationAndExecutions(signal)
-    if (!loadedAutomation) {
-      error.value = `Unable to find automation "${automationId.value}".`
-      return
-    }
-    automation.value = loadedAutomation
-    if (hasActiveExecution.value) ensureExecutionsPoll()
+    // DAR-UI-051: only the first draw is cached; the poll and the run-now refetch always go to the network.
+    await cachedRead(
+      `automationDashboard.load:${id}`,
+      () => Promise.all([
+        reconciliationFacade.getAutomation({ automationId: id }, signal),
+        reconciliationFacade.listAutomationExecutions({ automationId: id, pageIndex: 0, pageSize: 200 }, signal),
+      ]),
+      ([automationResponse, executionsResponse]) => {
+        if (signal.aborted) return
+        executions.value = executionsResponse.executions ?? []
+        resetExecutionsPage()
+        loading.value = false
+        automation.value = automationResponse.automation ?? null
+        if (!automation.value) {
+          error.value = `Unable to find automation "${id}".`
+          return
+        }
+        error.value = null
+        if (hasActiveExecution.value) ensureExecutionsPoll()
+      },
+    )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load automation.'

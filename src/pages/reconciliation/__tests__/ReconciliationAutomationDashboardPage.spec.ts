@@ -310,6 +310,20 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(push).toHaveBeenCalledTimes(1)
   })
 
+  it('shows the last visit\'s automation and runs at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    mount(ReconciliationAutomationDashboardPage).unmount()
+    await flushPromises()
+
+    getAutomation.mockReturnValue(new Promise(() => {}))
+    listAutomationExecutions.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+
+    expect(revisit.text()).toContain('Daily API orders')
+    expect(revisit.findAll('[data-testid="automation-execution-row"]')).toHaveLength(2)
+    expect(revisit.text()).not.toContain('Loading automation...')
+  })
+
   it('states no next run while the automation is paused', async () => {
     // The backend keeps reporting nextScheduledFireTime for a paused automation — it is derived
     // from the schedule expression, not from `active` — so this page has to be the one that stops

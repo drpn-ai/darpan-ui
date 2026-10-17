@@ -297,6 +297,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade, settingsFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type {
   AutomationSourceConfigOption,
   OmsRestSourceConfigRecord,
@@ -497,8 +498,11 @@ function sourceConfigDescription(sourceConfigId: string, systemEnumId: string | 
 /** Best-effort: every caller falls back to the config id, so a failure here is not a page error. */
 async function loadSourceConfigOptions(): Promise<void> {
   try {
-    const response = await reconciliationFacade.listAutomationSourceOptions(pageAbortController.signal)
-    sourceConfigOptions.value = response.sourceConfigs ?? []
+    await cachedRead(
+      'ruleSetManager.sourceOptions',
+      () => reconciliationFacade.listAutomationSourceOptions(pageAbortController.signal),
+      (response) => { sourceConfigOptions.value = response.sourceConfigs ?? [] },
+    )
   } catch {
     sourceConfigOptions.value = []
   }
@@ -799,13 +803,17 @@ async function ensureSchemaLabel(schemaId: string | undefined, schemaName: strin
   if (!lookupKey || currentLabel?.trim() || schemaLabels.value[lookupKey]) return
 
   try {
-    const response = await jsonSchemaFacade.get(schemaId?.trim() ? { jsonSchemaId: schemaId.trim() } : { schemaName }, pageAbortController.signal)
-    if (!response.schemaData) return
-
-    schemaLabels.value = {
-      ...schemaLabels.value,
-      [lookupKey]: resolveSchemaLabel(response.schemaData),
-    }
+    await cachedRead(
+      `ruleSetManager.schema:${lookupKey}`,
+      () => jsonSchemaFacade.get(schemaId?.trim() ? { jsonSchemaId: schemaId.trim() } : { schemaName }, pageAbortController.signal),
+      (response) => {
+        if (!response.schemaData) return
+        schemaLabels.value = {
+          ...schemaLabels.value,
+          [lookupKey]: resolveSchemaLabel(response.schemaData),
+        }
+      },
+    )
   } catch {
     // Display falls back to the stored schema name when the label cannot be resolved.
   }

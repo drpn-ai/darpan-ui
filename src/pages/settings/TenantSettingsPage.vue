@@ -532,6 +532,7 @@ import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type { ChatProviderId, LlmSettings, SlackChannel, SlackWorkspaceInstall, TenantChatSpace, TenantSettings } from '../../lib/api/types'
 import type { SaveTenantChatSpacePayload } from '../../lib/api/facadeTypes'
 import { useAuthStore } from '../../stores/auth'
@@ -1287,11 +1288,16 @@ async function submitChatSpaceFormStep(): Promise<void> {
 
 async function loadSlackInstall(): Promise<void> {
   try {
-    const response = await settingsFacade.getSlackInstall(pageAbortController.signal)
-    slackInstalls.value = response.installs ?? []
-    slackConfigured.value = response.slackConfigured ?? false
-    slackOauthAvailable.value = response.oauthAvailable ?? false
-    slackLoadError.value = null
+    await cachedRead(
+      'tenantSettings.slackInstall',
+      () => settingsFacade.getSlackInstall(pageAbortController.signal),
+      (response) => {
+        slackInstalls.value = response.installs ?? []
+        slackConfigured.value = response.slackConfigured ?? false
+        slackOauthAvailable.value = response.oauthAvailable ?? false
+        slackLoadError.value = null
+      },
+    )
   } catch (loadError) {
     // A Slack lookup failure must not take the whole settings page down — chat spaces, timezone and
     // AI settings are all independently useful. But it must not be silent either: an empty install

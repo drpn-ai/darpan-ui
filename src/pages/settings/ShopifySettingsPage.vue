@@ -60,6 +60,7 @@ const {
   selectRecords: (response) => response.shopifyAuthConfigs ?? [],
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
   fallbackErrorMessage: 'Failed to load Shopify configs.',
+  cacheKey: 'shopifySettings.listShopifyAuthConfigs',
 })
 
 onBeforeUnmount(() => {

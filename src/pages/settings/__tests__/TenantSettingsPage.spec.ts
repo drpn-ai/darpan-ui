@@ -949,4 +949,24 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.text()).toContain('Darpan admin only')
     expect(wrapper.find('[data-testid="tenant-ai-create-action"]').exists()).toBe(false)
   })
+
+  it('shows the last visit\'s Slack connection at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    getSlackInstall.mockResolvedValue({
+      ok: true, slackConfigured: true, oauthAvailable: false,
+      installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', botUserId: 'U_BOT', isActive: 'Y' }],
+    })
+    mount(TenantSettingsPage).unmount()
+    await flushPromises()
+
+    getSlackInstall.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(TenantSettingsPage)
+    await flushPromises()
+    await revisit.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+    await revisit.get('[data-testid="tenant-chat-space-slack"]').trigger('click')
+    await flushPromises()
+
+    expect(revisit.text()).toContain('Acme is connected')
+    expect(revisit.find('[data-testid="tenant-slack-menu-add-space"]').exists()).toBe(true)
+  })
 })

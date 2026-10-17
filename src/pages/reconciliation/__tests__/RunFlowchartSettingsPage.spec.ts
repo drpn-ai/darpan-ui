@@ -11,7 +11,7 @@ vi.mock('../../../lib/api/facade', () => ({
   },
 }))
 
-import { reconciliationFacade } from '../../../lib/api/facade'
+import { reconciliationFacade, settingsFacade } from '../../../lib/api/facade'
 import RunFlowchartSettingsPage from '../RunFlowchartSettingsPage.vue'
 
 const f = vi.mocked(reconciliationFacade)
@@ -61,6 +61,14 @@ describe('RunFlowchartSettingsPage', () => {
     expect(spine).not.toContain('gorjana_prod')
     // At rest no add row is open; only the quiet "+" actions exist.
     expect(w.find('[data-testid="lifecycle-settings-adding-filter"]').exists()).toBe(false)
+  })
+
+  it('asks for the account list beside the lifecycle, not after it (DAR-UI-051)', async () => {
+    vi.mocked(settingsFacade.listNsAuthConfigs).mockClear()
+    f.getReconciliation.mockReturnValue(new Promise(() => {}))
+    mount(RunFlowchartSettingsPage)
+    await flushPromises()
+    expect(settingsFacade.listNsAuthConfigs).toHaveBeenCalled()
   })
 
   it('adds a filter and an exception where they act, and saves only what changed', async () => {

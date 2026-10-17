@@ -1031,6 +1031,31 @@ describe('ReconciliationRunHistoryPage', () => {
     })
   })
 
+  it('a revisit draws the last visit\'s older results before the network answers (DAR-UI-051)', async () => {
+    // Older than the run-results store's 2-day window: its 30s refresh drops them, so on a revisit only
+    // the read cache can draw them.
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 2, pageCount: 1 },
+      generatedOutputs: [buildGeneratedOutput(20), buildGeneratedOutput(19)],
+    })
+    mount(ReconciliationRunHistoryPage).unmount()
+    await flushPromises()
+    useRunResultsStore().reset()
+
+    listGeneratedOutputs.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    expect(revisit.get('[data-testid="run-history-featured-tile"]').text()).toContain(
+      formatCreatedDateForExpectation('2026-03-20T09:00:00.000Z'),
+    )
+    expect(revisit.findAll('[data-testid="run-history-result-tile"]')).toHaveLength(1)
+    expect(revisit.text()).not.toContain('Loading')
+  })
+
   it('shows an inline error when the saved-result lookup fails', async () => {
     listGeneratedOutputs.mockRejectedValue(new ApiCallError('Unable to load saved results.', 503))
 

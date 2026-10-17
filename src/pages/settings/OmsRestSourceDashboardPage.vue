@@ -147,6 +147,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type { OmsRestSourceConfigRecord, SourceConfigEndpoint } from '../../lib/api/types'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
@@ -216,16 +217,20 @@ async function load(): Promise<void> {
   error.value = null
   config.value = null
   try {
-    const response = await settingsFacade.listOmsRestSourceConfigs({ pageIndex: 0, pageSize: 200 }, pageAbortController.signal)
-    const matchingConfig = filterRecordsForActiveTenant(
-      response.omsRestSourceConfigs ?? [],
-      authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-    ).find((record) => record.omsRestSourceConfigId === configId.value)
-    if (!matchingConfig) {
-      error.value = `Unable to find HotWax auth config "${configId.value}".`
-      return
-    }
-    config.value = matchingConfig
+    await cachedRead(
+      'omsRestSourceDashboard.listOmsRestSourceConfigs:0:200',
+      () => settingsFacade.listOmsRestSourceConfigs({ pageIndex: 0, pageSize: 200 }, pageAbortController.signal),
+      (response) => {
+        const matchingConfig = filterRecordsForActiveTenant(
+          response.omsRestSourceConfigs ?? [],
+          authStore.sessionInfo?.activeTenantUserGroupId ?? null,
+        ).find((record) => record.omsRestSourceConfigId === configId.value)
+        // DAR-UI-051: a cached copy is drawn at once, so the fresh answer may replace either outcome.
+        loading.value = false
+        config.value = matchingConfig ?? null
+        error.value = matchingConfig ? null : `Unable to find HotWax auth config "${configId.value}".`
+      },
+    )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load HotWax auth config.'
@@ -240,12 +245,17 @@ async function loadEndpoints(): Promise<void> {
   endpointsLoadState.value = 'loading'
   endpointsError.value = null
   try {
-    const response = await settingsFacade.listSourceConfigEndpoints(
-      { configTypeEnumId: SHARED_CONFIG_TYPES.hotwaxOms, configId: configId.value },
-      pageAbortController.signal,
+    await cachedRead(
+      `omsRestSourceDashboard.endpoints:${configId.value}`,
+      () => settingsFacade.listSourceConfigEndpoints(
+        { configTypeEnumId: SHARED_CONFIG_TYPES.hotwaxOms, configId: configId.value },
+        pageAbortController.signal,
+      ),
+      (response) => {
+        endpoints.value = response.endpoints ?? []
+        endpointsLoadState.value = 'ready'
+      },
     )
-    endpoints.value = response.endpoints ?? []
-    endpointsLoadState.value = 'ready'
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     endpointsError.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load endpoints.'

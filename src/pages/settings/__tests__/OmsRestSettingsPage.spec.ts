@@ -197,4 +197,23 @@ describe('OmsRestSettingsPage', () => {
     expect(wrapper.get('[data-testid="oms-auth-tile"]').text()).toBe('Krewe HotWax')
     expect(wrapper.text()).not.toContain('shared')
   })
+
+  it('shows the last visit\'s list at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    listOmsRestSourceConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      omsRestSourceConfigs: [{ omsRestSourceConfigId: 'krewe-oms', description: 'Krewe HotWax', companyUserGroupId: 'KREWE' }],
+      pagination: { pageIndex: 0, pageSize: 12, totalCount: 1, pageCount: 1 },
+    })
+    mount(OmsRestSettingsPage).unmount()
+    await flushPromises()
+
+    listOmsRestSourceConfigs.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(OmsRestSettingsPage)
+    await flushPromises()
+
+    expect(revisit.get('[data-testid="oms-auth-tile"]').text()).toBe('Krewe HotWax')
+    expect(revisit.text()).not.toContain('Loading auth configs')
+  })
 })

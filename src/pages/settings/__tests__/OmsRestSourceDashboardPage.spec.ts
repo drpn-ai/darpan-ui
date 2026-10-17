@@ -520,4 +520,27 @@ describe('OmsRestSourceDashboardPage', () => {
     // Same shape as ShopifyAuthDashboardPage: back, diagnose, delete — nothing else.
     expect(actions).toHaveLength(3)
   })
+
+  it('shows the last visit\'s config and endpoints at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    listOmsRestSourceConfigs.mockResolvedValue(dashboardListResponse())
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'OMS_ORDERS', endpointLabel: 'Orders API', isEnabled: true }],
+    })
+    mount(OmsRestSourceDashboardPage).unmount()
+    await flushPromises()
+
+    listOmsRestSourceConfigs.mockReturnValue(new Promise(() => {}))
+    listSourceConfigEndpoints.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(OmsRestSourceDashboardPage)
+    await flushPromises()
+
+    expect(revisit.text()).toContain('Krewe HotWax')
+    expect(revisit.text()).toContain('https://oms.example.com')
+    expect(revisit.get('[data-testid="oms-endpoint-tile"]').text()).toBe('Orders API')
+    expect(revisit.text()).not.toContain('Loading HotWax auth config')
+    expect(revisit.text()).not.toContain('Loading endpoints')
+  })
 })

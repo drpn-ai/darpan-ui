@@ -60,6 +60,7 @@ const {
   selectRecords: (response) => response.omsRestSourceConfigs ?? [],
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
   fallbackErrorMessage: 'Failed to load HotWax auth configs.',
+  cacheKey: 'omsRestSettings.listOmsRestSourceConfigs',
 })
 
 onBeforeUnmount(() => {

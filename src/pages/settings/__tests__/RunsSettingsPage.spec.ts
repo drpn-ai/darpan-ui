@@ -171,4 +171,23 @@ describe('RunsSettingsPage', () => {
     expect(pageSource).not.toContain('static-page-create-action')
     expect(pageSource).not.toContain('<style scoped>')
   })
+
+  it('shows the last visit\'s list at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    listSavedRuns.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      savedRuns: [{ savedRunId: 'RS_ORDER_CSV', runName: 'CSV Order Compare', description: 'CSV Order Compare', runType: 'ruleset', ruleSetId: 'RS_ORDER_CSV', compareScopeId: 'CS_ORDER_CSV', requiresSystemSelection: false, systemOptions: [] }],
+      pagination: { pageIndex: 0, pageSize: 12, totalCount: 1, pageCount: 1 },
+    })
+    mount(RunsSettingsPage).unmount()
+    await flushPromises()
+
+    listSavedRuns.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(RunsSettingsPage)
+    await flushPromises()
+
+    expect(revisit.get('[data-testid="run-tile"]').text()).toBe('CSV Order Compare')
+    expect(revisit.text()).not.toContain('Loading runs')
+  })
 })

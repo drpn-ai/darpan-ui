@@ -248,6 +248,7 @@ import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type { TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
 import { buildTimezoneOptions, resolveBrowserTimeZone } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
@@ -583,8 +584,11 @@ async function switchTenant(nextTenantUserGroupId: string): Promise<void> {
 
 async function loadNotificationDefault(): Promise<void> {
   try {
-    const response = await settingsFacade.getUserNotificationDefault(pageAbortController.signal)
-    notificationDefault.value = response.userNotificationDefault ?? null
+    await cachedRead(
+      'userSettings.notificationDefault',
+      () => settingsFacade.getUserNotificationDefault(pageAbortController.signal),
+      (response) => { notificationDefault.value = response.userNotificationDefault ?? null },
+    )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     settingsMessage.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load notification settings.'

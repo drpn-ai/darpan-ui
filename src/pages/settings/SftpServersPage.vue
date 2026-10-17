@@ -60,6 +60,7 @@ const {
   selectRecords: (response) => response.servers ?? [],
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
   fallbackErrorMessage: 'Failed to load servers.',
+  cacheKey: 'sftpServers.listSftpServers',
 })
 
 onBeforeUnmount(() => {

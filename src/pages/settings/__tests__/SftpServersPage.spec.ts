@@ -277,4 +277,23 @@ describe('SftpServersPage', () => {
     expect(sharedStyleSource).toContain('@media (max-width: 1020px)')
     expect(sharedStyleSource).toContain('@media (max-width: 768px)')
   })
+
+  it('shows the last visit\'s list at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    listSftpServers.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      servers: [{ sftpServerId: 'sftp-primary', description: 'Primary SFTP', companyUserGroupId: 'KREWE' }],
+      pagination: { pageIndex: 0, pageSize: 12, totalCount: 1, pageCount: 1 },
+    })
+    mount(SftpServersPage).unmount()
+    await flushPromises()
+
+    listSftpServers.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(SftpServersPage)
+    await flushPromises()
+
+    expect(revisit.get('[data-testid="sftp-server-tile"]').text()).toBe('Primary SFTP')
+    expect(revisit.text()).not.toContain('Loading servers')
+  })
 })

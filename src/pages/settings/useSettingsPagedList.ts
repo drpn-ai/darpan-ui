@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { ApiCallError, isAbortError } from '../../lib/api/client'
+import { cachedRead } from '../../lib/api/readCache'
 import type { PaginationMeta } from '../../lib/api/types'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 
@@ -22,6 +23,8 @@ interface UseSettingsPagedListOptions<T extends object, R extends PaginatedSetti
   selectRecords: (response: R) => T[] | undefined
   activeTenantUserGroupId?: () => string | null | undefined
   fallbackErrorMessage: string
+  /** DAR-UI-051: opts the list into the read cache. The page index and size are appended, so name only the read. */
+  cacheKey?: string
 }
 
 function normalizePageCount(pageCount: number | undefined): number {
@@ -40,6 +43,7 @@ export function useSettingsPagedList<T extends object, R extends PaginatedSettin
   selectRecords,
   activeTenantUserGroupId,
   fallbackErrorMessage,
+  cacheKey,
 }: UseSettingsPagedListOptions<T, R>) {
   const rows = ref<T[]>([]) as Ref<T[]>
   const pageIndex = ref(0)
@@ -56,11 +60,8 @@ export function useSettingsPagedList<T extends object, R extends PaginatedSettin
 
     loading.value = true
     error.value = null
-    try {
-      const response = await loadPage({
-        pageIndex: pageIndex.value,
-        pageSize,
-      }, controller.signal)
+    const request = { pageIndex: pageIndex.value, pageSize }
+    const applyPage = (response: R): void => {
       if (controller.signal.aborted) return
       const records = selectRecords(response) ?? []
       const tenantId = activeTenantUserGroupId?.()
@@ -68,6 +69,15 @@ export function useSettingsPagedList<T extends object, R extends PaginatedSettin
         ? records
         : filterRecordsForActiveTenant(records as TenantOwnedRecord[], tenantId) as T[]
       pageCount.value = normalizePageCount(response.pagination?.pageCount)
+      // A cached page is drawn at once: "Loading" is only for a list with nothing to show.
+      loading.value = false
+    }
+    try {
+      if (cacheKey) {
+        await cachedRead(`${cacheKey}:${request.pageIndex}:${request.pageSize}`, () => loadPage(request, controller.signal), applyPage)
+      } else {
+        applyPage(await loadPage(request, controller.signal))
+      }
     } catch (loadError) {
       if (controller.signal.aborted || isAbortError(loadError)) return
       error.value = normalizeError(loadError, fallbackErrorMessage)

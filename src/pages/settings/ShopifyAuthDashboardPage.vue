@@ -151,6 +151,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type { ShopifyAuthConfigRecord, SourceConfigEndpoint } from '../../lib/api/types'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
@@ -221,16 +222,20 @@ async function load(): Promise<void> {
   error.value = null
   config.value = null
   try {
-    const response = await settingsFacade.getShopifyAuthConfig({ shopifyAuthConfigId: configId.value }, pageAbortController.signal)
-    const record = response.shopifyAuthConfig ?? null
-    const [tenantRecord] = record
-      ? filterRecordsForActiveTenant([record], authStore.sessionInfo?.activeTenantUserGroupId ?? null)
-      : []
-    if (!tenantRecord) {
-      error.value = `Unable to find Shopify config "${configId.value}".`
-      return
-    }
-    config.value = tenantRecord
+    await cachedRead(
+      `shopifyAuthDashboard.config:${configId.value}`,
+      () => settingsFacade.getShopifyAuthConfig({ shopifyAuthConfigId: configId.value }, pageAbortController.signal),
+      (response) => {
+        const record = response.shopifyAuthConfig ?? null
+        const [tenantRecord] = record
+          ? filterRecordsForActiveTenant([record], authStore.sessionInfo?.activeTenantUserGroupId ?? null)
+          : []
+        // DAR-UI-051: a cached copy is drawn at once, so the fresh answer may replace either outcome.
+        loading.value = false
+        config.value = tenantRecord ?? null
+        error.value = tenantRecord ? null : `Unable to find Shopify config "${configId.value}".`
+      },
+    )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load Shopify config.'
@@ -245,12 +250,17 @@ async function loadEndpoints(): Promise<void> {
   endpointsLoadState.value = 'loading'
   endpointsError.value = null
   try {
-    const response = await settingsFacade.listSourceConfigEndpoints(
-      { configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth, configId: configId.value },
-      pageAbortController.signal,
+    await cachedRead(
+      `shopifyAuthDashboard.endpoints:${configId.value}`,
+      () => settingsFacade.listSourceConfigEndpoints(
+        { configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth, configId: configId.value },
+        pageAbortController.signal,
+      ),
+      (response) => {
+        endpoints.value = response.endpoints ?? []
+        endpointsLoadState.value = 'ready'
+      },
     )
-    endpoints.value = response.endpoints ?? []
-    endpointsLoadState.value = 'ready'
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     endpointsError.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load endpoints.'

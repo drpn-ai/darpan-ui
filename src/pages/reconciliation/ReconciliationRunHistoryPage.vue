@@ -187,6 +187,7 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type { PaginationMeta, GeneratedOutput } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -565,19 +566,37 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
     loadError.value = null
   }
 
+  const fetchOutputs = () => reconciliationFacade.listGeneratedOutputs({
+    savedRunId: requestedSavedRunId,
+    pageIndex: targetPageIndex,
+    pageSize: GENERATED_OUTPUT_FETCH_PAGE_SIZE,
+    query: '',
+  }, signal)
+  const showOutputs = (response: Awaited<ReturnType<typeof fetchOutputs>>) => {
+    if (savedRunId.value !== requestedSavedRunId) return
+    const nextOutputs = response.generatedOutputs ?? []
+    if (append) appendGeneratedOutputs(nextOutputs)
+    else generatedOutputs.value = nextOutputs
+    pagination.value = response.pagination ?? pagination.value
+    lastLoadedPageIndex.value = targetPageIndex
+    cachePrimedWithoutFetch.value = false
+    if (!append) loading.value = false
+  }
+
   try {
-    const response = await reconciliationFacade.listGeneratedOutputs({
-      savedRunId: requestedSavedRunId,
-      pageIndex: targetPageIndex,
-      pageSize: GENERATED_OUTPUT_FETCH_PAGE_SIZE,
-      query: '',
-    }, signal)
+    // DAR-UI-051: only the first page is drawn from the last visit, for runs the 2-day store does not hold.
+    // Pruning markers and seeding the store wait for the server's answer: a cached page is display only.
+    const response = append
+      ? await fetchOutputs().then((fresh) => { showOutputs(fresh); return fresh })
+      : await cachedRead(
+        `runHistory.generatedOutputs:${requestedSavedRunId}:${targetPageIndex}:${GENERATED_OUTPUT_FETCH_PAGE_SIZE}`,
+        fetchOutputs,
+        showOutputs,
+      )
 
     if (savedRunId.value !== requestedSavedRunId) return
 
     const nextOutputs = response.generatedOutputs ?? []
-    if (append) appendGeneratedOutputs(nextOutputs)
-    else generatedOutputs.value = nextOutputs
     // The server is the truth for running runs: no RUNNING row means an old-enough local
     // marker belongs to a run that died server-side — drop it instead of ghosting a tile.
     if (!generatedOutputs.value.some(isRunningGeneratedOutput)) {
@@ -587,10 +606,6 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
       requestedSavedRunId,
       generatedOutputs.value.filter(isResolvableGeneratedOutput),
     )
-
-    pagination.value = response.pagination ?? pagination.value
-    lastLoadedPageIndex.value = targetPageIndex
-    cachePrimedWithoutFetch.value = false
 
     // Seed the global run-results cache from this fetch so navigating away
     // and back doesn't need to re-fetch.

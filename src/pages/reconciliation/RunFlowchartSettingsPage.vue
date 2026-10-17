@@ -270,7 +270,7 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
 import type { FlowchartQuestion, LifecycleFinding, LifecycleRule, LifecycleStageException } from '../../lib/api/flowchartTypes'
 import { lifecycleBoard, notFindingPlacesOf } from '../../lib/lifecycleBoard'
-import { nsAccountLabel } from '../../lib/nsAccountLabel'
+import { accountLabelOf, nsAccountLabels } from '../../lib/nsAccountLabel'
 import { useLifecycleRuleOptions, type LifecycleRuleSource } from '../../lib/useLifecycleRuleOptions'
 
 // DAR-UI-050. A lifecycle's settings as one line that grows downward (research: funnel builders put an exclusion
@@ -532,6 +532,9 @@ async function save() {
 }
 
 onMounted(async () => {
+  // DAR-UI-051: the account list is fetched beside the lifecycle that names the account, not after it. The lifecycle
+  // is not cached: it seeds the edits this page saves, and a fresh copy landing late would undo them.
+  const accountLabels = nsAccountLabels()
   try {
     const got = await reconciliationFacade.getReconciliation({ reconciliationId: reconciliationId.value })
     lateAfter.value = originalLate.value = String(got.reconciliation?.lateAfterDays ?? 0)
@@ -551,7 +554,8 @@ onMounted(async () => {
     if (got.lifecycle) {
       source.value = got.lifecycle
       accountLabel.value = got.lifecycle.nsAuthConfigId
-      void nsAccountLabel(got.lifecycle.nsAuthConfigId).then((label) => { accountLabel.value = label })
+      const { nsAuthConfigId } = got.lifecycle
+      void accountLabels.then((labels) => { accountLabel.value = accountLabelOf(labels, nsAuthConfigId) })
       await Promise.all([rules.loadFields(got.lifecycle), stageRules.loadFields(got.lifecycle), findingRules.loadFields(got.lifecycle)])
       // Named as the account names them, once its fields are read.
       keptDetails.value = keptDetails.value.map((d) => ({ ...d, label: rules.fieldLabel(d.fieldId) }))

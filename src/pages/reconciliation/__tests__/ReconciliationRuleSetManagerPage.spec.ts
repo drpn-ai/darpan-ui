@@ -869,6 +869,25 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file2"]').text()).toBe('dev_shopify')
   })
 
+  it('names the source configs from the last visit at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    draftStoreState.ruleSetDraftState = createApiDraftState()
+    listAutomationSourceOptions.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      sourceConfigs: [{ sourceConfigId: 'dev_oms', sourceConfigType: 'HOTWAX_OMS_REST', description: 'Dev OMS', systemEnumId: 'OMS' }],
+    })
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    mount(ReconciliationRuleSetManagerPage).unmount()
+    await flushPromises()
+
+    listAutomationSourceOptions.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(revisit.get('[data-testid="ruleset-manager-system-config-name-file1"]').text()).toBe('Dev OMS')
+  })
+
   it('renders a saved run summary and equation without editable rule controls', async () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
       draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()

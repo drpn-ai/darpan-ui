@@ -33,6 +33,7 @@ import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type { FlowchartRun } from '../../lib/api/flowchartTypes'
 import { buildRunPayload, defaultWindowDays, windowFromDays } from '../../lib/flowchart/flowchartRunState'
 import { addDays, todayInDisplayTimeZone } from '../../lib/utils/date'
@@ -79,8 +80,15 @@ async function start() {
 
 onMounted(async () => {
   try {
-    run.value = (await reconciliationFacade.getReconciliation({ reconciliationId: reconciliationId.value })).reconciliation
-    days.value = String(defaultWindowDays(run.value?.defaultTimeWindow))
+    await cachedRead(
+      `flowchartStart.reconciliation:${reconciliationId.value}`,
+      () => reconciliationFacade.getReconciliation({ reconciliationId: reconciliationId.value }),
+      (got) => {
+        run.value = got.reconciliation
+        // DAR-UI-051: the default is set once, so the fresh answer never undoes days already picked.
+        if (!days.value) days.value = String(defaultWindowDays(run.value?.defaultTimeWindow))
+      },
+    )
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : String(caught)
   }

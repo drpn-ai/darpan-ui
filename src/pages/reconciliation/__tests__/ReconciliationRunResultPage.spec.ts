@@ -1112,6 +1112,69 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.text()).toContain('Page 1 of 2')
   })
 
+  it('a revisit draws the last visit\'s result before the network answers (DAR-UI-051)', async () => {
+    mount(ReconciliationRunResultPage).unmount()
+    await flushPromises()
+
+    getGeneratedOutputDifferences.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(revisit.get('[data-testid="run-result-title"]').text()).toBe('CSV Order Compare')
+    expect(revisit.findAll('[data-testid="diff-details-row"]')).toHaveLength(2)
+    expect(revisit.text()).toContain('1003')
+    expect(revisit.find('[data-testid="run-result-loading"]').exists()).toBe(false)
+  })
+
+  it('a revisit\'s late first page does not undo a page the user already moved to (DAR-UI-051)', async () => {
+    const simulate = simulateDifferences({
+      metadata: defaultDiffDetails.metadata,
+      summary: { totalDifferences: 7, onlyInFile1Count: 4, onlyInFile2Count: 3 },
+      differences: ['2001', '2002', '2003', '3001', '3002', '3003', '3004'].map((id) => ({
+        type: id.startsWith('2') ? 'missing_in_OMS' : 'missing_in_SHOPIFY', id, data: `{"order_id":"${id}"}`,
+      })),
+    })
+    getGeneratedOutputDifferences.mockImplementation(simulate)
+    mount(ReconciliationRunResultPage).unmount()
+    await flushPromises()
+
+    let firstPageArrives!: () => void
+    getGeneratedOutputDifferences.mockImplementation((payload: DifferencesQuery) => payload.includeFacets
+      ? new Promise((resolve) => { firstPageArrives = () => resolve(simulate(payload)) })
+      : simulate(payload))
+    const revisit = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    await revisit.get('[data-testid="diff-page-next"]').trigger('click')
+    await flushPromises()
+    expect(revisit.text()).toContain('Page 2 of 2')
+
+    firstPageArrives()
+    await flushPromises()
+    expect(revisit.text()).toContain('Page 2 of 2')
+    expect(revisit.text()).toContain('3004')
+  })
+
+  it('a revisit\'s fresh answer keeps a rename already under way (DAR-UI-051)', async () => {
+    mount(ReconciliationRunResultPage).unmount()
+    await flushPromises()
+
+    const fresh = getGeneratedOutputDifferences.getMockImplementation()
+    let firstPageArrives!: () => void
+    getGeneratedOutputDifferences.mockImplementation((payload: DifferencesQuery) => payload.includeFacets
+      ? new Promise((resolve) => { firstPageArrives = () => resolve(fresh ? fresh(payload) : defaultDiffDetails) })
+      : Promise.resolve(fresh ? fresh(payload) : defaultDiffDetails))
+    const revisit = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    const title = revisit.findComponent({ name: 'StaticEditableTitle' })
+    title.vm.$emit('update:modelValue', 'Renamed mid-load')
+    await flushPromises()
+    expect(revisit.findComponent({ name: 'StaticEditableTitle' }).props('modelValue')).toBe('Renamed mid-load')
+
+    firstPageArrives()
+    await flushPromises()
+    expect(revisit.findComponent({ name: 'StaticEditableTitle' }).props('modelValue')).toBe('Renamed mid-load')
+  })
+
   it('renders rule difference rows with primary ids and diff metadata instead of empty JSON objects', async () => {
     getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
       metadata: defaultDiffDetails.metadata,

@@ -576,6 +576,7 @@ import { ApiCallError } from '../../lib/api/client'
 // tests mount it standalone, where a globally registered directive does not exist.
 import { vExplain } from '../../directives/vExplain'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type {
   GeneratedOutput,
   GeneratedOutputDifferencesMetadata,
@@ -1319,44 +1320,56 @@ async function loadSavedResult(): Promise<void> {
   loadError.value = null
   resetDiffDetailsState()
 
+  const query = {
+    fileName: requestedOutputFileName,
+    pageIndex: 0,
+    pageSize: DIFF_DETAILS_PAGE_SIZE,
+    buckets: DIFF_BUCKET_ORDER.join(','),
+    ruleFilterKey: ALL_RULE_FILTER_KEY,
+    search: '',
+    includeFacets: true,
+  }
+  // DAR-UI-051: a cached draw makes the table usable before the server answers. If the user has moved its
+  // filters or page by then, the fresh first page must not replace what they asked for.
+  const tableQuery = () => JSON.stringify([
+    activeDiffBuckets.value, selectedRuleFilterKey.value, diffDetailsSearch.value, selectedConclusionCode.value, diffPageIndex.value,
+  ])
+  let drawnTableQuery = ''
+
   try {
-    const response = await reconciliationFacade.getGeneratedOutputDifferences({
-      fileName: requestedOutputFileName,
-      pageIndex: 0,
-      pageSize: DIFF_DETAILS_PAGE_SIZE,
-      buckets: DIFF_BUCKET_ORDER.join(','),
-      ruleFilterKey: ALL_RULE_FILTER_KEY,
-      search: '',
-      includeFacets: true,
-    }, signal)
+    await cachedRead(`runResult.differences:${JSON.stringify(query)}`, () => reconciliationFacade.getGeneratedOutputDifferences(query, signal), (response) => {
+      if (savedRunId.value !== requestedSavedRunId || outputFileName.value !== requestedOutputFileName) return
 
-    if (savedRunId.value !== requestedSavedRunId || outputFileName.value !== requestedOutputFileName) return
+      const metadata = response.metadata ?? {}
+      const summary = response.summary ?? {}
+      const descriptor = buildGeneratedOutputFromSummary(requestedOutputFileName, metadata, summary)
 
-    const metadata = response.metadata ?? {}
-    const summary = response.summary ?? {}
-    const descriptor = buildGeneratedOutputFromSummary(requestedOutputFileName, metadata, summary)
-
-    savedOutput.value = descriptor
-    downloadableOutputFile.value = response.outputFile ? { ...response.outputFile } : null
-    runSourceDetails.value = response.outputFile?.sourceDetails ?? null
-    editableRunName.value = descriptor.savedRunName || routeRunName.value
-    persistedRunName.value = editableRunName.value
-    diffDetailsMeta.value = {
-      file1Label: descriptor.file1Label,
-      file2Label: descriptor.file2Label,
-      timestamp: metadata.timestamp,
-    }
-    documentHasSecondSide.value = Boolean(normalizeDisplayText(metadata.file2Label))
-    diffDetailsSummary.value = {
-      totalDifferences: descriptor.totalDifferences,
-      onlyInFile1Count: descriptor.onlyInFile1Count,
-      onlyInFile2Count: descriptor.onlyInFile2Count,
-      ruleDifferenceCount: summary.ruleDifferenceCount ?? undefined,
-      missingObjectDifferenceCount: summary.missingObjectDifferenceCount ?? undefined,
-      conclusions: summary.conclusions,
-    }
-    applyDifferencesResponse(response, true)
-    diffControlsReady.value = true
+      savedOutput.value = descriptor
+      downloadableOutputFile.value = response.outputFile ? { ...response.outputFile } : null
+      runSourceDetails.value = response.outputFile?.sourceDetails ?? null
+      // A cached draw makes the name editable early: a rename already under way survives the fresh answer.
+      const nextRunName = descriptor.savedRunName || routeRunName.value
+      if (editableRunName.value === persistedRunName.value) editableRunName.value = nextRunName
+      persistedRunName.value = nextRunName
+      diffDetailsMeta.value = {
+        file1Label: descriptor.file1Label,
+        file2Label: descriptor.file2Label,
+        timestamp: metadata.timestamp,
+      }
+      documentHasSecondSide.value = Boolean(normalizeDisplayText(metadata.file2Label))
+      diffDetailsSummary.value = {
+        totalDifferences: descriptor.totalDifferences,
+        onlyInFile1Count: descriptor.onlyInFile1Count,
+        onlyInFile2Count: descriptor.onlyInFile2Count,
+        ruleDifferenceCount: summary.ruleDifferenceCount ?? undefined,
+        missingObjectDifferenceCount: summary.missingObjectDifferenceCount ?? undefined,
+        conclusions: summary.conclusions,
+      }
+      if (!diffControlsReady.value || tableQuery() === drawnTableQuery) applyDifferencesResponse(response, true)
+      diffControlsReady.value = true
+      drawnTableQuery = tableQuery()
+      loading.value = false
+    })
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     if (savedRunId.value !== requestedSavedRunId || outputFileName.value !== requestedOutputFileName) return

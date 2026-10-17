@@ -481,4 +481,27 @@ describe('ShopifyAuthDashboardPage', () => {
     await flushPromises()
     expect(wrapper.find('.static-page-frame--popup-open').exists()).toBe(true)
   })
+
+  it('shows the last visit\'s config and endpoints at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    getShopifyAuthConfig.mockResolvedValue(dashboardConfigResponse())
+    listSourceConfigEndpoints.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      endpoints: [{ systemEnumId: 'SHOPIFY_ORDERS', endpointLabel: 'Admin GraphQL Orders', isEnabled: true }],
+    })
+    mount(ShopifyAuthDashboardPage).unmount()
+    await flushPromises()
+
+    getShopifyAuthConfig.mockReturnValue(new Promise(() => {}))
+    listSourceConfigEndpoints.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(ShopifyAuthDashboardPage)
+    await flushPromises()
+
+    expect(revisit.text()).toContain('Krewe Shopify')
+    expect(revisit.text()).toContain('https://krewe.myshopify.com')
+    expect(revisit.get('[data-testid="shopify-endpoint-tile"]').text()).toBe('Admin GraphQL Orders')
+    expect(revisit.text()).not.toContain('Loading Shopify config')
+    expect(revisit.text()).not.toContain('Loading endpoints')
+  })
 })

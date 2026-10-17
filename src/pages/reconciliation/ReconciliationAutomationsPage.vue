@@ -62,6 +62,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
+import { cachedRead } from '../../lib/api/readCache'
 import type { AutomationRecord } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -102,12 +103,14 @@ async function loadAutomations(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const response = await reconciliationFacade.listAutomations({
-      pageIndex: 0,
-      pageSize: 200,
-      query: '',
-    }, pageAbortController.signal)
-    automations.value = response.automations ?? []
+    await cachedRead(
+      'automations.listAutomations',
+      () => reconciliationFacade.listAutomations({ pageIndex: 0, pageSize: 200, query: '' }, pageAbortController.signal),
+      (response) => {
+        automations.value = response.automations ?? []
+        loading.value = false
+      },
+    )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     automations.value = []

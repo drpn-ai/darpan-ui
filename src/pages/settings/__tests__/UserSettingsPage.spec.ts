@@ -643,4 +643,21 @@ describe('UserSettingsPage', () => {
     // Permissions is an access fact, so it sits with User ID and Username.
     expect(sectionFor('Account').text()).toContain('Permissions')
   })
+
+  it('shows the last visit\'s default chat space at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    getUserNotificationDefault.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      userNotificationDefault: { chatSpaceId: 'CS1', spaceName: 'Ops', isActive: 'Y' },
+    })
+    mountPage().unmount()
+    await flushPromises()
+
+    getUserNotificationDefault.mockReturnValue(new Promise(() => {}))
+    const revisit = mountPage()
+    await flushPromises()
+
+    expect(revisit.get('[data-testid="user-notification-default-card"]').text()).toContain('Ops')
+  })
 })

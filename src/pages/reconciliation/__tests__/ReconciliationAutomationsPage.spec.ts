@@ -121,6 +121,18 @@ describe('ReconciliationAutomationsPage', () => {
     expect(wrapper.find('[data-testid="automation-create-action"]').exists()).toBe(false)
   })
 
+  it('shows the last visit\'s automations at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    mount(ReconciliationAutomationsPage).unmount()
+    await flushPromises()
+
+    listAutomations.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(ReconciliationAutomationsPage)
+    await flushPromises()
+
+    expect(revisit.findAll('[data-testid="automation-tile"]')).toHaveLength(2)
+    expect(revisit.find('[data-testid="automation-loading"]').exists()).toBe(false)
+  })
+
   it('handles empty and error states', async () => {
     listAutomations.mockResolvedValueOnce({
       ok: true,

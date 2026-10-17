@@ -185,4 +185,23 @@ describe('ShopifySettingsPage', () => {
     expect(wrapper.text()).toContain('Krewe Shopify')
     expect(wrapper.text()).not.toContain('Gorjana Shopify')
   })
+
+  it('shows the last visit\'s list at once on a revisit, before the network answers (DAR-UI-051)', async () => {
+    listShopifyAuthConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      shopifyAuthConfigs: [{ shopifyAuthConfigId: 'krewe-shopify', description: 'Krewe Shopify', companyUserGroupId: 'KREWE' }],
+      pagination: { pageIndex: 0, pageSize: 12, totalCount: 1, pageCount: 1 },
+    })
+    mount(ShopifySettingsPage).unmount()
+    await flushPromises()
+
+    listShopifyAuthConfigs.mockReturnValue(new Promise(() => {}))
+    const revisit = mount(ShopifySettingsPage)
+    await flushPromises()
+
+    expect(revisit.get('[data-testid="shopify-auth-tile"]').text()).toBe('Krewe Shopify')
+    expect(revisit.text()).not.toContain('Loading Shopify configs')
+  })
 })

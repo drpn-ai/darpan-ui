@@ -48,6 +48,7 @@ const {
   loadPage: (request) => reconciliationFacade.listSavedRuns({ ...request, query: '' }),
   selectRecords: (response) => response.savedRuns ?? [],
   fallbackErrorMessage: 'Failed to load runs.',
+  cacheKey: 'runsSettings.listSavedRuns',
 })
 
 onBeforeUnmount(() => {
