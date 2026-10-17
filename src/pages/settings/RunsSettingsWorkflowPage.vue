@@ -184,6 +184,7 @@ import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import {
   fieldSharesRecordRoot,
+  fieldsReferenceSamePath,
   primaryIdExpressionPayloadFields,
   reconciliationSystemTitle,
   type ReconciliationRuleSetDraft,
@@ -678,38 +679,10 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
   }
 }
 
-function normalizeFieldPathValue(rawFieldPath: string): string {
-  const trimmed = rawFieldPath.trim()
-  if (!trimmed) return ''
-
-  const withoutSuffix = trimmed.split('|', 1)[0]?.trim() ?? ''
-  if (!withoutSuffix) return ''
-
-  return withoutSuffix
-    .replace(/\[(\d+)\]/g, '[*]')
-    .replace('.[*]', '[*]')
-}
-
-function buildFieldPathAliases(rawFieldPath: string): Set<string> {
-  const normalized = normalizeFieldPathValue(rawFieldPath)
-  if (!normalized) return new Set()
-
-  const aliases = new Set<string>([normalized])
-  if (normalized.startsWith('$.')) aliases.add(normalized.slice(2))
-  else if (normalized.startsWith('$[')) aliases.add(normalized.slice(1))
-  else if (!normalized.startsWith('$')) aliases.add(normalized.startsWith('[') ? `$${normalized}` : `$.${normalized}`)
-
-  return aliases
-}
-
 function resolveSelectedFieldPath(schemaId: string, rawFieldPath: string): string | null {
   if (!schemaId || !rawFieldPath) return null
 
-  const savedAliases = buildFieldPathAliases(rawFieldPath)
-  const matchingField = (flattenedFields.value[schemaId] ?? []).find((field) => {
-    const fieldAliases = buildFieldPathAliases(field.fieldPath)
-    return [...fieldAliases].some((alias) => savedAliases.has(alias))
-  })
+  const matchingField = (flattenedFields.value[schemaId] ?? []).find((field) => fieldsReferenceSamePath(field.fieldPath, rawFieldPath))
 
   return matchingField?.fieldPath ?? null
 }
@@ -718,9 +691,7 @@ function preserveFieldExpressionSuffix(originalFieldPath: string | undefined, se
   const suffix = originalFieldPath?.split('|').slice(1).join('|').trim()
   if (!originalFieldPath || !suffix) return selectedFieldPath
 
-  const originalAliases = buildFieldPathAliases(originalFieldPath)
-  const selectedAliases = buildFieldPathAliases(selectedFieldPath)
-  const sameBaseField = [...selectedAliases].some((alias) => originalAliases.has(alias))
+  const sameBaseField = fieldsReferenceSamePath(originalFieldPath, selectedFieldPath)
   return sameBaseField ? `${selectedFieldPath}|${suffix}` : selectedFieldPath
 }
 
@@ -733,11 +704,7 @@ function preserveFieldExpressionSuffix(originalFieldPath: string | undefined, se
 function buildPrimaryIdExpressionValues(originalExpressions: string[] | undefined, selectedFieldPaths: string[]): string[] {
   const originals = originalExpressions ?? []
   return selectedFieldPaths.map((fieldPath) => {
-    const selectedAliases = buildFieldPathAliases(fieldPath)
-    const matchingOriginal = originals.find((original) => {
-      const originalAliases = buildFieldPathAliases(original)
-      return [...selectedAliases].some((alias) => originalAliases.has(alias))
-    })
+    const matchingOriginal = originals.find((original) => fieldsReferenceSamePath(original, fieldPath))
     return preserveFieldExpressionSuffix(matchingOriginal, fieldPath)
   })
 }

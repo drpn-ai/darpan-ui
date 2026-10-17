@@ -49,25 +49,13 @@
         </div>
       </StaticPageSection>
 
-      <StaticPageSection title="Endpoints">
-        <p v-if="endpointsLoadState === 'loading'" class="section-note">Loading endpoints...</p>
-        <InlineValidation v-else-if="endpointsLoadState === 'error'" tone="error" :message="endpointsError ?? ''" />
-        <div
-          v-else
-          class="static-page-tile-grid static-page-record-grid static-page-record-grid--fixed"
-          data-testid="oms-endpoint-configs"
-        >
-          <article
-            v-for="endpoint in availableEndpoints"
-            :key="endpoint.systemEnumId"
-            class="static-page-tile static-page-list-tile static-page-record-tile"
-            data-testid="oms-endpoint-tile"
-          >
-            <span class="static-page-list-tile__title">{{ endpoint.endpointLabel }}</span>
-          </article>
-          <EmptyState v-if="availableEndpoints.length === 0" title="No available endpoints" />
-        </div>
-      </StaticPageSection>
+      <SourceConfigEndpointsSection
+        :load-state="endpointsLoadState"
+        :error="endpointsError"
+        :endpoints="availableEndpoints"
+        list-test-id="oms-endpoint-configs"
+        tile-test-id="oms-endpoint-tile"
+      />
     </template>
 
     <StaticPageSection v-else>
@@ -148,7 +136,7 @@ import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
-import type { OmsRestSourceConfigRecord, SourceConfigEndpoint } from '../../lib/api/types'
+import type { OmsRestSourceConfigRecord } from '../../lib/api/types'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -162,7 +150,9 @@ import {
 } from '../../lib/iconPaths'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
+import SourceConfigEndpointsSection from './SourceConfigEndpointsSection.vue'
 import { useConnectionDiagnostics } from './useConnectionDiagnostics'
+import { useSourceConfigEndpoints } from './useSourceConfigEndpoints'
 
 const route = useRoute()
 const router = useRouter()
@@ -175,9 +165,6 @@ const loading = ref(false)
 const deletingConfig = ref(false)
 const error = ref<string | null>(null)
 const deleteError = ref<string | null>(null)
-const endpoints = ref<SourceConfigEndpoint[]>([])
-const endpointsLoadState = ref<'loading' | 'ready' | 'error'>('loading')
-const endpointsError = ref<string | null>(null)
 
 const configId = computed(() => String(route.params.omsRestSourceConfigId ?? '').trim())
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
@@ -188,13 +175,23 @@ const heroTitle = computed(() => (
 ))
 const timeZone = computed(() => config.value?.timeZone?.trim() || 'UTC')
 const activeLabel = computed(() => (config.value?.isActive === 'N' ? 'No' : 'Yes'))
-const availableEndpoints = computed(() => endpoints.value.filter((endpoint) => endpoint.isEnabled))
 const editRoute = computed(() => ({
   name: 'settings-oms-edit',
   params: { omsRestSourceConfigId: configId.value },
 }))
 
 const pageAbortController = new AbortController()
+const {
+  availableEndpoints,
+  loadState: endpointsLoadState,
+  error: endpointsError,
+  load: loadEndpoints,
+} = useSourceConfigEndpoints({
+  configTypeEnumId: SHARED_CONFIG_TYPES.hotwaxOms,
+  configId: () => configId.value,
+  cacheKeyPrefix: 'omsRestSourceDashboard.endpoints',
+  signal: pageAbortController.signal,
+})
 const diagnostics = useConnectionDiagnostics('OMS')
 
 function runDiagnostics(): void {
@@ -236,30 +233,6 @@ async function load(): Promise<void> {
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load HotWax auth config.'
   } finally {
     loading.value = false
-  }
-}
-
-async function loadEndpoints(): Promise<void> {
-  if (!configId.value) return
-
-  endpointsLoadState.value = 'loading'
-  endpointsError.value = null
-  try {
-    await cachedRead(
-      `omsRestSourceDashboard.endpoints:${configId.value}`,
-      () => settingsFacade.listSourceConfigEndpoints(
-        { configTypeEnumId: SHARED_CONFIG_TYPES.hotwaxOms, configId: configId.value },
-        pageAbortController.signal,
-      ),
-      (response) => {
-        endpoints.value = response.endpoints ?? []
-        endpointsLoadState.value = 'ready'
-      },
-    )
-  } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
-    endpointsError.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load endpoints.'
-    endpointsLoadState.value = 'error'
   }
 }
 

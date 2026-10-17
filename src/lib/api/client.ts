@@ -487,6 +487,17 @@ function withMethodDetails(method: string, details: Record<string, unknown>): Re
   }
 }
 
+/** Drops the stale token and fails the call as auth-required, first giving the registered handler a
+ *  chance to recover the session (the session probe itself never notifies). */
+async function throwAuthRequired(detail: AuthRequiredDetail, details: Record<string, unknown>): Promise<never> {
+  clearAuthToken()
+  if (shouldNotifyAuthRequired(detail.method)) {
+    const recovered = await notifyAuthRequired(detail)
+    throw new AuthRequiredError(detail, details, recovered)
+  }
+  throw new ApiCallError(detail.message, 401, details)
+}
+
 async function dispatchService<T>(
   method: string,
   params: object,
@@ -557,14 +568,10 @@ async function dispatchService<T>(
       const message = parsed.error?.message ?? `Request failed with status ${response.status}`
       const authRequired = response.status === 401 || isAuthRequiredMessage(message)
       if (authRequired) {
-        clearAuthToken()
-        const details = withMethodDetails(method, { candidateUrl, data: parsed.error?.data })
-        if (shouldNotifyAuthRequired(method)) {
-          const detail: AuthRequiredDetail = { message, method, candidateUrl, status: 401, recoveryExhausted }
-          const recovered = await notifyAuthRequired(detail)
-          throw new AuthRequiredError(detail, details, recovered)
-        }
-        throw new ApiCallError(message, 401, details)
+        return throwAuthRequired(
+          { message, method, candidateUrl, status: 401, recoveryExhausted },
+          withMethodDetails(method, { candidateUrl, data: parsed.error?.data }),
+        )
       }
 
       throw new ApiCallError(
@@ -577,14 +584,10 @@ async function dispatchService<T>(
     if (parsed.error) {
       const authRequired = response.status === 401 || isAuthRequiredMessage(parsed.error.message)
       if (authRequired) {
-        clearAuthToken()
-        const details = withMethodDetails(method, { candidateUrl, data: parsed.error.data })
-        if (shouldNotifyAuthRequired(method)) {
-          const detail: AuthRequiredDetail = { message: parsed.error.message, method, candidateUrl, status: 401, recoveryExhausted }
-          const recovered = await notifyAuthRequired(detail)
-          throw new AuthRequiredError(detail, details, recovered)
-        }
-        throw new ApiCallError(parsed.error.message, 401, details)
+        return throwAuthRequired(
+          { message: parsed.error.message, method, candidateUrl, status: 401, recoveryExhausted },
+          withMethodDetails(method, { candidateUrl, data: parsed.error.data }),
+        )
       }
 
       throw new ApiCallError(
@@ -604,14 +607,10 @@ async function dispatchService<T>(
       const message = envelope.errors[0] ?? GENERIC_SERVICE_ERROR_MESSAGE
       const authRequired = isAuthRequiredMessage(message)
       if (authRequired) {
-        clearAuthToken()
-        const details = withMethodDetails(method, { candidateUrl, result })
-        if (shouldNotifyAuthRequired(method)) {
-          const detail: AuthRequiredDetail = { message, method, candidateUrl, status: 401, recoveryExhausted }
-          const recovered = await notifyAuthRequired(detail)
-          throw new AuthRequiredError(detail, details, recovered)
-        }
-        throw new ApiCallError(message, 401, details)
+        return throwAuthRequired(
+          { message, method, candidateUrl, status: 401, recoveryExhausted },
+          withMethodDetails(method, { candidateUrl, result }),
+        )
       }
 
       throw new ApiCallError(
@@ -639,24 +638,19 @@ async function dispatchService<T>(
   })
 
   if (authLikeFailure) {
-    clearAuthToken()
-    const details = withMethodDetails(method, {
-      attemptedUrls,
-      failures: parseFailures,
-    })
-    if (shouldNotifyAuthRequired(method)) {
-      const detail: AuthRequiredDetail = {
+    return throwAuthRequired(
+      {
         message: AUTH_REQUIRED_MESSAGE,
         method,
         candidateUrl: authLikeFailure.url,
         status: authLikeFailure.status ?? 401,
         recoveryExhausted,
-      }
-      const recovered = await notifyAuthRequired(detail)
-      throw new AuthRequiredError(detail, details, recovered)
-    }
-
-    throw new ApiCallError(AUTH_REQUIRED_MESSAGE, 401, details)
+      },
+      withMethodDetails(method, {
+        attemptedUrls,
+        failures: parseFailures,
+      }),
+    )
   }
 
   if (allUnreachable) {

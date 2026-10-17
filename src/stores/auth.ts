@@ -215,6 +215,22 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
+  /** A signed-in account call that threw: a 401 ends the session; anything else keeps the current
+   *  session and surfaces the error. Unlike a tenant switch, this leaves the response cache alone. */
+  function _applyAccountCallFailure(err: unknown): void {
+    if (err instanceof ApiCallError && err.status === 401) {
+      clearAuthToken()
+      _applyAuthState({ status: 'unauthenticated', error: err.message })
+      return
+    }
+
+    _applyAuthState({
+      status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
+      error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
+      sessionInfo: _sessionInfo.value,
+    })
+  }
+
   function _hydrateReferenceData(): void {
     // Fire-and-forget — pages await ensureLoaded() if they arrive before the
     // fan-out resolves, so we don't block the post-login redirect here.
@@ -463,17 +479,7 @@ export const useAuthStore = defineStore('auth', () => {
       })
       return false
     } catch (err) {
-      if (err instanceof ApiCallError && err.status === 401) {
-        clearAuthToken()
-        _applyAuthState({ status: 'unauthenticated', error: err.message })
-        return false
-      }
-
-      _applyAuthState({
-        status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-        error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
-        sessionInfo: _sessionInfo.value,
-      })
+      _applyAccountCallFailure(err)
       return false
     }
   }
@@ -523,17 +529,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       return response
     } catch (err) {
-      if (err instanceof ApiCallError && err.status === 401) {
-        clearAuthToken()
-        _applyAuthState({ status: 'unauthenticated', error: err.message })
-        return null
-      }
-
-      _applyAuthState({
-        status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-        error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
-        sessionInfo: _sessionInfo.value,
-      })
+      _applyAccountCallFailure(err)
       return null
     }
   }
@@ -560,17 +556,7 @@ export const useAuthStore = defineStore('auth', () => {
       })
       return false
     } catch (err) {
-      if (err instanceof ApiCallError && err.status === 401) {
-        clearAuthToken()
-        _applyAuthState({ status: 'unauthenticated', error: err.message })
-        return false
-      }
-
-      _applyAuthState({
-        status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-        error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
-        sessionInfo: _sessionInfo.value,
-      })
+      _applyAccountCallFailure(err)
       return false
     }
   }
@@ -617,17 +603,7 @@ export const useAuthStore = defineStore('auth', () => {
       })
       return false
     } catch (err) {
-      if (err instanceof ApiCallError && err.status === 401) {
-        clearAuthToken()
-        _applyAuthState({ status: 'unauthenticated', error: err.message })
-        return false
-      }
-
-      _applyAuthState({
-        status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-        error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
-        sessionInfo: _sessionInfo.value,
-      })
+      _applyAccountCallFailure(err)
       return false
     }
   }

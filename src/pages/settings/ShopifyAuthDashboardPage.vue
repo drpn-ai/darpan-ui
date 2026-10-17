@@ -53,25 +53,13 @@
         </div>
       </StaticPageSection>
 
-      <StaticPageSection title="Endpoints">
-        <p v-if="endpointsLoadState === 'loading'" class="section-note">Loading endpoints...</p>
-        <InlineValidation v-else-if="endpointsLoadState === 'error'" tone="error" :message="endpointsError ?? ''" />
-        <div
-          v-else
-          class="static-page-tile-grid static-page-record-grid static-page-record-grid--fixed"
-          data-testid="shopify-endpoint-configs"
-        >
-          <article
-            v-for="endpoint in availableEndpoints"
-            :key="endpoint.systemEnumId"
-            class="static-page-tile static-page-list-tile static-page-record-tile"
-            data-testid="shopify-endpoint-tile"
-          >
-            <span class="static-page-list-tile__title">{{ endpoint.endpointLabel }}</span>
-          </article>
-          <EmptyState v-if="availableEndpoints.length === 0" title="No available endpoints" />
-        </div>
-      </StaticPageSection>
+      <SourceConfigEndpointsSection
+        :load-state="endpointsLoadState"
+        :error="endpointsError"
+        :endpoints="availableEndpoints"
+        list-test-id="shopify-endpoint-configs"
+        tile-test-id="shopify-endpoint-tile"
+      />
     </template>
 
     <StaticPageSection v-else>
@@ -152,7 +140,7 @@ import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
-import type { ShopifyAuthConfigRecord, SourceConfigEndpoint } from '../../lib/api/types'
+import type { ShopifyAuthConfigRecord } from '../../lib/api/types'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -166,7 +154,9 @@ import {
 } from '../../lib/iconPaths'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
+import SourceConfigEndpointsSection from './SourceConfigEndpointsSection.vue'
 import { useConnectionDiagnostics } from './useConnectionDiagnostics'
+import { useSourceConfigEndpoints } from './useSourceConfigEndpoints'
 
 const route = useRoute()
 const router = useRouter()
@@ -179,9 +169,6 @@ const loading = ref(false)
 const deletingConfig = ref(false)
 const error = ref<string | null>(null)
 const deleteError = ref<string | null>(null)
-const endpoints = ref<SourceConfigEndpoint[]>([])
-const endpointsLoadState = ref<'loading' | 'ready' | 'error'>('loading')
-const endpointsError = ref<string | null>(null)
 
 const configId = computed(() => String(route.params.shopifyAuthConfigId ?? '').trim())
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
@@ -193,13 +180,23 @@ const heroTitle = computed(() => (
 const apiVersion = computed(() => config.value?.apiVersion?.trim() || '2026-01')
 const timeZone = computed(() => config.value?.timeZone?.trim() || 'UTC')
 const activeLabel = computed(() => (config.value?.isActive === 'N' ? 'No' : 'Yes'))
-const availableEndpoints = computed(() => endpoints.value.filter((endpoint) => endpoint.isEnabled))
 const editRoute = computed(() => ({
   name: 'settings-shopify-edit',
   params: { shopifyAuthConfigId: configId.value },
 }))
 
 const pageAbortController = new AbortController()
+const {
+  availableEndpoints,
+  loadState: endpointsLoadState,
+  error: endpointsError,
+  load: loadEndpoints,
+} = useSourceConfigEndpoints({
+  configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth,
+  configId: () => configId.value,
+  cacheKeyPrefix: 'shopifyAuthDashboard.endpoints',
+  signal: pageAbortController.signal,
+})
 const diagnostics = useConnectionDiagnostics('SHOPIFY')
 
 function runDiagnostics(): void {
@@ -241,30 +238,6 @@ async function load(): Promise<void> {
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load Shopify config.'
   } finally {
     loading.value = false
-  }
-}
-
-async function loadEndpoints(): Promise<void> {
-  if (!configId.value) return
-
-  endpointsLoadState.value = 'loading'
-  endpointsError.value = null
-  try {
-    await cachedRead(
-      `shopifyAuthDashboard.endpoints:${configId.value}`,
-      () => settingsFacade.listSourceConfigEndpoints(
-        { configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth, configId: configId.value },
-        pageAbortController.signal,
-      ),
-      (response) => {
-        endpoints.value = response.endpoints ?? []
-        endpointsLoadState.value = 'ready'
-      },
-    )
-  } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
-    endpointsError.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load endpoints.'
-    endpointsLoadState.value = 'error'
   }
 }
 
