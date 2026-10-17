@@ -454,6 +454,24 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(wrapper.get('[data-testid="create-run-submit"]').text()).toBe('Save run')
   })
 
+  // DAR-UI-054: Create a run already asked "What kind of run?" (Sync = two systems), so the wizard
+  // goes straight from the description to the first system and never asks a second time.
+  it('goes from description straight to the first system without asking the kind of run again', async () => {
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+
+    await wrapper.get('input').setValue('Returns Sync')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('What description should this run use?')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Which system provides the first source?')
+    expect(wrapper.text()).not.toContain('What kind of run is this?')
+    expect(wrapper.text()).not.toContain('Check one system')
+  })
+
   it('creates a basic diff run from the final primary ID step', async () => {
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()

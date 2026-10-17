@@ -307,11 +307,8 @@ function sourceArmSteps(side: SourceSide): WizardStep[] {
 const steps = computed<WizardStep[]>(() => [
   { id: 'run-name' },
   { id: 'description' },
-  { id: 'run-shape' },
   ...sourceArmSteps('file1'),
-  // Not hidden — absent. A skipped-but-present second arm leaves its answers in the draft, and
-  // they would be sent.
-  ...(isSingleSided.value ? [] : sourceArmSteps('file2')),
+  ...sourceArmSteps('file2'),
   // Final step regardless of source shape: the rules board, so comparison rules and exclusions
   // are set before the run is saved instead of in a second trip through the Ruleset Manager.
   { id: 'ruleset-rules' },
@@ -419,10 +416,7 @@ function applyApiEndpointSelection(side: SourceSide, endpointEnumId: string): vo
 
 /** Which of the four STAGES a card belongs to. Drives the progress bar; see STAGE_MAX_CARDS. */
 function stageOfStep(stepId: StepId): number {
-  // run-shape belongs to the naming stage, not a stage of its own: it is a question ABOUT the run
-  // rather than about a source. Unlisted it fell through to stage 3 — the final stage — and the
-  // progress bar jumped to 100% on the third card and then went backwards.
-  if (stepId === 'run-name' || stepId === 'description' || stepId === 'run-shape') return 0
+  if (stepId === 'run-name' || stepId === 'description') return 0
   if (stepId.startsWith('file1-')) return 1
   if (stepId.startsWith('file2-')) return 2
   return 3
@@ -450,27 +444,10 @@ const file1SystemParentLabel = computed(() =>
   (file1SystemParentEnumId.value ? resolveSystemLabel(file1SystemParentEnumId.value) : '') || undefined)
 const file2SystemParentLabel = computed(() =>
   (file2SystemParentEnumId.value ? resolveSystemLabel(file2SystemParentEnumId.value) : '') || undefined)
-/**
- * DAR-BE-058. The operator picks a KIND of run; sidedness follows. They are never asked an
- * abstract "one source or two?" — that is the model's question, not theirs.
- *
- * Deliberately NOT carried on runType. runType is derived, not stored, and already answers a
- * different question: which definition table the run came from (mapping vs ruleset). Six
- * `runType === 'ruleset'` branches across the UI route on it, and a third value would make every
- * one of them silently stop matching a single-sided run. scopeMode on the compare scope is the
- * stored truth, and every surface already reads it.
- */
-const SHAPE_COMPARE = 'compare'
-const SHAPE_EVALUATE = 'evaluate'
-const runShape = ref(SHAPE_COMPARE)
-const isSingleSided = computed(() => runShape.value === SHAPE_EVALUATE)
-const runShapeOptions = computed(() => [
-  { value: SHAPE_COMPARE, label: 'Compare two systems', description: 'Findings are records that disagree between them.' },
-  { value: SHAPE_EVALUATE, label: 'Check one system', description: 'Every record the source returns is a finding.' },
-])
-
+// DAR-UI-054: a Sync run always compares two systems. Create a run already asked which kind of
+// run this is, so the wizard no longer asks again; single-system checks are built as Lifecycles.
 const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
-  scopeMode: isSingleSided.value ? 'EVALUATE' : 'COMPARE',
+  scopeMode: 'COMPARE',
   runName: trimmedRunName.value,
   description: description.value.trim() || undefined,
   file1SystemEnumId: file1SystemEnumId.value,
@@ -488,8 +465,8 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file1SchemaLabel: !file1UsesApi.value ? resolveSelectedSchemaLabel(file1JsonSchemaId.value) : undefined,
   file1SchemaFileName: !file1UsesApi.value ? resolveSchemaFileName(file1JsonSchemaId.value) : undefined,
   file1PrimaryIdExpression: file1PrimaryIdExpression.value,
-  file2SystemEnumId: isSingleSided.value ? '' : file2SystemEnumId.value,
-  file2SystemLabel: isSingleSided.value ? undefined : file2SystemLabel.value || undefined,
+  file2SystemEnumId: file2SystemEnumId.value,
+  file2SystemLabel: file2SystemLabel.value || undefined,
   file2SystemParentLabel: file2SystemParentLabel.value,
   file2SourceTypeEnumId: file2UsesApi.value ? SOURCE_TYPE_API : undefined,
   file2SystemMessageRemoteId: file2UsesApi.value ? file2SystemMessageRemoteId.value || undefined : undefined,
@@ -511,8 +488,6 @@ const currentQuestion = computed(() => {
       return 'What should this run be called?'
     case 'description':
       return 'What description should this run use?'
-    case 'run-shape':
-      return 'What kind of run is this?'
     case 'file1-system':
       return 'Which system provides the first source?'
     case 'file1-endpoint':
@@ -576,7 +551,6 @@ const isRuleSetRulesStep = computed(() => currentStep.value.id === 'ruleset-rule
 
 const isSelectStep = computed(() => {
   switch (currentStep.value.id) {
-    case 'run-shape':
     case 'file1-system':
     case 'file1-endpoint':
     case 'file1-filetype':
@@ -614,8 +588,6 @@ const isChipTextStep = computed(() => {
 const activeSelectValue = computed({
   get: () => {
     switch (currentStep.value.id) {
-      case 'run-shape':
-        return runShape.value
       case 'file1-system':
         return file1SystemParentEnumId.value
       case 'file1-endpoint':
@@ -671,9 +643,6 @@ const activeSelectValue = computed({
         } else {
           file1SystemEnumId.value = value
         }
-        break
-      case 'run-shape':
-        runShape.value = value
         break
       case 'file1-source':
         setSourceMode('file1', value)
@@ -736,8 +705,6 @@ const activeSelectValue = computed({
 
 const activeSelectOptions = computed(() => {
   switch (currentStep.value.id) {
-    case 'run-shape':
-      return runShapeOptions.value
     case 'file1-system':
     case 'file2-system':
       return systemOptions.value
@@ -1076,11 +1043,6 @@ const canProceed = computed(() => {
       return trimmedRunName.value.length > 0
     case 'description':
       return true
-    // Always answered: the card opens on "Compare two systems" rather than on nothing, because
-    // the common run is two-sided and an unanswerable question is a dead end. Omitting this case
-    // fell through to the blocking default and trapped the wizard on the step.
-    case 'run-shape':
-      return runShape.value.length > 0
     case 'file1-system':
       return file1SystemParentEnumId.value.length > 0
     case 'file1-endpoint':

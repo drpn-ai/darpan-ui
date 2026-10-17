@@ -15,8 +15,6 @@ const RULESET_SOURCE_TYPE_API = 'AUT_SRC_API'
 export type ReconciliationCreateFlowStepId =
   | 'run-name'
   | 'description'
-  // DAR-BE-058: the kind of run, which decides whether a second arm exists at all.
-  | 'run-shape'
   | 'file1-system'
   | 'file1-source'
   | 'file1-endpoint'
