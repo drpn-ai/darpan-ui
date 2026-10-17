@@ -287,7 +287,9 @@ const countFormat = new Intl.NumberFormat('en-US')
 // DAR-UI-050. A lifecycle built from stages shows where records stopped. Its window is chosen when it runs
 // (RunFlowchartStartPage), as a Sync run's is.
 const isStages = computed(() => run.value?.buildMode === 'STAGES')
-const board = computed(() => lifecycleBoard(questions.value, executionRows.value))
+// What each stage's exceptions excuse, in their own words, so an excused place reads "Store Pickup, never billed".
+const excusedNames = ref<Record<string, string>>({})
+const board = computed(() => lifecycleBoard(questions.value, executionRows.value, excusedNames.value))
 
 const STATE_WORDS: Record<string, string> = {
   waiting: 'Waiting', running: 'Running', done: 'Done', nothing: 'Nothing to ask', failed: 'Failed', 'not-run': 'Not run', cancelled: 'Cancelled',
@@ -408,7 +410,7 @@ watch(() => (isResult.value ? [] : [mostRecent.value, ...previousTiles.value].fi
  */
 function findingsOf(rows: FlowchartExecutionRow[]): number | null {
   if (isStages.value) {
-    const counts = lifecycleBoard(questions.value, rows).stages.flatMap((st) => st.places).map((p) => p.count).filter((n): n is number => n !== null)
+    const counts = lifecycleBoard(questions.value, rows, excusedNames.value).stages.flatMap((st) => st.places).map((p) => p.count).filter((n): n is number => n !== null)
     return counts.length ? counts.reduce((a, b) => a + b, 0) : null
   }
   const starts = new Set(questions.value.filter((q) => q.questionRole === 'START').map((q) => q.reconciliationRunId))
@@ -422,7 +424,7 @@ function figure(n: number | null | undefined): string { return n == null ? '-' :
 function metricsOf(id: string): Array<{ label: string; value: string }> {
   const rows = tileRows.value[id]
   const tile = historyTiles.value.find((t) => t.id === id)
-  const complete = isStages.value && rows ? lifecycleBoard(questions.value, rows).complete : null
+  const complete = isStages.value && rows ? lifecycleBoard(questions.value, rows, excusedNames.value).complete : null
   return [
     { label: 'Findings', value: rows ? figure(findingsOf(rows)) : '-' },
     ...(isStages.value ? [{ label: complete?.label ?? 'Complete', value: figure(complete?.count) }] : []),
@@ -465,6 +467,9 @@ async function load() {
     ])
     run.value = got.reconciliation
     questions.value = got.questions ?? []
+    const byStage: Record<string, string[]> = {}
+    for (const e of got.exceptions ?? []) (byStage[e.stageLabel ?? ''] ??= []).push(e.value)
+    excusedNames.value = Object.fromEntries(Object.entries(byStage).map(([stage, values]) => [stage, values.join(' or ')]))
     if (saved) rules.value = saved.savedRuns ?? []
   } catch (error) {
     pageError.value = message(error)

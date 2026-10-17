@@ -20,7 +20,8 @@ export interface FlowchartQuestion {
   reconciliationRunId: string
   parentReconciliationRunId?: string | null
   parentBranch?: FlowchartBranch | null
-  questionRole?: 'START' | null
+  /** START heads a chart; EXCUSED (DAR-UI-050) sets a lifecycle stage's excused records apart and is not a stage. */
+  questionRole?: 'START' | 'EXCUSED' | null
   runSequence?: number | null
   isActive?: string | null
   runName?: string | null
@@ -60,7 +61,7 @@ export interface SaveFlowchartQuestionPayload {
   reconciliationRunId?: string
   ruleSetId: string
   runName?: string
-  questionRole?: 'START'
+  questionRole?: 'START' | 'EXCUSED'
   parentReconciliationRunId?: string
   parentBranch?: FlowchartBranch
   noOutcomeLabel?: string

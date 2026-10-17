@@ -30,7 +30,11 @@ export interface LifecycleBoard {
   largest: number
 }
 
-export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartExecutionRow[]): LifecycleBoard {
+/**
+ * @param excusedNames what each stage's exceptions excuse, by stage label ("Fulfillment" -> "Store Pickup or GFT-CP"),
+ *   so an excused place reads in a person's own words: "Store Pickup or GFT-CP, never billed".
+ */
+export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartExecutionRow[], excusedNames: Record<string, string> = {}): LifecycleBoard {
   const active = questions.filter((q) => q.isActive !== 'N')
   const rowOf = (id: string) => rows.find((r) => r.reconciliationRunId === id) ?? null
   const childrenOf = (id: string, branch: FlowchartBranch) => active
@@ -47,6 +51,21 @@ export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartEx
     ...(q.noOutcomeLabel ? [place(q, 'NO', q.noOutcomeLabel)] : childrenOf(q.reconciliationRunId, 'NO').flatMap(endings)),
   ]
 
+  // DAR-UI-050. Records an exception let past a stage without it take their own track: the excused check sits on the
+  // spine between two stages, and each place on its track belongs to the stage the records stopped at.
+  const excused: { stageLabel: string; place: LifecyclePlace }[] = []
+  const stepOverExcused = (q: FlowchartQuestion) => {
+    const name = excusedNames[q.runName ?? '']
+    const track = (e: FlowchartQuestion): void => {
+      if (e.noOutcomeLabel) {
+        const rest = e.noOutcomeLabel.includes(', ') ? e.noOutcomeLabel.slice(e.noOutcomeLabel.indexOf(', ')) : ''
+        excused.push({ stageLabel: e.runName ?? '', place: place(e, 'NO', name ? `${name}${rest}` : e.noOutcomeLabel) })
+      }
+      childrenOf(e.reconciliationRunId, 'YES').forEach(track)
+    }
+    childrenOf(q.reconciliationRunId, 'NO').forEach(track)
+  }
+
   const startQ = active.find((q) => q.questionRole === 'START') ?? null
   const stages: LifecycleStage[] = []
   let complete: LifecyclePlace | null = null
@@ -62,13 +81,23 @@ export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartEx
       places: here.noOutcomeLabel ? [place(here, 'NO', here.noOutcomeLabel)] : childrenOf(here.reconciliationRunId, 'NO').flatMap(endings),
     })
     if (here.yesOutcomeLabel) complete = place(here, 'YES', here.yesOutcomeLabel)
-    const next = childrenOf(here.reconciliationRunId, 'YES')[0]
+    let next = childrenOf(here.reconciliationRunId, 'YES')[0]
+    let parentOfNext: FlowchartQuestion = here
+    if (next?.questionRole === 'EXCUSED') {
+      stepOverExcused(next)
+      parentOfNext = next
+      next = childrenOf(next.reconciliationRunId, 'YES')[0]
+    }
     if (!next && parentOfCurrent) {
       const beside = childrenOf(parentOfCurrent.reconciliationRunId, 'YES').find((q) => q !== here && q.noOutcomeLabel)
       if (beside) complete = place(beside, 'NO', beside.noOutcomeLabel!)
     }
-    parentOfCurrent = here
+    parentOfCurrent = parentOfNext
     current = next
+  }
+  for (const { stageLabel, place: p } of excused) {
+    const stage = stages.find((st) => st.label === stageLabel)
+    if (stage) stage.places.push(p)
   }
   const counts = stages.flatMap((s) => s.places.map((p) => p.count ?? 0))
   return {

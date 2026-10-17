@@ -95,5 +95,33 @@ describe('lifecycle board, one question per place', () => {
     expect(board.stages[1]!.places.map((p) => [p.label, p.count, p.branch])).toEqual([['Billed, never shipped', 132, 'NO']])
     expect([board.complete?.label, board.complete?.count, board.complete?.branch]).toEqual(['Billed and shipped', 9716, 'NO'])
   })
+
+  // An exception lets records past a stage without it; an excused check between the stages takes them onto a track of
+  // their own, so the next stage sees only records that reached this one, and their place reads in the exception's words.
+  it('steps over the excused check and files its place under the stage they stopped at', () => {
+    const excusedTree = [
+      q('S', { questionRole: 'START', runName: 'Sales orders', runSequence: 1 }),
+      q('F', { parentReconciliationRunId: 'S', parentBranch: 'YES', runName: 'Fulfillment', runSequence: 2 }),
+      q('X', { parentReconciliationRunId: 'F', parentBranch: 'YES', questionRole: 'EXCUSED', runName: 'Fulfillment', runSequence: 3 }),
+      q('I', { parentReconciliationRunId: 'X', parentBranch: 'YES', runName: 'Invoice', noOutcomeLabel: 'Shipped, never billed', runSequence: 4 }),
+      q('D', { parentReconciliationRunId: 'X', parentBranch: 'YES', runName: 'Invoice', noOutcomeLabel: 'Shipped and billed', runSequence: 5 }),
+      q('XN', { parentReconciliationRunId: 'X', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Fulfillment not expected, never billed', runSequence: 6 }),
+      q('H', { parentReconciliationRunId: 'F', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Billed, never shipped', runSequence: 7 }),
+      q('N', { parentReconciliationRunId: 'F', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Never shipped, never billed', runSequence: 8 }),
+    ]
+    const rows: FlowchartExecutionRow[] = [
+      { reconciliationRunResultId: 'r1', reconciliationRunId: 'X', yesCount: 9900, noCount: 40 },
+      { reconciliationRunResultId: 'r2', reconciliationRunId: 'I', yesCount: 9650, noCount: 250 },
+      { reconciliationRunResultId: 'r3', reconciliationRunId: 'D', yesCount: 250, noCount: 9650 },
+      { reconciliationRunResultId: 'r4', reconciliationRunId: 'XN', yesCount: 30, noCount: 10 },
+    ]
+    const board = lifecycleBoard(excusedTree, rows, { Fulfillment: 'Store Pickup or GFT-CP' })
+    expect(board.stages.map((st) => st.label)).toEqual(['Fulfillment', 'Invoice'])
+    expect(board.stages[1]!.places.map((p) => [p.label, p.count])).toEqual([
+      ['Shipped, never billed', 250], ['Store Pickup or GFT-CP, never billed', 10]])
+    expect([board.complete?.label, board.complete?.count]).toEqual(['Shipped and billed', 9650])
+    // Without the exceptions' words, the place keeps its own name.
+    expect(lifecycleBoard(excusedTree, rows).stages[1]!.places[1]!.label).toBe('Fulfillment not expected, never billed')
+  })
 })
 
