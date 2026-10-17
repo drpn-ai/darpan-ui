@@ -8,6 +8,7 @@ const { routeParams, push, replace } = vi.hoisted(() => ({
 }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: routeParams }), useRouter: () => ({ push, replace }), RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } }))
 vi.mock('../../../lib/api/facade', () => ({
+  settingsFacade: { listNsAuthConfigs: vi.fn(async () => ({ authConfigs: [{ nsAuthConfigId: 'net_prod', description: 'Gorjana NetSuite' }, { nsAuthConfigId: 'gorjana_prod', description: 'Gorjana NetSuite (sandbox copy)' }] })) },
   reconciliationFacade: {
     getReconciliation: vi.fn(), listSavedRuns: vi.fn(), saveReconciliationQuestion: vi.fn(), saveReconciliation: vi.fn(),
     deleteReconciliationQuestion: vi.fn(), runReconciliation: vi.fn(), getReconciliationExecution: vi.fn(),
@@ -154,11 +155,38 @@ describe('RunFlowchartPage', () => {
       const w = mount(RunFlowchartPage)
       await flushPromises()
       const outline = w.get('[data-testid="lifecycle-outline"]').text()
-      for (const part of ['Sales orders', 'net_prod', 'except Status is Closed', 'judged after 2 days', 'Fulfillment',
+      // The account by its description, never its id.
+      expect(outline).not.toContain('net_prod')
+      for (const part of ['Sales orders', 'Gorjana NetSuite', 'except Status is Closed', 'judged after 2 days', 'Fulfillment',
         'not expected for Shipping Method is Store Pickup', 'Invoice']) expect(outline).toContain(part)
       expect(outline.indexOf('Fulfillment')).toBeLessThan(outline.indexOf('Invoice'))
+      // Each place is drawn under the stage it is concluded at, a Finding or quietly not.
+      const findings = w.findAll('[data-testid="lifecycle-outline-finding"]')
+      expect(findings.map((p) => p.find('span').text())).toEqual([
+        'stops at Billed, never shipped', 'stops at Never shipped, never billed', 'stops at Shipped, never billed'])
+      expect(findings.every((p) => p.find('.status-badge').text() === 'Finding')).toBe(true)
+      expect(w.get('[data-testid="lifecycle-outline-complete"]').text()).toBe('Shipped and billed')
       expect(w.find('[data-testid="lifecycle-outline"] button, [data-testid="lifecycle-outline"] select').exists()).toBe(false)
       expect(w.find('[data-testid="flowchart-settings"]').exists()).toBe(true)
+    })
+
+    // Findings are the records at the places that are findings; the others still show, marked, and say they are not.
+    it('counts only the places that are findings', async () => {
+      f.getReconciliation.mockResolvedValue({ reconciliation: { ...stagesRun, notFindingPlaces: JSON.stringify(['Billed, never shipped']) },
+        questions: stageQuestions, lifecycle: { nsAuthConfigId: 'net_prod', recordType: 'SalesOrd', recordLabel: 'Sales orders' },
+        rules: [], stages: [], exceptions: [] } as never)
+      routeParams.reconciliationExecutionId = 'E7'
+      f.getReconciliationExecution.mockResolvedValue({ results: [
+        { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 100 },
+        { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 90, noCount: 10 },
+        { reconciliationRunResultId: '3', reconciliationRunId: 'B', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 85, noCount: 5 },
+        { reconciliationRunResultId: '4', reconciliationRunId: 'W', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 4, noCount: 6 },
+      ] } as never)
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      // Shipped, never billed 5 + Never shipped, never billed 6; Billed, never shipped (4) is not a finding.
+      expect(w.get('[data-testid="flowchart-summary-findings"]').text()).toBe('11')
+      expect(w.findAll('[data-testid="lifecycle-place-not-finding"]')).toHaveLength(1)
     })
 
     // A run's result shows results alone: back, and nothing that changes or starts the run.

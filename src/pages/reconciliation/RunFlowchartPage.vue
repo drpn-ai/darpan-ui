@@ -34,7 +34,7 @@
       </StaticPageSection>
 
       <StaticPageSection v-if="isStages && isResult" title="Where Records Stopped">
-        <LifecycleBoard :board="board" :narrow="narrow" :can-open="canOpenPlace" @open="openPlace" />
+        <LifecycleBoard :board="board" :narrow="narrow" :can-open="canOpenPlace" :not-finding="notFinding" @open="openPlace" />
       </StaticPageSection>
       <StaticPageSection v-else-if="!isStages" title="Questions">
         <RunFlowchartBoard
@@ -90,6 +90,8 @@
             :stages="definition.stages"
             :exceptions="definition.exceptions"
             :late-after-days="definition.lateAfterDays"
+            :places="outlinePlaces"
+            :complete="board.complete?.label ?? null"
           />
         </StaticPageSection>
         <StaticPageSection v-if="activeTiles.length" title="In Progress">
@@ -267,7 +269,8 @@ import {
 } from '../../lib/flowchart/flowchartRunState'
 import { backIconPath, playIconPath, playIconTransform, settingsIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { buildReconciliationRunLiveRoute, buildReconciliationRunResultRoute } from '../../lib/reconciliationRoutes'
-import { lifecycleBoard, type LifecyclePlace } from '../../lib/lifecycleBoard'
+import { lifecycleBoard, notFindingPlacesOf, type LifecyclePlace } from '../../lib/lifecycleBoard'
+import { nsAccountLabel } from '../../lib/nsAccountLabel'
 import { questionCountLabel } from '../../lib/runTypes'
 import { addDays, displayCalendarDayOf, formatDateTime } from '../../lib/utils/date'
 
@@ -326,6 +329,10 @@ const definition = ref<{
 // What each stage's exceptions excuse, in their own words, so an excused place reads "Store Pickup, never billed".
 const excusedNames = ref<Record<string, string>>({})
 const board = computed(() => lifecycleBoard(questions.value, executionRows.value, excusedNames.value))
+// A lifecycle's findings are the records at the places it says are findings; every place is one unless it says not.
+const notFinding = computed(() => notFindingPlacesOf(run.value?.notFindingPlaces))
+const outlinePlaces = computed(() => board.value.stages.flatMap((st) => st.places.map((p) => ({
+  stageLabel: st.label, label: p.label, finding: !notFinding.value.includes(p.key), kind: p.kind }))))
 
 const STATE_WORDS: Record<string, string> = {
   waiting: 'Waiting', running: 'Running', done: 'Done', nothing: 'Nothing to ask', failed: 'Failed', 'not-run': 'Not run', cancelled: 'Cancelled',
@@ -446,8 +453,9 @@ watch(() => (isResult.value ? [] : [mostRecent.value, ...previousTiles.value].fi
  */
 function findingsOf(rows: FlowchartExecutionRow[]): number | null {
   if (isStages.value) {
-    const counts = lifecycleBoard(questions.value, rows, excusedNames.value).stages.flatMap((st) => st.places).map((p) => p.count).filter((n): n is number => n !== null)
-    return counts.length ? counts.reduce((a, b) => a + b, 0) : null
+    const counted = lifecycleBoard(questions.value, rows, excusedNames.value).stages.flatMap((st) => st.places).filter((p) => p.count !== null)
+    if (!counted.length) return null
+    return counted.filter((p) => !notFinding.value.includes(p.key)).reduce((sum, p) => sum + (p.count ?? 0), 0)
   }
   const starts = new Set(questions.value.filter((q) => q.questionRole === 'START').map((q) => q.reconciliationRunId))
   const asked = rows.filter((r) => !starts.has(r.reconciliationRunId ?? '') && typeof r.noCount === 'number')
@@ -520,7 +528,7 @@ async function load() {
     run.value = got.reconciliation
     questions.value = got.questions ?? []
     definition.value = got.lifecycle ? {
-      recordLabel: got.lifecycle.recordLabel, account: got.lifecycle.nsAuthConfigId, rules: got.rules ?? [],
+      recordLabel: got.lifecycle.recordLabel, account: await nsAccountLabel(got.lifecycle.nsAuthConfigId), rules: got.rules ?? [],
       stages: got.stages ?? [], exceptions: got.exceptions ?? [], lateAfterDays: got.reconciliation?.lateAfterDays ?? 0,
     } : null
     const byStage: Record<string, string[]> = {}

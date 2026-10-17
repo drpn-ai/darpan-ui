@@ -14,6 +14,8 @@ export interface FlowchartRun {
   buildMode?: 'STAGES' | null
   /** DAR-UI-050. Records younger than this many days are not judged yet. */
   lateAfterDays?: number | null
+  /** DAR-UI-050. The places (by stored name) whose records are not findings, as JSON; empty = every place is. */
+  notFindingPlaces?: string | null
 }
 
 export interface FlowchartQuestion {
@@ -21,7 +23,7 @@ export interface FlowchartQuestion {
   parentReconciliationRunId?: string | null
   parentBranch?: FlowchartBranch | null
   /** START heads a chart; EXCUSED (DAR-UI-050) sets a lifecycle stage's excused records apart and is not a stage. */
-  questionRole?: 'START' | 'EXCUSED' | null
+  questionRole?: 'START' | 'EXCUSED' | 'FINDING' | null
   runSequence?: number | null
   isActive?: string | null
   runName?: string | null
@@ -52,6 +54,8 @@ export interface SaveFlowchartRunPayload {
   defaultTimeWindow?: string
   /** DAR-UI-050. A lifecycle built from stages: records younger than this are not judged yet. */
   lateAfterDays?: number
+  /** DAR-UI-050. Replaces the places whose records are not findings. */
+  notFindingPlaces?: string[]
   isActive?: string
   isArchived?: string
 }
@@ -61,7 +65,7 @@ export interface SaveFlowchartQuestionPayload {
   reconciliationRunId?: string
   ruleSetId: string
   runName?: string
-  questionRole?: 'START' | 'EXCUSED'
+  questionRole?: 'START' | 'EXCUSED' | 'FINDING'
   parentReconciliationRunId?: string
   parentBranch?: FlowchartBranch
   noOutcomeLabel?: string
@@ -91,6 +95,22 @@ export interface GetFlowchartRunResponse {
   lifecycle?: { nsAuthConfigId: string; recordType: string; recordLabel: string } | null
   /** DAR-UI-050. The custom fields a lifecycle's records show beside the standard columns, in order. */
   details?: LifecycleDetail[] | null
+  /** DAR-UI-050. The findings people wrote for its stages. */
+  findings?: LifecycleFinding[] | null
+}
+
+/** DAR-UI-050. A finding written for a stage: records that reached it and whose field matches. */
+export interface LifecycleFinding {
+  reconciliationRunId?: string
+  stageRecordType: string
+  stageLabel?: string
+  label?: string
+  fieldId: string
+  fieldLabel: string
+  /** IN: the field is the value; GT: the field is more than the number. */
+  op: 'IN' | 'GT'
+  value: string
+  valueLabel: string
 }
 
 /** DAR-UI-050. A custom field a lifecycle's records show, and its key on each record. */
@@ -153,7 +173,8 @@ export interface SaveLifecycleResponse { reconciliationId: string; reconciliatio
 /** One rule: leave out the start's records whose field has this value (NO_VALUE = has no value). */
 export interface LifecycleRule { fieldId: string; fieldLabel: string; value: string; valueLabel: string }
 export interface LifecycleRuleOptionsResponse {
-  fields: { fieldId: string; label: string }[]
+  /** kind number: asked "more than" a threshold. */
+  fields: { fieldId: string; label: string; kind?: 'number' }[]
   values?: { value: string; label: string }[]
 }
 export interface LifecycleRulesResponse { rules: LifecycleRule[] }

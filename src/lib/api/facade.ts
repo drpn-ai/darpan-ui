@@ -172,6 +172,7 @@ import type {
   LifecycleStageException,
   LifecycleStageExceptionsResponse,
   LifecycleDetail,
+  LifecycleFinding,
   ListFlowchartExecutionsResponse,
   ListFlowchartRunsResponse,
   RunFlowchartPayload,
@@ -274,6 +275,8 @@ const RECONCILIATION = {
   deleteLifecycleRule: 'facade.ReconciliationFacadeServices.delete#LifecycleRule',
   saveLifecycleStageException: 'facade.ReconciliationFacadeServices.save#LifecycleStageException',
   saveLifecycleDetails: 'facade.ReconciliationFacadeServices.save#LifecycleDetails',
+  saveLifecycleFinding: 'facade.ReconciliationFacadeServices.save#LifecycleFinding',
+  deleteLifecycleFinding: 'facade.ReconciliationFacadeServices.delete#LifecycleFinding',
   deleteLifecycleStageException: 'facade.ReconciliationFacadeServices.delete#LifecycleStageException',
   saveLifecycleStages: 'facade.ReconciliationFacadeServices.save#LifecycleStages',
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
@@ -534,7 +537,7 @@ export const reconciliationFacade = {
   saveLifecycle(payload: SaveLifecyclePayload, signal?: AbortSignal): Promise<SaveLifecycleResponse> {
     return callService<SaveLifecycleResponse>(RECONCILIATION.saveLifecycle, payload, signal)
   },
-  getLifecycleRuleOptions(payload: { nsAuthConfigId: string; recordType: string; fieldId?: string; scope?: 'STAGE' }, signal?: AbortSignal): Promise<LifecycleRuleOptionsResponse> {
+  getLifecycleRuleOptions(payload: { nsAuthConfigId: string; recordType: string; fieldId?: string; scope?: 'STAGE' | 'FINDING' }, signal?: AbortSignal): Promise<LifecycleRuleOptionsResponse> {
     return callService<LifecycleRuleOptionsResponse>(RECONCILIATION.getLifecycleRuleOptions, payload, signal)
   },
   saveLifecycleRule(payload: { reconciliationId: string } & Omit<LifecycleRule, 'valueLabel'>, signal?: AbortSignal): Promise<LifecycleRulesResponse> {
@@ -542,6 +545,12 @@ export const reconciliationFacade = {
   },
   deleteLifecycleRule(payload: { reconciliationId: string; fieldId: string; value: string }, signal?: AbortSignal): Promise<LifecycleRulesResponse> {
     return callService<LifecycleRulesResponse>(RECONCILIATION.deleteLifecycleRule, payload, signal)
+  },
+  saveLifecycleFinding(payload: { reconciliationId: string } & Omit<LifecycleFinding, 'reconciliationRunId' | 'stageLabel' | 'label'>, signal?: AbortSignal): Promise<{ findings?: LifecycleFinding[] }> {
+    return callService<{ findings?: LifecycleFinding[] }>(RECONCILIATION.saveLifecycleFinding, payload, signal)
+  },
+  deleteLifecycleFinding(payload: { reconciliationId: string; reconciliationRunId: string }, signal?: AbortSignal): Promise<{ findings?: LifecycleFinding[] }> {
+    return callService<{ findings?: LifecycleFinding[] }>(RECONCILIATION.deleteLifecycleFinding, payload, signal)
   },
   saveLifecycleDetails(payload: { reconciliationId: string; details: { fieldId: string; label: string }[] }, signal?: AbortSignal): Promise<{ details?: LifecycleDetail[] }> {
     return callService<{ details?: LifecycleDetail[] }>(RECONCILIATION.saveLifecycleDetails, payload, signal)

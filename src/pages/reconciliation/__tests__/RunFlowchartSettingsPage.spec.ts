@@ -4,9 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const { push } = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: { reconciliationId: 'R1' } }), useRouter: () => ({ push }) }))
 vi.mock('../../../lib/api/facade', () => ({
+  settingsFacade: { listNsAuthConfigs: vi.fn(async () => ({ authConfigs: [{ nsAuthConfigId: 'net_prod', description: 'Gorjana NetSuite' }, { nsAuthConfigId: 'gorjana_prod', description: 'Gorjana NetSuite (sandbox copy)' }] })) },
   reconciliationFacade: {
     getReconciliation: vi.fn(), getLifecycleRuleOptions: vi.fn(), saveLifecycleRule: vi.fn(), deleteLifecycleRule: vi.fn(), saveReconciliation: vi.fn(),
-    saveLifecycleStageException: vi.fn(), deleteLifecycleStageException: vi.fn(), saveLifecycleStages: vi.fn(), saveLifecycleDetails: vi.fn(),
+    saveLifecycleStageException: vi.fn(), deleteLifecycleStageException: vi.fn(), saveLifecycleStages: vi.fn(), saveLifecycleDetails: vi.fn(), saveLifecycleFinding: vi.fn(), deleteLifecycleFinding: vi.fn(),
   },
 }))
 
@@ -24,7 +25,10 @@ beforeEach(() => {
     rules: [draft], stages: [{ recordType: 'CustInvc', label: 'Invoice' }, { recordType: 'ItemShip', label: 'Fulfillment' }], exceptions: [pickup],
     lifecycle: { nsAuthConfigId: 'gorjana_prod', recordType: 'SalesOrd', recordLabel: 'Sales orders' },
     details: [{ fieldId: 'custbody_hc_order_id', key: 'hcOrderId' }] } as never)
-  f.getLifecycleRuleOptions.mockImplementation((async (p: { fieldId?: string; scope?: string }) => (p.fieldId === 'custbody_hc_order_id'
+  f.getLifecycleRuleOptions.mockImplementation((async (p: { fieldId?: string; scope?: string }) => (p.scope === 'FINDING'
+    ? (p.fieldId === 'itemsbackordered' ? { fields: [], values: [{ value: '0', label: 'more than 0' }, { value: '5', label: 'more than 5' }] }
+      : { fields: [{ fieldId: 'status', label: 'Status' }, { fieldId: 'itemsbackordered', label: 'Items Backordered', kind: 'number' }] })
+    : p.fieldId === 'custbody_hc_order_id'
     ? { fields: [], values: [{ value: 'NO_VALUE', label: 'No value' }, { value: 'M1', label: 'M1' }] }
     : p.fieldId === 'shipmethod' ? { fields: [], values: [{ value: 'digital', label: 'digital' }, { value: 'Store Pickup', label: 'Store Pickup' }] }
       : p.fieldId === 'item' ? { fields: [], values: [{ value: 'GFT-CP', label: 'GFT-CP · Shopify Gift Card - Purchase' }] }
@@ -52,6 +56,9 @@ describe('RunFlowchartSettingsPage', () => {
     expect(spine.indexOf('Invoice')).toBeLessThan(spine.indexOf('Fulfillment'))
     expect(spine.indexOf('Fulfillment')).toBeLessThan(spine.indexOf('not expected for Shipping Method is Store Pickup'))
     expect(w.find('[data-testid="lifecycle-settings-readback"]').exists()).toBe(false)
+    // The account by its description, never its id.
+    expect(spine).toContain('Gorjana NetSuite (sandbox copy)')
+    expect(spine).not.toContain('gorjana_prod')
     // At rest no add row is open; only the quiet "+" actions exist.
     expect(w.find('[data-testid="lifecycle-settings-adding-filter"]').exists()).toBe(false)
   })
@@ -177,6 +184,47 @@ describe('RunFlowchartSettingsPage', () => {
     await flushPromises()
     expect(f.saveLifecycleDetails).toHaveBeenCalledWith({ reconciliationId: 'R1', details: [
       { fieldId: 'custbody_hc_order_id', label: 'HC Order Id' }, { fieldId: 'custbody_hc_sales_channel', label: 'HC Sales Channel' }] })
+  })
+
+  // A lifecycle says which places are findings; each place under its stage has a switch, kept by the place's name.
+  it('says which places are findings', async () => {
+    f.getReconciliation.mockResolvedValue({ reconciliation: { reconciliationId: 'R1', buildMode: 'STAGES', lateAfterDays: 1,
+      notFindingPlaces: JSON.stringify(['Shipped, never billed']) },
+    questions: [
+      { reconciliationRunId: 'S', ruleSetId: 'r0', questionRole: 'START', runName: 'Sales orders', runSequence: 1 },
+      { reconciliationRunId: 'F', ruleSetId: 'r1', parentReconciliationRunId: 'S', parentBranch: 'YES', runName: 'Fulfillment', runSequence: 2 },
+      { reconciliationRunId: 'I', ruleSetId: 'r2', parentReconciliationRunId: 'F', parentBranch: 'YES', runName: 'Invoice', noOutcomeLabel: 'Shipped, never billed', runSequence: 3 },
+      { reconciliationRunId: 'D', ruleSetId: 'r3', parentReconciliationRunId: 'F', parentBranch: 'YES', runName: 'Invoice', noOutcomeLabel: 'Shipped and billed', runSequence: 4 },
+      { reconciliationRunId: 'N', ruleSetId: 'r4', parentReconciliationRunId: 'F', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Never shipped, never billed', runSequence: 5 },
+    ],
+    rules: [], stages: [{ recordType: 'ItemShip', label: 'Fulfillment' }, { recordType: 'CustInvc', label: 'Invoice' }], exceptions: [],
+    lifecycle: { nsAuthConfigId: 'gorjana_prod', recordType: 'SalesOrd', recordLabel: 'Sales orders' } } as never)
+    const w = mount(RunFlowchartSettingsPage)
+    await flushPromises()
+    expect(w.get('[data-testid="lifecycle-settings-finding-Never shipped, never billed"]').text()).toBe('finding')
+    expect(w.get('[data-testid="lifecycle-settings-finding-Shipped, never billed"]').text()).toBe('not a finding')
+    await w.get('[data-testid="lifecycle-settings-finding-Never shipped, never billed"]').trigger('click')
+    await w.get('[data-testid="lifecycle-settings-finding-Shipped, never billed"]').trigger('click')
+    await w.get('form').trigger('submit')
+    await flushPromises()
+    expect(f.saveReconciliation).toHaveBeenCalledWith({ reconciliationId: 'R1', notFindingPlaces: ['Never shipped, never billed'] })
+  })
+
+  // A finding written for a stage: the records that reached it and whose field matches; a number asks "more than".
+  it('writes a finding for a stage', async () => {
+    const w = mount(RunFlowchartSettingsPage)
+    await flushPromises()
+    await w.get('[data-testid="lifecycle-settings-add-finding-ItemShip"]').trigger('click')
+    select(w, 'lifecycle-settings-finding-field').vm.$emit('update:modelValue', 'itemsbackordered')
+    await flushPromises()
+    select(w, 'lifecycle-settings-finding-value').vm.$emit('update:modelValue', '0')
+    await flushPromises()
+    await w.get('[data-testid="lifecycle-settings-add-written"]').trigger('click')
+    expect(w.get('[data-testid="lifecycle-settings-written-ItemShip-0"]').text()).toContain('finding when Items Backordered more than 0')
+    await w.get('form').trigger('submit')
+    await flushPromises()
+    expect(f.saveLifecycleFinding).toHaveBeenCalledWith({ reconciliationId: 'R1', stageRecordType: 'ItemShip', fieldId: 'itemsbackordered',
+      fieldLabel: 'Items Backordered', op: 'GT', value: '0', valueLabel: '0' })
   })
 
   it('an unchanged lifecycle saves nothing', async () => {

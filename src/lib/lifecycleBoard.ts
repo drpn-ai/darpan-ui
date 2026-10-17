@@ -7,6 +7,10 @@ import type { FlowchartBranch, FlowchartExecutionRow, FlowchartQuestion } from '
 
 export interface LifecyclePlace {
   label: string
+  /** The place's stored name, which stays put when its label is reworded: what "not a finding" is kept by. */
+  key: string
+  /** check: a finding a person wrote (records that reached the stage and match), not a place records stop at. */
+  kind?: 'check'
   questionId: string
   branch: FlowchartBranch
   count: number | null
@@ -30,6 +34,17 @@ export interface LifecycleBoard {
   largest: number
 }
 
+/** DAR-UI-050. The places a lifecycle says are not findings, from its stored JSON list; anything unreadable is none. */
+export function notFindingPlacesOf(stored?: string | null): string[] {
+  if (!stored) return []
+  try {
+    const parsed: unknown = JSON.parse(stored)
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 /**
  * @param excusedNames what each stage's exceptions excuse, by stage label ("Fulfillment" -> "Store Pickup or GFT-CP"),
  *   so an excused place reads in a person's own words: "Store Pickup or GFT-CP, never billed".
@@ -37,13 +52,16 @@ export interface LifecycleBoard {
 export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartExecutionRow[], excusedNames: Record<string, string> = {}): LifecycleBoard {
   const active = questions.filter((q) => q.isActive !== 'N')
   const rowOf = (id: string) => rows.find((r) => r.reconciliationRunId === id) ?? null
+  // Written findings hang beside the spine; they are never a stage, a stop, or the complete place.
+  const checks = active.filter((q) => q.questionRole === 'FINDING')
   const childrenOf = (id: string, branch: FlowchartBranch) => active
-    .filter((q) => q.parentReconciliationRunId === id && q.parentBranch === branch)
+    .filter((q) => q.parentReconciliationRunId === id && q.parentBranch === branch && q.questionRole !== 'FINDING')
     .sort((a, b) => (a.runSequence ?? 0) - (b.runSequence ?? 0))
   const place = (q: FlowchartQuestion, branch: FlowchartBranch, label: string): LifecyclePlace => {
     const row = rowOf(q.reconciliationRunId)
     const count = row ? (branch === 'YES' ? row.yesCount : row.noCount) ?? null : null
-    return { label, questionId: q.reconciliationRunId, branch, count, row }
+    const key = (branch === 'YES' ? q.yesOutcomeLabel : q.noOutcomeLabel) ?? label
+    return { label, key, questionId: q.reconciliationRunId, branch, count, row }
   }
   // Every named ending at or under q, yes before no, the way the skip-ahead chain reads.
   const endings = (q: FlowchartQuestion): LifecyclePlace[] => [
@@ -98,6 +116,10 @@ export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartEx
   for (const { stageLabel, place: p } of excused) {
     const stage = stages.find((st) => st.label === stageLabel)
     if (stage) stage.places.push(p)
+  }
+  for (const q of [...checks].sort((a, b) => (a.runSequence ?? 0) - (b.runSequence ?? 0))) {
+    const stage = stages.find((st) => st.label === q.runName)
+    if (stage && q.noOutcomeLabel) stage.places.push({ ...place(q, 'NO', q.noOutcomeLabel), kind: 'check' })
   }
   const counts = stages.flatMap((s) => s.places.map((p) => p.count ?? 0))
   return {

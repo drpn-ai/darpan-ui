@@ -259,6 +259,14 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Change',
     body: 'puts the changed exception back on its line. Nothing is saved until Save; the next run is the first to use it.',
   },
+  'add finding': {
+    title: 'Add finding',
+    body: 'flags records that reached this stage and whose field matches, like Items Backordered more than 0. It is a finding of its own, beside where records stop.',
+  },
+  'add this finding': {
+    title: 'Add',
+    body: 'puts the finding under the stage. Nothing is saved until Save; the next run is the first to ask it.',
+  },
   'show a field': {
     title: 'Show a field',
     body: 'adds a field NetSuite holds, like HC Order Id or eTail Order Id, to every record this lifecycle finds, beside its order, date, status, customer, total, shipping method and reference.',
@@ -534,6 +542,10 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^change (rule|exception) .+$/, {
     title: 'Change',
     body: 'opens this line where it stands, as the field and value it says. Nothing is saved until Save.',
+  }],
+  [/^.+ is a finding$/, {
+    title: 'Finding',
+    body: 'says whether this place\u2019s records count toward Findings. A place that is not a finding still shows its records, quietly.',
   }],
   [/^stop showing .+$/, {
     title: 'Stop showing',

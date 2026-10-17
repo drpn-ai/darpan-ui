@@ -28,7 +28,7 @@
           <div class="lifecycle-spine-group">
             <div class="lifecycle-spine-node lifecycle-spine-node--start">
               <span class="lifecycle-spine-name" data-testid="lifecycle-settings-records">{{ recordWord }}</span>
-              <span class="lifecycle-spine-quiet">{{ source?.nsAuthConfigId }}</span>
+              <span class="lifecycle-spine-quiet">{{ accountLabel }}</span>
             </div>
             <div class="lifecycle-spine-gap">
               <!-- A line opens in place as its editing row; a new one opens at the end. -->
@@ -186,6 +186,72 @@
               >
                 + not expected for
               </button>
+              <!-- Where records stop at this stage, and whether each place's records are findings. Hidden while the
+                   order is being changed: the places follow the order once it is saved. -->
+              <template v-if="!orderChanged">
+                <div
+                  v-for="place in placesAt(stage.label)"
+                  :key="place.key"
+                  class="lifecycle-spine-phrase"
+                  :data-testid="`lifecycle-settings-place-${place.key}`"
+                >
+                  <span><span class="lifecycle-spine-quiet">stops at</span> {{ place.label }}</span>
+                  <button
+                    type="button"
+                    class="lifecycle-spine-finding"
+                    :class="{ 'lifecycle-spine-finding--off': keptNotFinding.includes(place.key) }"
+                    :aria-pressed="keptNotFinding.includes(place.key) ? 'false' : 'true'"
+                    :aria-label="`${place.label} is a finding`"
+                    :data-testid="`lifecycle-settings-finding-${place.key}`"
+                    @click="toggleFinding(place.key)"
+                  >
+                    {{ keptNotFinding.includes(place.key) ? 'not a finding' : 'finding' }}
+                  </button>
+                </div>
+              </template>
+              <!-- Findings written for this stage: records that reached it and whose field matches. -->
+              <div
+                v-for="(finding, index) in findingsFor(stage.recordType)"
+                :key="`${finding.fieldId}=${finding.op}=${finding.value}`"
+                class="lifecycle-spine-phrase"
+                :data-testid="`lifecycle-settings-written-${stage.recordType}-${index}`"
+              >
+                <span><span class="lifecycle-spine-quiet">finding when</span> {{ finding.fieldLabel }} <span class="lifecycle-spine-quiet">{{ finding.op === 'GT' ? 'more than' : 'is' }}</span> {{ finding.valueLabel }}</span>
+                <button type="button" class="lifecycle-spine-remove" :aria-label="`Remove finding ${finding.fieldLabel} ${finding.valueLabel}`" @click="removeWritten(finding)">×</button>
+              </div>
+              <div v-if="adding?.kind === 'finding' && adding.stage === stage.recordType" class="lifecycle-spine-editing" :data-testid="`lifecycle-settings-adding-finding-${stage.recordType}`">
+                <span class="lifecycle-spine-quiet">finding when</span>
+                <AppSelect
+                  :model-value="fdField"
+                  :options="fdFieldOptions"
+                  :disabled="findingRules.loadingFields.value"
+                  :placeholder="findingRules.loadingFields.value ? 'Loading...' : 'field'"
+                  searchable
+                  test-id="lifecycle-settings-finding-field"
+                  @update:model-value="chooseFdField"
+                />
+                <span v-if="fdField && !fdIsNumber" class="lifecycle-spine-quiet">is</span>
+                <AppSelect
+                  v-model="fdValue"
+                  :options="fdValueOptions"
+                  :disabled="!fdField || findingRules.loadingValuesFor.value === fdField"
+                  :placeholder="findingRules.loadingValuesFor.value === fdField ? 'Loading...' : 'value'"
+                  searchable
+                  test-id="lifecycle-settings-finding-value"
+                />
+                <button type="button" class="wizard-secondary-link" aria-label="Add this finding" :disabled="!fdField || !fdValue" data-testid="lifecycle-settings-add-written" @click="addWritten(stage)">Add</button>
+                <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
+              </div>
+              <button
+                v-else
+                type="button"
+                class="lifecycle-spine-ghost"
+                aria-label="Add finding"
+                :data-testid="`lifecycle-settings-add-finding-${stage.recordType}`"
+                @click="startAdding({ kind: 'finding', stage: stage.recordType })"
+              >
+                + finding
+              </button>
             </div>
           </div>
         </div>
@@ -202,7 +268,9 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
-import type { LifecycleRule, LifecycleStageException } from '../../lib/api/flowchartTypes'
+import type { FlowchartQuestion, LifecycleFinding, LifecycleRule, LifecycleStageException } from '../../lib/api/flowchartTypes'
+import { lifecycleBoard, notFindingPlacesOf } from '../../lib/lifecycleBoard'
+import { nsAccountLabel } from '../../lib/nsAccountLabel'
 import { useLifecycleRuleOptions, type LifecycleRuleSource } from '../../lib/useLifecycleRuleOptions'
 
 // DAR-UI-050. A lifecycle's settings as one line that grows downward (research: funnel builders put an exclusion
@@ -212,6 +280,7 @@ import { useLifecycleRuleOptions, type LifecycleRuleSource } from '../../lib/use
 // Rules are set up here and in the create flow, never on the run page, which shows results.
 // What is open for editing: a new filter or exception, or an existing one (by its place among the filters, or itself).
 type Adding = { kind: 'filter'; index?: number } | { kind: 'exception'; stage: string; editing?: LifecycleStageException } | { kind: 'detail' }
+  | { kind: 'finding'; stage: string }
 
 const LATE_DAYS = [0, 1, 2, 3, 5, 7, 14, 30]
 const route = useRoute()
@@ -274,6 +343,54 @@ function exceptionRows(stage: string) {
 }
 
 const originalOrder = ref<string[]>([])
+// The account by its description, as the create flow names it.
+const accountLabel = ref('')
+const orderChanged = computed(() => stages.value.map((st) => st.recordType).join() !== originalOrder.value.join())
+
+// Which places' records are findings. Every place is one unless the lifecycle says not; the places are the ones its
+// questions end in, named in the exceptions' words as the board names them.
+const questions = ref<FlowchartQuestion[]>([])
+const originalNotFinding = ref<string[]>([])
+const keptNotFinding = ref<string[]>([])
+const placesByStage = computed(() => {
+  const byStage: Record<string, string[]> = {}
+  for (const e of keptExceptions.value) (byStage[e.stageLabel] ??= []).push(e.value)
+  const names = Object.fromEntries(Object.entries(byStage).map(([stage, values]) => [stage, values.join(' or ')]))
+  return lifecycleBoard(questions.value, [], names).stages
+})
+// Written findings have their own lines; the places listed are where records stop.
+const placesAt = (stageLabel: string) => (placesByStage.value.find((st) => st.label === stageLabel)?.places ?? []).filter((p) => p.kind !== 'check')
+
+// Findings people write for a stage: a field and a value ("is"), or a number the field is more than.
+const findingRules = useLifecycleRuleOptions('FINDING')
+const originalWritten = ref<LifecycleFinding[]>([])
+const keptWritten = ref<LifecycleFinding[]>([])
+const fdField = ref('')
+const fdValue = ref('')
+const fdIsNumber = computed(() => findingRules.fields.value.find((f) => f.fieldId === fdField.value)?.kind === 'number')
+const fdFieldOptions = computed(() => findingRules.fields.value.map((f) => ({ value: f.fieldId, label: f.label })))
+const fdValueOptions = computed(() => (findingRules.values[fdField.value] ?? []).map((v) => ({ value: v.value, label: v.label })))
+const sameWritten = (a: LifecycleFinding, b: LifecycleFinding) =>
+  a.stageRecordType === b.stageRecordType && a.fieldId === b.fieldId && a.op === b.op && a.value === b.value
+const findingsFor = (stage: string) => keptWritten.value.filter((f) => f.stageRecordType === stage)
+function chooseFdField(fieldId: string) {
+  fdField.value = fieldId
+  fdValue.value = ''
+  if (source.value) void findingRules.loadValues(source.value, fieldId)
+}
+function addWritten(stage: { recordType: string; label: string }) {
+  const number = fdIsNumber.value
+  const finding: LifecycleFinding = { stageRecordType: stage.recordType, fieldId: fdField.value, fieldLabel: findingRules.fieldLabel(fdField.value),
+    op: number ? 'GT' : 'IN', value: fdValue.value, valueLabel: number ? fdValue.value : findingRules.valueLabel(fdField.value, fdValue.value) }
+  if (!keptWritten.value.some((f) => sameWritten(f, finding))) keptWritten.value.push(finding)
+  adding.value = null
+}
+function removeWritten(finding: LifecycleFinding) {
+  keptWritten.value = keptWritten.value.filter((f) => !sameWritten(f, finding))
+}
+function toggleFinding(key: string) {
+  keptNotFinding.value = keptNotFinding.value.includes(key) ? keptNotFinding.value.filter((k) => k !== key) : [...keptNotFinding.value, key]
+}
 
 // A stage moves up or down; its exceptions move with it (they are kept by stage, not by place).
 function moveStage(index: number, by: -1 | 1) {
@@ -285,7 +402,7 @@ function moveStage(index: number, by: -1 | 1) {
 
 function startAdding(next: Adding) {
   adding.value = next
-  newField.value = newValue.value = exField.value = exValue.value = newDetail.value = ''
+  newField.value = newValue.value = exField.value = exValue.value = newDetail.value = fdField.value = fdValue.value = ''
 }
 
 function addDetail() {
@@ -390,11 +507,21 @@ async function save() {
       await reconciliationFacade.saveLifecycleStageException({ reconciliationId: id, stageRecordType: added.stageRecordType,
         fieldId: added.fieldId, fieldLabel: added.fieldLabel, value: added.value })
     }
+    for (const gone of originalWritten.value.filter((o) => !keptWritten.value.some((k) => sameWritten(k, o)))) {
+      if (gone.reconciliationRunId) await reconciliationFacade.deleteLifecycleFinding({ reconciliationId: id, reconciliationRunId: gone.reconciliationRunId })
+    }
+    for (const added of keptWritten.value.filter((k) => !originalWritten.value.some((o) => sameWritten(k, o)))) {
+      await reconciliationFacade.saveLifecycleFinding({ reconciliationId: id, stageRecordType: added.stageRecordType, fieldId: added.fieldId,
+        fieldLabel: added.fieldLabel, op: added.op, value: added.value, valueLabel: added.valueLabel })
+    }
     if (keptDetails.value.map((d) => d.fieldId).join() !== originalDetails.value.join()) {
       await reconciliationFacade.saveLifecycleDetails({ reconciliationId: id, details: keptDetails.value })
     }
-    if (lateAfter.value !== originalLate.value) {
-      await reconciliationFacade.saveReconciliation({ reconciliationId: id, lateAfterDays: Number(lateAfter.value) })
+    const findingsChanged = [...keptNotFinding.value].sort().join('|') !== [...originalNotFinding.value].sort().join('|')
+    if (lateAfter.value !== originalLate.value || findingsChanged) {
+      await reconciliationFacade.saveReconciliation({ reconciliationId: id,
+        ...(lateAfter.value !== originalLate.value ? { lateAfterDays: Number(lateAfter.value) } : {}),
+        ...(findingsChanged ? { notFindingPlaces: keptNotFinding.value } : {}) })
     }
     back()
   } catch (caught) {
@@ -412,13 +539,20 @@ onMounted(async () => {
     kept.value = [...original.value]
     stages.value = got.stages ?? []
     originalOrder.value = stages.value.map((st) => st.recordType)
+    questions.value = got.questions ?? []
+    originalWritten.value = got.findings ?? []
+    keptWritten.value = [...originalWritten.value]
+    originalNotFinding.value = notFindingPlacesOf(got.reconciliation?.notFindingPlaces)
+    keptNotFinding.value = [...originalNotFinding.value]
     originalExceptions.value = got.exceptions ?? []
     keptExceptions.value = [...originalExceptions.value]
     originalDetails.value = (got.details ?? []).map((d) => d.fieldId)
     keptDetails.value = originalDetails.value.map((fieldId) => ({ fieldId, label: fieldId }))
     if (got.lifecycle) {
       source.value = got.lifecycle
-      await Promise.all([rules.loadFields(got.lifecycle), stageRules.loadFields(got.lifecycle)])
+      accountLabel.value = got.lifecycle.nsAuthConfigId
+      void nsAccountLabel(got.lifecycle.nsAuthConfigId).then((label) => { accountLabel.value = label })
+      await Promise.all([rules.loadFields(got.lifecycle), stageRules.loadFields(got.lifecycle), findingRules.loadFields(got.lifecycle)])
       // Named as the account names them, once its fields are read.
       keptDetails.value = keptDetails.value.map((d) => ({ ...d, label: rules.fieldLabel(d.fieldId) }))
     }
@@ -493,6 +627,19 @@ onMounted(async () => {
 }
 .lifecycle-spine-line:hover,
 .lifecycle-spine-line:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+/* A place's finding switch: a quiet word, "finding" in text colour, "not a finding" dimmed. */
+.lifecycle-spine-finding {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.lifecycle-spine-finding--off { color: var(--text-dim); }
+.lifecycle-spine-finding:hover,
+.lifecycle-spine-finding:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 .lifecycle-spine-editing {
   display: flex;
   flex-wrap: wrap;

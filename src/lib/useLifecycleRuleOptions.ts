@@ -8,8 +8,9 @@ export interface LifecycleRuleSource { nsAuthConfigId: string; recordType: strin
 export interface LifecycleRuleDraft { fieldId: string; fieldLabel: string; value: string; valueLabel: string }
 
 /** scope STAGE: for a stage exception, which also offers standard fields (Shipping Method) and never "No value". */
-export function useLifecycleRuleOptions(scope?: 'STAGE') {
-  const fields = ref<{ fieldId: string; label: string }[]>([])
+/** scope FINDING: for a written finding, which also offers Status, Shipping Method and numbers ("more than"). */
+export function useLifecycleRuleOptions(scope?: 'STAGE' | 'FINDING') {
+  const fields = ref<{ fieldId: string; label: string; kind?: 'number' }[]>([])
   const values = reactive<Record<string, { value: string; label: string }[]>>({})
   const loadingFields = ref(false)
   const loadingValuesFor = ref<string | null>(null)

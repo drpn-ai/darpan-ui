@@ -22,11 +22,11 @@
           :type="openable(place) ? 'button' : undefined"
           :aria-label="openable(place) ? `Open ${place.label}` : undefined"
           class="lifecycle-line-place"
-          :class="{ 'lifecycle-line-place--empty': place.count === 0, 'lifecycle-line-place--open': openable(place) }"
+          :class="{ 'lifecycle-line-place--empty': place.count === 0 || uncounted(place), 'lifecycle-line-place--open': openable(place) }"
           :data-testid="`lifecycle-place-${place.questionId}-${place.branch}`"
           @click="openable(place) && emit('open', place)"
         >
-          <span class="lifecycle-line-place-label">{{ place.label }}</span>
+          <span class="lifecycle-line-place-label">{{ place.label }}<span v-if="uncounted(place)" class="lifecycle-line-note" data-testid="lifecycle-place-not-finding"> · not a finding</span></span>
           <span class="lifecycle-line-count">{{ place.count === null ? '' : format(place.count) }}</span>
         </component>
       </div>
@@ -55,12 +55,14 @@ import type { LifecycleBoard, LifecyclePlace } from '../../lib/lifecycleBoard'
 // DAR-UI-050. Where records stopped, drawn as the lifecycle's own line (the settings page's spine): a dot per stage
 // with how many reached it, the places a record stopped at listed under the stage where it stopped, the complete
 // place last. Monochrome; an empty place is dimmed; a place with records opens them, underlined on approach.
-const props = defineProps<{ board: LifecycleBoard; narrow?: boolean; canOpen: (place: LifecyclePlace) => boolean }>()
+// A place a person said is not a finding still shows its records, quietly, and says so.
+const props = defineProps<{ board: LifecycleBoard; narrow?: boolean; canOpen: (place: LifecyclePlace) => boolean; notFinding?: string[] }>()
 const emit = defineEmits<{ open: [place: LifecyclePlace] }>()
 const countFormat = new Intl.NumberFormat('en-US')
 
 function format(n: number): string { return countFormat.format(n) }
 function openable(place: LifecyclePlace): boolean { return props.canOpen(place) }
+function uncounted(place: LifecyclePlace): boolean { return Boolean(props.notFinding?.includes(place.key)) }
 </script>
 
 <style scoped>
@@ -131,6 +133,7 @@ function openable(place: LifecyclePlace): boolean { return props.canOpen(place) 
   font-size: var(--type-muted-size);
 }
 .lifecycle-line-place-label { min-width: 0; }
+.lifecycle-line-note { color: var(--text-dim); }
 .lifecycle-line-place--empty,
 .lifecycle-line-place--empty .lifecycle-line-count { color: var(--text-dim); }
 .lifecycle-line-place--open { cursor: pointer; }

@@ -120,6 +120,13 @@ describe('lifecycle board, one question per place', () => {
     expect(board.stages[1]!.places.map((p) => [p.label, p.count])).toEqual([
       ['Shipped, never billed', 250], ['Store Pickup or GFT-CP, never billed', 10]])
     expect([board.complete?.label, board.complete?.count]).toEqual(['Shipped and billed', 9650])
+    // A finding someone wrote is filed under its stage as a check, and never mistaken for the next stage.
+    const withCheck = [...excusedTree, q('C', { parentReconciliationRunId: 'X', parentBranch: 'YES', questionRole: 'FINDING', runName: 'Fulfillment',
+      noOutcomeLabel: 'Shipped, Items Backordered more than 0', runSequence: 9 })]
+    const checked = lifecycleBoard(withCheck, [...rows, { reconciliationRunResultId: 'r5', reconciliationRunId: 'C', yesCount: 9640, noCount: 10 }])
+    expect(checked.stages.map((st) => st.label)).toEqual(['Fulfillment', 'Invoice'])
+    expect(checked.stages[0]!.places.at(-1)).toMatchObject({ label: 'Shipped, Items Backordered more than 0', kind: 'check', count: 10 })
+    expect(checked.complete?.label).toBe('Shipped and billed')
     // Without the exceptions' words, the place keeps its own name.
     expect(lifecycleBoard(excusedTree, rows).stages[1]!.places[1]!.label).toBe('Fulfillment not expected, never billed')
   })
