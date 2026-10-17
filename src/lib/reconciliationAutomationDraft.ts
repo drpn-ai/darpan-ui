@@ -100,9 +100,6 @@ export interface ReconciliationAutomationDraftState {
   savedRun: SavedRunSummary | null
 }
 
-/** SessionStorage key for pending automation draft handoff state. */
-export const RECONCILIATION_AUTOMATION_PENDING_STATE_KEY = 'darpan.reconciliationAutomationDraftState'
-
 /**
  * Build a serializable state payload from an automation draft.  The result
  * can be spread into Vue Router `history.state` or saved to sessionStorage.
@@ -113,42 +110,6 @@ export function buildReconciliationAutomationDraftState(
   savedRun: SavedRunSummary | null,
 ): ReconciliationAutomationDraftState {
   return { draft, resumeStepId, savedRun }
-}
-
-/** Persist pending automation draft state to sessionStorage for cross-page handoff. */
-export function savePendingReconciliationAutomationDraftState(
-  draft: ReconciliationAutomationDraft,
-  resumeStepId: ReconciliationAutomationStepId | null,
-  savedRun: SavedRunSummary | null,
-): void {
-  try {
-    window.sessionStorage.setItem(
-      RECONCILIATION_AUTOMATION_PENDING_STATE_KEY,
-      JSON.stringify({ draft, resumeStepId, savedRun }),
-    )
-  } catch {
-    // ignore storage errors (private browsing, quota exceeded, etc.)
-  }
-}
-
-/** Read pending automation draft state from sessionStorage. */
-export function readPendingReconciliationAutomationDraftState(): ReconciliationAutomationDraftState | null {
-  try {
-    const raw = window.sessionStorage.getItem(RECONCILIATION_AUTOMATION_PENDING_STATE_KEY)
-    if (!raw) return null
-    return readReconciliationAutomationDraftState(JSON.parse(raw))
-  } catch {
-    return null
-  }
-}
-
-/** Remove pending automation draft state from sessionStorage. */
-export function clearPendingReconciliationAutomationDraftState(): void {
-  try {
-    window.sessionStorage.removeItem(RECONCILIATION_AUTOMATION_PENDING_STATE_KEY)
-  } catch {
-    // ignore
-  }
 }
 
 export function automationWindowNeedsCount(windowTypeEnumId: string | undefined): boolean {

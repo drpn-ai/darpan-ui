@@ -4,7 +4,6 @@ import {
   WORKFLOW_ORIGIN_PATH_KEY,
   WORKFLOW_ORIGIN_ROUTE_STATE_KEY,
   buildWorkflowOriginState,
-  readWorkflowOriginState,
   resolveStaticPageLabel,
 } from '../workflowOrigin'
 
@@ -28,42 +27,6 @@ describe('workflowOrigin', () => {
         reconciliationRuleSetDraft: { runName: 'JSON Order Compare' },
       },
     })
-  })
-
-  it('reads workflow origin state when both label and path are present', () => {
-    expect(
-      readWorkflowOriginState({
-        workflowOriginLabel: 'Schema Library',
-        workflowOriginPath: '/schemas/library',
-      }),
-    ).toEqual({
-      label: 'Schema Library',
-      path: '/schemas/library',
-    })
-  })
-
-  it('reads workflow origin route state when present', () => {
-    expect(
-      readWorkflowOriginState({
-        workflowOriginLabel: 'Run Details',
-        workflowOriginPath: '/reconciliation/ruleset-manager',
-        workflowOriginRouteState: {
-          reconciliationRuleSetDraft: { runName: 'JSON Order Compare' },
-        },
-      }),
-    ).toEqual({
-      label: 'Run Details',
-      path: '/reconciliation/ruleset-manager',
-      state: {
-        reconciliationRuleSetDraft: { runName: 'JSON Order Compare' },
-      },
-    })
-  })
-
-  it('rejects incomplete workflow origin state', () => {
-    expect(readWorkflowOriginState({ workflowOriginLabel: 'Dashboard' })).toBeNull()
-    expect(readWorkflowOriginState({ workflowOriginPath: '/' })).toBeNull()
-    expect(readWorkflowOriginState(null)).toBeNull()
   })
 
   it('returns the static page label for non-workflow routes', () => {

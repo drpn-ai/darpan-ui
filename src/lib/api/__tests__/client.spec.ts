@@ -189,7 +189,7 @@ describe('callService', () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED'))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { callService, getRpcUrl } = await import('../client')
+    const { callService } = await import('../client')
 
     let error: unknown
     try {
@@ -203,7 +203,6 @@ describe('callService', () => {
       message: 'Unable to connect to Darpan right now. Try again in a moment.',
     })
     const expectedProxyUrl = `${window.location.origin}/rpc/json`
-    expect(getRpcUrl()).toBe(expectedProxyUrl)
     expect(fetchMock.mock.calls[0]?.[0]).toBe(expectedProxyUrl)
     expect(fetchMock.mock.calls[1]?.[0]).toBe('http://localhost:8080/rpc/json')
   })

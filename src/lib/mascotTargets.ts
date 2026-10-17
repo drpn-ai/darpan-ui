@@ -305,4 +305,3 @@ export function resolveExplainTarget(start: Element | null): ExplainTarget | nul
   return null
 }
 
-export const __testing = { normalizeLabel, LABEL_INDEX, TIMESTAMP_PATTERN }

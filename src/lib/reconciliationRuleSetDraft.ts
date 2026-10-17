@@ -120,18 +120,6 @@ export function buildReconciliationRuleSetDraftState(
   return { draft, resumeStepId: resumeStepId ?? null }
 }
 
-/** Read a rule-set draft state payload from an arbitrary state-like object. */
-export function readReconciliationRuleSetDraftState(stateLike: unknown): ReconciliationRuleSetDraftState | null {
-  if (!stateLike || typeof stateLike !== 'object' || Array.isArray(stateLike)) return null
-  const state = stateLike as Record<string, unknown>
-  const rawDraft = state.draft
-  if (!rawDraft || typeof rawDraft !== 'object' || Array.isArray(rawDraft)) return null
-  const resumeStepId = typeof state.resumeStepId === 'string'
-    ? (state.resumeStepId as ReconciliationRuleSetDraftStepId)
-    : null
-  return { draft: rawDraft as ReconciliationRuleSetDraft, resumeStepId }
-}
-
 function normalizePreAction(value: unknown): ReconciliationRulePreAction | null {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toUpperCase()

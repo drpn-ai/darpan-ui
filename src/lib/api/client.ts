@@ -364,7 +364,6 @@ function clearCsrfToken(): void {
 }
 
 const rpcCandidates = buildRpcCandidates()
-const rpcUrl = rpcCandidates[0] ?? `${resolveApiOrigin(apiBase)}/rpc/json`
 
 function buildCsrfTokenUrl(): string {
   const apiOrigin = resolveApiOrigin(apiBase)
@@ -717,8 +716,4 @@ export async function callService<T>(method: string, params: object = {}, signal
   } finally {
     invalidateReadCache()
   }
-}
-
-export function getRpcUrl(): string {
-  return rpcUrl
 }

@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { SavedRunSummary } from '../api/types'
 import {
-  RECONCILIATION_AUTOMATION_PENDING_STATE_KEY,
   buildReconciliationAutomationDraftState,
   buildSaveAutomationPayload,
-  clearPendingReconciliationAutomationDraftState,
-  readPendingReconciliationAutomationDraftState,
   readReconciliationAutomationDraftState,
-  savePendingReconciliationAutomationDraftState,
   type ReconciliationAutomationDraft,
 } from '../reconciliationAutomationDraft'
 
@@ -78,21 +74,6 @@ describe('reconciliationAutomationDraft', () => {
       resumeStepId: 'schedule',
       savedRun,
     })
-  })
-
-  it('persists pending automation handoff state through session storage', () => {
-    savePendingReconciliationAutomationDraftState(createDraft(), 'input-mode', savedRun)
-
-    expect(window.sessionStorage.getItem(RECONCILIATION_AUTOMATION_PENDING_STATE_KEY)).toContain('JSON Order Compare Automation')
-    expect(readPendingReconciliationAutomationDraftState()).toEqual({
-      draft: createDraft(),
-      resumeStepId: 'input-mode',
-      savedRun,
-    })
-
-    clearPendingReconciliationAutomationDraftState()
-
-    expect(readPendingReconciliationAutomationDraftState()).toBeNull()
   })
 
   it('preserves saved-run API source metadata in automation handoff state', () => {

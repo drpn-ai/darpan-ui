@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildReconciliationRuleSetDraftState,
   buildCreateRuleSetRunPayload,
   buildRuleSetRulePayloads,
-  readReconciliationRuleSetDraftState,
   fieldSharesRecordRoot,
   type ReconciliationRuleSetDraft,
 } from '../reconciliationRuleSetDraft'
@@ -75,38 +73,6 @@ describe('reconciliationRuleSetDraft', () => {
 
     expect(rule.ruleLogic).toContain('RuleDiffSupport.violatesOperator')
     expect(rule.ruleLogic).not.toContain('String.valueOf')
-  })
-
-  it('round-trips rule metadata through history state', () => {
-    const state = buildReconciliationRuleSetDraftState(createDraft({
-      rules: [
-        {
-          ruleId: 'quantity-check',
-          file1FieldPath: '$.orders[*].totalQuantity',
-          file2FieldPath: '$[*].quantity',
-          operator: '>',
-          sequenceNum: 1,
-          enabled: 'N',
-          severity: 'ERROR',
-          ruleType: 'FIELD_COMPARISON',
-          ruleText: 'totalQuantity > quantity',
-          ruleLogic: 'rule "quantity-check"',
-          expression: JSON.stringify({ type: 'FIELD_COMPARISON' }),
-        },
-      ],
-    }))
-
-    const restored = readReconciliationRuleSetDraftState(state)
-
-    expect(restored?.draft.rules?.[0]).toMatchObject({
-      ruleId: 'quantity-check',
-      enabled: 'N',
-      severity: 'ERROR',
-      ruleType: 'FIELD_COMPARISON',
-      ruleText: 'totalQuantity > quantity',
-      ruleLogic: 'rule "quantity-check"',
-      expression: JSON.stringify({ type: 'FIELD_COMPARISON' }),
-    })
   })
 
   it('persists API source config ids in create payloads', () => {

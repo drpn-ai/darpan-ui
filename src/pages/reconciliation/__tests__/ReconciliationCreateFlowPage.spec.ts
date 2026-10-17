@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import {
-  buildReconciliationAutomationDraftState,
-  clearPendingReconciliationAutomationDraftState,
-  savePendingReconciliationAutomationDraftState,
-} from '../../../lib/reconciliationAutomationDraft'
+import { buildReconciliationAutomationDraftState } from '../../../lib/reconciliationAutomationDraft'
 import { buildReconciliationRuleSetDraftState, type ReconciliationRuleSetDraft } from '../../../lib/reconciliationRuleSetDraft'
 
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
@@ -1551,7 +1547,6 @@ describe('ReconciliationCreateFlowPage', () => {
       'input-mode',
       null,
     )
-    savePendingReconciliationAutomationDraftState({ intent: 'new-run' }, 'input-mode', null)
     window.history.replaceState({}, '', '/reconciliation/create?automationFlow=new-run')
 
     const wrapper = mount(ReconciliationCreateFlowPage)
@@ -1565,7 +1560,6 @@ describe('ReconciliationCreateFlowPage', () => {
 
     expect(push).toHaveBeenCalledWith({ path: '/reconciliation/automation/create' })
     expect(draftStoreState.setAutomationDraft).toHaveBeenCalled()
-    clearPendingReconciliationAutomationDraftState()
   })
 
   it('lets the user pick two fields for a composite primary key on a JSON source and submits both', async () => {
