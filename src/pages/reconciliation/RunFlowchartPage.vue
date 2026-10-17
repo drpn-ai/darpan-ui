@@ -40,7 +40,7 @@
         <RunFlowchartBoard
           :questions="questions"
           :rule-names="ruleNames"
-          :editable="!running"
+          :editable="!running && !isResult"
           :narrow="narrow"
           :selected-id="editing?.questionId ?? null"
           :states="states"
@@ -51,7 +51,7 @@
           @add-why="(id) => openNew(id, 'NO')"
         />
         <button
-          v-if="!hasStart && !running"
+          v-if="!hasStart && !running && !isResult"
           type="button"
           class="static-page-action-tile static-page-action-tile--inline"
           data-testid="flowchart-add-top"
@@ -81,6 +81,17 @@
       <!-- A run's own page is its results, as a Sync run's is: in progress, the most recent, then the ones before.
            A run's result page shows that run alone. Every tile is one link. -->
       <template v-if="!isResult">
+        <!-- How it works, read only; the gear changes it. A run's result shows results alone. -->
+        <StaticPageSection v-if="isStages && definition" title="How It Works">
+          <LifecycleOutline
+            :record-label="definition.recordLabel"
+            :account="definition.account"
+            :rules="definition.rules"
+            :stages="definition.stages"
+            :exceptions="definition.exceptions"
+            :late-after-days="definition.lateAfterDays"
+          />
+        </StaticPageSection>
         <StaticPageSection v-if="activeTiles.length" title="In Progress">
           <div class="static-page-tile-grid run-history-grid" data-testid="flowchart-history-running">
             <RouterLink
@@ -164,8 +175,9 @@
             <path :d="backIconPath" fill="currentColor" />
           </svg>
         </RouterLink>
+        <!-- Play, settings and delete act on the run itself, so they live on its own page; a result has only back. -->
         <RouterLink
-          v-if="!running && questions.length"
+          v-if="!isResult && !running && questions.length"
           :to="{ name: 'reconciliation-run-flowchart-start', params: { reconciliationId } }"
           class="app-icon-action app-icon-action--large"
           aria-label="Open run"
@@ -176,14 +188,14 @@
             <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
           </svg>
         </RouterLink>
-        <button v-else type="button" class="app-icon-action app-icon-action--large" aria-label="Open run" title="Open run" disabled data-testid="flowchart-run-button">
+        <button v-else-if="!isResult" type="button" class="app-icon-action app-icon-action--large" aria-label="Open run" title="Open run" disabled data-testid="flowchart-run-button">
           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
             <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
           </svg>
         </button>
         <!-- DAR-UI-050. As a Sync run's page: settings beside play. Rules are set up there, never on this page. -->
         <RouterLink
-          v-if="isStages"
+          v-if="isStages && !isResult"
           :to="{ name: 'reconciliation-run-flowchart-settings', params: { reconciliationId } }"
           class="app-icon-action app-icon-action--large"
           aria-label="Run settings"
@@ -236,6 +248,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import FlowchartQuestionEditor, { type FlowchartQuestionDraft } from '../../components/reconciliation/FlowchartQuestionEditor.vue'
 import LifecycleBoard from '../../components/reconciliation/LifecycleBoard.vue'
+import LifecycleOutline from '../../components/reconciliation/LifecycleOutline.vue'
 import RunFlowchartBoard from '../../components/reconciliation/RunFlowchartBoard.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
@@ -244,7 +257,8 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
 import type {
-  FlowchartBranch, FlowchartExecutionRow, FlowchartExecutionSummary, FlowchartQuestion, FlowchartRun,
+  FlowchartBranch, FlowchartExecutionRow, FlowchartExecutionSummary, FlowchartQuestion, FlowchartRun, LifecycleRule,
+  LifecycleStageException,
 } from '../../lib/api/flowchartTypes'
 import type { SavedRunSummary } from '../../lib/api/types'
 import { walkableQuestionIds } from '../../lib/flowchart/flowchartLayout'
@@ -304,6 +318,11 @@ const countFormat = new Intl.NumberFormat('en-US')
 // DAR-UI-050. A lifecycle built from stages shows where records stopped. Its window is chosen when it runs
 // (RunFlowchartStartPage), as a Sync run's is.
 const isStages = computed(() => run.value?.buildMode === 'STAGES')
+// How a lifecycle built from stages works, as its settings say: shown read-only on its own page.
+const definition = ref<{
+  recordLabel: string; account: string; rules: LifecycleRule[]; stages: { recordType: string; label: string }[]
+  exceptions: LifecycleStageException[]; lateAfterDays: number
+} | null>(null)
 // What each stage's exceptions excuse, in their own words, so an excused place reads "Store Pickup, never billed".
 const excusedNames = ref<Record<string, string>>({})
 const board = computed(() => lifecycleBoard(questions.value, executionRows.value, excusedNames.value))
@@ -500,6 +519,10 @@ async function load() {
     ])
     run.value = got.reconciliation
     questions.value = got.questions ?? []
+    definition.value = got.lifecycle ? {
+      recordLabel: got.lifecycle.recordLabel, account: got.lifecycle.nsAuthConfigId, rules: got.rules ?? [],
+      stages: got.stages ?? [], exceptions: got.exceptions ?? [], lateAfterDays: got.reconciliation?.lateAfterDays ?? 0,
+    } : null
     const byStage: Record<string, string[]> = {}
     for (const e of got.exceptions ?? []) (byStage[e.stageLabel ?? ''] ??= []).push(e.value)
     excusedNames.value = Object.fromEntries(Object.entries(byStage).map(([stage, values]) => [stage, values.join(' or ')]))
@@ -512,6 +535,7 @@ async function load() {
 }
 
 function openExisting(id: string) {
+  if (isResult.value) return
   const q = questions.value.find((x) => x.reconciliationRunId === id)
   if (!q) return
   editorError.value = null

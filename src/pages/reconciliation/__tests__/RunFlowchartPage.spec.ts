@@ -143,6 +143,34 @@ describe('RunFlowchartPage', () => {
       expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 2 stages')
     })
 
+    // How it works sits on the lifecycle's own page, read only; changing it is the gear's job.
+    it("the lifecycle's own page shows how it works, read only", async () => {
+      f.getReconciliation.mockResolvedValue({ reconciliation: stagesRun, questions: stageQuestions,
+        lifecycle: { nsAuthConfigId: 'net_prod', recordType: 'SalesOrd', recordLabel: 'Sales orders' },
+        rules: [{ fieldId: 'status', fieldLabel: 'Status', value: 'Sales Order : Closed', valueLabel: 'Closed' }],
+        stages: [{ recordType: 'ItemShip', label: 'Fulfillment' }, { recordType: 'CustInvc', label: 'Invoice' }],
+        exceptions: [{ stageRecordType: 'ItemShip', stageLabel: 'Fulfillment', fieldId: 'shipmethod', fieldLabel: 'Shipping Method', value: 'Store Pickup' }],
+      } as never)
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      const outline = w.get('[data-testid="lifecycle-outline"]').text()
+      for (const part of ['Sales orders', 'net_prod', 'except Status is Closed', 'judged after 2 days', 'Fulfillment',
+        'not expected for Shipping Method is Store Pickup', 'Invoice']) expect(outline).toContain(part)
+      expect(outline.indexOf('Fulfillment')).toBeLessThan(outline.indexOf('Invoice'))
+      expect(w.find('[data-testid="lifecycle-outline"] button, [data-testid="lifecycle-outline"] select').exists()).toBe(false)
+      expect(w.find('[data-testid="flowchart-settings"]').exists()).toBe(true)
+    })
+
+    // A run's result shows results alone: back, and nothing that changes or starts the run.
+    it("a run's result has only back", async () => {
+      routeParams.reconciliationExecutionId = 'E7'
+      f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(w.findAll('.action-row > *').map((a) => a.attributes('data-testid'))).toEqual(['flowchart-back'])
+      expect(w.find('[data-testid="lifecycle-outline"]').exists()).toBe(false)
+    })
+
     it("the lifecycle's own page is its history, with no result board", async () => {
       const w = mount(RunFlowchartPage)
       await flushPromises()
