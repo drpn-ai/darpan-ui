@@ -357,15 +357,14 @@ describe('HomePage', () => {
     expect(lifecycle.findAll('.static-page-tile')).toHaveLength(2)
 
     const chain = wrapper.get('[data-flow-id="lifecycle:R1"]')
-    expect(chain.text()).toContain('NetSuite order chain')
-    expect(chain.text()).toContain('Lifecycle · 4 questions · last 7 days')
+    // A tile is the run's name alone: its kind is its section, and the rest is on its page.
+    expect(chain.text()).toBe('NetSuite order chain')
     expect(JSON.parse(chain.attributes('data-to') ?? '{}')).toEqual({
       name: 'reconciliation-run-flowchart',
       params: { reconciliationId: 'R1' },
     })
 
-    expect(wrapper.get('[data-flow-id="saved-run:RS1"]').text()).toContain('Sync')
-    expect(wrapper.get('[data-flow-id="saved-run:RS1"] [data-run-type]').attributes('data-run-type')).toBe('sync')
+    expect(wrapper.find('[data-flow-id="saved-run:RS1"] [data-run-type]').exists()).toBe(false)
     // The type section follows every system-family section rather than sorting in among them.
     const titles = wrapper.findAll('.static-page-section').map((section) => section.text())
     expect(titles.findIndex((t) => t.startsWith('Lifecycle'))).toBe(titles.length - 1)

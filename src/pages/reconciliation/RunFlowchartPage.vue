@@ -195,6 +195,22 @@
             <path :d="settingsIconPath" />
           </svg>
         </RouterLink>
+        <!-- As an automation's delete: the run is archived, so it leaves Home and cannot run again; its past results
+             stay readable. -->
+        <button
+          v-if="!isResult && run"
+          type="button"
+          class="app-icon-action app-icon-action--large app-icon-action--danger"
+          aria-label="Delete run"
+          title="Delete run"
+          data-testid="flowchart-delete"
+          :disabled="deleting || running"
+          @click="void deleteRun()"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
+          </svg>
+        </button>
       </div>
     </template>
   </StaticPageFrame>
@@ -235,10 +251,10 @@ import { walkableQuestionIds } from '../../lib/flowchart/flowchartLayout'
 import {
   isExecutionDone, POLL_INTERVAL_MS, questionStates, shouldKeepPolling,
 } from '../../lib/flowchart/flowchartRunState'
-import { backIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
+import { backIconPath, playIconPath, playIconTransform, settingsIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { buildReconciliationRunLiveRoute, buildReconciliationRunResultRoute } from '../../lib/reconciliationRoutes'
 import { lifecycleBoard, type LifecyclePlace } from '../../lib/lifecycleBoard'
-import { lookBackLabel, questionCountLabel } from '../../lib/runTypes'
+import { questionCountLabel } from '../../lib/runTypes'
 import { addDays, displayCalendarDayOf, formatDateTime } from '../../lib/utils/date'
 
 // DAR-UI-048. One run's chart, on a static board: build it from existing rules (spec A7), run it over a
@@ -256,7 +272,8 @@ const typeDetail = computed(() => {
   const what = isStages.value
     ? `${board.value.stages.length} ${board.value.stages.length === 1 ? 'stage' : 'stages'}`
     : questionCountLabel(questions.value.filter((q) => q.questionRole !== 'START').length)
-  return `${what} · ${lookBackLabel(run.value?.defaultTimeWindow)}`
+  // The days are chosen each time it runs (RunFlowchartStartPage), so they are no part of what the run is.
+  return what
 })
 const rules = ref<SavedRunSummary[]>([])
 const loading = ref(true)
@@ -457,6 +474,22 @@ const summary = computed(() => {
 })
 
 function message(error: unknown): string { return error instanceof Error ? error.message : String(error) }
+
+// Delete takes the run off Home for good: it is archived (and turned off), never removed, so its results stay.
+const deleting = ref(false)
+async function deleteRun() {
+  if (!run.value || !window.confirm(`Delete run "${run.value.reconciliationName || reconciliationId.value}"?`)) return
+  deleting.value = true
+  pageError.value = null
+  try {
+    await reconciliationFacade.saveReconciliation({ reconciliationId: reconciliationId.value, isArchived: 'Y', isActive: 'N' })
+    await router.push({ name: 'hub' })
+  } catch (error) {
+    pageError.value = message(error)
+  } finally {
+    deleting.value = false
+  }
+}
 
 async function load() {
   pageError.value = null

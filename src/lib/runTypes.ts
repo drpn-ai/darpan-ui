@@ -1,6 +1,5 @@
 import type { RouteLocationRaw } from 'vue-router'
 import { lifecycleIconPath, syncIconPath } from './iconPaths'
-import { defaultWindowDays } from './flowchart/flowchartRunState'
 
 /**
  * DAR-UI-049. Everything is a run; the type tells the two apart.
@@ -51,7 +50,3 @@ export function questionCountLabel(n: number): string {
   return n === 1 ? '1 question' : `${n} questions`
 }
 
-export function lookBackLabel(defaultTimeWindow?: string | null): string {
-  const days = defaultWindowDays(defaultTimeWindow)
-  return days === 1 ? 'previous day' : `last ${days} days`
-}

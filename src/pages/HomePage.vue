@@ -18,7 +18,6 @@
             @dragstart="handleDragStart(flow.id, $event)"
           >
             <span class="static-page-tile-title">{{ flow.title }}</span>
-            <RunTypeBadge :type="flow.runTypeId" :detail="flow.typeDetail" />
           </RouterLink>
         </div>
         <div v-else class="static-page-drop-hint" data-testid="pinned-empty-state">drag and drop runs to pin</div>
@@ -48,7 +47,6 @@
             @dragstart="handleDragStart(flow.id, $event)"
           >
             <span class="static-page-tile-title">{{ flow.title }}</span>
-            <RunTypeBadge :type="flow.runTypeId" :detail="flow.typeDetail" />
           </RouterLink>
           <button
             v-if="group.hidden > 0"
@@ -107,14 +105,13 @@ import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-rout
 import StaticPageFrame from '../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../components/ui/StaticPageSection.vue'
 import InlineValidation from '../components/ui/InlineValidation.vue'
-import RunTypeBadge from '../components/ui/RunTypeBadge.vue'
 import { useAuthStore, buildAuthRedirect } from '../stores/auth'
 import { useReconciliationDraftStore } from '../stores/reconciliationDraft'
 import { usePermissionsStore } from '../stores/permissions'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { SavedRunSummary } from '../lib/api/types'
 import type { FlowchartRun } from '../lib/api/flowchartTypes'
-import { RUN_TYPES, lookBackLabel, questionCountLabel, type RunTypeId } from '../lib/runTypes'
+import { RUN_TYPES } from '../lib/runTypes'
 import { buildReconciliationDiffRoute } from '../lib/reconciliationRoutes'
 
 interface DashboardFlowCard {
@@ -124,8 +121,6 @@ interface DashboardFlowCard {
   title: string
   groupTitle: string
   to: RouteLocationRaw
-  runTypeId: RunTypeId
-  typeDetail?: string
   /**
    * save#DashboardPinnedSavedRuns validates pins against RuleSet ids only, so a lifecycle pin
    * would be dropped server-side and silently vanish. Lifecycle tiles stay put until it widens.
@@ -241,7 +236,6 @@ const savedRunCards = computed<DashboardFlowCard[]>(() =>
           file2SystemLabel: resolveSystemLabel(savedRun, savedRun.defaultFile2SystemEnumId),
         },
       ),
-      runTypeId: 'sync' as const,
       pinnable: true,
     }
   }),
@@ -256,8 +250,6 @@ const lifecycleRunCards = computed<DashboardFlowCard[]>(() =>
     title: resolveSavedRunTitle(run.reconciliationName || run.reconciliationId),
     groupTitle: RUN_TYPES.lifecycle.label,
     to: { name: 'reconciliation-run-flowchart', params: { reconciliationId: run.reconciliationId } },
-    runTypeId: 'lifecycle' as const,
-    typeDetail: `${questionCountLabel(run.questionCount ?? 0)} · ${lookBackLabel(run.defaultTimeWindow)}`,
     pinnable: false,
   })),
 )

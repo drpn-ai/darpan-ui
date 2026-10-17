@@ -9,7 +9,7 @@ const { routeParams, push, replace } = vi.hoisted(() => ({
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: routeParams }), useRouter: () => ({ push, replace }), RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } }))
 vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
-    getReconciliation: vi.fn(), listSavedRuns: vi.fn(), saveReconciliationQuestion: vi.fn(),
+    getReconciliation: vi.fn(), listSavedRuns: vi.fn(), saveReconciliationQuestion: vi.fn(), saveReconciliation: vi.fn(),
     deleteReconciliationQuestion: vi.fn(), runReconciliation: vi.fn(), getReconciliationExecution: vi.fn(),
     listReconciliationExecutions: vi.fn(), getLifecycleRuleOptions: vi.fn(), saveLifecycleRule: vi.fn(), deleteLifecycleRule: vi.fn(),
   },
@@ -50,7 +50,7 @@ describe('RunFlowchartPage', () => {
   it('says it is a Lifecycle run; its own page keeps play, not back, as a Sync run\'s does', async () => {
     const w = mount(RunFlowchartPage)
     await flushPromises()
-    expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 1 question · last 3 days')
+    expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 1 question')
     expect(w.find('[data-testid="flowchart-back"]').exists()).toBe(false)
   })
 
@@ -140,7 +140,7 @@ describe('RunFlowchartPage', () => {
       expect(w.find('[data-testid="lifecycle-board"]').exists()).toBe(true)
       expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(false)
       expect(w.text()).toContain('Billed, never shipped')
-      expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 2 stages · last 3 days')
+      expect(w.get('[data-testid="run-type-lifecycle"]').text()).toBe('Lifecycle · 2 stages')
     })
 
     it("the lifecycle's own page is its history, with no result board", async () => {
@@ -222,6 +222,33 @@ describe('RunFlowchartPage', () => {
     await w.get('[data-testid="flowchart-history-more"]').trigger('click')
     expect(previous()).toHaveLength(8)
     expect(w.find('[data-testid="flowchart-history-more"]').exists()).toBe(false)
+  })
+
+  // A run's own page deletes it as an automation's does: archived, off Home, its results kept.
+  it('deletes the run after asking, and goes Home', async () => {
+    f.saveReconciliation.mockResolvedValue({ reconciliation: run } as never)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    try {
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      await w.get('[data-testid="flowchart-delete"]').trigger('click')
+      expect(f.saveReconciliation).not.toHaveBeenCalled()
+      await w.get('[data-testid="flowchart-delete"]').trigger('click')
+      await flushPromises()
+      expect(confirm).toHaveBeenLastCalledWith('Delete run "Order chain"?')
+      expect(f.saveReconciliation).toHaveBeenCalledWith({ reconciliationId: 'R1', isArchived: 'Y', isActive: 'N' })
+      expect(push).toHaveBeenCalledWith({ name: 'hub' })
+    } finally {
+      confirm.mockRestore()
+    }
+  })
+
+  it("a run's result offers no delete", async () => {
+    routeParams.reconciliationExecutionId = 'E7'
+    f.getReconciliationExecution.mockResolvedValue({ results: [] } as never)
+    const w = mount(RunFlowchartPage)
+    await flushPromises()
+    expect(w.find('[data-testid="flowchart-delete"]').exists()).toBe(false)
   })
 
   // DAR-UI-050: the window is chosen when the run starts, in a workflow, as a Sync run's is.

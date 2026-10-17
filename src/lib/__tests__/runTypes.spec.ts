@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MASCOT_GLOSSARY } from '../mascotGlossary'
-import { RUN_TYPES, RUN_TYPE_ORDER, lookBackLabel, questionCountLabel } from '../runTypes'
+import { RUN_TYPES, RUN_TYPE_ORDER, questionCountLabel } from '../runTypes'
 
 describe('run types', () => {
   it('names the two kinds of run Sync and Lifecycle, in that order', () => {
@@ -23,10 +23,9 @@ describe('run types', () => {
     RUN_TYPE_ORDER.forEach((id) => expect(MASCOT_GLOSSARY[RUN_TYPES[id].glossaryTerm], id).toBeTruthy())
   })
 
-  it('labels a lifecycle run by its questions and look-back', () => {
+  // A run's days are chosen when it starts, so a lifecycle is labelled by its questions alone.
+  it('labels a lifecycle run by its questions', () => {
     expect(questionCountLabel(1)).toBe('1 question')
     expect(questionCountLabel(4)).toBe('4 questions')
-    expect(lookBackLabel('1d')).toBe('previous day')
-    expect(lookBackLabel('7d')).toBe('last 7 days')
   })
 })
