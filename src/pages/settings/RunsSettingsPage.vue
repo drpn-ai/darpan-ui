@@ -32,6 +32,7 @@ import { buildRuleSetDraft, buildSavedRunEditorRoute, savedRunName } from '../..
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import SettingsRecordListSection from './SettingsRecordListSection.vue'
 import { useSettingsPagedList } from './useSettingsPagedList'
+import { SETTINGS_LIST_KEYS } from '../../lib/api/queries'
 
 const route = useRoute()
 const draftStore = useReconciliationDraftStore()
@@ -48,7 +49,7 @@ const {
   loadPage: (request) => reconciliationFacade.listSavedRuns({ ...request, query: '' }),
   selectRecords: (response) => response.savedRuns ?? [],
   fallbackErrorMessage: 'Failed to load runs.',
-  cacheKey: 'runsSettings.listSavedRuns',
+  cacheKey: SETTINGS_LIST_KEYS.runs,
 })
 
 onBeforeUnmount(() => {

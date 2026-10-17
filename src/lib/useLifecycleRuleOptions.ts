@@ -1,5 +1,7 @@
 import { reactive, ref } from 'vue'
 import { reconciliationFacade } from './api/facade'
+import { lifecycleRuleFields } from './api/queries'
+import { READ_CACHE_MAX_AGE_MS, readQueryOnce } from './api/readCache'
 
 // DAR-UI-050. The rule dropdowns, read from the account: the text fields NetSuite shows on the start record (by their
 // own names), and what a chosen field holds, most common first, "No value" for empty. Fields load once; each field's
@@ -25,7 +27,9 @@ export function useLifecycleRuleOptions(scope?: 'STAGE' | 'FINDING') {
     loadingFields.value = true
     error.value = null
     try {
-      fields.value = (await reconciliationFacade.getLifecycleRuleOptions({ ...source, ...(scope ? { scope } : {}) })).fields ?? []
+      // DAR-UI-051: account metadata, so any cached copy will do; a hover on the settings link may have read it already.
+      const query = lifecycleRuleFields({ nsAuthConfigId: source.nsAuthConfigId, recordType: source.recordType }, scope)
+      fields.value = (await readQueryOnce(query, READ_CACHE_MAX_AGE_MS)).fields ?? []
       fieldsFor = key
     } catch (caught) {
       error.value = message(caught)

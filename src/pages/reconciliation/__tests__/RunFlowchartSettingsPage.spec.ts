@@ -13,6 +13,8 @@ vi.mock('../../../lib/api/facade', () => ({
 
 import { reconciliationFacade, settingsFacade } from '../../../lib/api/facade'
 import RunFlowchartSettingsPage from '../RunFlowchartSettingsPage.vue'
+import { prefetchQuery } from '../../../lib/api/readCache'
+import { lifecycleChart, lifecycleRuleFields } from '../../../lib/api/queries'
 
 const f = vi.mocked(reconciliationFacade)
 const draft = { fieldId: 'custbody_hc_sales_channel', fieldLabel: 'HC Sales Channel', value: 'Shopify Draft Order', valueLabel: 'Shopify Draft Order' }
@@ -69,6 +71,22 @@ describe('RunFlowchartSettingsPage', () => {
     mount(RunFlowchartSettingsPage)
     await flushPromises()
     expect(settingsFacade.listNsAuthConfigs).toHaveBeenCalled()
+  })
+
+  it('opens from what the lifecycle page or a hover just read, without asking again (DAR-UI-051)', async () => {
+    await prefetchQuery(lifecycleChart('R1'))
+    const got = await f.getReconciliation.mock.results[0]?.value
+    for (const scope of [undefined, 'STAGE', 'FINDING'] as const) {
+      await prefetchQuery(lifecycleRuleFields({ nsAuthConfigId: got.lifecycle.nsAuthConfigId, recordType: got.lifecycle.recordType }, scope))
+    }
+    f.getReconciliation.mockClear()
+    f.getLifecycleRuleOptions.mockClear()
+
+    const w = mount(RunFlowchartSettingsPage)
+    await flushPromises()
+    expect(f.getReconciliation).not.toHaveBeenCalled()
+    expect(f.getLifecycleRuleOptions).not.toHaveBeenCalled()
+    expect(w.get('[data-testid="lifecycle-spine"]').text()).toContain('Gorjana NetSuite (sandbox copy)')
   })
 
   it('adds a filter and an exception where they act, and saves only what changed', async () => {

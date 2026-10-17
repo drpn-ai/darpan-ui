@@ -259,6 +259,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
+import { lifecycleChart, lifecycleExecution, lifecycleExecutions, lifecycleRules } from '../../lib/api/queries'
 import type {
   FlowchartBranch, FlowchartExecutionRow, FlowchartExecutionSummary, FlowchartQuestion, FlowchartRun, LifecycleRule,
   LifecycleStageException,
@@ -271,7 +272,7 @@ import {
 import { backIconPath, playIconPath, playIconTransform, settingsIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { buildReconciliationRunLiveRoute, buildReconciliationRunResultRoute } from '../../lib/reconciliationRoutes'
 import { lifecycleBoard, notFindingPlacesOf, type LifecyclePlace } from '../../lib/lifecycleBoard'
-import { accountLabelOf, nsAccountLabels } from '../../lib/nsAccountLabel'
+import { accountLabelOf } from '../../lib/nsAccountLabel'
 import { questionCountLabel } from '../../lib/runTypes'
 import { addDays, displayCalendarDayOf, formatDateTime } from '../../lib/utils/date'
 
@@ -519,16 +520,8 @@ async function deleteRun() {
   }
 }
 
-// DAR-UI-051: the account list is fetched beside the lifecycle that names the account, not after it.
-async function fetchChart() {
-  const [got, accountLabels] = await Promise.all([
-    reconciliationFacade.getReconciliation({ reconciliationId: reconciliationId.value }),
-    nsAccountLabels(),
-  ])
-  return { got, accountLabels }
-}
-
-function applyChart({ got, accountLabels }: Awaited<ReturnType<typeof fetchChart>>) {
+// DAR-UI-051: the account list is fetched beside the lifecycle that names the account, not after it (lifecycleChart).
+function applyChart({ got, accountLabels }: Awaited<ReturnType<ReturnType<typeof lifecycleChart>['fetch']>>) {
   run.value = got.reconciliation
   questions.value = got.questions ?? []
   definition.value = got.lifecycle ? {
@@ -544,14 +537,11 @@ function applyChart({ got, accountLabels }: Awaited<ReturnType<typeof fetchChart
 
 async function load() {
   pageError.value = null
+  const chart = lifecycleChart(reconciliationId.value)
   try {
     await Promise.all([
-      cachedRead(`lifecycle.chart:${reconciliationId.value}`, fetchChart, applyChart),
-      rules.value.length ? null : cachedRead(
-        'lifecycle.listSavedRuns',
-        () => reconciliationFacade.listSavedRuns({ pageIndex: 0, pageSize: 200 }),
-        (saved) => { rules.value = saved.savedRuns ?? [] },
-      ),
+      cachedRead(chart.key, chart.fetch, applyChart),
+      rules.value.length ? null : cachedRead(lifecycleRules.key, lifecycleRules.fetch, (saved) => { rules.value = saved.savedRuns ?? [] }),
     ])
   } catch (error) {
     pageError.value = message(error)
@@ -625,11 +615,8 @@ function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = n
 
 async function loadExecutions() {
   try {
-    await cachedRead(
-      `lifecycle.executions:${reconciliationId.value}`,
-      () => reconciliationFacade.listReconciliationExecutions({ reconciliationId: reconciliationId.value }),
-      (response) => { if (!unmounted) executions.value = response?.executions ?? [] },
-    )
+    const { key, fetch } = lifecycleExecutions(reconciliationId.value)
+    await cachedRead(key, fetch, (response) => { if (!unmounted) executions.value = response?.executions ?? [] })
   } catch {
     // History is a convenience: failing to list it costs the picker, never the chart.
     executions.value = []
@@ -683,11 +670,10 @@ async function loadExecution(executionId: string, chartLoaded: Promise<unknown> 
   activeExecutionId.value = executionId
   executionRows.value = []
   try {
-    await cachedRead(
-      `lifecycle.execution:${executionId}`,
-      () => reconciliationFacade.getReconciliationExecution({ reconciliationExecutionId: executionId }),
-      ({ results }) => { if (!unmounted && activeExecutionId.value === executionId) executionRows.value = results ?? [] },
-    )
+    const { key, fetch } = lifecycleExecution(executionId)
+    await cachedRead(key, fetch, ({ results }) => {
+      if (!unmounted && activeExecutionId.value === executionId) executionRows.value = results ?? []
+    })
     await chartLoaded
     if (unmounted || activeExecutionId.value !== executionId) return
   } catch (error) {

@@ -110,6 +110,7 @@ import { useReconciliationDraftStore } from '../stores/reconciliationDraft'
 import { usePermissionsStore } from '../stores/permissions'
 import { reconciliationFacade } from '../lib/api/facade'
 import { cachedRead } from '../lib/api/readCache'
+import { homeReconciliations, homeSavedRuns } from '../lib/api/queries'
 import type { SavedRunSummary } from '../lib/api/types'
 import type { FlowchartRun } from '../lib/api/flowchartTypes'
 import { RUN_TYPES } from '../lib/runTypes'
@@ -400,8 +401,8 @@ async function importNetSuiteChecks(): Promise<void> {
 // Independent of the sync list: a failure here costs the Lifecycle section, never the page.
 function loadLifecycleRuns(): Promise<void> {
   return cachedRead(
-    'home.listReconciliations',
-    () => reconciliationFacade.listReconciliations(pageAbortController.signal),
+    homeReconciliations.key,
+    () => homeReconciliations.fetch(pageAbortController.signal),
     (response) => { lifecycleRuns.value = (response.reconciliations ?? []).filter((run) => run.isArchived !== 'Y') },
   ).then(() => {}, () => { lifecycleRuns.value = [] })
 }
@@ -433,8 +434,8 @@ async function loadDashboard(): Promise<void> {
     // checks beside its two-sided ones. totalCount comes back regardless, so whatever is still
     // beyond this is admitted rather than mis-grouped.
     await cachedRead(
-      'home.listSavedRuns',
-      () => reconciliationFacade.listSavedRuns({ pageIndex: 0, pageSize: 100, query: '' }, pageAbortController.signal),
+      homeSavedRuns.key,
+      () => homeSavedRuns.fetch(pageAbortController.signal),
       (response) => {
         pinnedSavedRunIds.value = response.pinnedSavedRunIds ?? []
         savedRuns.value = response.savedRuns ?? []

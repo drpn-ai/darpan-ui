@@ -61,8 +61,8 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'
-import { reconciliationFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
+import { automations as automationsQuery } from '../../lib/api/queries'
 import type { AutomationRecord } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -104,8 +104,8 @@ async function loadAutomations(): Promise<void> {
   error.value = null
   try {
     await cachedRead(
-      'automations.listAutomations',
-      () => reconciliationFacade.listAutomations({ pageIndex: 0, pageSize: 200, query: '' }, pageAbortController.signal),
+      automationsQuery.key,
+      () => automationsQuery.fetch(pageAbortController.signal),
       (response) => {
         automations.value = response.automations ?? []
         loading.value = false

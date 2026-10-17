@@ -2,8 +2,11 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
+import { installDataPrefetch } from './router/dataPrefetch'
 import { initTheme } from './composables/useTheme'
 import { setApiCacheReset } from './lib/api/facade'
+import { invalidateReadCache } from './lib/api/readCache'
+import { useAuthStore } from './stores/auth'
 import { useReferenceDataStore } from './stores/referenceData'
 import { useRunResultsStore } from './stores/runResults'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
@@ -23,6 +26,7 @@ const pinia = createPinia()
 // cache via this hook, plus clear the cross-tenant-leaking draft store and
 // any per-user localStorage that survives logout.
 setApiCacheReset(() => {
+  invalidateReadCache() // DAR-UI-051: callService already drops it around writes; this covers any reset path
   useReferenceDataStore(pinia).reset()
   useRunResultsStore(pinia).reset()
   useReconciliationDraftStore(pinia).resetAll() // setup-style store: explicit reset; clears its sessionStorage too
@@ -50,3 +54,5 @@ app
   // store on mount, which is after this point for every element that uses it.
   .directive('explain', vExplain)
   .mount('#app')
+
+installDataPrefetch(router, () => useAuthStore(pinia).authenticated)

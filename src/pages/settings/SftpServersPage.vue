@@ -39,6 +39,7 @@ import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import SettingsRecordListSection from './SettingsRecordListSection.vue'
 import { useSettingsPagedList } from './useSettingsPagedList'
+import { SETTINGS_LIST_KEYS } from '../../lib/api/queries'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -60,7 +61,7 @@ const {
   selectRecords: (response) => response.servers ?? [],
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
   fallbackErrorMessage: 'Failed to load servers.',
-  cacheKey: 'sftpServers.listSftpServers',
+  cacheKey: SETTINGS_LIST_KEYS.sftp,
 })
 
 onBeforeUnmount(() => {

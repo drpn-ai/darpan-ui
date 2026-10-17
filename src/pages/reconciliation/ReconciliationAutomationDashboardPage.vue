@@ -215,6 +215,7 @@ import StatusBadge from '../../components/ui/StatusBadge.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
+import { automationDashboard } from '../../lib/api/queries'
 import type { AutomationExecutionSummary, AutomationRecord } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import {
@@ -726,12 +727,10 @@ async function load(): Promise<void> {
   executions.value = []
   try {
     // DAR-UI-051: only the first draw is cached; the poll and the run-now refetch always go to the network.
+    const first = automationDashboard(id)
     await cachedRead(
-      `automationDashboard.load:${id}`,
-      () => Promise.all([
-        reconciliationFacade.getAutomation({ automationId: id }, signal),
-        reconciliationFacade.listAutomationExecutions({ automationId: id, pageIndex: 0, pageSize: 200 }, signal),
-      ]),
+      first.key,
+      () => first.fetch(signal),
       ([automationResponse, executionsResponse]) => {
         if (signal.aborted) return
         executions.value = executionsResponse.executions ?? []

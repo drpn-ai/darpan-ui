@@ -188,6 +188,7 @@ import StatusBadge from '../../components/ui/StatusBadge.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
+import { RUN_HISTORY_PAGE_SIZE, runHistoryPage } from '../../lib/api/queries'
 import type { PaginationMeta, GeneratedOutput } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -211,7 +212,7 @@ import { playIconPath, playIconTransform, settingsIconPath } from '../../lib/ico
 import { formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 
-const GENERATED_OUTPUT_FETCH_PAGE_SIZE = 6
+const GENERATED_OUTPUT_FETCH_PAGE_SIZE = RUN_HISTORY_PAGE_SIZE
 const OTHER_RESULTS_BATCH_SIZE = 5
 const RUNNING_STATUS_IDS = new Set(['AUT_STAT_PENDING', 'AUT_STAT_RUNNING'])
 
@@ -566,12 +567,8 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
     loadError.value = null
   }
 
-  const fetchOutputs = () => reconciliationFacade.listGeneratedOutputs({
-    savedRunId: requestedSavedRunId,
-    pageIndex: targetPageIndex,
-    pageSize: GENERATED_OUTPUT_FETCH_PAGE_SIZE,
-    query: '',
-  }, signal)
+  const page = runHistoryPage(requestedSavedRunId, targetPageIndex)
+  const fetchOutputs = () => page.fetch(signal)
   const showOutputs = (response: Awaited<ReturnType<typeof fetchOutputs>>) => {
     if (savedRunId.value !== requestedSavedRunId) return
     const nextOutputs = response.generatedOutputs ?? []
@@ -589,7 +586,7 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
     const response = append
       ? await fetchOutputs().then((fresh) => { showOutputs(fresh); return fresh })
       : await cachedRead(
-        `runHistory.generatedOutputs:${requestedSavedRunId}:${targetPageIndex}:${GENERATED_OUTPUT_FETCH_PAGE_SIZE}`,
+        page.key,
         fetchOutputs,
         showOutputs,
       )

@@ -577,6 +577,7 @@ import { ApiCallError } from '../../lib/api/client'
 import { vExplain } from '../../directives/vExplain'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
+import { runResultFirstPage } from '../../lib/api/queries'
 import type {
   GeneratedOutput,
   GeneratedOutputDifferencesMetadata,
@@ -594,8 +595,6 @@ import { RUN_STAGE_SEQUENCE, formatRunStepDuration, normalizeDisplayText, reconc
 import {
   ALL_RULE_FILTER_KEY,
   BASE_RULE_FILTER_KEY,
-  DIFF_BUCKET_ORDER,
-  DIFF_DETAILS_PAGE_SIZE,
   isJsonCollapseValue,
   type DiffBucketKey,
   type DiffDetailsMetadata,
@@ -1320,15 +1319,7 @@ async function loadSavedResult(): Promise<void> {
   loadError.value = null
   resetDiffDetailsState()
 
-  const query = {
-    fileName: requestedOutputFileName,
-    pageIndex: 0,
-    pageSize: DIFF_DETAILS_PAGE_SIZE,
-    buckets: DIFF_BUCKET_ORDER.join(','),
-    ruleFilterKey: ALL_RULE_FILTER_KEY,
-    search: '',
-    includeFacets: true,
-  }
+  const firstPage = runResultFirstPage(requestedOutputFileName)
   // DAR-UI-051: a cached draw makes the table usable before the server answers. If the user has moved its
   // filters or page by then, the fresh first page must not replace what they asked for.
   const tableQuery = () => JSON.stringify([
@@ -1337,7 +1328,7 @@ async function loadSavedResult(): Promise<void> {
   let drawnTableQuery = ''
 
   try {
-    await cachedRead(`runResult.differences:${JSON.stringify(query)}`, () => reconciliationFacade.getGeneratedOutputDifferences(query, signal), (response) => {
+    await cachedRead(firstPage.key, () => firstPage.fetch(signal), (response) => {
       if (savedRunId.value !== requestedSavedRunId || outputFileName.value !== requestedOutputFileName) return
 
       const metadata = response.metadata ?? {}
