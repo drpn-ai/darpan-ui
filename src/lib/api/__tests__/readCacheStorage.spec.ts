@@ -139,4 +139,39 @@ describe('stored reads (DAR-UI-057)', () => {
     setItem.mockRestore()
     expect(cache.readFinal('lifecycle.execution:e1')).toBeUndefined()
   })
+  // Security review of 36a26fd: a read that started under one user or tenant must never be stored under the
+  // next one's scope (Alice's in-flight read landing after Bob signs in on the same browser).
+  it('does not store a final answer whose read began under another scope', async () => {
+    const cache = await freshTab()
+    cache.setReadCacheScope('alice|GORJANA')
+    const token = cache.readCacheScopeToken()
+    cache.setReadCacheScope('bob|GORJANA')
+    cache.storeFinal('lifecycle.execution:e1', 'alice data', token)
+    expect(cache.readFinal('lifecycle.execution:e1')).toBeUndefined()
+    expect(storedNames()).toEqual([])
+  })
+
+  it('does not persist a read that landed after the scope changed, joined prefetch included', async () => {
+    const cache = await freshTab()
+    cache.setReadCacheScope('alice|GORJANA')
+    let release!: (v: string) => void
+    const slow = new Promise<string>((res) => { release = res })
+    void cache.prefetchQuery({ key: 'lifecycle.chart:100051', fetch: () => slow })
+    const joined = cache.cachedRead('lifecycle.chart:100051', () => Promise.resolve('unused'), () => {}, { persist: true })
+    const direct = cache.cachedRead('lifecycle.executions:100051', () => slow, () => {}, { persist: true })
+    cache.invalidateReadCache()
+    cache.setReadCacheScope('bob|GORJANA')
+    release('alice data')
+    await Promise.all([joined, direct])
+    expect(storedNames()).toEqual([])
+  })
+
+  it('does not serve a final answer older than its maximum age', async () => {
+    vi.useFakeTimers()
+    const cache = await freshTab()
+    cache.setReadCacheScope('alice|GORJANA')
+    cache.storeFinal('lifecycle.execution:e1', 'x')
+    vi.advanceTimersByTime(cache.STORED_FINAL_MAX_AGE_MS + 1)
+    expect(cache.readFinal('lifecycle.execution:e1')).toBeUndefined()
+  })
 })

@@ -54,12 +54,24 @@ const FINAL = 'final:'
 const LAST = 'last:'
 export const STORED_READ_MAX_ENTRIES = 40
 export const STORED_LAST_MAX_AGE_MS = 7 * 24 * 60 * 60_000
+/** A final answer cannot go stale, but it should not sit in the browser for good either. */
+export const STORED_FINAL_MAX_AGE_MS = 30 * 24 * 60 * 60_000
 
 let storedScope: string | null = null
+// Bumped whenever the scope changes or every stored read is wiped. A read takes the token when it starts
+// and stores only if it still matches, so an answer fetched for one user or tenant is never filed under the
+// next one's scope (security review of 36a26fd).
+let scopeToken = 0
 
 /** The signed-in user and active tenant, or null while signed out: nothing is stored or served without one. */
 export function setReadCacheScope(scope: string | null): void {
+  if (scope !== storedScope) scopeToken += 1
   storedScope = scope
+}
+
+/** Take this before a read starts; pass it to storeFinal when the answer lands. */
+export function readCacheScopeToken(): number {
+  return scopeToken
 }
 
 function storage(): Storage | null {
@@ -106,7 +118,8 @@ function readStored(kind: string, key: string, maxAgeMs?: number): Entry | undef
   }
 }
 
-function writeStored(kind: string, key: string, value: unknown): void {
+function writeStored(kind: string, key: string, value: unknown, token: number): void {
+  if (token !== scopeToken) return
   const name = storedKey(kind, key)
   const store = storage()
   if (!name || !store) return
@@ -132,6 +145,7 @@ function writeStored(kind: string, key: string, value: unknown): void {
 
 /** Every stored read, of every scope. Called on login, logout and tenant switch. */
 export function clearStoredReads(kind?: typeof FINAL | typeof LAST): void {
+  if (!kind) scopeToken += 1
   const store = storage()
   if (!store) return
   try {
@@ -143,12 +157,15 @@ export function clearStoredReads(kind?: typeof FINAL | typeof LAST): void {
 
 /** A final answer stored by an earlier visit, or undefined. */
 export function readFinal<T>(key: string): T | undefined {
-  return readStored(FINAL, key)?.value as T | undefined
+  return readStored(FINAL, key, STORED_FINAL_MAX_AGE_MS)?.value as T | undefined
 }
 
-/** Stores an answer that can never change again. Only call it once that is certain. */
-export function storeFinal(key: string, value: unknown): void {
-  writeStored(FINAL, key, value)
+/**
+ * Stores an answer that can never change again. Only call it once that is certain. `token` is
+ * readCacheScopeToken() from before the read began; the write is dropped if the scope moved since.
+ */
+export function storeFinal(key: string, value: unknown, token: number = scopeToken): void {
+  writeStored(FINAL, key, value, token)
 }
 
 export function invalidateReadCache(): void {
@@ -210,12 +227,14 @@ function fetchShared<T>(query: ReadQuery<T>): Promise<T> {
 export async function cachedRead<T>(
   key: string, fetcher: () => Promise<T>, apply: (value: T) => void, options: { persist?: boolean } = {},
 ): Promise<T> {
+  const token = scopeToken
   const cached = readFresh(key) ?? (options.persist ? readStored(LAST, key, STORED_LAST_MAX_AGE_MS) : undefined)
   if (cached) apply(cached.value as T)
   const joined = joinable<T>(key)
   if (joined) {
+    const joinedAt = generation
     const shared = await joined
-    if (options.persist) writeStored(LAST, key, shared)
+    if (options.persist && generation === joinedAt) writeStored(LAST, key, shared, token)
     apply(shared)
     return shared
   }
@@ -223,7 +242,7 @@ export async function cachedRead<T>(
   const fresh = await fetcher()
   if (generation === startedAt) {
     store(key, fresh)
-    if (options.persist) writeStored(LAST, key, fresh)
+    if (options.persist) writeStored(LAST, key, fresh, token)
   }
   apply(fresh)
   return fresh

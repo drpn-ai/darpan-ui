@@ -258,7 +258,7 @@ import StatusBadge from '../../components/ui/StatusBadge.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
-import { cachedRead, readFinal, storeFinal } from '../../lib/api/readCache'
+import { cachedRead, readCacheScopeToken, readFinal, storeFinal } from '../../lib/api/readCache'
 import { lifecycleChart, lifecycleExecution, lifecycleExecutions, lifecycleRules } from '../../lib/api/queries'
 import type {
   FlowchartBranch, FlowchartExecutionRow, FlowchartExecutionSummary, FlowchartQuestion, FlowchartRun, LifecycleRule,
@@ -678,6 +678,7 @@ async function loadExecution(executionId: string, chartLoaded: Promise<unknown> 
     executionRows.value = kept.results ?? []
     return
   }
+  const scope = readCacheScopeToken()
   try {
     const fresh = await cachedRead(key, fetch, ({ results }) => {
       if (!unmounted && activeExecutionId.value === executionId) executionRows.value = results ?? []
@@ -686,7 +687,7 @@ async function loadExecution(executionId: string, chartLoaded: Promise<unknown> 
     // Kept even if the page closed meanwhile: a final answer is final whoever is looking.
     const startedDate = executions.value.find((e) => e.reconciliationExecutionId === executionId)?.startedDate
     if (activeExecutionId.value === executionId && isExecutionFinal(walkable.value, fresh.results ?? [], startedDate, Date.now())) {
-      storeFinal(key, fresh)
+      storeFinal(key, fresh, scope)
     }
     if (unmounted || activeExecutionId.value !== executionId) return
   } catch (error) {
