@@ -83,7 +83,7 @@ npm run generate-api-types  # regenerate src/lib/api/generated/schema.d.ts from 
 
 For targeted specs, run `npx vitest run <path>`.
 
-After a backend contract change, run `npm run sync-contract` and then `npm run generate-api-types`.
+After a backend contract change, run `npm run sync-contract` and then `npm run generate-api-types`. `sync-contract` copies from the sibling `../darpan-backend/runtime/component/darpan/docs/api-contract/`, so the copy matches whatever that checkout holds; sync from the backend tag you ship against.
 
 ### Local backend + UI together
 
@@ -220,3 +220,4 @@ Notes:
 ## Notes
 
 - API contracts remain owned by `darpan-backend/runtime/component/darpan/service/facade/**`. `src/lib/api/contract/` is a copy; refresh it with `npm run sync-contract`.
+- Backend version: v3.0.0 needs darpan 2.0.0. It calls 25 facade methods darpan 1.5.1 lacks and renders the 2.0 run stage codes (`RUN_STAGE_SEQUENCE` in `src/lib/reconciliationDisplay.ts` mirrors the backend `STAGE_SEQUENCE`). Against a 1.5.1 backend, stay on v2.6.1.

@@ -2126,6 +2126,87 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ValidateJsonTextAgainstSchemaResult"];
         };
+        /**
+         * @description What the lifecycle builder may offer for one NetSuite account: record types with records in the
+         *                 last 30 days, and, given a record type, what follows it in NetSuite's link table over a settled week,
+         *                 with how many reached each follower, how soon, and the share done by each of a few days.
+         */
+        GetLifecycleOptionsParams: {
+            nsAuthConfigId: string;
+            /** @description Omit for the record-type counts only. */
+            recordType?: string;
+        };
+        GetLifecycleOptionsResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            recordTypes?: string[];
+            stages?: string[];
+            sampleSize?: number;
+            sampleFrom?: string;
+            sampleThru?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.NetSuiteLifecycleFacadeServices.get#LifecycleOptions */
+        GetLifecycleOptionsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.NetSuiteLifecycleFacadeServices.get#LifecycleOptions";
+            params?: components["schemas"]["GetLifecycleOptionsParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.NetSuiteLifecycleFacadeServices.get#LifecycleOptions. Check result.ok / result.errors for business failures. */
+        GetLifecycleOptionsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetLifecycleOptionsResult"];
+        };
+        /**
+         * @description DAR-UI-050. What a lifecycle rule may name: the text fields NetSuite shows on the record type, by
+         *                 their own names, and, given one, the values it holds over the last 30 days, most common first, with an
+         *                 empty value as NO_VALUE ("No value").
+         */
+        GetLifecycleRuleOptionsParams: {
+            nsAuthConfigId: string;
+            recordType: string;
+            /** @description Omit for the field list only. */
+            fieldId?: string;
+            /**
+             * @description STAGE for a stage exception: standard fields such as Shipping Method
+             *                     are offered too, read by display name, and "No value" is not.
+             */
+            scope?: string;
+        };
+        GetLifecycleRuleOptionsResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            fields?: string[];
+            values?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.NetSuiteLifecycleFacadeServices.get#LifecycleRuleOptions */
+        GetLifecycleRuleOptionsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.NetSuiteLifecycleFacadeServices.get#LifecycleRuleOptions";
+            params?: components["schemas"]["GetLifecycleRuleOptionsParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.NetSuiteLifecycleFacadeServices.get#LifecycleRuleOptions. Check result.ok / result.errors for business failures. */
+        GetLifecycleRuleOptionsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetLifecycleRuleOptionsResult"];
+        };
         /** @description One check definition with its full column projection, for editing. */
         GetNsSuiteQlSourceQueryParams: {
             nsSuiteQlSourceQueryId: string;
@@ -2158,9 +2239,8 @@ export interface components {
         /**
          * @description NetSuite SuiteQL check definitions the active tenant can see, paged.
          *
-         *                 Paged like every other settings list so the shared list component can render it —
-         *                 the composable every settings page uses requires a pagination block, and a list
-         *                 service that returns everything is the one that cannot be shown.
+         *                 Paged like every other list service (pageIndex/pageSize in, a pagination block out), so
+         *                 a caller gets a bounded page and the total instead of every row at once.
          */
         ListNsSuiteQlSourceQueriesParams: {
             pageIndex?: number;
@@ -2714,6 +2794,100 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["DeleteGeneratedOutputResult"];
         };
+        /** @description DAR-UI-050. Removes a finding a person wrote; its past results stay readable. */
+        DeleteLifecycleFindingParams: {
+            reconciliationId: string;
+            reconciliationRunId: string;
+        };
+        DeleteLifecycleFindingResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            findings?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.delete#LifecycleFinding */
+        DeleteLifecycleFindingRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.delete#LifecycleFinding";
+            params?: components["schemas"]["DeleteLifecycleFindingParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.delete#LifecycleFinding. Check result.ok / result.errors for business failures. */
+        DeleteLifecycleFindingResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DeleteLifecycleFindingResult"];
+        };
+        /** @description DAR-UI-050. Removes one rule (one field value) from a lifecycle built from stages. */
+        DeleteLifecycleRuleParams: {
+            reconciliationId: string;
+            fieldId: string;
+            value: string;
+        };
+        DeleteLifecycleRuleResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            rules?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.delete#LifecycleRule */
+        DeleteLifecycleRuleRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.delete#LifecycleRule";
+            params?: components["schemas"]["DeleteLifecycleRuleParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.delete#LifecycleRule. Check result.ok / result.errors for business failures. */
+        DeleteLifecycleRuleResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DeleteLifecycleRuleResult"];
+        };
+        /** @description DAR-UI-050. Removes one stage exception (one value) from a lifecycle built from stages. */
+        DeleteLifecycleStageExceptionParams: {
+            reconciliationId: string;
+            stageRecordType: string;
+            /** @description Which field's value goes, when a stage holds exceptions on several. */
+            fieldId?: string;
+            value: string;
+        };
+        DeleteLifecycleStageExceptionResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            exceptions?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.delete#LifecycleStageException */
+        DeleteLifecycleStageExceptionRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.delete#LifecycleStageException";
+            params?: components["schemas"]["DeleteLifecycleStageExceptionParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.delete#LifecycleStageException. Check result.ok / result.errors for business failures. */
+        DeleteLifecycleStageExceptionResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DeleteLifecycleStageExceptionResult"];
+        };
         /** @description DAR-UI-048. Remove one question. Refused while it has questions under it. */
         DeleteReconciliationQuestionParams: {
             reconciliationRunId: string;
@@ -3052,6 +3226,21 @@ export interface components {
             errors?: string[];
             reconciliation?: Record<string, never>;
             questions?: string[];
+            /** @description DAR-UI-050. A lifecycle built from stages: its rules, one per field value it leaves out. */
+            rules?: string[];
+            /** @description DAR-UI-050. A lifecycle built from stages: its stages in order. */
+            stages?: string[];
+            /** @description DAR-UI-050. A lifecycle built from stages: the records a stage is not expected of. */
+            exceptions?: string[];
+            /**
+             * @description DAR-UI-050. A lifecycle built from stages: the account and
+             *                     record type its start reads, which its rule dropdowns are filled from.
+             */
+            lifecycle?: Record<string, never>;
+            /** @description DAR-UI-050. A lifecycle built from stages: the custom fields its records show, [fieldId, label]. */
+            details?: string[];
+            /** @description DAR-UI-050. A lifecycle built from stages: the findings people wrote for its stages. */
+            findings?: string[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#Reconciliation */
         GetReconciliationRequest: {
@@ -4279,6 +4468,265 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SaveDashboardPinnedSavedRunsResult"];
         };
+        /**
+         * @description DAR-UI-050. Creates a lifecycle from the builder's dropdown choices: a NetSuite account, the record
+         *                 type it starts from, and its stages in order. Writes the start query, one "is this stage missing?" query per
+         *                 stage, a rule per question, and the question tree with every ending named. The caller sends record types
+         *                 only; no rule, query or question id crosses the wire.
+         */
+        SaveLifecycleParams: {
+            nsAuthConfigId: string;
+            /** @description The start record type, e.g. SalesOrd. */
+            recordType: string;
+            /** @description Stages in order, e.g. [ItemShip, CustInvc]. */
+            stageRecordTypes: string[];
+            lateAfterDays?: number;
+            /** @description Optional; generated from the stages when empty. */
+            reconciliationName?: string;
+            /**
+             * @description DAR-BE-073. Stages reached by a shared field rather than NetSuite's transaction links, e.g. a
+             *                         credit memo carrying the return's HC Return Id. Stages not named here are reached by link.
+             */
+            stageReach?: {
+                reach?: {
+                    recordType?: string;
+                    startField?: string;
+                    stageField?: string;
+                };
+            }[];
+            /**
+             * @description Rules chosen while setting it up, as save#LifecycleRule takes them: leave out the start's
+             *                         records whose field has this value.
+             */
+            rules?: {
+                rule?: {
+                    fieldId?: string;
+                    fieldLabel?: string;
+                    value?: string;
+                };
+            }[];
+        };
+        SaveLifecycleResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            reconciliationId?: string;
+            reconciliationName?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#Lifecycle */
+        SaveLifecycleRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.save#Lifecycle";
+            params?: components["schemas"]["SaveLifecycleParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.save#Lifecycle. Check result.ok / result.errors for business failures. */
+        SaveLifecycleResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveLifecycleResult"];
+        };
+        /**
+         * @description DAR-UI-050. What a lifecycle's records show beside the standard columns (order, date, status,
+         *                 customer, total, shipping method, reference): custom body fields such as HC Order Id or eTail Order Id, in
+         *                 order, on every one of its checks. Replaces the list.
+         */
+        SaveLifecycleDetailsParams: {
+            reconciliationId: string;
+            /** @description [fieldId (custbody_...), label]; an empty list leaves the standard columns only. */
+            details?: string[];
+        };
+        SaveLifecycleDetailsResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            details?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleDetails */
+        SaveLifecycleDetailsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.save#LifecycleDetails";
+            params?: components["schemas"]["SaveLifecycleDetailsParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.save#LifecycleDetails. Check result.ok / result.errors for business failures. */
+        SaveLifecycleDetailsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveLifecycleDetailsResult"];
+        };
+        /**
+         * @description DAR-UI-050. A finding a person writes for a stage of a lifecycle built from stages: the records
+         *                 that reached the stage and whose field matches ("Items Backordered more than 0"), a place of its own.
+         */
+        SaveLifecycleFindingParams: {
+            reconciliationId: string;
+            stageRecordType: string;
+            fieldId: string;
+            fieldLabel?: string;
+            /** @description IN (is, the default) or GT (more than a number). */
+            op?: string;
+            value: string;
+            valueLabel?: string;
+        };
+        SaveLifecycleFindingResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            findings?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleFinding */
+        SaveLifecycleFindingRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.save#LifecycleFinding";
+            params?: components["schemas"]["SaveLifecycleFindingParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.save#LifecycleFinding. Check result.ok / result.errors for business failures. */
+        SaveLifecycleFindingResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveLifecycleFindingResult"];
+        };
+        /**
+         * @description DAR-UI-050. Adds a rule to a lifecycle built from stages: leave out the start's records whose field
+         *                 has this value (NO_VALUE for "has no value"). The field joins the start's query; the rule is an EXCLUDE_IN
+         *                 filter on the start, so a left-out record is in no place. Adding a value already there changes nothing.
+         */
+        SaveLifecycleRuleParams: {
+            reconciliationId: string;
+            /** @description The NetSuite field, e.g. custbody_hc_sales_channel. */
+            fieldId: string;
+            /** @description Its name as people know it, e.g. HC Sales Channel. */
+            fieldLabel?: string;
+            value: string;
+        };
+        SaveLifecycleRuleResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            rules?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleRule */
+        SaveLifecycleRuleRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.save#LifecycleRule";
+            params?: components["schemas"]["SaveLifecycleRuleParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.save#LifecycleRule. Check result.ok / result.errors for business failures. */
+        SaveLifecycleRuleResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveLifecycleRuleResult"];
+        };
+        /**
+         * @description DAR-UI-050. A stage is not expected of a record whose field has this value ("Fulfillment, when Shipping
+         *                 Method is Store Pickup"): written on every check of the lifecycle that asks about the stage, so such a record
+         *                 counts as having it. One field per stage; adding a value already there changes nothing.
+         */
+        SaveLifecycleStageExceptionParams: {
+            reconciliationId: string;
+            stageRecordType: string;
+            fieldId: string;
+            fieldLabel?: string;
+            value: string;
+        };
+        SaveLifecycleStageExceptionResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            exceptions?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleStageException */
+        SaveLifecycleStageExceptionRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.save#LifecycleStageException";
+            params?: components["schemas"]["SaveLifecycleStageExceptionParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.save#LifecycleStageException. Check result.ok / result.errors for business failures. */
+        SaveLifecycleStageExceptionResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveLifecycleStageExceptionResult"];
+        };
+        /**
+         * @description DAR-UI-050. Changes a lifecycle's stages: their order, or which they are. The old stage questions are
+         *                 turned off (past runs stay readable) and new ones compiled under the same start, so filters stay; stage
+         *                 exceptions follow their stage. A name still as generated follows the new order.
+         */
+        SaveLifecycleStagesParams: {
+            reconciliationId: string;
+            stageRecordTypes: string[];
+            /**
+             * @description DAR-BE-073. Stages reached by a shared field rather than NetSuite's transaction links, e.g. a
+             *                         credit memo carrying the return's HC Return Id. Stages not named here are reached by link; when
+             *                         not sent, each stage keeps how it is reached now.
+             */
+            stageReach?: {
+                reach?: {
+                    recordType?: string;
+                    startField?: string;
+                    stageField?: string;
+                };
+            }[];
+        };
+        SaveLifecycleStagesResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            reconciliationName?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleStages */
+        SaveLifecycleStagesRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.ReconciliationFacadeServices.save#LifecycleStages";
+            params?: components["schemas"]["SaveLifecycleStagesParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.save#LifecycleStages. Check result.ok / result.errors for business failures. */
+        SaveLifecycleStagesResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveLifecycleStagesResult"];
+        };
         /** @description Update an existing two-source mapping for darpan-ui settings workflows. */
         SaveMappingParams: {
             reconciliationMappingId: string;
@@ -4330,6 +4778,13 @@ export interface components {
             reconciliationName?: string;
             description?: string;
             defaultTimeWindow?: string;
+            /** @description DAR-UI-050. A lifecycle built from stages: records younger than this are not judged yet. */
+            lateAfterDays?: number;
+            /**
+             * @description DAR-UI-050. A lifecycle built from stages: the places whose records are not findings,
+             *                         by their stored names. Replaces the list; an empty list makes every place a finding.
+             */
+            notFindingPlaces?: string[];
             isActive?: string;
             isArchived?: string;
         };
@@ -5967,7 +6422,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"];
+                "application/json": components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"];
             };
         };
         responses: {
@@ -5977,7 +6432,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"];
                 };
             };
         };
