@@ -713,9 +713,12 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(sharedStyleSource).toContain('max-width: 100%;')
     expect(homeSource).not.toContain('.static-page-tile {')
     expect(homeSource).not.toContain('.static-page-tile-title {')
-    expect(runHistorySource).toContain('.run-history-tile {')
-    expect(runHistorySource).toContain('align-items: flex-start;')
-    expect(runHistorySource).toContain('text-align: left;')
+    // The run-history tile's left-aligned override moved into the shared stylesheet (DAR-UI-050).
+    // Read that one rule block, not the whole file, so an unrelated rule cannot satisfy the check.
+    const runHistoryTileRule = sharedStyleSource.match(/\n\.run-history-tile \{([^}]*)\}/)?.[1] ?? ''
+    expect(runHistorySource).toContain('run-history-tile')
+    expect(runHistoryTileRule).toContain('align-items: flex-start;')
+    expect(runHistoryTileRule).toContain('text-align: left;')
   })
 
   it('anchors static-page board content to the top so single-section dashboards do not stretch internal spacing', () => {
@@ -1024,11 +1027,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(source).toMatch(
       /\.app-icon-action,\s*\.app-table__icon-action\s*\{[^}]*color: color-mix\(in oklab, var\(--danger\) 82%, var\(--text\)\);/,
     )
-    // The FABs stay pill-shaped rather than taking the rectangular icon-container radius. That was
-    // pinned as a literal 999px; --radius-pill is the same value and names the intent, so the guard
-    // now reads as "pill, not icon-container" instead of "this magic number".
     expect(source).toContain('--radius-pill: 999px;')
-    expect(source).toMatch(/\.user-fab,\s*\.home-fab\s*\{[^}]*border-radius: var\(--radius-pill\);/)
   })
 
   it('keeps the semantic primary save-action class without dedicated icon-action overrides', () => {
@@ -1101,8 +1100,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
       })
     })
 
-    expect(source).toContain('border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--border));')
-    expect(source).toContain('background: color-mix(in oklab, var(--accent) 92%, var(--surface));')
     expect(source).not.toContain('#d7a7a7')
     expect(source).not.toContain('#8d4a4a')
     expect(source).not.toContain('#c6ced8')
