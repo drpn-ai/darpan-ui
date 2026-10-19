@@ -258,7 +258,7 @@ import StatusBadge from '../../components/ui/StatusBadge.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { reconciliationFacade } from '../../lib/api/facade'
-import { cachedRead } from '../../lib/api/readCache'
+import { cachedRead, readFinal, storeFinal } from '../../lib/api/readCache'
 import { lifecycleChart, lifecycleExecution, lifecycleExecutions, lifecycleRules } from '../../lib/api/queries'
 import type {
   FlowchartBranch, FlowchartExecutionRow, FlowchartExecutionSummary, FlowchartQuestion, FlowchartRun, LifecycleRule,
@@ -267,7 +267,7 @@ import type {
 import type { SavedRunSummary } from '../../lib/api/types'
 import { walkableQuestionIds } from '../../lib/flowchart/flowchartLayout'
 import {
-  isExecutionDone, POLL_INTERVAL_MS, questionStates, shouldKeepPolling,
+  isExecutionDone, isExecutionFinal, POLL_INTERVAL_MS, questionStates, shouldKeepPolling,
 } from '../../lib/flowchart/flowchartRunState'
 import { backIconPath, playIconPath, playIconTransform, settingsIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { buildReconciliationRunLiveRoute, buildReconciliationRunResultRoute } from '../../lib/reconciliationRoutes'
@@ -540,8 +540,9 @@ async function load() {
   const chart = lifecycleChart(reconciliationId.value)
   try {
     await Promise.all([
-      cachedRead(chart.key, chart.fetch, applyChart),
-      rules.value.length ? null : cachedRead(lifecycleRules.key, lifecycleRules.fetch, (saved) => { rules.value = saved.savedRuns ?? [] }),
+      // DAR-UI-057: persisted, so a reload or a link opened in a new tab draws the last chart at once.
+      cachedRead(chart.key, chart.fetch, applyChart, { persist: true }),
+      rules.value.length ? null : cachedRead(lifecycleRules.key, lifecycleRules.fetch, (saved) => { rules.value = saved.savedRuns ?? [] }, { persist: true }),
     ])
   } catch (error) {
     pageError.value = message(error)
@@ -616,7 +617,7 @@ function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = n
 async function loadExecutions() {
   try {
     const { key, fetch } = lifecycleExecutions(reconciliationId.value)
-    await cachedRead(key, fetch, (response) => { if (!unmounted) executions.value = response?.executions ?? [] })
+    await cachedRead(key, fetch, (response) => { if (!unmounted) executions.value = response?.executions ?? [] }, { persist: true })
   } catch {
     // History is a convenience: failing to list it costs the picker, never the chart.
     executions.value = []
@@ -669,12 +670,24 @@ async function loadExecution(executionId: string, chartLoaded: Promise<unknown> 
   pollCeilingHit.value = false
   activeExecutionId.value = executionId
   executionRows.value = []
+  const { key, fetch } = lifecycleExecution(executionId)
+  // DAR-UI-057: a finished execution never changes, so an earlier visit's copy is the answer. No network,
+  // and nothing to follow.
+  const kept = readFinal<Awaited<ReturnType<typeof fetch>>>(key)
+  if (kept) {
+    executionRows.value = kept.results ?? []
+    return
+  }
   try {
-    const { key, fetch } = lifecycleExecution(executionId)
-    await cachedRead(key, fetch, ({ results }) => {
+    const fresh = await cachedRead(key, fetch, ({ results }) => {
       if (!unmounted && activeExecutionId.value === executionId) executionRows.value = results ?? []
     })
     await chartLoaded
+    // Kept even if the page closed meanwhile: a final answer is final whoever is looking.
+    const startedDate = executions.value.find((e) => e.reconciliationExecutionId === executionId)?.startedDate
+    if (activeExecutionId.value === executionId && isExecutionFinal(walkable.value, fresh.results ?? [], startedDate, Date.now())) {
+      storeFinal(key, fresh)
+    }
     if (unmounted || activeExecutionId.value !== executionId) return
   } catch (error) {
     pageError.value = message(error)

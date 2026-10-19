@@ -14,6 +14,11 @@ function installMapBackedStorage(property: 'localStorage' | 'sessionStorage'): v
       clear: () => {
         store.clear()
       },
+      // DAR-UI-057: the read cache enumerates its stored entries, as on a real Storage.
+      get length() {
+        return store.size
+      },
+      key: (index: number) => [...store.keys()][index] ?? null,
     },
   })
 }

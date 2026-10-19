@@ -18,7 +18,8 @@ vi.mock('../../../lib/api/facade', () => ({
 
 import { reconciliationFacade, settingsFacade } from '../../../lib/api/facade'
 import RunFlowchartPage from '../RunFlowchartPage.vue'
-import { invalidateReadCache } from '../../../lib/api/readCache'
+import { clearStoredReads, invalidateReadCache, setReadCacheScope } from '../../../lib/api/readCache'
+import { installLocalStorageStub } from '../../../test/localStorage'
 
 const f = vi.mocked(reconciliationFacade)
 const run = { reconciliationId: 'R1', reconciliationName: 'Order chain', defaultTimeWindow: '3d' }
@@ -443,6 +444,63 @@ describe('RunFlowchartPage', () => {
       expect(w.text()).toContain('Order chain')
       expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(true)
       expect(w.text()).not.toContain('Loading run...')
+      w.unmount()
+    })
+  })
+  // DAR-UI-057. A finished execution never changes: its next visit asks nothing of the network, even after
+  // a write elsewhere (which drops every other cached read) or in a new tab.
+  describe('a finished run is kept (DAR-UI-057)', () => {
+    const finished = [
+      { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 10, noCount: 0 },
+      { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 7, noCount: 3 },
+    ]
+    beforeEach(() => {
+      installLocalStorageStub()
+      setReadCacheScope('alice|GORJANA')
+    })
+    afterEach(() => {
+      clearStoredReads()
+      setReadCacheScope(null)
+    })
+
+    it('a finished run is drawn on its next visit without asking for it again', async () => {
+      routeParams.reconciliationExecutionId = 'E7'
+      f.getReconciliationExecution.mockResolvedValue({ results: finished } as never)
+      mount(RunFlowchartPage).unmount()
+      await flushPromises()
+      invalidateReadCache() // a write anywhere: every changeable read is gone
+      f.getReconciliationExecution.mockReset()
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(f.getReconciliationExecution).not.toHaveBeenCalled()
+      expect(w.get('[data-testid="flowchart-summary-status"]').text()).toContain('Done')
+      expect(w.get('[data-testid="flowchart-summary-findings"]').text()).toContain('3')
+      w.unmount()
+    })
+
+    it('a run paused between questions is not kept: the next visit asks again', async () => {
+      routeParams.reconciliationExecutionId = 'E8'
+      f.listReconciliationExecutions.mockResolvedValue({ executions: [{ reconciliationExecutionId: 'E8', startedDate: new Date().toISOString() }] } as never)
+      f.getReconciliationExecution.mockResolvedValue({ results: [finished[0]] } as never)
+      mount(RunFlowchartPage).unmount()
+      await flushPromises()
+      invalidateReadCache()
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(f.getReconciliationExecution).toHaveBeenCalledTimes(2)
+      w.unmount()
+    })
+
+    it('keeps nothing while signed out', async () => {
+      setReadCacheScope(null)
+      routeParams.reconciliationExecutionId = 'E7'
+      f.getReconciliationExecution.mockResolvedValue({ results: finished } as never)
+      mount(RunFlowchartPage).unmount()
+      await flushPromises()
+      invalidateReadCache()
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      expect(f.getReconciliationExecution).toHaveBeenCalledTimes(2)
       w.unmount()
     })
   })

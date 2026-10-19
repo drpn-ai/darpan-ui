@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import type { RouteLocationRaw } from 'vue-router'
 import { ApiCallError, clearAuthToken, getAuthToken, setAuthTokenContract } from '../lib/api/client'
 import { authFacade, clearApiResponseCache, settingsFacade } from '../lib/api/facade'
+import { setReadCacheScope } from '../lib/api/readCache'
 import { useReferenceDataStore } from './referenceData'
 import { useRunResultsStore } from './runResults'
 import type {
@@ -205,6 +206,13 @@ export const useAuthStore = defineStore('auth', () => {
     _error.value = nextState.error ?? null
     _sessionInfo.value = nextState.sessionInfo ?? null
     setDefaultDisplayTimeZone(resolveEffectiveTimeZone(_sessionInfo.value))
+    // DAR-UI-057: stored reads belong to one user in one tenant. A failed check is not a sign-out, so it
+    // leaves the scope as it was.
+    if (nextState.status === 'authenticated' && _sessionInfo.value?.userId) {
+      setReadCacheScope(`${_sessionInfo.value.userId}|${_sessionInfo.value.activeTenantUserGroupId ?? ''}`)
+    } else if (nextState.status === 'unauthenticated') {
+      setReadCacheScope(null)
+    }
   }
 
   function _applyAuthenticatedSession(sessionInfoArg: SessionInfo | null | undefined, errorMsg: string | null = null): void {

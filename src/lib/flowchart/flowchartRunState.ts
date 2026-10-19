@@ -56,6 +56,24 @@ export function isExecutionDone(walkable: string[], rows: FlowchartExecutionRow[
   return walkable.every((id) => TERMINAL.includes(states[id]?.state ?? 'waiting'))
 }
 
+/**
+ * DAR-UI-057. Whether an execution can never change again, so its answer may be cached for good. "No row
+ * active" is not enough: the walker writes a question's row only when its turn comes, so between two
+ * questions every row is done while the walk goes on. Final means every walkable question has a terminal
+ * row, or the walk started longer ago than any walk runs (questions added to the chart since it ran have
+ * no row and never will).
+ */
+export function isExecutionFinal(
+  walkable: string[], rows: FlowchartExecutionRow[], startedDate: string | number | null | undefined, now: number,
+): boolean {
+  // An unknown status reads as running, as questionStates reads it: never final on a status it cannot name.
+  if (!rows.length || rows.some((r) => !TERMINAL.includes(STATE_BY_STATUS[r.statusEnumId ?? ''] ?? 'running'))) return false
+  // An empty chart (not loaded, or failed to load) would make isExecutionDone vacuously true.
+  if (walkable.length && isExecutionDone(walkable, rows)) return true
+  const started = startedDate == null || startedDate === '' ? Number.NaN : new Date(startedDate).getTime()
+  return Number.isFinite(started) && now - started > POLL_CEILING_MS
+}
+
 export function shouldKeepPolling(startedAt: number, now: number, done: boolean): boolean {
   return !done && now - startedAt <= POLL_CEILING_MS
 }

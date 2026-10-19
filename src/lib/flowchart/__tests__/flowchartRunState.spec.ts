@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildRunPayload, defaultWindowDays, isExecutionDone, POLL_CEILING_MS, questionStates, shouldKeepPolling, windowFromDays,
+  buildRunPayload, defaultWindowDays, isExecutionDone, isExecutionFinal, POLL_CEILING_MS, questionStates, shouldKeepPolling, windowFromDays,
 } from '../flowchartRunState'
 
 describe('the window', () => {
@@ -55,5 +55,35 @@ describe('polling', () => {
     expect(shouldKeepPolling(0, 1000, false)).toBe(true)
     expect(shouldKeepPolling(0, POLL_CEILING_MS + 1, false)).toBe(false)
     expect(shouldKeepPolling(0, 1000, true)).toBe(false)
+  })
+})
+
+// DAR-UI-057. A finished execution is cached for good, so "finished" must never be a pause between questions:
+// the walker writes a question's row only when its turn comes.
+describe('a final execution', () => {
+  const ok = (id: string) => ({ reconciliationRunResultId: id, reconciliationRunId: id, statusEnumId: 'AUT_STAT_SUCCESS' })
+  const now = Date.parse('2026-10-19T12:00:00Z')
+  const recent = '2026-10-19T11:59:00Z'
+
+  it('is final when every walkable question has a terminal row', () => {
+    expect(isExecutionFinal(['S', 'a'], [ok('S'), ok('a')], recent, now)).toBe(true)
+  })
+  it('is not final between questions: every row done, but a walkable question has no row yet', () => {
+    expect(isExecutionFinal(['S', 'a'], [ok('S')], recent, now)).toBe(false)
+  })
+  it('is never final while a row is active', () => {
+    const running = { reconciliationRunResultId: 'a', reconciliationRunId: 'a', statusEnumId: 'AUT_STAT_RUNNING' }
+    expect(isExecutionFinal(['S', 'a'], [ok('S'), running], '2026-01-01T00:00:00Z', now)).toBe(false)
+  })
+  it('is final once it started longer ago than any walk runs, even if the chart gained questions since', () => {
+    expect(isExecutionFinal(['S', 'added-later'], [ok('S')], new Date(now - POLL_CEILING_MS - 1).toISOString(), now)).toBe(true)
+    expect(isExecutionFinal(['S', 'added-later'], [ok('S')], new Date(now - POLL_CEILING_MS + 60_000).toISOString(), now)).toBe(false)
+  })
+  it('is not final on a chart it could not read: no walkable questions proves nothing', () => {
+    expect(isExecutionFinal([], [ok('S')], recent, now)).toBe(false)
+  })
+  it('is not final with no rows, or with no start time to age it by', () => {
+    expect(isExecutionFinal(['S'], [], '2026-01-01T00:00:00Z', now)).toBe(false)
+    expect(isExecutionFinal(['S', 'a'], [ok('S')], null, now)).toBe(false)
   })
 })
