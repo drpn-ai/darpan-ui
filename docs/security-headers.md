@@ -1,21 +1,61 @@
 # Security headers (firebase.json)
 
-Both hosting targets (`uat`, `prod`) in `firebase.json` serve the same header set;
-only the CSP `connect-src` API host differs. firebase.json cannot carry comments,
+All three hosting targets in `firebase.json` (`prod`, `uat`, `sm-darpan`) serve the same header
+set. Only the CSP `connect-src` API host differs per target. firebase.json cannot carry comments,
 so the rationale for the non-obvious values lives here.
 
 Audit trail: hardened in `f4a5619` (canonical lowercase `nosniff`, Permissions-Policy,
-`frame-ancestors 'none'`), re-inventoried 2026-07-02 (MACH P2).
+`frame-ancestors 'none'`), re-inventoried 2026-07-02 (MACH P2), re-checked against firebase.json
+2026-10-19.
 
 ## Current posture
+
+Applied to every path (`source: "**"`):
 
 | Header | Value | Note |
 | --- | --- | --- |
 | Content-Security-Policy | see below | per-target `connect-src` |
-| X-Content-Type-Options | `nosniff` | canonical lowercase in both blocks |
 | Strict-Transport-Security | `max-age=31536000; includeSubDomains; preload` | |
+| Permissions-Policy | `camera=(self), microphone=(), geolocation=(), payment=(), usb=()` | |
+| X-Content-Type-Options | `nosniff` | canonical lowercase in every block |
 | Referrer-Policy | `strict-origin-when-cross-origin` | |
-| Permissions-Policy | camera=(self), everything else denied | |
+| Cache-Control | `no-cache` | `index.html` and SPA routes revalidate on every load, so a deploy is picked up at once |
+
+Path overrides:
+
+| Source | Cache-Control | Why |
+| --- | --- | --- |
+| `/assets/**` | `public, max-age=31536000, immutable` | Vite emits content-hashed filenames |
+| `/favicon.svg` | `public, max-age=86400` | not hashed |
+
+## CSP directives
+
+Shared by all targets:
+
+```
+default-src 'self';
+base-uri 'self';
+object-src 'none';
+font-src 'self' data: https://fonts.gstatic.com;
+script-src 'self' https://www.gstatic.com https://*.firebaseapp.com;
+img-src 'self' data: https:;
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+frame-src https://linear.app;
+frame-ancestors 'none';
+form-action 'self';
+```
+
+`connect-src` per target:
+
+| Target | `connect-src` |
+| --- | --- |
+| `prod` | `'self' https://*.hotwax.io https://api.drpn.ai` |
+| `uat` | `'self' https://*.hotwax.io https://api-uat.drpn.ai` |
+| `sm-darpan` | `'self' https://sm-darpan-maarg.hotwax.io` |
+
+`frame-src https://linear.app` exists for the embedded roadmap page (`/roadmap/reconciliation`,
+`VITE_DARPAN_LINEAR_EMBED_ENABLED`). When a target changes its API host, update that target's
+`connect-src` in the same change, or every RPC call is blocked by the browser.
 
 ## CSP: why `style-src` keeps `'unsafe-inline'`
 
