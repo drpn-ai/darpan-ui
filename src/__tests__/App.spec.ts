@@ -333,7 +333,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(wrapper.find('.floating-actions').exists()).toBe(true)
     // The launcher is the mascot now, so its name lives on the accessible label
     // rather than in visible text — the face carries the identity on screen.
-    expect(wrapper.find('.mascot-fab').attributes('aria-label')).toContain('Ask Darpan')
+    expect(wrapper.find('.mascot-fab').attributes('aria-label')).toMatch(/^Tara: .*Ask Darpan/)
     // Home and account are results inside the launcher rather than standing chrome.
     expect(wrapper.find('.home-fab').exists()).toBe(false)
     expect(wrapper.find('.user-fab').exists()).toBe(false)

@@ -15,6 +15,8 @@ describe('MascotDock', () => {
     const wrapper = mountDock()
     const fab = wrapper.get('.mascot-fab')
 
+    // DAR-UI-056: the character is Tara; the search she opens is still Ask Darpan.
+    expect(fab.attributes('aria-label')).toMatch(/^Tara: /)
     expect(fab.attributes('aria-label')).toContain('Ask Darpan')
     expect(wrapper.find('.mascot').exists()).toBe(true)
     // Nothing is said until it is asked: an empty corner at rest.

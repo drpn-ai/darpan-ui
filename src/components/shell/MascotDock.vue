@@ -92,7 +92,7 @@ const dockEl = ref<HTMLElement | null>(null)
 const fabLabel = computed(() =>
   mascot.hasWarnings
     ? `${mascot.warnings[0]?.title} — open the warning`
-    : 'Ask Darpan: search, or rest on a value to have it explained',
+    : 'Tara: open Ask Darpan to search, or rest on a value to have it explained',
 )
 
 const liveAnnouncement = computed(() =>
