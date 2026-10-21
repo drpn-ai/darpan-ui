@@ -1126,7 +1126,7 @@ export interface components {
         };
         /**
          * @description DAR-BE-028. Whether this environment can send password reset email (a SYSTEM EmailServer with
-         *                 an SMTP host, and DARPAN_MAIL_FROM set). darpan-ui hides "Forgot password?" when it cannot.
+         *                 an SMTP host). darpan-ui hides "Forgot password?" when it cannot.
          */
         GetPasswordResetStatusParams: Record<string, never>;
         GetPasswordResetStatusResult: {
