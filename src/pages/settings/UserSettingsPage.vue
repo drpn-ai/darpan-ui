@@ -1,5 +1,5 @@
 <template>
-  <StaticPageFrame :class="{ 'user-settings-page--popup-open': isPasswordWorkflowOpen || isNotificationDefaultWorkflowOpen || isTimezoneWorkflowOpen }">
+  <StaticPageFrame :class="{ 'user-settings-page--popup-open': isPasswordWorkflowOpen || isNotificationDefaultWorkflowOpen || isTimezoneWorkflowOpen || isRecoveryEmailWorkflowOpen }">
     <template #hero>
       <h1>User Settings</h1>
     </template>
@@ -22,6 +22,19 @@
         <article class="static-page-summary-card">
           <span class="static-page-summary-label">Username</span>
           <span>{{ username }}</span>
+        </article>
+        <!-- DAR-BE-028: where password reset codes go. Masked: the page never needs the whole address. -->
+        <article class="static-page-summary-card" data-testid="recovery-email-card">
+          <span class="static-page-summary-label">Recovery email</span>
+          <span>{{ authStore.emailAddressMasked ?? 'None — add one' }}</span>
+          <button
+            class="user-settings-control"
+            type="button"
+            data-testid="recovery-email-change"
+            @click="openRecoveryEmailWorkflow"
+          >
+            Change
+          </button>
         </article>
         <label class="static-page-summary-card user-settings-summary-field" for="user-display-name">
           <span class="static-page-summary-label">Display name</span>
@@ -147,6 +160,47 @@
               :name="passwordStepName"
               type="password"
               :autocomplete="passwordStepAutocomplete"
+              required
+            />
+          </label>
+        </WorkflowStepForm>
+      </div>
+    </section>
+  </div>
+
+  <div
+    v-if="isRecoveryEmailWorkflowOpen"
+    class="popup-workflow-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="recovery-email-workflow-title"
+    @click.self="closeRecoveryEmailWorkflow"
+  >
+    <section class="popup-workflow-modal workflow-panel" data-testid="recovery-email-workflow">
+      <header class="workflow-panel-header">
+        <h2 id="recovery-email-workflow-title">Recovery Email</h2>
+      </header>
+
+      <div class="workflow-step-wrapper">
+        <WorkflowStepForm
+          class="workflow-form--popup-compact"
+          :question="recoveryStep.question"
+          :primary-label="recoveryPrimaryLabel"
+          :submit-disabled="isRecoveryStepBlocked"
+          :show-back="recoveryStepIndex > 0"
+          :show-cancel-action="false"
+          :show-enter-hint="true"
+          primary-test-id="recovery-email-next"
+          @back="recoveryStepIndex = 0"
+          @submit="submitRecoveryStep"
+        >
+          <label class="workflow-context-block" :aria-label="recoveryStep.label">
+            <input
+              v-model="recoveryStepValue"
+              class="wizard-answer-control"
+              :name="recoveryStep.name"
+              :type="recoveryStep.type"
+              :autocomplete="recoveryStep.autocomplete"
               required
             />
           </label>
@@ -488,10 +542,95 @@ function closePasswordWorkflow(): void {
 }
 
 function handlePasswordWorkflowCancelRequest(event: Event): void {
+  if (isRecoveryEmailWorkflowOpen.value) {
+    event.preventDefault()
+    closeRecoveryEmailWorkflow()
+    return
+  }
   if (!isPasswordWorkflowOpen.value) return
 
   event.preventDefault()
   closePasswordWorkflow()
+}
+
+// DAR-BE-028 recovery email: current password first (the backend re-checks it on save, so a session token
+// alone cannot redirect reset codes), then the address.
+const isRecoveryEmailWorkflowOpen = ref(false)
+const isSavingRecoveryEmail = ref(false)
+const recoveryStepIndex = ref(0)
+const recoveryForm = ref({ currentPassword: '', emailAddress: '' })
+const recoverySteps = [
+  {
+    name: 'currentPassword',
+    label: 'Current Password',
+    question: 'Enter your current password.',
+    type: 'password',
+    autocomplete: 'current-password',
+  },
+  {
+    name: 'emailAddress',
+    label: 'Recovery Email',
+    question: 'Where should password reset codes go?',
+    type: 'email',
+    autocomplete: 'email',
+  },
+] as const
+const recoveryStep = computed(() => recoverySteps[recoveryStepIndex.value] ?? recoverySteps[0])
+const recoveryStepValue = computed({
+  get(): string {
+    return recoveryForm.value[recoveryStep.value.name]
+  },
+  set(value: string): void {
+    recoveryForm.value = { ...recoveryForm.value, [recoveryStep.value.name]: value }
+  },
+})
+const recoveryPrimaryLabel = computed(() => {
+  if (recoveryStepIndex.value < recoverySteps.length - 1) return 'OK'
+  return isSavingRecoveryEmail.value ? 'Saving' : 'Save'
+})
+const isRecoveryStepBlocked = computed(() =>
+  isSavingRecoveryEmail.value || isVerifyingCurrentPassword.value || recoveryStepValue.value.trim().length === 0)
+
+function openRecoveryEmailWorkflow(): void {
+  recoveryForm.value = { currentPassword: '', emailAddress: '' }
+  recoveryStepIndex.value = 0
+  isRecoveryEmailWorkflowOpen.value = true
+}
+
+function closeRecoveryEmailWorkflow(): void {
+  isRecoveryEmailWorkflowOpen.value = false
+  recoveryStepIndex.value = 0
+  recoveryForm.value = { currentPassword: '', emailAddress: '' }
+}
+
+async function submitRecoveryStep(): Promise<void> {
+  if (recoveryStep.value.name === 'currentPassword') {
+    if (isVerifyingCurrentPassword.value) return
+    isVerifyingCurrentPassword.value = true
+    try {
+      if (!(await authStore.verifyOwnPassword(recoveryForm.value.currentPassword))) {
+        showPasswordWorkflowWarning(authStore.error || 'Password incorrect.')
+        return
+      }
+    } finally {
+      isVerifyingCurrentPassword.value = false
+    }
+    recoveryStepIndex.value = 1
+    return
+  }
+
+  if (isSavingRecoveryEmail.value) return
+  isSavingRecoveryEmail.value = true
+  try {
+    const saved = await authStore.saveRecoveryEmail(recoveryForm.value.emailAddress.trim(), recoveryForm.value.currentPassword)
+    if (!saved) {
+      showPasswordWorkflowWarning(authStore.error || 'Unable to save the recovery email.')
+      return
+    }
+    closeRecoveryEmailWorkflow()
+  } finally {
+    isSavingRecoveryEmail.value = false
+  }
 }
 
 function goBackPasswordStep(): void {

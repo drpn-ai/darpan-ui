@@ -30,6 +30,7 @@ type TestSessionInfo = {
 const saveActiveTenant = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const verifyOwnPassword = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const changeOwnPassword = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+const saveRecoveryEmail = vi.hoisted(() => vi.fn())
 const getUserNotificationDefault = vi.hoisted(() => vi.fn())
 const saveUserNotificationDefault = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
@@ -45,7 +46,8 @@ const saveUserSettings = vi.hoisted(() => vi.fn(async ({ displayName, timeZone }
 // boolean and reports failure via this side-channel rather than throwing (see stores/auth.ts).
 // The useAuthStore mock below exposes it through a getter so a mid-test mutation (e.g. inside a
 // mockImplementationOnce) is visible to the page without needing to remount.
-const authState = vi.hoisted<{ sessionInfo: TestSessionInfo; error: string | null }>(() => ({
+const authState = vi.hoisted<{ sessionInfo: TestSessionInfo; error: string | null; emailAddressMasked: string | null }>(() => ({
+  emailAddressMasked: null,
   sessionInfo: {
     userId: 'M100000',
     username: 'john.doe',
@@ -92,6 +94,8 @@ vi.mock('../../../stores/auth', () => ({
     ...authState,
     sessionInfo: authState.sessionInfo,
     get error() { return authState.error },
+    get emailAddressMasked() { return authState.emailAddressMasked },
+    saveRecoveryEmail,
     saveActiveTenant,
     saveUserSettings,
     changeOwnPassword,
@@ -144,6 +148,12 @@ describe('UserSettingsPage', () => {
     saveUserNotificationDefault.mockReset()
     saveUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [], userNotificationDefault: undefined })
     authState.error = null
+    authState.emailAddressMasked = null
+    saveRecoveryEmail.mockReset()
+    saveRecoveryEmail.mockImplementation(async () => {
+      authState.emailAddressMasked = 'm•••@example.com'
+      return true
+    })
     authState.sessionInfo = {
       userId: 'M100000',
       username: 'john.doe',
@@ -184,7 +194,7 @@ describe('UserSettingsPage', () => {
       'Preferences',
       'Activity',
     ])
-    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(8)
+    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(9)
     expect(wrapper.findAll('.static-page-record-tile').map((node) => node.text())).toEqual(['Krewe', 'Gorjana'])
     expect(wrapper.findAll('.static-page-list-tile')).toHaveLength(0)
     expect(wrapper.find('.static-page-section-head .user-settings-password-trigger').exists()).toBe(false)
@@ -659,5 +669,58 @@ describe('UserSettingsPage', () => {
     await flushPromises()
 
     expect(revisit.get('[data-testid="user-notification-default-card"]').text()).toContain('Ops')
+  })
+
+  // ---- DAR-BE-028: recovery email ----
+
+  async function stepRecovery(wrapper: ReturnType<typeof mount>, value: string): Promise<void> {
+    await wrapper.get('[data-testid="recovery-email-workflow"] input').setValue(value)
+    await wrapper.get('[data-testid="recovery-email-next"]').trigger('click')
+    await flushPromises()
+  }
+
+  it('shows the recovery email masked, or asks for one', async () => {
+    const empty = mountPage()
+    await flushPromises()
+    expect(empty.get('[data-testid="recovery-email-card"]').text()).toContain('None — add one')
+
+    authState.emailAddressMasked = 'a•••@hotwax.co'
+    const set = mountPage()
+    await flushPromises()
+    expect(set.get('[data-testid="recovery-email-card"]').text()).toContain('a•••@hotwax.co')
+  })
+
+  it('changes the recovery email after the current password', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-testid="recovery-email-change"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="recovery-email-workflow"]').text()).toContain('Enter your current password.')
+    await stepRecovery(wrapper, 'Old-pass1!')
+    expect(verifyOwnPassword).toHaveBeenCalledWith('Old-pass1!')
+    expect(wrapper.get('[data-testid="recovery-email-workflow"]').text()).toContain('Where should password reset codes go?')
+    expect(wrapper.get('[data-testid="recovery-email-workflow"] input').attributes('type')).toBe('email')
+
+    await stepRecovery(wrapper, 'me@example.com')
+    expect(saveRecoveryEmail).toHaveBeenCalledWith('me@example.com', 'Old-pass1!')
+    expect(wrapper.find('[data-testid="recovery-email-workflow"]').exists()).toBe(false)
+    // The card reads the store; this mock store is not reactive, so read it from a fresh mount.
+    const after = mountPage()
+    await flushPromises()
+    expect(after.get('[data-testid="recovery-email-card"]').text()).toContain('m•••@example.com')
+  })
+
+  it('stays on the password step when the current password is wrong', async () => {
+    verifyOwnPassword.mockResolvedValue(false)
+    authState.error = 'Current password is incorrect.'
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-testid="recovery-email-change"]').trigger('click')
+    await flushPromises()
+    await stepRecovery(wrapper, 'wrong')
+
+    expect(wrapper.get('[data-testid="recovery-email-workflow"]').text()).toContain('Enter your current password.')
+    expect(saveRecoveryEmail).not.toHaveBeenCalled()
   })
 })
