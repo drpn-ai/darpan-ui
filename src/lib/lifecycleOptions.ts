@@ -1,4 +1,4 @@
-import type { LifecycleStageOption } from './api/flowchartTypes'
+import type { LifecycleStageOption, LifecycleStageReach } from './api/flowchartTypes'
 
 // DAR-UI-050. The lifecycle builder's dropdown options, from get#LifecycleOptions.
 
@@ -15,6 +15,11 @@ export function stageOptionLabel(stage: LifecycleStageOption): string {
 /** The chosen stages in the data's order (soonest first), whatever order they were clicked in. */
 export function orderedStages(stages: LifecycleStageOption[], chosen: string[]): LifecycleStageOption[] {
   return stages.filter((s) => chosen.includes(s.recordType))
+}
+
+/** DAR-UI-052. How each chosen stage found by a shared field is reached, as save#Lifecycle takes it; linked stages say nothing. */
+export function stageReach(ordered: LifecycleStageOption[]): LifecycleStageReach[] {
+  return ordered.flatMap((s) => (s.reach ? [{ recordType: s.recordType, startField: s.reach.startField, stageField: s.reach.stageField }] : []))
 }
 
 /** "Late after" is measured to the last stage, from the start record. The data still picks the default. */

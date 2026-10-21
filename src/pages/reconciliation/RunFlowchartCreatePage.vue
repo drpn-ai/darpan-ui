@@ -139,7 +139,7 @@ import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type { LifecycleRecordTypeOption, LifecycleStageOption } from '../../lib/api/flowchartTypes'
-import { orderedStages, lateAfterOptions, defaultLateAfter, stageOptionLabel } from '../../lib/lifecycleOptions'
+import { orderedStages, lateAfterOptions, defaultLateAfter, stageOptionLabel, stageReach } from '../../lib/lifecycleOptions'
 import { useLifecycleRuleOptions, type LifecycleRuleDraft } from '../../lib/useLifecycleRuleOptions'
 
 // DAR-UI-050. A lifecycle in four dropdowns, one per step. Every option is read from the account itself
@@ -253,12 +253,15 @@ async function create() {
   saving.value = true
   error.value = null
   try {
+    // DAR-UI-052: a stage found by a shared field (a return's credit memo by HC Return Id) says so; linked ones need nothing.
+    const reach = stageReach(chosenInOrder.value)
     const saved = await reconciliationFacade.saveLifecycle({
       nsAuthConfigId: accountId.value,
       recordType: recordType.value,
       stageRecordTypes: chosenInOrder.value.map((s) => s.recordType),
       lateAfterDays: Number(lateAfter.value),
       rules: pendingRules.value.map(({ fieldId, fieldLabel, value }) => ({ fieldId, fieldLabel, value })),
+      ...(reach.length ? { stageReach: reach } : {}),
     })
     await router.push({ name: 'reconciliation-run-flowchart', params: { reconciliationId: saved.reconciliationId } })
   } catch (caught) {

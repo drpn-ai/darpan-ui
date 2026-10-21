@@ -153,7 +153,11 @@ export interface LifecycleStageOption {
   typicalDays: number
   /** Share of those that reached it that had done so by each day. */
   coverage: { days: number; percent: number }[]
+  /** DAR-UI-052. Present when the stage is found by a field both records carry (HC Return Id), not NetSuite's link. */
+  reach?: LifecycleStageReachField
 }
+export interface LifecycleStageReachField { startField: string; stageField: string; fieldLabel: string }
+export interface LifecycleStageReach { recordType: string; startField: string; stageField: string }
 export interface GetLifecycleOptionsResponse {
   recordTypes: LifecycleRecordTypeOption[]
   stages: LifecycleStageOption[]
@@ -167,6 +171,7 @@ export interface SaveLifecyclePayload {
   stageRecordTypes: string[]
   lateAfterDays?: number
   rules?: { fieldId: string; fieldLabel: string; value: string }[]
+  stageReach?: LifecycleStageReach[]
 }
 export interface SaveLifecycleResponse { reconciliationId: string; reconciliationName: string }
 

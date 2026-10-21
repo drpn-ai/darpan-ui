@@ -92,6 +92,34 @@ describe('RunFlowchartCreatePage (lifecycle builder)', () => {
     expect(push).toHaveBeenCalledWith({ name: 'reconciliation-run-flowchart', params: { reconciliationId: 'R9' } })
   })
 
+  // DAR-UI-052. A return's credit memo is found by the HC Return Id both carry, not by a link: the option says so
+  // and the save carries it as the stage's reach.
+  it('saves how a stage reached by a shared field is found', async () => {
+    const reach = { startField: 'custbody_hc_return_id', stageField: 'custbody_hc_return_id', fieldLabel: 'HC Return Id' }
+    f.getLifecycleOptions.mockImplementation((async (p: { recordType?: string }) => (p.recordType
+      ? { recordTypes: [], stages: [
+        { recordType: 'ItemRcpt', label: 'Item receipt', past: 'Received', reached: 4721, rate: 75, typicalDays: 6,
+          coverage: [{ days: 14, percent: 97 }, { days: 30, percent: 100 }] },
+        { recordType: 'CustCred', label: 'Credit memo', past: 'Credited', reached: 5981, rate: 95, typicalDays: 7, reach,
+          coverage: [{ days: 14, percent: 96 }, { days: 30, percent: 100 }] }] }
+      : { recordTypes: [{ recordType: 'RtnAuth', label: 'Return authorizations', count: 6281 }, { recordType: 'SalesOrd', label: 'Sales orders', count: 24310 }], stages: [] })) as never)
+    const w = mount(RunFlowchartCreatePage)
+    await flushPromises()
+    select(w).vm.$emit('update:modelValue', 'RtnAuth')
+    await submit(w)
+    expect(w.text()).toContain('What happens to a return authorization?')
+    expect(labels(w)).toEqual(['Item receipt', 'Credit memo'])
+    await submit(w)
+    await submit(w)
+    select(w).vm.$emit('update:modelValue', '30')
+    await submit(w)
+
+    expect(f.saveLifecycle).toHaveBeenCalledWith({
+      nsAuthConfigId: 'gorjana_prod', recordType: 'RtnAuth', stageRecordTypes: ['ItemRcpt', 'CustCred'], lateAfterDays: 30, rules: [],
+      stageReach: [{ recordType: 'CustCred', startField: 'custbody_hc_return_id', stageField: 'custbody_hc_return_id' }],
+    })
+  })
+
   it('has no text inputs anywhere in the flow', async () => {
     const w = mount(RunFlowchartCreatePage)
     await flushPromises()

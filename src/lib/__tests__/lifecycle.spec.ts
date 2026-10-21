@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultLateAfter, lateAfterOptions, orderedStages, stageOptionLabel } from '../lifecycleOptions'
+import { defaultLateAfter, lateAfterOptions, orderedStages, stageOptionLabel, stageReach } from '../lifecycleOptions'
 import { lifecycleBoard } from '../lifecycleBoard'
 import type { FlowchartExecutionRow, FlowchartQuestion, LifecycleStageOption } from '../api/flowchartTypes'
 
@@ -16,6 +16,13 @@ describe('lifecycle options', () => {
   it('labels a stage by its name alone', () => {
     expect(stageOptionLabel(invoice)).toBe('Invoice')
     expect(stageOptionLabel(ship)).toBe('Fulfillment')
+  })
+
+  it('names how each chosen stage reached by a shared field is found, and nothing for a linked one', () => {
+    const credit: LifecycleStageOption = { ...invoice, recordType: 'CustCred', label: 'Credit memo',
+      reach: { startField: 'custbody_hc_return_id', stageField: 'custbody_hc_return_id', fieldLabel: 'HC Return Id' } }
+    expect(stageReach([ship, credit])).toEqual([{ recordType: 'CustCred', startField: 'custbody_hc_return_id', stageField: 'custbody_hc_return_id' }])
+    expect(stageReach([invoice, ship])).toEqual([])
   })
 
   it('keeps the data order, not the click order', () => {
