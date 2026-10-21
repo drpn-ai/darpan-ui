@@ -14,9 +14,9 @@
       <p class="eyebrow">Darpan</p>
       <!-- No heading in change mode: the step's own question ("Enter your new password.") is the
            instruction, and a title above it only restated that in larger type. -->
-      <h1 v-if="!isChangingPasswordMode">Sign In</h1>
+      <h1 v-if="!isChangingPasswordMode && !isResettingMode">Sign In</h1>
 
-      <form v-if="!isChangingPasswordMode" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
+      <form v-if="!isChangingPasswordMode && !isResettingMode" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
         <!-- The wrapping label already names each field for assistive tech; id/name are here for the
              password managers that still key off them rather than the autocomplete tokens. -->
         <label for="login-username">
@@ -31,8 +31,65 @@
 
         <div class="action-row">
           <button type="submit" :disabled="loading">Sign In</button>
+          <button
+            v-if="passwordResetAvailable"
+            type="button"
+            class="ghost-btn"
+            data-testid="login-forgot-password"
+            @click="enterResetMode"
+          >
+            Forgot password?
+          </button>
         </div>
       </form>
+
+      <!-- DAR-BE-028: one question per step, as the expired-password change below. -->
+      <template v-else-if="isResettingMode">
+        <WorkflowStepForm
+          :question="resetStep.question"
+          :primary-label="resetPrimaryLabel"
+          :submit-disabled="isResetStepBlocked"
+          :show-back="true"
+          :show-cancel-action="false"
+          :show-enter-hint="true"
+          primary-test-id="login-reset-next"
+          @back="goBackResetStep"
+          @submit="submitResetStep"
+        >
+          <!-- Shown whatever the request did: the backend answers the same either way, so the page does too. -->
+          <p v-if="resetStep.name === 'code'" class="section-note" data-testid="login-reset-note">
+            If that account has an email on file, a code is on its way. It expires in 15 minutes.<br />
+            No email on file? Ask your Darpan administrator.
+          </p>
+          <label class="workflow-context-block" :aria-label="resetStep.label">
+            <input
+              v-model="resetStepValue"
+              class="wizard-answer-control"
+              data-testid="login-reset-input"
+              :name="resetStep.name"
+              :type="resetStep.type"
+              :autocomplete="resetStep.autocomplete"
+              :inputmode="resetStep.inputmode"
+              required
+            />
+          </label>
+          <button
+            v-if="resetStep.name === 'code'"
+            type="button"
+            class="wizard-secondary-link"
+            data-testid="login-reset-resend"
+            @click="resendResetCode"
+          >
+            Send a new code
+          </button>
+          <ul v-if="resetStep.name === 'newPassword'" class="password-rules" aria-label="Password requirements">
+            <li v-for="rule in resetPasswordRules" :key="rule.id" :data-met="String(rule.met)" :class="{ met: rule.met }">
+              <span aria-hidden="true" class="password-rule-mark">{{ rule.met ? '✓' : '·' }}</span>
+              <span>{{ rule.label }}</span>
+            </li>
+          </ul>
+        </WorkflowStepForm>
+      </template>
 
       <template v-else>
         <WorkflowStepForm
@@ -115,6 +172,36 @@ const passwordForm = ref({
   newPasswordVerify: '',
 })
 
+// DAR-BE-028 forgot password. Hidden where the environment cannot send mail (no SMTP configured), so nobody
+// is sent to wait for a code that never comes.
+const passwordResetAvailable = ref(false)
+const isResettingMode = ref(false)
+const resetStepIndex = ref(0)
+const isSubmittingReset = ref(false)
+const resetForm = ref({ usernameOrEmail: '', code: '', newPassword: '', newPasswordVerify: '' })
+
+interface ResetStep {
+  name: keyof typeof resetForm.value
+  label: string
+  question: string
+  type: 'text' | 'password'
+  autocomplete: string
+  inputmode?: 'numeric'
+}
+const resetSteps: readonly [ResetStep, ResetStep, ResetStep, ResetStep] = [
+  { name: 'usernameOrEmail', label: 'Username or email', question: 'Username or email?', type: 'text', autocomplete: 'username' },
+  {
+    name: 'code',
+    label: 'Reset code',
+    question: 'Enter the code we emailed.',
+    type: 'text',
+    autocomplete: 'one-time-code',
+    inputmode: 'numeric',
+  },
+  { name: 'newPassword', label: 'New password', question: 'Enter your new password.', type: 'password', autocomplete: 'new-password' },
+  { name: 'newPasswordVerify', label: 'Verify password', question: 'Enter it again.', type: 'password', autocomplete: 'new-password' },
+]
+
 const passwordSteps = [
   {
     name: 'newPassword',
@@ -155,14 +242,15 @@ const PASSWORD_MIN_LENGTH = 8
 
 const isChoosingNewPassword = computed(() => passwordStep.value.name === 'newPassword')
 
-const passwordRules = computed(() => {
-  const value = passwordForm.value.newPassword
+function passwordRulesFor(value: string) {
   return [
     { id: 'length', label: `At least ${PASSWORD_MIN_LENGTH} characters`, met: value.length >= PASSWORD_MIN_LENGTH },
     { id: 'digit', label: 'At least one number', met: /\d/.test(value) },
     { id: 'other', label: 'At least one symbol (not a letter or number)', met: /[^\p{L}\p{N}]/u.test(value) },
   ]
-})
+}
+
+const passwordRules = computed(() => passwordRulesFor(passwordForm.value.newPassword))
 
 const newPasswordSatisfiesPolicy = computed(() => passwordRules.value.every((rule) => rule.met))
 
@@ -179,7 +267,7 @@ const errorText = computed(() => {
   if (localError.value) return localError.value
   // In change mode the standing notice already explains why sign-in was refused; only a fresh failure from
   // the change itself belongs here.
-  if (isChangingPasswordMode.value) return null
+  if (isChangingPasswordMode.value || isResettingMode.value) return null
   if (authStore.status === 'unauthenticated' && authStore.error === INITIAL_UNAUTHENTICATED_MESSAGE) return null
   return authStore.error
 })
@@ -198,6 +286,9 @@ function cleanupLoginSelfRedirect(): void {
 }
 
 onMounted(cleanupLoginSelfRedirect)
+onMounted(async () => {
+  passwordResetAvailable.value = await authStore.getPasswordResetAvailable()
+})
 watch(() => route.query.redirect, cleanupLoginSelfRedirect)
 
 async function submit(): Promise<void> {
@@ -292,6 +383,117 @@ async function submitPasswordChange(): Promise<void> {
     await router.replace(resolveInternalRedirectTarget(route.query.redirect))
   } finally {
     isSubmittingPasswordChange.value = false
+  }
+}
+
+const resetStep = computed(() => resetSteps[resetStepIndex.value] ?? resetSteps[0])
+const resetStepValue = computed({
+  get(): string {
+    return resetForm.value[resetStep.value.name]
+  },
+  set(value: string): void {
+    resetForm.value = { ...resetForm.value, [resetStep.value.name]: value }
+  },
+})
+const resetPasswordRules = computed(() => passwordRulesFor(resetForm.value.newPassword))
+const resetPrimaryLabel = computed(() => {
+  if (resetStep.value.name === 'usernameOrEmail') return 'Send code'
+  if (resetStepIndex.value < resetSteps.length - 1) return 'OK'
+  return isSubmittingReset.value ? 'Resetting' : 'Reset'
+})
+const isResetStepBlocked = computed(() => {
+  if (isSubmittingReset.value) return true
+  if (resetStepValue.value.trim().length === 0) return true
+  if (resetStep.value.name === 'newPassword') return !resetPasswordRules.value.every((rule) => rule.met)
+  return false
+})
+
+function enterResetMode(): void {
+  localError.value = null
+  resetForm.value = { usernameOrEmail: username.value.trim(), code: '', newPassword: '', newPasswordVerify: '' }
+  resetStepIndex.value = 0
+  isResettingMode.value = true
+}
+
+function leaveResetMode(): void {
+  isResettingMode.value = false
+  resetForm.value = { usernameOrEmail: '', code: '', newPassword: '', newPasswordVerify: '' }
+  resetStepIndex.value = 0
+}
+
+function goBackResetStep(): void {
+  localError.value = null
+  if (resetStepIndex.value === 0) {
+    leaveResetMode()
+    return
+  }
+  resetStepIndex.value -= 1
+}
+
+async function resendResetCode(): Promise<void> {
+  localError.value = null
+  resetForm.value = { ...resetForm.value, code: '' }
+  await authStore.requestPasswordReset(resetForm.value.usernameOrEmail.trim())
+}
+
+async function submitResetStep(): Promise<void> {
+  localError.value = null
+  const stepName = resetStep.value.name
+  const who = resetForm.value.usernameOrEmail.trim()
+  if (stepName === 'usernameOrEmail') {
+    await authStore.requestPasswordReset(who)
+    resetStepIndex.value += 1
+    return
+  }
+  if (stepName === 'code') {
+    // The backend ignores spaces in a pasted code, so the value goes up as typed.
+    if (!(await authStore.verifyPasswordResetCode(who, resetForm.value.code))) {
+      localError.value = authStore.error ?? "That code didn't work. Request a new one."
+      return
+    }
+    resetStepIndex.value += 1
+    return
+  }
+  if (stepName === 'newPassword') {
+    resetStepIndex.value += 1
+    return
+  }
+  await submitPasswordReset(who)
+}
+
+async function submitPasswordReset(who: string): Promise<void> {
+  if (isSubmittingReset.value) return
+  if (resetForm.value.newPassword !== resetForm.value.newPasswordVerify) {
+    localError.value = 'New passwords do not match.'
+    return
+  }
+  isSubmittingReset.value = true
+  try {
+    const reset = await authStore.completePasswordReset({
+      usernameOrEmail: who,
+      code: resetForm.value.code,
+      newPassword: resetForm.value.newPassword,
+      newPasswordVerify: resetForm.value.newPasswordVerify,
+    })
+    if (!reset) {
+      localError.value = authStore.error ?? 'Unable to reset the password.'
+      // A refused password is fixed on the step that chose it.
+      resetStepIndex.value = resetSteps.findIndex((step) => step.name === 'newPassword')
+      return
+    }
+
+    const nextPassword = resetForm.value.newPassword
+    leaveResetMode()
+    username.value = who
+    password.value = nextPassword
+    const authenticated = await authStore.loginWithCredentials(who, nextPassword)
+    if (!authenticated) {
+      localError.value = authStore.error ?? 'Password reset. Sign in with your new password.'
+      return
+    }
+    await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+  } finally {
+    isSubmittingReset.value = false
   }
 }
 </script>

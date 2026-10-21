@@ -4,6 +4,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 const replace = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const loginWithCredentials = vi.hoisted(() => vi.fn())
 const changeExpiredPassword = vi.hoisted(() => vi.fn())
+const getPasswordResetAvailable = vi.hoisted(() => vi.fn())
+const requestPasswordReset = vi.hoisted(() => vi.fn())
+const verifyPasswordResetCode = vi.hoisted(() => vi.fn())
+const completePasswordReset = vi.hoisted(() => vi.fn())
+const saveRecoveryEmail = vi.hoisted(() => vi.fn())
 const route = vi.hoisted(() => ({
   query: {} as Record<string, unknown>,
 }))
@@ -12,6 +17,7 @@ const authState = vi.hoisted(() => ({
   error: null as string | null,
   status: 'unauthenticated' as 'authenticated' | 'unauthenticated' | 'verification-failed',
   passwordChangeReason: null as 'PWDCHG' | 'PWDTIM' | null,
+  recoveryEmailMissing: false,
   sessionInfo: null as { userId: string; username?: string } | null,
   get authenticated() {
     return this.status === 'authenticated'
@@ -46,10 +52,18 @@ vi.mock('../../stores/auth', () => ({
     get authenticated() {
       return authState.authenticated
     },
+    get recoveryEmailMissing() {
+      return authState.recoveryEmailMissing
+    },
     checked: authState.checked,
     sessionInfo: authState.sessionInfo,
     loginWithCredentials,
     changeExpiredPassword,
+    getPasswordResetAvailable,
+    requestPasswordReset,
+    verifyPasswordResetCode,
+    completePasswordReset,
+    saveRecoveryEmail,
   }),
 }))
 
@@ -69,6 +83,17 @@ describe('LoginPage', () => {
     loginWithCredentials.mockResolvedValue(true)
     changeExpiredPassword.mockReset()
     changeExpiredPassword.mockResolvedValue(true)
+    getPasswordResetAvailable.mockReset()
+    getPasswordResetAvailable.mockResolvedValue(true)
+    requestPasswordReset.mockReset()
+    requestPasswordReset.mockResolvedValue(undefined)
+    verifyPasswordResetCode.mockReset()
+    verifyPasswordResetCode.mockResolvedValue(true)
+    completePasswordReset.mockReset()
+    completePasswordReset.mockResolvedValue(true)
+    saveRecoveryEmail.mockReset()
+    saveRecoveryEmail.mockResolvedValue(true)
+    authState.recoveryEmailMissing = false
     authState.error = null
     authState.status = 'unauthenticated'
     authState.passwordChangeReason = null
@@ -285,5 +310,114 @@ describe('LoginPage', () => {
 
     expect(loginWithCredentials).toHaveBeenCalledWith('john.doe', 'moqui')
     expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  // ---- DAR-BE-028: forgot password ----
+
+  /** Fill the current reset step and press its primary action. */
+  async function completeResetStep(wrapper: ReturnType<typeof mount>, value: string): Promise<void> {
+    await wrapper.get('[data-testid="login-reset-input"]').setValue(value)
+    await wrapper.get('[data-testid="login-reset-next"]').trigger('click')
+    await flushPromises()
+  }
+
+  async function openReset(typedUsername = ''): Promise<ReturnType<typeof mount>> {
+    const wrapper = mount(LoginPage)
+    await flushPromises()
+    if (typedUsername) await wrapper.get('input[autocomplete="username"]').setValue(typedUsername)
+    await wrapper.get('[data-testid="login-forgot-password"]').trigger('click')
+    await flushPromises()
+    return wrapper
+  }
+
+  it('hides Forgot password? when this environment cannot send reset email', async () => {
+    getPasswordResetAvailable.mockResolvedValue(false)
+    const wrapper = mount(LoginPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="login-forgot-password"]').exists()).toBe(false)
+  })
+
+  it('opens the reset on the username, prefilled from the sign-in form', async () => {
+    const wrapper = await openReset('pwr.user')
+
+    expect(wrapper.text()).toContain('Username or email?')
+    expect((wrapper.get('[data-testid="login-reset-input"]').element as HTMLInputElement).value).toBe('pwr.user')
+  })
+
+  it('requests a code and shows the same note whatever happened', async () => {
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+
+    expect(requestPasswordReset).toHaveBeenCalledWith('pwr.user')
+    expect(wrapper.get('[data-testid="login-reset-note"]').text()).toContain(
+      'If that account has an email on file, a code is on its way. It expires in 15 minutes.',
+    )
+    expect(wrapper.get('[data-testid="login-reset-note"]').text()).toContain('No email on file? Ask your Darpan administrator.')
+    expect(wrapper.text()).toContain('Enter the code we emailed.')
+  })
+
+  it('takes the code as a one-time code and can send a new one', async () => {
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+
+    const input = wrapper.get('[data-testid="login-reset-input"]')
+    expect(input.attributes('autocomplete')).toBe('one-time-code')
+    expect(input.attributes('inputmode')).toBe('numeric')
+    await wrapper.get('[data-testid="login-reset-resend"]').trigger('click')
+    await flushPromises()
+    expect(requestPasswordReset).toHaveBeenCalledTimes(2)
+  })
+
+  it('sends a pasted code unchanged and stays on the code step when it is wrong', async () => {
+    verifyPasswordResetCode.mockResolvedValue(false)
+    authState.error = "That code didn't work. Request a new one."
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+    await completeResetStep(wrapper, '123 456')
+
+    expect(verifyPasswordResetCode).toHaveBeenCalledWith('pwr.user', '123 456')
+    expect(wrapper.text()).toContain("That code didn't work. Request a new one.")
+    expect(wrapper.text()).toContain('Enter the code we emailed.')
+  })
+
+  it('sets the new password, signs in with it and lands on the requested route', async () => {
+    route.query = { redirect: '/settings' }
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+    await completeResetStep(wrapper, '123456')
+    expect(wrapper.text()).toContain('Enter your new password.')
+    await completeResetStep(wrapper, 'N3w-pass!')
+    expect(wrapper.text()).toContain('Enter it again.')
+    await completeResetStep(wrapper, 'N3w-pass!')
+
+    expect(completePasswordReset).toHaveBeenCalledWith({
+      usernameOrEmail: 'pwr.user', code: '123456', newPassword: 'N3w-pass!', newPasswordVerify: 'N3w-pass!',
+    })
+    expect(loginWithCredentials).toHaveBeenCalledWith('pwr.user', 'N3w-pass!')
+    expect(replace).toHaveBeenCalledWith('/settings')
+  })
+
+  it('keeps the user on the new password when the backend refuses it', async () => {
+    completePasswordReset.mockResolvedValue(false)
+    authState.error = 'Password was used in last 5 passwords'
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+    await completeResetStep(wrapper, '123456')
+    await completeResetStep(wrapper, 'N3w-pass!')
+    await completeResetStep(wrapper, 'N3w-pass!')
+
+    expect(wrapper.text()).toContain('Password was used in last 5 passwords')
+    expect(wrapper.text()).toContain('Enter your new password.')
+    expect(loginWithCredentials).not.toHaveBeenCalled()
+  })
+
+  it('returns to sign-in from the first reset step', async () => {
+    const wrapper = await openReset()
+    await wrapper.get('.wizard-back').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('form').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Sign In')
   })
 })
