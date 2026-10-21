@@ -3449,8 +3449,8 @@ export interface components {
             /** @description DAR-UI-050. A lifecycle built from stages: the findings people wrote for its stages. */
             findings?: string[];
             /**
-             * @description DAR-UI-052. A lifecycle built from stages: per place, how its records are named,
-             *                         [place, reconciliationRunId, conclusions: [conclusionEnumId, label, conditions]].
+             * @description DAR-UI-052. A lifecycle built from stages: its rules naming the records at its places, in
+             *                         order, [conclusionEnumId, label, places (empty = every place), conditions].
              */
             conclusions?: string[];
         };
@@ -4752,18 +4752,17 @@ export interface components {
             result: components["schemas"]["SaveLifecycleResult"];
         };
         /**
-         * @description DAR-UI-052. How one place of a lifecycle names its records: ordered conclusions, each a
-         *                 DarpanConclusion with conditions on the record's fields (a detail such as hcReturnChannel, or status) that
-         *                 must all hold. The first that holds names a record; none leaves it Unexplained. Drawn on every run of the
-         *                 place, and carried to the place of the same name when the stages change. Replaces the place's list.
+         * @description DAR-UI-052. The rules that name a lifecycle's records: ONE ordered list for the lifecycle. Each is a
+         *                 DarpanConclusion, the places it applies to (none = every place), and conditions on the record's fields (a
+         *                 detail such as hcReturnChannel, or status) that must all hold. At each place the first rule that applies and
+         *                 holds names a record; none leaves it Unexplained. Drawn on every run, and onto new places when the stages
+         *                 change or a finding is written. Replaces the list; an empty list clears it.
          */
         SaveLifecycleConclusionsParams: {
             reconciliationId: string;
-            /** @description The place's name, e.g. "Credited, never received". */
-            place: string;
             /**
-             * @description [conclusionEnumId, conditions: [field, operator (IN, NOT_IN, BLANK, NOT_BLANK), values, checkLabel]];
-             *                         an empty list clears the place.
+             * @description [conclusionEnumId, places: [place name], conditions: [field, operator (IN, NOT_IN, BLANK,
+             *                         NOT_BLANK), values, checkLabel]], in order.
              */
             conclusions?: string[];
         };
