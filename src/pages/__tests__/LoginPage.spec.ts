@@ -519,4 +519,34 @@ describe('LoginPage', () => {
     await flushPromises()
     expect(saveRecoveryEmail).toHaveBeenCalledWith('me@example.com', 'N3w-pass!')
   })
+
+  // ---- final review fixes ----
+
+  it('ignores a second submit while a reset step is in flight', async () => {
+    let finish: () => void = () => {}
+    requestPasswordReset.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve }))
+    const wrapper = await openReset()
+    await wrapper.get('[data-testid="login-reset-input"]').setValue('pwr.user')
+    await wrapper.get('[data-testid="login-reset-next"]').trigger('click')
+    await wrapper.get('[data-testid="login-reset-next"]').trigger('click')
+    finish()
+    await flushPromises()
+
+    expect(requestPasswordReset).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Enter the code we emailed.')
+  })
+
+  it('sends the user back to the code, with Send a new code, when the code died before the last step', async () => {
+    completePasswordReset.mockResolvedValue(false)
+    authState.error = "That code didn't work. Request a new one."
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+    await completeResetStep(wrapper, '123456')
+    await completeResetStep(wrapper, 'N3w-pass!')
+    await completeResetStep(wrapper, 'N3w-pass!')
+
+    expect(wrapper.text()).toContain('Enter the code we emailed.')
+    expect(wrapper.find('[data-testid="login-reset-resend"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain("That code didn't work. Request a new one.")
+  })
 })

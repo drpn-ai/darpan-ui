@@ -209,6 +209,9 @@ const isSavingRecoveryEmail = ref(false)
 const recoveryEmail = ref('')
 const recoveryEmailPassword = ref('')
 
+// The backend's one reply for every code failure (PasswordResetSupport.CODE_FAILURE_MESSAGE).
+const CODE_FAILURE_TEXT = "That code didn't work. Request a new one."
+
 // DAR-BE-028 forgot password. Hidden where the environment cannot send mail (no SMTP configured), so nobody
 // is sent to wait for a code that never comes.
 const passwordResetAvailable = ref(false)
@@ -503,12 +506,25 @@ function goBackResetStep(): void {
 }
 
 async function resendResetCode(): Promise<void> {
+  if (isSubmittingReset.value) return
   localError.value = null
   resetForm.value = { ...resetForm.value, code: '' }
   await authStore.requestPasswordReset(resetForm.value.usernameOrEmail.trim())
 }
 
 async function submitResetStep(): Promise<void> {
+  // One step at a time: every step awaits the backend (the request reply alone is held to 400ms), and a
+  // second Enter or click in that window would advance twice and land on a later step with this one unanswered.
+  if (isSubmittingReset.value) return
+  isSubmittingReset.value = true
+  try {
+    await runResetStep()
+  } finally {
+    isSubmittingReset.value = false
+  }
+}
+
+async function runResetStep(): Promise<void> {
   localError.value = null
   const stepName = resetStep.value.name
   const who = resetForm.value.usernameOrEmail.trim()
@@ -520,7 +536,7 @@ async function submitResetStep(): Promise<void> {
   if (stepName === 'code') {
     // The backend ignores spaces in a pasted code, so the value goes up as typed.
     if (!(await authStore.verifyPasswordResetCode(who, resetForm.value.code))) {
-      localError.value = authStore.error ?? "That code didn't work. Request a new one."
+      localError.value = authStore.error ?? CODE_FAILURE_TEXT
       return
     }
     resetStepIndex.value += 1
@@ -534,38 +550,35 @@ async function submitResetStep(): Promise<void> {
 }
 
 async function submitPasswordReset(who: string): Promise<void> {
-  if (isSubmittingReset.value) return
   if (resetForm.value.newPassword !== resetForm.value.newPasswordVerify) {
     localError.value = 'New passwords do not match.'
     return
   }
-  isSubmittingReset.value = true
-  try {
-    const reset = await authStore.completePasswordReset({
-      usernameOrEmail: who,
-      code: resetForm.value.code,
-      newPassword: resetForm.value.newPassword,
-      newPasswordVerify: resetForm.value.newPasswordVerify,
-    })
-    if (!reset) {
-      localError.value = authStore.error ?? 'Unable to reset the password.'
-      // A refused password is fixed on the step that chose it.
-      resetStepIndex.value = resetSteps.findIndex((step) => step.name === 'newPassword')
-      return
-    }
-
-    const nextPassword = resetForm.value.newPassword
-    leaveResetMode()
-    username.value = who
-    password.value = nextPassword
-    const authenticated = await authStore.loginWithCredentials(who, nextPassword)
-    if (!authenticated) {
-      localError.value = authStore.error ?? 'Password reset. Sign in with your new password.'
-      return
-    }
-    await finishSignIn(nextPassword)
-  } finally {
-    isSubmittingReset.value = false
+  const reset = await authStore.completePasswordReset({
+    usernameOrEmail: who,
+    code: resetForm.value.code,
+    newPassword: resetForm.value.newPassword,
+    newPasswordVerify: resetForm.value.newPasswordVerify,
+  })
+  if (!reset) {
+    localError.value = authStore.error ?? 'Unable to reset the password.'
+    // A dead code (expired, replaced, used up) is fixed on the code step, where Send a new code is; a refused
+    // password is fixed on the step that chose it.
+    const codeDied = authStore.error === CODE_FAILURE_TEXT
+    if (codeDied) resetForm.value = { ...resetForm.value, code: '' }
+    resetStepIndex.value = resetSteps.findIndex((step) => step.name === (codeDied ? 'code' : 'newPassword'))
+    return
   }
+
+  const nextPassword = resetForm.value.newPassword
+  leaveResetMode()
+  username.value = who
+  password.value = nextPassword
+  const authenticated = await authStore.loginWithCredentials(who, nextPassword)
+  if (!authenticated) {
+    localError.value = authStore.error ?? 'Password reset. Sign in with your new password.'
+    return
+  }
+  await finishSignIn(nextPassword)
 }
 </script>
