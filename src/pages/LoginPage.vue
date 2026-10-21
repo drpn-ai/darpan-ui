@@ -14,9 +14,9 @@
       <p class="eyebrow">Darpan</p>
       <!-- No heading in change mode: the step's own question ("Enter your new password.") is the
            instruction, and a title above it only restated that in larger type. -->
-      <h1 v-if="!isChangingPasswordMode && !isResettingMode">Sign In</h1>
+      <h1 v-if="!isChangingPasswordMode && !isResettingMode && !isAskingRecoveryEmail">Sign In</h1>
 
-      <form v-if="!isChangingPasswordMode && !isResettingMode" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
+      <form v-if="!isChangingPasswordMode && !isResettingMode && !isAskingRecoveryEmail" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
         <!-- The wrapping label already names each field for assistive tech; id/name are here for the
              password managers that still key off them rather than the autocomplete tokens. -->
         <label for="login-username">
@@ -42,6 +42,36 @@
           </button>
         </div>
       </form>
+
+      <!-- DAR-BE-028: signed in, but no email on file, so a forgotten password would be a dead end. Asked at
+           every sign-in until one is saved; Not now is never remembered. -->
+      <template v-else-if="isAskingRecoveryEmail">
+        <WorkflowStepForm
+          question="Where should password reset codes go?"
+          :primary-label="isSavingRecoveryEmail ? 'Saving' : 'Save'"
+          :submit-disabled="isSavingRecoveryEmail || recoveryEmail.trim().length === 0"
+          :show-back="false"
+          :show-cancel-action="true"
+          cancel-label="Not now"
+          cancel-test-id="login-recovery-skip"
+          :show-enter-hint="true"
+          primary-test-id="login-recovery-save"
+          @submit="saveRecoveryEmailAndContinue"
+          @cancel="continueAfterSignIn"
+        >
+          <label class="workflow-context-block" aria-label="Recovery email">
+            <input
+              v-model="recoveryEmail"
+              class="wizard-answer-control"
+              data-testid="login-recovery-input"
+              name="email"
+              type="email"
+              autocomplete="email"
+              required
+            />
+          </label>
+        </WorkflowStepForm>
+      </template>
 
       <!-- DAR-BE-028: one question per step, as the expired-password change below. -->
       <template v-else-if="isResettingMode">
@@ -172,6 +202,13 @@ const passwordForm = ref({
   newPasswordVerify: '',
 })
 
+// DAR-BE-028 recovery email. The backend requires the current password to save one (a session token alone
+// must not redirect reset codes); the user has just typed it, so it is held only until this step ends.
+const isAskingRecoveryEmail = ref(false)
+const isSavingRecoveryEmail = ref(false)
+const recoveryEmail = ref('')
+const recoveryEmailPassword = ref('')
+
 // DAR-BE-028 forgot password. Hidden where the environment cannot send mail (no SMTP configured), so nobody
 // is sent to wait for a code that never comes.
 const passwordResetAvailable = ref(false)
@@ -267,7 +304,7 @@ const errorText = computed(() => {
   if (localError.value) return localError.value
   // In change mode the standing notice already explains why sign-in was refused; only a fresh failure from
   // the change itself belongs here.
-  if (isChangingPasswordMode.value || isResettingMode.value) return null
+  if (isChangingPasswordMode.value || isResettingMode.value || isAskingRecoveryEmail.value) return null
   if (authStore.status === 'unauthenticated' && authStore.error === INITIAL_UNAUTHENTICATED_MESSAGE) return null
   return authStore.error
 })
@@ -305,7 +342,7 @@ async function submit(): Promise<void> {
       return
     }
 
-    await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+    await finishSignIn(password.value)
   } finally {
     loading.value = false
   }
@@ -380,9 +417,44 @@ async function submitPasswordChange(): Promise<void> {
       return
     }
 
-    await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+    await finishSignIn(nextPassword)
   } finally {
     isSubmittingPasswordChange.value = false
+  }
+}
+
+/** Every successful sign-in ends here, so no path (plain, after a forced change, after a reset) skips the
+ *  recovery-email question. */
+async function finishSignIn(passwordJustUsed: string): Promise<void> {
+  if (authStore.recoveryEmailMissing) {
+    recoveryEmail.value = ''
+    recoveryEmailPassword.value = passwordJustUsed
+    isAskingRecoveryEmail.value = true
+    return
+  }
+  await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+}
+
+async function continueAfterSignIn(): Promise<void> {
+  isAskingRecoveryEmail.value = false
+  recoveryEmailPassword.value = ''
+  localError.value = null
+  await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+}
+
+async function saveRecoveryEmailAndContinue(): Promise<void> {
+  if (isSavingRecoveryEmail.value) return
+  localError.value = null
+  isSavingRecoveryEmail.value = true
+  try {
+    const saved = await authStore.saveRecoveryEmail(recoveryEmail.value.trim(), recoveryEmailPassword.value)
+    if (!saved) {
+      localError.value = authStore.error ?? 'Unable to save the recovery email.'
+      return
+    }
+    await continueAfterSignIn()
+  } finally {
+    isSavingRecoveryEmail.value = false
   }
 }
 
@@ -491,7 +563,7 @@ async function submitPasswordReset(who: string): Promise<void> {
       localError.value = authStore.error ?? 'Password reset. Sign in with your new password.'
       return
     }
-    await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+    await finishSignIn(nextPassword)
   } finally {
     isSubmittingReset.value = false
   }

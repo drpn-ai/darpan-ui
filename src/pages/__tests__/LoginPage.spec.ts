@@ -420,4 +420,103 @@ describe('LoginPage', () => {
     expect(wrapper.find('form').exists()).toBe(true)
     expect(wrapper.text()).toContain('Sign In')
   })
+
+  // ---- DAR-BE-028: recovery email at sign-in ----
+
+  async function signIn(wrapper: ReturnType<typeof mount>, user = 'pwr.user', pass = 'Old-pass1!'): Promise<void> {
+    await wrapper.get('input[autocomplete="username"]').setValue(user)
+    await wrapper.get('input[autocomplete="current-password"]').setValue(pass)
+    await wrapper.get('form').trigger('submit.prevent')
+    await flushPromises()
+  }
+
+  it('asks for a recovery email after sign-in when the account has none', async () => {
+    authState.recoveryEmailMissing = true
+    const wrapper = mount(LoginPage)
+    await signIn(wrapper)
+
+    expect(wrapper.text()).toContain('Where should password reset codes go?')
+    const input = wrapper.get('[data-testid="login-recovery-input"]')
+    expect(input.attributes('type')).toBe('email')
+    expect(input.attributes('autocomplete')).toBe('email')
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('saves the recovery email with the password just used, then continues', async () => {
+    authState.recoveryEmailMissing = true
+    route.query = { redirect: '/settings' }
+    const wrapper = mount(LoginPage)
+    await signIn(wrapper)
+    await wrapper.get('[data-testid="login-recovery-input"]').setValue('me@example.com')
+    await wrapper.get('[data-testid="login-recovery-save"]').trigger('click')
+    await flushPromises()
+
+    expect(saveRecoveryEmail).toHaveBeenCalledWith('me@example.com', 'Old-pass1!')
+    expect(replace).toHaveBeenCalledWith('/settings')
+  })
+
+  it('continues without saving on Not now', async () => {
+    authState.recoveryEmailMissing = true
+    const wrapper = mount(LoginPage)
+    await signIn(wrapper)
+    await wrapper.get('[data-testid="login-recovery-skip"]').trigger('click')
+    await flushPromises()
+
+    expect(saveRecoveryEmail).not.toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  it('shows a save error inline and still lets the user go on', async () => {
+    authState.recoveryEmailMissing = true
+    saveRecoveryEmail.mockResolvedValue(false)
+    authState.error = 'Enter a valid email address.'
+    const wrapper = mount(LoginPage)
+    await signIn(wrapper)
+    await wrapper.get('[data-testid="login-recovery-input"]').setValue('nope')
+    await wrapper.get('[data-testid="login-recovery-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Enter a valid email address.')
+    expect(replace).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="login-recovery-skip"]').trigger('click')
+    await flushPromises()
+    expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  it('goes straight on when the account already has an email', async () => {
+    const wrapper = mount(LoginPage)
+    await signIn(wrapper)
+
+    expect(wrapper.text()).not.toContain('Where should password reset codes go?')
+    expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  it('asks for the email after a forced password change, with the new password', async () => {
+    const wrapper = await signInIntoPasswordChange()
+    authState.recoveryEmailMissing = true
+    loginWithCredentials.mockResolvedValue(true)
+    await completePasswordStep(wrapper, 'N3w-password!')
+    await completePasswordStep(wrapper, 'N3w-password!')
+    expect(wrapper.text()).toContain('Where should password reset codes go?')
+
+    await wrapper.get('[data-testid="login-recovery-input"]').setValue('me@example.com')
+    await wrapper.get('[data-testid="login-recovery-save"]').trigger('click')
+    await flushPromises()
+    expect(saveRecoveryEmail).toHaveBeenCalledWith('me@example.com', 'N3w-password!')
+  })
+
+  it('asks for the email after a completed reset, with the new password', async () => {
+    authState.recoveryEmailMissing = true
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+    await completeResetStep(wrapper, '123456')
+    await completeResetStep(wrapper, 'N3w-pass!')
+    await completeResetStep(wrapper, 'N3w-pass!')
+
+    expect(wrapper.text()).toContain('Where should password reset codes go?')
+    await wrapper.get('[data-testid="login-recovery-input"]').setValue('me@example.com')
+    await wrapper.get('[data-testid="login-recovery-save"]').trigger('click')
+    await flushPromises()
+    expect(saveRecoveryEmail).toHaveBeenCalledWith('me@example.com', 'N3w-pass!')
+  })
 })
