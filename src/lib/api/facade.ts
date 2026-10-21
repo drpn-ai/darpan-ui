@@ -16,6 +16,11 @@ export function clearApiResponseCache(): void {
 import type {
   CreateRuleSetRunResponse,
   ChangeExpiredPasswordResponse,
+  CompletePasswordResetResponse,
+  GetPasswordResetStatusResponse,
+  RequestPasswordResetResponse,
+  SaveRecoveryEmailResponse,
+  VerifyPasswordResetCodeResponse,
   ChangeOwnPasswordResponse,
   DeleteJsonSchemaResponse,
   DeleteAutomationResponse,
@@ -95,6 +100,10 @@ import type {
 } from './types'
 import type {
   ChangeExpiredPasswordPayload,
+  CompletePasswordResetPayload,
+  RequestPasswordResetPayload,
+  SaveRecoveryEmailPayload,
+  VerifyPasswordResetCodePayload,
   ChangeOwnPasswordPayload,
   ConfigTenantAccessMutationPayload,
   CreateRuleSetRunPayload,
@@ -191,6 +200,11 @@ const AUTH = {
   verifyOwnPassword: 'facade.AuthFacadeServices.verify#OwnPassword',
   changeOwnPassword: 'facade.AuthFacadeServices.change#OwnPassword',
   changeExpiredPassword: 'facade.AuthFacadeServices.change#ExpiredPassword',
+  requestPasswordReset: 'facade.AuthFacadeServices.request#PasswordReset',
+  verifyPasswordResetCode: 'facade.AuthFacadeServices.verify#PasswordResetCode',
+  completePasswordReset: 'facade.AuthFacadeServices.complete#PasswordReset',
+  saveRecoveryEmail: 'facade.AuthFacadeServices.save#RecoveryEmail',
+  getPasswordResetStatus: 'facade.AuthFacadeServices.get#PasswordResetStatus',
   logoutSession: 'facade.AuthFacadeServices.logout#Session',
 }
 
@@ -323,6 +337,22 @@ export const authFacade = {
    *  Issues no token — the caller signs in normally afterwards with the new password. */
   changeExpiredPassword(payload: ChangeExpiredPasswordPayload, signal?: AbortSignal): Promise<ChangeExpiredPasswordResponse> {
     return callService<ChangeExpiredPasswordResponse>(AUTH.changeExpiredPassword, payload, signal)
+  },
+  requestPasswordReset(payload: RequestPasswordResetPayload, signal?: AbortSignal): Promise<RequestPasswordResetResponse> {
+    return callService<RequestPasswordResetResponse>(AUTH.requestPasswordReset, payload, signal)
+  },
+  verifyPasswordResetCode(payload: VerifyPasswordResetCodePayload, signal?: AbortSignal): Promise<VerifyPasswordResetCodeResponse> {
+    return callService<VerifyPasswordResetCodeResponse>(AUTH.verifyPasswordResetCode, payload, signal)
+  },
+  /** Issues no token — the caller signs in normally afterwards with the new password. */
+  completePasswordReset(payload: CompletePasswordResetPayload, signal?: AbortSignal): Promise<CompletePasswordResetResponse> {
+    return callService<CompletePasswordResetResponse>(AUTH.completePasswordReset, payload, signal)
+  },
+  saveRecoveryEmail(payload: SaveRecoveryEmailPayload, signal?: AbortSignal): Promise<SaveRecoveryEmailResponse> {
+    return callService<SaveRecoveryEmailResponse>(AUTH.saveRecoveryEmail, payload, signal)
+  },
+  getPasswordResetStatus(signal?: AbortSignal): Promise<GetPasswordResetStatusResponse> {
+    return callService<GetPasswordResetStatusResponse>(AUTH.getPasswordResetStatus, {}, signal)
   },
   logoutSession(signal?: AbortSignal): Promise<LogoutSessionResponse> {
     return callService<LogoutSessionResponse>(AUTH.logoutSession, {}, signal)

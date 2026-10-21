@@ -63,6 +63,9 @@ export interface SessionInfo {
   canEditActiveTenantData?: boolean
   canManageDarpanCore?: boolean
   isSuperAdmin?: boolean
+  /** DAR-BE-028: no email on file, so password reset cannot reach this account yet. */
+  recoveryEmailMissing?: boolean
+  emailAddressMasked?: string | null
 }
 
 export interface AuthTokenContract {
@@ -113,6 +116,25 @@ export interface LoginSessionResponse extends ApiEnvelope, AuthTokenContract {
 
 export interface ChangeExpiredPasswordResponse extends ApiEnvelope {
   passwordUpdated?: boolean
+}
+
+/** DAR-BE-028. The reply is the same whether or not a code was sent. */
+export type RequestPasswordResetResponse = ApiEnvelope
+
+export interface VerifyPasswordResetCodeResponse extends ApiEnvelope {
+  verified?: boolean
+}
+
+export interface CompletePasswordResetResponse extends ApiEnvelope {
+  passwordUpdated?: boolean
+}
+
+export interface SaveRecoveryEmailResponse extends ApiEnvelope {
+  emailAddressMasked?: string | null
+}
+
+export interface GetPasswordResetStatusResponse {
+  available?: boolean
 }
 
 // Migration template (MACH P1): sourced from the generated OpenAPI contract types

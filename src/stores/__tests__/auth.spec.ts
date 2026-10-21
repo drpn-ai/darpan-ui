@@ -6,6 +6,11 @@ const saveTenantSettingsMock = vi.hoisted(() => vi.fn())
 const logoutSessionMock = vi.hoisted(() => vi.fn())
 const loginSessionMock = vi.hoisted(() => vi.fn())
 const changeExpiredPasswordMock = vi.hoisted(() => vi.fn())
+const requestPasswordResetMock = vi.hoisted(() => vi.fn())
+const verifyPasswordResetCodeMock = vi.hoisted(() => vi.fn())
+const completePasswordResetMock = vi.hoisted(() => vi.fn())
+const saveRecoveryEmailMock = vi.hoisted(() => vi.fn())
+const getPasswordResetStatusMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../lib/api/facade', () => ({
   authFacade: {
@@ -13,6 +18,11 @@ vi.mock('../../lib/api/facade', () => ({
     logoutSession: logoutSessionMock,
     loginSession: loginSessionMock,
     changeExpiredPassword: changeExpiredPasswordMock,
+    requestPasswordReset: requestPasswordResetMock,
+    verifyPasswordResetCode: verifyPasswordResetCodeMock,
+    completePasswordReset: completePasswordResetMock,
+    saveRecoveryEmail: saveRecoveryEmailMock,
+    getPasswordResetStatus: getPasswordResetStatusMock,
   },
   settingsFacade: {
     saveTenantSettings: saveTenantSettingsMock,
@@ -260,5 +270,94 @@ describe('auth store forced password change', () => {
 
     expect(changed).toBe(false)
     expect(store.error).toBe('Unable to change the password. Check the username and current password.')
+  })
+})
+
+// DAR-BE-028 — forgot password and the recovery email.
+describe('password reset and recovery email', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  async function signInWith(sessionInfo: Record<string, unknown>) {
+    loginSessionMock.mockResolvedValue({ ok: true, authenticated: true, authToken: 'tok', sessionInfo, messages: [], errors: [] })
+    const store = useAuthStore()
+    await store.loginWithCredentials('pwr.user', 'Old-pass1!')
+    return store
+  }
+
+  it('requests a code and never reports anything from the uniform reply', async () => {
+    requestPasswordResetMock.mockResolvedValue({ ok: true, messages: [], errors: [] })
+    const store = useAuthStore()
+
+    await store.requestPasswordReset('pwr.user')
+
+    expect(requestPasswordResetMock).toHaveBeenCalledWith({ usernameOrEmail: 'pwr.user' })
+    expect(store.error).toBeNull()
+  })
+
+  it('verifies a code and reports the backend message when it fails', async () => {
+    verifyPasswordResetCodeMock.mockResolvedValueOnce({ ok: true, verified: true, messages: [], errors: [] })
+    verifyPasswordResetCodeMock.mockResolvedValueOnce({
+      ok: false, verified: false, messages: [], errors: ["That code didn't work. Request a new one."],
+    })
+    const store = useAuthStore()
+
+    expect(await store.verifyPasswordResetCode('pwr.user', '123 456')).toBe(true)
+    expect(verifyPasswordResetCodeMock).toHaveBeenCalledWith({ usernameOrEmail: 'pwr.user', code: '123 456' })
+    expect(await store.verifyPasswordResetCode('pwr.user', '000000')).toBe(false)
+    expect(store.error).toBe("That code didn't work. Request a new one.")
+  })
+
+  it('completes a reset and surfaces a refused password', async () => {
+    completePasswordResetMock.mockResolvedValueOnce({ ok: true, passwordUpdated: true, messages: [], errors: [] })
+    completePasswordResetMock.mockResolvedValueOnce({
+      ok: false, passwordUpdated: false, messages: [], errors: ['Password shorter than 8 characters'],
+    })
+    const store = useAuthStore()
+    const payload = { usernameOrEmail: 'pwr.user', code: '123456', newPassword: 'N3w-pass!', newPasswordVerify: 'N3w-pass!' }
+
+    expect(await store.completePasswordReset(payload)).toBe(true)
+    expect(completePasswordResetMock).toHaveBeenCalledWith(payload)
+    expect(await store.completePasswordReset({ ...payload, newPassword: 'a', newPasswordVerify: 'a' })).toBe(false)
+    expect(store.error).toBe('Password shorter than 8 characters')
+  })
+
+  it('reads the recovery email flags from the session', async () => {
+    const store = await signInWith({ userId: 'U1', recoveryEmailMissing: true, emailAddressMasked: null })
+
+    expect(store.recoveryEmailMissing).toBe(true)
+    expect(store.emailAddressMasked).toBeNull()
+  })
+
+  it('saves a recovery email with the current password and updates the session flags', async () => {
+    const store = await signInWith({ userId: 'U1', recoveryEmailMissing: true, emailAddressMasked: null })
+    saveRecoveryEmailMock.mockResolvedValue({ ok: true, emailAddressMasked: 'n•••@example.com', messages: [], errors: [] })
+
+    expect(await store.saveRecoveryEmail('new@example.com', 'Old-pass1!')).toBe(true)
+
+    expect(saveRecoveryEmailMock).toHaveBeenCalledWith({ emailAddress: 'new@example.com', currentPassword: 'Old-pass1!' })
+    expect(store.recoveryEmailMissing).toBe(false)
+    expect(store.emailAddressMasked).toBe('n•••@example.com')
+  })
+
+  it('keeps the flags when the recovery email is refused', async () => {
+    const store = await signInWith({ userId: 'U1', recoveryEmailMissing: true, emailAddressMasked: null })
+    saveRecoveryEmailMock.mockResolvedValue({ ok: false, messages: [], errors: ['Current password is incorrect.'] })
+
+    expect(await store.saveRecoveryEmail('new@example.com', 'wrong')).toBe(false)
+
+    expect(store.error).toBe('Current password is incorrect.')
+    expect(store.recoveryEmailMissing).toBe(true)
+  })
+
+  it('treats an unreachable reset status as unavailable', async () => {
+    getPasswordResetStatusMock.mockResolvedValueOnce({ available: true })
+    getPasswordResetStatusMock.mockRejectedValueOnce(new Error('offline'))
+    const store = useAuthStore()
+
+    expect(await store.getPasswordResetAvailable()).toBe(true)
+    expect(await store.getPasswordResetAvailable()).toBe(false)
   })
 })

@@ -8,6 +8,9 @@ import { useReferenceDataStore } from './referenceData'
 import { useRunResultsStore } from './runResults'
 import type {
   ChangeExpiredPasswordResponse,
+  CompletePasswordResetResponse,
+  SaveRecoveryEmailResponse,
+  VerifyPasswordResetCodeResponse,
   ChangeOwnPasswordResponse,
   LoginSessionResponse,
   PasswordChangeReason,
@@ -187,6 +190,8 @@ export const useAuthStore = defineStore('auth', () => {
   const authenticated = computed(() => _status.value === 'authenticated')
   const userId = computed(() => _sessionInfo.value?.userId ?? null)
   const username = computed(() => _sessionInfo.value?.username ?? _sessionInfo.value?.userId ?? null)
+  const recoveryEmailMissing = computed(() => _sessionInfo.value?.recoveryEmailMissing === true)
+  const emailAddressMasked = computed(() => _sessionInfo.value?.emailAddressMasked ?? null)
 
   function noteDeepLinkTenantSwitch(tenantLabel: string): void {
     _deepLinkTenantSwitch.value = tenantLabel?.toString()?.trim() || null
@@ -593,6 +598,80 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // DAR-BE-028. The request reply is identical whether or not a code went out, so there is nothing in it to
+  // report; only a transport failure sets the error.
+  async function requestPasswordReset(usernameOrEmail: string): Promise<void> {
+    try {
+      await authFacade.requestPasswordReset({ usernameOrEmail })
+      _error.value = null
+    } catch (err) {
+      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+    }
+  }
+
+  async function verifyPasswordResetCode(usernameOrEmail: string, code: string): Promise<boolean> {
+    try {
+      const response: VerifyPasswordResetCodeResponse = await authFacade.verifyPasswordResetCode({ usernameOrEmail, code })
+      const verified = response.verified === true
+      _error.value = verified ? null : response.errors?.[0] ?? "That code didn't work. Request a new one."
+      return verified
+    } catch (err) {
+      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      return false
+    }
+  }
+
+  async function completePasswordReset(payload: {
+    usernameOrEmail: string
+    code: string
+    newPassword: string
+    newPasswordVerify: string
+  }): Promise<boolean> {
+    try {
+      const response: CompletePasswordResetResponse = await authFacade.completePasswordReset(payload)
+      const updated = response.ok && response.passwordUpdated === true
+      _error.value = updated ? null : response.errors?.[0] ?? 'Unable to reset the password.'
+      return updated
+    } catch (err) {
+      // A refused new password arrives as a service error, as in changeExpiredPassword.
+      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      return false
+    }
+  }
+
+  async function saveRecoveryEmail(emailAddress: string, currentPassword: string): Promise<boolean> {
+    if (authBypass) return true
+
+    try {
+      const response: SaveRecoveryEmailResponse = await authFacade.saveRecoveryEmail({ emailAddress, currentPassword })
+      if (!response.ok) {
+        _error.value = response.errors?.[0] ?? 'Unable to save the recovery email.'
+        return false
+      }
+      _error.value = null
+      if (_sessionInfo.value) {
+        _sessionInfo.value = {
+          ..._sessionInfo.value,
+          recoveryEmailMissing: false,
+          emailAddressMasked: response.emailAddressMasked ?? null,
+        }
+      }
+      return true
+    } catch (err) {
+      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      return false
+    }
+  }
+
+  async function getPasswordResetAvailable(): Promise<boolean> {
+    try {
+      const response = await authFacade.getPasswordResetStatus()
+      return response.available === true
+    } catch {
+      return false
+    }
+  }
+
   async function verifyOwnPassword(currentPassword: string): Promise<boolean> {
     if (authBypass) return true
 
@@ -639,5 +718,12 @@ export const useAuthStore = defineStore('auth', () => {
     changeOwnPassword,
     changeExpiredPassword,
     verifyOwnPassword,
+    recoveryEmailMissing,
+    emailAddressMasked,
+    requestPasswordReset,
+    verifyPasswordResetCode,
+    completePasswordReset,
+    saveRecoveryEmail,
+    getPasswordResetAvailable,
   }
 })

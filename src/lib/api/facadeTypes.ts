@@ -31,6 +31,29 @@ export interface ChangeExpiredPasswordPayload {
   newPasswordVerify: string
 }
 
+/** DAR-BE-028 forgot password; all three run before sign-in, so they carry who is asking. */
+export interface RequestPasswordResetPayload {
+  usernameOrEmail: string
+}
+
+export interface VerifyPasswordResetCodePayload {
+  usernameOrEmail: string
+  code: string
+}
+
+export interface CompletePasswordResetPayload {
+  usernameOrEmail: string
+  code: string
+  newPassword: string
+  newPasswordVerify: string
+}
+
+/** The backend checks currentPassword itself: a session token alone cannot redirect reset codes. */
+export interface SaveRecoveryEmailPayload {
+  emailAddress: string
+  currentPassword: string
+}
+
 // ─── Settings ────────────────────────────────────────────────────────────────
 
 export interface GetLlmSettingsPayload {
