@@ -682,12 +682,15 @@ describe('UserSettingsPage', () => {
   it('shows the recovery email masked, or asks for one', async () => {
     const empty = mountPage()
     await flushPromises()
-    expect(empty.get('[data-testid="recovery-email-card"]').text()).toContain('None — add one')
+    expect(empty.get('[data-testid="recovery-email-card"]').text()).toContain('None')
+    expect(empty.get('[data-testid="recovery-email-card"]').text()).not.toContain('add one')
+    expect(empty.get('[data-testid="recovery-email-change"]').text()).toBe('Add')
 
     authState.emailAddressMasked = 'a•••@hotwax.co'
     const set = mountPage()
     await flushPromises()
     expect(set.get('[data-testid="recovery-email-card"]').text()).toContain('a•••@hotwax.co')
+    expect(set.get('[data-testid="recovery-email-change"]').text()).toBe('Change')
   })
 
   it('changes the recovery email after the current password', async () => {

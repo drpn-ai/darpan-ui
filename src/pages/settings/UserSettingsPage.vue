@@ -26,14 +26,14 @@
         <!-- DAR-BE-028: where password reset codes go. Masked: the page never needs the whole address. -->
         <article class="static-page-summary-card" data-testid="recovery-email-card">
           <span class="static-page-summary-label">Recovery email</span>
-          <span>{{ authStore.emailAddressMasked ?? 'None — add one' }}</span>
+          <span>{{ authStore.emailAddressMasked ?? 'None' }}</span>
           <button
             class="user-settings-control"
             type="button"
             data-testid="recovery-email-change"
             @click="openRecoveryEmailWorkflow"
           >
-            Change
+            {{ authStore.emailAddressMasked ? 'Change' : 'Add' }}
           </button>
         </article>
         <label class="static-page-summary-card user-settings-summary-field" for="user-display-name">
