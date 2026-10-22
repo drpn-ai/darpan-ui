@@ -175,3 +175,52 @@ describe('stored reads (DAR-UI-057)', () => {
     expect(cache.readFinal('lifecycle.execution:e1')).toBeUndefined()
   })
 })
+
+// DAR-UI-050. What a customer's NetSuite says about itself (a record type's fields, the values each holds) cannot be
+// changed by a Darpan write, so a form's pickers are drawn from it without asking again.
+describe('account metadata (DAR-UI-050)', () => {
+  beforeEach(() => installLocalStorageStub())
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('asks once, then serves the answer through writes and on the next visit', async () => {
+    const cache = await freshTab()
+    cache.setReadCacheScope('alice|GORJANA')
+    const fetch = vi.fn(async () => ({ fields: ['f1'] }))
+    const query = { key: 'lifecycle.ruleFields::ns:SalesOrd', fetch }
+    const [a, b] = await Promise.all([cache.readAccountMeta(query), cache.readAccountMeta(query)])
+    expect(a).toEqual({ fields: ['f1'] })
+    expect(b).toEqual({ fields: ['f1'] })
+    cache.invalidateReadCache()
+    expect(await cache.readAccountMeta(query)).toEqual({ fields: ['f1'] })
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    const next = await freshTab()
+    next.setReadCacheScope('alice|GORJANA')
+    expect(next.peekAccountMeta(query.key)).toEqual({ fields: ['f1'] })
+  })
+
+  it('never serves another user or tenant, and ages out', async () => {
+    vi.useFakeTimers()
+    const cache = await freshTab()
+    cache.setReadCacheScope('alice|GORJANA')
+    cache.storeAccountMeta('lifecycle.ruleValues::ns:SalesOrd', { f1: [] })
+    cache.setReadCacheScope('alice|KREWE')
+    expect(cache.peekAccountMeta('lifecycle.ruleValues::ns:SalesOrd')).toBeUndefined()
+    cache.setReadCacheScope('alice|GORJANA')
+    expect(cache.peekAccountMeta('lifecycle.ruleValues::ns:SalesOrd')).toEqual({ f1: [] })
+    vi.advanceTimersByTime(cache.STORED_META_MAX_AGE_MS + 1)
+    expect(cache.peekAccountMeta('lifecycle.ruleValues::ns:SalesOrd')).toBeUndefined()
+  })
+
+  it('goes with login, logout and tenant switch', async () => {
+    const cache = await freshTab()
+    cache.setReadCacheScope('alice|GORJANA')
+    cache.storeAccountMeta('lifecycle.ruleValues::ns:SalesOrd', { f1: [] })
+    cache.clearStoredReads()
+    expect(cache.peekAccountMeta('lifecycle.ruleValues::ns:SalesOrd')).toBeUndefined()
+    expect(storedNames()).toEqual([])
+  })
+})

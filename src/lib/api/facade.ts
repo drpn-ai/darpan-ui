@@ -183,6 +183,7 @@ import type {
   LifecycleStageExceptionsResponse,
   LifecycleDetail,
   LifecycleFinding,
+  FlowchartQuestion,
   ListFlowchartExecutionsResponse,
   ListFlowchartRunsResponse,
   RunFlowchartPayload,
@@ -294,6 +295,7 @@ const RECONCILIATION = {
   deleteLifecycleFinding: 'facade.ReconciliationFacadeServices.delete#LifecycleFinding',
   deleteLifecycleStageException: 'facade.ReconciliationFacadeServices.delete#LifecycleStageException',
   saveLifecycleStages: 'facade.ReconciliationFacadeServices.save#LifecycleStages',
+  getLifecyclePlan: 'facade.ReconciliationFacadeServices.get#LifecyclePlan',
   listAutomations: 'facade.ReconciliationFacadeServices.list#Automations',
   getAutomation: 'facade.ReconciliationFacadeServices.get#Automation',
   saveAutomation: 'facade.ReconciliationFacadeServices.save#Automation',
@@ -610,6 +612,10 @@ export const reconciliationFacade = {
   },
   saveLifecycleStages(payload: { reconciliationId: string; stageRecordTypes: string[] }, signal?: AbortSignal): Promise<{ reconciliationName?: string }> {
     return callService<{ reconciliationName?: string }>(RECONCILIATION.saveLifecycleStages, payload, signal)
+  },
+  /** DAR-UI-050. The questions these stages in this order would make, named as a save names them; nothing is saved. */
+  getLifecyclePlan(payload: { recordType: string; stageRecordTypes: string[] }, signal?: AbortSignal): Promise<{ questions?: FlowchartQuestion[] }> {
+    return callService<{ questions?: FlowchartQuestion[] }>(RECONCILIATION.getLifecyclePlan, payload, signal)
   },
   deleteLifecycleStageException(payload: { reconciliationId: string; stageRecordType: string; fieldId?: string; value: string }, signal?: AbortSignal): Promise<LifecycleStageExceptionsResponse> {
     return callService<LifecycleStageExceptionsResponse>(RECONCILIATION.deleteLifecycleStageException, payload, signal)

@@ -49,7 +49,7 @@
         :submit-disabled="!chosenStages.length"
         :show-back="true"
         @back="step = 'records'"
-        @submit="goToLeave"
+        @submit="goToLate"
       >
         <div class="wizard-input-shell">
           <WorkflowSelect
@@ -64,51 +64,6 @@
       </WorkflowStepForm>
 
       <WorkflowStepForm
-        v-else-if="step === 'leave'"
-        :question="pendingRules.length ? `Leave out any other ${recordWordMany}?` : `Leave out any ${recordWordMany}?`"
-        :submit-disabled="rules.loadingFields.value || Boolean(rules.loadingValuesFor.value)"
-        :allow-select-enter="true"
-        :show-back="true"
-        @back="step = 'stages'"
-        @submit="leaveNext"
-      >
-        <p v-for="rule in pendingRules" :key="`${rule.fieldId}=${rule.value}`" class="workflow-context-label" data-testid="lifecycle-create-pending-rule">
-          Leaving out where {{ rule.fieldLabel }} is {{ rule.valueLabel }}
-        </p>
-        <div class="wizard-input-shell">
-          <WorkflowSelect
-            v-model="leaveField"
-            :options="leaveFieldOptions"
-            :disabled="rules.loadingFields.value"
-            :placeholder="rules.loadingFields.value ? 'Loading...' : 'pick a field'"
-            test-id="lifecycle-create-leave-field"
-          />
-        </div>
-        <InlineValidation v-if="error || rules.error.value" tone="error" :message="(error || rules.error.value) ?? ''" />
-      </WorkflowStepForm>
-
-      <WorkflowStepForm
-        v-else-if="step === 'leaveValue'"
-        :question="`Leave out where ${rules.fieldLabel(leaveField)} is`"
-        :submit-disabled="!leaveValue"
-        :allow-select-enter="true"
-        :show-back="true"
-        @back="step = 'leave'"
-        @submit="addPendingRule"
-      >
-        <div class="wizard-input-shell">
-          <WorkflowSelect
-            v-model="leaveValue"
-            :options="leaveValueOptions"
-            :disabled="rules.loadingValuesFor.value === leaveField"
-            :placeholder="rules.loadingValuesFor.value === leaveField ? 'Loading...' : 'pick a value'"
-            test-id="lifecycle-create-leave-value"
-          />
-        </div>
-        <InlineValidation v-if="rules.error.value" tone="error" :message="rules.error.value ?? ''" />
-      </WorkflowStepForm>
-
-      <WorkflowStepForm
         v-else
         :question="`When is ${recordWordOne} late?`"
         primary-action-variant="save"
@@ -117,7 +72,7 @@
         :allow-select-enter="true"
         :show-back="true"
         :show-cancel-action="true"
-        @back="step = 'leave'"
+        @back="step = 'stages'"
         @cancel="cancel"
         @submit="create"
       >
@@ -140,13 +95,12 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type { LifecycleRecordTypeOption, LifecycleStageOption } from '../../lib/api/flowchartTypes'
 import { orderedStages, lateAfterOptions, defaultLateAfter, stageOptionLabel, stageReach } from '../../lib/lifecycleOptions'
-import { useLifecycleRuleOptions, type LifecycleRuleDraft } from '../../lib/useLifecycleRuleOptions'
 
 // DAR-UI-050. A lifecycle in four dropdowns, one per step. Every option is read from the account itself
 // (get#LifecycleOptions), so nothing is typed and nothing is offered that the data does not contain. Leave-out
-// rules are part of setting it up: a field then a value, each from the account. The name, the stage order and
-// every place name are made by the backend.
-type Step = 'account' | 'records' | 'stages' | 'leave' | 'leaveValue' | 'late'
+// rules are set from the lifecycle's settings, not here. The name, the stage order and every place name are made
+// by the backend.
+type Step = 'account' | 'records' | 'stages' | 'late'
 const router = useRouter()
 const step = ref<Step>('account')
 const accounts = ref<{ id: string; label: string }[]>([])
@@ -168,39 +122,6 @@ const accountOptions = computed(() => accounts.value.map((a) => ({ value: a.id, 
 const accountLabel = computed(() => accounts.value.find((a) => a.id === accountId.value)?.label ?? 'the account')
 // The account decides which record types are offered (only those with records); the label is just the name.
 const recordTypeOptions = computed(() => recordTypes.value.map((r) => ({ value: r.recordType, label: r.label })))
-// Leave-out rules, one field then one value per card, repeated until "Nothing" / "Nothing else".
-const NOTHING = '__nothing'
-const rules = useLifecycleRuleOptions()
-const pendingRules = ref<LifecycleRuleDraft[]>([])
-const leaveField = ref(NOTHING)
-const leaveValue = ref('')
-const ruleSource = computed(() => ({ nsAuthConfigId: accountId.value, recordType: recordType.value }))
-const recordWordMany = computed(() => (recordTypes.value.find((r) => r.recordType === recordType.value)?.label ?? 'records').toLowerCase())
-const leaveFieldOptions = computed(() => [{ value: NOTHING, label: pendingRules.value.length ? 'Nothing else' : 'Nothing' },
-  ...rules.fields.value.map((f) => ({ value: f.fieldId, label: f.label }))])
-const leaveValueOptions = computed(() => (rules.values[leaveField.value] ?? []).map((v) => ({ value: v.value, label: v.label })))
-
-function goToLeave() {
-  leaveField.value = NOTHING
-  step.value = 'leave'
-  void rules.loadFields(ruleSource.value)
-}
-
-function leaveNext() {
-  if (leaveField.value === NOTHING) { goToLate(); return }
-  leaveValue.value = ''
-  step.value = 'leaveValue'
-  void rules.loadValues(ruleSource.value, leaveField.value)
-}
-
-function addPendingRule() {
-  const rule = { fieldId: leaveField.value, fieldLabel: rules.fieldLabel(leaveField.value), value: leaveValue.value,
-    valueLabel: rules.valueLabel(leaveField.value, leaveValue.value) }
-  if (!pendingRules.value.some((r) => r.fieldId === rule.fieldId && r.value === rule.value)) pendingRules.value.push(rule)
-  leaveField.value = NOTHING
-  step.value = 'leave'
-}
-
 const recordWordOne = computed(() => {
   const label = recordTypes.value.find((r) => r.recordType === recordType.value)?.label ?? 'a record'
   return `a ${label.replace(/s$/, '').toLowerCase()}`
@@ -208,7 +129,7 @@ const recordWordOne = computed(() => {
 const stageOptions = computed(() => stages.value.map((s) => ({ value: s.recordType, label: stageOptionLabel(s) })))
 const chosenInOrder = computed(() => orderedStages(stages.value, chosenStages.value))
 const lateOptions = computed(() => lateAfterOptions(chosenInOrder.value))
-const progress = computed(() => ({ account: 0, records: 20, stages: 40, leave: 60, leaveValue: 70, late: 85 })[step.value])
+const progress = computed(() => ({ account: 0, records: 25, stages: 50, late: 75 })[step.value])
 
 function backToTypeChoice() { void router.push({ name: 'run-create' }) }
 function backFromRecords() { if (skippedAccount.value) backToTypeChoice(); else step.value = 'account' }
@@ -260,7 +181,6 @@ async function create() {
       recordType: recordType.value,
       stageRecordTypes: chosenInOrder.value.map((s) => s.recordType),
       lateAfterDays: Number(lateAfter.value),
-      rules: pendingRules.value.map(({ fieldId, fieldLabel, value }) => ({ fieldId, fieldLabel, value })),
       ...(reach.length ? { stageReach: reach } : {}),
     })
     await router.push({ name: 'reconciliation-run-flowchart', params: { reconciliationId: saved.reconciliationId } })

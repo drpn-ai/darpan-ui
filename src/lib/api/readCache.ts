@@ -57,6 +57,17 @@ export const STORED_LAST_MAX_AGE_MS = 7 * 24 * 60 * 60_000
 /** A final answer cannot go stale, but it should not sit in the browser for good either. */
 export const STORED_FINAL_MAX_AGE_MS = 30 * 24 * 60 * 60_000
 
+/*
+ * DAR-UI-050. A third stored kind, meta: what a customer's own system says about itself, such as a NetSuite record
+ * type's fields and the values each holds. No Darpan write can change it, so writes keep it (a form's pickers stay
+ * drawn after the form saves); it ages out after STORED_META_MAX_AGE_MS and goes with the scope, as the others do.
+ * Held in memory as well, so storage that refuses a large answer (quota) still serves it for the life of the tab.
+ */
+const META = 'meta:'
+export const STORED_META_MAX_AGE_MS = 12 * 60 * 60_000
+const metaEntries = new Map<string, Entry>()
+const metaInFlight = new Map<string, { token: number; promise: Promise<unknown> }>()
+
 let storedScope: string | null = null
 // Bumped whenever the scope changes or every stored read is wiped. A read takes the token when it starts
 // and stores only if it still matches, so an answer fetched for one user or tenant is never filed under the
@@ -65,7 +76,10 @@ let scopeToken = 0
 
 /** The signed-in user and active tenant, or null while signed out: nothing is stored or served without one. */
 export function setReadCacheScope(scope: string | null): void {
-  if (scope !== storedScope) scopeToken += 1
+  if (scope !== storedScope) {
+    scopeToken += 1
+    metaEntries.clear()
+  }
   storedScope = scope
 }
 
@@ -128,7 +142,7 @@ function writeStored(kind: string, key: string, value: unknown, token: number): 
   } catch {
     return
   }
-  // Oldest first, across both kinds: the newest STORED_READ_MAX_ENTRIES survive.
+  // Oldest first, across every kind: the newest STORED_READ_MAX_ENTRIES survive.
   const aged = storedKeys(STORED_PREFIX).map((k) => {
     try {
       return { k, at: (JSON.parse(store.getItem(k) ?? '') as Entry).storedAt }
@@ -144,7 +158,8 @@ function writeStored(kind: string, key: string, value: unknown, token: number): 
 }
 
 /** Every stored read, of every scope. Called on login, logout and tenant switch. */
-export function clearStoredReads(kind?: typeof FINAL | typeof LAST): void {
+export function clearStoredReads(kind?: typeof FINAL | typeof LAST | typeof META): void {
+  if (!kind || kind === META) metaEntries.clear()
   if (!kind) scopeToken += 1
   const store = storage()
   if (!store) return
@@ -263,4 +278,39 @@ export function readQueryOnce<T>(query: ReadQuery<T>, maxAgeMs = READ_ONCE_FRESH
   const cached = readFresh(query.key, maxAgeMs)
   if (cached) return Promise.resolve(cached.value as T)
   return fetchShared(query)
+}
+
+/** Account metadata stored by this tab or an earlier visit, or undefined. Never asks the network. */
+export function peekAccountMeta<T>(key: string): T | undefined {
+  if (!storedScope) return undefined
+  const held = metaEntries.get(key)
+  if (held && Date.now() - held.storedAt <= STORED_META_MAX_AGE_MS) return held.value as T
+  const stored = readStored(META, key, STORED_META_MAX_AGE_MS)
+  if (!stored) return undefined
+  metaEntries.set(key, stored)
+  return stored.value as T
+}
+
+/** Stores account metadata. `token` is readCacheScopeToken() from before the read began. */
+export function storeAccountMeta(key: string, value: unknown, token: number = scopeToken): void {
+  if (token !== scopeToken || !storedScope) return
+  metaEntries.set(key, { value, storedAt: Date.now() })
+  writeStored(META, key, value, token)
+}
+
+/** Account metadata: the stored answer when there is one, otherwise one network read, joined by any other asker. */
+export function readAccountMeta<T>(query: ReadQuery<T>): Promise<T> {
+  const held = peekAccountMeta<T>(query.key)
+  if (held !== undefined) return Promise.resolve(held)
+  const running = metaInFlight.get(query.key)
+  if (running && running.token === scopeToken) return running.promise as Promise<T>
+  const token = scopeToken
+  const promise = query.fetch().then((value) => {
+    storeAccountMeta(query.key, value, token)
+    return value
+  }).finally(() => {
+    if (metaInFlight.get(query.key)?.promise === promise) metaInFlight.delete(query.key)
+  })
+  metaInFlight.set(query.key, { token, promise })
+  return promise
 }

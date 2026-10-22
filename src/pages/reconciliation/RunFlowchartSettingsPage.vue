@@ -186,9 +186,9 @@
               >
                 + not expected for
               </button>
-              <!-- Where records stop at this stage, and whether each place's records are findings. Hidden while the
-                   order is being changed: the places follow the order once it is saved. -->
-              <template v-if="!orderChanged">
+              <!-- Where records stop at this stage, and whether each place's records are findings. While the order is
+                   being changed, the places the new order makes, as the backend names them. -->
+              <template v-if="!orderChanged || planQuestions">
                 <div
                   v-for="place in placesAt(stage.label)"
                   :key="place.key"
@@ -261,7 +261,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -358,7 +358,20 @@ const placesByStage = computed(() => {
   const byStage: Record<string, string[]> = {}
   for (const e of keptExceptions.value) (byStage[e.stageLabel] ??= []).push(e.value)
   const names = Object.fromEntries(Object.entries(byStage).map(([stage, values]) => [stage, values.join(' or ')]))
-  return lifecycleBoard(questions.value, [], names).stages
+  return lifecycleBoard(orderChanged.value ? planQuestions.value ?? [] : questions.value, [], names).stages
+})
+// DAR-UI-050. A new order makes new places with new names; they are asked for (get#LifecyclePlan), never guessed here.
+// Until the answer lands, or if it fails, the places are not drawn rather than drawn for the wrong order.
+const planQuestions = ref<FlowchartQuestion[] | null>(null)
+watch(() => stages.value.map((st) => st.recordType).join(), async (order) => {
+  planQuestions.value = null
+  if (!orderChanged.value || !source.value) return
+  try {
+    const plan = await reconciliationFacade.getLifecyclePlan({ recordType: source.value.recordType, stageRecordTypes: order.split(',') })
+    if (stages.value.map((st) => st.recordType).join() === order) planQuestions.value = plan.questions ?? []
+  } catch {
+    // The places return with the saved order, or after the save.
+  }
 })
 // Written findings have their own lines; the places listed are where records stop.
 const placesAt = (stageLabel: string) => (placesByStage.value.find((st) => st.label === stageLabel)?.places ?? []).filter((p) => p.kind !== 'check')
@@ -558,6 +571,11 @@ onMounted(async () => {
       await Promise.all([rules.loadFields(got.lifecycle), stageRules.loadFields(got.lifecycle), findingRules.loadFields(got.lifecycle)])
       // Named as the account names them, once its fields are read.
       keptDetails.value = keptDetails.value.map((d) => ({ ...d, label: rules.fieldLabel(d.fieldId) }))
+      // Every value each picker offers, read now, one scope after another, so no pick waits on NetSuite.
+      const lifecycle = got.lifecycle
+      void (async () => {
+        for (const picker of [rules, stageRules, findingRules]) await picker.warmValues(lifecycle)
+      })()
     }
   } catch (caught) {
     error.value = message(caught)

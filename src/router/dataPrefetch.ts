@@ -1,6 +1,7 @@
 import type { Router } from 'vue-router'
 import * as q from '../lib/api/queries'
 import { prefetchQuery, readQueryOnce } from '../lib/api/readCache'
+import { warmLifecycleRuleOptions } from '../lib/useLifecycleRuleOptions'
 
 /**
  * DAR-UI-051. Warms the read cache before a page opens, so a first visit draws as fast as a revisit.
@@ -46,7 +47,10 @@ export const ROUTE_DATA: Record<string, RoutePrefetch> = {
     void readQueryOnce(q.lifecycleChart(id)).then(({ got }) => {
       if (!got.lifecycle) return
       const source = { nsAuthConfigId: got.lifecycle.nsAuthConfigId, recordType: got.lifecycle.recordType }
-      for (const scope of [undefined, 'STAGE', 'FINDING'] as const) void prefetchQuery(q.lifecycleRuleFields(source, scope))
+      // DAR-UI-050: and every value they offer, one scope after another; stored as account metadata, so once a day.
+      void (async () => {
+        for (const scope of [undefined, 'STAGE', 'FINDING'] as const) await warmLifecycleRuleOptions(source, scope)
+      })()
     }, () => {})
   },
   'reconciliation-run-flowchart-start': (route) => {

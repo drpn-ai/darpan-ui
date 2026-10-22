@@ -7,14 +7,15 @@ vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: { listNsAuthConfigs: vi.fn(async () => ({ authConfigs: [{ nsAuthConfigId: 'net_prod', description: 'Gorjana NetSuite' }, { nsAuthConfigId: 'gorjana_prod', description: 'Gorjana NetSuite (sandbox copy)' }] })) },
   reconciliationFacade: {
     getReconciliation: vi.fn(), getLifecycleRuleOptions: vi.fn(), saveLifecycleRule: vi.fn(), deleteLifecycleRule: vi.fn(), saveReconciliation: vi.fn(),
-    saveLifecycleStageException: vi.fn(), deleteLifecycleStageException: vi.fn(), saveLifecycleStages: vi.fn(), saveLifecycleDetails: vi.fn(), saveLifecycleFinding: vi.fn(), deleteLifecycleFinding: vi.fn(),
+    saveLifecycleStageException: vi.fn(), deleteLifecycleStageException: vi.fn(), saveLifecycleStages: vi.fn(), getLifecyclePlan: vi.fn(), saveLifecycleDetails: vi.fn(), saveLifecycleFinding: vi.fn(), deleteLifecycleFinding: vi.fn(),
   },
 }))
 
 import { reconciliationFacade, settingsFacade } from '../../../lib/api/facade'
 import RunFlowchartSettingsPage from '../RunFlowchartSettingsPage.vue'
-import { prefetchQuery } from '../../../lib/api/readCache'
-import { lifecycleChart, lifecycleRuleFields } from '../../../lib/api/queries'
+import { clearStoredReads, invalidateReadCache, prefetchQuery, setReadCacheScope } from '../../../lib/api/readCache'
+import { lifecycleChart } from '../../../lib/api/queries'
+import { warmLifecycleRuleOptions } from '../../../lib/useLifecycleRuleOptions'
 
 const f = vi.mocked(reconciliationFacade)
 const draft = { fieldId: 'custbody_hc_sales_channel', fieldLabel: 'HC Sales Channel', value: 'Shopify Draft Order', valueLabel: 'Shopify Draft Order' }
@@ -74,19 +75,34 @@ describe('RunFlowchartSettingsPage', () => {
   })
 
   it('opens from what the lifecycle page or a hover just read, without asking again (DAR-UI-051)', async () => {
-    await prefetchQuery(lifecycleChart('R1'))
-    const got = await f.getReconciliation.mock.results[0]?.value
-    for (const scope of [undefined, 'STAGE', 'FINDING'] as const) {
-      await prefetchQuery(lifecycleRuleFields({ nsAuthConfigId: got.lifecycle.nsAuthConfigId, recordType: got.lifecycle.recordType }, scope))
-    }
-    f.getReconciliation.mockClear()
-    f.getLifecycleRuleOptions.mockClear()
+    // DAR-UI-050: the account's fields and every value they offer are kept as account metadata, which a write
+    // (this form's own save) does not drop, so a pick never waits on NetSuite.
+    setReadCacheScope('alice|GORJANA')
+    try {
+      await prefetchQuery(lifecycleChart('R1'))
+      const got = await f.getReconciliation.mock.results[0]?.value
+      for (const scope of [undefined, 'STAGE', 'FINDING'] as const) {
+        await warmLifecycleRuleOptions({ nsAuthConfigId: got.lifecycle.nsAuthConfigId, recordType: got.lifecycle.recordType }, scope)
+      }
+      invalidateReadCache()
+      await prefetchQuery(lifecycleChart('R1'))
+      f.getReconciliation.mockClear()
+      f.getLifecycleRuleOptions.mockClear()
 
-    const w = mount(RunFlowchartSettingsPage)
-    await flushPromises()
-    expect(f.getReconciliation).not.toHaveBeenCalled()
-    expect(f.getLifecycleRuleOptions).not.toHaveBeenCalled()
-    expect(w.get('[data-testid="lifecycle-spine"]').text()).toContain('Gorjana NetSuite (sandbox copy)')
+      const w = mount(RunFlowchartSettingsPage)
+      await flushPromises()
+      expect(f.getReconciliation).not.toHaveBeenCalled()
+      expect(f.getLifecycleRuleOptions).not.toHaveBeenCalled()
+      expect(w.get('[data-testid="lifecycle-spine"]').text()).toContain('Gorjana NetSuite (sandbox copy)')
+      await w.get('[data-testid="lifecycle-settings-add-filter"]').trigger('click')
+      select(w, 'lifecycle-settings-field').vm.$emit('update:modelValue', 'custbody_hc_order_id')
+      await w.vm.$nextTick()
+      expect(select(w, 'lifecycle-settings-value').props('options').length).toBeGreaterThan(0)
+      expect(f.getLifecycleRuleOptions).not.toHaveBeenCalled()
+    } finally {
+      clearStoredReads()
+      setReadCacheScope(null)
+    }
   })
 
   it('adds a filter and an exception where they act, and saves only what changed', async () => {
@@ -136,6 +152,36 @@ describe('RunFlowchartSettingsPage', () => {
     await flushPromises()
     expect(f.saveLifecycleStages).toHaveBeenCalledWith({ reconciliationId: 'R1', stageRecordTypes: ['ItemShip', 'CustInvc'] })
     expect(f.saveLifecycleStageException).not.toHaveBeenCalled()
+  })
+
+  // Places are named by the backend for an order; a new order's places are asked for, not guessed, and stay on screen.
+  it('keeps the places on screen while the order changes, named for the new order', async () => {
+    const q = (id: string, parent: string | null, branch: 'YES' | 'NO' | null, runName: string, noOutcomeLabel: string | null = null,
+      questionRole: string | null = null) => ({ reconciliationRunId: id, parentReconciliationRunId: parent, parentBranch: branch, runName,
+      noOutcomeLabel, questionRole, isActive: 'Y', ruleSetId: '' })
+    const plan = [q('start', null, null, 'Sales orders', null, 'START'), q('s0', 'start', 'YES', 'Fulfillment'),
+      q('x0', 's0', 'YES', 'Fulfillment', null, 'EXCUSED'), q('s1', 'x0', 'YES', 'Invoice', 'Shipped, never billed'),
+      q('done', 'x0', 'YES', 'Invoice', 'Shipped and billed'), q('x0.not1', 'x0', 'NO', 'Invoice', 'Fulfillment not expected, never billed'),
+      q('s0.has1', 's0', 'NO', 'Invoice', 'Billed, never shipped'), q('s0.not1', 's0', 'NO', 'Invoice', 'Never shipped, never billed')]
+      .map((x, i) => ({ ...x, runSequence: i + 1 }))
+    f.getLifecyclePlan.mockResolvedValue({ questions: plan } as never)
+    const w = mount(RunFlowchartSettingsPage)
+    await flushPromises()
+    await w.get('[data-testid="lifecycle-settings-up-ItemShip"]').trigger('click')
+    await flushPromises()
+    expect(f.getLifecyclePlan).toHaveBeenCalledWith({ recordType: 'SalesOrd', stageRecordTypes: ['ItemShip', 'CustInvc'] })
+    const spine = w.get('[data-testid="lifecycle-spine"]').text()
+    expect(spine).toContain('stops at Billed, never shipped')
+    expect(spine).toContain('stops at Never shipped, never billed')
+    // The excused place reads in the exception's words.
+    expect(spine).toContain('stops at Store Pickup, never billed')
+    expect(spine.indexOf('Never shipped, never billed')).toBeLessThan(spine.indexOf('Invoice'))
+    // Back to the saved order: the saved places, nothing asked.
+    f.getLifecyclePlan.mockClear()
+    await w.get('[data-testid="lifecycle-settings-up-CustInvc"]').trigger('click')
+    await flushPromises()
+    expect(f.getLifecyclePlan).not.toHaveBeenCalled()
+    expect(w.get('[data-testid="lifecycle-spine"]').text()).not.toContain('Never shipped, never billed')
   })
 
   // A stage holds exceptions on several fields: Store Pickup orders and gift-card orders are both not owed a fulfillment.

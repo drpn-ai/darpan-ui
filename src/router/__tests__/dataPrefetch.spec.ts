@@ -15,7 +15,7 @@ vi.mock('../../lib/api/facade', () => ({
 }))
 
 import { HOVER_INTENT_MS, installDataPrefetch } from '../dataPrefetch'
-import { cachedRead, readQueryOnce } from '../../lib/api/readCache'
+import { cachedRead, readAccountMeta, setReadCacheScope } from '../../lib/api/readCache'
 import { lifecycleChart, lifecycleRuleFields } from '../../lib/api/queries'
 
 const Blank = { template: '<div />' }
@@ -36,6 +36,7 @@ const hover = (el: Element) => el.dispatchEvent(new Event('pointerover', { bubbl
 beforeEach(async () => {
   vi.useFakeTimers()
   Object.values(f).forEach((fn) => fn.mockClear())
+  f.getLifecycleRuleOptions.mockImplementation(async () => ({ fields: [] }))
   authenticated = true
   router = createRouter({
     history: createMemoryHistory(),
@@ -102,27 +103,35 @@ describe('intent prefetch (DAR-UI-051)', () => {
     expect(f.listAutomations).toHaveBeenCalledTimes(1)
   })
 
-  it("a lifecycle's settings link warms the lifecycle, then its account's field lists", async () => {
+  it("a lifecycle's settings link warms the lifecycle, then its account's fields and every value they offer", async () => {
+    f.getLifecycleRuleOptions.mockImplementation((async (options: Record<string, string>) => (options.fieldId
+      ? { fields: [], values: [{ value: 'POS', label: 'POS' }] }
+      : { fields: [{ fieldId: 'custbody_channel', label: 'Channel' }] })) as never)
     hover(link('/reconciliation/runs/R1/settings'))
     await vi.advanceTimersByTimeAsync(HOVER_INTENT_MS)
+    await vi.runAllTimersAsync()
     expect(f.getReconciliation).toHaveBeenCalledWith({ reconciliationId: 'R1' })
+    const source = { nsAuthConfigId: 'net_prod', recordType: 'salesorder' }
+    // One scope after another: its fields, then each field's values.
     expect(f.getLifecycleRuleOptions.mock.calls.map(([args]) => args)).toEqual([
-      { nsAuthConfigId: 'net_prod', recordType: 'salesorder' },
-      { nsAuthConfigId: 'net_prod', recordType: 'salesorder', scope: 'STAGE' },
-      { nsAuthConfigId: 'net_prod', recordType: 'salesorder', scope: 'FINDING' },
+      source, { ...source, fieldId: 'custbody_channel' },
+      { ...source, scope: 'STAGE' }, { ...source, fieldId: 'custbody_channel', scope: 'STAGE' },
+      { ...source, scope: 'FINDING' }, { ...source, fieldId: 'custbody_channel', scope: 'FINDING' },
     ])
   })
 
   it('the page then opens from the warmed entries without asking again', async () => {
+    setReadCacheScope('alice|GORJANA')
     hover(link('/reconciliation/runs/R1/settings'))
     await vi.advanceTimersByTimeAsync(HOVER_INTENT_MS)
     const apply = vi.fn()
     const chart = lifecycleChart('R1')
     void cachedRead(chart.key, () => new Promise(() => {}), apply)
     expect(apply).toHaveBeenCalledTimes(1)
-    await readQueryOnce(lifecycleRuleFields({ nsAuthConfigId: 'net_prod', recordType: 'salesorder' }, 'STAGE'), 60_000)
+    await readAccountMeta(lifecycleRuleFields({ nsAuthConfigId: 'net_prod', recordType: 'salesorder' }, 'STAGE'))
     expect(f.getReconciliation).toHaveBeenCalledTimes(1)
     expect(f.getLifecycleRuleOptions).toHaveBeenCalledTimes(3)
+    setReadCacheScope(null)
   })
 })
 
