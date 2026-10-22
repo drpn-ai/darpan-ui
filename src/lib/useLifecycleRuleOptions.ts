@@ -19,7 +19,9 @@ function valuesKey(source: LifecycleRuleSource, scope?: Scope) {
   return `lifecycle.ruleValues:${scope ?? ''}:${source.nsAuthConfigId}:${source.recordType}`
 }
 
-const valuesInFlight = new Map<string, Promise<RuleValue[]>>()
+// Each read carries the scope it began under: after a sign-in or tenant switch, a read still running for the old scope
+// is not joined, so one tenant's values never answer another's pick (a NetSuite account may be shared).
+const valuesInFlight = new Map<string, { token: number; promise: Promise<RuleValue[]> }>()
 
 /** One field's values: the stored copy, or one read shared by every asker (the sweep and a pick racing it). */
 function readValues(source: LifecycleRuleSource, scope: Scope | undefined, fieldId: string): Promise<RuleValue[]> {
@@ -27,17 +29,17 @@ function readValues(source: LifecycleRuleSource, scope: Scope | undefined, field
   const held = peekAccountMeta<Record<string, RuleValue[]>>(key)?.[fieldId]
   if (held) return Promise.resolve(held)
   const flightKey = `${key}:${fieldId}`
-  const running = valuesInFlight.get(flightKey)
-  if (running) return running
   const token = readCacheScopeToken()
+  const running = valuesInFlight.get(flightKey)
+  if (running && running.token === token) return running.promise
   const promise = reconciliationFacade.getLifecycleRuleOptions({ ...source, fieldId, ...(scope ? { scope } : {}) })
     .then((response) => {
       const values = response.values ?? []
       storeAccountMeta(key, { ...(peekAccountMeta<Record<string, RuleValue[]>>(key) ?? {}), [fieldId]: values }, token)
       return values
     })
-    .finally(() => { valuesInFlight.delete(flightKey) })
-  valuesInFlight.set(flightKey, promise)
+    .finally(() => { if (valuesInFlight.get(flightKey)?.promise === promise) valuesInFlight.delete(flightKey) })
+  valuesInFlight.set(flightKey, { token, promise })
   return promise
 }
 
