@@ -1,4 +1,5 @@
 import { callService } from './client'
+import type { GetAuditFindingResponse, GetAuditReportResponse, GetAuditsResponse } from './auditTypes'
 
 // Cache-reset coordinator. The actual reset implementation is wired up in
 // main.ts after Pinia is installed, so this module stays free of store
@@ -491,6 +492,25 @@ export const jsonSchemaFacade = {
   },
   delete(payload: DeleteJsonSchemaPayload, signal?: AbortSignal): Promise<DeleteJsonSchemaResponse> {
     return callService<DeleteJsonSchemaResponse>(JSON_SCHEMA.delete, payload, signal)
+  },
+}
+
+// DAR-UI-058. The audit run: the assembler's JSON unchanged, so the screen reads what GraphQL and the CLI read.
+const AUDIT = {
+  getAudits: 'facade.AuditFacadeServices.get#Audits',
+  getAuditReport: 'facade.AuditFacadeServices.get#AuditReport',
+  getAuditFinding: 'facade.AuditFacadeServices.get#AuditFinding',
+}
+
+export const auditFacade = {
+  getAudits(signal?: AbortSignal): Promise<GetAuditsResponse> {
+    return callService<GetAuditsResponse>(AUDIT.getAudits, {}, signal)
+  },
+  getAuditReport(payload: { audit: string; date?: string; period?: string }, signal?: AbortSignal): Promise<GetAuditReportResponse> {
+    return callService<GetAuditReportResponse>(AUDIT.getAuditReport, payload, signal)
+  },
+  getAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<GetAuditFindingResponse> {
+    return callService<GetAuditFindingResponse>(AUDIT.getAuditFinding, payload, signal)
   },
 }
 

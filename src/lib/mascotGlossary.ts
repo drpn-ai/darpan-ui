@@ -283,6 +283,10 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Lifecycle run',
     body: 'follows records through a chain of questions and names where each one stalls. Never zero — watch which stall grows.',
   },
+  runTypeAudit: {
+    title: 'Audit run',
+    body: 're-checks a list of what must be true with sync and lifecycle checks, and keeps each finding open until a later run clears it. A fix counts when a run sees it, not when someone says so.',
+  },
   pinnedRuns: {
     title: 'Pinned runs',
     body: 'the runs you asked to keep at the top. Pinning changes what you see first, never what a run does.',
