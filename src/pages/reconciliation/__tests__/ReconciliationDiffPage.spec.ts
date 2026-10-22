@@ -1135,11 +1135,13 @@ describe('ReconciliationDiffPage', () => {
 
   it('keeps the custom API calendar constrained to the workflow column', () => {
     const source = readFileSync('src/pages/reconciliation/ReconciliationDiffPage.vue', 'utf8')
+    // DAR-UI-060: the calendar's styles moved with it into the shared component.
+    const calendarSource = readFileSync('src/components/workflow/WorkflowDateRangeCalendar.vue', 'utf8')
 
     expect(source).toMatch(/\.reconciliation-diff-layout\s*\{[^}]*min-width: 0;/s)
-    expect(source).toMatch(/\.wizard-api-calendar-grid\s*\{[^}]*width: 100%;[^}]*min-width: 0;[^}]*max-width: 100%;/s)
-    expect(source).toMatch(/\.wizard-api-calendar-weekdays,\n\.wizard-api-calendar-days\s*\{[^}]*grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/s)
-    expect(source).toMatch(/\.wizard-api-calendar-day__label\s*\{[^}]*inline-size: min\(1\.95rem, 100%\);[^}]*min-width: 0;/s)
+    expect(calendarSource).toMatch(/\.wizard-api-calendar-grid\s*\{[^}]*width: 100%;[^}]*min-width: 0;[^}]*max-width: 100%;/s)
+    expect(calendarSource).toMatch(/\.wizard-api-calendar-weekdays,\n\.wizard-api-calendar-days\s*\{[^}]*grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/s)
+    expect(calendarSource).toMatch(/\.wizard-api-calendar-day__label\s*\{[^}]*inline-size: min\(1\.95rem, 100%\);[^}]*min-width: 0;/s)
   })
 
   it('does not allow outside-month calendar cells to be selected or highlighted', async () => {

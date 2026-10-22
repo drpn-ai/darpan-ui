@@ -1,23 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildRunPayload, defaultWindowDays, isExecutionDone, isExecutionFinal, POLL_CEILING_MS, questionStates, shouldKeepPolling, windowFromDays,
+  buildRunPayload, isExecutionDone, isExecutionFinal, POLL_CEILING_MS, questionStates, shouldKeepPolling,
 } from '../flowchartRunState'
 
 describe('the window', () => {
-  it('reads "<n>d" and falls back to one day', () => {
-    expect(defaultWindowDays('3d')).toBe(3)
-    expect(defaultWindowDays(' 14d ')).toBe(14)
-    expect(defaultWindowDays('week')).toBe(1)
-    expect(defaultWindowDays(null)).toBe(1)
-  })
-
-  it('is the last n days ending today, end exclusive', () => {
-    const today = new Date(2026, 7, 17)
-    const w = windowFromDays(3, today)
-    expect(w.endExclusiveDate.getDate()).toBe(17)
-    expect(w.startDate.getDate()).toBe(14)
-  })
-
   it('builds the run payload with instants and local dates', () => {
     const p = buildRunPayload('R1', { startDate: new Date(2026, 7, 14), endExclusiveDate: new Date(2026, 7, 17) })
     expect(p.reconciliationId).toBe('R1')

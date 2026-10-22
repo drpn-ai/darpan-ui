@@ -56,93 +56,7 @@
               @choose="chooseApiWindowPresetChoice"
             />
 
-            <div v-else-if="currentStep.id === 'api-window-custom'" class="wizard-api-range-selector wizard-input-shell">
-              <div class="wizard-api-range-panel wizard-api-range-panel--custom">
-                <div class="wizard-api-window-shell">
-                  <button
-                    type="button"
-                    :class="[
-                      'wizard-api-window-field',
-                      { 'wizard-api-window-field--active': customApiWindowSelecting === 'start' },
-                    ]"
-                    data-testid="api-window-custom-start"
-                    @click="setCustomDateSelectionSide('start')"
-                  >
-                    <span class="workflow-context-label">Start</span>
-                    <span :class="['wizard-api-window-value', { empty: !customApiWindowStartDate }]">
-                      {{ customApiWindowStartLabel }}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    :class="[
-                      'wizard-api-window-field',
-                      { 'wizard-api-window-field--active': customApiWindowSelecting === 'end' },
-                    ]"
-                    data-testid="api-window-custom-end"
-                    @click="setCustomDateSelectionSide('end')"
-                  >
-                    <span class="workflow-context-label">End</span>
-                    <span :class="['wizard-api-window-value', { empty: !customApiWindowEndDate }]">
-                      {{ customApiWindowEndLabel }}
-                    </span>
-                  </button>
-                </div>
-
-                <div class="wizard-api-calendar-grid">
-                  <section
-                    v-for="(month, monthIndex) in customCalendarMonths"
-                    :key="month.key"
-                    class="wizard-api-calendar-month"
-                  >
-                    <div class="wizard-api-calendar-month__head">
-                      <button
-                        v-if="monthIndex === 0"
-                        type="button"
-                        class="wizard-api-calendar-nav"
-                        aria-label="Show previous month"
-                        data-testid="api-window-custom-previous-month"
-                        @click="shiftCustomCalendarMonth(-1)"
-                      >
-                        ‹
-                      </button>
-                      <span v-else class="wizard-api-calendar-nav-spacer" aria-hidden="true"></span>
-                      <h3>{{ month.label }}</h3>
-                      <button
-                        v-if="monthIndex === customCalendarMonths.length - 1 && canShiftCustomCalendarMonth(1)"
-                        type="button"
-                        class="wizard-api-calendar-nav"
-                        aria-label="Show next month"
-                        data-testid="api-window-custom-next-month"
-                        @click="shiftCustomCalendarMonth(1)"
-                      >
-                        ›
-                      </button>
-                      <span v-else class="wizard-api-calendar-nav-spacer" aria-hidden="true"></span>
-                    </div>
-                    <div class="wizard-api-calendar-weekdays" aria-hidden="true">
-                      <span v-for="(weekday, weekdayIndex) in weekdayLabels" :key="`${month.key}-${weekdayIndex}`">
-                        {{ weekday }}
-                      </span>
-                    </div>
-                    <div class="wizard-api-calendar-days">
-                      <button
-                        v-for="cell in month.cells"
-                        :key="cell.key"
-                        type="button"
-                        class="wizard-api-calendar-day"
-                        :class="customCalendarCellClasses(cell)"
-                        :disabled="isCustomCalendarCellDisabled(cell)"
-                        :data-testid="cell.isCurrentMonth ? `api-window-custom-day-${cell.key}` : undefined"
-                        @click="selectCustomCalendarDate(cell)"
-                      >
-                        <span class="wizard-api-calendar-day__label">{{ cell.day }}</span>
-                      </button>
-                    </div>
-                  </section>
-                </div>
-              </div>
-            </div>
+            <WorkflowDateRangeCalendar v-else-if="currentStep.id === 'api-window-custom'" :calendar="calendar" />
 
             <label v-else-if="isFileStepId(currentStep.id)" class="wizard-file-shell wizard-input-shell">
               <input
@@ -270,9 +184,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowSelect from '../../components/workflow/WorkflowSelect.vue'
-import WorkflowShortcutChoiceCards, {
-  type WorkflowShortcutChoiceOption,
-} from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
+import WorkflowDateRangeCalendar from '../../components/workflow/WorkflowDateRangeCalendar.vue'
+import WorkflowShortcutChoiceCards from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -292,17 +205,23 @@ import {
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import {
-  addDays,
   displayDayStart,
   formatDateInputValue,
-  formatMonthLabel,
   formatSavedResultDateTime,
   todayInDisplayTimeZone,
 } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { listIconPath, settingsIconPath } from '../../lib/iconPaths'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
-import { useCalendarWidget, type CalendarRange } from '../../composables/useCalendarWidget'
+import { useCalendarWidget } from '../../composables/useCalendarWidget'
+import {
+  customWindowRange,
+  isRunWindowPreset,
+  presetWindowRange,
+  runWindowPresetOptions,
+  type RunWindowPreset,
+  type RunWindowRange,
+} from '../../lib/runWindow'
 import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -315,15 +234,6 @@ interface UploadStep {
 type ExpectedFileType = 'CSV' | 'JSON' | null
 type FileStepId = 'file-1' | 'file-2'
 type UploadPayloadKey = 'file1Name' | 'file1Text' | 'file2Name' | 'file2Text'
-type ApiWindowPreset = 'previous-day' | 'previous-week' | 'previous-month' | 'custom'
-
-interface ApiWindowPresetOption extends WorkflowShortcutChoiceOption {
-  value: ApiWindowPreset
-}
-
-interface ApiWindowRange extends CalendarRange {
-  summary: string
-}
 
 interface UploadSourceInput {
   file: File | null
@@ -334,7 +244,6 @@ interface UploadSourceInput {
 }
 
 const SOURCE_TYPE_API = 'AUT_SRC_API'
-const weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 const route = useRoute()
 const router = useRouter()
@@ -356,20 +265,14 @@ const {
 } = diff
 
 const calendar = useCalendarWidget()
-const {
-  startDate: customApiWindowStartDate,
-  endDate: customApiWindowEndDate,
-  selecting: customApiWindowSelecting,
-  endDateValue: customApiWindowEndDateValue,
-  calendarMonths: customCalendarMonths,
-} = calendar
+const { startDate: customApiWindowStartDate } = calendar
 
 const selectedSavedRunId = ref('')
 const file1SystemEnumId = ref('')
 const file2SystemEnumId = ref('')
 const file1 = ref<File | null>(null)
 const file2 = ref<File | null>(null)
-const apiWindowPreset = ref<ApiWindowPreset | ''>('')
+const apiWindowPreset = ref<RunWindowPreset | ''>('')
 const pendingSubmittedRun = ref<PendingReconciliationRun | null>(null)
 const currentStepIndex = ref(0)
 const inputResetKey = ref(0)
@@ -436,41 +339,12 @@ const workflowSteps = computed<UploadStep[]>(() => {
 const currentStep = computed<UploadStep>(() => workflowSteps.value[currentStepIndex.value] ?? workflowSteps.value[0]!)
 const progressPercent = computed(() => ((Math.max(1, currentStepIndex.value + 1) / workflowSteps.value.length) * 100).toFixed(2))
 const isFinalStep = computed(() => currentStepIndex.value === workflowSteps.value.length - 1)
-const apiWindowPresetOptions = computed<ApiWindowPresetOption[]>(() => {
-  const previousDay = buildPresetApiWindowRange('previous-day')
-  const previousWeek = buildPresetApiWindowRange('previous-week')
-  const previousMonth = buildPresetApiWindowRange('previous-month')
-
-  return [
-    {
-      value: 'previous-day',
-      label: formatApiWindowPresetOptionLabel('Previous Day', previousDay.summary),
-      shortcutKey: 'A',
-    },
-    {
-      value: 'previous-week',
-      label: formatApiWindowPresetOptionLabel('Previous Week', previousWeek.summary),
-      shortcutKey: 'B',
-    },
-    {
-      value: 'previous-month',
-      label: formatApiWindowPresetOptionLabel('Previous Month', previousMonth.summary),
-      shortcutKey: 'C',
-    },
-    {
-      value: 'custom',
-      label: 'Custom Dates, select start and end dates',
-      shortcutKey: 'D',
-    },
-  ]
-})
-const selectedApiWindowRange = computed<ApiWindowRange | null>(() => {
+const apiWindowPresetOptions = computed(() => runWindowPresetOptions(todayInDisplayTimeZone()))
+const selectedApiWindowRange = computed<RunWindowRange | null>(() => {
   if (!apiWindowPreset.value) return null
-  if (apiWindowPreset.value === 'custom') return buildCustomApiWindowRange()
-  return buildPresetApiWindowRange(apiWindowPreset.value)
+  if (apiWindowPreset.value === 'custom') return customWindowRange(calendar)
+  return presetWindowRange(apiWindowPreset.value, todayInDisplayTimeZone())
 })
-const customApiWindowStartLabel = computed(() => formatDateInputLabel(customApiWindowStartDate.value))
-const customApiWindowEndLabel = computed(() => formatDateInputLabel(customApiWindowEndDate.value))
 const file1SystemLabel = computed(() => {
   const option = selectedSystemOptions.value.find((systemOption) => systemOption.enumId === file1SystemEnumId.value)
   return option?.label || option?.description || option?.enumCode || option?.enumId || ''
@@ -620,16 +494,12 @@ function isApiSource(option: SavedRunSystemOption | null): boolean {
   return option?.sourceTypeEnumId?.trim() === SOURCE_TYPE_API
 }
 
-function isApiWindowPreset(value: string): value is ApiWindowPreset {
-  return ['previous-day', 'previous-week', 'previous-month', 'custom'].includes(value)
-}
-
 function chooseApiWindowPresetChoice(value: string): void {
-  if (!isApiWindowPreset(value)) return
+  if (!isRunWindowPreset(value)) return
   chooseApiWindowPreset(value)
 }
 
-function chooseApiWindowPreset(preset: ApiWindowPreset): void {
+function chooseApiWindowPreset(preset: RunWindowPreset): void {
   apiWindowPreset.value = preset
   if (preset !== 'custom') {
     calendar.reset()
@@ -642,72 +512,8 @@ function chooseApiWindowPreset(preset: ApiWindowPreset): void {
   void focusCurrentStepControlOnNextTick()
 }
 
-function buildPresetApiWindowRange(preset: Exclude<ApiWindowPreset, 'custom'>): ApiWindowRange {
-  const today = todayInDisplayTimeZone()
-  if (preset === 'previous-day') {
-    const previousDay = addDays(today, -1)
-    return {
-      startDate: previousDay,
-      endExclusiveDate: today,
-      summary: formatDateLabel(previousDay),
-    }
-  }
-  if (preset === 'previous-week') {
-    const startDate = addDays(today, -8)
-    const endDate = addDays(today, -1)
-    return {
-      startDate,
-      endExclusiveDate: today,
-      summary: formatDateRangeLabel(startDate, endDate),
-    }
-  }
-
-  const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-  const previousMonthStart = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() - 1, 1)
-  return {
-    startDate: previousMonthStart,
-    endExclusiveDate: currentMonthStart,
-    summary: formatMonthLabel(previousMonthStart),
-  }
-}
-
-function buildCustomApiWindowRange(): ApiWindowRange | null {
-  const calendarRange = calendar.range.value
-  if (!calendarRange) return null
-
-  const inclusiveEndDate = customApiWindowEndDateValue.value ?? calendarRange.endExclusiveDate
-  return {
-    ...calendarRange,
-    summary: formatDateRangeLabel(calendarRange.startDate, inclusiveEndDate),
-  }
-}
-
-function formatApiWindowPresetOptionLabel(title: string, summary: string): string {
-  return `${title}, ${summary}`
-}
-
-function formatDateInputLabel(value: string): string {
-  if (!value) return 'mm/dd/yyyy'
-  return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$2/$3/$1')
-}
-
-const setCustomDateSelectionSide = calendar.setSelectionSide
-const shiftCustomCalendarMonth = calendar.shiftMonth
-const canShiftCustomCalendarMonth = calendar.canShiftMonth
-const isCustomCalendarCellDisabled = calendar.isCellDisabled
-const selectCustomCalendarDate = calendar.selectCell
-const customCalendarCellClasses = calendar.cellClasses
-
 function formatDateForPayload(date: Date): string {
   return displayDayStart(date).toISOString()
-}
-
-function formatDateLabel(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
-}
-
-function formatDateRangeLabel(startDate: Date, endDate: Date): string {
-  return `${formatDateLabel(startDate)} to ${formatDateLabel(endDate)}`
 }
 
 function normalizeExpectedFileType(rawType?: string | null): ExpectedFileType {
@@ -1233,296 +1039,6 @@ onMounted(() => {
   margin: 0;
 }
 
-.wizard-api-range-selector {
-  width: min(42rem, 100%);
-  min-width: 0;
-  max-width: 100%;
-  justify-self: center;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-}
-
-.wizard-api-range-panel {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 82%, var(--surface));
-  box-shadow: 0 0.8rem 1.8rem color-mix(in oklab, black 8%, transparent);
-}
-
-.wizard-api-range-panel--custom {
-  gap: var(--space-3);
-  padding: var(--space-3);
-}
-
-.wizard-api-window-shell {
-  min-width: 0;
-  max-width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-  align-items: end;
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.wizard-api-window-field {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-0);
-  /* Sits between scale steps by more than the fold tolerance; snapping it would be a visible shift rather than a sub-pixel one. */
-  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
-  padding: 0.65rem var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.wizard-api-window-field--active,
-.wizard-api-window-field:focus-visible {
-  border-color: color-mix(in oklab, var(--accent) 72%, var(--border));
-  outline: none;
-}
-
-.wizard-api-window-value {
-  min-width: 0;
-  overflow: hidden;
-  font-size: clamp(0.9rem, 1vw, 1.02rem);
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wizard-api-window-value.empty {
-  color: var(--text-muted);
-}
-
-.wizard-api-calendar-grid {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.wizard-api-calendar-month {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  display: grid;
-  gap: var(--space-1-5);
-}
-
-.wizard-api-calendar-month__head {
-  display: grid;
-  grid-template-columns: 1.75rem minmax(0, 1fr) 1.75rem;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.wizard-api-calendar-month__head h3 {
-  margin: 0;
-  overflow: hidden;
-  color: var(--text);
-  font-size: var(--type-tile-size);
-  font-weight: 400;
-  line-height: 1.2;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wizard-api-calendar-nav,
-.wizard-api-calendar-nav-spacer {
-  width: 1.75rem;
-  height: 1.75rem;
-}
-
-.wizard-api-calendar-nav {
-  display: inline-grid;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-muted);
-  /* Sizes an icon glyph, not text. */
-  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
-  font-size: 1.45rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.wizard-api-calendar-nav:hover,
-.wizard-api-calendar-nav:focus-visible {
-  background: color-mix(in oklab, var(--surface) 74%, var(--accent) 26%);
-  color: var(--accent);
-  outline: none;
-}
-
-.wizard-api-calendar-weekdays,
-.wizard-api-calendar-days {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.wizard-api-calendar-weekdays {
-  color: var(--text-muted);
-  font-size: var(--type-eyebrow-size);
-  font-weight: 400;
-  line-height: 1.1;
-  text-align: center;
-}
-
-.wizard-api-calendar-weekdays span {
-  min-width: 0;
-  min-height: 1.75rem;
-  display: grid;
-  place-items: center;
-  padding: 0;
-}
-
-.wizard-api-calendar-days {
-  row-gap: 0.2rem;
-}
-
-.wizard-api-calendar-day {
-  position: relative;
-  width: 100%;
-  inline-size: 100%;
-  height: 2rem;
-  min-width: 0;
-  min-inline-size: 0;
-  max-width: 100%;
-  display: grid;
-  place-items: center;
-  justify-self: stretch;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--type-muted-size);
-  line-height: 1;
-  cursor: pointer;
-  z-index: 0;
-}
-
-.wizard-api-calendar-day__label {
-  position: relative;
-  z-index: 2;
-  display: inline-grid;
-  width: min(1.95rem, 100%);
-  inline-size: min(1.95rem, 100%);
-  min-width: 0;
-  max-width: 100%;
-  height: 1.95rem;
-  place-items: center;
-  line-height: 1;
-}
-
-.wizard-api-calendar-day::before,
-.wizard-api-calendar-day::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-}
-
-.wizard-api-calendar-day::before {
-  top: 0.18rem;
-  right: 0;
-  bottom: 0.18rem;
-  left: 0;
-  background: transparent;
-  z-index: 0;
-}
-
-.wizard-api-calendar-day::after {
-  top: 50%;
-  left: 50%;
-  width: min(1.95rem, 100%);
-  inline-size: min(1.95rem, 100%);
-  height: 1.95rem;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-}
-
-.wizard-api-calendar-day--in-range::before,
-.wizard-api-calendar-day--range-start::before,
-.wizard-api-calendar-day--range-end::before {
-  background: color-mix(in oklab, var(--accent) 16%, var(--surface));
-}
-
-.wizard-api-calendar-day--range-start::before {
-  left: 50%;
-}
-
-.wizard-api-calendar-day--range-end::before {
-  right: 50%;
-}
-
-.wizard-api-calendar-day--range-start.wizard-api-calendar-day--range-end::before {
-  background: transparent;
-}
-
-.wizard-api-calendar-day--range-start,
-.wizard-api-calendar-day--range-end {
-  color: var(--surface);
-  font-weight: 400;
-}
-
-.wizard-api-calendar-day--range-start::after,
-.wizard-api-calendar-day--range-end::after {
-  background: color-mix(in oklab, var(--accent) 66%, var(--surface));
-}
-
-.wizard-api-calendar-day--outside {
-  color: color-mix(in oklab, var(--text-muted) 58%, transparent);
-}
-
-.wizard-api-calendar-day:disabled,
-.wizard-api-calendar-day--disabled {
-  color: color-mix(in oklab, var(--text-muted) 56%, transparent);
-  cursor: not-allowed;
-}
-
-.wizard-api-calendar-day:disabled::before,
-.wizard-api-calendar-day:disabled::after {
-  background: transparent;
-  box-shadow: none;
-}
-
-.wizard-api-calendar-day:hover,
-.wizard-api-calendar-day:focus-visible {
-  outline: none;
-}
-
-.wizard-api-calendar-day:hover::after,
-.wizard-api-calendar-day:focus-visible::after {
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 65%, var(--border));
-}
-
-@media (max-width: 720px) {
-  .wizard-api-window-shell,
-  .wizard-api-calendar-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .reconciliation-run-history-board {
   display: grid;
   width: min(var(--workflow-question-width), 100%);
@@ -1629,10 +1145,6 @@ onMounted(() => {
   .reconciliation-diff-layout,
   .reconciliation-diff-main {
     gap: var(--space-4);
-  }
-
-  .wizard-api-window-shell {
-    grid-template-columns: 1fr;
   }
 
   .reconciliation-run-history-card__metrics {

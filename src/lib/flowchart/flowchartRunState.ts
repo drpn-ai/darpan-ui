@@ -1,21 +1,11 @@
 import type { FlowchartExecutionRow, RunFlowchartPayload } from '../api/flowchartTypes'
-import { addDays, displayDayStart, formatDateInputValue, todayInDisplayTimeZone } from '../utils/date'
+import { displayDayStart, formatDateInputValue } from '../utils/date'
 
-// DAR-UI-048. The run bar's window and the chart's per-question run states. A question with no row yet
+// DAR-UI-048. The run's window payload and the chart's per-question run states. A question with no row yet
 // is waiting: the backend creates a question's row only when its turn comes (spec A3).
 export const POLL_INTERVAL_MS = 3000
 // A walk that dies leaves unvisited questions without rows; stop asking after this and say so.
 export const POLL_CEILING_MS = 6 * 60 * 60 * 1000
-
-export function defaultWindowDays(defaultTimeWindow?: string | null): number {
-  const match = /^\s*(\d+)\s*d\s*$/i.exec(defaultTimeWindow ?? '')
-  const days = match?.[1] ? Number.parseInt(match[1], 10) : 1
-  return days > 0 ? days : 1
-}
-
-export function windowFromDays(days: number, today: Date = todayInDisplayTimeZone()): { startDate: Date; endExclusiveDate: Date } {
-  return { startDate: addDays(today, -days), endExclusiveDate: today }
-}
 
 export function buildRunPayload(reconciliationId: string, window: { startDate: Date; endExclusiveDate: Date }): RunFlowchartPayload {
   return {
