@@ -37,13 +37,16 @@
         <template #header>
           <div class="static-page-section-header-row">
             <h2 class="static-page-section-heading">Findings</h2>
-            <AppSelect
-              v-if="periods.length > 1"
-              :model-value="report.report.period"
-              :options="periods.map((value) => ({ value, label: value }))"
-              test-id="audit-period"
-              @update:model-value="choosePeriod"
-            />
+            <!-- A header-row select keeps a fixed width, as the design system's run result screen holds it; on a
+                 phone it gives way to the heading rather than push the page past the screen. -->
+            <div v-if="periods.length > 1" :style="{ width: 'min(13.75rem, 45vw)' }">
+              <AppSelect
+                :model-value="report.report.period"
+                :options="periods.map((value) => ({ value, label: value }))"
+                test-id="audit-period"
+                @update:model-value="choosePeriod"
+              />
+            </div>
           </div>
         </template>
         <div class="static-page-summary-grid">
@@ -74,11 +77,17 @@
             <StatusBadge :label="asStatement(row).badge.label" :tone="asStatement(row).badge.tone" />
           </template>
           <template #row-detail="{ row }">
-            <div :data-testid="`audit-statement-detail-${row.id}`">
-              <p v-if="asStatement(row).statement.reason" class="section-note">{{ asStatement(row).statement.reason }}</p>
-              <p v-for="check in asStatement(row).statement.checks" :key="check.id" class="section-note">
-                {{ check.label }} · {{ checkStatusBadge(check.status).label }}<template v-if="check.reason"> · {{ check.reason }}</template>
-              </p>
+            <!-- The section body's grid, so an opened statement reads like a small section. -->
+            <div class="static-page-section-body" :data-testid="`audit-statement-detail-${row.id}`">
+              <div>
+                <!-- A statement's reason repeats its checks' own; it says something new only when it has none. -->
+                <p v-if="!asStatement(row).statement.checks.length && asStatement(row).statement.reason" class="section-note">
+                  {{ asStatement(row).statement.reason }}
+                </p>
+                <p v-for="check in asStatement(row).statement.checks" :key="check.id" class="section-note">
+                  {{ check.label }} · {{ checkStatusBadge(check.status).label }}<template v-if="check.reason"> · {{ check.reason }}</template>
+                </p>
+              </div>
               <AppTableFrame
                 v-if="asStatement(row).statement.findings.length"
                 :columns="findingColumns"
@@ -105,7 +114,7 @@
         <p v-if="findingLoading" class="section-note">Loading finding...</p>
         <InlineValidation v-if="findingError" tone="error" :message="findingError" data-testid="audit-finding-error" />
         <template v-if="finding">
-          <p class="section-note" data-testid="audit-finding-headline">{{ finding.finding.headline }}</p>
+          <p ref="findingTop" class="section-note" data-testid="audit-finding-headline">{{ finding.finding.headline }}</p>
           <div class="static-page-summary-grid">
             <article class="static-page-summary-card">
               <span class="static-page-summary-label">State</span>
@@ -123,10 +132,6 @@
               <span class="static-page-summary-label">Last Seen</span>
               <span>{{ finding.finding.status.lastSeen }}</span>
             </article>
-            <article class="static-page-summary-card">
-              <span class="static-page-summary-label">Fix In</span>
-              <span>{{ finding.finding.fix.where || '' }}</span>
-            </article>
           </div>
           <AppTableFrame :columns="recordColumns" :rows="findingRecords" row-key="key" row-test-id="audit-record-row" />
           <p v-if="finding.finding.fix.action" class="section-note" data-testid="audit-finding-fix">{{ finding.finding.fix.action }}</p>
@@ -138,7 +143,7 @@
           />
           <AppTableFrame
             :columns="historyColumns"
-            :rows="finding.finding.history.map((event, index) => ({ key: String(index), at: event.at, event: event.event, by: event.by.label || event.by.type }))"
+            :rows="finding.finding.history.map((event, index) => ({ key: String(index), at: instantLabel(event.at), event: event.event, by: instantLabel(event.by.label || event.by.type) }))"
             row-key="key"
             row-test-id="audit-history-row"
           />
@@ -163,6 +168,7 @@ import type { AuditFindingDocument, AuditReport } from '../../lib/api/auditTypes
 import {
   ageLabel,
   checkStatusBadge,
+  instantLabel,
   findingStateBadge,
   healthBadge,
   periodOptions,
@@ -187,6 +193,7 @@ const finding = ref<AuditFindingDocument | null>(null)
 const findingLoading = ref(false)
 const findingError = ref('')
 const expandedStatements = ref<string[]>([])
+const findingTop = ref<HTMLElement | null>(null)
 
 let abort = new AbortController()
 onBeforeUnmount(() => abort.abort())
@@ -224,25 +231,25 @@ const categories = computed(() =>
 const findingRecords = computed(() => recordRows(finding.value?.finding.records) as unknown as Array<Record<string, unknown>>)
 
 const statementColumns = [
-  { key: 'id', label: 'ID' },
+  { key: 'id', label: 'ID', colStyle: { width: '4.5rem' } },
   { key: 'text', label: 'Statement' },
-  { key: 'status', label: 'Check' },
-  { key: 'open', label: 'Open' },
-  { key: 'pending', label: 'Pending' },
+  { key: 'status', label: 'Check', colStyle: { width: '8rem' } },
+  { key: 'open', label: 'Open', colStyle: { width: '5.5rem' } },
+  { key: 'pending', label: 'Pending', colStyle: { width: '6.5rem' } },
 ]
 const findingColumns = [
   { key: 'headline', label: 'Finding' },
-  { key: 'records', label: 'Records' },
-  { key: 'state', label: 'State' },
-  { key: 'firstFound', label: 'First Found' },
-  { key: 'age', label: 'Age' },
+  { key: 'records', label: 'Records', colStyle: { width: '11rem' } },
+  { key: 'state', label: 'State', colStyle: { width: '7.5rem' } },
+  { key: 'firstFound', label: 'First Found', colStyle: { width: '8.5rem' } },
+  { key: 'age', label: 'Age', colStyle: { width: '7rem' } },
 ]
 const recordColumns = [
-  { key: 'system', label: 'System' },
-  { key: 'recordType', label: 'Record' },
+  { key: 'system', label: 'System', colStyle: { width: '8.5rem' } },
+  { key: 'recordType', label: 'Record', colStyle: { width: '9rem' } },
   { key: 'id', label: 'ID' },
-  { key: 'internalId', label: 'Internal ID' },
-  { key: 'status', label: 'Status' },
+  { key: 'internalId', label: 'Internal ID', colStyle: { width: '9rem' } },
+  { key: 'status', label: 'Status', colStyle: { width: '15rem' } },
 ]
 const evidenceColumns = [
   { key: 'label', label: 'Check' },
@@ -250,8 +257,8 @@ const evidenceColumns = [
   { key: 'passed', label: 'Passed' },
 ]
 const historyColumns = [
-  { key: 'at', label: 'When' },
-  { key: 'event', label: 'Event' },
+  { key: 'at', label: 'When', colStyle: { width: '17rem' } },
+  { key: 'event', label: 'Event', colStyle: { width: '8rem' } },
   { key: 'by', label: 'By' },
 ]
 
@@ -335,4 +342,7 @@ function choosePeriod(period: string): void {
 
 watch(() => [auditCode.value, route.query.date, route.query.period], () => void loadReport(), { immediate: true })
 watch(findingId, () => void loadFinding(), { immediate: true })
+// The finding opens below the categories: bring it to the reader when it appears, whether it was clicked or linked
+// (a link loads it before the report it sits under).
+watch(findingTop, (element) => element?.scrollIntoView?.({ block: 'start' }))
 </script>

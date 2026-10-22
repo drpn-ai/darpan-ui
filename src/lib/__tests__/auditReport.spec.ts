@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ageLabel, checkStatusBadge, findingStateBadge, periodOptions, recordIds, recordRows, systemLabel } from '../auditReport'
+import { ageLabel, checkStatusBadge, instantLabel, findingStateBadge, periodOptions, recordIds, recordRows, systemLabel } from '../auditReport'
 
 // DAR-UI-058. The audit view's words for the report JSON's codes, and rows for its keyed objects.
 describe('auditReport', () => {
@@ -31,6 +31,13 @@ describe('auditReport', () => {
     expect(periodOptions('2027-01')).toEqual(['2027-01', '2026-12', '2026-11'])
     expect(periodOptions('2026-Q4')).toEqual(['2026-Q4'])
     expect(periodOptions(null)).toEqual([])
+  })
+
+  it('writes an instant as day, minute and the tenant offset, inside any text', () => {
+    expect(instantLabel('2026-10-21T23:44:35-07:00')).toBe('2026-10-21 23:44 -07:00')
+    expect(instantLabel('scheduled check, 2026-10-21T23:44-07:00')).toBe('scheduled check, 2026-10-21 23:44 -07:00')
+    expect(instantLabel('check')).toBe('check')
+    expect(instantLabel(null)).toBe('')
   })
 
   it('counts age in days', () => {

@@ -126,6 +126,13 @@ export function statementRows(statements: Record<string, AuditStatement> | null 
   }))
 }
 
+/** "2026-10-21T23:44:35-07:00" -> "2026-10-21 23:44 -07:00", wherever such an instant sits in the text; the offset
+ *  stays, since the document's times are in the tenant's zone, not the reader's. */
+export function instantLabel(text: string | null | undefined): string {
+  return (text ?? '').replace(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?(Z|[+-]\d{2}:\d{2})?/g,
+    (_, day: string, time: string, offset?: string) => `${day} ${time}${offset ? ` ${offset}` : ''}`)
+}
+
 /** "1 day", "12 days". */
 export function ageLabel(days: number | null | undefined): string {
   if (days == null) return ''
