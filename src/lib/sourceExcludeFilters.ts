@@ -2,6 +2,8 @@ import type { CreateRuleSetRunPayload } from './api/facadeTypes'
 
 export const EXCLUDE_FILTER_OPERATOR = 'EXCLUDE_IN'
 export const INCLUDE_FILTER_OPERATOR = 'INCLUDE_IN'
+/** DAR-BE-097: keep only values starting with a listed one (gorjana R15: exchange orders are named EXC-…). */
+export const INCLUDE_PREFIX_FILTER_OPERATOR = 'INCLUDE_PREFIX'
 
 export interface SourceExcludeFilter {
   fieldExpression: string

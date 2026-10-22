@@ -1298,6 +1298,21 @@ describe('ReconciliationRuleSetEditorPage', () => {
         .toBe('Only these values')
     })
 
+    it('marks a starts-with filter with ^ and says so', async () => {
+      // DAR-BE-097: gorjana R15 keeps only exchange orders, whose names start with EXC-.
+      draftStoreState.ruleSetDraftState = createApiDraftState([], {
+        file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, operator: 'INCLUDE_PREFIX', values: ['EXC-'] }],
+      })
+      window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
+
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      expect(wrapper.get(EXCLUDE_MARK).text()).toBe('^')
+      expect(wrapper.get('[data-testid="ruleset-field-exclude-status-file1-6"]').text())
+        .toBe('Only values starting with')
+    })
+
     it('opens the editor on the operator the filter already has', async () => {
       draftStoreState.ruleSetDraftState = createApiDraftState([], {
         file1: [{ fieldExpression: EXCLUDED_FIELD_PATH, operator: 'INCLUDE_IN', values: ['WEB_SALES_CHANNEL'] }],

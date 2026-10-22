@@ -370,7 +370,7 @@
           v-model="pendingExclusionValue"
           type="text"
           placeholder="Type a value, press Enter"
-          :aria-label="editingExclusionOperator === INCLUDE_FILTER_OPERATOR ? 'Values to keep' : 'Values to exclude'"
+          :aria-label="editingExclusionOperator === INCLUDE_PREFIX_FILTER_OPERATOR ? 'Starts to keep' : editingExclusionOperator === INCLUDE_FILTER_OPERATOR ? 'Values to keep' : 'Values to exclude'"
           data-testid="ruleset-exclusion-value-input"
           @keydown.enter.prevent.stop="commitPendingExclusionValue"
         />
@@ -422,6 +422,7 @@ import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
   EXCLUDE_FILTER_OPERATOR,
   INCLUDE_FILTER_OPERATOR,
+  INCLUDE_PREFIX_FILTER_OPERATOR,
   normalizeExcludeFilters,
   parseExcludeFilterValues,
   type SourceExcludeFilter,
@@ -568,6 +569,7 @@ const editingExclusionOperator = ref<string>(EXCLUDE_FILTER_OPERATOR)
 const exclusionModeOptions: AppSelectOption[] = [
   { value: EXCLUDE_FILTER_OPERATOR, label: 'Exclude these values' },
   { value: INCLUDE_FILTER_OPERATOR, label: 'Only these values' },
+  { value: INCLUDE_PREFIX_FILTER_OPERATOR, label: 'Only values starting with' },
 ]
 const exclusionUnavailable = ref<{ side: RuleSide; fieldPath: string; message: string } | null>(null)
 let longPressTimer: number | null = null
@@ -1088,14 +1090,16 @@ function hasExclusion(side: RuleSide, fieldPath: string): boolean {
  * in Plex Mono without changing the mark's 1.55rem box.
  */
 function excludeFilterMark(side: RuleSide, fieldPath: string): string {
-  return excludeFilterFor(side, fieldPath)?.operator === INCLUDE_FILTER_OPERATOR ? '=' : '≠'
+  const operator = excludeFilterFor(side, fieldPath)?.operator
+  if (operator === INCLUDE_PREFIX_FILTER_OPERATOR) return '^'
+  return operator === INCLUDE_FILTER_OPERATOR ? '=' : '≠'
 }
 
 /** The mark is aria-hidden, so this is the only thing a screen reader hears about the mode. */
 function excludeFilterStatusLabel(side: RuleSide, fieldPath: string): string {
-  return excludeFilterFor(side, fieldPath)?.operator === INCLUDE_FILTER_OPERATOR
-    ? 'Only these values'
-    : 'Excludes values'
+  const operator = excludeFilterFor(side, fieldPath)?.operator
+  if (operator === INCLUDE_PREFIX_FILTER_OPERATOR) return 'Only values starting with'
+  return operator === INCLUDE_FILTER_OPERATOR ? 'Only these values' : 'Excludes values'
 }
 
 function closeExclusionEditor(): void {
