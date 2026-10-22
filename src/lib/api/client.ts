@@ -37,6 +37,15 @@ export function isAbortError(error: unknown): boolean {
   return (error as { name?: string } | null)?.name === 'AbortError'
 }
 
+/**
+ * True when the backend's tenant gate refused a record because it belongs to another tenant
+ * (requireTenantRecordAccess: "... is not available in your active tenant."). The wording is the
+ * only signal — the gate answers with a plain service error, not a distinct status.
+ */
+export function isOtherTenantRecordError(error: unknown): boolean {
+  return error instanceof ApiCallError && /is not available in your active tenant\.?$/.test(error.message)
+}
+
 export interface AuthRequiredDetail {
   /** Raw backend text, for diagnostics only — never rendered (see AuthRequiredError). */
   message: string

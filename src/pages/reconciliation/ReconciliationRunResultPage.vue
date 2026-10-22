@@ -571,7 +571,7 @@ import StatusBadge from '../../components/ui/StatusBadge.vue'
 import RunResultConclusionEvidence from '../../components/reconciliation/RunResultConclusionEvidence.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
-import { ApiCallError } from '../../lib/api/client'
+import { ApiCallError, isOtherTenantRecordError } from '../../lib/api/client'
 // Imported rather than relied on from main.ts's global registration: this page's own
 // tests mount it standalone, where a globally registered directive does not exist.
 import { vExplain } from '../../directives/vExplain'
@@ -1364,6 +1364,12 @@ async function loadSavedResult(): Promise<void> {
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     if (savedRunId.value !== requestedSavedRunId || outputFileName.value !== requestedOutputFileName) return
+
+    // DAR-UI-061: the run is another tenant's (a tenant switch remounts this page under the new one).
+    if (isOtherTenantRecordError(error)) {
+      void router.replace({ name: 'hub' })
+      return
+    }
 
     resetDiffDetailsState()
     loadError.value = error instanceof ApiCallError ? error.message : 'Unable to load saved result.'

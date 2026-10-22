@@ -1397,6 +1397,22 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.text()).toContain('Unable to load saved result.')
   })
 
+  // DAR-UI-061: a tenant switch remounts the page under the new tenant, and the backend refuses a
+  // run that belongs to the old one. Nothing on the page can recover from that, so go home.
+  it('goes home when the saved result belongs to another tenant', async () => {
+    getGeneratedOutputDifferences.mockReset()
+    getGeneratedOutputDifferences.mockRejectedValue(new ApiCallError(
+      "Generated output 'reconciliation-runs/RS_RETURNS_GRAPHQL/20261022-050014098/RS_RETURNS_GRAPHQL_result.json' is not available in your active tenant.",
+      200,
+    ))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(routerReplace).toHaveBeenCalledWith({ name: 'hub' })
+    expect(wrapper.text()).not.toContain('is not available in your active tenant')
+  })
+
   it('renders diff details through the shared app table frame instead of a page-local table shell', () => {
     const source = readFileSync('src/pages/reconciliation/ReconciliationRunResultPage.vue', 'utf8')
 
