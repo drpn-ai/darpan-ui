@@ -7,6 +7,7 @@ const listSavedRuns = vi.hoisted(() => vi.fn())
 const saveDashboardPinnedSavedRuns = vi.hoisted(() => vi.fn())
 const listReconciliations = vi.hoisted(() => vi.fn())
 const importNetSuiteChecksAsRuns = vi.hoisted(() => vi.fn())
+const getAudits = vi.hoisted(() => vi.fn())
 const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 const route = vi.hoisted(() => ({
   name: 'hub',
@@ -58,6 +59,7 @@ vi.mock('../../lib/api/facade', () => ({
     saveDashboardPinnedSavedRuns,
     importNetSuiteChecksAsRuns,
   },
+  auditFacade: { getAudits },
 }))
 
 import HomePage from '../HomePage.vue'
@@ -93,6 +95,8 @@ describe('HomePage', () => {
     saveDashboardPinnedSavedRuns.mockReset()
     listReconciliations.mockReset()
     listReconciliations.mockResolvedValue({ reconciliations: [] })
+    getAudits.mockReset()
+    getAudits.mockResolvedValue({ audits: [] })
     importNetSuiteChecksAsRuns.mockReset()
     permissions.canEditTenantSettings = true
 
@@ -362,6 +366,35 @@ describe('HomePage', () => {
     })
     expect(wrapper.findAll('[data-testid="other-runs"] .static-page-tile')).toHaveLength(0)
   })
+  // DAR-UI-058. An audit is a run too: one tile per audit, in its type's section, after the lifecycle runs.
+  it('lists the tenant\'s audits as their own section, last', async () => {
+    listReconciliations.mockResolvedValue({
+      reconciliations: [{ reconciliationId: 'R1', reconciliationName: 'Order chain', defaultTimeWindow: '7d', questionCount: 4 }],
+    })
+    getAudits.mockResolvedValue({ audits: [{ id: 'month-close', name: 'Month close', period: 'month' }] })
+
+    const wrapper = mount(HomePage)
+    await flushPromises()
+
+    const audit = wrapper.get('[data-testid="run-group-audit"]')
+    expect(wrapper.text()).toContain('Audit · 1')
+    const tile = wrapper.get('[data-flow-id="audit:month-close"]')
+    expect(tile.text()).toBe('Month close')
+    expect(JSON.parse(tile.attributes('data-to') ?? '{}')).toEqual({ name: 'audit-report', params: { audit: 'month-close' } })
+    expect(tile.attributes('draggable')).toBe('false')
+    const sections = wrapper.findAll('[data-testid^="run-group-"]').map((node) => node.attributes('data-testid'))
+    expect(sections.slice(-2)).toEqual(['run-group-lifecycle', 'run-group-audit'])
+    expect(audit.findAll('.static-page-tile')).toHaveLength(1)
+  })
+
+  it('keeps every other section when the audits fail to load', async () => {
+    getAudits.mockRejectedValue(new Error('boom'))
+    const wrapper = mount(HomePage)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-group-audit"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-group-oms-shopify"]').exists()).toBe(true)
+  })
+
   // DAR-UI-049. Everything is a run; the type tells them apart.
   it('lists lifecycle runs beside sync runs, each wearing its type', async () => {
     listReconciliations.mockResolvedValue({

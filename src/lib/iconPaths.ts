@@ -32,5 +32,8 @@ export const diagnosticsIconPath =
 // circular-arrows lifecycle glyph, which reads as sync/refresh beside the Sync icon.
 export const syncIconPath = 'M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4'
 
+// DAR-UI-058. An audit run: a list of checks, each ticked. Same stroked 24-unit language as sync and lifecycle.
+export const auditIconPath = 'M4 6l1.5 1.5L8.5 4.5M11 6h9M4 12l1.5 1.5L8.5 10.5M11 12h9M4 18l1.5 1.5L8.5 16.5M11 18h9'
+
 export const lifecycleIconPath =
   'M10 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM10 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM10 20a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 6v4M8 14v4M10 12h9M16 9l3 3-3 3'

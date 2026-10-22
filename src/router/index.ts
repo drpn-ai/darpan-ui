@@ -94,6 +94,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Run' },
   },
   {
+    // DAR-UI-058. An audit run's report; ?period, ?date and ?finding pick what it shows.
+    path: '/audits/:audit',
+    name: 'audit-report',
+    component: () => import('../pages/reconciliation/AuditReportPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Audit' },
+  },
+  {
     path: '/reconciliation/ruleset-manager',
     name: 'reconciliation-ruleset-manager',
     component: () => import('../pages/reconciliation/ReconciliationRuleSetManagerPage.vue'),

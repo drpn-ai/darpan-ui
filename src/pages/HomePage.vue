@@ -108,11 +108,12 @@ import InlineValidation from '../components/ui/InlineValidation.vue'
 import { useAuthStore, buildAuthRedirect } from '../stores/auth'
 import { useReconciliationDraftStore } from '../stores/reconciliationDraft'
 import { usePermissionsStore } from '../stores/permissions'
-import { reconciliationFacade } from '../lib/api/facade'
+import { auditFacade, reconciliationFacade } from '../lib/api/facade'
 import { cachedRead } from '../lib/api/readCache'
 import { homeReconciliations, homeSavedRuns } from '../lib/api/queries'
 import type { SavedRunSummary } from '../lib/api/types'
 import type { FlowchartRun } from '../lib/api/flowchartTypes'
+import type { AuditListItem } from '../lib/api/auditTypes'
 import { RUN_TYPES } from '../lib/runTypes'
 import { buildReconciliationDiffRoute } from '../lib/reconciliationRoutes'
 
@@ -209,6 +210,7 @@ const draftStore = useReconciliationDraftStore()
 const permissionsStore = usePermissionsStore()
 const savedRuns = ref<SavedRunSummary[]>([])
 const lifecycleRuns = ref<FlowchartRun[]>([])
+const audits = ref<AuditListItem[]>([])
 const pinnedSavedRunIds = ref<string[]>([])
 // Per group, not one flag for the page: expanding NetSuite should not also expand every other
 // family, which is what a single showAllOtherRuns did once there was more than one section.
@@ -256,7 +258,20 @@ const lifecycleRunCards = computed<DashboardFlowCard[]>(() =>
   })),
 )
 
-const flowCards = computed<DashboardFlowCard[]>(() => [...savedRunCards.value, ...lifecycleRunCards.value])
+// DAR-UI-058. An audit run is one tile per audit, in its type's own section, as lifecycle runs are. Not pinnable: the
+// pin preference stores RuleSet ids.
+const auditRunCards = computed<DashboardFlowCard[]>(() =>
+  audits.value.map((audit) => ({
+    id: `audit:${audit.id}`,
+    savedRunId: `audit:${audit.id}`,
+    title: audit.name || audit.id,
+    groupTitle: RUN_TYPES.audit.label,
+    to: { name: 'audit-report', params: { audit: audit.id } },
+    pinnable: false,
+  })),
+)
+
+const flowCards = computed<DashboardFlowCard[]>(() => [...savedRunCards.value, ...lifecycleRunCards.value, ...auditRunCards.value])
 
 const pinnedFlowCards = computed<DashboardFlowCard[]>(() => {
   const flowCardMap = new Map(flowCards.value.map((card) => [card.savedRunId, card]))
@@ -299,9 +314,10 @@ const runGroups = computed<DashboardRunGroup[]>(() => {
 
   // The type section is a different axis from the system families, so it follows them all
   // instead of sorting in among them.
-  const lifecycleTitle = RUN_TYPES.lifecycle.label
+  const typeTitles = [RUN_TYPES.lifecycle.label, RUN_TYPES.audit.label]
+  const typeRank = (title: string): number => typeTitles.indexOf(title) + 1
   return [...byTitle.entries()]
-    .sort(([a], [b]) => (a === lifecycleTitle ? 1 : 0) - (b === lifecycleTitle ? 1 : 0) || a.localeCompare(b))
+    .sort(([a], [b]) => typeRank(a) - typeRank(b) || a.localeCompare(b))
     .map(([title, cards]) => {
       const key = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'other'
       const expanded = expandedGroupKeys.value.has(key)
@@ -407,6 +423,12 @@ function loadLifecycleRuns(): Promise<void> {
   ).then(() => {}, () => { lifecycleRuns.value = [] })
 }
 
+// DAR-UI-058. Independent too: a tenant with no audits, or a failed read, costs the Audit section only.
+function loadAudits(): Promise<void> {
+  return auditFacade.getAudits(pageAbortController.signal)
+    .then((response) => { audits.value = response.audits ?? [] }, () => { audits.value = [] })
+}
+
 function setDashboardOrigin(): void {
   draftStore.setWorkflowOrigin('Dashboard', '/')
 }
@@ -427,6 +449,7 @@ async function loadDashboard(): Promise<void> {
   lifecycleRuns.value = []
 
   void loadLifecycleRuns()
+  void loadAudits()
 
   try {
     // 12 was enough while Home showed five tiles and a More.... Grouping puts a COUNT in every

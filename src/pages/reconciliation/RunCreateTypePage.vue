@@ -35,7 +35,7 @@ const options = RUN_TYPE_ORDER.map((id, index) => ({
 
 function choose(value: string) {
   const definition = RUN_TYPES[value as RunTypeId]
-  if (definition) void router.push(definition.createRoute)
+  if (definition?.createRoute) void router.push(definition.createRoute)
 }
 
 function goHome() { void router.push({ name: 'hub' }) }
