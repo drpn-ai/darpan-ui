@@ -25,6 +25,7 @@ import type {
   ChangeOwnPasswordResponse,
   DeleteJsonSchemaResponse,
   DeleteAutomationResponse,
+  DeleteNsAuthConfigResponse,
   DeleteOmsRestSourceConfigResponse,
   DeleteSavedRunResponse,
   DeleteShopifyAuthConfigResponse,
@@ -110,6 +111,7 @@ import type {
   CreateRuleSetRunPayload,
   DeleteAutomationPayload,
   DeleteJsonSchemaPayload,
+  DeleteNsAuthConfigPayload,
   DeleteOmsRestSourceConfigPayload,
   DeleteSavedRunPayload,
   DeleteShopifyAuthConfigPayload,
@@ -230,6 +232,7 @@ const SETTINGS = {
   saveSftpServer: 'facade.SettingsFacadeServices.save#SftpServer',
   listNsAuthConfigs: 'facade.SettingsFacadeServices.list#NsAuthConfigs',
   saveNsAuthConfig: 'facade.SettingsFacadeServices.save#NsAuthConfig',
+  deleteNsAuthConfig: 'facade.SettingsFacadeServices.delete#NsAuthConfig',
   listNsRestletConfigs: 'facade.SettingsFacadeServices.list#NsRestletConfigs',
   saveNsRestletConfig: 'facade.SettingsFacadeServices.save#NsRestletConfig',
   listShopifyAuthConfigs: 'facade.ShopifyFacadeServices.list#ShopifyAuthConfigs',
@@ -419,6 +422,9 @@ export const settingsFacade = {
   },
   saveNsAuthConfig(payload: SaveNsAuthConfigPayload, signal?: AbortSignal): Promise<SaveNsAuthConfigResponse> {
     return callService<SaveNsAuthConfigResponse>(SETTINGS.saveNsAuthConfig, payload, signal)
+  },
+  deleteNsAuthConfig(payload: DeleteNsAuthConfigPayload, signal?: AbortSignal): Promise<DeleteNsAuthConfigResponse> {
+    return callService<DeleteNsAuthConfigResponse>(SETTINGS.deleteNsAuthConfig, payload, signal)
   },
   listNsRestletConfigs(payload: ListNsRestletConfigsPayload, signal?: AbortSignal): Promise<ListNsRestletConfigsResponse> {
     return callService<ListNsRestletConfigsResponse>(SETTINGS.listNsRestletConfigs, payload, signal)

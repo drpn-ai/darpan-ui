@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 
 const route = vi.hoisted(() => ({
   params: {} as Record<string, string>,
+  query: {} as Record<string, string>,
   name: 'settings-netsuite-endpoints-create',
   fullPath: '/settings/netsuite/endpoints/create',
 }))
@@ -89,6 +90,7 @@ import NetSuiteEndpointWorkflowPage from '../NetSuiteEndpointWorkflowPage.vue'
 describe('NetSuiteEndpointWorkflowPage', () => {
   beforeEach(() => {
     route.params = {}
+    route.query = {}
     route.name = 'settings-netsuite-endpoints-create'
     route.fullPath = '/settings/netsuite/endpoints/create'
     push.mockReset()
@@ -184,7 +186,39 @@ describe('NetSuiteEndpointWorkflowPage', () => {
       readTimeoutSeconds: 60,
       isActive: 'Y',
     })
-    expect(push).toHaveBeenCalledWith('/settings/netsuite')
+    expect(push).toHaveBeenCalledWith({ name: 'settings-netsuite-auth', params: { nsAuthConfigId: 'auth-primary' } })
+  })
+
+  it('preselects the auth profile it was opened from', async () => {
+    route.query = { nsAuthConfigId: 'auth-primary' }
+    route.fullPath = '/settings/netsuite/endpoints/create?nsAuthConfigId=auth-primary'
+    listNsAuthConfigs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      authConfigs: [
+        {
+          nsAuthConfigId: 'auth-primary',
+          description: 'Primary Auth',
+          companyUserGroupId: 'KREWE',
+          authType: 'OAUTH2_M2M_JWT',
+          isActive: 'Y',
+          hasPassword: false,
+          hasApiToken: false,
+          hasPrivateKeyPem: true,
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+
+    const wrapper = mount(NetSuiteEndpointWorkflowPage)
+    await flushPromises()
+
+    await wrapper.get('input[name="endpointUrl"]').setValue('https://netsuite.example.com/restlet')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="netsuite-endpoint-auth-config"]').text()).toContain('Primary Auth')
   })
 
   it('caps endpoint config IDs at 20 characters in create and edit forms', async () => {
@@ -329,7 +363,7 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     expect(wrapper.get('[data-testid="netsuite-endpoint-is-active"]').element.closest('.wizard-answer-control')).toBeNull()
   })
 
-  it('shows an X cancel action on edit and returns to the NetSuite dashboard without saving', async () => {
+  it('shows an X cancel action on edit and returns to its auth profile without saving', async () => {
     route.params = { nsRestletConfigId: 'endpoint-primary' }
     route.name = 'settings-netsuite-endpoints-edit'
     route.fullPath = '/settings/netsuite/endpoints/edit/endpoint-primary'
@@ -385,7 +419,7 @@ describe('NetSuiteEndpointWorkflowPage', () => {
 
     await cancelButton.trigger('click')
 
-    expect(push).toHaveBeenCalledWith('/settings/netsuite')
+    expect(push).toHaveBeenCalledWith({ name: 'settings-netsuite-auth', params: { nsAuthConfigId: 'auth-primary' } })
     expect(saveNsRestletConfig).not.toHaveBeenCalled()
   })
 

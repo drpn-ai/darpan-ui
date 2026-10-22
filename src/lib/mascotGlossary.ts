@@ -159,6 +159,14 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Base URL',
     body: 'the root address every request is built on. A trailing path here quietly changes every endpoint below it.',
   },
+  tokenUrl: {
+    title: 'Token URL',
+    body: 'where Darpan trades its signed key for a short-lived sign-in token. A wrong account number here fails every call before any data is read.',
+  },
+  netSuiteScope: {
+    title: 'Scope',
+    body: 'which NetSuite doors the token opens. RESTlets reach custom scripts, REST Web Services reach SuiteQL; drop one and those calls come back refused.',
+  },
   authType: {
     title: 'Auth Type',
     body: 'how Darpan proves who it is to this system. Change it and the credentials below change with it.',

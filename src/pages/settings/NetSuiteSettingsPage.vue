@@ -25,28 +25,6 @@
       empty-create-test-id="netsuite-auth-create-action"
       @update:page-index="goToAuthPage"
     />
-
-    <SettingsRecordListSection
-      title="Endpoints"
-      :tiles="endpointTiles"
-      :page-index="endpointPageIndex"
-      :page-count="endpointPageCount"
-      pager-aria-label="NetSuite endpoint pages"
-      previous-test-id="netsuite-endpoint-page-previous"
-      next-test-id="netsuite-endpoint-page-next"
-      :loading="endpointLoading"
-      loading-message="Loading endpoint configs..."
-      :error="endpointError"
-      empty-title="No endpoint configs"
-      list-test-id="saved-endpoint-configs"
-      tile-test-id="netsuite-endpoint-tile"
-      :can-create="canEditTenantSettings"
-      :create-route="endpointCreateRoute"
-      create-label="Create Endpoint"
-      create-test-id="netsuite-endpoint-create-action"
-      empty-create-test-id="netsuite-endpoint-create-action"
-      @update:page-index="goToEndpointPage"
-    />
   </StaticPageFrame>
 </template>
 
@@ -85,26 +63,9 @@ const {
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
   fallbackErrorMessage: 'Failed to load NetSuite auth configs.',
 })
-const {
-  rows: endpointRows,
-  pageIndex: endpointPageIndex,
-  pageCount: endpointPageCount,
-  loading: endpointLoading,
-  error: endpointError,
-  load: loadEndpointConfigs,
-  goToPage: goToEndpointPage,
-  dispose: disposeEndpointConfigs,
-} = useSettingsPagedList({
-  pageSize: 10,
-  loadPage: (request) => settingsFacade.listNsRestletConfigs(request),
-  selectRecords: (response) => response.restletConfigs ?? [],
-  activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  fallbackErrorMessage: 'Failed to load endpoint configs.',
-})
 
 onBeforeUnmount(() => {
   disposeAuthConfigs()
-  disposeEndpointConfigs()
 })
 
 const authCreateRoute = computed(() => ({ name: 'settings-netsuite-auth-create' }))
@@ -120,22 +81,8 @@ const authTiles = computed(() => authRows.value.map((row) => ({
   },
 })))
 
-const endpointCreateRoute = computed(() => ({ name: 'settings-netsuite-endpoints-create' }))
-const endpointTiles = computed(() => endpointRows.value.map((row) => ({
-  key: row.nsRestletConfigId,
-  label: resolveRecordLabel({
-    description: row.description,
-    fallbackId: row.nsRestletConfigId,
-  }),
-  to: {
-    name: 'settings-netsuite-endpoints-edit',
-    params: { nsRestletConfigId: row.nsRestletConfigId },
-  },
-})))
-
 onMounted(() => {
   draftStore.setWorkflowOrigin('NetSuite', route.fullPath || '/settings/netsuite')
   void loadAuthConfigs()
-  void loadEndpointConfigs()
 })
 </script>

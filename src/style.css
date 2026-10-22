@@ -742,6 +742,10 @@ button:disabled {
   grid-column: span 2;
 }
 
+.static-page-summary-card--full {
+  grid-column: 1 / -1;
+}
+
 .static-page-summary-card > span:not(.static-page-summary-label) {
   min-width: 0;
   max-width: 100%;

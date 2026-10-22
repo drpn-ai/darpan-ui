@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { lookupGlossary } from '../mascotGlossary'
 import { resolveExplainTarget } from '../mascotTargets'
 import { formatDateTime } from '../utils/date'
 
@@ -75,6 +76,20 @@ describe('resolveExplainTarget', () => {
 
     expect(resolveExplainTarget(section.querySelector('h2'))?.term).toBe('previousRuns')
     expect(resolveExplainTarget(plain.querySelector('h3'))?.term).toBe('exclusions')
+  })
+
+  it('explains the NetSuite OAuth fields as themselves, not as a base URL', () => {
+    const host = render(`
+      <article class="static-page-summary-card"><span class="static-page-summary-label">Token URL</span><span>https://x</span></article>
+      <article class="static-page-summary-card"><span class="static-page-summary-label">Scope</span><span>RESTlets</span></article>
+    `)
+    const [tokenUrl, scope] = host.querySelectorAll('.static-page-summary-label')
+
+    // The token URL only mints the sign-in token; reading it as "the root of every request" was wrong.
+    expect(resolveExplainTarget(tokenUrl ?? null)?.term).toBe('tokenUrl')
+    expect(resolveExplainTarget(scope ?? null)?.term).toBe('netSuiteScope')
+    expect(lookupGlossary('tokenUrl')?.title).toBe('Token URL')
+    expect(lookupGlossary('netSuiteScope')?.title).toBe('Scope')
   })
 
   it('stays silent on a label it has no phrase for', () => {

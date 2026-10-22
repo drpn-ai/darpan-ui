@@ -363,6 +363,8 @@ export type SaveShopifyAuthConfigResponse = Schemas['SaveShopifyAuthConfigResult
 
 export type DeleteShopifyAuthConfigResponse = Schemas['DeleteShopifyAuthConfigResult']
 
+export type DeleteNsAuthConfigResponse = Schemas['DeleteNsAuthConfigResult']
+
 export interface GetShopifyAuthConfigResponse extends ApiEnvelope {
   shopifyAuthConfig?: ShopifyAuthConfigRecord | null
 }

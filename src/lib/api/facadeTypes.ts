@@ -186,6 +186,10 @@ export interface DeleteShopifyAuthConfigPayload {
   shopifyAuthConfigId: string
 }
 
+export interface DeleteNsAuthConfigPayload {
+  nsAuthConfigId: string
+}
+
 export interface TestSourceConnectionPayload {
   systemEnumId: string
   configId: string

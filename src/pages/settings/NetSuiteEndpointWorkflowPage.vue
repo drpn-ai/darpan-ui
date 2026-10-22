@@ -385,6 +385,8 @@ function applyRecord(record: NsRestletConfigRecord): void {
 
 function resetCreateForm(): void {
   Object.assign(form, createDefaultEndpointForm())
+  // Opened from an auth profile's details page: that profile is the answer to the auth step.
+  form.nsAuthConfigId = String(route.query.nsAuthConfigId ?? '').trim()
   currentStepIndex.value = 0
   error.value = null
   success.value = null
@@ -487,7 +489,7 @@ async function save(): Promise<void> {
       isActive: form.isActive,
     })
     success.value = response.messages?.[0] ?? 'Saved endpoint config.'
-    await router.push('/settings/netsuite')
+    await router.push(authDashboardRoute())
   } catch (saveError) {
     error.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save endpoint config.'
   } finally {
@@ -497,7 +499,13 @@ async function save(): Promise<void> {
 
 async function cancelEdit(): Promise<void> {
   if (!isEditing.value || loading.value) return
-  await router.push('/settings/netsuite')
+  await router.push(authDashboardRoute())
+}
+
+/** Endpoints are listed under their auth profile, so that is where saving or leaving lands. */
+function authDashboardRoute() {
+  const nsAuthConfigId = form.nsAuthConfigId.trim()
+  return nsAuthConfigId ? { name: 'settings-netsuite-auth', params: { nsAuthConfigId } } : '/settings/netsuite'
 }
 
 watch(() => route.fullPath, () => {

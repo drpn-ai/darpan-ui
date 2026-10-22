@@ -137,14 +137,15 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-shopify-auth') },
   ]),
 
-  // NetSuite is the only settings page carrying two lists, and telling them apart is the
-  // whole job: auth is who you are, an endpoint is what you ask for.
+  // Endpoints live inside the auth profile they sign in with (DAR-UI-062), so this page lists profiles only.
   'settings-netsuite': Object.freeze([
-    { text: 'Auth is who NetSuite thinks you are. An endpoint is what you ask it for — you need both.', when: control('netsuite-auth-tile') },
-    { text: 'Endpoints are listed separately below, and a run needs one of each.', when: control('netsuite-endpoint-tile') },
+    { text: 'Auth is who NetSuite thinks you are. Its endpoints, what you ask it for, live inside it.', when: control('netsuite-auth-tile') },
   ]),
   'settings-netsuite-auth': Object.freeze([
     { text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('netsuite-endpoint-tile') },
+    { text: 'A new endpoint made here already knows which profile it signs in with.', when: control('netsuite-endpoint-create-action') },
+    { text: 'Diagnostics mints one token and reads one id — safe to run whenever you doubt a credential.', when: control('diagnose-netsuite-auth') },
+    { text: 'Delete refuses while endpoints, checks or saved runs still sign in with this profile.', when: control('delete-netsuite-auth') },
   ]),
   'settings-netsuite-auth-create': Object.freeze([
     { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },

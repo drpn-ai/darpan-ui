@@ -153,7 +153,7 @@ describe('connections saved-name lists', () => {
     )
   })
 
-  it('renders the endpoint section as saved-record tiles that open the endpoint edit workflow', async () => {
+  it('lists auth profiles only, leaving endpoints to each profile details page', async () => {
     listNsAuthConfigs.mockResolvedValue({
       ok: true,
       messages: [],
@@ -197,16 +197,11 @@ describe('connections saved-name lists', () => {
     const wrapper = mount(NetSuiteSettingsPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Endpoints')
-    const tile = wrapper.get('[data-testid="netsuite-endpoint-tile"]')
-    expect(tile.text()).toBe('Invoice Export')
-    expect(wrapper.text()).not.toContain('Configure NetSuite endpoint URLs')
-    expect(wrapper.get('[data-testid="saved-endpoint-configs"]').classes()).toContain('static-page-record-grid--fixed')
-    expect(tile.attributes('data-to')).toContain('"name":"settings-netsuite-endpoints-edit"')
-    expect(tile.attributes('data-to')).toContain('"nsRestletConfigId":"endpoint-primary"')
-    expect(wrapper.get('[data-testid="netsuite-endpoint-create-action"]').attributes('data-to')).toContain(
-      '"name":"settings-netsuite-endpoints-create"',
-    )
+    // Endpoints live on each auth profile's details page now; the home page lists profiles only.
+    expect(listNsRestletConfigs).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Endpoints')
+    expect(wrapper.find('[data-testid="netsuite-endpoint-tile"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="netsuite-endpoint-create-action"]').exists()).toBe(false)
   })
 
   it('keeps NetSuite records visible but hides create affordances for view-only tenants', async () => {
@@ -261,12 +256,10 @@ describe('connections saved-name lists', () => {
     await flushPromises()
 
     expect(wrapper.findAll('[data-testid="netsuite-auth-tile"]')).toHaveLength(1)
-    expect(wrapper.findAll('[data-testid="netsuite-endpoint-tile"]')).toHaveLength(1)
     expect(wrapper.find('[data-testid="netsuite-auth-create-action"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="netsuite-endpoint-create-action"]').exists()).toBe(false)
   })
 
-  it('filters out auth and endpoint tiles from other tenants without rendering tenant labels', async () => {
+  it('filters out auth tiles from other tenants without rendering tenant labels', async () => {
     authState.sessionInfo = {
       userId: 'john.doe',
       isSuperAdmin: true,
@@ -345,8 +338,6 @@ describe('connections saved-name lists', () => {
 
     expect(wrapper.findAll('[data-testid="netsuite-auth-tile"]')).toHaveLength(1)
     expect(wrapper.get('[data-testid="netsuite-auth-tile"]').text()).toBe('Primary Auth')
-    expect(wrapper.findAll('[data-testid="netsuite-endpoint-tile"]')).toHaveLength(1)
-    expect(wrapper.get('[data-testid="netsuite-endpoint-tile"]').text()).toBe('Invoice Export')
     expect(wrapper.text()).not.toContain('Gorjana Auth')
     expect(wrapper.text()).not.toContain('Gorjana Endpoint')
     expect(wrapper.text()).not.toContain('Krewe')

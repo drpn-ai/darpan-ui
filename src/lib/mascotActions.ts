@@ -375,6 +375,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Delete HotWax source',
     body: 'removes the connection. Runs and automations pointing at it will fail from their next run on.',
   },
+  'delete netsuite auth profile': {
+    title: 'Delete NetSuite auth profile',
+    body: 'removes the profile, but only once nothing signs in with it. Anything still using it is named, and nothing is touched.',
+  },
   'delete shopify config': {
     title: 'Delete Shopify config',
     body: 'removes the connection. Runs and automations pointing at it will fail from their next run on.',
