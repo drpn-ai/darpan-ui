@@ -104,7 +104,7 @@ describe('connections saved-name lists', () => {
     }
   })
 
-  it('renders the auth section as saved-record tiles that open the auth edit workflow', async () => {
+  it('renders the auth section as saved-record tiles that open the auth details page', async () => {
     listNsAuthConfigs.mockResolvedValue({
       ok: true,
       messages: [],
@@ -146,7 +146,7 @@ describe('connections saved-name lists', () => {
     const tile = wrapper.get('[data-testid="netsuite-auth-tile"]')
     expect(tile.text()).toBe('Primary Auth')
     expect(wrapper.get('[data-testid="saved-auth-configs"]').classes()).toContain('static-page-record-grid--fixed')
-    expect(tile.attributes('data-to')).toContain('"name":"settings-netsuite-auth-edit"')
+    expect(tile.attributes('data-to')).toContain('"name":"settings-netsuite-auth"')
     expect(tile.attributes('data-to')).toContain('"nsAuthConfigId":"auth-primary"')
     expect(wrapper.get('[data-testid="netsuite-auth-create-action"]').attributes('data-to')).toContain(
       '"name":"settings-netsuite-auth-create"',

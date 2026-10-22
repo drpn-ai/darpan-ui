@@ -115,7 +115,7 @@ const authTiles = computed(() => authRows.value.map((row) => ({
     fallbackId: row.nsAuthConfigId,
   }),
   to: {
-    name: 'settings-netsuite-auth-edit',
+    name: 'settings-netsuite-auth',
     params: { nsAuthConfigId: row.nsAuthConfigId },
   },
 })))

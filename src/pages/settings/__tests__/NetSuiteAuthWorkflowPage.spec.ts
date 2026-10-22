@@ -407,7 +407,7 @@ describe('NetSuiteAuthWorkflowPage', () => {
     expect(identityRow?.find('input[name="description"]').exists()).toBe(true)
   })
 
-  it('shows an X cancel action on edit and returns to the NetSuite dashboard without saving', async () => {
+  it('shows an X cancel action on edit and returns to the auth details page without saving', async () => {
     route.params = { nsAuthConfigId: 'auth-primary' }
     route.name = 'settings-netsuite-auth-edit'
     route.fullPath = '/settings/netsuite/auth/edit/auth-primary'
@@ -445,7 +445,7 @@ describe('NetSuiteAuthWorkflowPage', () => {
 
     await cancelButton.trigger('click')
 
-    expect(push).toHaveBeenCalledWith('/settings/netsuite')
+    expect(push).toHaveBeenCalledWith({ name: 'settings-netsuite-auth', params: { nsAuthConfigId: 'auth-primary' } })
     expect(saveNsAuthConfig).not.toHaveBeenCalled()
   })
 
@@ -678,6 +678,7 @@ describe('NetSuiteAuthWorkflowPage', () => {
     await flushPromises()
 
     expect(saveNsAuthConfig).toHaveBeenCalledTimes(1)
+    expect(push).toHaveBeenCalledWith({ name: 'settings-netsuite-auth', params: { nsAuthConfigId: 'auth-primary' } })
   })
 
   // The affects-N-tenants warning and its confirm checkbox were removed with the chip field

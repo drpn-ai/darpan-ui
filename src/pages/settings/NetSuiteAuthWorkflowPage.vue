@@ -797,7 +797,7 @@ async function save(): Promise<void> {
     form.apiToken = ''
     form.privateKeyPem = ''
     success.value = response.messages?.[0] ?? 'Saved auth config.'
-    await router.push('/settings/netsuite')
+    await router.push(isEditing.value ? authDashboardRoute(form.nsAuthConfigId.trim()) : '/settings/netsuite')
   } catch (saveError) {
     error.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save auth config.'
   } finally {
@@ -807,7 +807,11 @@ async function save(): Promise<void> {
 
 async function cancelEdit(): Promise<void> {
   if (!isEditing.value || loading.value) return
-  await router.push('/settings/netsuite')
+  await router.push(authDashboardRoute(activeAuthConfigId.value))
+}
+
+function authDashboardRoute(nsAuthConfigId: string) {
+  return { name: 'settings-netsuite-auth', params: { nsAuthConfigId } }
 }
 
 watch(

@@ -143,6 +143,9 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'Auth is who NetSuite thinks you are. An endpoint is what you ask it for — you need both.', when: control('netsuite-auth-tile') },
     { text: 'Endpoints are listed separately below, and a run needs one of each.', when: control('netsuite-endpoint-tile') },
   ]),
+  'settings-netsuite-auth': Object.freeze([
+    { text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('netsuite-endpoint-tile') },
+  ]),
   'settings-netsuite-auth-create': Object.freeze([
     { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
     { text: 'The eye shows what you pasted, so a stray space is visible before you save it.', when: control('toggle-client-id-visibility') },

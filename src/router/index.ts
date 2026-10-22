@@ -241,6 +241,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'NetSuite' },
   },
   {
+    path: '/settings/netsuite/auth/:nsAuthConfigId',
+    name: 'settings-netsuite-auth',
+    component: () => import('../pages/settings/NetSuiteAuthDashboardPage.vue'),
+    props: true,
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'NetSuite' },
+  },
+  {
     path: '/settings/shopify',
     name: 'settings-shopify',
     component: () => import('../pages/settings/ShopifySettingsPage.vue'),

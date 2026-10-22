@@ -470,6 +470,14 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Edit Shopify Config',
     body: 'the credentials and shop this connection uses. Every run pointing at it picks the change up on its next run.',
   },
+  'edit netsuite auth': {
+    title: 'Edit NetSuite Auth',
+    body: 'the credentials this auth profile signs in with. Every run pointing at it picks the change up on its next run.',
+  },
+  'back to netsuite settings': {
+    title: 'Back to NetSuite Settings',
+    body: 'the NetSuite auth profiles and endpoints. Nothing on this page is saved on the way out.',
+  },
   'back to hotwax settings': {
     title: 'Back to HotWax Settings',
     body: 'the list of HotWax connections. Nothing on this page is saved on the way out.',
