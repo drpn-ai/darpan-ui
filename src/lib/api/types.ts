@@ -169,6 +169,8 @@ export interface TenantSettings {
   companyUserGroupId?: string | null
   companyLabel?: string | null
   timeZone: string
+  /** Chat space for tenant-wide streak messages; null when unset or the space was deactivated. */
+  streaksChatSpaceId?: string | null
   createdByUserId?: string
   createdDate?: string
   lastUpdatedDate?: string

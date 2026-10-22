@@ -18,6 +18,9 @@ describe('useTenantSettingsPopup', () => {
     popup.openTimezone()
     expect(popup.activePopup.value).toEqual({ type: 'timezone' })
 
+    popup.openStreaksSpace()
+    expect(popup.activePopup.value).toEqual({ type: 'streaks-space' })
+
     popup.openNotificationMenu()
     expect(popup.activePopup.value).toEqual({ type: 'notification-menu' })
 

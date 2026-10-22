@@ -374,6 +374,119 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toContain('Europe/London')
   })
 
+  describe('streaks space', () => {
+    function tenantSettingsWith(streaksChatSpaceId: string | null) {
+      return {
+        ok: true,
+        messages: ['Saved tenant settings.'],
+        errors: [],
+        tenantSettings: {
+          companyUserGroupId: 'KREWE',
+          companyLabel: 'Krewe',
+          timeZone: 'America/Los_Angeles',
+          streaksChatSpaceId,
+        },
+      }
+    }
+
+    it('shows None when unset', async () => {
+      const wrapper = mount(TenantSettingsPage)
+      await flushPromises()
+      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('None')
+    })
+
+    it('shows the space name when set', async () => {
+      getTenantSettings.mockResolvedValue(tenantSettingsWith('CS2'))
+      const wrapper = mount(TenantSettingsPage)
+      await flushPromises()
+      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('Finance')
+      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).not.toContain('None')
+    })
+
+    it('saves the chosen space alone, without the timezone', async () => {
+      saveTenantSettings.mockResolvedValue(tenantSettingsWith('CS1'))
+      const wrapper = mount(TenantSettingsPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="tenant-module-streaks-space"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[role="dialog"]').text()).toContain('Which chat space gets streaks?')
+
+      await wrapper.get('[data-testid="tenant-streaks-space-select"]').trigger('click')
+      await wrapper.get('[data-testid="app-select-option"][data-option-value="CS1"]').trigger('click')
+      await wrapper.get('[data-testid="save-tenant-streaks-space"]').trigger('click')
+      await flushPromises()
+
+      expect(saveTenantSettings).toHaveBeenCalledTimes(1)
+      expect(saveTenantSettings).toHaveBeenCalledWith({ streaksChatSpaceId: 'CS1' })
+      expect(saveTenantSettings.mock.calls[0]![0]).not.toHaveProperty('timeZone')
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('Ops')
+      expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toContain('America/Los_Angeles')
+    })
+
+    it('clears the space when None is chosen', async () => {
+      getTenantSettings.mockResolvedValue(tenantSettingsWith('CS2'))
+      saveTenantSettings.mockResolvedValue(tenantSettingsWith(null))
+      const wrapper = mount(TenantSettingsPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="tenant-module-streaks-space"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="tenant-streaks-space-select"]').text()).toContain('Finance')
+
+      await wrapper.get('[data-testid="tenant-streaks-space-select"]').trigger('click')
+      await wrapper.get('[data-testid="app-select-option"][data-option-value=""]').trigger('click')
+      await wrapper.get('[data-testid="save-tenant-streaks-space"]').trigger('click')
+      await flushPromises()
+
+      expect(saveTenantSettings).toHaveBeenCalledWith({ streaksChatSpaceId: '' })
+      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('None')
+    })
+
+    it('does not offer inactive spaces', async () => {
+      listTenantChatSpaces.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        chatSpaces: [
+          { chatSpaceId: 'CS1', spaceName: 'Ops', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, googleChatConfigured: true, isActive: 'Y', inUse: true },
+          { chatSpaceId: 'CS3', spaceName: 'Archive', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, googleChatConfigured: true, isActive: 'N', inUse: false },
+        ],
+      })
+      const wrapper = mount(TenantSettingsPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="tenant-module-streaks-space"]').trigger('click')
+      await flushPromises()
+      await wrapper.get('[data-testid="tenant-streaks-space-select"]').trigger('click')
+
+      const offered = wrapper.findAll('[data-testid="app-select-option"]').map((option) => option.attributes('data-option-value'))
+      expect(offered).toEqual(['', 'CS1'])
+      expect(offered).not.toContain('CS3')
+    })
+
+    it('lets a read-only user see the space but not change it', async () => {
+      authState.sessionInfo = {
+        ...authState.sessionInfo,
+        canEditActiveTenantData: false,
+        isSuperAdmin: false,
+        canManageDarpanCore: false,
+      }
+      getTenantSettings.mockResolvedValue(tenantSettingsWith('CS1'))
+      const wrapper = mount(TenantSettingsPage)
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('Ops')
+      await wrapper.get('[data-testid="tenant-module-streaks-space"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="tenant-streaks-space-select"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('[data-testid="save-tenant-streaks-space"]').exists()).toBe(false)
+      expect(saveTenantSettings).not.toHaveBeenCalled()
+    })
+  })
+
   it('opens AI edits as a popup workflow and saves through the settings facade', async () => {
     saveLlmSettings.mockResolvedValue({
       ok: true,

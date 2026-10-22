@@ -71,6 +71,8 @@ export interface SaveLlmSettingsPayload {
 
 export interface SaveTenantSettingsPayload {
   timeZone?: string
+  /** Absent leaves it unchanged; '' clears it. */
+  streaksChatSpaceId?: string
 }
 
 export interface ListSlackChannelsPayload {

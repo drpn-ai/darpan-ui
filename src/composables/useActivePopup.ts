@@ -5,6 +5,7 @@ export type TenantSettingsChatSpaceFormMode = 'create' | 'edit'
 
 export type TenantSettingsActivePopup =
   | { type: 'timezone' }
+  | { type: 'streaks-space' }
   | { type: 'notification-menu' }
   | { type: 'chat-space-menu'; chatSpaceId: string }
   | { type: 'slack-menu' }
@@ -41,6 +42,7 @@ export interface TenantSettingsPopupActions {
   isAiEditing: ComputedRef<boolean>
   isChatSpaceEditing: ComputedRef<boolean>
   openTimezone: () => void
+  openStreaksSpace: () => void
   openNotificationMenu: () => void
   openChatSpaceMenu: (chatSpaceId: string) => void
   openSlackMenu: () => void
@@ -68,6 +70,7 @@ export function useTenantSettingsPopup(): TenantSettingsPopupActions {
     isAiEditing,
     isChatSpaceEditing,
     openTimezone: () => open({ type: 'timezone' }),
+    openStreaksSpace: () => open({ type: 'streaks-space' }),
     openNotificationMenu: () => open({ type: 'notification-menu' }),
     openChatSpaceMenu: (chatSpaceId: string) => open({ type: 'chat-space-menu', chatSpaceId }),
     openSlackMenu: () => open({ type: 'slack-menu' }),

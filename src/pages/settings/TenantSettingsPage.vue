@@ -72,8 +72,22 @@
             <span class="tenant-settings-list-status">{{ tenantTimezoneSummary }}</span>
           </span>
         </button>
+        <button
+          type="button"
+          class="static-page-tile static-page-record-tile static-page-list-tile"
+          data-testid="tenant-module-streaks-space"
+          @click="openStreaksSpaceWorkflow"
+        >
+          <span class="tenant-settings-list-row">
+            <span class="tenant-settings-list-main">
+              <span class="static-page-tile-title static-page-list-tile__title">Streaks space</span>
+            </span>
+            <span class="tenant-settings-list-status">{{ streaksSpaceSummary }}</span>
+          </span>
+        </button>
       </div>
       <p v-if="timezoneWorkflowSuccess" class="section-note" role="status">{{ timezoneWorkflowSuccess }}</p>
+      <p v-if="streaksWorkflowSuccess" class="section-note" role="status">{{ streaksWorkflowSuccess }}</p>
     </StaticPageSection>
 
     <StaticPageSection title="Operations">
@@ -145,6 +159,34 @@
               searchable
               search-placeholder="Search timezones"
               test-id="tenant-timezone-select"
+            />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup?.type === 'streaks-space'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="Which chat space gets streaks?"
+          :primary-label="streaksPrimaryLabel"
+          primary-action-variant="save"
+          primary-test-id="save-tenant-streaks-space"
+          :submit-disabled="streaksSaveDisabled"
+          :show-primary-action="canEditTenantSettings"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="tenant-streaks-space-workflow-cancel"
+          @cancel="closePopup"
+          @submit="saveStreaksSpaceSettings"
+        >
+          <InlineValidation v-if="streaksWorkflowError" tone="error" :message="streaksWorkflowError" />
+
+          <label class="wizard-input-shell">
+            <span class="workflow-context-label">Chat space</span>
+            <AppSelect
+              v-model="streaksForm.streaksChatSpaceId"
+              :options="streaksSpaceOptions"
+              :disabled="!canEditTenantSettings || streaksWorkflowSaving"
+              test-id="tenant-streaks-space-select"
             />
           </label>
         </WorkflowStepForm>
@@ -687,6 +729,26 @@ const tenantTimezoneSummary = computed(() => (
 const timezoneWorkflowError = ref<string | null>(null)
 const timezoneWorkflowSuccess = ref<string | null>(null)
 const timezoneWorkflowSaving = ref(false)
+// Only an active space can be chosen; the service refuses an inactive one and reads a
+// deactivated choice back as unset, so the tile reports a deactivated choice as None too.
+const activeChatSpaces = computed(() => chatSpaces.value.filter((space) => space.isActive !== 'N'))
+const savedStreaksChatSpaceId = computed(() => normalizeStringOrEmpty(tenantSettings.value?.streaksChatSpaceId))
+const streaksSpaceSummary = computed(() => {
+  if (referenceDataStore.tenantSettingsLoading || chatSpacesLoading.value) return '—'
+  const spaceId = savedStreaksChatSpaceId.value
+  if (!spaceId) return 'None'
+  const space = chatSpaces.value.find((candidate) => candidate.chatSpaceId === spaceId)
+  // Unknown to the list (it failed to load): the id is still a true answer, None would not be.
+  if (!space) return spaceId
+  return space.isActive === 'N' ? 'None' : space.spaceName
+})
+const streaksSpaceOptions = computed<AppSelectOption[]>(() => [
+  { value: '', label: 'None' },
+  ...activeChatSpaces.value.map((space) => ({ value: space.chatSpaceId, label: space.spaceName })),
+])
+const streaksWorkflowError = ref<string | null>(null)
+const streaksWorkflowSuccess = ref<string | null>(null)
+const streaksWorkflowSaving = ref(false)
 // An in-flight fetch leaves `chatSpaces` empty, which is indistinguishable from "loaded and
 // genuinely empty" unless the loading flag is consulted here. Asserting "Not configured" during
 // the load window renders a definitive claim that is simply wrong, then flips once the fetch
@@ -705,6 +767,7 @@ const {
   isAiEditing,
   isChatSpaceEditing,
   openTimezone,
+  openStreaksSpace,
   openNotificationMenu,
   openChatSpaceMenu,
   openSlackMenu,
@@ -742,6 +805,9 @@ const chatSpaceForm = reactive({
 const timezoneForm = reactive({
   timeZone: 'UTC',
 })
+const streaksForm = reactive({
+  streaksChatSpaceId: '',
+})
 
 const canManageGlobalSettings = computed(() => permissionsStore.canManageGlobalSettings)
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
@@ -765,6 +831,7 @@ const selectedAiProvider = computed(() => {
 })
 const popupTitle = computed(() => {
   if (activePopup.value?.type === 'timezone') return 'Timezone'
+  if (activePopup.value?.type === 'streaks-space') return 'Streaks space'
   if (
     activePopup.value?.type === 'notification-menu'
     || activePopup.value?.type === 'chat-space-menu'
@@ -1001,6 +1068,12 @@ const timezoneSaveDisabled = computed(() => (
 const timezonePrimaryLabel = computed(() => (
   timezoneWorkflowSaving.value ? 'Saving timezone' : 'Save Timezone'
 ))
+const streaksSaveDisabled = computed(() => (
+  streaksWorkflowSaving.value || !canEditTenantSettings.value
+))
+const streaksPrimaryLabel = computed(() => (
+  streaksWorkflowSaving.value ? 'Saving streaks space' : 'Save Streaks Space'
+))
 
 function normalizeProvider(rawProvider: unknown): LlmProvider | null {
   const normalized = normalizeStringOrEmpty(rawProvider).toUpperCase()
@@ -1095,6 +1168,44 @@ async function saveTimezoneSettings(): Promise<void> {
     timezoneWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save tenant timezone.'
   } finally {
     timezoneWorkflowSaving.value = false
+  }
+}
+
+function openStreaksSpaceWorkflow(): void {
+  streaksWorkflowError.value = null
+  streaksWorkflowSuccess.value = null
+  // Seeded from the saved id unless that space is known to be inactive — a ?workflow= open can
+  // land before the space list does, and seeding None then would clear the choice on Save.
+  const savedId = savedStreaksChatSpaceId.value
+  const savedSpace = chatSpaces.value.find((space) => space.chatSpaceId === savedId)
+  streaksForm.streaksChatSpaceId = savedId && savedSpace?.isActive !== 'N' ? savedId : ''
+  openStreaksSpace()
+}
+
+async function saveStreaksSpaceSettings(): Promise<void> {
+  if (streaksSaveDisabled.value) return
+
+  streaksWorkflowSaving.value = true
+  streaksWorkflowError.value = null
+  streaksWorkflowSuccess.value = null
+  try {
+    // Only the streaks space is sent: an absent timeZone leaves the tenant's zone untouched,
+    // and '' (None) clears the space.
+    const response = await authStore.saveTenantSettings({
+      streaksChatSpaceId: normalizeStringOrEmpty(streaksForm.streaksChatSpaceId),
+    })
+    if (!response?.ok) {
+      streaksWorkflowError.value = response?.errors?.[0] ?? authStore.error ?? 'Failed to save streaks space.'
+      return
+    }
+
+    applyTenantSettings(response.tenantSettings)
+    streaksWorkflowSuccess.value = response.messages?.[0] ?? 'Saved tenant settings.'
+    closeActivePopup()
+  } catch (saveError) {
+    streaksWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save streaks space.'
+  } finally {
+    streaksWorkflowSaving.value = false
   }
 }
 
@@ -1505,6 +1616,7 @@ function closePopup(): void {
   resetAiForm()
   resetChatSpaceForm()
   timezoneWorkflowError.value = null
+  streaksWorkflowError.value = null
   notificationWorkflowError.value = null
   if (route.query.workflow) {
     void router.replace('/settings/tenant')
@@ -1594,6 +1706,11 @@ function openRouteRequestedWorkflow(): void {
 
   if (workflow === 'timezone') {
     openTimezoneWorkflow()
+    return
+  }
+
+  if (workflow === 'streaks-space') {
+    openStreaksSpaceWorkflow()
   }
 }
 

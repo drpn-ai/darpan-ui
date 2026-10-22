@@ -5672,6 +5672,8 @@ export interface components {
                 companyUserGroupId?: string;
                 companyLabel?: string;
                 timeZone?: string;
+                /** @description DAR-BE-108. Chat space for tenant-wide streak messages; null when unset or when the space was deactivated. */
+                streaksChatSpaceId?: string;
                 createdByUserId?: string;
                 /** @description Timestamp — ISO-8601 string or epoch milliseconds */
                 createdDate?: string | number;
@@ -6191,8 +6193,10 @@ export interface components {
         };
         /** @description Save active-tenant settings shared by users in the tenant. */
         SaveTenantSettingsParams: {
-            /** @description Timezone identifier for the active tenant, such as UTC or America/Los_Angeles. */
-            timeZone: string;
+            /** @description Timezone identifier for the active tenant, such as UTC or America/Los_Angeles. Absent leaves it unchanged. */
+            timeZone?: string;
+            /** @description DAR-BE-108. Chat space (owned by the active tenant, active) for tenant-wide streak messages. Empty string clears it; absent leaves it unchanged. */
+            streaksChatSpaceId?: string;
         };
         SaveTenantSettingsResult: {
             ok?: boolean;
@@ -6202,6 +6206,8 @@ export interface components {
                 companyUserGroupId?: string;
                 companyLabel?: string;
                 timeZone?: string;
+                /** @description DAR-BE-108. Chat space for tenant-wide streak messages; null when unset or when the space was deactivated. */
+                streaksChatSpaceId?: string;
                 createdByUserId?: string;
                 /** @description Timestamp — ISO-8601 string or epoch milliseconds */
                 createdDate?: string | number;

@@ -33,6 +33,7 @@ vi.mock('../../lib/api/facade', () => ({
 import { resolveEffectiveTimeZone, useAuthStore } from '../auth'
 import { getDefaultDisplayTimeZone, setDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { clearAuthToken } from '../../lib/api/client'
+import { useReferenceDataStore } from '../referenceData'
 
 describe('resolveEffectiveTimeZone', () => {
   /**
@@ -136,6 +137,32 @@ describe('auth store display-timezone sync', () => {
     await store.saveTenantSettings({ timeZone: 'America/Los_Angeles' })
 
     expect(getDefaultDisplayTimeZone()).toBe('America/Los_Angeles')
+    expect(useReferenceDataStore().tenantSettings?.timeZone).toBe('America/Los_Angeles')
+  })
+
+  it('stores a streaks-only save without touching the session timezone', async () => {
+    saveUserSettingsMock.mockResolvedValue({
+      ok: true,
+      authenticated: true,
+      messages: [],
+      errors: [],
+      sessionInfo: { userId: 'M100000', timeZone: 'Asia/Kolkata', tenantTimeZone: 'Asia/Kolkata' },
+    })
+    const store = useAuthStore()
+    await store.saveUserSettings({})
+
+    // The service answers with the whole settings map even when only the space was sent.
+    saveTenantSettingsMock.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      tenantSettings: { companyUserGroupId: 'RAILS', timeZone: 'Asia/Kolkata', streaksChatSpaceId: 'CS1' },
+    })
+    await store.saveTenantSettings({ streaksChatSpaceId: 'CS1' })
+
+    expect(saveTenantSettingsMock).toHaveBeenLastCalledWith({ streaksChatSpaceId: 'CS1' })
+    expect(useReferenceDataStore().tenantSettings?.streaksChatSpaceId).toBe('CS1')
+    expect(getDefaultDisplayTimeZone()).toBe('Asia/Kolkata')
   })
 
   it('clears the display timezone when the session ends', async () => {

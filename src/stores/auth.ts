@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import type { RouteLocationRaw } from 'vue-router'
 import { ApiCallError, clearAuthToken, getAuthToken, setAuthTokenContract } from '../lib/api/client'
 import { authFacade, clearApiResponseCache, settingsFacade } from '../lib/api/facade'
+import type { SaveTenantSettingsPayload } from '../lib/api/facadeTypes'
 import { setReadCacheScope } from '../lib/api/readCache'
 import { useReferenceDataStore } from './referenceData'
 import { useRunResultsStore } from './runResults'
@@ -497,9 +498,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function saveTenantSettings(payload: { timeZone?: string }): Promise<SaveTenantSettingsResponse | null> {
+  async function saveTenantSettings(payload: SaveTenantSettingsPayload): Promise<SaveTenantSettingsResponse | null> {
     if (authBypass) {
       const timeZone = payload.timeZone?.toString()?.trim() || _sessionInfo.value?.timeZone || 'UTC'
+      // Absent leaves the stored space alone, '' clears it — the same contract the service keeps.
+      let streaksChatSpaceId: string | null = null
+      if (payload.streaksChatSpaceId !== undefined) {
+        streaksChatSpaceId = payload.streaksChatSpaceId.trim() || null
+      } else {
+        try {
+          streaksChatSpaceId = useReferenceDataStore().tenantSettings?.streaksChatSpaceId ?? null
+        } catch {
+          // ignore — store optional in some test contexts
+        }
+      }
       _applyAuthState({
         status: 'authenticated',
         sessionInfo: {
@@ -517,17 +529,22 @@ export const useAuthStore = defineStore('auth', () => {
           companyUserGroupId: _sessionInfo.value?.activeTenantUserGroupId,
           companyLabel: _sessionInfo.value?.activeTenantLabel,
           timeZone,
+          streaksChatSpaceId,
         },
       }
     }
 
     try {
       const response = await settingsFacade.saveTenantSettings(payload)
-      if (response.ok && response.tenantSettings?.timeZone && _sessionInfo.value) {
-        _applyAuthenticatedSession({
-          ..._sessionInfo.value,
-          timeZone: response.tenantSettings.timeZone,
-        })
+      if (response.ok && response.tenantSettings) {
+        // A streaks-only save still answers with the whole settings map, so the store takes it
+        // as-is; only a returned zone moves the session's timezone.
+        if (response.tenantSettings.timeZone && _sessionInfo.value) {
+          _applyAuthenticatedSession({
+            ..._sessionInfo.value,
+            timeZone: response.tenantSettings.timeZone,
+          })
+        }
         try {
           useReferenceDataStore().setTenantSettings(response.tenantSettings)
         } catch {
