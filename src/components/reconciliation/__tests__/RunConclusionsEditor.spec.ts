@@ -84,7 +84,7 @@ function tree(scopeMode = 'COMPARE'): RunConclusions {
       { id: 'CONC_NO_CUSTOMER_NAME', label: 'No customer name' },
     ],
     buckets: ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING'],
-    operators: ['IN', 'NOT_IN', 'GT_ZERO', 'BLANK', 'NOT_BLANK'],
+    operators: ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'BLANK', 'NOT_BLANK'],
     presence: ['ANY', 'KEPT', 'EXCLUDED', 'ABSENT'],
     keyScopes: ['FULL', 'FIRST_FIELD'],
     quantifiers: ['ALL', 'ANY'],
@@ -223,6 +223,31 @@ describe('RunConclusionsEditor', () => {
       conditions: [{ subject: 'FILE_1', field: 'status', operator: 'NOT_IN', values: ['Credit Memo : Open'], checkLabel: 'The memo is not open' }],
     })
     expect(wrapper.emitted('saved')?.[0]).toEqual([stored])
+    wrapper.unmount()
+  })
+
+  it('"is more than" takes one number and saves it as the one value', async () => {
+    const wrapper = await mountEditor()
+    selectsIn(wrapper, 'run-conclusions-operator').at(3)!.vm.$emit('update:modelValue', 'GT')
+    await flushPromises()
+    const amount = nodeAt(wrapper, 3)!.get('[data-testid="run-conclusions-amount"]')
+    expect(amount.attributes('inputmode')).toBe('decimal')
+    expect(nodeAt(wrapper, 3)!.find('[data-testid="run-conclusions-values"]').exists()).toBe(false)
+    await amount.setValue(' 5 ')
+    saveConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], savedConclusions: tree() })
+    await wrapper.get('[data-testid="run-conclusions-save"]').trigger('click')
+    await flushPromises()
+    expect(savedPayload()[3]!.conditions[0]).toMatchObject({ field: 'returnId', operator: 'GT', values: ['5'] })
+    wrapper.unmount()
+  })
+
+  it('shows a stored "is more than" with its number', async () => {
+    const stored = tree()
+    stored.conclusions[3]!.conditions[0] = { ...stored.conclusions[3]!.conditions[0]!, field: 'unapplied', operator: 'GT', values: ['5'] }
+    getConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: stored })
+    const wrapper = mount(RunConclusionsEditor, { props: { savedRunId: 'RS_RETURNS', file1Label: 'OMS', file2Label: 'NetSuite' }, attachTo: document.body })
+    await flushPromises()
+    expect((nodeAt(wrapper, 3)!.get('[data-testid="run-conclusions-amount"]').element as HTMLInputElement).value).toBe('5')
     wrapper.unmount()
   })
 

@@ -197,7 +197,18 @@
               test-id="run-conclusions-quantifier"
             />
             <input
-              v-if="takesValues(condition.operator)"
+              v-if="condition.operator === 'GT'"
+              v-model="condition.valuesText"
+              type="text"
+              inputmode="decimal"
+              name="conditionAmount"
+              placeholder="number"
+              aria-label="More than"
+              :disabled="saving"
+              data-testid="run-conclusions-amount"
+            />
+            <input
+              v-else-if="takesValues(condition.operator)"
               v-model="condition.valuesText"
               type="text"
               name="conditionValues"
@@ -350,10 +361,11 @@ const PLUS_ICON_PATH =
   'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'
 
 const DEFAULT_BUCKETS: ConclusionBucket[] = ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING']
-const DEFAULT_OPERATORS: ConclusionOperator[] = ['IN', 'NOT_IN', 'GT_ZERO', 'BLANK', 'NOT_BLANK']
+const DEFAULT_OPERATORS: ConclusionOperator[] = ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'BLANK', 'NOT_BLANK']
 const OPERATOR_LABELS: Record<string, string> = {
   IN: 'is one of',
   NOT_IN: 'is not one of',
+  GT: 'is more than',
   GT_ZERO: 'is above zero',
   BLANK: 'is blank',
   NOT_BLANK: 'has a value',
@@ -521,7 +533,7 @@ function buildCondition(condition: DraftCondition): RunConclusionCondition {
     quantifier: condition.quantifier,
     field: field || null,
     operator: operator || null,
-    values: takesValues(operator) ? splitValues(condition.valuesText) : [],
+    values: operator === 'GT' ? [condition.valuesText.trim()].filter(Boolean) : takesValues(operator) ? splitValues(condition.valuesText) : [],
     checkLabel: condition.checkLabel.trim(),
   }
 }
