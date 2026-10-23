@@ -178,5 +178,30 @@ describe('single-sided runs (DAR-BE-058)', () => {
     expect(buildCreateRuleSetRunPayload({ ...singleSided, scopeMode: 'evaluate' }).scopeMode)
       .toBe('EVALUATE')
   })
+  // DAR-UI-064: a side's duplicate-key handling and extract options.
+  describe('side options', () => {
+    it('sends FINDING and only the true / non-blank options, and nothing for the defaults', () => {
+      const payload = buildCreateRuleSetRunPayload(createDraft({
+        file1DuplicateKeyHandling: 'FINDING',
+        file2DuplicateKeyHandling: '',
+        file1ExtractOptions: { onlyCancelledReturns: true, includeReturnsWithoutShopifyRef: false, note: '  ' },
+        file2ExtractOptions: {},
+      }))
+      expect(payload.file1DuplicateKeyHandling).toBe('FINDING')
+      expect(payload.file1ExtractOptions).toEqual({ onlyCancelledReturns: true })
+      expect(payload).not.toHaveProperty('file2DuplicateKeyHandling')
+      expect(payload).not.toHaveProperty('file2ExtractOptions')
+    })
+
+    it('drops the second side\'s options on a single-sided run', () => {
+      const payload = buildCreateRuleSetRunPayload(createDraft({
+        scopeMode: 'EVALUATE',
+        file2DuplicateKeyHandling: 'FINDING',
+        file2ExtractOptions: { onlyCancelledReturns: true },
+      }))
+      expect(payload).not.toHaveProperty('file2DuplicateKeyHandling')
+      expect(payload).not.toHaveProperty('file2ExtractOptions')
+    })
+  })
 })
 

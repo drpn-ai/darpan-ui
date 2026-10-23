@@ -204,6 +204,66 @@ describe('RuleSetBoard with CSV column lists', () => {
   })
 })
 
+// DAR-UI-064: a NetSuite SuiteQL side has no RESTlet and no remote; its query's projection is its field list.
+describe('RuleSetBoard with SuiteQL query sides', () => {
+  beforeEach(() => {
+    listAutomationSourceOptions.mockReset()
+    draftStoreState.ruleSetDraftState = null
+    draftStoreState.pendingExclusion = null
+  })
+
+  it('lists each side from its query row', async () => {
+    listAutomationSourceOptions.mockResolvedValue({
+      ok: true,
+      nsRestletConfigs: [],
+      systemRemotes: [],
+      sourceConfigs: [
+        { sourceConfigId: 'NS_WARRANTY_CLAIM', systemEnumId: 'NETSUITE_SUITEQL',
+          fieldOptions: [{ fieldPath: '$.records[*].returnId' }, { fieldPath: '$.records[*].amount' }] },
+        { sourceConfigId: 'NS_RETURN_MEMO', systemEnumId: 'NETSUITE_SUITEQL',
+          fieldOptions: [{ fieldPath: '$.records[*].returnId' }, { fieldPath: '$.records[*].amount' }, { fieldPath: '$.records[*].status' }] },
+      ],
+    })
+    draftStoreState.ruleSetDraftState = { resumeStepId: null, draft: {
+      runName: 'Warranty claims - credit memos',
+      file1SystemEnumId: 'NETSUITE_SUITEQL', file1SourceTypeEnumId: 'AUT_SRC_API', file1SourceConfigId: 'NS_WARRANTY_CLAIM',
+      file1PrimaryIdExpression: ['$.records[*].returnId'],
+      file2SystemEnumId: 'NETSUITE_SUITEQL', file2SourceTypeEnumId: 'AUT_SRC_API', file2SourceConfigId: 'NS_RETURN_MEMO',
+      file2PrimaryIdExpression: ['$.records[*].returnId'],
+      rules: [],
+    } }
+
+    const wrapper = mount(RuleSetBoard)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ruleset-field-list-file1"]').text()).toContain('amount')
+    expect(wrapper.get('[data-testid="ruleset-field-list-file2"]').text()).toContain('status')
+  })
+
+  it('names the side in a pre-action field when both sides are the same system', async () => {
+    listAutomationSourceOptions.mockResolvedValue({ ok: true, nsRestletConfigs: [], systemRemotes: [], sourceConfigs: [
+      { sourceConfigId: 'NS_WARRANTY_CLAIM', systemEnumId: 'NETSUITE_SUITEQL', fieldOptions: [{ fieldPath: '$.records[*].amount' }] },
+      { sourceConfigId: 'NS_RETURN_MEMO', systemEnumId: 'NETSUITE_SUITEQL', fieldOptions: [{ fieldPath: '$.records[*].amount' }] },
+    ] })
+    draftStoreState.ruleSetDraftState = { resumeStepId: null, draft: {
+      runName: 'Warranty claims - credit memos',
+      file1SystemEnumId: 'NETSUITE_SUITEQL', file1SourceTypeEnumId: 'AUT_SRC_API', file1SourceConfigId: 'NS_WARRANTY_CLAIM',
+      file1PrimaryIdExpression: ['$.records[*].amount'],
+      file2SystemEnumId: 'NETSUITE_SUITEQL', file2SourceTypeEnumId: 'AUT_SRC_API', file2SourceConfigId: 'NS_RETURN_MEMO',
+      file2PrimaryIdExpression: ['$.records[*].amount'],
+      rules: [{ id: 'r1', ruleId: 'r1', sequenceNum: 1, ruleType: 'FIELD_COMPARISON', enabled: 'Y', ruleText: 'amount = amount',
+        expression: JSON.stringify({ type: 'FIELD_COMPARISON', file1FieldPath: '$.records[*].amount', file2FieldPath: '$.records[*].amount', operator: '=' }) }],
+    } }
+    const wrapper = mount(RuleSetBoard, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-testid="ruleset-rule-operator-r1"]').trigger('click')
+    await wrapper.get('[data-testid="ruleset-rule-add-pre-action"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.ruleset-rule-popover').text()).toContain('(source 1)')
+  })
+})
+
 // DAR-UI-047: Escape on an open popover must close the popover, not abort the create-run workflow (which
 // discarded the whole draft). App.vue dispatches this cancelable request before aborting; the board claims it.
 describe('RuleSetBoard and the workflow Escape', () => {

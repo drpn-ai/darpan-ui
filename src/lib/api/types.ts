@@ -1,5 +1,6 @@
 import type { Schemas } from './generated'
 import type { SourceExcludeFilter } from '../sourceExcludeFilters'
+import type { SourceExtractOption } from './authoringTypes'
 
 export interface ApiEnvelope {
   ok: boolean
@@ -726,6 +727,12 @@ export interface AutomationSourceConfigOption {
   nsAuthConfigId?: string
   shopifyAuthConfigId?: string
   omsRestSourceConfigId?: string
+  /** DAR-UI-064. The extract options this (config x endpoint) row's connector declares; absent when it takes none. */
+  extractOptions?: SourceExtractOption[]
+  /** DAR-UI-064. A SuiteQL query row's own projection: its key candidates and the rules board's fields. */
+  primaryIdOptions?: AutomationPrimaryIdOption[]
+  fieldOptions?: AutomationPrimaryIdOption[]
+  supportsExcludeFilters?: boolean
 }
 
 export interface AutomationPrimaryIdOption {

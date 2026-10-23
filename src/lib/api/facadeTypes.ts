@@ -4,6 +4,7 @@
 import type { SourceExcludeFilter } from '../sourceExcludeFilters'
 import type { SharedConfigType } from '../sharedConfig'
 import type { ChatProviderId } from './types'
+import type { SourceExtractOptions } from './authoringTypes'
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
@@ -344,6 +345,12 @@ export interface CreateRuleSetRunPayload {
   file1ExcludeFilters?: SourceExcludeFilter[]
   file2ExcludeFilters?: SourceExcludeFilter[]
   rules?: RuleSetRulePayload[]
+  /** DAR-UI-064. Blank fails the run when a key repeats on that side; FINDING makes each such record a finding. */
+  file1DuplicateKeyHandling?: string
+  file2DuplicateKeyHandling?: string
+  /** DAR-UI-064. Only names the side's connector declares; false / blank are left out. */
+  file1ExtractOptions?: SourceExtractOptions
+  file2ExtractOptions?: SourceExtractOptions
 }
 
 export interface SaveRuleSetRunPayload extends CreateRuleSetRunPayload {

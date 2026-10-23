@@ -1058,6 +1058,12 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* A grid item's auto min-width is its content, so a long select label pushed the cell past its
+   minmax(0, 1fr) track and over the next control. At 0 the label truncates inside its own trigger. */
+.workflow-form-grid--two > .wizard-input-shell {
+  min-width: 0;
+}
+
 .tenant-notification-current-webhook {
   max-width: 100%;
   margin: 0;
@@ -2305,6 +2311,9 @@ label > span {
 .workflow-select {
   position: relative;
   width: 100%;
+  /* DAR-UI-064: a grid or flex child's auto min-width is its content, so a long selected label (a NetSuite query's
+     description) widened the select past its cell and over the next control; at 0 the label's ellipsis takes over. */
+  min-width: 0;
 }
 
 .app-select-trigger--disabled,

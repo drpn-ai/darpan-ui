@@ -9,7 +9,7 @@
       :primary-label="isCreateStep ? 'Save run' : 'OK'"
       :submit-disabled="isCreateStep ? !canCreateRun || loadingSelections : !canProceed || loadingSelections"
       :show-back="currentStepIndex > 0"
-      :show-primary-action="!isShortcutChoiceStep"
+      :show-primary-action="!isShortcutChoiceStep || isCreateStep"
       :show-enter-hint="!isShortcutChoiceStep && !isRuleSetRulesStep"
       :allow-select-enter="true"
       :primary-test-id="isCreateStep ? 'create-run-submit' : 'wizard-next'"
@@ -48,6 +48,14 @@
 
         <InlineValidation v-if="activeStepError" tone="error" :message="activeStepError" />
 
+        <a
+          v-if="newQueryHref"
+          class="wizard-secondary-link reconciliation-create-schema-link"
+          data-testid="new-suiteql-query"
+          :href="newQueryHref"
+          @click.prevent="openNewQueryWorkflow"
+        >New query</a>
+
         <div v-if="activeConfigCreateTarget" class="reconciliation-create-schema-choice">
           <p class="wizard-or" data-testid="create-config-divider">Or</p>
           <button
@@ -71,6 +79,39 @@
             Create New Schema
           </button>
         </div>
+      </template>
+
+      <template v-else-if="isOptionsStep">
+        <div class="workflow-choice-grid" :data-testid="`${activeOptionsSide}-options`">
+          <label
+            v-for="option in activeBooleanExtractOptions"
+            :key="option.name"
+            :class="[
+              'workflow-choice-option',
+              'workflow-choice-option--filter',
+              { 'workflow-choice-option--active': extractOptionChecked(option.name) },
+            ]"
+          >
+            <input
+              type="checkbox"
+              :name="option.name"
+              :data-testid="`${activeOptionsSide}-option-${option.name}`"
+              :checked="extractOptionChecked(option.name)"
+              @change="setExtractOption(option.name, ($event.target as HTMLInputElement).checked)"
+            />
+            <span class="workflow-choice-label">{{ option.label }}</span>
+          </label>
+        </div>
+        <label v-for="option in activeTextExtractOptions" :key="option.name" class="wizard-input-shell">
+          <span class="workflow-context-label">{{ option.label }}</span>
+          <input
+            :name="option.name"
+            :data-testid="`${activeOptionsSide}-option-${option.name}`"
+            class="wizard-answer-control"
+            :value="extractOptionText(option.name)"
+            @input="setExtractOption(option.name, ($event.target as HTMLInputElement).value)"
+          />
+        </label>
       </template>
 
       <template v-else-if="isChipTextStep">
@@ -115,6 +156,8 @@ import RuleSetBoard from '../../components/reconciliation/RuleSetBoard.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade } from '../../lib/api/facade'
+import { netSuiteQueryFacade } from '../../lib/api/authoringFacade'
+import type { SourceExtractOption, SourceExtractOptions } from '../../lib/api/authoringTypes'
 import type {
   AutomationNsRestletOption,
   AutomationPrimaryIdOption,
@@ -169,8 +212,9 @@ const STAGE_MAX_CARDS: Record<(typeof STAGES)[number], number> = {
   // adding a card to a stage without raising its ceiling is silent, because Math.min caps the
   // fraction at 1 — the bar simply stops moving for the last card of the stage instead of failing.
   name: 3,
-  file1: 6,
-  file2: 6,
+  // 8 since DAR-UI-064 added the duplicate-key and extract-option cards after the key.
+  file1: 8,
+  file2: 8,
   rules: 1,
 }
 
@@ -180,6 +224,17 @@ const SOURCE_TYPE_API = 'AUT_SRC_API'
 const SOURCE_MODE_FILE = 'file'
 const SOURCE_MODE_API = 'api'
 const SHORTCUT_KEYS = ['A', 'B', 'C', 'D', 'E', 'F']
+// DAR-UI-064. A side's answer to "a key repeats": blank on the wire fails the run, FINDING reports each record.
+const DUPLICATES_FAIL = 'FAIL'
+const DUPLICATES_FINDING = 'FINDING'
+// A run side over a saved NetSuite SuiteQL query: the config IS the query, and there is no endpoint card after it.
+const SOURCE_CONFIG_TYPE_SUITEQL = 'NETSUITE_SUITEQL'
+const SUITEQL_RECORD_ROOT = '$.records[*].'
+const NEW_QUERY_PATH = '/reconciliation/queries/new'
+// DAR-UI-064. /reconciliation/create?scope=EVALUATE builds one source and no second side: every record it
+// returns is a finding (the gorjana month-close checks). Create a run still asks the kind of run once.
+const SCOPE_EVALUATE = 'EVALUATE'
+const SCOPE_COMPARE = 'COMPARE'
 // Where an operator goes to create the API credentials a source needs, keyed by canonical parent
 // system. Used only by the escape hatch on the API cards: reaching one of those with an empty list
 // is a dead end, and Back is not an answer to "you have no config yet".
@@ -241,6 +296,15 @@ const file2SourceConfigId = ref('')
 const file2SourceConfigType = ref('')
 const file2NsRestletConfigId = ref('')
 const file2SystemMessageRemoteId = ref('')
+const scopeMode = ref(readQueryValue('scope').toUpperCase() === SCOPE_EVALUATE ? SCOPE_EVALUATE : SCOPE_COMPARE)
+const isSingleSided = computed(() => scopeMode.value === SCOPE_EVALUATE)
+const file1DuplicateKeyHandling = ref(DUPLICATES_FAIL)
+const file2DuplicateKeyHandling = ref(DUPLICATES_FAIL)
+const file1ExtractOptions = ref<SourceExtractOptions>({})
+const file2ExtractOptions = ref<SourceExtractOptions>({})
+// A SuiteQL query's record field names, by query id: undefined while loading, null when the read failed.
+const suiteQlQueryFields = ref<Record<string, string[] | null>>({})
+const pendingQueryFieldLoads = ref(0)
 
 // The rules board (final step) reads and writes these directly off the shared draft store — it
 // takes no props and emits nothing, so this is the only channel back to the wizard's own payload
@@ -248,7 +312,7 @@ const file2SystemMessageRemoteId = ref('')
 // entire editing UI; the wizard only ever needs to carry the latest known value forward.
 const ruleSetDraftExtras = ref<Pick<ReconciliationRuleSetDraft, 'rules' | 'file1ExcludeFilters' | 'file2ExcludeFilters'>>({})
 
-const loadingSelections = computed(() => loadingOptions.value || loadingSchemaFields.value)
+const loadingSelections = computed(() => loadingOptions.value || loadingSchemaFields.value || pendingQueryFieldLoads.value > 0)
 const file1UsesApi = computed(() => file1SourceMode.value === SOURCE_MODE_API)
 const file2UsesApi = computed(() => file2SourceMode.value === SOURCE_MODE_API)
 const file1UsesJson = computed(() => file1FileTypeEnumId.value === FILE_TYPE_JSON)
@@ -301,18 +365,24 @@ function sourceArmSteps(side: SourceSide): WizardStep[] {
   }
 
   armSteps.push({ id: `${side}-primary-id` as StepId })
+  // DAR-UI-064. What a repeated key means is a property of the side, so it follows the key.
+  armSteps.push({ id: `${side}-duplicates` as StepId })
+  if (armExtractOptions(side).length) armSteps.push({ id: `${side}-options` as StepId })
   return armSteps
 }
 
-const steps = computed<WizardStep[]>(() => [
-  { id: 'run-name' },
-  { id: 'description' },
-  ...sourceArmSteps('file1'),
-  ...sourceArmSteps('file2'),
-  // Final step regardless of source shape: the rules board, so comparison rules and exclusions
-  // are set before the run is saved instead of in a second trip through the Ruleset Manager.
-  { id: 'ruleset-rules' },
-])
+const steps = computed<WizardStep[]>(() => (isSingleSided.value
+  // A single-sided run has no second source and no field pairs to draw, so it saves from its last source card.
+  ? [{ id: 'run-name' }, { id: 'description' }, ...sourceArmSteps('file1')]
+  : [
+      { id: 'run-name' },
+      { id: 'description' },
+      ...sourceArmSteps('file1'),
+      ...sourceArmSteps('file2'),
+      // Final step regardless of source shape: the rules board, so comparison rules and exclusions
+      // are set before the run is saved instead of in a second trip through the Ruleset Manager.
+      { id: 'ruleset-rules' },
+    ]))
 
 function armUsesApi(side: SourceSide): boolean {
   return side === 'file1' ? file1UsesApi.value : file2UsesApi.value
@@ -330,7 +400,80 @@ function armHasEndpointStep(side: SourceSide): boolean {
 }
 
 function armNeedsApiSourceStep(side: SourceSide): boolean {
+  // A SuiteQL query is read by its connector directly; no RESTlet or remote sits behind it.
+  if (armUsesSuiteQl(side)) return false
   return side === 'file1' ? file1ApiSourceStepNeeded.value : file2ApiSourceStepNeeded.value
+}
+
+function selectedSourceConfigType(side: SourceSide): string {
+  return side === 'file1' ? file1SourceConfigType.value : file2SourceConfigType.value
+}
+
+function armUsesSuiteQl(side: SourceSide): boolean {
+  return armUsesApi(side) && selectedSourceConfigType(side) === SOURCE_CONFIG_TYPE_SUITEQL
+}
+
+/** The (config x endpoint) row this API side resolved to, which is what declares its extract options. */
+function selectedSourceConfigRow(side: SourceSide): AutomationSourceConfigOption | null {
+  const sourceConfigId = selectedSourceConfigId(side)
+  const endpointEnumId = selectedSystemEnumId(side)
+  if (!armUsesApi(side) || !sourceConfigId || !endpointEnumId) return null
+  return sourceConfigs.value.find((config) =>
+    sourceConfigMatches(config.sourceConfigId, sourceConfigId) &&
+    (!config.systemEnumId || endpointMatchesSystem(config.systemEnumId, endpointEnumId)),
+  ) ?? null
+}
+
+function armExtractOptions(side: SourceSide): SourceExtractOption[] {
+  return (selectedSourceConfigRow(side)?.extractOptions ?? [])
+    .filter((option) => Boolean(option?.name?.trim()) && (option.type === 'boolean' || option.type === 'text'))
+}
+
+function armExtractOptionValues(side: SourceSide): SourceExtractOptions {
+  return side === 'file1' ? file1ExtractOptions.value : file2ExtractOptions.value
+}
+
+/** Only the names this side's row declares, and only a checked box or a non-blank text. */
+function declaredExtractOptionValues(side: SourceSide): SourceExtractOptions | undefined {
+  const values = armExtractOptionValues(side)
+  const chosen = armExtractOptions(side).flatMap((option): Array<[string, boolean | string]> => {
+    const value = values[option.name]
+    if (option.type === 'boolean') return value === true ? [[option.name, true]] : []
+    return typeof value === 'string' && value.trim() ? [[option.name, value.trim()]] : []
+  })
+  return chosen.length ? Object.fromEntries(chosen) : undefined
+}
+
+function clearExtractOptions(side: SourceSide): void {
+  if (side === 'file1') {
+    file1ExtractOptions.value = {}
+  } else {
+    file2ExtractOptions.value = {}
+  }
+}
+
+function duplicateKeyHandlingForDraft(side: SourceSide): string | undefined {
+  const value = side === 'file1' ? file1DuplicateKeyHandling.value : file2DuplicateKeyHandling.value
+  return value === DUPLICATES_FINDING ? DUPLICATES_FINDING : undefined
+}
+
+/** The query's fields as key options; a typed bare name gets the records root its extract returns. */
+function primaryIdExpressionForDraft(side: SourceSide): string[] {
+  const values = side === 'file1' ? file1PrimaryIdExpression.value : file2PrimaryIdExpression.value
+  if (!armUsesSuiteQl(side)) return values
+  return values.map((value) => (value.trim().startsWith('$') ? value : `${SUITEQL_RECORD_ROOT}${value.trim()}`))
+}
+
+function suiteQlFieldsForSide(side: SourceSide): string[] | null | undefined {
+  if (!armUsesSuiteQl(side)) return undefined
+  return suiteQlQueryFields.value[selectedSourceConfigId(side)]
+}
+
+// The query's fields could not be read (or it has none): the key is typed, as on a CSV side.
+function suiteQlKeyIsTyped(side: SourceSide): boolean {
+  if (!armUsesSuiteQl(side)) return false
+  const fields = suiteQlFieldsForSide(side)
+  return fields === null || (Array.isArray(fields) && fields.length === 0)
 }
 
 function armParentEnumId(side: SourceSide): string {
@@ -404,6 +547,8 @@ function syncFileEndpointSelection(side: SourceSide): void {
 
 function applyApiEndpointSelection(side: SourceSide, endpointEnumId: string): void {
   const sourceConfigType = resolveSourceConfigType(selectedSourceConfigId(side), endpointEnumId)
+  // Another endpoint is another connector row, with its own declared options.
+  clearExtractOptions(side)
   if (side === 'file1') {
     file1SystemEnumId.value = endpointEnumId
     file1SourceConfigType.value = sourceConfigType
@@ -425,6 +570,9 @@ function stageOfStep(stepId: StepId): number {
 const currentStep = computed<WizardStep>(() => steps.value[currentStepIndex.value] ?? steps.value[steps.value.length - 1]!)
 const isCreateStep = computed(() => currentStepIndex.value === steps.value.length - 1)
 const progressPercent = computed(() => {
+  // A single-sided run saves from its last source card, which is therefore the end of the bar.
+  if (isSingleSided.value && isCreateStep.value) return (100).toFixed(2)
+  const stageCount = isSingleSided.value ? 2 : STAGES.length
   const stage = stageOfStep(currentStep.value.id)
   const stageName = STAGES[stage]!
   const cardsInStage = steps.value.filter((step) => stageOfStep(step.id) === stage)
@@ -432,7 +580,7 @@ const progressPercent = computed(() => {
   // Denominator is the stage's constant ceiling, never its live card count, so answering a
   // question that adds cards can only ever move the bar forwards.
   const withinStage = Math.min((positionInStage + 1) / STAGE_MAX_CARDS[stageName], 1)
-  return (((stage + withinStage) / STAGES.length) * 100).toFixed(2)
+  return (((stage + withinStage) / stageCount) * 100).toFixed(2)
 })
 const trimmedRunName = computed(() => runName.value.trim())
 const file1SystemLabel = computed(() => resolveSystemLabel(file1SystemEnumId.value))
@@ -444,15 +592,17 @@ const file1SystemParentLabel = computed(() =>
   (file1SystemParentEnumId.value ? resolveSystemLabel(file1SystemParentEnumId.value) : '') || undefined)
 const file2SystemParentLabel = computed(() =>
   (file2SystemParentEnumId.value ? resolveSystemLabel(file2SystemParentEnumId.value) : '') || undefined)
-// DAR-UI-054: a Sync run always compares two systems. Create a run already asked which kind of
-// run this is, so the wizard no longer asks again; single-system checks are built as Lifecycles.
+// DAR-UI-054: a Sync run compares two systems, and Create a run already asked which kind of run this
+// is, so the wizard never asks again. DAR-UI-064: ?scope=EVALUATE (set by the caller, not asked here)
+// builds a single-sided run over one source.
 const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
-  scopeMode: 'COMPARE',
+  scopeMode: scopeMode.value,
   runName: trimmedRunName.value,
   description: description.value.trim() || undefined,
   file1SystemEnumId: file1SystemEnumId.value,
   file1SystemLabel: file1SystemLabel.value || undefined,
   file1SystemParentLabel: file1SystemParentLabel.value,
+  file1SystemParentEnumId: file1SystemParentEnumId.value || undefined,
   file1SourceTypeEnumId: file1UsesApi.value ? SOURCE_TYPE_API : undefined,
   file1SystemMessageRemoteId: file1UsesApi.value ? file1SystemMessageRemoteId.value || undefined : undefined,
   file1SystemMessageRemoteLabel: file1UsesApi.value && file1SystemMessageRemoteId.value ? selectedApiSourceLabel('file1') || undefined : undefined,
@@ -464,10 +614,13 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file1JsonSchemaId: !file1UsesApi.value ? file1JsonSchemaId.value || undefined : undefined,
   file1SchemaLabel: !file1UsesApi.value ? resolveSelectedSchemaLabel(file1JsonSchemaId.value) : undefined,
   file1SchemaFileName: !file1UsesApi.value ? resolveSchemaFileName(file1JsonSchemaId.value) : undefined,
-  file1PrimaryIdExpression: file1PrimaryIdExpression.value,
+  file1PrimaryIdExpression: primaryIdExpressionForDraft('file1'),
+  file1DuplicateKeyHandling: duplicateKeyHandlingForDraft('file1'),
+  file1ExtractOptions: declaredExtractOptionValues('file1'),
   file2SystemEnumId: file2SystemEnumId.value,
   file2SystemLabel: file2SystemLabel.value || undefined,
   file2SystemParentLabel: file2SystemParentLabel.value,
+  file2SystemParentEnumId: file2SystemParentEnumId.value || undefined,
   file2SourceTypeEnumId: file2UsesApi.value ? SOURCE_TYPE_API : undefined,
   file2SystemMessageRemoteId: file2UsesApi.value ? file2SystemMessageRemoteId.value || undefined : undefined,
   file2SystemMessageRemoteLabel: file2UsesApi.value && file2SystemMessageRemoteId.value ? selectedApiSourceLabel('file2') || undefined : undefined,
@@ -479,7 +632,9 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file2JsonSchemaId: !file2UsesApi.value ? file2JsonSchemaId.value || undefined : undefined,
   file2SchemaLabel: !file2UsesApi.value ? resolveSelectedSchemaLabel(file2JsonSchemaId.value) : undefined,
   file2SchemaFileName: !file2UsesApi.value ? resolveSchemaFileName(file2JsonSchemaId.value) : undefined,
-  file2PrimaryIdExpression: file2PrimaryIdExpression.value,
+  file2PrimaryIdExpression: primaryIdExpressionForDraft('file2'),
+  file2DuplicateKeyHandling: duplicateKeyHandlingForDraft('file2'),
+  file2ExtractOptions: declaredExtractOptionValues('file2'),
 }))
 
 const currentQuestion = computed(() => {
@@ -489,7 +644,7 @@ const currentQuestion = computed(() => {
     case 'description':
       return 'What description should this run use?'
     case 'file1-system':
-      return 'Which system provides the first source?'
+      return isSingleSided.value ? 'Which system should this run check?' : 'Which system provides the first source?'
     case 'file1-endpoint':
       // Worded for the branch the operator already chose one card earlier. "Endpoint" is
       // API vocabulary and reads as nonsense to someone about to upload a CSV.
@@ -514,6 +669,10 @@ const currentQuestion = computed(() => {
       return `Which ${sourceSystemLabel('file1')} config should this source use?`
     case 'file1-api':
       return `Which API endpoint should ${sourceSystemLabel('file1')} use?`
+    case 'file1-duplicates':
+      return `What happens when a key repeats in ${apiRecordSourceLabel('file1')}?`
+    case 'file1-options':
+      return `Which options should ${apiRecordSourceLabel('file1')} use?`
     case 'file2-system':
       return 'Which system provides the second source?'
     case 'file2-endpoint':
@@ -540,6 +699,10 @@ const currentQuestion = computed(() => {
       return `Which ${sourceSystemLabel('file2')} config should this source use?`
     case 'file2-api':
       return `Which API endpoint should ${sourceSystemLabel('file2')} use?`
+    case 'file2-duplicates':
+      return `What happens when a key repeats in ${apiRecordSourceLabel('file2')}?`
+    case 'file2-options':
+      return `Which options should ${apiRecordSourceLabel('file2')} use?`
     case 'ruleset-rules':
       return 'How should Darpan compare these two systems?'
     default:
@@ -565,9 +728,9 @@ const isSelectStep = computed(() => {
     case 'file2-api':
       return true
     case 'file1-primary-id':
-      return file1UsesJson.value || file1UsesApi.value || file1JsonSchemaId.value.length > 0
+      return (file1UsesJson.value || file1UsesApi.value || file1JsonSchemaId.value.length > 0) && !suiteQlKeyIsTyped('file1')
     case 'file2-primary-id':
-      return file2UsesJson.value || file2UsesApi.value || file2JsonSchemaId.value.length > 0
+      return (file2UsesJson.value || file2UsesApi.value || file2JsonSchemaId.value.length > 0) && !suiteQlKeyIsTyped('file2')
     default:
       return false
   }
@@ -576,10 +739,11 @@ const isSelectStep = computed(() => {
 const isChipTextStep = computed(() => {
   switch (currentStep.value.id) {
     case 'file1-primary-id':
-      // A CSV side that skipped the schema step still types its column names.
-      return !file1UsesJson.value && !file1UsesApi.value && file1JsonSchemaId.value.length === 0
+      // A CSV side that skipped the schema step still types its column names, as does a SuiteQL
+      // side whose query fields could not be read.
+      return (!file1UsesJson.value && !file1UsesApi.value && file1JsonSchemaId.value.length === 0) || suiteQlKeyIsTyped('file1')
     case 'file2-primary-id':
-      return !file2UsesJson.value && !file2UsesApi.value && file2JsonSchemaId.value.length === 0
+      return (!file2UsesJson.value && !file2UsesApi.value && file2JsonSchemaId.value.length === 0) || suiteQlKeyIsTyped('file2')
     default:
       return false
   }
@@ -616,6 +780,10 @@ const activeSelectValue = computed({
         return file2SourceConfigId.value
       case 'file2-api':
         return selectedApiSourceValue('file2')
+      case 'file1-duplicates':
+        return file1DuplicateKeyHandling.value
+      case 'file2-duplicates':
+        return file2DuplicateKeyHandling.value
       default:
         return ''
     }
@@ -698,6 +866,12 @@ const activeSelectValue = computed({
         break
       case 'file2-api':
         updateApiSource('file2', value)
+        break
+      case 'file1-duplicates':
+        file1DuplicateKeyHandling.value = value === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
+        break
+      case 'file2-duplicates':
+        file2DuplicateKeyHandling.value = value === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
         break
     }
   },
@@ -914,7 +1088,33 @@ const showEmptyState = computed(() =>
 
 const isFileTypeChoiceStep = computed(() => currentStep.value.id === 'file1-filetype' || currentStep.value.id === 'file2-filetype')
 const isSourceChoiceStep = computed(() => currentStep.value.id === 'file1-source' || currentStep.value.id === 'file2-source')
-const isShortcutChoiceStep = computed(() => isSourceChoiceStep.value || isFileTypeChoiceStep.value)
+const isDuplicatesChoiceStep = computed(() => currentStep.value.id === 'file1-duplicates' || currentStep.value.id === 'file2-duplicates')
+const isShortcutChoiceStep = computed(() => isSourceChoiceStep.value || isFileTypeChoiceStep.value || isDuplicatesChoiceStep.value)
+const isOptionsStep = computed(() => currentStep.value.id === 'file1-options' || currentStep.value.id === 'file2-options')
+const activeOptionsSide = computed<SourceSide>(() => (currentStep.value.id === 'file2-options' ? 'file2' : 'file1'))
+const activeBooleanExtractOptions = computed(() =>
+  (isOptionsStep.value ? armExtractOptions(activeOptionsSide.value) : []).filter((option) => option.type === 'boolean'))
+const activeTextExtractOptions = computed(() =>
+  (isOptionsStep.value ? armExtractOptions(activeOptionsSide.value) : []).filter((option) => option.type === 'text'))
+
+function extractOptionChecked(name: string): boolean {
+  return armExtractOptionValues(activeOptionsSide.value)[name] === true
+}
+
+function extractOptionText(name: string): string {
+  const value = armExtractOptionValues(activeOptionsSide.value)[name]
+  return typeof value === 'string' ? value : ''
+}
+
+function setExtractOption(name: string, value: boolean | string): void {
+  const side = activeOptionsSide.value
+  const next = { ...armExtractOptionValues(side), [name]: value }
+  if (side === 'file1') {
+    file1ExtractOptions.value = next
+  } else {
+    file2ExtractOptions.value = next
+  }
+}
 const isSchemaSelectionStep = computed(() => currentStep.value.id === 'file1-schema' || currentStep.value.id === 'file2-schema')
 
 const activeShortcutChoiceTestPrefix = computed(() => {
@@ -927,18 +1127,29 @@ const activeShortcutChoiceTestPrefix = computed(() => {
       return 'file2-source-choice'
     case 'file2-filetype':
       return 'file2-filetype-choice'
+    case 'file1-duplicates':
+      return 'file1-duplicates-choice'
+    case 'file2-duplicates':
+      return 'file2-duplicates-choice'
     default:
       return 'workflow-choice'
   }
 })
 
 const activeShortcutChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() =>
-  (isSourceChoiceStep.value ? sourceModeOptions.value : activeSelectOptions.value).map((option, index) => ({
+  (isSourceChoiceStep.value
+    ? sourceModeOptions.value
+    : (isDuplicatesChoiceStep.value ? duplicateKeyOptions : activeSelectOptions.value)).map((option, index) => ({
     value: option.value,
     label: option.label,
     shortcutKey: SHORTCUT_KEYS[index] ?? String(index + 1),
   })),
 )
+
+const duplicateKeyOptions: WorkflowSelectOption[] = [
+  { value: DUPLICATES_FAIL, label: 'Fail the run' },
+  { value: DUPLICATES_FINDING, label: 'Report each as a finding' },
+]
 
 const sourceModeOptions = computed<WorkflowSelectOption[]>(() => [
   { value: SOURCE_MODE_FILE, label: 'File upload' },
@@ -978,6 +1189,7 @@ const schemaSelectionError = computed(() => {
 const schemaFieldSelectionError = computed(() => {
   switch (currentStep.value.id) {
     case 'file1-primary-id':
+      if (armUsesSuiteQl('file1') && (suiteQlFieldsForSide('file1') === undefined || suiteQlKeyIsTyped('file1'))) return ''
       if (file1UsesApi.value) {
         return apiPrimaryIdOptions('file1').length === 0
           ? `No ID fields are available for ${apiRecordSourceLabel('file1')}.`
@@ -989,6 +1201,7 @@ const schemaFieldSelectionError = computed(() => {
         ? `No comparable fields are available in ${file1SchemaLabel.value}.`
         : ''
     case 'file2-primary-id':
+      if (armUsesSuiteQl('file2') && (suiteQlFieldsForSide('file2') === undefined || suiteQlKeyIsTyped('file2'))) return ''
       if (file2UsesApi.value) {
         return apiPrimaryIdOptions('file2').length === 0
           ? `No ID fields are available for ${apiRecordSourceLabel('file2')}.`
@@ -1037,6 +1250,37 @@ const activeConfigCreateTarget = computed<{ path: string, label: string } | null
   return CONFIG_CREATE_TARGETS[canonicalDarpanSystemEnumId(parentEnumId)] ?? null
 })
 
+// DAR-UI-064. A SuiteQL query is authored from the NetSuite config card; saving it comes back here with
+// newQuery=<id>&side=<side>, and the answers so far ride the draft store across the trip.
+const newQueryHref = computed(() => {
+  const stepId = currentStep.value.id
+  if (stepId !== 'file1-api-config' && stepId !== 'file2-api-config') return ''
+  const side: SourceSide = stepId === 'file1-api-config' ? 'file1' : 'file2'
+  if (canonicalDarpanSystemEnumId(armParentEnumId(side)) !== 'NETSUITE') return ''
+  const params = new URLSearchParams({ returnTo: wizardReturnPath(), side })
+  return `${NEW_QUERY_PATH}?${params.toString()}`
+})
+
+function readQueryValue(name: string): string {
+  const raw = route.query?.[name]
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+/** This wizard's own path and query, minus a previous trip's return markers. */
+function wizardReturnPath(): string {
+  const params = new URLSearchParams()
+  Object.entries(route.query ?? {}).forEach(([key, raw]) => {
+    if (key === 'newQuery' || key === 'side') return
+    const values = Array.isArray(raw) ? raw : [raw]
+    values.forEach((value) => { if (typeof value === 'string') params.append(key, value) })
+  })
+  if (isSingleSided.value && !params.has('scope')) params.set('scope', SCOPE_EVALUATE)
+  const query = params.toString()
+  const path = (route as { path?: string }).path || '/reconciliation/create'
+  return query ? `${path}?${query}` : path
+}
+
 const canProceed = computed(() => {
   switch (currentStep.value.id) {
     case 'run-name':
@@ -1079,6 +1323,11 @@ const canProceed = computed(() => {
       return file2SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
     case 'file2-api':
       return hasApiEndpoint('file2') && !apiSourceSelectionError.value
+    case 'file1-duplicates':
+    case 'file2-duplicates':
+    case 'file1-options':
+    case 'file2-options':
+      return true
     default:
       return false
   }
@@ -1093,15 +1342,23 @@ const canCreateRun = computed(() => {
       : file1FileTypeEnumId.value.length > 0 &&
         (!file1UsesJson.value || !!resolveSchemaFileName(file1JsonSchemaId.value)) &&
         file1PrimaryIdExpression.value.length > 0) &&
+    (isSingleSided.value || canCreateSecondSide())
+  )
+})
+
+function canCreateSecondSide(): boolean {
+  return (
     file2SystemEnumId.value.length > 0 &&
     (file2UsesApi.value
       ? hasApiSourceConfig('file2') && hasApiEndpoint('file2') && file2PrimaryIdExpression.value.length > 0
       : file2FileTypeEnumId.value.length > 0 &&
         (!file2UsesJson.value || !!resolveSchemaFileName(file2JsonSchemaId.value)) &&
         file2PrimaryIdExpression.value.length > 0) &&
-    file1SystemEnumId.value !== file2SystemEnumId.value
+    // DAR-UI-064: both sides may read the same system through different configs (NetSuite warranty claims against
+    // NetSuite credit memos); only the very same source twice is refused, as create#RuleSetRun refuses it.
+    (file1SystemEnumId.value !== file2SystemEnumId.value || file1SourceConfigId.value.trim() !== file2SourceConfigId.value.trim())
   )
-})
+}
 
 watch(
   () => steps.value.length,
@@ -1109,6 +1366,15 @@ watch(
     if (currentStepIndex.value >= nextLength) {
       currentStepIndex.value = Math.max(0, nextLength - 1)
     }
+  },
+)
+
+watch(
+  () => [armUsesSuiteQl('file1') ? file1SourceConfigId.value : '', armUsesSuiteQl('file2') ? file2SourceConfigId.value : ''],
+  (queryIds) => {
+    queryIds.forEach((queryId) => {
+      if (queryId) void ensureSuiteQlQueryFieldsLoaded(queryId)
+    })
   },
 )
 
@@ -1203,6 +1469,11 @@ function sourceSystemLabel(side: SourceSide): string {
 }
 
 function apiRecordSourceLabel(side: SourceSide): string {
+  if (armUsesSuiteQl(side)) {
+    const queryId = selectedSourceConfigId(side)
+    const option = apiSourceConfigOptionsForSide(side).find((candidate) => candidate.value === queryId)
+    if (option?.label) return option.label
+  }
   return selectedApiSourceLabel(side) || sourceSystemLabel(side)
 }
 
@@ -1287,6 +1558,7 @@ function hasApiSourceConfig(side: SourceSide): boolean {
 }
 
 function hasApiEndpoint(side: SourceSide): boolean {
+  if (armUsesSuiteQl(side)) return true
   return side === 'file1'
     ? Boolean(file1NsRestletConfigId.value || file1SystemMessageRemoteId.value)
     : Boolean(file2NsRestletConfigId.value || file2SystemMessageRemoteId.value)
@@ -1329,6 +1601,7 @@ function updateApiSourceConfig(side: SourceSide, value: string): void {
     file2PrimaryIdExpression.value = []
     clearApiEndpoint('file2')
   }
+  clearExtractOptions(side)
 
   syncSoleApiEndpoint(side)
 }
@@ -1376,6 +1649,7 @@ function updateApiSource(side: SourceSide, value: string): void {
 }
 
 function clearApiSourceConfig(side: SourceSide): void {
+  clearExtractOptions(side)
   if (side === 'file1') {
     file1SourceConfigId.value = ''
     file1SourceConfigType.value = ''
@@ -1453,6 +1727,9 @@ function selectedApiSourceLabel(side: SourceSide): string {
 }
 
 function apiPrimaryIdOptions(side: SourceSide): WorkflowSelectOption[] {
+  if (armUsesSuiteQl(side)) {
+    return (suiteQlFieldsForSide(side) ?? []).map((fieldName) => ({ value: `${SUITEQL_RECORD_ROOT}${fieldName}`, label: fieldName }))
+  }
   const rawOptions = selectedApiSourceOption(side)?.primaryIdOptions ?? []
   return rawOptions.flatMap((option: AutomationPrimaryIdOption) => {
     const fieldPath = option.fieldPath?.trim()
@@ -1499,6 +1776,34 @@ async function ensureFieldsLoaded(schemaId: string): Promise<void> {
   }
 }
 
+async function ensureSuiteQlQueryFieldsLoaded(queryId: string): Promise<void> {
+  if (!queryId || queryId in suiteQlQueryFields.value) return
+  // The option row already carries the query's fields, including what its template adds (a SALES_LINES query's
+  // orderLineId, lineLocation); reading the query itself only knows its projection, so it is the fallback.
+  const declared = sourceConfigs.value.find((config) => config.sourceConfigId === queryId)?.primaryIdOptions ?? []
+  if (declared.length) {
+    suiteQlQueryFields.value = {
+      ...suiteQlQueryFields.value,
+      [queryId]: declared.map((option) => option.fieldPath.replace(SUITEQL_RECORD_ROOT, '')).filter(Boolean),
+    }
+    return
+  }
+  pendingQueryFieldLoads.value += 1
+  try {
+    const response = await netSuiteQueryFacade.get(queryId, pageAbortController.signal)
+    const fieldNames = (response.query?.fields ?? [])
+      .map((field) => field.recordFieldName?.trim() ?? '')
+      .filter(Boolean)
+    suiteQlQueryFields.value = { ...suiteQlQueryFields.value, [queryId]: fieldNames }
+  } catch (error) {
+    if ((error as { name?: string })?.name === 'AbortError') return
+    // Unreadable is not a dead end: the key is typed instead.
+    suiteQlQueryFields.value = { ...suiteQlQueryFields.value, [queryId]: null }
+  } finally {
+    pendingQueryFieldLoads.value = Math.max(0, pendingQueryFieldLoads.value - 1)
+  }
+}
+
 async function focusActiveSelectTrigger(): Promise<void> {
   await nextTick()
 
@@ -1526,6 +1831,11 @@ function advanceFromShortcutChoice(value: string): void {
   if (!canProceed.value) return
 
   currentStepIndex.value = Math.min(currentStepIndex.value + 1, steps.value.length - 1)
+  // DAR-UI-064: a choice card (a side's repeated-key handling) can now be the last card before the rules board, and
+  // the board reads only the draft store, so it has to be seeded here exactly as the OK path seeds it.
+  if (currentStep.value.id === 'ruleset-rules') {
+    seedRuleSetBoardDraft()
+  }
 }
 
 function handleShortcutChoiceKeydown(event: KeyboardEvent): void {
@@ -1605,6 +1915,7 @@ async function restoreDraftFromHistoryState(): Promise<void> {
     return
   }
 
+  scopeMode.value = (draftState.draft.scopeMode ?? '').toUpperCase() === SCOPE_EVALUATE ? SCOPE_EVALUATE : scopeMode.value
   runName.value = draftState.draft.runName
   description.value = draftState.draft.description ?? ''
   file1SystemEnumId.value = draftState.draft.file1SystemEnumId
@@ -1625,11 +1936,19 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   file2SourceConfigType.value = draftState.draft.file2SourceConfigType ?? ''
   file2NsRestletConfigId.value = draftState.draft.file2NsRestletConfigId ?? ''
   file2SystemMessageRemoteId.value = draftState.draft.file2SystemMessageRemoteId ?? ''
+  file1DuplicateKeyHandling.value = draftState.draft.file1DuplicateKeyHandling === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
+  file2DuplicateKeyHandling.value = draftState.draft.file2DuplicateKeyHandling === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
+  file1ExtractOptions.value = { ...(draftState.draft.file1ExtractOptions ?? {}) }
+  file2ExtractOptions.value = { ...(draftState.draft.file2ExtractOptions ?? {}) }
   // Resolve step 1's answer from the resumed concrete value (e.g. OMS_RETURNS -> OMS) BEFORE
   // steps.value is read below — steps.value only includes file{n}-endpoint when the parent has
   // one, so this must be set first or a resumeStepId targeting that step would not be found.
-  file1SystemParentEnumId.value = resolveDarpanSystemParentEnumId(file1SystemEnumId.value, allSystemOptions.value)
-  file2SystemParentEnumId.value = resolveDarpanSystemParentEnumId(file2SystemEnumId.value, allSystemOptions.value)
+  // A draft published from a card before the endpoint resolved (the config card, on a system with
+  // endpoints) has a blank systemEnumId, so the stored first-card answer wins when present.
+  file1SystemParentEnumId.value = draftState.draft.file1SystemParentEnumId ||
+    resolveDarpanSystemParentEnumId(file1SystemEnumId.value, allSystemOptions.value)
+  file2SystemParentEnumId.value = draftState.draft.file2SystemParentEnumId ||
+    resolveDarpanSystemParentEnumId(file2SystemEnumId.value, allSystemOptions.value)
   // A draft written before the file branch dropped API-only endpoints can still name one.
   syncFileEndpointSelection('file1')
   syncFileEndpointSelection('file2')
@@ -1729,6 +2048,36 @@ async function handlePrimarySubmit(): Promise<void> {
   }
 }
 
+async function openNewQueryWorkflow(): Promise<void> {
+  const href = newQueryHref.value
+  if (!href) return
+  continuingFlowElsewhere = true
+  publishDraftForDetour(currentStep.value.id)
+  await router.push(href)
+}
+
+/**
+ * Back from the query editor: preselect the saved query on the side that asked for it. Options were
+ * reloaded on mount, so a query saved a moment ago is in them. Applied only to a side that is still
+ * a NetSuite API side, so a stale URL on a fresh wizard changes nothing.
+ */
+async function applyReturnedQuery(): Promise<void> {
+  const queryId = readQueryValue('newQuery')
+  const sideValue = readQueryValue('side')
+  if (!queryId || (sideValue !== 'file1' && sideValue !== 'file2')) return
+  const side: SourceSide = sideValue
+  if (!armUsesApi(side) || canonicalDarpanSystemEnumId(armParentEnumId(side)) !== 'NETSUITE') return
+  if (!apiSourceConfigOptionsForSide(side).some((option) => option.value === queryId)) return
+
+  updateApiSourceConfig(side, queryId)
+  const configStepIndex = steps.value.findIndex((step) => step.id === `${side}-api-config`)
+  if (configStepIndex >= 0) currentStepIndex.value = configStepIndex
+
+  // Drop the return markers so a reload does not apply them a second time.
+  const rest = Object.fromEntries(Object.entries(route.query ?? {}).filter(([key]) => key !== 'newQuery' && key !== 'side'))
+  await router.replace({ query: rest })
+}
+
 async function openSchemaCreateWorkflow(): Promise<void> {
   await openCreateDetour('/schemas/create')
 }
@@ -1803,6 +2152,7 @@ async function createRun(): Promise<void> {
 onMounted(async () => {
   await loadOptions()
   await restoreDraftFromHistoryState()
+  await applyReturnedQuery()
 })
 
 onMounted(() => {

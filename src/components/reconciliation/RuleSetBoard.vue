@@ -414,6 +414,7 @@ import { jsonSchemaFacade, reconciliationFacade } from '../../lib/api/facade'
 import type {
   AutomationNsRestletOption,
   AutomationPrimaryIdOption,
+  AutomationSourceConfigOption,
   AutomationSystemRemoteOption,
   JsonSchemaField,
 } from '../../lib/api/types'
@@ -546,6 +547,7 @@ const loadError = ref<string | null>(null)
 const loadingFields = ref(false)
 const nsRestletConfigs = ref<AutomationNsRestletOption[]>([])
 const systemRemotes = ref<AutomationSystemRemoteOption[]>([])
+const sourceConfigs = ref<AutomationSourceConfigOption[]>([])
 const loadedFields = ref<Record<RuleSide, RuleField[]>>({
   file1: [],
   file2: [],
@@ -592,9 +594,12 @@ const editingPreActionFieldOptions = computed<AppSelectOption[]>(() => {
   const rule = editingRule.value
   if (!rule) return []
 
+  // DAR-UI-064: when both sides read the same system (NetSuite claims against NetSuite memos) the titles match, so the
+  // side is named too, or the two choices read identically.
+  const sameTitle = file1Title.value === file2Title.value
   return [
-    { value: 'file1', label: `${formatFieldKey(rule.file1FieldPath)} - ${file1Title.value}` },
-    { value: 'file2', label: `${formatFieldKey(rule.file2FieldPath)} - ${file2Title.value}` },
+    { value: 'file1', label: `${formatFieldKey(rule.file1FieldPath)} - ${file1Title.value}${sameTitle ? ' (source 1)' : ''}` },
+    { value: 'file2', label: `${formatFieldKey(rule.file2FieldPath)} - ${file2Title.value}${sameTitle ? ' (source 2)' : ''}` },
   ]
 })
 const activeRule = computed(() => editingRule.value ?? orderedRules.value.find((rule) => rule.id === hoveredRuleId.value) ?? null)
@@ -729,6 +734,17 @@ function selectedApiSourceOption(side: RuleSide): AutomationNsRestletOption | Au
     return systemRemotes.value.find(matchesRemoteAndConfig) ?? null
   }
 
+  // DAR-UI-064: a NetSuite SuiteQL side has no RESTlet and no remote; its query is the config row, and the query's own
+  // projection is its field list (fieldOptions on the row).
+  if (sourceConfigId?.trim()) {
+    const systemEnumId = (side === 'file1' ? draft.value.file1SystemEnumId : draft.value.file2SystemEnumId)?.trim()
+    return sourceConfigs.value.find((config) => (
+      config.sourceConfigId === sourceConfigId.trim()
+      && (!systemEnumId || darpanSystemIdsMatch(config.systemEnumId, systemEnumId))
+      && Boolean(config.fieldOptions?.length || config.primaryIdOptions?.length)
+    )) as AutomationSystemRemoteOption | undefined ?? null
+  }
+
   return null
 }
 
@@ -736,11 +752,12 @@ const loadAbortController = new AbortController()
 
 async function ensureApiSourceOptionsLoaded(): Promise<void> {
   if (!sourceUsesApi('file1') && !sourceUsesApi('file2')) return
-  if (nsRestletConfigs.value.length || systemRemotes.value.length) return
+  if (nsRestletConfigs.value.length || systemRemotes.value.length || sourceConfigs.value.length) return
 
   const response = await reconciliationFacade.listAutomationSourceOptions(loadAbortController.signal)
   nsRestletConfigs.value = response.nsRestletConfigs ?? []
   systemRemotes.value = response.systemRemotes ?? []
+  sourceConfigs.value = response.sourceConfigs ?? []
 }
 
 /**

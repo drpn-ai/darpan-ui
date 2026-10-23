@@ -846,6 +846,260 @@ describe('RunsSettingsWorkflowPage', () => {
     expect(push).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
   })
 
+  describe('DAR-UI-064 NetSuite SuiteQL sides', () => {
+    const suiteQlSourceOptions = {
+      ok: true,
+      messages: [],
+      errors: [],
+      inputModes: [],
+      sourceTypes: [],
+      relativeWindows: [],
+      fileTypes: [],
+      systems: [],
+      savedRuns: [],
+      sftpServers: [],
+      sourceConfigs: [
+        {
+          sourceConfigId: 'NS_INVOICE_ETAIL',
+          sourceConfigType: 'NETSUITE_SUITEQL',
+          label: 'Invoices - Etail with a long query description that must truncate',
+          systemEnumId: 'NETSUITE_SUITEQL',
+          primaryIdOptions: [
+            { fieldPath: '$.records[*].tranId', label: 'tranId' },
+            { fieldPath: '$.records[*].entity', label: 'entity' },
+          ],
+        },
+        {
+          sourceConfigId: 'NS_WARRANTY_CLAIMS',
+          sourceConfigType: 'NETSUITE_SUITEQL',
+          label: 'Warranty claims',
+          systemEnumId: 'NETSUITE_SUITEQL',
+          primaryIdOptions: [{ fieldPath: '$.records[*].claimId', label: 'claimId' }],
+        },
+        {
+          sourceConfigId: 'NS_CREDIT_MEMOS',
+          sourceConfigType: 'NETSUITE_SUITEQL',
+          label: 'Credit memos',
+          systemEnumId: 'NETSUITE_SUITEQL',
+          primaryIdOptions: [{ fieldPath: '$.records[*].createdFrom', label: 'createdFrom' }],
+        },
+      ],
+      nsRestletConfigs: [],
+      systemRemotes: [],
+    }
+    const storedFilters = [{ fieldExpression: '$.records[*].status', operator: 'in', values: ['Voided'] }]
+
+    function suiteQlSide(side: 'file1' | 'file2', queryId: string, key: string) {
+      return {
+        [`${side}SystemEnumId`]: 'NETSUITE_SUITEQL',
+        [`${side}SystemLabel`]: 'NetSuite',
+        [`${side}SourceTypeEnumId`]: 'AUT_SRC_API',
+        [`${side}SourceConfigId`]: queryId,
+        [`${side}SourceConfigType`]: 'NETSUITE_SUITEQL',
+        [`${side}FileTypeEnumId`]: 'DftJson',
+        [`${side}PrimaryIdExpression`]: [key],
+      }
+    }
+
+    beforeEach(() => {
+      listAutomationSourceOptions.mockResolvedValue(suiteQlSourceOptions)
+      draftStoreState.workflowOrigin = { label: 'Run Details', path: '/reconciliation/ruleset-manager' }
+    })
+
+    it('edits a one-system SuiteQL run with no endpoint and no second side', async () => {
+      route.params.reconciliationMappingId = 'RS_INVOICE_ETAIL'
+      saveRuleSetRun.mockResolvedValueOnce({
+        ok: true,
+        messages: ['Saved.'],
+        errors: [],
+        savedRun: { savedRunId: 'RS_INVOICE_ETAIL', runName: 'Invoices - Etail key', runType: 'ruleset' },
+      })
+      draftStoreState.ruleSetDraftState = {
+        draft: {
+          savedRunId: 'RS_INVOICE_ETAIL',
+          scopeMode: 'EVALUATE',
+          runName: 'Invoices - Etail id',
+          description: 'Etail invoices with no shipment.',
+          ...suiteQlSide('file1', 'NS_INVOICE_ETAIL', '$.records[*].tranId'),
+          file2SystemEnumId: '',
+          file2FileTypeEnumId: '',
+          file2PrimaryIdExpression: [],
+          file1ExcludeFilters: storedFilters,
+          rules: [],
+        },
+        resumeStepId: 'ruleset-manager',
+      }
+      window.history.replaceState({}, '', '/settings/runs/edit/RS_INVOICE_ETAIL')
+
+      const wrapper = mount(RunsSettingsWorkflowPage)
+      await flushPromises()
+
+      // The stored name, not the description.
+      expect((wrapper.get('input[name="mappingName"]').element as HTMLInputElement).value).toBe('Invoices - Etail id')
+      expect(wrapper.text()).not.toContain('needs an API endpoint')
+      expect(wrapper.find('[data-testid="run-api-endpoint-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="run-source-2-row"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="run-schema-2"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="run-api-field-1"]').attributes('disabled')).toBeUndefined()
+
+      await wrapper.get('[data-testid="run-api-field-1"]').trigger('click')
+      const optionValues = wrapper.findAll('[data-testid="workflow-select-option"]')
+        .map((option) => option.attributes('data-option-value'))
+      expect(optionValues).toEqual(['$.records[*].tranId', '$.records[*].entity'])
+
+      await wrapper.get('input[name="mappingName"]').setValue('Invoices - Etail key')
+      expect(wrapper.get('[data-testid="save-run-settings"]').attributes('disabled')).toBeUndefined()
+      await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+      await flushPromises()
+
+      const payload = saveRuleSetRun.mock.calls[0]![0] as Record<string, unknown>
+      expect(payload).toEqual({
+        savedRunId: 'RS_INVOICE_ETAIL',
+        runName: 'Invoices - Etail key',
+        description: 'Etail invoices with no shipment.',
+        file1SystemEnumId: 'NETSUITE_SUITEQL',
+        file1SourceTypeEnumId: 'AUT_SRC_API',
+        file1SourceConfigId: 'NS_INVOICE_ETAIL',
+        file1SourceConfigType: 'NETSUITE_SUITEQL',
+        file1PrimaryIdExpression: '$.records[*].tranId',
+      })
+      expect(Object.keys(payload).filter((key) => key.startsWith('file2'))).toEqual([])
+      // Omitted, so the stored filters and rules stay as they are.
+      expect(payload).not.toHaveProperty('file1ExcludeFilters')
+      expect(payload).not.toHaveProperty('rules')
+
+      const handedBack = draftStoreState.setRuleSetDraft.mock.calls[0]![0] as Record<string, unknown>
+      expect(handedBack.scopeMode).toBe('EVALUATE')
+      expect(handedBack.file1ExcludeFilters).toEqual(storedFilters)
+      expect(handedBack.file2SystemEnumId).toBe('')
+      expect(push).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
+    })
+
+    // A seed-loaded run stores its key bare ("tranId"); the query offers $.records[*].<field>. The bare key names no root
+    // to narrow by, so the picker keeps its options (it emptied and disabled itself).
+    it('keeps the key picker usable when the stored key is bare', async () => {
+      route.params.reconciliationMappingId = 'RS_INVOICE_ETAIL'
+      draftStoreState.ruleSetDraftState = {
+        draft: {
+          savedRunId: 'RS_INVOICE_ETAIL',
+          scopeMode: 'EVALUATE',
+          runName: 'Invoices - Etail id',
+          ...suiteQlSide('file1', 'NS_INVOICE_ETAIL', 'tranId'),
+          file2SystemEnumId: '',
+          file2FileTypeEnumId: '',
+          file2PrimaryIdExpression: [],
+          rules: [],
+        },
+        resumeStepId: 'ruleset-manager',
+      }
+      window.history.replaceState({}, '', '/settings/runs/edit/RS_INVOICE_ETAIL')
+
+      const wrapper = mount(RunsSettingsWorkflowPage)
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="run-api-field-1"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('saves a two-system run with SuiteQL on both sides of the same system', async () => {
+      route.params.reconciliationMappingId = 'RS_CLAIMS_VS_MEMOS'
+      draftStoreState.ruleSetDraftState = {
+        draft: {
+          savedRunId: 'RS_CLAIMS_VS_MEMOS',
+          runName: 'Claims vs memos',
+          ...suiteQlSide('file1', 'NS_WARRANTY_CLAIMS', '$.records[*].claimId'),
+          ...suiteQlSide('file2', 'NS_CREDIT_MEMOS', '$.records[*].createdFrom'),
+        },
+        resumeStepId: 'ruleset-manager',
+      }
+      window.history.replaceState({}, '', '/settings/runs/edit/RS_CLAIMS_VS_MEMOS')
+
+      const wrapper = mount(RunsSettingsWorkflowPage)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="run-api-endpoint-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="run-api-endpoint-2"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('same system')
+
+      await wrapper.get('input[name="mappingName"]').setValue('Claims vs credit memos')
+      await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+      await flushPromises()
+
+      expect(saveRuleSetRun).toHaveBeenCalledWith({
+        savedRunId: 'RS_CLAIMS_VS_MEMOS',
+        runName: 'Claims vs credit memos',
+        description: undefined,
+        file1SystemEnumId: 'NETSUITE_SUITEQL',
+        file1SourceTypeEnumId: 'AUT_SRC_API',
+        file1SourceConfigId: 'NS_WARRANTY_CLAIMS',
+        file1SourceConfigType: 'NETSUITE_SUITEQL',
+        file1PrimaryIdExpression: '$.records[*].claimId',
+        file2SystemEnumId: 'NETSUITE_SUITEQL',
+        file2SourceTypeEnumId: 'AUT_SRC_API',
+        file2SourceConfigId: 'NS_CREDIT_MEMOS',
+        file2SourceConfigType: 'NETSUITE_SUITEQL',
+        file2PrimaryIdExpression: '$.records[*].createdFrom',
+      })
+    })
+
+    it('still refuses the very same SuiteQL query on both sides', async () => {
+      route.params.reconciliationMappingId = 'RS_SAME_QUERY'
+      draftStoreState.ruleSetDraftState = {
+        draft: {
+          savedRunId: 'RS_SAME_QUERY',
+          runName: 'Same query',
+          ...suiteQlSide('file1', 'NS_CREDIT_MEMOS', '$.records[*].createdFrom'),
+          ...suiteQlSide('file2', 'NS_CREDIT_MEMOS', '$.records[*].createdFrom'),
+        },
+        resumeStepId: 'ruleset-manager',
+      }
+
+      const wrapper = mount(RunsSettingsWorkflowPage)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Both sides use the same system.')
+      expect(wrapper.get('[data-testid="save-run-settings"]').attributes('disabled')).toBeDefined()
+    })
+
+    it('keeps the endpoint control and its requirement on a RESTlet/remote side', async () => {
+      listAutomationSourceOptions.mockResolvedValue({
+        ...suiteQlSourceOptions,
+        sourceConfigs: [
+          ...suiteQlSourceOptions.sourceConfigs,
+          { sourceConfigId: 'KREWE_OMS', sourceConfigType: 'HOTWAX_OMS_REST', label: 'Krewe OMS', systemEnumId: 'OMS' },
+        ],
+      })
+      route.params.reconciliationMappingId = 'RS_OMS_NO_ENDPOINT'
+      draftStoreState.ruleSetDraftState = {
+        draft: {
+          savedRunId: 'RS_OMS_NO_ENDPOINT',
+          runName: 'OMS vs claims',
+          file1SystemEnumId: 'OMS',
+          file1SystemLabel: 'HotWax',
+          file1SourceTypeEnumId: 'AUT_SRC_API',
+          file1SourceConfigId: 'KREWE_OMS',
+          file1SourceConfigType: 'HOTWAX_OMS_REST',
+          file1FileTypeEnumId: '',
+          file1PrimaryIdExpression: ['$.records[*].orderId'],
+          ...suiteQlSide('file2', 'NS_WARRANTY_CLAIMS', '$.records[*].claimId'),
+        },
+        resumeStepId: 'ruleset-manager',
+      }
+
+      const wrapper = mount(RunsSettingsWorkflowPage)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="run-api-endpoint-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="run-api-endpoint-2"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('HotWax needs an API endpoint.')
+      expect(wrapper.get('[data-testid="save-run-settings"]').attributes('disabled')).toBeDefined()
+    })
+  })
+
+  it('lets a long select label truncate inside its own grid cell', () => {
+    const styleSource = readFileSync('src/style.css', 'utf8')
+    expect(styleSource).toMatch(/\.workflow-form-grid--two > \.wizard-input-shell \{\s*min-width: 0;/)
+  })
+
   it('uses the shared app select controls and no page-local scoped styles', () => {
     const source = readFileSync('src/pages/settings/RunsSettingsWorkflowPage.vue', 'utf8')
 

@@ -2,6 +2,7 @@
 // This file keeps types and pure utility functions for building API payloads.
 
 import type { CreateRuleSetRunPayload, RuleSetRulePayload, SaveRuleSetRunPayload } from './api/facadeTypes'
+import type { SourceExtractOptions } from './api/authoringTypes'
 import { excludeFilterPayloadFields, type SourceExcludeFilter } from './sourceExcludeFilters'
 import { normalizeString } from './utils/strings'
 
@@ -23,6 +24,8 @@ export type ReconciliationCreateFlowStepId =
   | 'file1-api-config'
   | 'file1-api'
   | 'file1-primary-id'
+  | 'file1-duplicates'
+  | 'file1-options'
   | 'file2-system'
   | 'file2-source'
   | 'file2-endpoint'
@@ -31,6 +34,8 @@ export type ReconciliationCreateFlowStepId =
   | 'file2-api-config'
   | 'file2-api'
   | 'file2-primary-id'
+  | 'file2-duplicates'
+  | 'file2-options'
   | 'ruleset-rules'
 
 export type ReconciliationRuleSetDraftStepId = 'ruleset-manager' | ReconciliationCreateFlowStepId
@@ -71,6 +76,8 @@ export interface ReconciliationRuleSetDraft {
   file1SystemLabel?: string
   /** Family name for an endpoint-level system ("Shopify" for SHOPIFY_RETURN_REFS). See SavedRunSystemOption. */
   file1SystemParentLabel?: string
+  /** The system answered on the first card (NETSUITE for NETSUITE_SUITEQL), so a detour resumes before the endpoint is known. */
+  file1SystemParentEnumId?: string
   file1SourceTypeEnumId?: string
   file1SystemMessageRemoteId?: string
   file1SystemMessageRemoteLabel?: string
@@ -87,6 +94,7 @@ export interface ReconciliationRuleSetDraft {
   file2SystemLabel?: string
   /** Family name for an endpoint-level system ("Shopify" for SHOPIFY_RETURN_REFS). See SavedRunSystemOption. */
   file2SystemParentLabel?: string
+  file2SystemParentEnumId?: string
   file2SourceTypeEnumId?: string
   file2SystemMessageRemoteId?: string
   file2SystemMessageRemoteLabel?: string
@@ -99,6 +107,12 @@ export interface ReconciliationRuleSetDraft {
   file2SchemaLabel?: string
   file2SchemaFileName?: string
   file2PrimaryIdExpression: string[]
+  /** DAR-UI-064. FINDING reports every record under a repeated key; blank fails the run. */
+  file1DuplicateKeyHandling?: string
+  file2DuplicateKeyHandling?: string
+  /** DAR-UI-064. The side connector's declared extract options, as chosen. */
+  file1ExtractOptions?: SourceExtractOptions
+  file2ExtractOptions?: SourceExtractOptions
   file1ExcludeFilters?: SourceExcludeFilter[]
   file2ExcludeFilters?: SourceExcludeFilter[]
   rules?: ReconciliationRuleSetDraftRule[]
@@ -188,6 +202,8 @@ export function buildCreateRuleSetRunPayload(draft: ReconciliationRuleSetDraft):
   return {
     ...buildSideSourceFields('file1', draft),
     ...(singleSided ? {} : buildSideSourceFields('file2', draft)),
+    ...sideOptionPayloadFields('file1', draft),
+    ...(singleSided ? {} : sideOptionPayloadFields('file2', draft)),
     ...excludeFilterPayloadFields(draft.file1ExcludeFilters, 'file1'),
     ...(singleSided ? {} : excludeFilterPayloadFields(draft.file2ExcludeFilters, 'file2')),
     ...(rules.length ? { rules } : {}),
@@ -196,6 +212,24 @@ export function buildCreateRuleSetRunPayload(draft: ReconciliationRuleSetDraft):
     description: draft.description?.trim() || undefined,
     file1SystemEnumId: draft.file1SystemEnumId,
     ...(singleSided ? {} : { file2SystemEnumId: draft.file2SystemEnumId }),
+  }
+}
+
+/**
+ * DAR-UI-064. A side's duplicate-key handling and extract options. Only FINDING is sent (blank is the
+ * backend default, fail the run); an option left false or blank is not sent, and an empty set sends nothing.
+ */
+function sideOptionPayloadFields(side: 'file1' | 'file2', draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
+  const handling = (side === 'file1' ? draft.file1DuplicateKeyHandling : draft.file2DuplicateKeyHandling)?.trim().toUpperCase()
+  const options = Object.entries((side === 'file1' ? draft.file1ExtractOptions : draft.file2ExtractOptions) ?? {})
+    .flatMap(([name, value]): Array<[string, boolean | string]> => {
+      if (value === true) return [[name, true]]
+      if (typeof value === 'string' && value.trim()) return [[name, value.trim()]]
+      return []
+    })
+  return {
+    ...(handling === 'FINDING' ? { [`${side}DuplicateKeyHandling`]: 'FINDING' } : {}),
+    ...(options.length ? { [`${side}ExtractOptions`]: Object.fromEntries(options) } : {}),
   }
 }
 

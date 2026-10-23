@@ -45,7 +45,7 @@
             />
           </label>
 
-          <label class="wizard-input-shell">
+          <label v-if="!source1UsesSuiteQl" class="wizard-input-shell">
             <span class="workflow-context-label">{{ sourceNames.source1 }} Endpoint</span>
             <AppSelect
               v-model="source1ApiEndpointValue"
@@ -63,7 +63,7 @@
               multiple
               :disabled="!canEditTenantSettings || loading || activeSource1ApiFieldOptions.length === 0"
               :options="activeSource1ApiFieldOptions"
-              :placeholder="source1ApiEndpointValue ? `Select ${sourceNames.source1} primary ID` : 'Choose an endpoint first'"
+              :placeholder="apiPrimaryIdPlaceholder('source1')"
               test-id="run-api-field-1"
             />
           </label>
@@ -95,7 +95,7 @@
         </template>
       </div>
 
-      <div class="workflow-form-grid workflow-form-grid--two" data-testid="run-source-2-row">
+      <div v-if="!isSingleSided" class="workflow-form-grid workflow-form-grid--two" data-testid="run-source-2-row">
         <template v-if="source2UsesApi">
           <label class="wizard-input-shell">
             <span class="workflow-context-label">{{ sourceNames.source2 }} API Config</span>
@@ -108,7 +108,7 @@
             />
           </label>
 
-          <label class="wizard-input-shell">
+          <label v-if="!source2UsesSuiteQl" class="wizard-input-shell">
             <span class="workflow-context-label">{{ sourceNames.source2 }} Endpoint</span>
             <AppSelect
               v-model="source2ApiEndpointValue"
@@ -126,7 +126,7 @@
               multiple
               :disabled="!canEditTenantSettings || loading || activeSource2ApiFieldOptions.length === 0"
               :options="activeSource2ApiFieldOptions"
-              :placeholder="source2ApiEndpointValue ? `Select ${sourceNames.source2} primary ID` : 'Choose an endpoint first'"
+              :placeholder="apiPrimaryIdPlaceholder('source2')"
               test-id="run-api-field-2"
             />
           </label>
@@ -213,6 +213,10 @@ const router = useRouter()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 const SOURCE_TYPE_API = 'AUT_SRC_API'
+// A side over a saved NetSuite SuiteQL query: the config IS the query, with no endpoint behind it (as in the run builder).
+const SOURCE_CONFIG_TYPE_SUITEQL = 'NETSUITE_SUITEQL'
+// DAR-UI-064. A one-system run reads one side and has no second one to show, validate or send.
+const SCOPE_EVALUATE = 'EVALUATE'
 
 const schemas = ref<JsonSchemaSummary[]>([])
 const sourceConfigs = ref<AutomationSourceConfigOption[]>([])
@@ -236,6 +240,9 @@ const source1Schema = computed(() => schemas.value.find((schema) => schema.jsonS
 const source2Schema = computed(() => schemas.value.find((schema) => schema.jsonSchemaId === form.source2.schemaId) ?? null)
 const source1UsesApi = computed(() => sourceUsesApi('source1'))
 const source2UsesApi = computed(() => sourceUsesApi('source2'))
+const source1UsesSuiteQl = computed(() => sourceUsesSuiteQl('source1'))
+const source2UsesSuiteQl = computed(() => sourceUsesSuiteQl('source2'))
+const isSingleSided = computed(() => (ruleSetDraft.value?.scopeMode ?? '').trim().toUpperCase() === SCOPE_EVALUATE)
 const schemaOptions = computed<AppSelectOption[]>(() => (
   schemas.value.map((schema) => ({
     value: schema.jsonSchemaId,
@@ -278,10 +285,16 @@ const validationMessage = computed(() => {
   if (form.mappingName.trim().length === 0) return 'Run name is required.'
   const source1Validation = validateSource('source1')
   if (source1Validation) return source1Validation
+  if (isSingleSided.value) return sourceSystemEnumId('source1') ? null : 'The source needs an assigned reconciliation system.'
   const source2Validation = validateSource('source2')
   if (source2Validation) return source2Validation
   if (!sourceSystemEnumId('source1') || !sourceSystemEnumId('source2')) return 'Both sources need an assigned reconciliation system.'
-  if (darpanSystemIdsMatch(sourceSystemEnumId('source1'), sourceSystemEnumId('source2'))) return 'Both sides use the same system.'
+  // Both sides may read one system through different configs (NetSuite claims against NetSuite credit memos);
+  // only the very same source twice is refused, as in the run builder.
+  if (
+    darpanSystemIdsMatch(sourceSystemEnumId('source1'), sourceSystemEnumId('source2')) &&
+    form.source1.sourceConfigId.trim() === form.source2.sourceConfigId.trim()
+  ) return 'Both sides use the same system.'
   return null
 })
 const submitDisabled = computed(() => !canEditTenantSettings.value || loading.value || !!validationMessage.value)
@@ -315,6 +328,10 @@ function sourceUsesApi(sourceKey: SourceKey): boolean {
     ? ruleSetDraft.value?.file1SourceTypeEnumId
     : ruleSetDraft.value?.file2SourceTypeEnumId
   return sourceTypeEnumId?.trim() === SOURCE_TYPE_API
+}
+
+function sourceUsesSuiteQl(sourceKey: SourceKey): boolean {
+  return sourceUsesApi(sourceKey) && resolveSelectedSourceConfigType(sourceKey) === SOURCE_CONFIG_TYPE_SUITEQL
 }
 
 function sourceForm(sourceKey: SourceKey): RunSourceForm {
@@ -439,8 +456,27 @@ function selectedRemoteOptionForSource(sourceKey: SourceKey): AutomationSystemRe
   return systemRemotes.value.find(matchesRemoteAndConfig) ?? null
 }
 
+/** The query's own option row: its primaryIdOptions are the SuiteQL side's key candidates. */
+function selectedSuiteQlQueryRow(sourceKey: SourceKey): AutomationSourceConfigOption | null {
+  const source = sourceForm(sourceKey)
+  const systemEnumId = sourceSystemEnumId(sourceKey)
+  if (!source.sourceConfigId) return null
+  return sourceConfigs.value.find((config) =>
+    sourceConfigMatches(config.sourceConfigId, source.sourceConfigId) &&
+    (!config.systemEnumId || !systemEnumId || endpointMatchesSystem(config.systemEnumId, systemEnumId)),
+  ) ?? null
+}
+
+function apiPrimaryIdPlaceholder(sourceKey: SourceKey): string {
+  const ready = sourceUsesSuiteQl(sourceKey) ? Boolean(sourceForm(sourceKey).sourceConfigId) : Boolean(selectedApiEndpointValue(sourceKey))
+  if (ready) return `Select ${sourceNames.value[sourceKey]} primary ID`
+  return sourceUsesSuiteQl(sourceKey) ? 'Choose an API config first' : 'Choose an endpoint first'
+}
+
 function apiPrimaryIdOptionsForSource(sourceKey: SourceKey): AppSelectOption[] {
-  const rawOptions = selectedApiSourceOption(sourceKey)?.primaryIdOptions ?? []
+  const rawOptions = (sourceUsesSuiteQl(sourceKey)
+    ? selectedSuiteQlQueryRow(sourceKey)?.primaryIdOptions
+    : selectedApiSourceOption(sourceKey)?.primaryIdOptions) ?? []
   return rawOptions.flatMap((option: AutomationPrimaryIdOption) => {
     const fieldPath = option.fieldPath?.trim()
     if (!fieldPath) return []
@@ -497,7 +533,7 @@ function validateSource(sourceKey: SourceKey): string | null {
   if (sourceUsesApi(sourceKey)) {
     const sourceLabel = sourceNames.value[sourceKey]
     if (!source.sourceConfigId) return `${sourceLabel} needs an API config.`
-    if (!selectedApiEndpointValue(sourceKey)) return `${sourceLabel} needs an API endpoint.`
+    if (!sourceUsesSuiteQl(sourceKey) && !selectedApiEndpointValue(sourceKey)) return `${sourceLabel} needs an API endpoint.`
     if (!source.fieldPaths.length) return `${sourceLabel} needs a primary ID field.`
     return null
   }
@@ -558,15 +594,19 @@ function buildSourceKeyFields(sourceKey: SourceKey): Partial<SaveRuleSetRunPaylo
   }
 }
 
+/**
+ * Rules and exclusion filters are left off on purpose: save#RuleSetRun keeps the stored ones when they
+ * are omitted, and this page edits neither. A one-system (EVALUATE) run sends no file2 field at all.
+ */
 function buildRuleSetSavePayload(): SaveRuleSetRunPayload {
   return {
     ...buildSourceKeyFields('source1'),
-    ...buildSourceKeyFields('source2'),
+    ...(isSingleSided.value ? {} : buildSourceKeyFields('source2')),
     savedRunId: ruleSetDraft.value?.savedRunId ?? activeMappingId.value,
     runName: form.mappingName.trim(),
     description: ruleSetDraft.value?.description,
     file1SystemEnumId: sourceSystemEnumId('source1'),
-    file2SystemEnumId: sourceSystemEnumId('source2'),
+    ...(isSingleSided.value ? {} : { file2SystemEnumId: sourceSystemEnumId('source2') }),
   }
 }
 
@@ -629,7 +669,34 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
   const file1SystemEnumId = source1?.systemEnumId ?? ruleSetDraft.value?.file1SystemEnumId ?? ''
   const file2SystemEnumId = source2?.systemEnumId ?? ruleSetDraft.value?.file2SystemEnumId ?? ''
 
+  const file2Fields: Partial<ReconciliationRuleSetDraft> = {
+    file2SystemEnumId: file2SystemEnumId,
+    file2SystemLabel: source2?.systemLabel ?? ruleSetDraft.value?.file2SystemLabel,
+    file2SystemParentLabel: carriedSystemParentLabel('file2', file2SystemEnumId),
+    ...(source2UsesApi.value
+      ? {
+          file2SourceTypeEnumId: SOURCE_TYPE_API,
+          file2SystemMessageRemoteId: form.source2.systemMessageRemoteId || undefined,
+          file2SystemMessageRemoteLabel: form.source2.systemMessageRemoteId ? selectedApiSourceLabel('source2') || undefined : undefined,
+          file2NsRestletConfigId: form.source2.nsRestletConfigId || undefined,
+          file2NsRestletConfigLabel: form.source2.nsRestletConfigId ? selectedApiSourceLabel('source2') || undefined : undefined,
+          file2SourceConfigId: form.source2.sourceConfigId || undefined,
+          file2SourceConfigType: form.source2.sourceConfigType || resolveSelectedSourceConfigType('source2') || undefined,
+          file2FileTypeEnumId: '',
+        }
+      : {
+          file2FileTypeEnumId: 'DftJson',
+          file2JsonSchemaId: source2?.jsonSchemaId,
+          file2SchemaLabel: source2 ? resolveSchemaLabel(source2) : ruleSetDraft.value?.file2SchemaLabel,
+          file2SchemaFileName: source2?.schemaName,
+        }),
+    file2PrimaryIdExpression,
+  }
+
+  // Spread the draft this page opened with first: scopeMode, exclusion filters and side options are not
+  // edited here, and the run details page reads them off this draft (an EVALUATE run keeps its empty file2).
   return {
+    ...(ruleSetDraft.value ?? {}),
     savedRunId: ruleSetDraft.value?.savedRunId ?? activeMappingId.value,
     runName: savedRunName,
     description: ruleSetDraft.value?.description,
@@ -654,27 +721,10 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
           file1SchemaFileName: source1?.schemaName,
         }),
     file1PrimaryIdExpression,
-    file2SystemEnumId: file2SystemEnumId,
-    file2SystemLabel: source2?.systemLabel ?? ruleSetDraft.value?.file2SystemLabel,
-    file2SystemParentLabel: carriedSystemParentLabel('file2', file2SystemEnumId),
-    ...(source2UsesApi.value
-      ? {
-          file2SourceTypeEnumId: SOURCE_TYPE_API,
-          file2SystemMessageRemoteId: form.source2.systemMessageRemoteId || undefined,
-          file2SystemMessageRemoteLabel: form.source2.systemMessageRemoteId ? selectedApiSourceLabel('source2') || undefined : undefined,
-          file2NsRestletConfigId: form.source2.nsRestletConfigId || undefined,
-          file2NsRestletConfigLabel: form.source2.nsRestletConfigId ? selectedApiSourceLabel('source2') || undefined : undefined,
-          file2SourceConfigId: form.source2.sourceConfigId || undefined,
-          file2SourceConfigType: form.source2.sourceConfigType || resolveSelectedSourceConfigType('source2') || undefined,
-          file2FileTypeEnumId: '',
-        }
-      : {
-          file2FileTypeEnumId: 'DftJson',
-          file2JsonSchemaId: source2?.jsonSchemaId,
-          file2SchemaLabel: source2 ? resolveSchemaLabel(source2) : ruleSetDraft.value?.file2SchemaLabel,
-          file2SchemaFileName: source2?.schemaName,
-        }),
-    file2PrimaryIdExpression,
+    file2SystemEnumId: ruleSetDraft.value?.file2SystemEnumId ?? '',
+    file2FileTypeEnumId: ruleSetDraft.value?.file2FileTypeEnumId ?? '',
+    file2PrimaryIdExpression: ruleSetDraft.value?.file2PrimaryIdExpression ?? [],
+    ...(isSingleSided.value ? {} : file2Fields),
     rules: ruleSetDraft.value?.rules,
   }
 }
@@ -718,7 +768,9 @@ function buildFieldOptions(schemaId: string): AppSelectOption[] {
 
 function restrictToSharedRecordRoot(options: AppSelectOption[], chosenFieldPaths: string[]): AppSelectOption[] {
   const reference = chosenFieldPaths[0]
-  if (!reference) return options
+  // DAR-UI-064: a bare stored key (a seed-loaded run's "tranId") names no record root to share; narrowing by it emptied
+  // the list and disabled the picker.
+  if (!reference || !reference.trim().startsWith('$')) return options
   return options.filter((option) => fieldSharesRecordRoot(option.value, reference))
 }
 

@@ -55,6 +55,19 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
+    // DAR-UI-064. A NetSuite run side's SuiteQL query, reached from the side picker; ?returnTo and ?side bring it back.
+    path: '/reconciliation/queries/new',
+    name: 'reconciliation-netsuite-query-create',
+    component: () => import('../pages/reconciliation/NetSuiteQueryWorkflowPage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
+    path: '/reconciliation/queries/:queryId/edit',
+    name: 'reconciliation-netsuite-query-edit',
+    component: () => import('../pages/reconciliation/NetSuiteQueryWorkflowPage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
     // DAR-UI-049. One Create Run: pick Sync or Lifecycle, then the create flow for that type.
     path: '/reconciliation/new',
     name: 'run-create',

@@ -76,7 +76,9 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
   return {
     savedRunId: row.savedRunId,
     scopeMode: row.scopeMode,
-    runName: savedRunName(row),
+    // DAR-UI-064: the STORED name. savedRunName is the display label and prefers the description, so a draft built from
+    // it saved every edited run back under its description (found renaming gorjana's "Invoices - Etail id").
+    runName: normalizeStringOrEmpty(row.runName) || savedRunName(row),
     description: row.description,
     file1SystemEnumId: file1Option.enumId,
     file1SystemLabel: file1Option.label || file1Option.description || file1Option.enumCode,

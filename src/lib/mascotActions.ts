@@ -141,6 +141,67 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Run audit',
     body: 'asks which days, then runs every check of this audit over them. Findings land as each check finishes; nothing waits for the morning run.',
   },
+  // DAR-UI-064. The audit authoring editors.
+  'add statement': {
+    title: 'Add statement',
+    body: 'links this check to one more statement. One run often proves several: returns against credit memos covers R4, R7 and R8 at once.',
+  },
+  'money': {
+    title: 'Money',
+    body: 'say the expected and actual amounts are money, in which currency, and where each comes from. Findings then show the difference to the cent.',
+  },
+  'remove': {
+    title: 'Remove',
+    body: 'takes it out. For a check, it unlinks from this audit; the check itself stays if its findings or another audit still name it.',
+  },
+  'keep': {
+    title: 'Keep',
+    body: 'changed your mind. Nothing is removed.',
+  },
+  'new conclusion': {
+    title: 'New conclusion',
+    body: 'names a new answer for your findings, e.g. \'RMA still open\'. It is yours alone: no other company sees it.',
+  },
+  'move up': {
+    title: 'Move up',
+    body: 'conclusions are tried top to bottom and the first that holds wins, so order is the decision. Its children move with it.',
+  },
+  'move down': {
+    title: 'Move down',
+    body: 'conclusions are tried top to bottom and the first that holds wins, so order is the decision. Its children move with it.',
+  },
+  'add child conclusion': {
+    title: 'Add child conclusion',
+    body: 'refines a conclusion once it holds: a cancelled return with an open RMA, and then whether that RMA is still waiting for its receipt. Three levels deep at most.',
+  },
+  'add': {
+    title: 'Add',
+    body: 'adds what you typed. Nothing is saved until you save.',
+  },
+  'add condition': {
+    title: 'Add condition',
+    body: 'every condition of a conclusion must hold. Say what it checks in words: that line is what a finding shows as its proof.',
+  },
+  'add conclusion': {
+    title: 'Add conclusion',
+    body: 'a new top-level answer, tried after the ones above it. Pick which rows it applies to, then the conditions that prove it.',
+  },
+  'add match rule': {
+    title: 'Add match rule',
+    body: 'narrows the query inside NetSuite, so only the records you mean ever leave it. A wrong value does not fail; it reads a different population, so preview first.',
+  },
+  'add column': {
+    title: 'Add column',
+    body: 'one field of each record: a column, one function with a name (ABS(foreigntotal) AS amount), or a macro like ACCOUNT_USED(42065).',
+  },
+  'preview': {
+    title: 'Preview',
+    body: 'runs the query against NetSuite for one day and shows the first rows and the exact SQL. Nothing is saved; it is how a typo shows before it becomes a run.',
+  },
+  'add check': {
+    title: 'Add check',
+    body: 'ties a run to this statement: which of its rows break it, who fixes them and where. The audit schedules the run on its next play.',
+  },
   'audit settings': {
     title: 'Audit settings',
     body: 'the name, the daily schedule all its checks share, and each statement in its own words. A statement turned off drops out and stops raising findings.',

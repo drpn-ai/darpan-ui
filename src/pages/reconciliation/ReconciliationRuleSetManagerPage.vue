@@ -175,6 +175,11 @@
       </template>
     </StaticPageSection>
 
+    <!-- DAR-UI-064 (S3): what each row of this run is concluded to be. Edited in place; it saves on its own. -->
+    <StaticPageSection v-if="draft && savedRunId && canEditTenantSettings" title="Conclusions" data-testid="ruleset-manager-conclusions">
+      <RunConclusionsEditor :saved-run-id="savedRunId" :file1-label="file1Title" :file2-label="file2Title" />
+    </StaticPageSection>
+
     <template #actions>
       <div class="action-row ruleset-manager-footer-row">
         <RouterLink
@@ -295,6 +300,7 @@ import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import RunConclusionsEditor from '../../components/reconciliation/RunConclusionsEditor.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'

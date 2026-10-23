@@ -13,6 +13,7 @@ const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
 const getShopifyAuthConfig = vi.hoisted(() => vi.fn())
 const listSourceConfigEndpoints = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
+const getRunConclusions = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     activeTenantUserGroupId: 'tenant-a',
@@ -53,6 +54,10 @@ vi.mock('../../../lib/api/facade', () => ({
     getShopifyAuthConfig,
     listSourceConfigEndpoints,
   },
+}))
+
+vi.mock('../../../lib/api/authoringFacade', () => ({
+  runConclusionFacade: { get: getRunConclusions, save: vi.fn() },
 }))
 
 vi.mock('../../../stores/auth', () => ({
@@ -203,6 +208,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
     // endpoint rows; every other test that happens to mount the page never calls this.
     listSourceConfigEndpoints.mockResolvedValue({ ok: true, messages: [], errors: [], endpoints: [] })
     routerPush.mockReset()
+    getRunConclusions.mockReset()
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: null })
     permissionState.canRunActiveTenantReconciliation = true
     permissionState.canEditTenantSettings = true
     permissionState.canManageGlobalSettings = false
@@ -912,6 +919,38 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(wrapper.text()).not.toContain('Shopify Orders - SHOPIFY - Primary ID')
     expect(wrapper.text()).not.toContain('Krewe OMS Orders - OMS - Primary ID')
     expect(wrapper.text()).not.toContain('orders-reconciliation-prod-2026-03-01-to-2026-03-31-2026-04-09-04-55-22')
+  })
+
+  it('edits the saved run\'s conclusions in their own section (DAR-UI-064)', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      conclusions: {
+        savedRunId: 'RS_ORDER_SYNC', scopeMode: 'COMPARE', conclusions: [], catalog: [],
+        buckets: [], operators: [], presence: [], keyScopes: [], quantifiers: [],
+      },
+    })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const section = wrapper.get('[data-testid="ruleset-manager-conclusions"]')
+    expect(section.text()).toContain('Conclusions')
+    expect(section.find('[data-testid="run-conclusions-editor"]').exists()).toBe(true)
+    expect(getRunConclusions).toHaveBeenCalledWith('RS_ORDER_SYNC', expect.any(AbortSignal))
+  })
+
+  it('offers no conclusions editor to a user who cannot edit the run', async () => {
+    permissionState.canEditTenantSettings = false
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ruleset-manager-conclusions"]').exists()).toBe(false)
+    expect(getRunConclusions).not.toHaveBeenCalled()
   })
 
   it('allows tenant users to run a saved ruleset without edit or delete actions', async () => {

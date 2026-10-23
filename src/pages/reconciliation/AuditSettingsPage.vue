@@ -102,6 +102,24 @@
                 <span v-else :data-testid="`audit-settings-check-${check.id}`">{{ check.label }}</span>
               </li>
             </ul>
+            <!-- DAR-UI-064: add a check to this statement. -->
+            <AuditCheckEditor
+              v-if="addingCheckFor === statement.code"
+              class="audit-settings-add-check"
+              :audit="auditCode"
+              :statement="statement.code"
+              @saved="void checkAdded()"
+              @cancel="addingCheckFor = null"
+            />
+            <button
+              v-else
+              type="button"
+              class="ghost-btn audit-settings-add-check"
+              :data-testid="`audit-settings-add-check-${statement.code}`"
+              @click="addingCheckFor = statement.code"
+            >
+              Add check
+            </button>
           </div>
         </div>
       </div>
@@ -112,6 +130,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AuditCheckEditor from '../../components/audit/AuditCheckEditor.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -167,6 +186,20 @@ function show(settings: AuditSettings) {
   scheduleTime.value = settings.schedule.time
   scheduleTimeZone.value = settings.schedule.timeZone
   statements.value = settings.statements.map((statement) => ({ ...statement, checks: [...statement.checks] }))
+}
+
+// DAR-UI-064: after a check is added, refetch only the check lists, so unsaved edits to the name, statements or
+// schedule stay on the page.
+const addingCheckFor = ref<string | null>(null)
+async function checkAdded() {
+  addingCheckFor.value = null
+  try {
+    const response = await auditFacade.getAuditSettings({ audit: auditCode.value }, abort.signal)
+    const fresh = new Map((response.settings?.statements ?? []).map((statement) => [statement.id, statement.checks]))
+    statements.value = statements.value.map((statement) => ({ ...statement, checks: [...(fresh.get(statement.id) ?? statement.checks)] }))
+  } catch (caught) {
+    if (!abort.signal.aborted) error.value = message(caught)
+  }
 }
 
 async function load() {
@@ -314,6 +347,14 @@ onMounted(() => {
   resize: vertical;
 }
 
+/* DAR-UI-064: the add-check form and its button span the statement's text and toggle columns, like its checks. */
+.audit-settings-add-check {
+  grid-column: 2 / -1;
+  justify-self: stretch;
+}
+button.audit-settings-add-check {
+  justify-self: start;
+}
 .audit-settings-checks {
   grid-column: 2 / -1;
   display: grid;
