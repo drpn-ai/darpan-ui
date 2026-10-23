@@ -8,13 +8,18 @@ const { route, replace } = vi.hoisted(() => ({
 vi.mock('vue-router', async () => {
   const { reactive: r } = await import('vue')
   const reactiveRoute = r(route)
-  return { useRoute: () => reactiveRoute, useRouter: () => ({ replace }) }
+  return {
+    useRoute: () => reactiveRoute,
+    useRouter: () => ({ replace }),
+    RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' },
+  }
 })
 vi.mock('../../../lib/api/facade', () => ({
   auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAudits: vi.fn() },
 }))
 
 import { useRoute } from 'vue-router'
+import { WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
 import { auditFacade } from '../../../lib/api/facade'
 import AuditReportPage from '../AuditReportPage.vue'
 import type { AuditReport } from '../../../lib/api/auditTypes'
@@ -182,6 +187,68 @@ describe('AuditReportPage', () => {
     liveRoute.query = { period: '2026-09' }
     await flushPromises()
     expect(f.getAuditReport).toHaveBeenLastCalledWith({ audit: 'month-close', period: '2026-09' }, expect.anything())
+  })
+
+  it('carries play and the settings gear, each opening its own page for this audit', async () => {
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    // Beside the name, so a long audit cannot push them below the fold.
+    expect(w.get('.audit-hero-title').find('[data-testid="audit-run-button"]').exists()).toBe(true)
+    const play = w.get('[data-testid="audit-run-button"]')
+    expect(play.attributes('aria-label')).toBe('Run audit')
+    expect(JSON.parse(play.attributes('data-to') ?? '{}')).toEqual({ name: 'audit-run-start', params: { audit: 'month-close' }, query: {} })
+    const gear = w.get('[data-testid="audit-settings-button"]')
+    expect(gear.attributes('aria-label')).toBe('Audit settings')
+    expect(JSON.parse(gear.attributes('data-to') ?? '{}')).toEqual({ name: 'audit-settings', params: { audit: 'month-close' }, query: {} })
+  })
+
+  // DAR-UI-063. A played range is said beside the period, so the findings are not read as the whole month's.
+  it('says which days the checks read when a person played a range, and nothing when they read the period', async () => {
+    const played = report()
+    for (const category of Object.values(played.categories)) {
+      for (const statement of Object.values(category.statements)) {
+        statement.checks = statement.checks.map((check) => ({ ...check, window: { from: '2026-10-01', thru: '2026-10-05' } }))
+      }
+    }
+    f.getAuditReport.mockResolvedValue({ ok: true, report: played } as never)
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.get('[data-testid="audit-window"]').text()).toBe('2026-10-01 to 2026-10-08 · read 2026-10-01 to 2026-10-05')
+
+    const morning = report()
+    for (const category of Object.values(morning.categories)) {
+      for (const statement of Object.values(category.statements)) {
+        statement.checks = statement.checks.map((check) => ({ ...check, window: { from: '2026-10-01', thru: '2026-10-08' } }))
+      }
+    }
+    f.getAuditReport.mockResolvedValue({ ok: true, report: morning } as never)
+    const w2 = mount(AuditReportPage)
+    await flushPromises()
+    expect(w2.get('[data-testid="audit-window"]').text()).toBe('2026-10-01 to 2026-10-08')
+  })
+
+  it('hands the period and date on, so coming back shows the same morning, but not the open finding', async () => {
+    liveRoute.query = { period: '2026-09', date: '2026-09-30', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    const query = { period: '2026-09', date: '2026-09-30' }
+    expect(JSON.parse(w.get('[data-testid="audit-run-button"]').attributes('data-to') ?? '{}').query).toEqual(query)
+    expect(JSON.parse(w.get('[data-testid="audit-settings-button"]').attributes('data-to') ?? '{}').query).toEqual(query)
+  })
+
+  it('says once in the top pill that a run it started is under way', async () => {
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail.message)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    window.history.replaceState({ startedAudit: true }, '')
+    mount(AuditReportPage)
+    await flushPromises()
+    expect(heard).toEqual(['Running. Findings arrive as each check finishes.'])
+    expect((window.history.state as { startedAudit?: boolean }).startedAudit).toBeFalsy()
+    mount(AuditReportPage)
+    await flushPromises()
+    expect(heard).toHaveLength(1)
+    document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
   })
 
   it('says so in words when the audit does not exist', async () => {

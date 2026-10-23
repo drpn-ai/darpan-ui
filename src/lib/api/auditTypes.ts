@@ -61,6 +61,8 @@ export interface AuditStatementCheck {
   matchedBy: string | null
   graceDays: number | null
   compared: Record<string, number> | null
+  /** DAR-UI-063. The days this morning's run read: the period to date, or the days a person played. */
+  window?: { from: string; thru: string } | null
 }
 
 export interface AuditFindingSummary {
@@ -183,4 +185,64 @@ export interface GetAuditReportResponse extends AuditEnvelope {
 
 export interface GetAuditFindingResponse extends AuditEnvelope {
   finding?: AuditFindingDocument | null
+}
+
+// DAR-UI-063. The audit's settings gear and play button (facade.AuditFacadeServices get#/save#AuditSettings, run#Audit).
+export interface AuditSettingsCheck {
+  id: string
+  label: string
+  savedRunId: string | null
+  runName: string | null
+}
+
+export interface AuditSettingsStatement {
+  id: string
+  code: string
+  text: string
+  active: boolean
+  checks: AuditSettingsCheck[]
+}
+
+export interface AuditSchedule {
+  active: boolean
+  /** HH:mm, 24-hour. */
+  time: string
+  timeZone: string
+  /** The checks' automations do not agree on time, zone or on/off; saving sets them all. */
+  mixed: boolean
+  automations: number
+  checksWithoutRun: number
+}
+
+export interface AuditSettings {
+  audit: { id: string; name: string; period: string | null }
+  /** The earliest day a play can record today, YYYY-MM-DD. */
+  playableFrom?: string | null
+  schedule: AuditSchedule
+  statements: AuditSettingsStatement[]
+}
+
+export interface GetAuditSettingsResponse extends AuditEnvelope {
+  settings?: AuditSettings | null
+}
+
+export interface SaveAuditSettingsPayload {
+  audit: string
+  name?: string
+  statements?: Array<{ id: string; text?: string; active?: boolean }>
+  schedule?: { active: boolean; time: string; timeZone: string }
+}
+
+export type SaveAuditSettingsResponse = GetAuditSettingsResponse
+
+export interface RunAuditPayload {
+  audit: string
+  /** First day, YYYY-MM-DD. */
+  fromDate: string
+  /** Last day, YYYY-MM-DD, inclusive. */
+  thruDate: string
+}
+
+export interface RunAuditResponse extends AuditEnvelope {
+  runs?: Array<{ automationId: string | null; savedRunId: string | null; submitted: boolean; error: string | null }>
 }

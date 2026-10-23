@@ -23,6 +23,8 @@ export interface UseCalendarWidgetOptions {
   onRangeConfirmed?: (range: CalendarRange) => void
   // The latest day a range may include; today when left out. A lifecycle built from stages stops short of it.
   lastPickableDate?: () => Date
+  // The earliest day a range may include; none when left out. An audit plays only days its periods still record.
+  firstPickableDate?: () => Date | null
 }
 
 export interface UseCalendarWidget {
@@ -62,6 +64,10 @@ export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCa
   const selecting = ref<CalendarSelectionSide>('start')
   const visibleMonth = ref<Date>(getDefaultVisibleMonth())
   const lastPickableTime = () => startOfLocalDay(options.lastPickableDate?.() ?? new Date()).getTime()
+  const firstPickableTime = () => {
+    const first = options.firstPickableDate?.()
+    return first ? startOfLocalDay(first).getTime() : Number.NEGATIVE_INFINITY
+  }
 
   const startDateValue = computed(() => parseDateInput(startDate.value))
   const endDateValue = computed(() => parseDateInput(endDate.value))
@@ -76,6 +82,7 @@ export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCa
     if (!start || !end) return null
     if (start.getTime() > end.getTime()) return null
     if (start.getTime() > lastPickableTime() || end.getTime() > lastPickableTime()) return null
+    if (start.getTime() < firstPickableTime()) return null
 
     return {
       startDate: start,
@@ -98,7 +105,8 @@ export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCa
   }
 
   function isDateDisabled(date: Date): boolean {
-    return startOfLocalDay(date).getTime() > lastPickableTime()
+    const time = startOfLocalDay(date).getTime()
+    return time > lastPickableTime() || time < firstPickableTime()
   }
 
   function isCellDisabled(cell: CalendarCell): boolean {

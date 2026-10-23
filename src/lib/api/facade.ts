@@ -1,5 +1,14 @@
 import { callService } from './client'
-import type { GetAuditFindingResponse, GetAuditReportResponse, GetAuditsResponse } from './auditTypes'
+import type {
+  GetAuditFindingResponse,
+  GetAuditReportResponse,
+  GetAuditSettingsResponse,
+  GetAuditsResponse,
+  RunAuditPayload,
+  RunAuditResponse,
+  SaveAuditSettingsPayload,
+  SaveAuditSettingsResponse,
+} from './auditTypes'
 
 // Cache-reset coordinator. The actual reset implementation is wired up in
 // main.ts after Pinia is installed, so this module stays free of store
@@ -508,6 +517,9 @@ const AUDIT = {
   getAudits: 'facade.AuditFacadeServices.get#Audits',
   getAuditReport: 'facade.AuditFacadeServices.get#AuditReport',
   getAuditFinding: 'facade.AuditFacadeServices.get#AuditFinding',
+  getAuditSettings: 'facade.AuditFacadeServices.get#AuditSettings',
+  saveAuditSettings: 'facade.AuditFacadeServices.save#AuditSettings',
+  runAudit: 'facade.AuditFacadeServices.run#Audit',
 }
 
 export const auditFacade = {
@@ -519,6 +531,16 @@ export const auditFacade = {
   },
   getAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<GetAuditFindingResponse> {
     return callService<GetAuditFindingResponse>(AUDIT.getAuditFinding, payload, signal)
+  },
+  // DAR-UI-063. The settings gear and play button. save# and run# are writes, so callService drops the read cache.
+  getAuditSettings(payload: { audit: string }, signal?: AbortSignal): Promise<GetAuditSettingsResponse> {
+    return callService<GetAuditSettingsResponse>(AUDIT.getAuditSettings, payload, signal)
+  },
+  saveAuditSettings(payload: SaveAuditSettingsPayload, signal?: AbortSignal): Promise<SaveAuditSettingsResponse> {
+    return callService<SaveAuditSettingsResponse>(AUDIT.saveAuditSettings, payload, signal)
+  },
+  runAudit(payload: RunAuditPayload, signal?: AbortSignal): Promise<RunAuditResponse> {
+    return callService<RunAuditResponse>(AUDIT.runAudit, payload, signal)
   },
 }
 

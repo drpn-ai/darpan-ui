@@ -45,6 +45,9 @@ describe('router release scope', () => {
     { name: 'reconciliation-run-live', path: '/reconciliation/run-live/:savedRunId/:runResultId', surfaceMode: 'static', staticPageLabel: 'Run Progress' },
     { name: 'reconciliation-run-history', path: '/reconciliation/run-history/:savedRunId', surfaceMode: 'static' },
     { name: 'hub', path: '/', surfaceMode: 'static' },
+    { name: 'audit-report', path: '/audits/:audit', surfaceMode: 'static', staticPageLabel: 'Audit' },
+    { name: 'audit-run-start', path: '/audits/:audit/run', surfaceMode: 'workflow' },
+    { name: 'audit-settings', path: '/audits/:audit/settings', surfaceMode: 'workflow' },
   ]
 
   it.each(expectedRoutes)('registers $name at $path', ({ name, path, surfaceMode, staticPageLabel, redirect }) => {
@@ -54,6 +57,16 @@ describe('router release scope', () => {
     if (surfaceMode) expect(route?.meta.surfaceMode).toBe(surfaceMode)
     if (staticPageLabel) expect(route?.meta.staticPageLabel).toBe(staticPageLabel)
     if (redirect) expect(route?.redirect).toBeTruthy()
+  })
+
+  // DAR-UI-063. The audit's play and settings change things, so they need edit access, as a lifecycle's do.
+  it.each(['audit-run-start', 'audit-settings'])('%s resolves past the audit page and needs tenant edit access', (name) => {
+    const suffix = name === 'audit-run-start' ? 'run' : 'settings'
+    const resolved = router.resolve(`/audits/month-close/${suffix}`)
+    expect(resolved.name).toBe(name)
+    expect(resolved.params.audit).toBe('month-close')
+    expect(resolved.meta.requiresTenantEdit).toBe(true)
+    expect(resolved.meta.tenantEditRedirectName).toBe('settings-runs')
   })
 
   it.each([

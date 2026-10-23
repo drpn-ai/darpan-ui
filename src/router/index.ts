@@ -94,6 +94,20 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Run' },
   },
   {
+    // DAR-UI-063. An audit's play: which days, then every check runs over them. Declared before /audits/:audit.
+    path: '/audits/:audit/run',
+    name: 'audit-run-start',
+    component: () => import('../pages/reconciliation/AuditRunStartPage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
+    // DAR-UI-063. An audit's settings gear: its name, schedule and statements.
+    path: '/audits/:audit/settings',
+    name: 'audit-settings',
+    component: () => import('../pages/reconciliation/AuditSettingsPage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
     // DAR-UI-058. An audit run's report; ?period, ?date and ?finding pick what it shows.
     path: '/audits/:audit',
     name: 'audit-report',

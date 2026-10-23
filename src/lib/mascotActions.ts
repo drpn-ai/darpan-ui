@@ -136,6 +136,20 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Run settings',
     body: 'opens the saved run behind this history. Changing it changes what future runs compare and leaves every past one alone.',
   },
+  // DAR-UI-063. An audit's own play and gear, beside its name.
+  'run audit': {
+    title: 'Run audit',
+    body: 'asks which days, then runs every check of this audit over them. Findings land as each check finishes; nothing waits for the morning run.',
+  },
+  'audit settings': {
+    title: 'Audit settings',
+    body: 'the name, the daily schedule all its checks share, and each statement in its own words. A statement turned off drops out and stops raising findings.',
+  },
+  // DAR-UI-063. The audit settings page.
+  'daily schedule': {
+    title: 'Daily schedule',
+    body: 'pauses or resumes every check of this audit at once. A paused check keeps its findings; it just stops looking for new ones.',
+  },
   'delete run': {
     title: 'Delete run',
     body: 'removes the saved setup for good. Results it already produced stay where they are; nothing new can be run from it.',
@@ -558,6 +572,14 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^.+ is a finding$/, {
     title: 'Finding',
     body: 'says whether this place\u2019s records count toward Findings. A place that is not a finding still shows its records, quietly.',
+  }],
+  [/^check statement .+$/, {
+    title: 'Statement',
+    body: 'off leaves the statement out of the audit from its next run. Its findings so far stay on record.',
+  }],
+  [/^open rules for .+$/, {
+    title: 'Open rules',
+    body: 'goes to the run this check reads. A rule changed there changes this check from its next run, and every other check on that run.',
   }],
   [/^stop showing .+$/, {
     title: 'Stop showing',

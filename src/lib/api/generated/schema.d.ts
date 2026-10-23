@@ -1014,6 +1014,42 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetAuditReportResult"];
         };
+        /**
+         * @description An audit's settings: its name, the daily schedule its checks run on, and each statement with its
+         *                 checks and the run each check reads.
+         */
+        GetAuditSettingsParams: {
+            /** @description The audit's code. */
+            audit: string;
+        };
+        GetAuditSettingsResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            /**
+             * @description {audit: {id, name, period}, playableFrom: YYYY-MM-DD (the earliest
+             *                     day play can record today), schedule: {active, time HH:mm,
+             *                     timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label,
+             *                     savedRunId, runName}]}]}
+             */
+            settings?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditSettings */
+        GetAuditSettingsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /** @constant */
+            method: "facade.AuditFacadeServices.get#AuditSettings";
+            params?: components["schemas"]["GetAuditSettingsParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuditFacadeServices.get#AuditSettings. Check result.ok / result.errors for business failures. */
+        GetAuditSettingsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetAuditSettingsResult"];
+        };
         /** @description The active tenant's audits: id (the audit's code), name and the period it reports by. */
         GetAuditsParams: Record<string, never>;
         GetAuditsResult: {
@@ -1046,6 +1082,85 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["GetAuditsResult"];
+        };
+        /**
+         * @description Play: runs every check of the audit now over the days picked, first to last inclusive (the tenant's zone),
+         *                 recording findings as the morning run does. Submitted to the background, one automation per run; the audit page
+         *                 shows the results as each finishes. Refused up front for days in the future or in a period that ended and was
+         *                 not extended.
+         */
+        RunAuditParams: {
+            /** @description The audit's code. */
+            audit: string;
+            /** @description First day, YYYY-MM-DD. */
+            fromDate: string;
+            /** @description Last day, YYYY-MM-DD, inclusive. */
+            thruDate: string;
+        };
+        RunAuditResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            /** @description [{automationId, savedRunId, submitted, error}] */
+            runs?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.AuditFacadeServices.run#Audit */
+        RunAuditRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /** @constant */
+            method: "facade.AuditFacadeServices.run#Audit";
+            params?: components["schemas"]["RunAuditParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuditFacadeServices.run#Audit. Check result.ok / result.errors for business failures. */
+        RunAuditResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RunAuditResult"];
+        };
+        /**
+         * @description Changes an audit's name, statements (text, on/off) and the daily schedule of every check it runs. A check
+         *                 whose run has no automation gets one (paused) when the schedule is saved. Answers the settings as saved.
+         */
+        SaveAuditSettingsParams: {
+            /** @description The audit's code. */
+            audit: string;
+            /** @description New name; blank keeps it. */
+            name?: string;
+            /** @description [{id, text, active}], only those that changed. */
+            statements?: string[];
+            /** @description {active, time HH:mm, timeZone}; absent keeps it. */
+            schedule?: Record<string, never>;
+        };
+        SaveAuditSettingsResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            /**
+             * @description {audit: {id, name, period}, playableFrom: YYYY-MM-DD (the earliest
+             *                     day play can record today), schedule: {active, time HH:mm,
+             *                     timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label,
+             *                     savedRunId, runName}]}]}
+             */
+            settings?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.AuditFacadeServices.save#AuditSettings */
+        SaveAuditSettingsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /** @constant */
+            method: "facade.AuditFacadeServices.save#AuditSettings";
+            params?: components["schemas"]["SaveAuditSettingsParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuditFacadeServices.save#AuditSettings. Check result.ok / result.errors for business failures. */
+        SaveAuditSettingsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveAuditSettingsResult"];
         };
         /**
          * @description Change the password of an account that cannot sign in until it is changed, without a session.

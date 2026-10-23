@@ -1,10 +1,38 @@
 <template>
   <StaticPageFrame>
     <template #hero>
-      <h1>{{ report?.report.audit.name || 'Audit' }}</h1>
+      <!-- DAR-UI-063. Play and the settings gear beside the name, where a long audit cannot push them out of sight. -->
+      <div class="audit-hero-title">
+        <h1>{{ report?.report.audit.name || 'Audit' }}</h1>
+        <div class="action-row audit-hero-actions">
+          <RouterLink
+            :to="{ name: 'audit-run-start', params: { audit: auditCode }, query: carriedQuery }"
+            class="app-icon-action app-icon-action--large"
+            aria-label="Run audit"
+            title="Run audit"
+            data-testid="audit-run-button"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
+            </svg>
+          </RouterLink>
+          <RouterLink
+            :to="{ name: 'audit-settings', params: { audit: auditCode }, query: carriedQuery }"
+            class="app-icon-action app-icon-action--large"
+            aria-label="Audit settings"
+            title="Audit settings"
+            data-testid="audit-settings-button"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path :d="settingsIconPath" />
+            </svg>
+          </RouterLink>
+        </div>
+      </div>
       <RunTypeBadge v-if="report" type="audit" :detail="report.report.period" />
       <p v-if="report" class="static-page-section-description" data-testid="audit-window">
-        {{ report.report.window.from }} to {{ report.report.window.thru }}
+        {{ report.report.window.from }} to {{ report.report.window.thru }}<template v-if="readWindow"> · read {{ readWindow.from }} to {{ readWindow.thru }}</template>
       </p>
     </template>
 
@@ -154,8 +182,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
@@ -164,6 +192,8 @@ import AppTableFrame from '../../components/ui/AppTableFrame.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
 import { auditFacade } from '../../lib/api/facade'
+import { playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
+import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
 import type { AuditFindingDocument, AuditReport } from '../../lib/api/auditTypes'
 import {
   ageLabel,
@@ -200,6 +230,15 @@ onBeforeUnmount(() => abort.abort())
 
 const auditCode = computed(() => String(route.params.audit ?? ''))
 const findingId = computed(() => (typeof route.query.finding === 'string' ? route.query.finding : ''))
+// The morning on show, handed to the run and settings pages so they return to it; an open finding is not.
+const carriedQuery = computed(() => {
+  const query: Record<string, string> = {}
+  for (const key of ['period', 'date']) {
+    const value = route.query[key]
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  return query
+})
 
 const health = computed(() => (report.value ? healthBadge(report.value) : { label: '', tone: 'neutral' as const }))
 const sources = computed(() => (report.value ? sourceRows(report.value) : []))
@@ -221,6 +260,19 @@ const counts = computed(() => {
   ]
 })
 const periods = computed(() => periodOptions(report.value?.report.period))
+// DAR-UI-063. When every check this morning read the same days and they are not the period to date (a person played
+// a range), say which: the window above is the period's, the findings are from those days.
+const readWindow = computed(() => {
+  const doc = report.value
+  if (!doc) return null
+  const windows = Object.values(doc.categories ?? {}).flatMap((category) =>
+    Object.values(category.statements ?? {}).flatMap((statement) => statement.checks ?? []))
+    .map((check) => check.window).filter((window): window is { from: string; thru: string } => Boolean(window))
+  const distinct = [...new Set(windows.map((w) => `${w.from}|${w.thru}`))]
+  if (distinct.length !== 1) return null
+  const [from, thru] = distinct[0]!.split('|')
+  return from === doc.report.window.from && thru === doc.report.window.thru ? null : { from: from!, thru: thru! }
+})
 const categories = computed(() =>
   Object.entries(report.value?.categories ?? {}).map(([id, category]) => ({
     id,
@@ -345,4 +397,26 @@ watch(findingId, () => void loadFinding(), { immediate: true })
 // The finding opens below the categories: bring it to the reader when it appears, whether it was clicked or linked
 // (a link loads it before the report it sits under).
 watch(findingTop, (element) => element?.scrollIntoView?.({ block: 'start' }))
+
+// DAR-UI-063. Arrived from play: the runs were submitted and finish in the background. Said once in the top pill,
+// and consumed, so a reload does not say it again.
+onMounted(() => {
+  const state = window.history.state as Record<string, unknown> | null
+  if (!state?.startedAudit) return
+  window.history.replaceState({ ...state, startedAudit: false }, '')
+  document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, {
+    detail: { message: 'Running. Findings arrive as each check finishes.', durationMs: 5000 },
+  }))
+})
 </script>
+
+<style scoped>
+/* DAR-UI-063. The name with play and the settings gear on its right; they wrap under it on a phone. */
+.audit-hero-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+</style>
