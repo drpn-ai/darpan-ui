@@ -1,11 +1,4 @@
-import type {
-  AuditCheckStatus,
-  AuditFindingState,
-  AuditRecords,
-  AuditReport,
-  AuditSourceRead,
-  AuditStatement,
-} from './api/auditTypes'
+import type { AuditCheckStatus, AuditFindingState, AuditRecords, AuditSourceRead } from './api/auditTypes'
 
 // DAR-UI-058. What the audit view derives from the report JSON: words and tones for its codes, rows for its keyed
 // objects. Pure, so the page carries no logic of its own.
@@ -47,29 +40,25 @@ export function sourceReadBadge(read: string): Badge {
   return SOURCE_READS[read as AuditSourceRead] ?? { label: read, tone: 'neutral' }
 }
 
-export function healthBadge(report: AuditReport): Badge {
-  return report.health.complete ? { label: 'Complete', tone: 'success' } : { label: 'Not complete', tone: 'warning' }
-}
-
 /** The JSON names systems by key; the page says HotWax for the OMS, as every other page does. */
 export function systemLabel(system: string): string {
   return system === 'OMS' ? 'HotWax' : system
 }
 
-export interface SourceRow {
-  system: string
-  badge: Badge
-  records: string
-  reason: string | null
+/** A finding's fix.where is a system code, named as every page names systems. */
+export const FIX_WHERE_LABELS: Record<string, string> = { OMS: 'HotWax', NETSUITE: 'NetSuite', SHOPIFY: 'Shopify' }
+
+/** The morning an audit page shows (?period, ?date), carried to its run and settings pages and back. */
+export function auditMorningQuery(query: Record<string, unknown> | undefined): Record<string, string> {
+  return Object.fromEntries(['period', 'date'].flatMap((key) => {
+    const value = query?.[key]
+    return typeof value === 'string' && value ? [[key, value]] : []
+  }))
 }
 
-export function sourceRows(report: AuditReport): SourceRow[] {
-  return Object.entries(report.health.sources ?? {}).map(([system, source]) => ({
-    system: systemLabel(system),
-    badge: sourceReadBadge(source.read),
-    records: source.records == null ? '' : source.records.toLocaleString('en-US'),
-    reason: source.reason,
-  }))
+/** DAR-BE-117. creditMemo -> "credit memo", rma -> "RMA": a record type as the tile says it. */
+export function recordTypeLabel(recordType: string): string {
+  return recordType === 'rma' ? 'RMA' : recordType.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
 export interface RecordRow {
@@ -101,38 +90,6 @@ export function recordRows(records: AuditRecords | null | undefined): RecordRow[
   return rows
 }
 
-/** "M1137118, INV8440371": a finding's record ids, for a one-line cell. */
-export function recordIds(records: AuditRecords | null | undefined): string {
-  return [...new Set(recordRows(records).map((row) => row.id))].join(', ')
-}
-
-export interface StatementRow {
-  id: string
-  text: string
-  badge: Badge
-  open: number
-  pending: number
-  statement: AuditStatement
-}
-
-export function statementRows(statements: Record<string, AuditStatement> | null | undefined): StatementRow[] {
-  return Object.values(statements ?? {}).map((statement) => ({
-    id: statement.id,
-    text: statement.text,
-    badge: checkStatusBadge(statement.status),
-    open: statement.counts?.open ?? 0,
-    pending: statement.counts?.pending ?? 0,
-    statement,
-  }))
-}
-
-/** "2026-10-21T23:44:35-07:00" -> "2026-10-21 23:44 -07:00", wherever such an instant sits in the text; the offset
- *  stays, since the document's times are in the tenant's zone, not the reader's. */
-export function instantLabel(text: string | null | undefined): string {
-  return (text ?? '').replace(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?(Z|[+-]\d{2}:\d{2})?/g,
-    (_, day: string, time: string, offset?: string) => `${day} ${time}${offset ? ` ${offset}` : ''}`)
-}
-
 /** "1 day", "12 days". */
 export function ageLabel(days: number | null | undefined): string {
   if (days == null) return ''
@@ -143,13 +100,47 @@ export function ageLabel(days: number | null | undefined): string {
  * The periods the filter offers: the report's own and the two before it, for a monthly audit (YYYY-MM). Other period
  * kinds get no filter yet; the report's period still shows on the page.
  */
-export function periodOptions(period: string | null | undefined): string[] {
+export function periodOptions(period: string | null | undefined, date?: string | null): string[] {
   const match = /^(\d{4})-(\d{2})$/.exec(period ?? '')
   if (!match) return period ? [period] : []
-  const year = Number(match[1])
-  const month = Number(match[2])
-  return [0, 1, 2].map((back) => {
+  // DAR-UI-067. Count back from the report date's month, not the period on show, so an older pick can come back.
+  const anchor = /^(\d{4})-(\d{2})/.exec(date ?? '') ?? match
+  const year = Number(anchor[1])
+  const month = Number(anchor[2])
+  const options = [0, 1, 2].map((back) => {
     const index = year * 12 + (month - 1) - back
     return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`
   })
+  return options.includes(period as string) ? options : [...options, period as string]
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** DAR-UI-066. "Oct 22" for a day, "Oct 22, 07:28" for an instant: the tenant's wall clock as written, no offset. */
+export function shortDate(text: string | null | undefined): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?/.exec(text ?? '')
+  if (!match) return text ?? ''
+  const day = `${MONTHS[Number(match[2]) - 1]} ${Number(match[3])}`
+  return match[4] ? `${day}, ${match[4]}` : day
+}
+
+/** "Oct 1 – 22" inside a month, "Sep 28 – Oct 3" across one. */
+export function shortRange(from: string | null | undefined, thru: string | null | undefined): string {
+  const start = shortDate(from)
+  const end = shortDate(thru)
+  if (!start || !end) return start || end
+  return start.split(' ')[0] === end.split(' ')[0] ? `${start} – ${end.split(' ')[1]}` : `${start} – ${end}`
+}
+
+/** "Return 630208: Completed return with no order" splits into the record and what is wrong with it. */
+export function splitHeadline(headline: string | null | undefined): { subject: string; rest: string } {
+  const text = (headline ?? '').trim()
+  const at = text.indexOf(': ')
+  return at > 0 ? { subject: text.slice(0, at), rest: text.slice(at + 2) } : { subject: text, rest: '' }
+}
+
+/** A history code in words: stillOpen -> "Still open". */
+export function eventLabel(event: string | null | undefined): string {
+  const words = (event ?? '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }

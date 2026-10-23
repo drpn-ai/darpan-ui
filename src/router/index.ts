@@ -125,7 +125,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/audits/:audit',
     name: 'audit-report',
     component: () => import('../pages/reconciliation/AuditReportPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Audit' },
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Audit', queryKeepsPage: true },
   },
   {
     path: '/reconciliation/ruleset-manager',
@@ -482,7 +482,9 @@ export const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  scrollBehavior() {
+  scrollBehavior(to, from) {
+    // DAR-UI-068. The audit page's column picks change only the query; jumping to the top loses the column in view.
+    if (to.meta.queryKeepsPage && to.path === from.path) return false
     return { top: 0 }
   },
 })

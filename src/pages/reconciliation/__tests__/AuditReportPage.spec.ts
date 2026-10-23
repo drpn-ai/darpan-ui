@@ -118,7 +118,7 @@ describe('AuditReportPage', () => {
     expect(f.getAuditReport).toHaveBeenCalledWith({ audit: 'month-close' }, expect.anything())
     expect(w.get('h1').text()).toBe('Month close')
     expect(w.get('[data-testid="run-type-audit"]').text()).toBe('Audit · 2026-10')
-    expect(w.get('[data-testid="audit-window"]').text()).toBe('2026-10-01 to 2026-10-08')
+    expect(w.get('[data-testid="audit-window"]').text()).toBe('Oct 1 – 8')
     // Column 1: Run health first, then the categories.
     expect(w.get('[data-testid="audit-category-health"]').text()).toContain('complete')
     expect(w.get('[data-testid="audit-category-orders"]').attributes('aria-current')).toBe('true')
@@ -131,15 +131,15 @@ describe('AuditReportPage', () => {
     const findings = w.findAll('[data-testid="audit-finding-row"]')
     expect(findings).toHaveLength(2)
     expect(findings[0]!.text()).toContain('F-1')
-    expect(findings[0]!.text()).toContain('Open · 6 days')
+    expect(findings[0]!.text()).toContain('Open · 6d')
     expect(w.get('[data-testid="audit-statement-text"]').text()).toBe('Every invoice carries the Etail id.')
     expect(w.get('[data-testid="audit-check-invoices-without-etail-id"]').text()).toContain('Invoices with no Etail id')
     expect(w.get('[data-testid="audit-compared-bar"]').text()).toContain('3,311')
     // The counts are the filters, and the day's movement sits beside them.
     expect(w.get('[data-testid="audit-filter-open"]').text()).toBe('1 open')
-    expect(w.get('[data-testid="audit-filter-all"]').text()).toBe('2 statements')
+    expect(w.get('[data-testid="audit-filter-all"]').text()).toBe('2 all')
     expect(w.get('[data-testid="audit-filter-all"]').attributes('aria-pressed')).toBe('true')
-    expect(w.get('[data-testid="audit-today"]').text()).toBe('2 new today · 0 fixed today · oldest open R2, 6 days')
+    expect(w.get('[data-testid="audit-today"]').text()).toBe('2 new · 0 fixed today · oldest R2, 6d')
     expect(w.get('[data-testid="audit-columns"]').attributes('data-level')).toBe('1')
   })
 
@@ -179,7 +179,7 @@ describe('AuditReportPage', () => {
 
     liveRoute.query = { category: 'orders', statement: 'R3' }
     await flushPromises()
-    expect(w.get('[data-testid="audit-statement-empty-R3"]').text()).toBe('Holds. Nothing found this period')
+    expect(w.get('[data-testid="audit-statement-empty-R3"]').text()).toBe('Holds')
     expect(w.get('[data-testid="audit-columns"]').attributes('data-level')).toBe('3')
 
     await w.get('[data-testid="audit-category-health"]').trigger('click')
@@ -259,6 +259,42 @@ describe('AuditReportPage', () => {
     expect(f.getAuditReport).toHaveBeenLastCalledWith({ audit: 'month-close', period: '2026-09' }, expect.anything())
   })
 
+  // DAR-UI-069. A fixed finding is gone from the board: the report keeps it for the day's "fixed today" count only.
+  it('lists only open and pending findings', async () => {
+    const doc = report()
+    doc.categories.orders!.statements.R2!.findings.push({ id: 'F-3', headline: 'Invoice INV3 has no Etail id', state: 'fixed',
+      firstFound: '2026-10-01', ageDays: 7, records: {}, difference: null, next: 'darpan findings show F-3' })
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))).toEqual(['F-1', 'F-2'])
+  })
+
+  // DAR-UI-068. A pick changes only ?category, ?statement or ?finding; the report on screen is still the one to show.
+  it('asks for the report once while columns are picked', async () => {
+    mount(AuditReportPage)
+    await flushPromises()
+    // Pages earlier tests mounted are still live, so count only what the picks ask for.
+    const before = f.getAuditReport.mock.calls.length
+    liveRoute.query = { category: 'orders' }
+    await flushPromises()
+    liveRoute.query = { category: 'orders', statement: 'R3' }
+    await flushPromises()
+    expect(f.getAuditReport.mock.calls.length).toBe(before)
+  })
+
+  // DAR-UI-067. On an older month the list still starts at the report date's month, so the way back is there.
+  it('keeps the current month on the list while an older one is on show', async () => {
+    const doc = report()
+    doc.report.period = '2026-08'
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    const select = w.findComponent({ name: 'AppSelect' })
+    expect(select.props('options').map((o: { value: string }) => o.value)).toEqual(['2026-10', '2026-09', '2026-08'])
+  })
+
   // DAR-UI-063. Play and the settings gear, as a lifecycle run's page carries them.
   it('carries play and the settings gear, each opening its own page for this audit', async () => {
     const w = mount(AuditReportPage)
@@ -284,7 +320,7 @@ describe('AuditReportPage', () => {
     f.getAuditReport.mockResolvedValue({ ok: true, report: played } as never)
     const w = mount(AuditReportPage)
     await flushPromises()
-    expect(w.get('[data-testid="audit-window"]').text()).toBe('2026-10-01 to 2026-10-08 · read 2026-10-01 to 2026-10-05')
+    expect(w.get('[data-testid="audit-window"]').text()).toBe('Oct 1 – 8 · read Oct 1 – 5')
 
     const morning = report()
     for (const category of Object.values(morning.categories)) {
@@ -295,7 +331,7 @@ describe('AuditReportPage', () => {
     f.getAuditReport.mockResolvedValue({ ok: true, report: morning } as never)
     const w2 = mount(AuditReportPage)
     await flushPromises()
-    expect(w2.get('[data-testid="audit-window"]').text()).toBe('2026-10-01 to 2026-10-08')
+    expect(w2.get('[data-testid="audit-window"]').text()).toBe('Oct 1 – 8')
   })
 
   it('hands the period and date on, so coming back shows the same morning, but not the open finding', async () => {

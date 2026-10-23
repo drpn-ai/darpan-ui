@@ -4,7 +4,6 @@
     <div v-if="errors.length" class="audit-check-errors" data-testid="audit-check-errors">
       <InlineValidation v-for="message in errors" :key="message" tone="error" :message="message" />
     </div>
-    <p v-if="notice" class="section-note" data-testid="audit-check-notice">{{ notice }}</p>
 
     <template v-if="options">
       <label class="wizard-input-shell">
@@ -49,7 +48,7 @@
             type="text"
             :maxlength="CODE_MAX_LENGTH"
             data-testid="audit-check-id"
-            :disabled="isEditing || busy"
+            :disabled="busy"
             @input="editId"
           />
         </label>
@@ -248,31 +247,9 @@
         <p class="section-note">{name} is the finding's field of that name.</p>
       </div>
 
-      <div v-if="confirmingRemove" class="audit-check-actions" data-testid="audit-check-remove-confirm">
-        <span>Remove {{ form.label || form.id }} from {{ options.audit.name }}?</span>
-        <button type="button" class="audit-check-text-action" data-testid="audit-check-remove-yes" :disabled="busy" @click="void remove()">
-          Remove
-        </button>
-        <button type="button" class="audit-check-text-action" data-testid="audit-check-remove-no" :disabled="busy" @click="confirmingRemove = false">
-          Keep
-        </button>
-      </div>
-      <div v-else class="audit-check-actions">
+      <div class="audit-check-actions">
         <AppSaveAction test-id="audit-check-save" :disabled="busy" @click="void save()" />
         <AppCancelAction test-id="audit-check-cancel" :disabled="saving" @click="emit('cancel')" />
-        <button
-          v-if="isEditing"
-          type="button"
-          class="app-icon-action app-icon-action--large app-icon-action--danger"
-          aria-label="Remove check"
-          data-testid="audit-check-remove"
-          :disabled="busy"
-          @click="confirmingRemove = true"
-        >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
-        </button>
       </div>
     </template>
   </div>
@@ -294,28 +271,25 @@ import type {
   AuditCheckOptions,
   AuditCheckStatementLink,
   AuditDiffType,
-  DeleteAuditCheckResponse,
 } from '../../lib/api/authoringTypes'
+import { FIX_WHERE_LABELS } from '../../lib/auditReport'
 import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 
 // The run builder; scope=EVALUATE builds a run that reads one system.
 const NEW_RUN_LINK = { path: '/reconciliation/create' }
 const NEW_EVALUATE_RUN_LINK = { path: '/reconciliation/create', query: { scope: 'EVALUATE' } }
 
-// DAR-UI-064 S4. Adds or edits one check on an audit: the run it reads, which statements it tests and which of the
+// DAR-UI-064 S4. Adds one check to an audit: the run it reads, which statements it tests and which of the
 // run's rows break each one, and how a finding reads. Mounted inside the audit settings page, so it is not a form.
 const props = defineProps<{
   /** The audit's code, e.g. month-close. */
   audit: string
-  /** The statement code the editor was opened from; a new check links it first. */
+  /** The statement code the editor was opened from; the check links it first. */
   statement: string
-  /** A check code to edit; absent = a new check. */
-  check?: string | null
 }>()
 
 const emit = defineEmits<{
   saved: [check: AuditCheckDetail]
-  removed: [result: NonNullable<DeleteAuditCheckResponse['result']>]
   cancel: []
 }>()
 
@@ -329,23 +303,12 @@ interface LinkRow {
   ruleIds: string[]
 }
 
-interface CheckForm {
-  id: string
-  label: string
-  savedRunId: string
-  file1RecordType: string
-  file2RecordType: string
-  graceDays: string | number
-  matchedBy: string
-  fixOwner: string
-  fixWhereEnumId: string
-  expectedSource: string
-  actualSource: string
-  amountCurrencyUomId: string
-  headlineTemplate: string
-  fixActionTemplate: string
-  passesWhenTemplate: string
-}
+const FORM_FIELDS = [
+  'id', 'label', 'savedRunId', 'file1RecordType', 'file2RecordType', 'graceDays', 'matchedBy', 'fixOwner', 'fixWhereEnumId',
+  'expectedSource', 'actualSource', 'amountCurrencyUomId', 'headlineTemplate', 'fixActionTemplate', 'passesWhenTemplate',
+] as const
+// graceDays is a number input, so v-model may hand it back as a number.
+type CheckForm = Record<Exclude<(typeof FORM_FIELDS)[number], 'graceDays'>, string> & { graceDays: string | number }
 
 const CODE_MAX_LENGTH = 60
 const MAX_GRACE_DAYS = 60
@@ -362,34 +325,10 @@ const DIFF_TYPE_LABELS: Record<AuditDiffType, string> = {
 }
 // An EVALUATE run reads one side, so only its findings and its duplicates can break a statement.
 const EVALUATE_DIFF_TYPES: AuditDiffType[] = ['FINDING', 'DUPLICATE_IN_FILE_1']
-const COMPARE_DIFF_TYPES: AuditDiffType[] = [
-  'MISSING_IN_FILE_1',
-  'MISSING_IN_FILE_2',
-  'FIELD_MISMATCH',
-  'FINDING',
-  'DUPLICATE_IN_FILE_1',
-  'DUPLICATE_IN_FILE_2',
-]
-const FIX_WHERE_LABELS: Record<string, string> = { OMS: 'HotWax', NETSUITE: 'NetSuite', SHOPIFY: 'Shopify' }
+const COMPARE_DIFF_TYPES = Object.keys(DIFF_TYPE_LABELS) as AuditDiffType[]
 
 function emptyForm(): CheckForm {
-  return {
-    id: '',
-    label: '',
-    savedRunId: '',
-    file1RecordType: '',
-    file2RecordType: '',
-    graceDays: '',
-    matchedBy: '',
-    fixOwner: '',
-    fixWhereEnumId: '',
-    expectedSource: '',
-    actualSource: '',
-    amountCurrencyUomId: '',
-    headlineTemplate: '',
-    fixActionTemplate: '',
-    passesWhenTemplate: '',
-  }
+  return Object.fromEntries(FORM_FIELDS.map((field) => [field, ''])) as CheckForm
 }
 
 const options = ref<AuditCheckOptions | null>(null)
@@ -397,14 +336,11 @@ const form = reactive<CheckForm>(emptyForm())
 const links = ref<LinkRow[]>([])
 const idEdited = ref(false)
 const moneyOpen = ref(false)
-const confirmingRemove = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const errors = ref<string[]>([])
-const notice = ref<string | null>(null)
 let nextKey = 0
 
-const isEditing = computed(() => Boolean(props.check))
 const busy = computed(() => loading.value || saving.value)
 const run = computed<Run | null>(() => options.value?.runs.find((item) => item.savedRunId === form.savedRunId) ?? null)
 const isEvaluate = computed(() => run.value?.scopeMode === 'EVALUATE')
@@ -462,7 +398,7 @@ function setLabel(event: Event): void {
 }
 
 function deriveId(): void {
-  if (!isEditing.value && !idEdited.value) form.id = toCode(form.label)
+  if (!idEdited.value) form.id = toCode(form.label)
 }
 
 function editId(event: Event): void {
@@ -509,33 +445,6 @@ function asList(value: string | string[]): string[] {
   return Array.isArray(value) ? value : [value].filter(Boolean)
 }
 
-function text(value: unknown): string {
-  return value === null || value === undefined ? '' : String(value)
-}
-
-function showCheck(detail: AuditCheckDetail): void {
-  Object.assign(form, {
-    id: text(detail.id),
-    label: text(detail.label),
-    savedRunId: text(detail.savedRunId),
-    file1RecordType: text(detail.file1RecordType),
-    file2RecordType: text(detail.file2RecordType),
-    graceDays: text(detail.graceDays),
-    matchedBy: text(detail.matchedBy),
-    fixOwner: text(detail.fixOwner),
-    fixWhereEnumId: text(detail.fixWhereEnumId),
-    expectedSource: text(detail.expectedSource),
-    actualSource: text(detail.actualSource),
-    amountCurrencyUomId: text(detail.amountCurrencyUomId),
-    headlineTemplate: text(detail.headlineTemplate),
-    fixActionTemplate: text(detail.fixActionTemplate),
-    passesWhenTemplate: text(detail.passesWhenTemplate),
-  })
-  idEdited.value = true
-  moneyOpen.value = Boolean(form.amountCurrencyUomId || form.expectedSource || form.actualSource)
-  links.value = (detail.statements ?? []).map((link) => makeLink(link))
-}
-
 /** A refusal carries every sentence in `errors`; the thrown error names only the first. */
 function serviceErrors(caught: unknown, fallback: string): string[] {
   if (caught instanceof ApiCallError) {
@@ -555,28 +464,18 @@ async function load(): Promise<void> {
   const signal = abort.signal
   loading.value = true
   errors.value = []
-  notice.value = null
-  confirmingRemove.value = false
   Object.assign(form, emptyForm())
   idEdited.value = false
   moneyOpen.value = false
   links.value = []
   try {
-    const [optionsResponse, checkResponse] = await Promise.all([
-      auditCheckFacade.getOptions(props.audit, signal),
-      props.check ? auditCheckFacade.get(props.audit, props.check, signal) : Promise.resolve(null),
-    ])
+    const optionsResponse = await auditCheckFacade.getOptions(props.audit, signal)
     if (!optionsResponse.options) {
       errors.value = optionsResponse.errors?.length ? optionsResponse.errors : ['Unable to load the audit.']
       return
     }
-    if (checkResponse && !checkResponse.check) {
-      errors.value = checkResponse.errors?.length ? checkResponse.errors : [`Check '${props.check}' was not found.`]
-      return
-    }
     options.value = optionsResponse.options
-    if (checkResponse?.check) showCheck(checkResponse.check)
-    if (!links.value.length) links.value = [makeLink({ id: props.statement })]
+    links.value = [makeLink({ id: props.statement })]
   } catch (caught) {
     if (!isAbortError(caught) && !signal.aborted) errors.value = serviceErrors(caught, 'Unable to load the check.')
   } finally {
@@ -608,7 +507,7 @@ function draft(): AuditCheckDraft {
     fixActionTemplate: orNull(form.fixActionTemplate),
     passesWhenTemplate: orNull(form.passesWhenTemplate),
     // A new check may not take over a code another audit already uses; the backend refuses it (DAR-UI-064).
-    ...(isEditing.value ? {} : { create: true }),
+    create: true,
   }
 }
 
@@ -627,41 +526,18 @@ function statementLinks(): AuditCheckStatementLink[] {
 async function save(): Promise<void> {
   if (busy.value || !options.value) return
   const check = draft()
-  if (!isEditing.value && options.value.checks.some((existing) => existing.id === check.id)) {
+  if (options.value.checks.some((existing) => existing.id === check.id)) {
     errors.value = [`Check '${check.id}' is already on this audit.`]
     return
   }
   saving.value = true
   errors.value = []
-  notice.value = null
   try {
     const response = await auditCheckFacade.save(props.audit, check, statementLinks())
     if (response.savedCheck) emit('saved', response.savedCheck)
     else errors.value = response.errors?.length ? response.errors : ['Unable to save the check.']
   } catch (caught) {
     errors.value = serviceErrors(caught, 'Unable to save the check.')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function remove(): Promise<void> {
-  if (busy.value || !props.check) return
-  saving.value = true
-  errors.value = []
-  notice.value = null
-  try {
-    const response = await auditCheckFacade.delete(props.audit, props.check)
-    const result = response.result
-    if (!result) {
-      errors.value = response.errors?.length ? response.errors : ['Unable to remove the check.']
-      return
-    }
-    confirmingRemove.value = false
-    notice.value = result.removed ? 'Check removed.' : 'Unlinked from this audit; its findings or other audits keep the check.'
-    emit('removed', result)
-  } catch (caught) {
-    errors.value = serviceErrors(caught, 'Unable to remove the check.')
   } finally {
     saving.value = false
   }
@@ -676,7 +552,7 @@ function keepEnterHere(event: KeyboardEvent): void {
   target.click()
 }
 
-watch(() => [props.audit, props.check], () => void load(), { immediate: true })
+watch(() => props.audit, () => void load(), { immediate: true })
 </script>
 
 <style scoped>

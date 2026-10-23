@@ -32,7 +32,7 @@
       </div>
       <RunTypeBadge v-if="report" type="audit" :detail="report.report.period" />
       <p v-if="report" class="static-page-section-description" data-testid="audit-window">
-        {{ report.report.window.from }} to {{ report.report.window.thru }}<template v-if="readWindow"> · read {{ readWindow.from }} to {{ readWindow.thru }}</template>
+        {{ shortRange(report.report.window.from, report.report.window.thru) }}<template v-if="readWindow"> · read {{ shortRange(readWindow.from, readWindow.thru) }}</template>
       </p>
     </template>
 
@@ -53,7 +53,7 @@
             :data-testid="`audit-filter-${pill.id}`"
             @click="chooseFilter(pill.id)"
           >
-            <span class="audit-filter-count">{{ pill.count }}</span> <span>{{ pill.label }}</span>
+            <span class="audit-filter-count">{{ pill.count.toLocaleString('en-US') }}</span> <span>{{ pill.label }}</span>
           </button>
         </div>
         <p class="section-note audit-today" data-testid="audit-today">{{ todayLine }}</p>
@@ -98,7 +98,7 @@ import { auditFacade } from '../../lib/api/facade'
 import { playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
 import type { AuditFindingDocument, AuditReport } from '../../lib/api/auditTypes'
-import { ageLabel, periodOptions } from '../../lib/auditReport'
+import { auditMorningQuery, periodOptions, shortRange } from '../../lib/auditReport'
 import {
   AUDIT_FILTERS,
   HEALTH,
@@ -131,18 +131,11 @@ let abort = new AbortController()
 onBeforeUnmount(() => abort.abort())
 
 const auditCode = computed(() => String(route.params.audit ?? ''))
-const findingId = computed(() => (typeof route.query.finding === 'string' ? route.query.finding : ''))
+const findingId = computed(() => queryValue('finding'))
 // The morning on show, handed to the run and settings pages so they return to it; an open finding is not.
-const carriedQuery = computed(() => {
-  const query: Record<string, string> = {}
-  for (const key of ['period', 'date']) {
-    const value = route.query[key]
-    if (typeof value === 'string' && value) query[key] = value
-  }
-  return query
-})
+const carriedQuery = computed(() => auditMorningQuery(route.query))
 
-const periods = computed(() => periodOptions(report.value?.report.period))
+const periods = computed(() => periodOptions(report.value?.report.period, report.value?.report.date))
 // DAR-UI-063. When every check this morning read the same days and they are not the period to date (a person played
 // a range), say which: the window above is the period's, the findings are from those days.
 const readWindow = computed(() => {
@@ -198,7 +191,7 @@ const level = computed(() => {
   return queryValue('category') ? 2 : 1
 })
 
-const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', pending: 'pending', notChecked: 'not checked', all: 'statements' }
+const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', pending: 'pending', notChecked: 'unchecked', all: 'all' }
 const pills = computed(() => {
   const doc = report.value
   if (!doc) return []
@@ -209,9 +202,8 @@ const todayLine = computed(() => {
   const summary = report.value?.summary
   if (!summary) return ''
   return [
-    `${summary.newToday} new today`,
-    `${summary.fixedToday} fixed today`,
-    summary.oldestOpen ? `oldest open ${summary.oldestOpen.statement}, ${ageLabel(summary.oldestOpen.ageDays)}` : '',
+    `${summary.newToday} new · ${summary.fixedToday} fixed today`,
+    summary.oldestOpen ? `oldest ${summary.oldestOpen.statement}, ${summary.oldestOpen.ageDays}d` : '',
   ].filter(Boolean).join(' · ')
 })
 
@@ -227,11 +219,7 @@ async function loadReport(): Promise<void> {
   pageError.value = ''
   try {
     const response = await auditFacade.getAuditReport(
-      {
-        audit: auditCode.value,
-        ...(typeof route.query.date === 'string' ? { date: route.query.date } : {}),
-        ...(typeof route.query.period === 'string' ? { period: route.query.period } : {}),
-      },
+      { audit: auditCode.value, ...carriedQuery.value },
       abort.signal,
     )
     if (response.ok === false || !response.report) {
@@ -290,7 +278,8 @@ onMounted(() => {
   }))
 })
 
-watch(() => [auditCode.value, route.query.date, route.query.period], () => void loadReport(), { immediate: true })
+// DAR-UI-068. One source per value, so a column pick (a new query object) does not count as a new morning.
+watch([auditCode, () => route.query.date, () => route.query.period], () => void loadReport(), { immediate: true })
 watch(findingId, () => void loadFinding(), { immediate: true })
 </script>
 

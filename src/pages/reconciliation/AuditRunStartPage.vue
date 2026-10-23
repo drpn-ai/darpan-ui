@@ -35,6 +35,7 @@ import WorkflowShortcutChoiceCards from '../../components/workflow/WorkflowShort
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { useCalendarWidget } from '../../composables/useCalendarWidget'
 import { auditFacade } from '../../lib/api/facade'
+import { auditMorningQuery } from '../../lib/auditReport'
 import {
   customWindowRange,
   isRunWindowPreset,
@@ -70,14 +71,7 @@ const range = computed(() => {
 const canSubmit = computed(() => !starting.value && (step.value === 'window' && preset.value === 'custom' ? true : !!range.value))
 
 // Back to the audit, on the morning it was showing.
-const auditRoute = computed(() => {
-  const query: Record<string, string> = {}
-  for (const key of ['period', 'date']) {
-    const value = route.query?.[key]
-    if (typeof value === 'string' && value) query[key] = value
-  }
-  return { name: 'audit-report', params: { audit: auditCode.value }, query }
-})
+const auditRoute = computed(() => ({ name: 'audit-report', params: { audit: auditCode.value }, query: auditMorningQuery(route.query) }))
 
 function choose(value: string) {
   if (!isRunWindowPreset(value)) return

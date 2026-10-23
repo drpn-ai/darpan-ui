@@ -5,7 +5,6 @@
 export type AuditFindingState = 'open' | 'pending' | 'fixed'
 export type AuditCheckStatus = 'ran' | 'partial' | 'notRun'
 export type AuditSourceRead = 'complete' | 'partial' | 'failed'
-export type AuditCategoryId = 'orders' | 'refundsAndCredits' | 'returns' | 'exchangesAndWarranty'
 
 export interface AuditMoney {
   amount: string

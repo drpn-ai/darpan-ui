@@ -51,8 +51,8 @@
       </section>
 
       <template v-if="isHealth">
-        <section class="audit-col audit-col--2" aria-label="This morning's run">
-          <h2 class="micro-label audit-col-head">This morning's run</h2>
+        <section class="audit-col audit-col--2" aria-label="Today's run">
+          <h2 class="micro-label audit-col-head">Today's run</h2>
           <button
             v-for="item in sources"
             :key="item.key"
@@ -83,7 +83,7 @@
           </template>
           <template v-else-if="source === SOURCE_NOT_COVERED">
             <h2 class="micro-label">Not covered</h2>
-            <p class="audit-lead">No check reads these statements, so nothing they break can show up here.</p>
+            <p class="audit-lead">No check reads these</p>
             <dl class="audit-facts">
               <template v-for="id in report.health.notCovered" :key="id">
                 <dt>{{ id }}</dt><dd>{{ statementText(id) }}</dd>
@@ -96,7 +96,7 @@
             <p v-if="sourceDoc.reason" class="section-note">{{ sourceDoc.reason }}</p>
             <dl class="audit-facts">
               <dt>Records</dt><dd>{{ sourceDoc.records == null ? '—' : sourceDoc.records.toLocaleString('en-US') }}</dd>
-              <dt>Read at</dt><dd>{{ instantLabel(sourceDoc.readAt) || '—' }}</dd>
+              <dt>Read</dt><dd>{{ shortDate(sourceDoc.readAt) || '—' }}</dd>
               <template v-if="sourceDoc.affects.length"><dt>Affects</dt><dd>{{ sourceDoc.affects.join(', ') }}</dd></template>
             </dl>
           </template>
@@ -124,25 +124,27 @@
         </section>
 
         <section class="audit-col audit-col--3" aria-label="Findings">
-          <h2 class="micro-label audit-col-head"><span>Findings</span><span>{{ statement }}</span></h2>
-          <button
-            v-for="item in findings"
-            :key="item.id"
-            type="button"
-            class="audit-row audit-row--finding"
-            :class="{ 'audit-row--picked': item.id === finding }"
-            :aria-current="item.id === finding ? 'true' : undefined"
-            data-testid="audit-finding-row"
-            @click="emit('navigate', { category, statement, finding: item.id })"
-          >
-            <span class="audit-row-sub audit-row-split">
-              <span>{{ item.id }}</span>
-              <span :class="{ 'audit-hot': item.state === 'open' }">{{ findingStateBadge(item.state).label }} · {{ ageLabel(item.ageDays) }}</span>
-            </span>
-            <span class="audit-row-text">{{ item.headline }}</span>
-          </button>
+          <h2 class="micro-label audit-col-head"><span>Findings</span><span>{{ findings.length }}</span></h2>
+          <template v-for="(item, index) in findings" :key="item.id">
+            <p v-if="groupLabel(index)" class="audit-col-note" data-testid="audit-findings-group">{{ groupLabel(index) }}</p>
+            <button
+              type="button"
+              class="audit-row audit-row--finding"
+              :class="{ 'audit-row--picked': item.id === finding }"
+              :aria-current="item.id === finding ? 'true' : undefined"
+              :title="item.id"
+              data-testid="audit-finding-row"
+              @click="emit('navigate', { category, statement, finding: item.id })"
+            >
+              <span class="audit-row-split">
+                <span class="audit-finding-subject">{{ splitHeadline(item.headline).subject }}</span>
+                <span class="audit-row-sub" :class="{ 'audit-hot': item.state === 'open' }">{{ findingStateBadge(item.state).label }} · {{ ageShort(item.ageDays) }}</span>
+              </span>
+              <span class="sr-only">{{ item.id }}</span>
+            </button>
+          </template>
           <div v-if="statementDoc && !findings.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
-            {{ statementDoc.status === 'notRun' ? 'No check yet, so nothing can be found here' : 'Holds. Nothing found this period' }}
+            {{ statementDoc.status === 'notRun' ? 'No check yet' : 'Holds' }}
           </div>
           <p v-if="statementDoc?.findingsOmitted" class="section-note audit-pad">{{ statementDoc.findingsOmitted }} more</p>
         </section>
@@ -154,61 +156,54 @@
             <InlineValidation v-if="findingError" tone="error" :message="findingError" data-testid="audit-finding-error" />
             <template v-if="findingDoc">
               <div class="audit-detail-head">
-                <span class="audit-row-sub">{{ findingDoc.finding.id }} · {{ findingDoc.finding.statement.id }}</span>
                 <StatusBadge :label="findingStateBadge(findingDoc.finding.status.state).label" :tone="findingStateBadge(findingDoc.finding.status.state).tone" />
+                <span class="audit-row-sub">{{ sinceLine }}</span>
               </div>
-              <p class="audit-lead" data-testid="audit-finding-headline">{{ findingDoc.finding.headline }}</p>
-              <p class="audit-row-sub audit-meta">
-                <span>first found {{ findingDoc.finding.status.firstFound }}</span>
-                <span>{{ seenLabel }}</span>
-                <span v-if="findingDoc.finding.fix.verify?.nextCheck">next check {{ instantLabel(findingDoc.finding.fix.verify.nextCheck) }}</span>
-              </p>
 
-              <h3 class="micro-label">Records</h3>
               <div class="audit-records">
                 <article v-for="row in records" :key="row.key" class="audit-record" data-testid="audit-record-row">
-                  <span class="audit-row-sub audit-row-split"><span>{{ row.system }}</span><span>{{ row.recordType }}</span></span>
+                  <span class="audit-row-sub">{{ row.system }} {{ recordTypeLabel(row.recordType) }}</span>
                   <span class="audit-record-id">{{ row.id }}</span>
-                  <span class="audit-row-sub audit-row-split"><span>{{ row.status }}</span><span>{{ row.internalId }}</span></span>
+                  <span v-if="row.status || row.internalId" class="audit-row-sub audit-row-split"><span>{{ row.status }}</span><span>{{ row.internalId }}</span></span>
                 </article>
               </div>
+              <p class="audit-lead" data-testid="audit-finding-headline">{{ headlineText }}</p>
 
-              <template v-if="money.length">
-                <h3 class="micro-label">Amounts</h3>
-                <dl class="audit-facts">
-                  <template v-for="item in money" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></template>
-                </dl>
+              <dl v-if="money.length" class="audit-facts">
+                <template v-for="item in money" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></template>
+              </dl>
+
+              <p v-if="whyLine" class="audit-body audit-muted">{{ whyLine }}</p>
+
+              <template v-if="findingDoc.finding.fix.action">
+                <div class="audit-detail-head">
+                  <h3 class="micro-label">Fix</h3>
+                  <span v-if="fixOwner" class="audit-tag">{{ fixOwner }}</span>
+                </div>
+                <p class="audit-body" data-testid="audit-finding-fix">{{ findingDoc.finding.fix.action }}</p>
+                <p v-if="findingDoc.finding.fix.verify?.passesWhen" class="section-note">Done when {{ findingDoc.finding.fix.verify.passesWhen.replace(/\.$/, '') }}</p>
               </template>
 
-              <template v-if="findingDoc.finding.evidence.checks.length">
-                <h3 class="micro-label">Evidence</h3>
+              <details v-if="findingDoc.finding.evidence.checks.length" class="audit-fold" :open="evidenceFailed">
+                <summary class="micro-label">Evidence <span class="audit-fold-count">{{ evidenceLine }}</span></summary>
                 <ul class="audit-evidence">
                   <li v-for="(item, index) in findingDoc.finding.evidence.checks" :key="index" data-testid="audit-evidence-row">
                     <span :class="item.passed ? 'audit-pass' : 'audit-hot'" aria-hidden="true">{{ item.passed ? '✓' : '✗' }}</span>
-                    <span>{{ item.label }}<span class="visually-hidden">{{ item.passed ? ' passed' : ' failed' }}</span></span>
-                    <span>{{ item.value ?? '' }}</span>
+                    <span>{{ item.label }}<span class="sr-only">{{ item.passed ? ' passed' : ' failed' }}</span></span>
+                    <span class="audit-row-sub">{{ item.value ?? '' }}</span>
                   </li>
                 </ul>
-              </template>
+              </details>
 
-              <template v-if="findingDoc.finding.diagnosis.conclusion || findingDoc.finding.diagnosis.explanation">
-                <h3 class="micro-label">Why</h3>
-                <p class="audit-body">{{ whyLine }}</p>
-              </template>
-
-              <template v-if="findingDoc.finding.fix.action">
-                <h3 class="micro-label">Fix</h3>
-                <p class="audit-body" data-testid="audit-finding-fix">{{ findingDoc.finding.fix.action }}</p>
-                <p v-if="fixLine" class="section-note">{{ fixLine }}</p>
-              </template>
-
-              <h3 class="micro-label">History</h3>
-              <ul class="audit-history">
-                <li v-for="(event, index) in findingDoc.finding.history" :key="index" data-testid="audit-history-row">
-                  <span class="audit-row-sub">{{ instantLabel(event.at) }}</span>
-                  <span>{{ event.event }} · {{ instantLabel(event.by.label || event.by.type) }}</span>
-                </li>
-              </ul>
+              <details class="audit-fold">
+                <summary class="micro-label">History <span class="audit-fold-count">{{ findingDoc.finding.history.length }}</span></summary>
+                <ul class="audit-history">
+                  <li v-for="(event, index) in findingDoc.finding.history" :key="index" data-testid="audit-history-row">
+                    <span class="audit-row-sub">{{ shortDate(event.at) }}</span>
+                    <span>{{ eventLabel(event.event) }}<template v-if="event.by.type !== 'check' && event.by.label"> · {{ event.by.label }}</template></span>
+                  </li>
+                </ul>
+              </details>
             </template>
           </template>
 
@@ -239,15 +234,12 @@
               <dl class="audit-facts">
                 <template v-if="check.matchedBy"><dt>Matched by</dt><dd>{{ check.matchedBy }}</dd></template>
                 <template v-if="check.graceDays != null"><dt>Grace</dt><dd>{{ check.graceDays === 0 ? 'none' : ageLabel(check.graceDays) }}</dd></template>
-                <template v-if="check.window"><dt>Read</dt><dd>{{ check.window.from }} to {{ check.window.thru }}</dd></template>
+                <template v-if="check.window"><dt>Read</dt><dd>{{ shortRange(check.window.from, check.window.thru) }}</dd></template>
               </dl>
             </article>
-            <dl class="audit-facts">
-              <dt>Open</dt><dd>{{ statementDoc.counts.open }}</dd>
-              <dt>Pending</dt><dd>{{ statementDoc.counts.pending }}</dd>
-              <dt>New today</dt><dd>{{ statementDoc.counts.newToday }}</dd>
-              <dt>Fixed today</dt><dd>{{ statementDoc.counts.fixedToday }}</dd>
-            </dl>
+            <p class="audit-row-sub" data-testid="audit-statement-counts">
+              {{ statementDoc.counts.open }} open · {{ statementDoc.counts.pending }} pending · {{ statementDoc.counts.newToday }} new · {{ statementDoc.counts.fixedToday }} fixed today
+            </p>
           </template>
 
           <div v-else class="audit-empty">Pick a statement</div>
@@ -265,10 +257,15 @@ import type { AuditFindingDocument, AuditMoney, AuditReport } from '../../lib/ap
 import {
   ageLabel,
   checkStatusBadge,
+  eventLabel,
+  FIX_WHERE_LABELS,
   findingStateBadge,
-  instantLabel,
   recordRows,
+  recordTypeLabel,
+  shortDate,
+  shortRange,
   sourceReadBadge,
+  splitHeadline,
   systemLabel,
 } from '../../lib/auditReport'
 import {
@@ -311,15 +308,38 @@ const sourceDoc = computed(() => props.report.health.sources?.[props.source] ?? 
 const categoryDoc = computed(() => props.report.categories?.[props.category] ?? null)
 const statements = computed(() => statementItems(categoryDoc.value, props.filter))
 const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statement] ?? null)
-const findings = computed(() => statementDoc.value?.findings ?? [])
+// DAR-UI-069. A fixed finding stays in the report for the day's "fixed today" only; the board lists what is still wrong.
+const findings = computed(() => (statementDoc.value?.findings ?? []).filter((item) => item.state !== 'fixed'))
 const records = computed(() => recordRows(props.findingDoc?.finding.records))
 
 const categoryLabel = computed(() => categories.value.find((item) => item.id === props.category)?.label ?? '')
 const secondLabel = computed(() =>
   isHealth.value ? (sources.value.find((item) => item.key === props.source)?.label ?? '') : props.statement)
 
-// fix.where is a system code; the page names systems the way every other page does.
-const WHERE_LABELS: Record<string, string> = { NETSUITE: 'NetSuite', OMS: 'HotWax', SHOPIFY: 'Shopify' }
+// DAR-UI-066. Fewer words: the record leads, what is said once is not said again, dates short.
+
+function ageShort(days: number | null | undefined): string {
+  return days == null ? '' : `${days}d`
+}
+
+function sameText(a: string, b: string): boolean {
+  const norm = (text: string) => text.trim().replace(/\.$/, '').toLowerCase()
+  return norm(a) === norm(b)
+}
+
+// Findings under a statement mostly share a conclusion; say it once above each run of rows that share it.
+const rests = computed(() => findings.value.map((item) => splitHeadline(item.headline).rest))
+function groupLabel(index: number): string {
+  const rest = rests.value[index] ?? ''
+  return rest && (index === 0 || rest !== rests.value[index - 1]) ? rest : ''
+}
+
+// The record tiles carry the subject ("Return 630208"), so the headline keeps only what is wrong.
+const headlineText = computed(() => {
+  const headline = props.findingDoc?.finding.headline ?? ''
+  const { rest } = splitHeadline(headline)
+  return records.value.length && rest ? rest : headline
+})
 
 function moneyLabel(money: AuditMoney | null | undefined): string {
   return money ? `${money.amount} ${money.currency}` : ''
@@ -329,30 +349,38 @@ const money = computed(() => {
   const evidence = props.findingDoc?.finding.evidence
   if (!evidence) return []
   return [
-    { label: evidence.expected?.source ? `Expected (${systemLabel(evidence.expected.source)})` : 'Expected', value: moneyLabel(evidence.expected) },
-    { label: evidence.actual?.source ? `Actual (${systemLabel(evidence.actual.source)})` : 'Actual', value: moneyLabel(evidence.actual) },
-    { label: 'Difference', value: moneyLabel(evidence.difference) },
+    { label: evidence.expected?.source ? systemLabel(evidence.expected.source) : 'Expected', value: moneyLabel(evidence.expected) },
+    { label: evidence.actual?.source ? systemLabel(evidence.actual.source) : 'Actual', value: moneyLabel(evidence.actual) },
+    { label: 'Gap', value: moneyLabel(evidence.difference) },
   ].filter((item) => item.value)
 })
 
-const fixLine = computed(() => {
+const fixOwner = computed(() => {
   const fix = props.findingDoc?.finding.fix
-  if (!fix) return ''
-  return [fix.owner, fix.where ? (WHERE_LABELS[fix.where] ?? fix.where) : '', fix.verify?.passesWhen ? `passes when ${fix.verify.passesWhen}` : '']
+  return fix?.owner || (fix?.where ? (FIX_WHERE_LABELS[fix.where] ?? fix.where) : '')
+})
+
+const sinceLine = computed(() => {
+  const status = props.findingDoc?.finding.status
+  if (!status) return ''
+  const next = props.findingDoc?.finding.fix.verify?.nextCheck
+  return [`since ${shortDate(status.firstFound)}`, status.timesSeen > 1 ? `seen ${status.timesSeen}×` : '', next ? `next ${shortDate(next)}` : '']
     .filter(Boolean).join(' · ')
 })
 
-const seenLabel = computed(() => {
-  const times = props.findingDoc?.finding.status.timesSeen ?? 0
-  return times === 1 ? 'seen once' : `seen ${times} times`
+const evidenceFailed = computed(() => (props.findingDoc?.finding.evidence.checks ?? []).some((item) => !item.passed))
+const evidenceLine = computed(() => {
+  const checks = props.findingDoc?.finding.evidence.checks ?? []
+  return `${checks.filter((item) => item.passed).length}/${checks.length}`
 })
 
-// The conclusion's label and its explanation are often the same sentence; say it once.
+// The conclusion's label and its explanation are often the headline again; say only what is new.
 const whyLine = computed(() => {
   const diagnosis = props.findingDoc?.finding.diagnosis
+  const said = [props.findingDoc?.finding.headline ?? '', headlineText.value]
   const parts = [diagnosis?.conclusion?.label, diagnosis?.explanation]
     .map((part) => (part ?? '').trim().replace(/\.$/, ''))
-    .filter(Boolean)
+    .filter((part) => part && !said.some((text) => sameText(text, part)))
   return [...new Set(parts)].map((part) => `${part}.`).join(' ')
 })
 
@@ -518,6 +546,40 @@ function statementText(id: string): string {
   gap: var(--space-2);
 }
 
+.audit-finding-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-label-size);
+}
+
+.audit-col-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: var(--type-meta-size);
+}
+
+.audit-muted {
+  color: var(--text-muted);
+}
+
+.audit-fold summary {
+  display: flex;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.audit-fold-count {
+  color: var(--text-dim);
+}
+
+.audit-fold[open] summary {
+  margin-bottom: var(--space-1);
+}
+
 .audit-row-code {
   flex: none;
   width: 2.6rem;
@@ -674,13 +736,6 @@ function statementText(id: string): string {
   margin: var(--space-2) 0 0;
 }
 
-.audit-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  margin: 0;
-}
-
 .audit-records {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
@@ -697,7 +752,9 @@ function statementText(id: string): string {
 }
 
 .audit-record-id {
-  font-size: var(--type-tile-size);
+  /* The record a person goes looking for: the one large thing on the page. */
+  font-size: calc(var(--type-tile-size) * 1.45);
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
@@ -778,17 +835,8 @@ function statementText(id: string): string {
 
 .audit-history li {
   display: grid;
-  grid-template-columns: 11rem minmax(0, 1fr);
+  grid-template-columns: 7.5rem minmax(0, 1fr);
   gap: var(--space-2);
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 
 /* A phone shows one column at a time: the deepest the URL names. The path above steps back up. */

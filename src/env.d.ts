@@ -26,5 +26,7 @@ declare module 'vue-router' {
     tenantEditRedirectName?: RouteRecordName
     surfaceMode?: 'static' | 'workflow'
     staticPageLabel?: string
+    /** A query change keeps the page: the same instance (App's RouterView key) and the same scroll. */
+    queryKeepsPage?: boolean
   }
 }

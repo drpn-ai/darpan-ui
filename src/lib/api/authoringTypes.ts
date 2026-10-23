@@ -204,14 +204,6 @@ export interface GetAuditCheckOptionsResponse extends ApiEnvelope {
   options?: AuditCheckOptions | null
 }
 
-export interface GetAuditCheckResponse extends ApiEnvelope {
-  check?: AuditCheckDetail | null
-}
-
 export interface SaveAuditCheckResponse extends ApiEnvelope {
   savedCheck?: AuditCheckDetail | null
-}
-
-export interface DeleteAuditCheckResponse extends ApiEnvelope {
-  result?: { id: string; removed: boolean; unlinked: boolean } | null
 }

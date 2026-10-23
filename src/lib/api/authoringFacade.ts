@@ -4,9 +4,7 @@ import type {
   AuditCheckDraft,
   AuditCheckStatementLink,
   CreateRunConclusionCodeResponse,
-  DeleteAuditCheckResponse,
   GetAuditCheckOptionsResponse,
-  GetAuditCheckResponse,
   GetRunConclusionsResponse,
   RunConclusionNode,
   SaveAuditCheckResponse,
@@ -64,24 +62,15 @@ export const runConclusionFacade = {
 
 export const AUDIT_CHECK = {
   getOptions: 'facade.AuditFacadeServices.get#AuditCheckOptions',
-  get: 'facade.AuditFacadeServices.get#AuditCheck',
   save: 'facade.AuditFacadeServices.save#AuditCheck',
-  delete: 'facade.AuditFacadeServices.delete#AuditCheck',
 } as const
 
 export const auditCheckFacade = {
   getOptions(audit: string, signal?: AbortSignal): Promise<GetAuditCheckOptionsResponse> {
     return callService<GetAuditCheckOptionsResponse>(AUDIT_CHECK.getOptions, { audit }, signal)
   },
-  get(audit: string, check: string, signal?: AbortSignal): Promise<GetAuditCheckResponse> {
-    return callService<GetAuditCheckResponse>(AUDIT_CHECK.get, { audit, check }, signal)
-  },
   /** Creates or updates check.id and replaces its links to this audit's statements. */
   save(audit: string, check: AuditCheckDraft, statements: AuditCheckStatementLink[], signal?: AbortSignal): Promise<SaveAuditCheckResponse> {
     return callService<SaveAuditCheckResponse>(AUDIT_CHECK.save, { audit, check, statements }, signal)
-  },
-  /** Unlinks the check from this audit; the check row goes too when nothing else names it. */
-  delete(audit: string, check: string, signal?: AbortSignal): Promise<DeleteAuditCheckResponse> {
-    return callService<DeleteAuditCheckResponse>(AUDIT_CHECK.delete, { audit, check }, signal)
   },
 }

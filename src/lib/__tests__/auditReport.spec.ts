@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ageLabel, checkStatusBadge, instantLabel, findingStateBadge, periodOptions, recordIds, recordRows, systemLabel } from '../auditReport'
+import { ageLabel, checkStatusBadge, eventLabel, findingStateBadge, periodOptions, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemLabel } from '../auditReport'
 
 // DAR-UI-058. The audit view's words for the report JSON's codes, and rows for its keyed objects.
 describe('auditReport', () => {
@@ -22,8 +22,15 @@ describe('auditReport', () => {
     expect(recordRows(records).map((r) => [r.system, r.recordType, r.id, r.internalId, r.status])).toEqual([
       ['NetSuite', 'rma', 'RMA1', '51', 'Pending Refund'], ['NetSuite', 'creditMemo', 'CM1', '', ''], ['HotWax', 'return', 'M1', '', 'Completed'],
     ])
-    expect(recordIds(records)).toBe('RMA1, CM1, M1')
     expect(recordRows(null)).toEqual([])
+  })
+
+  // DAR-BE-117. A finding now names records in several systems; their types read as words.
+  it('says a record type in words', () => {
+    expect(recordTypeLabel('creditMemo')).toBe('credit memo')
+    expect(recordTypeLabel('replacementOrder')).toBe('replacement order')
+    expect(recordTypeLabel('rma')).toBe('RMA')
+    expect(recordTypeLabel('order')).toBe('order')
   })
 
   it('offers a monthly audit its period and the two before, across a year end', () => {
@@ -33,15 +40,37 @@ describe('auditReport', () => {
     expect(periodOptions(null)).toEqual([])
   })
 
-  it('writes an instant as day, minute and the tenant offset, inside any text', () => {
-    expect(instantLabel('2026-10-21T23:44:35-07:00')).toBe('2026-10-21 23:44 -07:00')
-    expect(instantLabel('scheduled check, 2026-10-21T23:44-07:00')).toBe('scheduled check, 2026-10-21 23:44 -07:00')
-    expect(instantLabel('check')).toBe('check')
-    expect(instantLabel(null)).toBe('')
+  // DAR-UI-067. Picking an older month must not take the current one off the list.
+  it('lists from the report date, keeping an older period on show', () => {
+    expect(periodOptions('2026-08', '2026-10-23')).toEqual(['2026-10', '2026-09', '2026-08'])
+    expect(periodOptions('2026-06', '2026-10-23')).toEqual(['2026-10', '2026-09', '2026-08', '2026-06'])
+    expect(periodOptions('2026-10', '2026-10-23')).toEqual(['2026-10', '2026-09', '2026-08'])
   })
 
   it('counts age in days', () => {
     expect(ageLabel(1)).toBe('1 day')
     expect(ageLabel(0)).toBe('0 days')
+  })
+
+  // DAR-UI-066. Short words for the busy finding view.
+  it('writes days and instants short, without the offset', () => {
+    expect(shortDate('2026-10-22')).toBe('Oct 22')
+    expect(shortDate('2026-10-22T07:28:00-07:00')).toBe('Oct 22, 07:28')
+    expect(shortDate('soon')).toBe('soon')
+    expect(shortDate(null)).toBe('')
+    expect(shortRange('2026-10-01', '2026-10-23')).toBe('Oct 1 – 23')
+    expect(shortRange('2026-09-28', '2026-10-03')).toBe('Sep 28 – Oct 3')
+  })
+
+  it('splits a headline into the record and what is wrong', () => {
+    expect(splitHeadline('Return 630208: Completed return with no order, never synced')).toEqual({
+      subject: 'Return 630208', rest: 'Completed return with no order, never synced',
+    })
+    expect(splitHeadline('Invoice INV1 has no Etail id')).toEqual({ subject: 'Invoice INV1 has no Etail id', rest: '' })
+  })
+
+  it('says a history code in words', () => {
+    expect(eventLabel('stillOpen')).toBe('Still open')
+    expect(eventLabel('found')).toBe('Found')
   })
 })

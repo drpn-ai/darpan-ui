@@ -4,15 +4,13 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiCallError } from '../../../lib/api/client'
 import type { AuditCheckDetail, AuditCheckOptions } from '../../../lib/api/authoringTypes'
 
-// DAR-UI-064 S4 — the add / edit check editor the audit settings page mounts under each statement.
+// DAR-UI-064 S4 — the add-check editor the audit settings page mounts under each statement.
 
 const getOptions = vi.hoisted(() => vi.fn())
-const getCheck = vi.hoisted(() => vi.fn())
 const saveCheck = vi.hoisted(() => vi.fn())
-const deleteCheck = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../lib/api/authoringFacade', () => ({
-  auditCheckFacade: { getOptions, get: getCheck, save: saveCheck, delete: deleteCheck },
+  auditCheckFacade: { getOptions, save: saveCheck },
 }))
 
 import AuditCheckEditor from '../AuditCheckEditor.vue'
@@ -125,9 +123,7 @@ async function optionValues(w: VueWrapper, testId: string): Promise<string[]> {
 
 beforeEach(() => {
   getOptions.mockReset().mockResolvedValue(ok({ options }))
-  getCheck.mockReset().mockResolvedValue(ok({ check: stored }))
   saveCheck.mockReset()
-  deleteCheck.mockReset()
 })
 
 afterEach(() => {
@@ -146,7 +142,6 @@ describe('AuditCheckEditor', () => {
     const w = await mountEditor()
 
     expect(getOptions).toHaveBeenCalledWith('month-close', expect.any(AbortSignal))
-    expect(getCheck).not.toHaveBeenCalled()
     expect(w.findAll('[data-testid="audit-check-link"]')).toHaveLength(1)
     expect(trigger(w, 'audit-check-statement-0').text()).toContain('R4')
     expect(w.find('[data-testid="audit-check-remove"]').exists()).toBe(false)
@@ -281,27 +276,6 @@ describe('AuditCheckEditor', () => {
     expect(w.emitted('saved')).toBeUndefined()
   })
 
-  it('edits a stored check with its id locked', async () => {
-    saveCheck.mockResolvedValue(ok({ savedCheck: stored }))
-    const w = await mountEditor({ check: 'returns-credited' })
-
-    expect(getCheck).toHaveBeenCalledWith('month-close', 'returns-credited', expect.any(AbortSignal))
-    const id = trigger(w, 'audit-check-id')
-    expect((id.element as HTMLInputElement).value).toBe('returns-credited')
-    expect(id.attributes('disabled')).toBeDefined()
-    expect(trigger(w, 'audit-check-run').text()).toContain('Returns: OMS vs NetSuite')
-    expect(w.findAll('[data-testid="audit-check-link"]')).toHaveLength(2)
-    expect(w.find('[data-testid="audit-check-money"]').exists()).toBe(true)
-
-    await trigger(w, 'audit-check-label').setValue('Returns credited on time')
-    expect((id.element as HTMLInputElement).value).toBe('returns-credited')
-
-    await trigger(w, 'audit-check-save').trigger('click')
-    await flushPromises()
-    expect(saveCheck.mock.calls[0]?.[1]).toMatchObject({ id: 'returns-credited', label: 'Returns credited on time', graceDays: 3 })
-    expect(saveCheck.mock.calls[0]?.[2]).toEqual(stored.statements)
-  })
-
   it('refuses a new check whose id the audit already has', async () => {
     const w = await mountEditor()
     await trigger(w, 'audit-check-label').setValue('Returns credited')
@@ -311,38 +285,6 @@ describe('AuditCheckEditor', () => {
 
     expect(saveCheck).not.toHaveBeenCalled()
     expect(w.get('[data-testid="audit-check-errors"]').text()).toContain("Check 'returns-credited' is already on this audit.")
-  })
-
-  it('confirms inline before removing, and says when the check was removed', async () => {
-    deleteCheck.mockResolvedValue(ok({ result: { id: 'returns-credited', removed: true, unlinked: true } }))
-    const w = await mountEditor({ check: 'returns-credited' })
-
-    await trigger(w, 'audit-check-remove').trigger('click')
-    expect(deleteCheck).not.toHaveBeenCalled()
-    expect(w.get('[data-testid="audit-check-remove-confirm"]').text()).toContain('Month close')
-
-    await trigger(w, 'audit-check-remove-yes').trigger('click')
-    await flushPromises()
-
-    expect(deleteCheck).toHaveBeenCalledWith('month-close', 'returns-credited')
-    expect(w.get('[data-testid="audit-check-notice"]').text()).toBe('Check removed.')
-    expect(w.emitted('removed')).toEqual([[{ id: 'returns-credited', removed: true, unlinked: true }]])
-  })
-
-  it('says when the check was only unlinked, and Keep backs out', async () => {
-    deleteCheck.mockResolvedValue(ok({ result: { id: 'returns-credited', removed: false, unlinked: true } }))
-    const w = await mountEditor({ check: 'returns-credited' })
-
-    await trigger(w, 'audit-check-remove').trigger('click')
-    await trigger(w, 'audit-check-remove-no').trigger('click')
-    expect(w.find('[data-testid="audit-check-remove-confirm"]').exists()).toBe(false)
-
-    await trigger(w, 'audit-check-remove').trigger('click')
-    await trigger(w, 'audit-check-remove-yes').trigger('click')
-    await flushPromises()
-
-    expect(w.get('[data-testid="audit-check-notice"]').text()).toContain('Unlinked from this audit')
-    expect(w.emitted('removed')?.[0]?.[0]).toMatchObject({ removed: false, unlinked: true })
   })
 
   it('emits cancel', async () => {

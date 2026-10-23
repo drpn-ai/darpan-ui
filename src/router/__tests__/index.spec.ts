@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { RouteLocationNormalized } from 'vue-router'
 import router from '../index'
 
 describe('router release scope', () => {
@@ -67,6 +68,17 @@ describe('router release scope', () => {
     expect(resolved.params.audit).toBe('month-close')
     expect(resolved.meta.requiresTenantEdit).toBe(true)
     expect(resolved.meta.tenantEditRedirectName).toBe('settings-runs')
+  })
+
+  // DAR-UI-068. Each column pick on the audit page changes only the query; the page stays where it was.
+  it('keeps the scroll on a query-only change of the audit page, and goes to the top otherwise', () => {
+    const scroll = router.options.scrollBehavior!
+    const at = (path: string) => router.resolve(path) as unknown as RouteLocationNormalized
+    const from = at('/audits/month-close?category=returns')
+    expect(scroll(at('/audits/month-close?category=returns&statement=R8'), from, null)).toBe(false)
+    expect(scroll(at('/audits/other'), from, null)).toEqual({ top: 0 })
+    expect(scroll(from, at('/'), null)).toEqual({ top: 0 })
+    expect(scroll(at('/reconciliation/diff?step=2'), at('/reconciliation/diff'), null)).toEqual({ top: 0 })
   })
 
   it.each([

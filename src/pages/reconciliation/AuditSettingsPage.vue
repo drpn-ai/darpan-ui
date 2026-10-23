@@ -138,6 +138,7 @@ import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import { auditFacade } from '../../lib/api/facade'
+import { auditMorningQuery } from '../../lib/auditReport'
 import type { AuditSettings, AuditSettingsCheck, AuditSettingsStatement, SaveAuditSettingsPayload } from '../../lib/api/auditTypes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { buildTimezoneOptions } from '../../lib/timezones'
@@ -162,18 +163,11 @@ const error = ref<string | null>(null)
 
 const timezoneOptions = computed(() => buildTimezoneOptions(scheduleTimeZone.value))
 
-let abort = new AbortController()
+const abort = new AbortController()
 onBeforeUnmount(() => abort.abort())
 
 // Back to the audit, on the morning it was showing.
-const auditRoute = computed(() => {
-  const query: Record<string, string> = {}
-  for (const key of ['period', 'date']) {
-    const value = route.query?.[key]
-    if (typeof value === 'string' && value) query[key] = value
-  }
-  return { name: 'audit-report', params: { audit: auditCode.value }, query }
-})
+const auditRoute = computed(() => ({ name: 'audit-report', params: { audit: auditCode.value }, query: auditMorningQuery(route.query) }))
 
 function message(caught: unknown): string {
   return caught instanceof Error ? caught.message : String(caught)
@@ -284,11 +278,7 @@ async function openRules(check: AuditSettingsCheck) {
   }
 }
 
-onMounted(() => {
-  abort.abort()
-  abort = new AbortController()
-  void load()
-})
+onMounted(() => void load())
 </script>
 
 <style scoped>

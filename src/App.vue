@@ -117,8 +117,9 @@ const workflowEscapeOriginPath = ref<string | null>(null)
 
 const isShelllessRoute = computed(() => route.name === 'login')
 const surfaceMode = computed<'static' | 'workflow'>(() => (route.meta.surfaceMode === 'workflow' ? 'workflow' : 'static'))
+// DAR-UI-068. A route that reads its query reactively keys on its path, so a query change does not rebuild the page.
 const routerViewKey = computed(
-  () => `${route.fullPath}::${authStore.sessionInfo?.activeTenantUserGroupId ?? authStore.sessionInfo?.scopeType ?? 'anonymous'}`,
+  () => `${route.meta.queryKeepsPage ? route.path : route.fullPath}::${authStore.sessionInfo?.activeTenantUserGroupId ?? authStore.sessionInfo?.scopeType ?? 'anonymous'}`,
 )
 const userDisplayName = computed(() => resolveUserDisplayName(authStore.sessionInfo))
 const activeTenantUserGroupId = computed(() => authStore.sessionInfo?.activeTenantUserGroupId ?? null)

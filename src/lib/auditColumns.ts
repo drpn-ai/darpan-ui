@@ -31,7 +31,6 @@ export interface StatementItem {
   text: string
   open: number
   pending: number
-  notChecked: boolean
   /** What the row's count shows: open, else pending, else 0; a dash when nothing checked it. */
   badge: string
   tone: 'open' | 'pending' | 'clean' | 'notChecked'
@@ -115,7 +114,6 @@ export function statementItems(category: AuditCategory | null | undefined, filte
       text: statement.text,
       open,
       pending,
-      notChecked,
       badge: notChecked ? '–' : String(open || pending || 0),
       tone: notChecked ? 'notChecked' : open ? 'open' : pending ? 'pending' : 'clean',
     }
