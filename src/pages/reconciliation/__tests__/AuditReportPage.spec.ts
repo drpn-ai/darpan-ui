@@ -1,16 +1,17 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { route, replace } = vi.hoisted(() => ({
+const { route, replace, push } = vi.hoisted(() => ({
   route: { params: { audit: 'month-close' }, query: {} as Record<string, string | undefined> },
   replace: vi.fn(),
+  push: vi.fn(),
 }))
 vi.mock('vue-router', async () => {
   const { reactive: r } = await import('vue')
   const reactiveRoute = r(route)
   return {
     useRoute: () => reactiveRoute,
-    useRouter: () => ({ replace }),
+    useRouter: () => ({ replace, push }),
     RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' },
   }
 })
@@ -103,77 +104,146 @@ const findingDocument = {
 beforeEach(() => {
   Object.values(f).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockReset())
   replace.mockReset()
+  push.mockReset()
   liveRoute.query = {}
   f.getAuditReport.mockResolvedValue({ ok: true, report: report() } as never)
   f.getAuditFinding.mockResolvedValue({ ok: true, finding: findingDocument } as never)
 })
 
 describe('AuditReportPage', () => {
-  it('shows a complete morning: health, counts, and each category of statements', async () => {
+  // DAR-UI-065. Drill-down columns: category › statement › finding › the deepest pick.
+  it('opens on the category with the most open findings, its first statement with findings, and that statement\'s check', async () => {
     const w = mount(AuditReportPage)
     await flushPromises()
     expect(f.getAuditReport).toHaveBeenCalledWith({ audit: 'month-close' }, expect.anything())
     expect(w.get('h1').text()).toBe('Month close')
     expect(w.get('[data-testid="run-type-audit"]').text()).toBe('Audit · 2026-10')
     expect(w.get('[data-testid="audit-window"]').text()).toBe('2026-10-01 to 2026-10-08')
-    expect(w.get('[data-testid="audit-health"]').text()).toBe('Complete')
-    expect(w.get('[data-testid="audit-source-HotWax"]').text()).toContain('3,871')
-    expect(w.find('[data-testid="audit-health-summary"]').exists()).toBe(false)
-    expect(w.get('[data-testid="audit-count-open"]').text()).toBe('1')
-    expect(w.get('[data-testid="audit-oldest-open"]').text()).toBe('R2 · 6 days')
-    expect(w.findAll('[data-testid="audit-statement-row-orders"]').map((row) => row.text())).toEqual([
-      expect.stringContaining('R2'), expect.stringContaining('R3'),
-    ])
+    // Column 1: Run health first, then the categories.
+    expect(w.get('[data-testid="audit-category-health"]').text()).toContain('complete')
+    expect(w.get('[data-testid="audit-category-orders"]').attributes('aria-current')).toBe('true')
+    expect(w.get('[data-testid="audit-category-orders"]').text()).toContain('1 open · 1 pending')
+    // Column 2: the category's statements; R2 has findings, so it is picked.
+    const rows = w.findAll('[data-testid="audit-statement-row-orders"]')
+    expect(rows.map((row) => row.text())).toEqual([expect.stringContaining('R2'), expect.stringContaining('R3')])
+    expect(rows[0]!.attributes('aria-current')).toBe('true')
+    // Column 3: its findings. Column 4: what checked it.
+    const findings = w.findAll('[data-testid="audit-finding-row"]')
+    expect(findings).toHaveLength(2)
+    expect(findings[0]!.text()).toContain('F-1')
+    expect(findings[0]!.text()).toContain('Open · 6 days')
+    expect(w.get('[data-testid="audit-statement-text"]').text()).toBe('Every invoice carries the Etail id.')
+    expect(w.get('[data-testid="audit-check-invoices-without-etail-id"]').text()).toContain('Invoices with no Etail id')
+    expect(w.get('[data-testid="audit-compared-bar"]').text()).toContain('3,311')
+    // The counts are the filters, and the day's movement sits beside them.
+    expect(w.get('[data-testid="audit-filter-open"]').text()).toBe('1 open')
+    expect(w.get('[data-testid="audit-filter-all"]').text()).toBe('2 statements')
+    expect(w.get('[data-testid="audit-filter-all"]').attributes('aria-pressed')).toBe('true')
+    expect(w.get('[data-testid="audit-today"]').text()).toBe('2 new today · 0 fixed today · oldest open R2, 6 days')
+    expect(w.get('[data-testid="audit-columns"]').attributes('data-level')).toBe('1')
   })
 
-  it('says why a morning is not complete', async () => {
+  it('shows the run\'s health as its own column: each read, the checks, and why a morning is not complete', async () => {
+    liveRoute.query = { category: 'health' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.findAll('[data-testid^="audit-source-"]').map((row) => row.attributes('data-testid'))).toEqual([
+      'audit-source-NetSuite', 'audit-source-HotWax', 'audit-source-Checks', 'audit-source-detail',
+    ])
+    expect(w.get('[data-testid="audit-source-HotWax"]').text()).toContain('3,871 records')
+    // Every read complete: it opens on the checks.
+    expect(w.get('[data-testid="audit-health"]').text()).toBe('Complete')
+    expect(w.get('[data-testid="audit-checks-ran"]').text()).toBe('2')
+
     f.getAuditReport.mockResolvedValue({ ok: true, report: report({
       complete: false,
       summary: 'Not complete: the NetSuite read was partial.',
       sources: { NetSuite: { read: 'partial', records: 900, readAt: null, reason: 'one page failed', affects: ['R2'] } },
       checks: { ran: 1, partial: 1, notRun: 0 },
     }) } as never)
-    const w = mount(AuditReportPage)
+    const w2 = mount(AuditReportPage)
     await flushPromises()
-    expect(w.get('[data-testid="audit-health"]').text()).toBe('Not complete')
-    expect(w.get('[data-testid="audit-source-NetSuite"]').text()).toContain('Partial')
-    expect(w.get('[data-testid="audit-checks"]').text()).toBe('1 ran · 1 partial')
-    expect(w.get('[data-testid="audit-health-summary"]').text()).toBe('Not complete: the NetSuite read was partial.')
+    expect(w2.get('[data-testid="audit-category-health"]').text()).toContain('not complete')
+    // A partial read is what needs a look, so it opens on that.
+    const detail = w2.get('[data-testid="audit-source-detail"]')
+    expect(detail.text()).toContain('Partial')
+    expect(detail.text()).toContain('one page failed')
+    expect(detail.text()).toContain('R2')
   })
 
-  it('opens a statement to its findings, and an empty one to an empty hint', async () => {
+  it('walks the columns through the URL, one history step per pick, and says why a statement has no findings', async () => {
     const w = mount(AuditReportPage)
     await flushPromises()
-    const rows = w.findAll('[data-testid="audit-statement-row-orders"]')
-    await rows[0]!.trigger('click')
-    const detail = w.get('[data-testid="audit-statement-detail-R2"]')
-    expect(detail.text()).toContain('Invoices with no Etail id · Ran')
-    const findings = detail.findAll('[data-testid="audit-finding-row"]')
-    expect(findings).toHaveLength(2)
-    expect(findings[0]!.text()).toContain('INV1')
-    expect(findings[0]!.text()).toContain('Open')
-    expect(findings[1]!.text()).toContain('0 days')
-    await rows[1]!.trigger('click')
-    expect(w.get('[data-testid="audit-statement-empty-R3"]').text()).toBe('No findings')
+    await w.findAll('[data-testid="audit-statement-row-orders"]')[1]!.trigger('click')
+    expect(push).toHaveBeenCalledWith({ query: { category: 'orders', statement: 'R3', finding: undefined } })
+
+    liveRoute.query = { category: 'orders', statement: 'R3' }
+    await flushPromises()
+    expect(w.get('[data-testid="audit-statement-empty-R3"]').text()).toBe('Holds. Nothing found this period')
+    expect(w.get('[data-testid="audit-columns"]').attributes('data-level')).toBe('3')
+
+    await w.get('[data-testid="audit-category-health"]').trigger('click')
+    expect(push).toHaveBeenLastCalledWith({ query: { category: 'health', statement: undefined, finding: undefined, source: undefined } })
   })
 
-  it('opens a finding below the report: its records, fix and history', async () => {
+  it('opens a finding in the last column and folds the categories to a rail', async () => {
     const w = mount(AuditReportPage)
     await flushPromises()
-    await w.findAll('[data-testid="audit-statement-row-orders"]')[0]!.trigger('click')
     await w.findAll('[data-testid="audit-finding-row"]')[0]!.trigger('click')
-    expect(replace).toHaveBeenCalledWith({ query: { finding: 'F-1' } })
+    expect(push).toHaveBeenCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-1' } })
 
-    liveRoute.query = { finding: 'F-1' }
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
     await flushPromises()
     expect(f.getAuditFinding).toHaveBeenCalledWith({ findingId: 'F-1' }, expect.anything())
+    expect(w.get('[data-testid="audit-columns"]').classes()).toContain('audit-columns--rail')
+    expect(w.get('[data-testid="audit-columns"]').attributes('data-level')).toBe('4')
     expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Invoice INV1 has no Etail id')
     const records = w.findAll('[data-testid="audit-record-row"]').map((row) => row.text())
     expect(records[0]).toContain('NetSuite')
     expect(records[0]).toContain('801')
     expect(records[1]).toContain('HotWax')
+    expect(w.get('[data-testid="audit-evidence-row"]').text()).toContain('The invoice has no Etail id')
     expect(w.get('[data-testid="audit-finding-fix"]').text()).toBe('Enter the Shopify order id on invoice INV1.')
     expect(w.findAll('[data-testid="audit-history-row"]')).toHaveLength(1)
+
+    // The path steps back up: the statement drops the finding.
+    await w.get('[data-testid="audit-path-statement"]').trigger('click')
+    expect(push).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: undefined } })
+  })
+
+  it('opens a linked finding under its own category and statement', async () => {
+    const doc = report()
+    // A busier category would win the default; the link still lands on the finding's own.
+    doc.categories.returns = {
+      label: 'Returns',
+      counts: counts(5, 0),
+      statements: { R8: { id: 'R8', text: 'Every return reaches NetSuite.', weight: 'derived', status: 'ran', reason: null, checks: [], counts: counts(5, 0), findings: [], findingsOmitted: 0 } },
+    }
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    liveRoute.query = { finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.get('[data-testid="audit-category-orders"]').attributes('aria-current')).toBe('true')
+    expect(w.findAll('[data-testid="audit-finding-row"]')[0]!.attributes('aria-current')).toBe('true')
+    expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Invoice INV1 has no Etail id')
+  })
+
+  it('filters the statements by a count pill and starts the columns over', async () => {
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    await w.get('[data-testid="audit-filter-pending"]').trigger('click')
+    expect(replace).toHaveBeenCalledWith({
+      query: { show: 'pending', category: undefined, statement: undefined, finding: undefined, source: undefined },
+    })
+
+    liveRoute.query = { show: 'pending' }
+    await flushPromises()
+    expect(w.get('[data-testid="audit-filter-pending"]').attributes('aria-pressed')).toBe('true')
+    expect(w.findAll('[data-testid="audit-statement-row-orders"]').map((row) => row.text())).toEqual([expect.stringContaining('R2')])
+
+    liveRoute.query = { show: 'notChecked', category: 'orders' }
+    await flushPromises()
+    expect(w.get('[data-testid="audit-statements-empty"]').text()).toBe('Nothing here for this filter')
   })
 
   it('reloads for another period and drops the open finding', async () => {
@@ -189,6 +259,7 @@ describe('AuditReportPage', () => {
     expect(f.getAuditReport).toHaveBeenLastCalledWith({ audit: 'month-close', period: '2026-09' }, expect.anything())
   })
 
+  // DAR-UI-063. Play and the settings gear, as a lifecycle run's page carries them.
   it('carries play and the settings gear, each opening its own page for this audit', async () => {
     const w = mount(AuditReportPage)
     await flushPromises()
@@ -256,6 +327,6 @@ describe('AuditReportPage', () => {
     const w = mount(AuditReportPage)
     await flushPromises()
     expect(w.get('[data-testid="audit-page-error"]').text()).toContain('Audit month-close was not found')
-    expect(w.find('[data-testid="audit-health"]').exists()).toBe(false)
+    expect(w.find('[data-testid="audit-columns"]').exists()).toBe(false)
   })
 })
