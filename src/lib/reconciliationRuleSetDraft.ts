@@ -326,9 +326,13 @@ export function buildRuleSetRulePayloads(draft: ReconciliationRuleSetDraft): Rul
     })
 }
 
+// Operators whose meaning lives in RuleDiffSupport.matchesOperator. DAR-BE-126: "requires" breaks when the left value
+// is true and the right is not; "required by" is its mirror.
+const RULE_DIFF_OPERATORS = ['>', '<', '>=', '<=', 'requires', 'required by']
+
 function normalizeRuleOperator(operator: string | undefined): string {
   const normalized = operator?.trim()
-  return normalized && ['=', '==', '!=', '>', '<', '>=', '<='].includes(normalized) ? normalized : '='
+  return normalized && ['=', '==', '!=', ...RULE_DIFF_OPERATORS].includes(normalized) ? normalized : '='
 }
 
 function buildFieldComparisonRuleLogic(
@@ -400,7 +404,7 @@ function pathSegments(fieldPath: string): string[] {
 }
 
 function buildViolationExpression(file1ValueExpression: string, file2ValueExpression: string, operator: string, useRuleDiffSupport = false): string {
-  if (useRuleDiffSupport || ['>', '<', '>=', '<='].includes(operator)) {
+  if (useRuleDiffSupport || RULE_DIFF_OPERATORS.includes(operator)) {
     return `reconciliation.rule.RuleDiffSupport.violatesOperator(${file1ValueExpression}, ${file2ValueExpression}, "${escapeDrlString(operator)}")`
   }
   switch (operator) {

@@ -532,12 +532,13 @@ function updateApiEndpoint(sourceKey: SourceKey, value: string): void {
     return
   }
 
-  if (value.startsWith('remote:')) {
-    const remote = systemRemotes.value.find((candidate) => remoteSelectValue(candidate) === value)
-    source.systemMessageRemoteId = remote ? remote.systemMessageRemoteId ?? '' : value.split(':')[1] ?? ''
+  // Every remote option is built from systemRemotes by remoteSelectValue, so a pick always finds its row.
+  const remote = systemRemotes.value.find((candidate) => remoteSelectValue(candidate) === value)
+  if (remote) {
+    source.systemMessageRemoteId = remote.systemMessageRemoteId ?? ''
     source.nsRestletConfigId = ''
-    if (remote?.systemEnumId) source.systemEnumId = remote.systemEnumId
-    if (remote?.sourceConfigType) source.sourceConfigType = remote.sourceConfigType
+    if (remote.systemEnumId) source.systemEnumId = remote.systemEnumId
+    if (remote.sourceConfigType) source.sourceConfigType = remote.sourceConfigType
     return
   }
 

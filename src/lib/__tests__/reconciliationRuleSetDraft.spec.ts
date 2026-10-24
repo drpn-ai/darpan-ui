@@ -75,6 +75,19 @@ describe('reconciliationRuleSetDraft', () => {
     expect(rule.ruleLogic).not.toContain('String.valueOf')
   })
 
+  // DAR-BE-126. A one-way presence rule ("paid in Shopify needs a payment in HotWax") is its own operator, not "<=" on
+  // Y/N strings that works only because N sorts before Y.
+  it.each(['requires', 'required by'])('keeps the "%s" operator and checks it through RuleDiffSupport', (operator) => {
+    const [rule] = buildRuleSetRulePayloads(createDraft({
+      rules: [{ file1FieldPath: '$.orders[*].hasPayment', file2FieldPath: '$[*].hasPayment', operator, sequenceNum: 1 }],
+    }))
+    if (!rule) throw new Error('Expected a generated rule payload')
+
+    expect(JSON.parse(rule.expression as string).operator).toBe(operator)
+    expect(rule.ruleText).toBe(`hasPayment ${operator} hasPayment`)
+    expect(rule.ruleLogic).toContain(`RuleDiffSupport.violatesOperator(((Map) $m.get("file1")).get("hasPayment"), ((Map) $m.get("file2")).get("hasPayment"), "${operator}")`)
+  })
+
   it('persists API source config ids in create payloads', () => {
     const payload = buildCreateRuleSetRunPayload(createDraft({
       file1SourceTypeEnumId: 'AUT_SRC_API',
