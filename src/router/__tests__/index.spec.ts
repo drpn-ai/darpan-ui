@@ -60,6 +60,12 @@ describe('router release scope', () => {
     if (redirect) expect(route?.redirect).toBeTruthy()
   })
 
+  // DAR-UI-074. The audit board takes the whole screen; its settings and run pages keep the static width.
+  it('marks only the audit board wide', () => {
+    expect(router.resolve('/audits/month-close').meta.wide).toBe(true)
+    expect(router.resolve('/audits/month-close/settings').meta.wide).toBeUndefined()
+  })
+
   // DAR-UI-063. The audit's play and settings change things, so they need edit access, as a lifecycle's do.
   it.each(['audit-run-start', 'audit-settings'])('%s resolves past the audit page and needs tenant edit access', (name) => {
     const suffix = name === 'audit-run-start' ? 'run' : 'settings'

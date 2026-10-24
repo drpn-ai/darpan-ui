@@ -123,7 +123,7 @@
                 >
                   <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                     <path
-                      d="M10 2.5a.75.75 0 0 1 .75.75v7.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V3.25A.75.75 0 0 1 10 2.5Zm-5 11a.75.75 0 0 1 .75.75v1.5c0 .14.11.25.25.25h8c.14 0 .25-.11.25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 14 17.5H6A1.75 1.75 0 0 1 4.25 15.75v-1.5A.75.75 0 0 1 5 13.5Z"
+                      :d="downloadIconPath"
                       fill="currentColor"
                     />
                   </svg>
@@ -365,7 +365,7 @@
               >
                 <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                   <path
-                    d="M10 2.5a.75.75 0 0 1 .75.75v7.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V3.25A.75.75 0 0 1 10 2.5Zm-5 11a.75.75 0 0 1 .75.75v1.5c0 .14.11.25.25.25h8c.14 0 .25-.11.25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 14 17.5H6A1.75 1.75 0 0 1 4.25 15.75v-1.5A.75.75 0 0 1 5 13.5Z"
+                    :d="downloadIconPath"
                     fill="currentColor"
                   />
                 </svg>
@@ -607,7 +607,7 @@ import {
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
-import { backIconPath, listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
+import { backIconPath, downloadIconPath, listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'

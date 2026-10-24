@@ -489,6 +489,19 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(wrapper.get('.workflow-escape-hint').classes()).toContain('workflow-escape-hint--static')
   })
 
+  // DAR-UI-074. A page that needs the whole screen (the audit board) lifts the static shell's width cap; the rest keep it.
+  it('lifts the static shell\'s width cap only for a page marked wide', async () => {
+    route.meta = { surfaceMode: 'static', wide: true }
+    const wide = mountApp()
+    await flushPromises()
+    expect(wide.get('.app-shell').classes()).toContain('app-shell--wide')
+
+    route.meta = { surfaceMode: 'static' }
+    const plain = mountApp()
+    await flushPromises()
+    expect(plain.get('.app-shell').classes()).not.toContain('app-shell--wide')
+  })
+
   it('reserves no lane at rest, so a static page does not open on an empty band', async () => {
     route.meta = { surfaceMode: 'static' }
     const wrapper = mountApp()

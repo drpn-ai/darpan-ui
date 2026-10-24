@@ -25,6 +25,8 @@ declare module 'vue-router' {
     reconciliationRunRedirectName?: RouteRecordName
     tenantEditRedirectName?: RouteRecordName
     surfaceMode?: 'static' | 'workflow'
+    /** DAR-UI-074. A static page that uses the whole screen: the shell keeps its padding and drops its width cap. */
+    wide?: boolean
     staticPageLabel?: string
     /** A query change keeps the page: the same instance (App's RouterView key) and the same scroll. */
     queryKeepsPage?: boolean

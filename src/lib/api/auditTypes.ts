@@ -73,6 +73,19 @@ export interface AuditFindingSummary {
   records: AuditRecords
   difference: AuditMoney | null
   next: string
+  /** DAR-UI-075. An order's lines as one finding: id is the order, the lines sit under it, stuck names the line(s)
+   *  holding it up (their cause is their own while the others' is held by it). Absent on a lone line. */
+  kind?: 'order'
+  order?: string
+  cause?: string | null
+  stuck?: string[]
+  lines?: AuditFindingLine[]
+}
+
+export interface AuditFindingLine extends AuditFindingSummary {
+  cause: string | null
+  /** Held by another line's cause (e.g. "another line of its order is backordered"). */
+  held: boolean
 }
 
 export interface AuditStatement {
@@ -184,6 +197,38 @@ export interface GetAuditReportResponse extends AuditEnvelope {
 
 export interface GetAuditFindingResponse extends AuditEnvelope {
   finding?: AuditFindingDocument | null
+}
+
+// DAR-UI-075. Every open and pending finding of an audit and period, one per order (get#AuditFindingsByOrder).
+export interface GetAuditFindingsByOrderResponse extends AuditEnvelope {
+  findings?: AuditFindingListItem[]
+}
+
+// DAR-UI-072. What each system's read wrote for a check's morning (get#AuditCheckExtracts); read via get#GeneratedOutput.
+export interface AuditCheckExtract {
+  system: string | null
+  records: number | null
+  filePath: string
+}
+
+export interface GetAuditCheckExtractsResponse extends AuditEnvelope {
+  extracts?: AuditCheckExtract[]
+}
+
+// DAR-UI-070. A page of a statement's open and pending findings past the report's 50 (get#AuditFindings).
+// A findings page row: the report's summary plus where it sits and, DAR-UI-073, its cause in words.
+export interface AuditFindingListItem extends AuditFindingSummary {
+  audit?: string
+  period?: string
+  statement: string
+  category: string
+  cause: string | null
+}
+
+export interface GetAuditFindingsResponse extends AuditEnvelope {
+  findings?: AuditFindingListItem[]
+  endCursor?: string | null
+  hasNextPage?: boolean
 }
 
 // DAR-UI-063. The audit's settings gear and play button (facade.AuditFacadeServices get#/save#AuditSettings, run#Audit).

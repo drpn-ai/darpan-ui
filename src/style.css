@@ -409,6 +409,11 @@ button:disabled {
   padding: 0;
 }
 
+/* DAR-UI-074. A static page that needs the whole screen (the audit board): the shell's padding stays as the gutter. */
+.app-shell--wide {
+  max-width: none;
+}
+
 /* Bound only when a notice is up on a static surface — see --notice-lane-height above. The :not()
    is belt-and-braces: this rule sits after .app-shell--workflow's `padding: 0`, so without it a
    leaked class would silently un-zero a workflow surface's padding. */

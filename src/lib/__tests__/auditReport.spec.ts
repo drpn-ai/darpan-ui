@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ageLabel, checkStatusBadge, eventLabel, findingStateBadge, periodOptions, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemLabel } from '../auditReport'
+import { ageLabel, checkStatusBadge, eventLabel, findingStateBadge, periodOptions, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemLabel } from '../auditReport'
 
 // DAR-UI-058. The audit view's words for the report JSON's codes, and rows for its keyed objects.
 describe('auditReport', () => {
@@ -31,6 +31,15 @@ describe('auditReport', () => {
     expect(recordTypeLabel('replacementOrder')).toBe('replacement order')
     expect(recordTypeLabel('rma')).toBe('RMA')
     expect(recordTypeLabel('order')).toBe('order')
+  })
+
+  // DAR-UI-071. Fewer words: a record is named by its system, and by its type only beside another of that system.
+  it('names a record by its system, adding the type only when the system has two', () => {
+    const rows = recordRows({
+      HotWax: { orderItem: [{ id: 'M1/01', internalId: null, status: 'Completed' }] },
+      NetSuite: { rma: [{ id: 'RMA1', internalId: '51', status: null }], creditMemo: [{ id: 'CM1', internalId: null, status: null }] },
+    })
+    expect(rows.map((row) => recordLabel(row, rows))).toEqual(['HotWax', 'NetSuite RMA', 'NetSuite credit memo'])
   })
 
   it('offers a monthly audit its period and the two before, across a year end', () => {

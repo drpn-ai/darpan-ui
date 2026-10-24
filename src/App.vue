@@ -9,6 +9,7 @@
       `app-shell--${surfaceMode}`,
       { 'app-shell--popup-open': isCommandPaletteOpen || mascot.popupOpen },
       { 'app-shell--notice-open': workflowHint !== null && surfaceMode === 'static' },
+      { 'app-shell--wide': route.meta.wide === true && surfaceMode === 'static' },
     ]"
   >
     <section id="main-content" :class="['content-shell', `content-shell--${surfaceMode}`]" tabindex="-1">

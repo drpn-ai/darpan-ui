@@ -70,6 +70,12 @@ export interface RecordRow {
   status: string
 }
 
+/** DAR-UI-071. A record by its system; its type too only when another record shares the system. */
+export function recordLabel(row: RecordRow, rows: RecordRow[]): string {
+  const shared = rows.some((other) => other !== row && other.system === row.system)
+  return shared ? `${row.system} ${recordTypeLabel(row.recordType)}` : row.system
+}
+
 /** records.<System>.<recordType>[] as one row each, in the document's order. */
 export function recordRows(records: AuditRecords | null | undefined): RecordRow[] {
   const rows: RecordRow[] = []

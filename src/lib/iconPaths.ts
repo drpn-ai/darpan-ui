@@ -6,6 +6,10 @@ export const trashIconPath =
 
 export const trashIconTransform = 'translate(0 0.75)'
 
+// Arrow into a tray: a download. Filled on a 20-unit viewBox.
+export const downloadIconPath =
+  'M10 2.5a.75.75 0 0 1 .75.75v7.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V3.25A.75.75 0 0 1 10 2.5Zm-5 11a.75.75 0 0 1 .75.75v1.5c0 .14.11.25.25.25h8c.14 0 .25-.11.25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 14 17.5H6A1.75 1.75 0 0 1 4.25 15.75v-1.5A.75.75 0 0 1 5 13.5Z'
+
 export const backIconPath =
   'M9.53 4.47a.75.75 0 0 1 0 1.06L6.81 8.25H15a.75.75 0 0 1 0 1.5H6.81l2.72 2.72a.75.75 0 1 1-1.06 1.06l-4-4a.75.75 0 0 1 0-1.06l4-4a.75.75 0 0 1 1.06 0Z'
 

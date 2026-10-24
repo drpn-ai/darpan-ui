@@ -1,17 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import type { AuditCategory, AuditReport, AuditStatement } from '../api/auditTypes'
+import type { AuditCategory, AuditFindingListItem, AuditReport, AuditStatement } from '../api/auditTypes'
 import {
   HEALTH,
   categoryItems,
+  causeOptions,
   comparedBars,
   comparedGap,
+  countFor,
   countsLine,
   defaultCategory,
   defaultSource,
   defaultStatement,
   filterCounts,
   findStatement,
+  findingsLeft,
   isAuditFilter,
+  lineLabel,
+  matchesFindingFilters,
+  narrowedCounts,
+  orderKey,
+  statementFindings,
   sourceItems,
   statementItems,
 } from '../auditColumns'
@@ -79,8 +87,24 @@ describe('auditColumns', () => {
       .toEqual([['R5', '–', 'notChecked']])
   })
 
-  it('counts findings on the open and pending pills and statements on the other two', () => {
-    expect(filterCounts(report())).toEqual({ open: 3, pending: 1, notChecked: 1, all: 6 })
+  // DAR-UI-073. The pill decides what every column counts and lists: Open open, Pending pending, the rest both.
+  it('counts what the picked pill shows, in every column', () => {
+    expect([countFor(counts(340, 285), 'open'), countFor(counts(340, 285), 'pending'), countFor(counts(340, 285), 'all'),
+      countFor(counts(340, 285), 'notChecked'), countFor(undefined, 'open')]).toEqual([340, 285, 625, 625, 0])
+    expect(categoryItems(report(), 'pending').map((item) => item.count)).toEqual([0, 1, 0, 0])
+    expect(categoryItems(report(), 'all')[1]!.count).toBe(2)
+    const orders = { ...report().categories.orders!, statements: { R1: { ...statement('R1', 340, 285) } } }
+    expect(['open', 'pending', 'all'].map((f) => statementItems(orders, f as 'open')[0]!.badge)).toEqual(['340', '285', '625'])
+    const summary = (id: string, state: 'open' | 'pending') => ({ id, headline: id, state, firstFound: '', ageDays: 0, records: {}, difference: null, next: '' })
+    const doc = { ...statement('R1', 400, 6), findings: [summary('F-1', 'open'), summary('F-2', 'pending')], findingsOmitted: 404 }
+    expect(statementFindings(doc, [], 'open').map((item) => item.id)).toEqual(['F-1'])
+    expect(statementFindings(doc, [summary('F-3', 'pending')], 'pending').map((item) => item.id)).toEqual(['F-2', 'F-3'])
+    expect([findingsLeft(doc, 1, null, 'open'), findingsLeft(doc, 2, null, 'pending'), findingsLeft(doc, 2, null, 'all')]).toEqual([399, 4, 404])
+  })
+
+  // DAR-UI-073. All counts findings too (open + pending), as everything under it does; only unchecked counts statements.
+  it('counts findings on open, pending and all, and statements on unchecked', () => {
+    expect(filterCounts(report())).toEqual({ open: 3, pending: 1, notChecked: 1, all: 4 })
   })
 
   it('opens on the category with the most open findings the filter keeps, and its first statement with findings', () => {
@@ -117,12 +141,85 @@ describe('auditColumns', () => {
   it('draws a check\'s compared counts as shares of the largest and says the gap', () => {
     const check = { id: 'c', label: 'c', status: 'ran' as const, reason: null, matchedBy: null, graceDays: 1, compared: { OMS: 412, NetSuite: 409 } }
     expect(comparedBars(check)).toEqual([
-      { system: 'HotWax', count: '412', share: '100%' },
-      { system: 'NetSuite', count: '409', share: '99%' },
+      { key: 'OMS', system: 'HotWax', count: '412', share: '100%' },
+      { key: 'NetSuite', system: 'NetSuite', count: '409', share: '99%' },
     ])
     expect(comparedGap(check)).toBe('3 records not matched')
     expect(comparedGap({ ...check, compared: { NetSuite: 2210 } })).toBe('')
     expect(comparedGap({ ...check, compared: { OMS: 9, NetSuite: 9 } })).toBe('every record matched')
+  })
+
+  // DAR-UI-070. The report lists 50 a statement; "N more" pages through the rest.
+  it('lists a statement\'s findings past the report\'s 50, without the fixed or a repeat', () => {
+    const summary = (id: string, state: 'open' | 'pending' | 'fixed' = 'open') =>
+      ({ id, headline: id, state, firstFound: '2026-10-01', ageDays: 1, records: {}, difference: null, next: '' })
+    const doc = { ...statement('R1', 3, 1), findings: [summary('F-1'), summary('F-2', 'fixed'), summary('F-3', 'pending')], findingsOmitted: 2 }
+    expect(statementFindings(doc, [])).toEqual([summary('F-1'), summary('F-3', 'pending')])
+    expect(statementFindings(doc, [summary('F-1'), summary('F-4'), summary('F-5')]).map((item) => item.id)).toEqual(['F-1', 'F-3', 'F-4', 'F-5'])
+    expect(statementFindings(null, [])).toEqual([])
+  })
+
+  it('says how many findings are left to show, and none once the last page is in', () => {
+    const doc = { ...statement('R1', 400, 6), findingsOmitted: 357 }
+    expect(findingsLeft(doc, 50, null)).toBe(356)
+    expect(findingsLeft(doc, 150, true)).toBe(256)
+    expect(findingsLeft(doc, 406, false)).toBe(0)
+    expect(findingsLeft(doc, 380, false)).toBe(0)
+    expect(findingsLeft({ ...doc, findingsOmitted: 0 }, 50, null)).toBe(0)
+    expect(findingsLeft(null, 0, null)).toBe(0)
+  })
+
+  // DAR-UI-072. Findings of one order sit together under it; an order with one finding needs no heading.
+  it('keys a finding by its order: HotWax first, then Shopify, then NetSuite', () => {
+    const item = (records: Record<string, Record<string, { id: string }[]>>) =>
+      ({ id: 'F', headline: '', state: 'open' as const, firstFound: '', ageDays: 0, difference: null, next: '',
+        records: Object.fromEntries(Object.entries(records).map(([system, byType]) => [system,
+          Object.fromEntries(Object.entries(byType).map(([type, list]) => [type, list.map((r) => ({ ...r, internalId: null, status: null }))]))])) })
+    expect(orderKey(item({ OMS: { orderItem: [{ id: 'M1168149/02' }] }, NetSuite: { salesOrderLine: [{ id: 'SO7' }] } }))).toBe('M1168149')
+    expect(orderKey(item({ OMS: { order: [{ id: 'M1168007' }] } }))).toBe('M1168007')
+    expect(orderKey(item({ NetSuite: { invoice: [{ id: 'INV1' }] }, Shopify: { order: [{ id: '1895' }] } }))).toBe('1895')
+    expect(orderKey(item({ NetSuite: { salesOrder: [{ id: 'SO9' }] } }))).toBe('SO9')
+    expect(orderKey(item({ NetSuite: { creditMemo: [{ id: 'CM1' }] } }))).toBe('')
+  })
+
+  // DAR-UI-073. The toolbar's search, cause and age narrow the whole board.
+  it('narrows findings by a search over ids, a cause and an age, and counts what is left per category and statement', () => {
+    const item = (id: string, over: Partial<AuditFindingListItem>): AuditFindingListItem => ({
+      id, headline: `Item ${id} is completed in HotWax and not billed in NetSuite`, state: 'open', firstFound: '', ageDays: 2,
+      difference: null, next: '', audit: 'month-close', period: '2026-10', statement: 'R1', category: 'orders', cause: null,
+      records: { OMS: { orderItem: [{ id: 'M1168149/01', internalId: null, status: null }] },
+        NetSuite: { salesOrderLine: [{ id: 'SO7330652', internalId: '81049165', status: null }] } }, ...over })
+    const a = item('F-1', { cause: 'Backordered in NetSuite', ageDays: 9 })
+    const b = item('F-2', { records: {}, statement: 'R3', ageDays: 1 })
+    const none = { q: '', cause: '', age: 0 }
+    expect(matchesFindingFilters(a, none)).toBe(true)
+    expect(['m1168149', 'SO7330652', '81049165', 'f-1', 'billed'].map((q) => matchesFindingFilters(a, { ...none, q }))).toEqual([true, true, true, true, true])
+    expect(matchesFindingFilters(b, { ...none, q: 'M1168149' })).toBe(false)
+    expect([a, b].filter((x) => matchesFindingFilters(x, { ...none, cause: 'Backordered in NetSuite' })).map((x) => x.id)).toEqual(['F-1'])
+    expect([a, b].filter((x) => matchesFindingFilters(x, { ...none, age: 7 })).map((x) => x.id)).toEqual(['F-1'])
+    expect(causeOptions([a, b, item('F-3', { cause: 'Another line backordered' }), item('F-4', { cause: 'Backordered in NetSuite' })]))
+      .toEqual(['Another line backordered', 'Backordered in NetSuite'])
+    const counted = narrowedCounts([a, b, item('F-5', { category: 'returns', statement: 'R8' })])
+    expect([counted.byCategory.get('orders'), counted.byCategory.get('returns'), counted.byStatement.get('R1'), counted.byStatement.get('R3')]).toEqual([2, 1, 1, 1])
+  })
+
+  // DAR-UI-075. An order is one finding; its lines are named by their place in it, and the filters see every line.
+  it('names an order\'s line by its place in the order, and filters an order by any of its lines', () => {
+    const line = (id: string, item: string, cause: string | null, held = false) => ({
+      id, headline: `Item ${item} is completed in HotWax and not billed in NetSuite`, state: 'open' as const, firstFound: '',
+      ageDays: 2, difference: null, next: '', cause, held,
+      records: { OMS: { orderItem: [{ id: item, internalId: null, status: 'Completed' }] } } })
+    const lines = [line('F-1', 'M1168785/01', 'Backordered in NetSuite'),
+      line('F-2', 'M1168785/02', 'Shipped, not billed: another line of its order is backordered in NetSuite', true)]
+    expect(lines.map((l) => lineLabel('M1168785', l))).toEqual(['Line 1', 'Line 2'])
+    expect(lineLabel('M1168785', { ...lines[0]!, records: {} })).toBe('F-1')
+    const order: AuditFindingListItem = { id: 'M1168785', kind: 'order', order: 'M1168785', headline: 'Order M1168785: line 1 backordered in NetSuite, holding 1 more line',
+      state: 'open', firstFound: '', ageDays: 2, difference: null, next: '', records: {}, statement: 'R1', category: 'orders',
+      cause: 'Backordered in NetSuite', stuck: ['F-1'], lines }
+    const none = { q: '', cause: '', age: 0 }
+    expect(matchesFindingFilters(order, { ...none, q: 'M1168785/02' })).toBe(true)
+    expect(matchesFindingFilters(order, { ...none, cause: 'Shipped, not billed: another line of its order is backordered in NetSuite' })).toBe(true)
+    expect(causeOptions([order])).toEqual(['Backordered in NetSuite', 'Shipped, not billed: another line of its order is backordered in NetSuite'])
   })
 
   it('reads counts and filters in words', () => {

@@ -1,6 +1,9 @@
 import { callService } from './client'
 import type {
   GetAuditFindingResponse,
+  GetAuditCheckExtractsResponse,
+  GetAuditFindingsByOrderResponse,
+  GetAuditFindingsResponse,
   GetAuditReportResponse,
   GetAuditSettingsResponse,
   GetAuditsResponse,
@@ -517,6 +520,9 @@ const AUDIT = {
   getAudits: 'facade.AuditFacadeServices.get#Audits',
   getAuditReport: 'facade.AuditFacadeServices.get#AuditReport',
   getAuditFinding: 'facade.AuditFacadeServices.get#AuditFinding',
+  getAuditFindings: 'facade.AuditFacadeServices.get#AuditFindings',
+  getAuditCheckExtracts: 'facade.AuditFacadeServices.get#AuditCheckExtracts',
+  getAuditFindingsByOrder: 'facade.AuditFacadeServices.get#AuditFindingsByOrder',
   getAuditSettings: 'facade.AuditFacadeServices.get#AuditSettings',
   saveAuditSettings: 'facade.AuditFacadeServices.save#AuditSettings',
   runAudit: 'facade.AuditFacadeServices.run#Audit',
@@ -531,6 +537,24 @@ export const auditFacade = {
   },
   getAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<GetAuditFindingResponse> {
     return callService<GetAuditFindingResponse>(AUDIT.getAuditFinding, payload, signal)
+  },
+  getAuditFindings(
+    payload: { audit: string; statement?: string; state?: 'open' | 'pending'; period?: string; after?: string },
+    signal?: AbortSignal,
+  ): Promise<GetAuditFindingsResponse> {
+    return callService<GetAuditFindingsResponse>(AUDIT.getAuditFindings, payload, signal)
+  },
+  getAuditFindingsByOrder(
+    payload: { audit: string; statement?: string; state?: 'open' | 'pending'; period?: string },
+    signal?: AbortSignal,
+  ): Promise<GetAuditFindingsByOrderResponse> {
+    return callService<GetAuditFindingsByOrderResponse>(AUDIT.getAuditFindingsByOrder, payload, signal)
+  },
+  getAuditCheckExtracts(
+    payload: { audit: string; check: string; date: string; period: string },
+    signal?: AbortSignal,
+  ): Promise<GetAuditCheckExtractsResponse> {
+    return callService<GetAuditCheckExtractsResponse>(AUDIT.getAuditCheckExtracts, payload, signal)
   },
   // DAR-UI-063. The settings gear and play button. save# and run# are writes, so callService drops the read cache.
   getAuditSettings(payload: { audit: string }, signal?: AbortSignal): Promise<GetAuditSettingsResponse> {

@@ -16,12 +16,16 @@ vi.mock('vue-router', async () => {
   }
 })
 vi.mock('../../../lib/api/facade', () => ({
-  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAudits: vi.fn() },
+  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindings: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn() },
+  reconciliationFacade: { getGeneratedOutput: vi.fn() },
 }))
 
+vi.mock('../../../lib/utils/download', () => ({ downloadTextFile: vi.fn() }))
+
+import { downloadTextFile } from '../../../lib/utils/download'
 import { useRoute } from 'vue-router'
 import { WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
-import { auditFacade } from '../../../lib/api/facade'
+import { auditFacade, reconciliationFacade } from '../../../lib/api/facade'
 import AuditReportPage from '../AuditReportPage.vue'
 import type { AuditReport } from '../../../lib/api/auditTypes'
 
@@ -94,8 +98,8 @@ const findingDocument = {
     status: { state: 'open', firstFound: '2026-10-02', lastSeen: '2026-10-08', lastChecked: null, ageDays: 6, timesSeen: 7, pendingUntil: null, closedAt: null, closedBy: null },
     records: { NetSuite: { invoice: [{ id: 'INV1', internalId: '801', status: 'Invoice : Open' }] }, OMS: { order: [{ id: 'M1', internalId: null, status: null }] } },
     evidence: { rule: null, expected: null, actual: null, difference: null, checks: [{ label: 'The invoice has no Etail id', passed: true, value: null }] },
-    diagnosis: { conclusion: null, explanation: null },
-    fix: { owner: 'Gorjana Accounting', where: 'NETSUITE', action: 'Enter the Shopify order id on invoice INV1.', verify: { by: 'next check', nextCheck: null, passesWhen: null }, darpanChanges: 'Nothing.' },
+    diagnosis: { conclusion: { code: 'CONC_NO_ETAIL', label: 'No Shopify order id (Etail id)' }, explanation: null },
+    fix: { owner: 'Gorjana Accounting', where: 'NETSUITE', action: 'Enter the Shopify order id on invoice INV1.', verify: { by: 'next check', nextCheck: null, passesWhen: 'the invoice carries the Etail id.' }, darpanChanges: 'Nothing.' },
     history: [{ at: '2026-10-02T06:10:00-07:00', event: 'found', by: { type: 'check', id: 'invoices-without-etail-id', label: 'scheduled check' } }],
   },
   access: { mode: 'read-only', note: '' },
@@ -135,11 +139,14 @@ describe('AuditReportPage', () => {
     expect(w.get('[data-testid="audit-statement-text"]').text()).toBe('Every invoice carries the Etail id.')
     expect(w.get('[data-testid="audit-check-invoices-without-etail-id"]').text()).toContain('Invoices with no Etail id')
     expect(w.get('[data-testid="audit-compared-bar"]').text()).toContain('3,311')
-    // The counts are the filters, and the day's movement sits beside them.
+    // The counts are the filters.
     expect(w.get('[data-testid="audit-filter-open"]').text()).toBe('1 open')
     expect(w.get('[data-testid="audit-filter-all"]').text()).toBe('2 all')
     expect(w.get('[data-testid="audit-filter-all"]').attributes('aria-pressed')).toBe('true')
     expect(w.get('[data-testid="audit-today"]').text()).toBe('2 new · 0 fixed today · oldest R2, 6d')
+    // DAR-UI-074. The day's note describes the morning, so it sits under the window in the hero; the toolbar holds controls.
+    expect(w.find('.static-page-hero [data-testid="audit-today"]').exists()).toBe(true)
+    expect(w.find('.audit-toolbar [data-testid="audit-today"]').exists()).toBe(false)
     expect(w.get('[data-testid="audit-columns"]').attributes('data-level')).toBe('1')
   })
 
@@ -200,11 +207,20 @@ describe('AuditReportPage', () => {
     expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Invoice INV1 has no Etail id')
     const records = w.findAll('[data-testid="audit-record-row"]').map((row) => row.text())
     expect(records[0]).toContain('NetSuite')
-    expect(records[0]).toContain('801')
+    expect(records[0]).toContain('Invoice : Open')
     expect(records[1]).toContain('HotWax')
-    expect(w.get('[data-testid="audit-evidence-row"]').text()).toContain('The invoice has no Etail id')
+    // A finding its cause explains needs no evidence: the fix and the records say it.
+    expect(w.find('[data-testid="audit-evidence-row"]').exists()).toBe(false)
     expect(w.get('[data-testid="audit-finding-fix"]').text()).toBe('Enter the Shopify order id on invoice INV1.')
     expect(w.findAll('[data-testid="audit-history-row"]')).toHaveLength(1)
+    // DAR-UI-071. What is wrong leads, then the fix; the records are a plain list under them, not tiles.
+    const order = ['audit-finding-headline', 'audit-finding-fix', 'audit-record-row']
+      .map((id) => w.get('[data-testid="audit-columns"]').html().indexOf(`data-testid="${id}"`))
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+    expect(w.find('.audit-record-id').exists()).toBe(false)
+    // Half the words: the fix is written per cause, so the cause, "done when", the internal id and the sighting count go.
+    const detail = w.get('[aria-label="Detail"]').text()
+    for (const gone of ['No Shopify order id', 'Done when', '801', 'seen']) expect(detail).not.toContain(gone)
 
     // The path steps back up: the statement drops the finding.
     await w.get('[data-testid="audit-path-statement"]').trigger('click')
@@ -249,7 +265,8 @@ describe('AuditReportPage', () => {
   it('reloads for another period and drops the open finding', async () => {
     const w = mount(AuditReportPage)
     await flushPromises()
-    const select = w.findComponent({ name: 'AppSelect' })
+    // DAR-UI-073: the toolbar's cause and age selects come first; take the period's by its test id.
+    const select = w.findAllComponents({ name: 'AppSelect' }).find((c) => c.props('testId') === 'audit-period')!
     expect(select.props('options').map((o: { value: string }) => o.value)).toEqual(['2026-10', '2026-09', '2026-08'])
     select.vm.$emit('update:modelValue', '2026-09')
     expect(replace).toHaveBeenCalledWith({ query: { period: '2026-09', finding: undefined } })
@@ -269,6 +286,232 @@ describe('AuditReportPage', () => {
     const w = mount(AuditReportPage)
     await flushPromises()
     expect(w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))).toEqual(['F-1', 'F-2'])
+  })
+
+  // DAR-UI-070. The report lists 50 a statement; "N more" pages through the rest, a page at a time.
+  it('shows a statement\'s findings past the report\'s 50 when "more" is picked', async () => {
+    const doc = report()
+    const r2 = doc.categories.orders!.statements.R2!
+    r2.counts = counts(3, 1)
+    r2.findingsOmitted = 2
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    const summary = (id: string) => ({ id, headline: `Invoice ${id} has no Etail id`, state: 'open', firstFound: '2026-10-08',
+      ageDays: 0, records: {}, difference: null, next: '' })
+    // DAR-UI-075. "More" reads the rest as the report lists them, one per order, in one call.
+    f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [summary('F-1'), summary('F-2'), summary('F-4'), summary('F-5')] } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    const rows = () => w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    const more = () => w.find('[data-testid="audit-findings-more"]')
+    expect(more().text()).toBe('2 more')
+    // The heading counts the statement's open and pending findings, not the rows the report listed.
+    expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('4')
+
+    await more().trigger('click')
+    await flushPromises()
+    expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R2', period: '2026-10' }, expect.anything())
+    expect(rows()).toEqual(['F-1', 'F-2', 'F-4', 'F-5'])
+    expect(more().exists()).toBe(false)
+
+    // Another statement starts over from the report's own list.
+    liveRoute.query = { category: 'orders', statement: 'R3' }
+    await flushPromises()
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    await flushPromises()
+    expect(rows()).toEqual(['F-1', 'F-2'])
+  })
+
+  // DAR-UI-071. With no cause to explain it, the checks are the only explanation, so the evidence shows.
+  it('shows the evidence only for a finding no cause explains', async () => {
+    f.getAuditFinding.mockResolvedValue({ ok: true, finding: { ...findingDocument,
+      finding: { ...findingDocument.finding, diagnosis: { conclusion: null, explanation: null } } } } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.get('[data-testid="audit-evidence-row"]').text()).toContain('The invoice has no Etail id')
+  })
+
+  // DAR-UI-072. The findings of one order sit together under it.
+  // DAR-UI-075. An order is one finding: its row names the order, its detail the line holding it up and every line.
+  it('shows an order as one finding and names the line holding it up', async () => {
+    const doc = report()
+    const line = (id: string, item: string, cause: string, held: boolean) => ({ id, headline: `Item ${item} is completed in HotWax and not billed in NetSuite`,
+      state: 'open' as const, firstFound: '2026-10-02', ageDays: 6, difference: null, next: '', cause, held,
+      records: { OMS: { orderItem: [{ id: item, internalId: null, status: 'Completed' }] } } })
+    doc.categories.orders!.statements.R2!.findings = [{ id: 'M1168785', kind: 'order', order: 'M1168785',
+      headline: 'Order M1168785: line 1 backordered in NetSuite, holding 1 more line', state: 'open', firstFound: '2026-10-02', ageDays: 6,
+      difference: null, next: 'darpan findings show F-1', records: {}, cause: 'Backordered in NetSuite', stuck: ['F-1'],
+      lines: [line('F-1', 'M1168785/01', 'Backordered in NetSuite', false),
+        line('F-2', 'M1168785/02', 'Shipped, not billed: another line of its order is backordered in NetSuite', true)] }]
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    const row = w.get('[data-testid="audit-finding-row"]')
+    expect(row.text()).toContain('Order M1168785')
+    expect(row.text()).toContain('line 1 backordered in NetSuite, holding 1 more line')
+
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M1168785' }
+    await flushPromises()
+    expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-1' }, expect.anything())
+    expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Order M1168785: line 1 backordered in NetSuite, holding 1 more line')
+    const lines = w.findAll('[data-testid="audit-order-line"]')
+    expect(lines.map((l) => l.text())).toEqual([expect.stringContaining('Line 1'), expect.stringContaining('Line 2')])
+    expect(lines.map((l) => l.text()).join(' ')).not.toContain('/0')
+    expect(lines[0]!.classes()).toContain('audit-line--stuck')
+    expect(lines[1]!.text()).toContain('Held by line 1')
+    await lines[1]!.trigger('click')
+    expect(push).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-2' } })
+  })
+
+  // DAR-UI-075. An order past the report's 50 (a reload, a link) is found by reading the statement's orders first.
+  it('opens an order the report does not list by reading the statement\'s orders', async () => {
+    const line = { id: 'F-7', headline: 'Item M77/01 is completed in HotWax and not billed in NetSuite', state: 'open' as const,
+      firstFound: '2026-10-02', ageDays: 6, difference: null, next: '', cause: null, held: false,
+      records: { OMS: { orderItem: [{ id: 'M77/01', internalId: null, status: 'Completed' }] } } }
+    f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [{ id: 'M77', kind: 'order', order: 'M77',
+      headline: 'Order M77: line 1 is completed in HotWax and not billed in NetSuite', state: 'open', firstFound: '2026-10-02',
+      ageDays: 6, difference: null, next: '', records: {}, cause: null, stuck: [], lines: [line], statement: 'R2', category: 'orders' }] } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M77' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R2', period: '2026-10' }, expect.anything())
+    expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-7' }, expect.anything())
+    expect(f.getAuditFinding).not.toHaveBeenCalledWith({ findingId: 'M77' }, expect.anything())
+    expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Order M77: line 1 is completed in HotWax and not billed in NetSuite')
+  })
+
+  // DAR-UI-072. JSON exports: the morning's report, every page of a statement's findings, the open finding.
+  it('exports the report, a statement\'s findings and the open finding as JSON', async () => {
+    const download = vi.mocked(downloadTextFile)
+    download.mockReset()
+    const summary = (id: string, item: string) => ({ id, headline: id, state: 'open', firstFound: '2026-10-02', ageDays: 6,
+      difference: null, next: '', records: { OMS: { orderItem: [{ id: item, internalId: null, status: null }] } } })
+    f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [summary('F-1', 'M1/01'), summary('F-9', 'M2/01')] } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+
+    await w.get('[data-testid="audit-export-report"]').trigger('click')
+    expect(download).toHaveBeenLastCalledWith('month-close-2026-10-08.json', JSON.stringify(report(), null, 2), 'application/json')
+
+    await w.get('[data-testid="audit-export-findings"]').trigger('click')
+    await flushPromises()
+    expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R2', period: '2026-10' }, expect.anything())
+    const [name, text] = download.mock.lastCall!
+    expect(name).toBe('month-close-2026-10-R2-findings.json')
+    const doc = JSON.parse(text)
+    expect([doc.audit, doc.period, doc.statement]).toEqual(['month-close', '2026-10', 'R2'])
+    expect(doc.findings.map((item: { id: string; order: string }) => [item.id, item.order])).toEqual([['F-1', 'M1'], ['F-9', 'M2']])
+
+    await w.get('[data-testid="audit-export-finding"]').trigger('click')
+    expect(download).toHaveBeenLastCalledWith('F-1.json', JSON.stringify(findingDocument, null, 2), 'application/json')
+  })
+
+  // DAR-UI-072. Each system's bar on a check downloads what that system's read wrote that morning.
+  it('downloads a check\'s extract for one system', async () => {
+    const download = vi.mocked(downloadTextFile)
+    download.mockReset()
+    f.getAuditCheckExtracts.mockResolvedValue({ ok: true, extracts: [
+      { system: 'NetSuite', records: 3311, filePath: 'reconciliation-runs/GORJANA/ns.json' }] } as never)
+    vi.mocked(reconciliationFacade.getGeneratedOutput).mockResolvedValue({ ok: true,
+      outputFile: { contentText: '[{"tranId":"INV1"}]', contentType: 'application/json' } } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+
+    await w.get('[data-testid="audit-extract-NetSuite"]').trigger('click')
+    await flushPromises()
+    expect(f.getAuditCheckExtracts).toHaveBeenCalledWith(
+      { audit: 'month-close', check: 'invoices-without-etail-id', date: '2026-10-08', period: '2026-10' }, expect.anything())
+    expect(reconciliationFacade.getGeneratedOutput).toHaveBeenCalledWith({ fileName: 'reconciliation-runs/GORJANA/ns.json', format: 'json' })
+    expect(download).toHaveBeenLastCalledWith('month-close-2026-10-08-invoices-without-etail-id-NetSuite.json', '[{"tranId":"INV1"}]', 'application/json')
+  })
+
+  it('says so when a check\'s run kept no extract', async () => {
+    f.getAuditCheckExtracts.mockResolvedValue({ ok: true, extracts: [] } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    await w.get('[data-testid="audit-extract-NetSuite"]').trigger('click')
+    await flushPromises()
+    expect(w.get('[data-testid="audit-export-error"]').text()).toContain('No NetSuite extract')
+  })
+
+  // DAR-UI-073. The pill decides what every column counts and lists.
+  it('counts and lists what the picked pill shows, in every column', async () => {
+    const rows = (w: ReturnType<typeof mount>) => w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    liveRoute.query = { show: 'open', category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(rows(w)).toEqual(['F-1'])
+    expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('1')
+
+    liveRoute.query = { show: 'pending', category: 'orders', statement: 'R2' }
+    await flushPromises()
+    expect(rows(w)).toEqual(['F-2'])
+    expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('1')
+
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    await flushPromises()
+    expect(rows(w)).toEqual(['F-1', 'F-2'])
+    expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('2')
+  })
+
+  it('asks only for the picked pill\'s findings when "more" is picked', async () => {
+    const doc = report()
+    doc.categories.orders!.statements.R2!.counts = counts(3, 1)
+    doc.categories.orders!.statements.R2!.findingsOmitted = 2
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [] } as never)
+    liveRoute.query = { show: 'open', category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.get('[data-testid="audit-findings-more"]').text()).toBe('2 more')
+    await w.get('[data-testid="audit-findings-more"]').trigger('click')
+    expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R2', period: '2026-10', state: 'open' }, expect.anything())
+  })
+
+  // DAR-UI-073. The toolbar's search, cause and age narrow the whole board, over every finding of the period.
+  it('narrows the whole board by a search, a cause and an age', async () => {
+    const item = (id: string, statement: string, invoice: string, cause: string | null, ageDays: number) => ({
+      id, headline: `Invoice ${invoice} has no Etail id`, state: 'open', firstFound: '2026-10-02', ageDays, difference: null, next: '',
+      audit: 'month-close', period: '2026-10', statement, category: 'orders', cause,
+      records: { NetSuite: { invoice: [{ id: invoice, internalId: null, status: null }] } } })
+    f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [
+      item('F-1', 'R2', 'INV1', 'Never reached NetSuite', 6), item('F-2', 'R2', 'INV2', 'Backordered in NetSuite', 0),
+      item('F-9', 'R3', 'INV9', 'Backordered in NetSuite', 9)] } as never)
+    const rows = (w: ReturnType<typeof mount>) => w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    const badges = (w: ReturnType<typeof mount>) => w.findAll('[data-testid="audit-statement-row-orders"]').map((row) => row.text())
+
+    liveRoute.query = { category: 'orders', statement: 'R2', q: 'inv2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', period: '2026-10' }, expect.anything())
+    expect(rows(w)).toEqual(['F-2'])
+    expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('1')
+    expect(badges(w)).toEqual([expect.stringContaining('R2')])
+    // Pages earlier tests mounted are still live; count only what the later picks ask for.
+    const reads = f.getAuditFindingsByOrder.mock.calls.length
+
+    liveRoute.query = { category: 'orders', statement: 'R3', cause: 'Backordered in NetSuite' }
+    await flushPromises()
+    expect(rows(w)).toEqual(['F-9'])
+    expect(badges(w).length).toBe(2)
+
+    liveRoute.query = { category: 'orders', statement: 'R2', age: '7' }
+    await flushPromises()
+    expect(rows(w)).toEqual([])
+    liveRoute.query = { category: 'orders', statement: 'R3', age: '7' }
+    await flushPromises()
+    expect(rows(w)).toEqual(['F-9'])
+    // One read of the period serves every filter.
+    expect(f.getAuditFindingsByOrder.mock.calls.length).toBe(reads)
+
+    await w.get('[data-testid="audit-search"]').setValue('SO7330652')
+    await w.get('[data-testid="audit-search"]').trigger('change')
+    expect(replace).toHaveBeenLastCalledWith({ query: expect.objectContaining({ q: 'SO7330652', finding: undefined }) })
   })
 
   // DAR-UI-068. A pick changes only ?category, ?statement or ?finding; the report on screen is still the one to show.
@@ -291,7 +534,8 @@ describe('AuditReportPage', () => {
     f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
     const w = mount(AuditReportPage)
     await flushPromises()
-    const select = w.findComponent({ name: 'AppSelect' })
+    // DAR-UI-073: the toolbar's cause and age selects come first; take the period's by its test id.
+    const select = w.findAllComponents({ name: 'AppSelect' }).find((c) => c.props('testId') === 'audit-period')!
     expect(select.props('options').map((o: { value: string }) => o.value)).toEqual(['2026-10', '2026-09', '2026-08'])
   })
 

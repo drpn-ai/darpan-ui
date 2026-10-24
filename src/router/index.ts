@@ -125,7 +125,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/audits/:audit',
     name: 'audit-report',
     component: () => import('../pages/reconciliation/AuditReportPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Audit', queryKeepsPage: true },
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Audit', queryKeepsPage: true, wide: true },
   },
   {
     path: '/reconciliation/ruleset-manager',

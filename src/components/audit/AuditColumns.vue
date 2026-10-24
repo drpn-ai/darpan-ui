@@ -38,7 +38,7 @@
         >
           <template v-if="rail">
             <span class="audit-rail-label">{{ item.short }}</span>
-            <span class="audit-rail-count" :class="{ 'audit-rail-count--hot': item.attention }">{{ item.id === HEALTH ? (item.attention ? '!' : '✓') : item.open || item.pending }}</span>
+            <span class="audit-rail-count" :class="{ 'audit-rail-count--hot': item.attention }">{{ item.id === HEALTH ? (item.attention ? '!' : '✓') : item.count }}</span>
           </template>
           <template v-else>
             <span class="audit-row-main">
@@ -124,9 +124,17 @@
         </section>
 
         <section class="audit-col audit-col--3" aria-label="Findings">
-          <h2 class="micro-label audit-col-head"><span>Findings</span><span>{{ findings.length }}</span></h2>
+          <h2 class="micro-label audit-col-head">
+            <span>Findings</span>
+            <span class="audit-col-head-end">
+              <span data-testid="audit-findings-count">{{ findingsTotal.toLocaleString('en-US') }}</span>
+              <button v-if="findings.length" type="button" class="app-icon-action" aria-label="Export findings" title="Export findings" data-testid="audit-export-findings" :disabled="exporting" @click="emit('export', 'statement')">
+                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
+              </button>
+            </span>
+          </h2>
           <template v-for="(item, index) in findings" :key="item.id">
-            <p v-if="groupLabel(index)" class="audit-col-note" data-testid="audit-findings-group">{{ groupLabel(index) }}</p>
+            <p v-if="item.kind !== 'order' && groupLabel(index)" class="audit-col-note" data-testid="audit-findings-group">{{ groupLabel(index) }}</p>
             <button
               type="button"
               class="audit-row audit-row--finding"
@@ -140,13 +148,18 @@
                 <span class="audit-finding-subject">{{ splitHeadline(item.headline).subject }}</span>
                 <span class="audit-row-sub" :class="{ 'audit-hot': item.state === 'open' }">{{ findingStateBadge(item.state).label }} · {{ ageShort(item.ageDays) }}</span>
               </span>
+              <!-- DAR-UI-075. An order: what holds it up, under its name. -->
+              <span v-if="item.kind === 'order'" class="audit-row-sub">{{ splitHeadline(item.headline).rest }}</span>
               <span class="sr-only">{{ item.id }}</span>
             </button>
           </template>
           <div v-if="statementDoc && !findings.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
-            {{ statementDoc.status === 'notRun' ? 'No check yet' : 'Holds' }}
+            {{ narrowed ? 'No match' : statementDoc.status === 'notRun' ? 'No check yet' : 'Holds' }}
           </div>
-          <p v-if="statementDoc?.findingsOmitted" class="section-note audit-pad">{{ statementDoc.findingsOmitted }} more</p>
+          <InlineValidation v-if="more.error" tone="error" :message="more.error" data-testid="audit-findings-more-error" />
+          <button v-if="findingsLeftCount" type="button" class="audit-more audit-pad" data-testid="audit-findings-more" :disabled="more.loading" @click="emit('more')">
+            {{ more.loading ? 'Loading...' : `${findingsLeftCount} more` }}
+          </button>
         </section>
 
         <section class="audit-col audit-col--4 audit-col--detail" aria-label="Detail">
@@ -157,23 +170,22 @@
             <template v-if="findingDoc">
               <div class="audit-detail-head">
                 <StatusBadge :label="findingStateBadge(findingDoc.finding.status.state).label" :tone="findingStateBadge(findingDoc.finding.status.state).tone" />
-                <span class="audit-row-sub">{{ sinceLine }}</span>
+                <span class="audit-col-head-end">
+                  <span class="audit-row-sub">{{ sinceLine }}</span>
+                  <button type="button" class="app-icon-action" aria-label="Export finding" title="Export finding" data-testid="audit-export-finding" @click="emit('export', 'finding')">
+                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
+                  </button>
+                </span>
               </div>
 
-              <div class="audit-records">
-                <article v-for="row in records" :key="row.key" class="audit-record" data-testid="audit-record-row">
-                  <span class="audit-row-sub">{{ row.system }} {{ recordTypeLabel(row.recordType) }}</span>
-                  <span class="audit-record-id">{{ row.id }}</span>
-                  <span v-if="row.status || row.internalId" class="audit-row-sub audit-row-split"><span>{{ row.status }}</span><span>{{ row.internalId }}</span></span>
-                </article>
-              </div>
-              <p class="audit-lead" data-testid="audit-finding-headline">{{ headlineText }}</p>
+              <!-- DAR-UI-071. What is wrong leads, then the fix; the records are the reference under them. -->
+              <p class="audit-lead" data-testid="audit-finding-headline">{{ orderUnit?.headline ?? findingDoc.finding.headline }}</p>
 
               <dl v-if="money.length" class="audit-facts">
                 <template v-for="item in money" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></template>
               </dl>
 
-              <p v-if="whyLine" class="audit-body audit-muted">{{ whyLine }}</p>
+              <p v-if="whyLine && !findingDoc.finding.fix.action" class="audit-body audit-muted">{{ whyLine }}</p>
 
               <template v-if="findingDoc.finding.fix.action">
                 <div class="audit-detail-head">
@@ -181,10 +193,37 @@
                   <span v-if="fixOwner" class="audit-tag">{{ fixOwner }}</span>
                 </div>
                 <p class="audit-body" data-testid="audit-finding-fix">{{ findingDoc.finding.fix.action }}</p>
-                <p v-if="findingDoc.finding.fix.verify?.passesWhen" class="section-note">Done when {{ findingDoc.finding.fix.verify.passesWhen.replace(/\.$/, '') }}</p>
               </template>
 
-              <details v-if="findingDoc.finding.evidence.checks.length" class="audit-fold" :open="evidenceFailed">
+              <!-- DAR-UI-075. An order's lines: the one holding it up outlined, the rest held by it; each opens its own finding. -->
+              <template v-if="orderUnit?.lines?.length">
+                <h3 class="micro-label">Lines <span class="audit-fold-count">{{ orderUnit.lines.length }}</span></h3>
+                <ul class="audit-lines">
+                  <li v-for="line in orderUnit.lines" :key="line.id">
+                    <button
+                      type="button"
+                      class="audit-line"
+                      :class="{ 'audit-line--stuck': orderUnit.stuck?.includes(line.id) }"
+                      :title="line.id"
+                      data-testid="audit-order-line"
+                      @click="emit('navigate', { category, statement, finding: line.id })"
+                    >
+                      <span>{{ lineLabel(orderUnit.order ?? orderUnit.id, line) }}</span>
+                      <span class="audit-row-sub">{{ lineWhy(line) }}</span>
+                    </button>
+                  </li>
+                </ul>
+              </template>
+
+              <dl v-if="records.length" class="audit-facts audit-records">
+                <div v-for="row in records" :key="row.key" data-testid="audit-record-row">
+                  <dt>{{ recordLabel(row, records) }}</dt>
+                  <dd>{{ row.id }}<span v-if="row.status" class="audit-muted"> · {{ row.status }}</span></dd>
+                </div>
+              </dl>
+
+              <!-- DAR-UI-071. A finding its cause explains needs no evidence: the fix and the records already say it. -->
+              <details v-if="findingDoc.finding.evidence.checks.length && !findingDoc.finding.diagnosis.conclusion" class="audit-fold" :open="evidenceFailed">
                 <summary class="micro-label">Evidence <span class="audit-fold-count">{{ evidenceLine }}</span></summary>
                 <ul class="audit-evidence">
                   <li v-for="(item, index) in findingDoc.finding.evidence.checks" :key="index" data-testid="audit-evidence-row">
@@ -228,6 +267,9 @@
                   <span class="audit-row-sub">{{ bar.system }}</span>
                   <span class="audit-bar-track"><span class="audit-bar-fill" :style="{ width: bar.share }" /></span>
                   <span>{{ bar.count }}</span>
+                  <button type="button" class="app-icon-action" :aria-label="`Export ${bar.system} extract`" :title="`Export ${bar.system} extract`" :data-testid="`audit-extract-${bar.key}`" :disabled="exporting" @click="emit('extract', check.id, bar.key)">
+                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
+                  </button>
                 </div>
               </div>
               <p v-if="comparedGap(check)" class="section-note" data-testid="audit-compared-gap">{{ comparedGap(check) }}</p>
@@ -253,15 +295,16 @@
 import { computed } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
-import type { AuditFindingDocument, AuditMoney, AuditReport } from '../../lib/api/auditTypes'
+import { downloadIconPath } from '../../lib/iconPaths'
+import type { AuditFindingDocument, AuditFindingListItem, AuditFindingSummary, AuditMoney, AuditReport } from '../../lib/api/auditTypes'
 import {
   ageLabel,
   checkStatusBadge,
   eventLabel,
   FIX_WHERE_LABELS,
   findingStateBadge,
+  recordLabel,
   recordRows,
-  recordTypeLabel,
   shortDate,
   shortRange,
   sourceReadBadge,
@@ -275,10 +318,16 @@ import {
   categoryItems,
   comparedBars,
   comparedGap,
+  countFor,
   findStatement,
+  findingsLeft,
+  lineLabel,
+  narrowedCounts,
   sourceItems,
+  statementFindings,
   statementItems,
   type AuditFilter,
+  type FindingsMore,
 } from '../../lib/auditColumns'
 
 // DAR-UI-065. The audit report as drill-down columns: categories › statements › findings › the deepest pick. The page
@@ -296,21 +345,50 @@ const props = defineProps<{
   findingDoc: AuditFindingDocument | null
   findingLoading: boolean
   findingError: string
+  more: FindingsMore
+  exporting: boolean
+  /** DAR-UI-073. What the toolbar's filters left of the period's findings; null when none is on. */
+  narrowed?: AuditFindingListItem[] | null
+  /** DAR-UI-075. The order open in the detail; findingDoc is then its stuck line's (its fix and history). */
+  orderUnit?: AuditFindingSummary | null
 }>()
 
-const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>] }>()
+const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string] }>()
 
 const isHealth = computed(() => props.category === HEALTH)
 const rail = computed(() => !isHealth.value && Boolean(props.finding))
-const categories = computed(() => categoryItems(props.report))
+// DAR-UI-073. With the toolbar's filters on, every column counts and lists what they left.
+const narrowedBy = computed(() => (props.narrowed ? narrowedCounts(props.narrowed) : null))
+const categories = computed(() => {
+  const items = categoryItems(props.report, props.filter)
+  const counted = narrowedBy.value
+  if (!counted) return items
+  return items.map((item) => item.id === HEALTH ? item : { ...item, count: counted.byCategory.get(item.id) ?? 0,
+    sub: `${counted.byCategory.get(item.id) ?? 0} found`, attention: (counted.byCategory.get(item.id) ?? 0) > 0 })
+})
 const sources = computed(() => sourceItems(props.report))
 const sourceDoc = computed(() => props.report.health.sources?.[props.source] ?? null)
 const categoryDoc = computed(() => props.report.categories?.[props.category] ?? null)
-const statements = computed(() => statementItems(categoryDoc.value, props.filter))
+const statements = computed(() => {
+  const items = statementItems(categoryDoc.value, props.filter)
+  const counted = narrowedBy.value
+  return counted ? items.filter((item) => counted.byStatement.has(item.id))
+    .map((item) => ({ ...item, badge: String(counted.byStatement.get(item.id)) })) : items
+})
 const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statement] ?? null)
-// DAR-UI-069. A fixed finding stays in the report for the day's "fixed today" only; the board lists what is still wrong.
-const findings = computed(() => (statementDoc.value?.findings ?? []).filter((item) => item.state !== 'fixed'))
-const records = computed(() => recordRows(props.findingDoc?.finding.records))
+const findings = computed(() => (props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
+  : statementFindings(statementDoc.value, props.more.findings, props.filter)))
+// DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
+function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
+  const unit = props.orderUnit
+  const stuck = (unit?.lines ?? []).filter((other) => unit?.stuck?.includes(other.id))
+  if (line.held && stuck.length) return `Held by ${stuck.map((other) => lineLabel(unit?.order ?? unit?.id ?? '', other).toLowerCase()).join(', ')}`
+  return line.cause ?? findingStateBadge(line.state).label
+}
+// What the picked pill counts for the statement (DAR-UI-073), not the 50 the report lists or the pages loaded so far.
+const findingsTotal = computed(() => (statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts, props.filter) : findings.value.length))
+const findingsLeftCount = computed(() => props.narrowed ? 0 : findingsLeft(statementDoc.value, findings.value.length, props.more.hasNextPage, props.filter))
+const records = computed(() => recordRows(props.orderUnit?.records ?? props.findingDoc?.finding.records))
 
 const categoryLabel = computed(() => categories.value.find((item) => item.id === props.category)?.label ?? '')
 const secondLabel = computed(() =>
@@ -333,13 +411,6 @@ function groupLabel(index: number): string {
   const rest = rests.value[index] ?? ''
   return rest && (index === 0 || rest !== rests.value[index - 1]) ? rest : ''
 }
-
-// The record tiles carry the subject ("Return 630208"), so the headline keeps only what is wrong.
-const headlineText = computed(() => {
-  const headline = props.findingDoc?.finding.headline ?? ''
-  const { rest } = splitHeadline(headline)
-  return records.value.length && rest ? rest : headline
-})
 
 function moneyLabel(money: AuditMoney | null | undefined): string {
   return money ? `${money.amount} ${money.currency}` : ''
@@ -364,7 +435,7 @@ const sinceLine = computed(() => {
   const status = props.findingDoc?.finding.status
   if (!status) return ''
   const next = props.findingDoc?.finding.fix.verify?.nextCheck
-  return [`since ${shortDate(status.firstFound)}`, status.timesSeen > 1 ? `seen ${status.timesSeen}×` : '', next ? `next ${shortDate(next)}` : '']
+  return [`since ${shortDate(status.firstFound)}`, next ? `next ${shortDate(next)}` : '']
     .filter(Boolean).join(' · ')
 })
 
@@ -377,7 +448,8 @@ const evidenceLine = computed(() => {
 // The conclusion's label and its explanation are often the headline again; say only what is new.
 const whyLine = computed(() => {
   const diagnosis = props.findingDoc?.finding.diagnosis
-  const said = [props.findingDoc?.finding.headline ?? '', headlineText.value]
+  const headline = props.findingDoc?.finding.headline ?? ''
+  const said = [headline, splitHeadline(headline).rest]
   const parts = [diagnosis?.conclusion?.label, diagnosis?.explanation]
     .map((part) => (part ?? '').trim().replace(/\.$/, ''))
     .filter((part) => part && !said.some((text) => sameText(text, part)))
@@ -432,7 +504,9 @@ function statementText(id: string): string {
   display: grid;
   /* The deepest column gets the most room; the lists keep enough for a two-line statement. */
   grid-template-columns: minmax(10rem, 0.8fr) minmax(13rem, 1.1fr) minmax(13rem, 1fr) minmax(18rem, 1.5fr);
-  height: min(72vh, 46rem);
+  /* DAR-UI-074. Held to the window, less the toolbar and path above it, so each column scrolls on its own and the pills
+     stay in view. A phone stacks the columns at their own height (below). */
+  height: max(28rem, calc(100dvh - 12rem));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -540,6 +614,20 @@ function statementText(id: string): string {
   font-size: var(--type-meta-size);
 }
 
+.audit-more {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--type-meta-size);
+  cursor: pointer;
+}
+
+.audit-more:hover:not(:disabled) {
+  color: var(--text);
+}
+
 .audit-row-split {
   display: flex;
   justify-content: space-between;
@@ -560,6 +648,47 @@ function statementText(id: string): string {
   border-bottom: 1px solid var(--border-soft);
   color: var(--text-muted);
   font-size: var(--type-meta-size);
+}
+
+.audit-col-head-end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.audit-lines {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* DAR-UI-075. One line of an order; the line holding the order up takes the solid border (attention). */
+.audit-line {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-label-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.audit-line:hover {
+  border-color: var(--border);
+}
+
+.audit-line--stuck {
+  border-color: var(--text-soft);
+  background: var(--surface-3);
 }
 
 .audit-muted {
@@ -737,25 +866,13 @@ function statementText(id: string): string {
 }
 
 .audit-records {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--space-1-5);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-soft);
 }
 
-.audit-record {
-  display: grid;
-  gap: var(--space-0);
-  padding: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
-
-.audit-record-id {
-  /* The record a person goes looking for: the one large thing on the page. */
-  font-size: calc(var(--type-tile-size) * 1.45);
-  line-height: 1.2;
-  overflow-wrap: anywhere;
+/* A record's dt and dd sit in the list's grid; the wrapper only groups them for the test and a reader. */
+.audit-records > div {
+  display: contents;
 }
 
 .audit-facts {
@@ -789,7 +906,7 @@ function statementText(id: string): string {
 
 .audit-bar {
   display: grid;
-  grid-template-columns: 6rem minmax(0, 1fr) 4rem;
+  grid-template-columns: 6rem minmax(0, 1fr) 4rem auto;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--type-meta-size);
