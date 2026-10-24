@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ageLabel, checkStatusBadge, eventLabel, findingStateBadge, periodOptions, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemLabel } from '../auditReport'
+import { ageLabel, checkStatusBadge, eventLabel, findingStateBadge, periodOptions, recordFacts, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemLabel } from '../auditReport'
 
 // DAR-UI-058. The audit view's words for the report JSON's codes, and rows for its keyed objects.
 describe('auditReport', () => {
@@ -40,6 +40,21 @@ describe('auditReport', () => {
       NetSuite: { rma: [{ id: 'RMA1', internalId: '51', status: null }], creditMemo: [{ id: 'CM1', internalId: null, status: null }] },
     })
     expect(rows.map((row) => recordLabel(row, rows))).toEqual(['HotWax', 'NetSuite RMA', 'NetSuite credit memo'])
+  })
+
+  // DAR-BE-125 (Aditi: "there should be a Order ID, Order Name, and HC ID"). An order reads by those three names.
+  it('names an order by its Order ID, Order Name and HotWax Order ID, and every other record as before', () => {
+    const rows = recordRows({
+      Shopify: { order: [{ id: '18957262782595', internalId: null, status: null }] },
+      OMS: { order: [{ id: '#GOR197395235', internalId: 'M1173432', status: null }] },
+      NetSuite: { salesOrder: [{ id: 'SO1', internalId: null, status: 'Pending Billing' }] },
+    })
+    expect(recordFacts(rows).map((f) => [f.label, f.value, f.status])).toEqual([
+      ['Order ID', '18957262782595', ''],
+      ['Order Name', '#GOR197395235', ''],
+      ['HotWax Order ID', 'M1173432', ''],
+      ['NetSuite', 'SO1', 'Pending Billing'],
+    ])
   })
 
   it('offers a monthly audit its period and the two before, across a year end', () => {

@@ -76,6 +76,28 @@ export function recordLabel(row: RecordRow, rows: RecordRow[]): string {
   return shared ? `${row.system} ${recordTypeLabel(row.recordType)}` : row.system
 }
 
+export interface RecordFact {
+  key: string
+  label: string
+  value: string
+  status: string
+}
+
+/**
+ * DAR-BE-125. A record as label and value lines: an order reads as Order ID (Shopify's id), Order Name and HotWax Order ID
+ * (HotWax's name and id); every other record by recordLabel.
+ */
+export function recordFacts(rows: RecordRow[]): RecordFact[] {
+  return rows.flatMap((row): RecordFact[] => {
+    const fact = (label: string, value: string, suffix = '') => ({ key: row.key + suffix, label, value, status: suffix ? '' : row.status })
+    if (row.recordType === 'order' && row.system === 'Shopify') return [fact('Order ID', row.id)]
+    if (row.recordType === 'order' && row.system === 'HotWax' && row.internalId) {
+      return [fact('Order Name', row.id), fact('HotWax Order ID', row.internalId, '|hc')]
+    }
+    return [fact(recordLabel(row, rows), row.id)]
+  })
+}
+
 /** records.<System>.<recordType>[] as one row each, in the document's order. */
 export function recordRows(records: AuditRecords | null | undefined): RecordRow[] {
   const rows: RecordRow[] = []

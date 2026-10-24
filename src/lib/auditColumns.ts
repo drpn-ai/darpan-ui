@@ -7,7 +7,7 @@ import type {
   AuditStatement,
   AuditStatementCheck,
 } from './api/auditTypes'
-import { systemLabel } from './auditReport'
+import { splitHeadline, systemLabel } from './auditReport'
 
 // DAR-UI-065. The audit page as drill-down columns: what each column lists and what is picked when the URL does not
 // say. Pure, so the page and its component carry no rules of their own.
@@ -237,6 +237,23 @@ export function statementFindings(statement: AuditStatement | null | undefined, 
   const listed = (statement?.findings ?? []).filter((item) => states.includes(item.state))
   const seen = new Set(listed.map((item) => item.id))
   return [...listed, ...more.filter((item) => states.includes(item.state) && !seen.has(item.id))]
+}
+
+// DAR-BE-125. A finding's heading: its cause in the catalog's words (renamed since the finding was written, it still reads
+// in the new ones), else what its headline says after the record.
+export function causeHeading(item: AuditFindingSummary): string {
+  return item.cause || splitHeadline(item.headline).rest
+}
+
+// DAR-BE-125. Findings with the same cause together, so its heading is said once: causes in the order their first finding
+// came, findings in their own order within a cause. An order unit says what holds it on its own row, so it stays alone.
+export function causeGroups<T extends AuditFindingSummary>(items: T[]): T[] {
+  const groups = new Map<string, T[]>()
+  items.forEach((item) => {
+    const key = item.kind === 'order' ? `order|${item.id}` : `cause|${causeHeading(item)}`
+    groups.set(key, [...(groups.get(key) ?? []), item])
+  })
+  return [...groups.values()].flat()
 }
 
 // DAR-UI-072. The order a finding is about, as a person searches it: HotWax's order (an item's id before its "/"),

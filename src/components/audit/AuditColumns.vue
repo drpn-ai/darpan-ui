@@ -220,9 +220,9 @@
               </template>
 
               <dl v-if="records.length" class="audit-facts audit-records">
-                <div v-for="row in records" :key="row.key" data-testid="audit-record-row">
-                  <dt>{{ recordLabel(row, records) }}</dt>
-                  <dd>{{ row.id }}<span v-if="row.status" class="audit-muted"> · {{ row.status }}</span></dd>
+                <div v-for="fact in recordFacts(records)" :key="fact.key" data-testid="audit-record-row">
+                  <dt>{{ fact.label }}</dt>
+                  <dd>{{ fact.value }}<span v-if="fact.status" class="audit-muted"> · {{ fact.status }}</span></dd>
                 </div>
               </dl>
 
@@ -307,7 +307,7 @@ import {
   eventLabel,
   FIX_WHERE_LABELS,
   findingStateBadge,
-  recordLabel,
+  recordFacts,
   recordRows,
   shortDate,
   shortRange,
@@ -329,6 +329,8 @@ import {
   narrowedCounts,
   sourceItems,
   statementFindings,
+  causeGroups,
+  causeHeading,
   statementItems,
   type AuditFilter,
   type FindingsMore,
@@ -381,7 +383,7 @@ const statements = computed(() => {
     .map((item) => ({ ...item, badge: String(counted.byStatement.get(item.id)) })) : items
 })
 const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statement] ?? null)
-const findings = computed(() => (props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
+const findings = computed(() => causeGroups(props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
   : statementFindings(statementDoc.value, props.more.findings, props.filter)))
 // DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
 function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
@@ -410,8 +412,8 @@ function sameText(a: string, b: string): boolean {
   return norm(a) === norm(b)
 }
 
-// Findings under a statement mostly share a conclusion; say it once above each run of rows that share it.
-const rests = computed(() => findings.value.map((item) => splitHeadline(item.headline).rest))
+// Findings under a statement mostly share a conclusion; causeGroups puts them together, so it is said once above them.
+const rests = computed(() => findings.value.map(causeHeading))
 function groupLabel(index: number): string {
   const rest = rests.value[index] ?? ''
   return rest && (index === 0 || rest !== rests.value[index - 1]) ? rest : ''

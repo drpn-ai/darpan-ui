@@ -4,6 +4,8 @@ import {
   HEALTH,
   categoryItems,
   causeOptions,
+  causeGroups,
+  causeHeading,
   comparedBars,
   comparedGap,
   countFor,
@@ -227,5 +229,22 @@ describe('auditColumns', () => {
     expect(countsLine(counts(2, 0))).toBe('2 open')
     expect(isAuditFilter('open')).toBe(true)
     expect(isAuditFilter('everything')).toBe(false)
+  })
+
+  // DAR-BE-125 (Aditi: "the findings subheadings are not organized properly"). A cause is said once: its findings sit
+  // together under it, causes in the order their first finding came, findings in their own order within a cause.
+  it('keeps each cause\'s findings together under one heading', () => {
+    const f = (id: string, rest: string, kind?: 'order') => ({ id, headline: `Return ${id}: ${rest}`, kind }) as AuditFindingListItem
+    const items = [f('a', 'Waits'), f('b', 'No order'), f('c', 'Backordered'), f('d', 'No order'), f('e', 'Backordered'), f('o', 'Held', 'order')]
+    expect(causeGroups(items).map((item) => item.id)).toEqual(['a', 'b', 'd', 'c', 'e', 'o'])
+  })
+
+  // A finding written before its cause was renamed heads by the cause's new words, beside one written after.
+  it('heads a finding by its cause as the catalog names it now', () => {
+    const old = { id: 'a', headline: 'Return a: Its order is backordered in NetSuite', cause: 'Order backordered' } as AuditFindingListItem
+    const fresh = { id: 'b', headline: 'Return b: Order backordered', cause: 'Order backordered' } as AuditFindingListItem
+    const bare = { id: 'c', headline: 'Return c: No RMA', cause: null } as AuditFindingListItem
+    expect([old, fresh, bare].map(causeHeading)).toEqual(['Order backordered', 'Order backordered', 'No RMA'])
+    expect(causeGroups([old, bare, fresh]).map((item) => item.id)).toEqual(['a', 'b', 'c'])
   })
 })
