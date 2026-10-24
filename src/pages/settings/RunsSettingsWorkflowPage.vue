@@ -189,7 +189,14 @@ import {
   reconciliationSystemTitle,
   type ReconciliationRuleSetDraft,
 } from '../../lib/reconciliationRuleSetDraft'
-import { darpanSystemDisplayLabel, darpanSystemIdsMatch, darpanSystemNamePair } from '../../lib/utils/darpanSystems'
+import {
+  darpanSystemDisplayLabel,
+  darpanSystemIdsMatch,
+  darpanSystemNamePair,
+  deduplicateDarpanSystemOptions,
+  resolveDarpanSystemParentEnumId,
+  type DarpanSystemValueOption,
+} from '../../lib/utils/darpanSystems'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
 
@@ -200,6 +207,8 @@ interface RunSourceForm {
   sourceConfigType: string
   nsRestletConfigId: string
   systemMessageRemoteId: string
+  // An API side's endpoint system (OMS, OMS_GQL, ...): picking another endpoint can change it.
+  systemEnumId: string
 }
 
 interface RunForm {
@@ -222,6 +231,7 @@ const schemas = ref<JsonSchemaSummary[]>([])
 const sourceConfigs = ref<AutomationSourceConfigOption[]>([])
 const nsRestletConfigs = ref<AutomationNsRestletOption[]>([])
 const systemRemotes = ref<AutomationSystemRemoteOption[]>([])
+const systemOptions = ref<DarpanSystemValueOption[]>([])
 const flattenedFields = ref<Record<string, JsonSchemaField[]>>({})
 const ruleSetDraft = ref<ReconciliationRuleSetDraft | null>(null)
 const loading = ref(false)
@@ -230,9 +240,21 @@ const success = ref<string | null>(null)
 
 const form = reactive<RunForm>({
   mappingName: '',
-  source1: { schemaId: '', fieldPaths: [], sourceConfigId: '', sourceConfigType: '', nsRestletConfigId: '', systemMessageRemoteId: '' },
-  source2: { schemaId: '', fieldPaths: [], sourceConfigId: '', sourceConfigType: '', nsRestletConfigId: '', systemMessageRemoteId: '' },
+  source1: emptySourceForm(),
+  source2: emptySourceForm(),
 })
+
+function emptySourceForm(): RunSourceForm {
+  return {
+    schemaId: '',
+    fieldPaths: [],
+    sourceConfigId: '',
+    sourceConfigType: '',
+    nsRestletConfigId: '',
+    systemMessageRemoteId: '',
+    systemEnumId: '',
+  }
+}
 
 const activeMappingId = computed(() => String(route.params.reconciliationMappingId ?? '').trim())
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
@@ -339,11 +361,7 @@ function sourceForm(sourceKey: SourceKey): RunSourceForm {
 }
 
 function sourceSystemEnumId(sourceKey: SourceKey): string {
-  if (sourceUsesApi(sourceKey)) {
-    return sourceKey === 'source1'
-      ? ruleSetDraft.value?.file1SystemEnumId ?? ''
-      : ruleSetDraft.value?.file2SystemEnumId ?? ''
-  }
+  if (sourceUsesApi(sourceKey)) return sourceForm(sourceKey).systemEnumId
 
   return sourceKey === 'source1'
     ? source1Schema.value?.systemEnumId ?? ''
@@ -352,6 +370,15 @@ function sourceSystemEnumId(sourceKey: SourceKey): string {
 
 function endpointMatchesSystem(endpointSystemEnumId: string | undefined, selectedSystemEnumId: string): boolean {
   return darpanSystemIdsMatch(endpointSystemEnumId, selectedSystemEnumId)
+}
+
+// DAR-UI-077. Endpoints are grouped under their parent system (OMS_GQL and OMS_RECON_ORDERS under OMS), as in the run
+// builder, so a side can move to a sibling endpoint and not only keep its own.
+function endpointInSystemFamily(endpointSystemEnumId: string | undefined, selectedSystemEnumId: string): boolean {
+  return darpanSystemIdsMatch(
+    resolveDarpanSystemParentEnumId(endpointSystemEnumId, systemOptions.value),
+    resolveDarpanSystemParentEnumId(selectedSystemEnumId, systemOptions.value),
+  )
 }
 
 function sourceConfigMatches(candidate: string | undefined, selected: string): boolean {
@@ -382,7 +409,7 @@ function apiEndpointOptionsForSource(sourceKey: SourceKey): AppSelectOption[] {
         label: config.label || config.description || config.nsRestletConfigId,
       })),
     ...systemRemotes.value
-      .filter((remote) => endpointMatchesSystem(remote.systemEnumId, systemEnumId))
+      .filter((remote) => endpointInSystemFamily(remote.systemEnumId, systemEnumId))
       .filter((remote) => sourceConfigMatches(remote.sourceConfigId || remote.optionKey, source.sourceConfigId))
       .map((remote) => ({
         value: remoteSelectValue(remote),
@@ -391,19 +418,18 @@ function apiEndpointOptionsForSource(sourceKey: SourceKey): AppSelectOption[] {
   ]
 }
 
+// Keyed by endpoint system too: sibling endpoints share one remote (HOTWAX_ORDERS_API), and OMS_GQL has none.
 function remoteSelectValue(remote: AutomationSystemRemoteOption): string {
-  const optionKey = remote.optionKey || remote.sourceConfigId
-  return optionKey ? `remote:${remote.systemMessageRemoteId}:${optionKey}` : `remote:${remote.systemMessageRemoteId}`
+  const optionKey = remote.optionKey || remote.sourceConfigId || ''
+  return `remote:${remote.systemMessageRemoteId ?? ''}:${optionKey}:${remote.systemEnumId ?? ''}`
 }
 
 function selectedApiEndpointValue(sourceKey: SourceKey): string {
   const source = sourceForm(sourceKey)
   if (source.nsRestletConfigId) return `ns:${source.nsRestletConfigId}`
-  if (source.systemMessageRemoteId) {
-    const selectedRemote = selectedRemoteOptionForSource(sourceKey)
-    return selectedRemote ? remoteSelectValue(selectedRemote) : `remote:${source.systemMessageRemoteId}`
-  }
-  return ''
+  const selectedRemote = selectedRemoteOptionForSource(sourceKey)
+  if (selectedRemote) return remoteSelectValue(selectedRemote)
+  return source.systemMessageRemoteId ? `remote:${source.systemMessageRemoteId}` : ''
 }
 
 function selectedApiSourceOption(sourceKey: SourceKey): AutomationNsRestletOption | AutomationSystemRemoteOption | null {
@@ -434,14 +460,14 @@ function selectedApiSourceLabel(sourceKey: SourceKey): string {
  * refundOrReturnId nowhere in the list. Same defect class as the Schema card's endpoint label.
  *
  * Falls back to the unconstrained match when the side carries no systemEnumId or nothing matches,
- * so bespoke remotes outside the endpoint registry keep resolving as before.
+ * so bespoke remotes outside the endpoint registry keep resolving as before. A side with no remote
+ * (OMS_GQL, DAR-UI-077) resolves only through its own endpoint row.
  */
 function selectedRemoteOptionForSource(sourceKey: SourceKey): AutomationSystemRemoteOption | null {
   const source = sourceForm(sourceKey)
-  if (!source.systemMessageRemoteId) return null
 
   const matchesRemoteAndConfig = (remote: AutomationSystemRemoteOption): boolean => (
-    remote.systemMessageRemoteId === source.systemMessageRemoteId &&
+    (remote.systemMessageRemoteId ?? '') === source.systemMessageRemoteId &&
     (!source.sourceConfigId || sourceConfigMatches(remote.sourceConfigId || remote.optionKey, source.sourceConfigId))
   )
 
@@ -453,6 +479,7 @@ function selectedRemoteOptionForSource(sourceKey: SourceKey): AutomationSystemRe
     if (endpointMatch) return endpointMatch
   }
 
+  if (!source.systemMessageRemoteId) return null
   return systemRemotes.value.find(matchesRemoteAndConfig) ?? null
 }
 
@@ -506,9 +533,11 @@ function updateApiEndpoint(sourceKey: SourceKey, value: string): void {
   }
 
   if (value.startsWith('remote:')) {
-    const [, remoteId = ''] = value.split(':')
-    source.systemMessageRemoteId = remoteId
+    const remote = systemRemotes.value.find((candidate) => remoteSelectValue(candidate) === value)
+    source.systemMessageRemoteId = remote ? remote.systemMessageRemoteId ?? '' : value.split(':')[1] ?? ''
     source.nsRestletConfigId = ''
+    if (remote?.systemEnumId) source.systemEnumId = remote.systemEnumId
+    if (remote?.sourceConfigType) source.sourceConfigType = remote.sourceConfigType
     return
   }
 
@@ -630,12 +659,14 @@ function hydrateRuleSetDraftForm(draft: ReconciliationRuleSetDraft): void {
   form.source1.sourceConfigType = draft.file1SourceConfigType ?? resolveSelectedSourceConfigType('source1')
   form.source1.nsRestletConfigId = draft.file1NsRestletConfigId ?? ''
   form.source1.systemMessageRemoteId = draft.file1SystemMessageRemoteId ?? ''
+  form.source1.systemEnumId = draft.file1SystemEnumId ?? ''
   form.source2.schemaId = sourceUsesApi('source2') ? '' : resolveSchemaId(draft.file2JsonSchemaId, draft.file2SchemaFileName)
   form.source2.fieldPaths = [...(draft.file2PrimaryIdExpression ?? [])]
   form.source2.sourceConfigId = draft.file2SourceConfigId ?? ''
   form.source2.sourceConfigType = draft.file2SourceConfigType ?? resolveSelectedSourceConfigType('source2')
   form.source2.nsRestletConfigId = draft.file2NsRestletConfigId ?? ''
   form.source2.systemMessageRemoteId = draft.file2SystemMessageRemoteId ?? ''
+  form.source2.systemEnumId = draft.file2SystemEnumId ?? ''
 }
 
 /**
@@ -643,15 +674,16 @@ function hydrateRuleSetDraftForm(draft: ReconciliationRuleSetDraft): void {
  * from the draft this workflow opened with. Nothing in this form can derive it — a JSON schema row
  * has no parent concept and an API source has no schema row at all — so the only source is the
  * backend-resolved value already on the draft, and dropping it silently reverts that card to the
- * ENDPOINT name after any edit. Carried ONLY when the side still points at the same system: switch
- * the source system in the workflow and the old family label would be plain wrong, so it is dropped
- * and the card falls back to the endpoint label until the run is reloaded from the backend.
+ * ENDPOINT name after any edit. Carried ONLY while the side stays in the same system family (a move to a
+ * sibling endpoint keeps "HotWax"): switch the source system in the workflow and the old family label
+ * would be plain wrong, so it is dropped and the card falls back to the endpoint label until the run
+ * is reloaded from the backend.
  */
 function carriedSystemParentLabel(side: 'file1' | 'file2', resolvedSystemEnumId: string): string | undefined {
   const prior = ruleSetDraft.value
   if (!prior) return undefined
   const priorSystemEnumId = side === 'file1' ? prior.file1SystemEnumId : prior.file2SystemEnumId
-  if (!darpanSystemIdsMatch(priorSystemEnumId, resolvedSystemEnumId)) return undefined
+  if (!endpointInSystemFamily(priorSystemEnumId, resolvedSystemEnumId)) return undefined
   return side === 'file1' ? prior.file1SystemParentLabel : prior.file2SystemParentLabel
 }
 
@@ -666,12 +698,12 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
     ruleSetDraft.value?.file2PrimaryIdExpression,
     form.source2.fieldPaths,
   ).map((value) => value.trim()).filter(Boolean)
-  const file1SystemEnumId = source1?.systemEnumId ?? ruleSetDraft.value?.file1SystemEnumId ?? ''
-  const file2SystemEnumId = source2?.systemEnumId ?? ruleSetDraft.value?.file2SystemEnumId ?? ''
+  const file1SystemEnumId = (source1UsesApi.value ? form.source1.systemEnumId : source1?.systemEnumId) ?? ruleSetDraft.value?.file1SystemEnumId ?? ''
+  const file2SystemEnumId = (source2UsesApi.value ? form.source2.systemEnumId : source2?.systemEnumId) ?? ruleSetDraft.value?.file2SystemEnumId ?? ''
 
   const file2Fields: Partial<ReconciliationRuleSetDraft> = {
     file2SystemEnumId: file2SystemEnumId,
-    file2SystemLabel: source2?.systemLabel ?? ruleSetDraft.value?.file2SystemLabel,
+    file2SystemLabel: source2?.systemLabel ?? selectedApiSourceOption('source2')?.systemLabel ?? ruleSetDraft.value?.file2SystemLabel,
     file2SystemParentLabel: carriedSystemParentLabel('file2', file2SystemEnumId),
     ...(source2UsesApi.value
       ? {
@@ -701,7 +733,7 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
     runName: savedRunName,
     description: ruleSetDraft.value?.description,
     file1SystemEnumId: file1SystemEnumId,
-    file1SystemLabel: source1?.systemLabel ?? ruleSetDraft.value?.file1SystemLabel,
+    file1SystemLabel: source1?.systemLabel ?? selectedApiSourceOption('source1')?.systemLabel ?? ruleSetDraft.value?.file1SystemLabel,
     file1SystemParentLabel: carriedSystemParentLabel('file1', file1SystemEnumId),
     ...(source1UsesApi.value
       ? {
@@ -853,6 +885,10 @@ async function load(): Promise<void> {
     sourceConfigs.value = automationSourceOptionsResponse?.sourceConfigs ?? []
     nsRestletConfigs.value = automationSourceOptionsResponse?.nsRestletConfigs ?? []
     systemRemotes.value = automationSourceOptionsResponse?.systemRemotes ?? []
+    systemOptions.value = deduplicateDarpanSystemOptions(automationSourceOptionsResponse?.systems ?? []).map((option) => ({
+      value: option.enumId,
+      parentEnumId: option.parentEnumId || undefined,
+    }))
 
     if (historyDraft) {
       ruleSetDraft.value = historyDraft

@@ -574,7 +574,7 @@ describe('RunsSettingsWorkflowPage', () => {
     expect(wrapper.get('[data-testid="run-api-endpoint-2"]').text()).toContain('Orders')
     expect(wrapper.get('[data-testid="run-source-2-row"]').findAll('[data-testid="workflow-select-chip"]')[0]!.text()).toContain('Order ID')
 
-    await chooseAppSelectOption(wrapper, 'run-api-endpoint-1', 'remote:HOTWAX_RETURNS_API:KREWE_OMS')
+    await chooseAppSelectOption(wrapper, 'run-api-endpoint-1', 'remote:HOTWAX_RETURNS_API:KREWE_OMS:OMS')
     await flushPromises()
     await pickWorkflowSelectOption(wrapper, 'run-api-field-1', '$.records[*].returnId')
     await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
@@ -1092,6 +1092,134 @@ describe('RunsSettingsWorkflowPage', () => {
       expect(wrapper.find('[data-testid="run-api-endpoint-2"]').exists()).toBe(false)
       expect(wrapper.text()).toContain('HotWax needs an API endpoint.')
       expect(wrapper.get('[data-testid="save-run-settings"]').attributes('disabled')).toBeDefined()
+    })
+  })
+
+  // DAR-UI-077. gorjana "Orders" (HotWax "Sales orders") could not move to "HotWax orders and payments": the endpoint
+  // list held only the side's stored endpoint, and a pick never changed the side's system or config type.
+  describe('DAR-UI-077 endpoints across the system family', () => {
+    const paymentsRow = {
+      // OMS_GQL is a connector with no SystemMessageRemote of its own.
+      description: 'HotWax orders and payments',
+      label: 'HotWax orders and payments',
+      systemEnumId: 'OMS_GQL',
+      optionKey: 'KREWE_OMS',
+      sourceConfigId: 'KREWE_OMS',
+      sourceConfigType: 'HOTWAX_OMS_GQL',
+      primaryIdOptions: [{ fieldPath: '$.records[*].externalId', label: 'Shopify order ID' }],
+    }
+    const salesOrdersRow = {
+      systemMessageRemoteId: 'HOTWAX_ORDERS_API',
+      description: 'HotWax sales orders',
+      label: 'HotWax sales orders',
+      systemEnumId: 'OMS_RECON_ORDERS',
+      optionKey: 'KREWE_OMS',
+      sourceConfigId: 'KREWE_OMS',
+      sourceConfigType: 'HOTWAX_OMS_REST',
+      primaryIdOptions: [{ fieldPath: '$.records[*].externalId', label: 'Shopify order ID' }],
+    }
+
+    async function mountSalesOrdersRun(file2Extras: Record<string, unknown> = {}) {
+      const base = await listAutomationSourceOptions()
+      listAutomationSourceOptions.mockResolvedValue({
+        ...base,
+        systems: [
+          { enumId: 'OMS', label: 'HotWax' },
+          { enumId: 'OMS_RECON_ORDERS', label: 'HotWax sales orders', parentEnumId: 'OMS' },
+          { enumId: 'OMS_GQL', label: 'HotWax orders and payments', parentEnumId: 'OMS' },
+          { enumId: 'SHOPIFY', label: 'Shopify' },
+          { enumId: 'SHOPIFY_RETURN_REFS', label: 'Shopify returns', parentEnumId: 'SHOPIFY' },
+        ],
+        systemRemotes: [...base.systemRemotes, salesOrdersRow, paymentsRow],
+      })
+      route.params.reconciliationMappingId = 'RS_ORDERS_1'
+      draftStoreState.workflowOrigin = { label: 'Run Details', path: '/reconciliation/ruleset-manager' }
+      draftStoreState.ruleSetDraftState = {
+        draft: {
+          savedRunId: 'RS_ORDERS_1',
+          runName: 'Orders',
+          file1SystemEnumId: 'SHOPIFY',
+          file1SystemLabel: 'Shopify',
+          file1SourceTypeEnumId: 'AUT_SRC_API',
+          file1SystemMessageRemoteId: 'SHOPIFY_REMOTE',
+          file1SourceConfigId: 'SHOPIFY_MAIN',
+          file1SourceConfigType: 'SHOPIFY_AUTH',
+          file1FileTypeEnumId: '',
+          file1PrimaryIdExpression: ['$.records[*].id'],
+          file2SystemEnumId: 'OMS_RECON_ORDERS',
+          file2SystemLabel: 'HotWax sales orders',
+          file2SourceTypeEnumId: 'AUT_SRC_API',
+          file2SystemMessageRemoteId: 'HOTWAX_ORDERS_API',
+          file2SourceConfigId: 'KREWE_OMS',
+          file2SourceConfigType: 'HOTWAX_OMS_REST',
+          file2FileTypeEnumId: '',
+          file2PrimaryIdExpression: ['$.records[*].externalId'],
+          ...file2Extras,
+        },
+        resumeStepId: 'ruleset-manager',
+      }
+      const wrapper = mount(RunsSettingsWorkflowPage)
+      await flushPromises()
+      return wrapper
+    }
+
+    function endpointLabels(wrapper: ReturnType<typeof mount>): string[] {
+      return wrapper.findAll('[data-testid="app-select-option"]').map((option) => option.text())
+    }
+
+    it('offers every endpoint of the side\'s system for its config, and only that system', async () => {
+      const wrapper = await mountSalesOrdersRun()
+
+      await wrapper.get('[data-testid="run-api-endpoint-2"]').trigger('click')
+      const labels = endpointLabels(wrapper)
+
+      expect(labels).toEqual(expect.arrayContaining(['HotWax sales orders', 'HotWax orders and payments', 'Orders API', 'Returns API']))
+      expect(labels).not.toContain('Shopify Return References')
+    })
+
+    it('moves the side to the picked endpoint: its system, config type and remote', async () => {
+      const wrapper = await mountSalesOrdersRun()
+
+      await chooseAppSelectOption(wrapper, 'run-api-endpoint-2', 'remote::KREWE_OMS:OMS_GQL')
+      await flushPromises()
+      await pickWorkflowSelectOption(wrapper, 'run-api-field-2', '$.records[*].externalId')
+      await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+      await flushPromises()
+
+      const payload = saveRuleSetRun.mock.calls[0]![0]
+      expect(payload).toMatchObject({
+        file2SystemEnumId: 'OMS_GQL',
+        file2SourceTypeEnumId: 'AUT_SRC_API',
+        file2SourceConfigId: 'KREWE_OMS',
+        file2SourceConfigType: 'HOTWAX_OMS_GQL',
+        file2PrimaryIdExpression: '$.records[*].externalId',
+      })
+      expect(payload).not.toHaveProperty('file2SystemMessageRemoteId')
+    })
+
+    it('reopens a remote-less endpoint side as selected', async () => {
+      const wrapper = await mountSalesOrdersRun({
+        file2SystemEnumId: 'OMS_GQL',
+        file2SystemMessageRemoteId: undefined,
+        file2SourceConfigType: 'HOTWAX_OMS_GQL',
+      })
+
+      expect(wrapper.get('[data-testid="run-api-endpoint-2"]').text()).toContain('HotWax orders and payments')
+      expect(wrapper.text()).not.toContain('needs an API endpoint')
+    })
+
+    it('keeps the family label on a move to a sibling endpoint', async () => {
+      const wrapper = await mountSalesOrdersRun({ file2SystemParentLabel: 'HotWax' })
+
+      await chooseAppSelectOption(wrapper, 'run-api-endpoint-2', 'remote::KREWE_OMS:OMS_GQL')
+      await flushPromises()
+      await pickWorkflowSelectOption(wrapper, 'run-api-field-2', '$.records[*].externalId')
+      await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+      await flushPromises()
+
+      const handedBack = draftStoreState.setRuleSetDraft.mock.calls.at(-1)?.[0] as Record<string, unknown>
+      expect(handedBack.file2SystemEnumId).toBe('OMS_GQL')
+      expect(handedBack.file2SystemParentLabel).toBe('HotWax')
     })
   })
 
