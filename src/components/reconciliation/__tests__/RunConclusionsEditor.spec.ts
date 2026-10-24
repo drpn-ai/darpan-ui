@@ -26,6 +26,7 @@ function tree(scopeMode = 'COMPARE'): RunConclusions {
         label: 'Return not in NetSuite',
         bucket: 'MISSING_FROM_FILE_2',
         question: 'Is the return done?',
+        fix: 'Fulfil {orderInNetsuite.tranId} in NetSuite.',
         conditions: [
           {
             subject: 'FILE_1', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL',
@@ -84,7 +85,7 @@ function tree(scopeMode = 'COMPARE'): RunConclusions {
       { id: 'CONC_NO_CUSTOMER_NAME', label: 'No customer name' },
     ],
     buckets: ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING'],
-    operators: ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'BLANK', 'NOT_BLANK'],
+    operators: ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK'],
     presence: ['ANY', 'KEPT', 'EXCLUDED', 'ABSENT'],
     keyScopes: ['FULL', 'FIRST_FIELD'],
     quantifiers: ['ALL', 'ANY'],
@@ -206,6 +207,7 @@ describe('RunConclusionsEditor', () => {
       conclusion: 'CONC_RETURN_NOT_IN_NETSUITE',
       bucket: 'MISSING_FROM_FILE_2',
       question: 'Is the return done?',
+      fix: 'Fulfil {orderInNetsuite.tranId} in NetSuite.',
       conditions: [{
         subject: 'FILE_1', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL', field: 'statusId', operator: 'IN',
         values: ['RETURN_COMPLETED', 'RETURN_RECEIVED', 'RETURN_ACCEPTED'],
@@ -238,6 +240,31 @@ describe('RunConclusionsEditor', () => {
     await wrapper.get('[data-testid="run-conclusions-save"]').trigger('click')
     await flushPromises()
     expect(savedPayload()[3]!.conditions[0]).toMatchObject({ field: 'returnId', operator: 'GT', values: ['5'] })
+    wrapper.unmount()
+  })
+
+  // DAR-BE-124. Save replaces the whole tree: a cause's fix the editor does not show still goes back as loaded.
+  it('saves each cause\'s fix as loaded, so a save never erases it', async () => {
+    const wrapper = await mountEditor()
+    await nodeAt(wrapper, 3)!.get('[data-testid="run-conclusions-check-label"]').setValue('A return has its RMA')
+    saveConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], savedConclusions: tree() })
+    await wrapper.get('[data-testid="run-conclusions-save"]').trigger('click')
+    await flushPromises()
+    expect(savedPayload().map((node) => node.fix ?? null)).toEqual(['Fulfil {orderInNetsuite.tranId} in NetSuite.', null, null, null])
+    wrapper.unmount()
+  })
+
+  it('"is within the last hours" takes one number of hours and saves it as the one value', async () => {
+    const wrapper = await mountEditor()
+    selectsIn(wrapper, 'run-conclusions-operator').at(3)!.vm.$emit('update:modelValue', 'WITHIN_HOURS')
+    await flushPromises()
+    const hours = nodeAt(wrapper, 3)!.get('[data-testid="run-conclusions-amount"]')
+    expect(hours.attributes('placeholder')).toBe('hours')
+    await hours.setValue('24')
+    saveConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], savedConclusions: tree() })
+    await wrapper.get('[data-testid="run-conclusions-save"]').trigger('click')
+    await flushPromises()
+    expect(savedPayload()[3]!.conditions[0]).toMatchObject({ field: 'returnId', operator: 'WITHIN_HOURS', values: ['24'] })
     wrapper.unmount()
   })
 

@@ -11,6 +11,7 @@ import type {
   RunAuditResponse,
   SaveAuditSettingsPayload,
   SaveAuditSettingsResponse,
+  VerifyAuditFindingResponse,
 } from './auditTypes'
 
 // Cache-reset coordinator. The actual reset implementation is wired up in
@@ -526,6 +527,7 @@ const AUDIT = {
   getAuditSettings: 'facade.AuditFacadeServices.get#AuditSettings',
   saveAuditSettings: 'facade.AuditFacadeServices.save#AuditSettings',
   runAudit: 'facade.AuditFacadeServices.run#Audit',
+  verifyAuditFinding: 'facade.AuditFacadeServices.verify#AuditFinding',
 }
 
 export const auditFacade = {
@@ -565,6 +567,9 @@ export const auditFacade = {
   },
   runAudit(payload: RunAuditPayload, signal?: AbortSignal): Promise<RunAuditResponse> {
     return callService<RunAuditResponse>(AUDIT.runAudit, payload, signal)
+  },
+  verifyAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<VerifyAuditFindingResponse> {
+    return callService<VerifyAuditFindingResponse>(AUDIT.verifyAuditFinding, payload, signal)
   },
 }
 

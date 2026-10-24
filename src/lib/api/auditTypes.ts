@@ -290,3 +290,8 @@ export interface RunAuditPayload {
 export interface RunAuditResponse extends AuditEnvelope {
   runs?: Array<{ automationId: string | null; savedRunId: string | null; submitted: boolean; error: string | null }>
 }
+
+// DAR-BE-123. Resolve: one finding re-checked in the background; get#AuditFinding shows it once lastChecked moves.
+export interface VerifyAuditFindingResponse extends AuditEnvelope {
+  submitted?: boolean
+}

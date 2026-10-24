@@ -121,10 +121,12 @@
         :exporting="exporting"
         :narrowed="narrowed"
         :order-unit="orderUnit"
+        :verifying="verifying"
         @navigate="navigate"
         @more="loadMore"
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
         @extract="(check, system) => void exportExtract(check, system)"
+        @verify="verifyFinding"
       />
     </template>
   </StaticPageFrame>
@@ -179,6 +181,7 @@ const findingLoading = ref(false)
 const findingError = ref('')
 const more = ref(emptyFindingsMore())
 const exporting = ref(false)
+const verifying = ref(false)
 const exportError = ref('')
 
 let abort = new AbortController()
@@ -321,6 +324,47 @@ async function loadFinding(): Promise<void> {
   } finally {
     findingLoading.value = false
   }
+}
+
+// DAR-BE-123. Resolve: the finding's check runs again for its record alone, in the background; the
+// finding is read again until its lastChecked moves, then the top pill says whether it closed.
+const VERIFY_POLL_MS = 3000
+const VERIFY_POLL_TRIES = 60
+async function verifyFinding(): Promise<void> {
+  const id = findingId.value
+  if (!id || verifying.value) return
+  const before = finding.value?.finding.status.lastChecked ?? null
+  verifying.value = true
+  findingError.value = ''
+  try {
+    const started = await auditFacade.verifyAuditFinding({ findingId: id })
+    if (started.ok === false || !started.submitted) {
+      findingError.value = errorOf(started, 'The finding dodged the check. Try again.')
+      return
+    }
+    for (let tries = 0; tries < VERIFY_POLL_TRIES && findingId.value === id; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, VERIFY_POLL_MS))
+      const response = await auditFacade.getAuditFinding({ findingId: id })
+      const doc = response.finding
+      if (findingId.value !== id || !doc || doc.finding.status.lastChecked === before) continue
+      finding.value = doc
+      const closed = doc.finding.status.state === 'fixed'
+      say(closed ? 'Resolved. The finding is closed.' : 'Still open. The cause above is from this check.')
+      if (closed) void loadReport()
+      return
+    }
+    if (findingId.value === id) say('Still checking. Reopen the finding in a minute.')
+  } catch {
+    if (findingId.value === id) findingError.value = 'The finding dodged the check. Try again.'
+  } finally {
+    verifying.value = false
+  }
+}
+
+function say(message: string): void {
+  document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, {
+    detail: { message, durationMs: 5000 },
+  }))
 }
 
 // DAR-UI-070. The report lists 50 findings a statement; "N more" asks for the rest a page at a time.
@@ -487,9 +531,7 @@ onMounted(() => {
   const state = window.history.state as Record<string, unknown> | null
   if (!state?.startedAudit) return
   window.history.replaceState({ ...state, startedAudit: false }, '')
-  document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, {
-    detail: { message: 'Running. Findings arrive as each check finishes.', durationMs: 5000 },
-  }))
+  say('Running. Findings arrive as each check finishes.')
 })
 
 // DAR-UI-068. One source per value, so a column pick (a new query object) does not count as a new morning.

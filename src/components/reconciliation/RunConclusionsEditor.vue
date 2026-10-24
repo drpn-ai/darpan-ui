@@ -197,13 +197,13 @@
               test-id="run-conclusions-quantifier"
             />
             <input
-              v-if="condition.operator === 'GT'"
+              v-if="takesOneNumber(condition.operator)"
               v-model="condition.valuesText"
               type="text"
               inputmode="decimal"
               name="conditionAmount"
-              placeholder="number"
-              aria-label="More than"
+              :placeholder="condition.operator === 'GT' ? 'number' : 'hours'"
+              :aria-label="condition.operator === 'GT' ? 'More than' : 'Within hours'"
               :disabled="saving"
               data-testid="run-conclusions-amount"
             />
@@ -342,6 +342,8 @@ interface DraftNode {
   conclusion: string
   bucket: string
   question: string
+  /** Kept as loaded: save replaces the whole tree, so a fix the editor dropped would be erased (DAR-BE-124). */
+  fix: string | null
   conditions: DraftCondition[]
 }
 
@@ -361,12 +363,13 @@ const PLUS_ICON_PATH =
   'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'
 
 const DEFAULT_BUCKETS: ConclusionBucket[] = ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING']
-const DEFAULT_OPERATORS: ConclusionOperator[] = ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'BLANK', 'NOT_BLANK']
+const DEFAULT_OPERATORS: ConclusionOperator[] = ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK']
 const OPERATOR_LABELS: Record<string, string> = {
   IN: 'is one of',
   NOT_IN: 'is not one of',
   GT: 'is more than',
   GT_ZERO: 'is above zero',
+  WITHIN_HOURS: 'is within the last hours',
   BLANK: 'is blank',
   NOT_BLANK: 'has a value',
 }
@@ -463,6 +466,10 @@ function takesValues(operator: string): boolean {
   return operator === 'IN' || operator === 'NOT_IN'
 }
 
+function takesOneNumber(operator: string): boolean {
+  return operator === 'GT' || operator === 'WITHIN_HOURS'
+}
+
 function nextUid(): string {
   uidCounter += 1
   return `c${uidCounter}`
@@ -510,6 +517,7 @@ function toDraftNodes(source: RunConclusionNode[]): DraftNode[] {
     conclusion: node.conclusion ?? '',
     bucket: node.bucket ?? '',
     question: node.question ?? '',
+    fix: node.fix ?? null,
     conditions: (node.conditions ?? []).map(toDraftCondition),
   }))
 }
@@ -533,7 +541,7 @@ function buildCondition(condition: DraftCondition): RunConclusionCondition {
     quantifier: condition.quantifier,
     field: field || null,
     operator: operator || null,
-    values: operator === 'GT' ? [condition.valuesText.trim()].filter(Boolean) : takesValues(operator) ? splitValues(condition.valuesText) : [],
+    values: takesOneNumber(operator) ? [condition.valuesText.trim()].filter(Boolean) : takesValues(operator) ? splitValues(condition.valuesText) : [],
     checkLabel: condition.checkLabel.trim(),
   }
 }
@@ -546,6 +554,7 @@ function buildPayload(): RunConclusionNode[] {
     conclusion: node.conclusion,
     bucket: depth === 1 && node.bucket ? (node.bucket as ConclusionBucket) : null,
     question: node.question.trim() || null,
+    fix: node.fix,
     conditions: node.conditions.map(buildCondition),
   }))
 }
@@ -584,6 +593,7 @@ function newNode(parentUid: string | null): DraftNode {
     conclusion: '',
     bucket: '',
     question: '',
+    fix: null,
     conditions: [blankCondition()],
   }
 }

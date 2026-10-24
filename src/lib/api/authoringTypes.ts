@@ -85,7 +85,7 @@ export type SourceExtractOptions = Record<string, boolean | string>
 
 // S3 — a run's conclusion tree (facade.RunConclusionFacadeServices).
 export type ConclusionBucket = 'MISSING_FROM_FILE_1' | 'MISSING_FROM_FILE_2' | 'RULE' | 'FINDING'
-export type ConclusionOperator = 'IN' | 'NOT_IN' | 'GT' | 'GT_ZERO' | 'BLANK' | 'NOT_BLANK'
+export type ConclusionOperator = 'IN' | 'NOT_IN' | 'GT' | 'GT_ZERO' | 'WITHIN_HOURS' | 'BLANK' | 'NOT_BLANK'
 
 export interface RunConclusionCondition {
   subject: 'FILE_1' | 'FILE_2'
@@ -112,6 +112,8 @@ export interface RunConclusionNode {
   /** Roots only; blank = any row. */
   bucket?: ConclusionBucket | null
   question?: string | null
+  /** DAR-BE-120: what to do when this is the cause, e.g. "Fulfil {orderInNetsuite.tranId} in NetSuite". */
+  fix?: string | null
   conditions: RunConclusionCondition[]
 }
 

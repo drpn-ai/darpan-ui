@@ -172,6 +172,10 @@
                 <StatusBadge :label="findingStateBadge(findingDoc.finding.status.state).label" :tone="findingStateBadge(findingDoc.finding.status.state).tone" />
                 <span class="audit-col-head-end">
                   <span class="audit-row-sub">{{ sinceLine }}</span>
+                  <!-- DAR-BE-123. Re-checks this finding's record now; it closes if the problem is gone. -->
+                  <button v-if="findingDoc.finding.status.state !== 'fixed'" type="button" class="app-icon-action" aria-label="Resolve finding" title="Resolve finding" data-testid="audit-verify-finding" :disabled="verifying" @click="emit('verify')">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="resolveIconPath" /></svg>
+                  </button>
                   <button type="button" class="app-icon-action" aria-label="Export finding" title="Export finding" data-testid="audit-export-finding" @click="emit('export', 'finding')">
                     <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
                   </button>
@@ -295,7 +299,7 @@
 import { computed } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
-import { downloadIconPath } from '../../lib/iconPaths'
+import { downloadIconPath, resolveIconPath } from '../../lib/iconPaths'
 import type { AuditFindingDocument, AuditFindingListItem, AuditFindingSummary, AuditMoney, AuditReport } from '../../lib/api/auditTypes'
 import {
   ageLabel,
@@ -351,9 +355,10 @@ const props = defineProps<{
   narrowed?: AuditFindingListItem[] | null
   /** DAR-UI-075. The order open in the detail; findingDoc is then its stuck line's (its fix and history). */
   orderUnit?: AuditFindingSummary | null
+  verifying: boolean
 }>()
 
-const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string] }>()
+const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: [] }>()
 
 const isHealth = computed(() => props.category === HEALTH)
 const rail = computed(() => !isHealth.value && Boolean(props.finding))

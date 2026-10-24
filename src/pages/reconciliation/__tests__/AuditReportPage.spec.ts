@@ -16,7 +16,7 @@ vi.mock('vue-router', async () => {
   }
 })
 vi.mock('../../../lib/api/facade', () => ({
-  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindings: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn() },
+  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindings: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn() },
   reconciliationFacade: { getGeneratedOutput: vi.fn() },
 }))
 
@@ -585,6 +585,52 @@ describe('AuditReportPage', () => {
     const query = { period: '2026-09', date: '2026-09-30' }
     expect(JSON.parse(w.get('[data-testid="audit-run-button"]').attributes('data-to') ?? '{}').query).toEqual(query)
     expect(JSON.parse(w.get('[data-testid="audit-settings-button"]').attributes('data-to') ?? '{}').query).toEqual(query)
+  })
+
+  // DAR-BE-123. Resolve re-checks the finding in the background and reads it again until its last check moves.
+  it('resolves a finding: re-checks it, waits for the check, and says it closed', async () => {
+    vi.useFakeTimers()
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail.message)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    try {
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      f.verifyAuditFinding.mockResolvedValue({ ok: true, submitted: true } as never)
+      const closed = { ...findingDocument, finding: { ...findingDocument.finding,
+        status: { ...findingDocument.finding.status, state: 'fixed', lastChecked: '2026-10-24T13:05:00Z', closedAt: '2026-10-24T13:05:00Z' } } }
+      f.getAuditFinding.mockResolvedValueOnce({ ok: true, finding: findingDocument } as never)
+        .mockResolvedValueOnce({ ok: true, finding: closed } as never)
+      const reportCalls = f.getAuditReport.mock.calls.length
+
+      await w.get('[data-testid="audit-verify-finding"]').trigger('click')
+      expect(f.verifyAuditFinding).toHaveBeenCalledWith({ findingId: 'F-1' })
+      expect(w.get('[data-testid="audit-verify-finding"]').attributes('disabled')).toBeDefined()
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(heard).toEqual([])   // the first read is from before the check: keep waiting
+      await vi.advanceTimersByTimeAsync(3000)
+      await flushPromises()
+      expect(heard).toEqual(['Resolved. The finding is closed.'])
+      expect(w.find('[data-testid="audit-verify-finding"]').exists()).toBe(false)
+      expect(f.getAuditReport.mock.calls.length).toBe(reportCalls + 1)
+    } finally {
+      document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+      vi.useRealTimers()
+    }
+  })
+
+  it('says in words why a finding cannot be resolved', async () => {
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    f.verifyAuditFinding.mockResolvedValue({ ok: false, submitted: false,
+      errors: ['Finding F-1 cannot be re-checked: its check has no automation yet (play the audit once).'] } as never)
+    const reads = f.getAuditFinding.mock.calls.length
+    await w.get('[data-testid="audit-verify-finding"]').trigger('click')
+    await flushPromises()
+    expect(w.get('[data-testid="audit-finding-error"]').text()).toContain('its check has no automation yet')
+    expect(f.getAuditFinding.mock.calls.length).toBe(reads)   // nothing to wait for
   })
 
   it('says once in the top pill that a run it started is under way', async () => {
