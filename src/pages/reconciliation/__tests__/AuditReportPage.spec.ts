@@ -16,7 +16,7 @@ vi.mock('vue-router', async () => {
   }
 })
 vi.mock('../../../lib/api/facade', () => ({
-  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindings: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn() },
+  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn() },
   reconciliationFacade: { getGeneratedOutput: vi.fn() },
 }))
 
@@ -26,6 +26,7 @@ import { downloadTextFile } from '../../../lib/utils/download'
 import { useRoute } from 'vue-router'
 import { WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
 import { auditFacade, reconciliationFacade } from '../../../lib/api/facade'
+import { ApiCallError } from '../../../lib/api/client'
 import AuditReportPage from '../AuditReportPage.vue'
 import type { AuditReport } from '../../../lib/api/auditTypes'
 
@@ -48,7 +49,6 @@ function report(overrides: Partial<AuditReport['health']> = {}): AuditReport {
       date: '2026-10-08',
       window: { from: '2026-10-01', thru: '2026-10-08' },
       running: true,
-      extendedThru: null,
       period: '2026-10',
       generatedAt: '2026-10-08T06:12:40-07:00',
     },
@@ -176,6 +176,24 @@ describe('AuditReportPage', () => {
     expect(detail.text()).toContain('Partial')
     expect(detail.text()).toContain('one page failed')
     expect(detail.text()).toContain('R2')
+  })
+
+  // DAR-UI-078 (walked in Chrome): a new audit's statement with a check that has not run yet is not "No check yet".
+  it('says a statement whose check has not run is not run yet, and one with no check has none', async () => {
+    const doc = report()
+    const orders = doc.categories.orders!
+    const check = orders.statements.R2!.checks[0]!
+    orders.statements.R3 = { ...orders.statements.R3!, status: 'notRun', checks: [{ ...check, status: 'notRun' }] }
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    liveRoute.query = { category: 'orders', statement: 'R3' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.get('[data-testid="audit-statement-empty-R3"]').text()).toBe('Not run yet')
+    orders.statements.R3 = { ...orders.statements.R3!, checks: [] }
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    const w2 = mount(AuditReportPage)
+    await flushPromises()
+    expect(w2.get('[data-testid="audit-statement-empty-R3"]').text()).toBe('No check yet')
   })
 
   it('walks the columns through the URL, one history step per pick, and says why a statement has no findings', async () => {
@@ -363,6 +381,12 @@ describe('AuditReportPage', () => {
     expect(lines[1]!.text()).toContain('Held by line 1')
     await lines[1]!.trigger('click')
     expect(push).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-2' } })
+
+    // DAR-UI-079. Resolve on the order re-checks the line holding it up, not the order id.
+    f.verifyAuditFinding.mockResolvedValue({ ok: true, submitted: true } as never)
+    await w.get('[data-testid="audit-verify-finding"]').trigger('click')
+    expect(f.verifyAuditFinding).toHaveBeenCalledWith({ findingId: 'F-1' })
+    w.unmount()
   })
 
   // DAR-UI-075. An order past the report's 50 (a reload, a link) is found by reading the statement's orders first.
@@ -624,8 +648,8 @@ describe('AuditReportPage', () => {
     liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
     const w = mount(AuditReportPage)
     await flushPromises()
-    f.verifyAuditFinding.mockResolvedValue({ ok: false, submitted: false,
-      errors: ['Finding F-1 cannot be re-checked: its check has no automation yet (play the audit once).'] } as never)
+    const refusal = 'Finding F-1 cannot be re-checked: its check has no automation yet (play the audit once).'
+    f.verifyAuditFinding.mockRejectedValue(new ApiCallError(refusal, 200, { result: { errors: [refusal] } }))
     const reads = f.getAuditFinding.mock.calls.length
     await w.get('[data-testid="audit-verify-finding"]').trigger('click')
     await flushPromises()

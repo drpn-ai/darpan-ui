@@ -121,6 +121,44 @@
               Add check
             </button>
           </div>
+          <!-- DAR-UI-078: a new statement, saved at once so a check can be added to it. -->
+          <div v-if="addingStatement" class="audit-settings-new" data-testid="audit-settings-new-statement">
+            <textarea
+              ref="newTextEl"
+              v-model="newText"
+              class="wizard-answer-control audit-settings-text"
+              rows="2"
+              aria-label="New statement"
+              placeholder="What must be true"
+              data-testid="audit-settings-new-text"
+              :disabled="addingBusy"
+              @keydown.enter.exact.prevent="void addStatement()"
+            />
+            <div class="audit-settings-new-row">
+              <AppSelect v-model="newCategory" test-id="audit-settings-new-category" :options="categoryOptions" :disabled="addingBusy" />
+              <AppSelect v-model="newWeight" test-id="audit-settings-new-weight" :options="weightOptions" :disabled="addingBusy" />
+              <!-- Words, not the save icon: the page's own Save sits just below it. -->
+              <button
+                type="button"
+                class="ghost-btn"
+                data-testid="audit-settings-new-save"
+                :disabled="addingBusy || !newText.trim()"
+                @click="void addStatement()"
+              >
+                Save statement
+              </button>
+              <AppCancelAction test-id="audit-settings-new-cancel" :disabled="addingBusy" @click="addingStatement = false" />
+            </div>
+          </div>
+          <button
+            v-else
+            type="button"
+            class="ghost-btn audit-settings-new-open"
+            data-testid="audit-settings-new-open"
+            @click="openNewStatement"
+          >
+            New statement
+          </button>
         </div>
       </div>
     </WorkflowStepForm>
@@ -128,9 +166,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuditCheckEditor from '../../components/audit/AuditCheckEditor.vue'
+import AppCancelAction from '../../components/ui/AppCancelAction.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -146,6 +185,7 @@ import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 
 // DAR-UI-063. The audit page's settings gear: the audit's name, the daily schedule of every check it runs, and each
 // statement's text and on/off, with a way from each check to its run's rules. Save sends only what changed.
+// DAR-UI-078: also where a new audit gets its statements.
 const route = useRoute()
 const router = useRouter()
 const draftStore = useReconciliationDraftStore()
@@ -196,12 +236,62 @@ async function checkAdded() {
   }
 }
 
+// DAR-UI-078: a new statement is saved on its own, at once, and joins the list as saved, so the page's Save leaves it be.
+// Enter saves it (Shift+Enter is a new line); an audit with no statements opens with the box ready, as that is its next step.
+const addingStatement = ref(false)
+const newTextEl = ref<HTMLTextAreaElement | null>(null)
+async function openNewStatement() {
+  addingStatement.value = true
+  await nextTick()
+  newTextEl.value?.focus()
+}
+const addingBusy = ref(false)
+const newText = ref('')
+const newCategory = ref('orders')
+const newWeight = ref('derived')
+const categoryOptions = [
+  { value: 'orders', label: 'Orders' },
+  { value: 'refundsAndCredits', label: 'Refunds and credits' },
+  { value: 'returns', label: 'Returns' },
+  { value: 'exchangesAndWarranty', label: 'Exchanges and warranty' },
+]
+const weightOptions = [
+  { value: 'derived', label: 'Derived' },
+  { value: 'firm', label: 'Firm' },
+]
+async function addStatement(): Promise<boolean> {
+  if (addingBusy.value || !newText.value.trim() || !original.value) return false
+  addingBusy.value = true
+  error.value = null
+  try {
+    const response = await auditFacade.addAuditStatement({ audit: auditCode.value, text: newText.value.trim(),
+      category: newCategory.value, weight: newWeight.value as 'firm' | 'derived' })
+    const added = response.statement
+    if (!added) {
+      error.value = response.errors?.[0] || 'The statement was not added.'
+      return false
+    }
+    original.value = { ...original.value, statements: [...original.value.statements, { ...added, checks: [] }] }
+    statements.value = [...statements.value, { ...added, checks: [] }]
+    newText.value = ''
+    addingStatement.value = false
+    return true
+  } catch (caught) {
+    error.value = message(caught)
+    return false
+  } finally {
+    addingBusy.value = false
+  }
+}
+
 async function load() {
   error.value = null
   try {
     const response = await auditFacade.getAuditSettings({ audit: auditCode.value }, abort.signal)
-    if (response.settings) show(response.settings)
-    else error.value = response.errors?.[0] || 'Audit settings filed for an extension.'
+    if (response.settings) {
+      show(response.settings)
+      if (!response.settings.statements.length) await openNewStatement()
+    } else error.value = response.errors?.[0] || 'Audit settings filed for an extension.'
   } catch (caught) {
     if (!abort.signal.aborted) error.value = message(caught)
   }
@@ -233,6 +323,8 @@ function changes(): SaveAuditSettingsPayload | null {
 
 async function save() {
   if (saving.value || !original.value) return
+  // A statement still being typed is saved first, not dropped with the form.
+  if (addingStatement.value && newText.value.trim() && !(await addStatement())) return
   const payload = changes()
   if (!payload) {
     back()
@@ -376,6 +468,24 @@ button.audit-settings-add-check {
   text-decoration: none;
 }
 
+/* DAR-UI-078: a new statement takes the statement grid's text and toggle columns, its category and weight under it. */
+.audit-settings-new {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+}
+
+.audit-settings-new-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(8rem, 12rem) auto auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+button.audit-settings-new-open {
+  justify-self: start;
+}
+
 @media (max-width: 768px) {
   .audit-settings-schedule {
     grid-template-columns: 1fr;
@@ -388,6 +498,10 @@ button.audit-settings-add-check {
   .audit-settings-code,
   .audit-settings-checks {
     grid-column: 1 / -1;
+  }
+
+  .audit-settings-new-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

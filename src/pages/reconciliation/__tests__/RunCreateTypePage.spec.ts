@@ -36,6 +36,18 @@ describe('RunCreateTypePage', () => {
     target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }))
   }
 
+  // DAR-UI-078: an audit is made in the app too.
+  it('hands an Audit to the audit create flow, on C as on a click', async () => {
+    const w = mount(RunCreateTypePage, { attachTo: document.body })
+    expect(w.get('[data-testid="run-type-choice-audit"]').text()).toContain('Audit')
+    await w.get('[data-testid="run-type-choice-audit"]').trigger('click')
+    expect(push).toHaveBeenLastCalledWith({ name: 'audit-create' })
+    push.mockReset()
+    press('c')
+    expect(push).toHaveBeenLastCalledWith({ name: 'audit-create' })
+    w.unmount()
+  })
+
   it('opens Sync on A and Lifecycle on B, either case', async () => {
     const w = mount(RunCreateTypePage, { attachTo: document.body })
     press('a')

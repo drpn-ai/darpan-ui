@@ -141,6 +141,7 @@ import AppSelect from '../../components/ui/AppSelect.vue'
 import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
 import AuditColumns from '../../components/audit/AuditColumns.vue'
 import { auditFacade, reconciliationFacade } from '../../lib/api/facade'
+import { ApiCallError } from '../../lib/api/client'
 import { downloadIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { downloadTextFile } from '../../lib/utils/download'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
@@ -331,31 +332,32 @@ async function loadFinding(): Promise<void> {
 const VERIFY_POLL_MS = 3000
 const VERIFY_POLL_TRIES = 60
 async function verifyFinding(): Promise<void> {
-  const id = findingId.value
+  // An order's finding is its stuck line's (F-n), never the order id in the URL.
+  const id = findingTarget.value
   if (!id || verifying.value) return
   const before = finding.value?.finding.status.lastChecked ?? null
   verifying.value = true
   findingError.value = ''
   try {
     const started = await auditFacade.verifyAuditFinding({ findingId: id })
-    if (started.ok === false || !started.submitted) {
-      findingError.value = errorOf(started, 'The finding dodged the check. Try again.')
+    if (!started.submitted) {
+      findingError.value = 'The finding dodged the check. Try again.'
       return
     }
-    for (let tries = 0; tries < VERIFY_POLL_TRIES && findingId.value === id; tries++) {
+    for (let tries = 0; tries < VERIFY_POLL_TRIES && findingTarget.value === id; tries++) {
       await new Promise((resolve) => setTimeout(resolve, VERIFY_POLL_MS))
       const response = await auditFacade.getAuditFinding({ findingId: id })
       const doc = response.finding
-      if (findingId.value !== id || !doc || doc.finding.status.lastChecked === before) continue
+      if (findingTarget.value !== id || !doc || doc.finding.status.lastChecked === before) continue
       finding.value = doc
       const closed = doc.finding.status.state === 'fixed'
       say(closed ? 'Resolved. The finding is closed.' : 'Still open. The cause above is from this check.')
       if (closed) void loadReport()
       return
     }
-    if (findingId.value === id) say('Still checking. Reopen the finding in a minute.')
-  } catch {
-    if (findingId.value === id) findingError.value = 'The finding dodged the check. Try again.'
+    if (findingTarget.value === id) say('Still checking. Reopen the finding in a minute.')
+  } catch (error) {
+    if (findingTarget.value === id) findingError.value = error instanceof ApiCallError ? error.message : 'The finding dodged the check. Try again.'
   } finally {
     verifying.value = false
   }
@@ -381,7 +383,7 @@ async function loadMore(): Promise<void> {
     if (statement !== selectedStatement.value) return
     more.value = response.ok === false
       ? { ...more.value, error: errorOf(response, 'The findings could not be found. Yes, really.') }
-      : { ...more.value, findings: response.findings ?? [], cursor: null, hasNextPage: false }
+      : { ...more.value, findings: response.findings ?? [], hasNextPage: false }
   } catch {
     if (!abort.signal.aborted) more.value = { ...more.value, error: 'The findings could not be found. Yes, really.' }
   } finally {

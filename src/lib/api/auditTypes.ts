@@ -115,7 +115,6 @@ export interface AuditReport {
     date: string
     window: { from: string; thru: string }
     running: boolean
-    extendedThru: string | null
     period: string
     generatedAt: string
   }
@@ -215,20 +214,13 @@ export interface GetAuditCheckExtractsResponse extends AuditEnvelope {
   extracts?: AuditCheckExtract[]
 }
 
-// DAR-UI-070. A page of a statement's open and pending findings past the report's 50 (get#AuditFindings).
-// A findings page row: the report's summary plus where it sits and, DAR-UI-073, its cause in words.
+// A findings row (get#AuditFindingsByOrder): the report's summary plus where it sits and, DAR-UI-073, its cause in words.
 export interface AuditFindingListItem extends AuditFindingSummary {
   audit?: string
   period?: string
   statement: string
   category: string
   cause: string | null
-}
-
-export interface GetAuditFindingsResponse extends AuditEnvelope {
-  findings?: AuditFindingListItem[]
-  endCursor?: string | null
-  hasNextPage?: boolean
 }
 
 // DAR-UI-063. The audit's settings gear and play button (facade.AuditFacadeServices get#/save#AuditSettings, run#Audit).
@@ -278,6 +270,27 @@ export interface SaveAuditSettingsPayload {
 }
 
 export type SaveAuditSettingsResponse = GetAuditSettingsResponse
+
+// DAR-UI-078. An audit made in the app, and a statement added to one (saved at once, so a check can be added to it).
+export interface CreateAuditPayload {
+  name: string
+  period: 'day' | 'month' | 'quarter'
+}
+
+export interface CreateAuditResponse extends AuditEnvelope {
+  audit?: AuditListItem | null
+}
+
+export interface AddAuditStatementPayload {
+  audit: string
+  text: string
+  category: string
+  weight?: 'firm' | 'derived'
+}
+
+export interface AddAuditStatementResponse extends AuditEnvelope {
+  statement?: AuditSettingsStatement | null
+}
 
 export interface RunAuditPayload {
   audit: string

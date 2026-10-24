@@ -1,7 +1,8 @@
 <template>
   <!-- data-enter-submit="off" and the Enter capture keep this editor's keys from saving the settings form it sits in. -->
   <div class="audit-check-editor" data-enter-submit="off" data-testid="audit-check-editor" @keydown.enter.capture="keepEnterHere">
-    <div v-if="errors.length" class="audit-check-errors" data-testid="audit-check-errors">
+    <!-- Loading failed: there is no form, so the reason stands alone. -->
+    <div v-if="errors.length && !options" class="audit-check-errors" data-testid="audit-check-errors">
       <InlineValidation v-for="message in errors" :key="message" tone="error" :message="message" />
     </div>
 
@@ -135,11 +136,11 @@
 
       <div :class="['workflow-form-grid', { 'workflow-form-grid--two': !isEvaluate }]">
         <label class="wizard-input-shell">
-          <span class="workflow-context-label">File 1 record</span>
+          <span class="workflow-context-label">{{ sideName('FILE_1') }} record</span>
           <input v-model="form.file1RecordType" name="file1RecordType" class="wizard-answer-control" type="text" :disabled="busy" />
         </label>
         <label v-if="!isEvaluate" class="wizard-input-shell" data-testid="audit-check-file2">
-          <span class="workflow-context-label">File 2 record</span>
+          <span class="workflow-context-label">{{ sideName('FILE_2') }} record</span>
           <input v-model="form.file2RecordType" name="file2RecordType" class="wizard-answer-control" type="text" :disabled="busy" />
         </label>
       </div>
@@ -221,6 +222,7 @@
             name="headlineTemplate"
             class="wizard-answer-control workflow-form-textarea workflow-form-textarea--single-row"
             rows="1"
+            :placeholder="defaultHeadline"
             :disabled="busy"
           />
         </label>
@@ -247,8 +249,15 @@
         <p class="section-note">{name} is the finding's field of that name.</p>
       </div>
 
+      <!-- DAR-UI-078: what stopped the save sits by its button, and goes once the form changes. -->
+      <div v-if="errors.length" class="audit-check-errors" data-testid="audit-check-errors">
+        <InlineValidation v-for="message in errors" :key="message" tone="error" :message="message" />
+      </div>
       <div class="audit-check-actions">
-        <AppSaveAction test-id="audit-check-save" :disabled="busy" @click="void save()" />
+        <!-- Words, not the save icon: the settings page's own Save sits just below. -->
+        <button type="button" class="ghost-btn" data-testid="audit-check-save" :disabled="busy" @click="void save()">
+          Save check
+        </button>
         <AppCancelAction test-id="audit-check-cancel" :disabled="saving" @click="emit('cancel')" />
       </div>
     </template>
@@ -259,7 +268,6 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppCancelAction from '../ui/AppCancelAction.vue'
-import AppSaveAction from '../ui/AppSaveAction.vue'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowSelect from '../workflow/WorkflowSelect.vue'
@@ -315,13 +323,14 @@ const MAX_GRACE_DAYS = 60
 const plusIconPath =
   'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'
 
-const DIFF_TYPE_LABELS: Record<AuditDiffType, string> = {
-  MISSING_IN_FILE_1: 'Missing in file 1',
-  MISSING_IN_FILE_2: 'Missing in file 2',
-  FIELD_MISMATCH: 'Field mismatch',
-  FINDING: 'Finding',
-  DUPLICATE_IN_FILE_1: 'Duplicate in file 1',
-  DUPLICATE_IN_FILE_2: 'Duplicate in file 2',
+// DAR-UI-078: a side is named by its system once a run is picked ("Missing in HotWax"), as "file 1" means nothing to a reader.
+const DIFF_TYPE_LABELS: Record<AuditDiffType, (side: (s: 'FILE_1' | 'FILE_2') => string) => string> = {
+  MISSING_IN_FILE_1: (side) => `Missing in ${side('FILE_1')}`,
+  MISSING_IN_FILE_2: (side) => `Missing in ${side('FILE_2')}`,
+  FIELD_MISMATCH: () => 'Field mismatch',
+  FINDING: () => 'Finding',
+  DUPLICATE_IN_FILE_1: (side) => `Duplicate in ${side('FILE_1')}`,
+  DUPLICATE_IN_FILE_2: (side) => `Duplicate in ${side('FILE_2')}`,
 }
 // An EVALUATE run reads one side, so only its findings and its duplicates can break a statement.
 const EVALUATE_DIFF_TYPES: AuditDiffType[] = ['FINDING', 'DUPLICATE_IN_FILE_1']
@@ -354,7 +363,7 @@ const allowedDiffTypes = computed<AuditDiffType[]>(() => {
   return offered.length ? forMode.filter((type) => offered.includes(type)) : forMode
 })
 const diffTypeOptions = computed<AppSelectOption[]>(() =>
-  allowedDiffTypes.value.map((type) => ({ value: type, label: DIFF_TYPE_LABELS[type] ?? type })),
+  allowedDiffTypes.value.map((type) => ({ value: type, label: DIFF_TYPE_LABELS[type]?.(sideName) ?? type })),
 )
 const ruleOptions = computed<AppSelectOption[]>(() =>
   (run.value?.rules ?? []).map((rule) => ({ value: rule.ruleId, label: rule.ruleText || rule.ruleId })),
@@ -366,6 +375,31 @@ const fixWhereOptions = computed<AppSelectOption[]>(() => [
   { value: '', label: 'None' },
   ...(options.value?.fixWhere ?? []).map((value) => ({ value, label: FIX_WHERE_LABELS[value] ?? value })),
 ])
+
+/** A run side by its system (HotWax, NetSuite, Shopify); numbered when both sides read one system, "file N" before a run. */
+function sideName(side: 'FILE_1' | 'FILE_2'): string {
+  const sides = run.value?.sides ?? []
+  const system = sides.find((item) => item.side === side)?.system
+  if (!system) return side === 'FILE_1' ? 'file 1' : 'file 2'
+  const label = FIX_WHERE_LABELS[system] ?? system
+  return sides.filter((item) => item.system === system).length > 1 ? `${label} ${side === 'FILE_1' ? 1 : 2}` : label
+}
+
+/** "Shopify legacyResourceId = HotWax externalId": how the run pairs its records, said in the check's words. */
+function matchedByOf(item: Run): string {
+  const sides = (item.sides ?? []).filter((s) => s.key)
+  return sides.map((s) => `${sideName(s.side)} ${s.key}`).join(' = ')
+}
+
+// DAR-UI-078 (walked in Chrome): a check saved with no headline read "Field comparison failed: isFulfilled >= isCompleted".
+// Left blank, the headline is the record and the check's own name, which says what is wrong ("Shopify order {recordKey}:
+// Completed in HotWax, not fulfilled in Shopify"); shown as the field's placeholder so it is seen before it is saved.
+const defaultHeadline = computed(() => {
+  const name = form.label.trim()
+  if (!name) return ''
+  const record = run.value ? `${sideName('FILE_1')} ${form.file1RecordType.trim() || 'record'}` : 'Record'
+  return `${record} {recordKey}: ${name}`
+})
 
 function statementOptionsFor(row: LinkRow): AppSelectOption[] {
   const taken = new Set(links.value.filter((other) => other !== row).map((other) => other.id))
@@ -431,6 +465,13 @@ function removeLink(index: number): void {
 /** A new run keeps only the row types, rules and conclusions it can produce. */
 function selectRun(savedRunId: string): void {
   form.savedRunId = savedRunId
+  // DAR-UI-078: what the run already says fills what is still empty; nothing typed is overwritten.
+  const picked = run.value
+  if (picked) {
+    if (!form.file1RecordType) form.file1RecordType = picked.recordType ?? ''
+    if (!form.file2RecordType && !isEvaluate.value) form.file2RecordType = picked.recordType ?? ''
+    if (!form.matchedBy) form.matchedBy = matchedByOf(picked)
+  }
   const allowed = new Set<string>(allowedDiffTypes.value)
   const rules = new Set(ruleOptions.value.map((option) => option.value))
   const conclusions = new Set(conclusionOptions.value.map((option) => option.value))
@@ -503,7 +544,7 @@ function draft(): AuditCheckDraft {
     expectedSource: orNull(form.expectedSource),
     actualSource: orNull(form.actualSource),
     amountCurrencyUomId: orNull(form.amountCurrencyUomId.toUpperCase()),
-    headlineTemplate: orNull(form.headlineTemplate),
+    headlineTemplate: orNull(form.headlineTemplate) ?? orNull(defaultHeadline.value),
     fixActionTemplate: orNull(form.fixActionTemplate),
     passesWhenTemplate: orNull(form.passesWhenTemplate),
     // A new check may not take over a code another audit already uses; the backend refuses it (DAR-UI-064).
@@ -526,6 +567,11 @@ function statementLinks(): AuditCheckStatementLink[] {
 async function save(): Promise<void> {
   if (busy.value || !options.value) return
   const check = draft()
+  // The id follows the name, so an empty name is the thing to say, not the id it left empty.
+  if (!check.label) {
+    errors.value = ['Name the check: what it compares, in a few words.']
+    return
+  }
   if (options.value.checks.some((existing) => existing.id === check.id)) {
     errors.value = [`Check '${check.id}' is already on this audit.`]
     return
@@ -553,6 +599,8 @@ function keepEnterHere(event: KeyboardEvent): void {
 }
 
 watch(() => props.audit, () => void load(), { immediate: true })
+// DAR-UI-078: a refusal is about the form as it was; once it changes, the stale reason goes.
+watch([form, links], () => { if (options.value && !saving.value) errors.value = [] }, { deep: true })
 </script>
 
 <style scoped>

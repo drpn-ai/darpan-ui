@@ -127,6 +127,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 function handleShortcutKeydown(event: KeyboardEvent) {
   if (step.value !== 'window') return
+  // DAR-UI-078 (walked in Chrome): a letter picks a card but leaves focus on the page, outside the form that answers
+  // Enter, so "press Enter" did nothing. Enter there runs, as the hint says; inside the form the form answers it.
+  if (event.key === 'Enter' && !event.defaultPrevented && !event.repeat && !(event.target instanceof Element && event.target.closest('form'))) {
+    event.preventDefault()
+    void start()
+    return
+  }
   if (typeof event.key !== 'string' || event.key.length !== 1) return
   if (event.defaultPrevented || event.repeat || event.isComposing) return
   if (event.altKey || event.ctrlKey || event.metaKey) return

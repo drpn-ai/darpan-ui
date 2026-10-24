@@ -154,7 +154,7 @@
             </button>
           </template>
           <div v-if="statementDoc && !findings.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
-            {{ narrowed ? 'No match' : statementDoc.status === 'notRun' ? 'No check yet' : 'Holds' }}
+            {{ narrowed ? 'No match' : statementDoc.status === 'notRun' ? (statementDoc.checks.length ? 'Not run yet' : 'No check yet') : 'Holds' }}
           </div>
           <InlineValidation v-if="more.error" tone="error" :message="more.error" data-testid="audit-findings-more-error" />
           <button v-if="findingsLeftCount" type="button" class="audit-more audit-pad" data-testid="audit-findings-more" :disabled="more.loading" @click="emit('more')">

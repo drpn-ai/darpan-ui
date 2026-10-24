@@ -7,7 +7,7 @@ const { push, route } = vi.hoisted(() => ({
   route: { params: { audit: 'month-close' }, query: { period: '2026-09' } as Record<string, string>, fullPath: '/audits/month-close/settings?period=2026-09' },
 }))
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push }) }))
-vi.mock('../../../lib/api/facade', () => ({ auditFacade: { getAuditSettings: vi.fn(), saveAuditSettings: vi.fn() } }))
+vi.mock('../../../lib/api/facade', () => ({ auditFacade: { getAuditSettings: vi.fn(), saveAuditSettings: vi.fn(), addAuditStatement: vi.fn() } }))
 vi.mock('../../../lib/savedRunEditorRoute', () => ({
   resolveSavedRunEditorTarget: vi.fn(),
   buildSavedRunEditorRoute: vi.fn(() => ({ name: 'settings-runs-edit', params: { reconciliationMappingId: 'S1' } })),
@@ -40,6 +40,7 @@ beforeEach(() => {
   push.mockReset()
   f.getAuditSettings.mockReset()
   f.saveAuditSettings.mockReset()
+  f.addAuditStatement.mockReset()
   vi.mocked(resolveSavedRunEditorTarget).mockReset()
   f.getAuditSettings.mockResolvedValue({ ok: true, settings: settings() } as never)
   f.saveAuditSettings.mockResolvedValue({ ok: true, settings: settings() } as never)
@@ -163,5 +164,53 @@ describe('AuditSettingsPage', () => {
     await flushPromises()
     expect(w.text()).toContain('Audit month-close was not found')
     expect(form(w).props('submitDisabled')).toBe(true)
+  })
+
+  // DAR-UI-078. A new audit gets its statements here: saved at once, listed as saved, so a check can be added to it.
+  it('adds a statement at once, which the page\'s Save then leaves be', async () => {
+    f.addAuditStatement.mockResolvedValue({ ok: true,
+      statement: { id: 'ST3', code: 'R4', text: 'Every return reaches NetSuite.', active: true, checks: [] } } as never)
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    await w.get('[data-testid="audit-settings-new-open"]').trigger('click')
+    await w.get('[data-testid="audit-settings-new-text"]').setValue(' Every return reaches NetSuite. ')
+    w.findAllComponents({ name: 'AppSelect' }).find((c) => c.props('testId') === 'audit-settings-new-category')!.vm.$emit('update:modelValue', 'returns')
+    await flushPromises()
+    await w.get('[data-testid="audit-settings-new-save"]').trigger('click')
+    await flushPromises()
+    expect(f.addAuditStatement).toHaveBeenCalledWith({ audit: 'month-close', text: 'Every return reaches NetSuite.', category: 'returns', weight: 'derived' })
+    expect(w.find('[data-testid="audit-settings-statement-ST3"]').exists()).toBe(true)
+    expect(w.find('[data-testid="audit-settings-add-check-R4"]').exists()).toBe(true)
+    expect(w.find('[data-testid="audit-settings-new-statement"]').exists()).toBe(false)
+    await save(w)
+    expect(f.saveAuditSettings).not.toHaveBeenCalled()
+  })
+
+  it('opens a new audit with the statement box ready, and Enter saves it', async () => {
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { ...settings(), statements: [] } } as never)
+    f.addAuditStatement.mockResolvedValue({ ok: true,
+      statement: { id: 'ST1', code: 'R1', text: 'Every return reaches NetSuite.', active: true, checks: [] } } as never)
+    const w = mount(AuditSettingsPage, { attachTo: document.body })
+    await flushPromises()
+    const box = w.get('[data-testid="audit-settings-new-text"]')
+    expect(document.activeElement).toBe(box.element)
+    await box.setValue('Every return reaches NetSuite.')
+    await box.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect(f.addAuditStatement).toHaveBeenCalledTimes(1)
+    expect(w.find('[data-testid="audit-settings-add-check-R1"]').exists()).toBe(true)
+    w.unmount()
+  })
+
+  it('saves a statement still being typed before the page\'s Save, not dropping it', async () => {
+    f.addAuditStatement.mockResolvedValue({ ok: true,
+      statement: { id: 'ST3', code: 'R4', text: 'Every return reaches NetSuite.', active: true, checks: [] } } as never)
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    await w.get('[data-testid="audit-settings-new-open"]').trigger('click')
+    await w.get('[data-testid="audit-settings-new-text"]').setValue('Every return reaches NetSuite.')
+    await save(w)
+    expect(f.addAuditStatement).toHaveBeenCalledTimes(1)
+    expect(push).toHaveBeenCalledWith(back)
   })
 })

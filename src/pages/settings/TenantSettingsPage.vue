@@ -1706,11 +1706,6 @@ function openRouteRequestedWorkflow(): void {
 
   if (workflow === 'timezone') {
     openTimezoneWorkflow()
-    return
-  }
-
-  if (workflow === 'streaks-space') {
-    openStreaksSpaceWorkflow()
   }
 }
 

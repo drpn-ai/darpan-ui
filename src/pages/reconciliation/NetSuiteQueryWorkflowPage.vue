@@ -1,5 +1,5 @@
 <template>
-  <WorkflowPage :progress-percent="progressPercent" aria-label="SuiteQL query setup progress" center-stage :edit-surface="isEditing">
+  <WorkflowPage :progress-percent="progressPercent" aria-label="SuiteQL query setup progress" center-stage>
     <div v-if="errors.length" class="netsuite-query-errors" data-testid="netsuite-query-errors">
       <InlineValidation v-for="message in errors" :key="message" tone="error" :message="message" />
     </div>
@@ -13,166 +13,94 @@
     </datalist>
 
     <WorkflowStepForm
-      :class="[
-        'workflow-form--compact',
-        {
-          'workflow-form--edit-single-page': isEditing,
-          'workflow-form--board-stage': isWideStep,
-        },
-      ]"
-      :data-step-id="isEditing ? 'edit' : currentCreateStep.id"
+      :class="['workflow-form--compact', { 'workflow-form--board-stage': isWideStep }]"
+      :data-step-id="currentCreateStep.id"
       :question="currentQuestion"
       :primary-label="primaryLabel"
       :primary-action-variant="primaryActionVariant"
-      :show-enter-hint="!isEditing"
       :show-back="showBack"
-      :show-cancel-action="isEditing && Boolean(returnTo)"
-      :cancel-disabled="loading"
-      cancel-test-id="cancel-netsuite-query"
       :allow-select-enter="isCreateSelectStep"
       :submit-disabled="submitDisabled"
       :show-primary-action="canEditTenantSettings"
       :primary-test-id="primaryTestId"
       @submit="handlePrimarySubmit"
       @back="goBack"
-      @cancel="leave"
     >
-      <template v-if="isEditing">
-        <div class="workflow-form-grid workflow-form-grid--compact">
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Query ID</span>
-            <input
-              name="nsSuiteQlSourceQueryId"
-              :value="form.nsSuiteQlSourceQueryId"
-              class="wizard-answer-control"
-              type="text"
-              disabled
-            />
-          </label>
+      <label v-if="currentCreateStep.id === 'nsAuthConfigId'" class="wizard-input-shell">
+        <WorkflowSelect
+          v-model="form.nsAuthConfigId"
+          test-id="netsuite-query-account"
+          :options="accountOptions"
+          placeholder="Select account"
+        />
+      </label>
 
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Account</span>
-            <AppSelect
-              v-model="form.nsAuthConfigId"
-              :options="accountOptions"
-              placeholder="Select account"
-              test-id="netsuite-query-account"
-            />
-          </label>
+      <label v-else-if="currentCreateStep.id === 'nsSuiteQlSourceQueryId'" class="wizard-input-shell">
+        <input
+          name="nsSuiteQlSourceQueryId"
+          v-model="form.nsSuiteQlSourceQueryId"
+          :class="['wizard-answer-control', { empty: !form.nsSuiteQlSourceQueryId.trim() }]"
+          type="text"
+          placeholder="NS_WARRANTY_CLAIM"
+        />
+      </label>
 
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Active</span>
-            <AppSelect v-model="form.isActive" :options="yesNoOptions" test-id="netsuite-query-is-active" />
-          </label>
-        </div>
+      <label v-else-if="currentCreateStep.id === 'description'" class="wizard-input-shell">
+        <input
+          name="description"
+          v-model="form.description"
+          class="wizard-answer-control"
+          type="text"
+          placeholder="Warranty claims"
+        />
+      </label>
 
-        <label class="wizard-input-shell">
-          <span class="workflow-context-label">Description</span>
-          <input name="description" v-model="form.description" class="wizard-answer-control" type="text" />
-        </label>
+      <div v-else-if="currentCreateStep.id === 'recordType'" class="wizard-input-shell">
+        <WorkflowSelect
+          :model-value="recordTypeSelectValue"
+          test-id="netsuite-query-record-type"
+          :options="recordTypeOptions"
+          placeholder="Select record type"
+          @update:model-value="selectRecordType"
+        />
+        <p class="wizard-or">Or</p>
+        <input
+          name="recordTypeOther"
+          v-model="otherRecordType"
+          class="wizard-answer-control"
+          type="text"
+          placeholder="Another record type"
+        />
+      </div>
 
-        <div class="workflow-form-grid workflow-form-grid--compact">
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Record Type</span>
-            <input
-              name="recordType"
-              v-model="form.recordType"
-              class="wizard-answer-control"
-              type="text"
-              list="netsuite-query-record-types"
-            />
-          </label>
+      <label v-else-if="currentCreateStep.id === 'dateColumn'" class="wizard-input-shell">
+        <WorkflowSelect
+          v-model="form.dateColumn"
+          test-id="netsuite-query-date-column"
+          :options="dateColumnOptions"
+          placeholder="Select date column"
+        />
+      </label>
 
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Date Column</span>
-            <AppSelect v-model="form.dateColumn" :options="dateColumnOptions" test-id="netsuite-query-date-column" />
-          </label>
+      <label v-else-if="currentCreateStep.id === 'queryTemplate'" class="wizard-input-shell">
+        <WorkflowSelect
+          v-model="form.queryTemplate"
+          test-id="netsuite-query-template"
+          :options="templateOptions"
+          placeholder="Select records"
+        />
+      </label>
 
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Records</span>
-            <AppSelect v-model="form.queryTemplate" :options="templateOptions" test-id="netsuite-query-template" />
-          </label>
-        </div>
-      </template>
-
-      <template v-else>
-        <label v-if="currentCreateStep.id === 'nsAuthConfigId'" class="wizard-input-shell">
-          <WorkflowSelect
-            v-model="form.nsAuthConfigId"
-            test-id="netsuite-query-account"
-            :options="accountOptions"
-            placeholder="Select account"
-          />
-        </label>
-
-        <label v-else-if="currentCreateStep.id === 'nsSuiteQlSourceQueryId'" class="wizard-input-shell">
-          <input
-            name="nsSuiteQlSourceQueryId"
-            v-model="form.nsSuiteQlSourceQueryId"
-            :class="['wizard-answer-control', { empty: !form.nsSuiteQlSourceQueryId.trim() }]"
-            type="text"
-            placeholder="NS_WARRANTY_CLAIM"
-          />
-        </label>
-
-        <label v-else-if="currentCreateStep.id === 'description'" class="wizard-input-shell">
-          <input
-            name="description"
-            v-model="form.description"
-            class="wizard-answer-control"
-            type="text"
-            placeholder="Warranty claims"
-          />
-        </label>
-
-        <div v-else-if="currentCreateStep.id === 'recordType'" class="wizard-input-shell">
-          <WorkflowSelect
-            :model-value="recordTypeSelectValue"
-            test-id="netsuite-query-record-type"
-            :options="recordTypeOptions"
-            placeholder="Select record type"
-            @update:model-value="selectRecordType"
-          />
-          <p class="wizard-or">Or</p>
-          <input
-            name="recordTypeOther"
-            v-model="otherRecordType"
-            class="wizard-answer-control"
-            type="text"
-            placeholder="Another record type"
-          />
-        </div>
-
-        <label v-else-if="currentCreateStep.id === 'dateColumn'" class="wizard-input-shell">
-          <WorkflowSelect
-            v-model="form.dateColumn"
-            test-id="netsuite-query-date-column"
-            :options="dateColumnOptions"
-            placeholder="Select date column"
-          />
-        </label>
-
-        <label v-else-if="currentCreateStep.id === 'queryTemplate'" class="wizard-input-shell">
-          <WorkflowSelect
-            v-model="form.queryTemplate"
-            test-id="netsuite-query-template"
-            :options="templateOptions"
-            placeholder="Select records"
-          />
-        </label>
-
-        <label v-else-if="currentCreateStep.id === 'joinKeyFieldName'" class="wizard-input-shell">
-          <WorkflowSelect
-            v-model="form.joinKeyFieldName"
-            test-id="netsuite-query-join-key"
-            :options="keyFieldOptions"
-            placeholder="Select key field"
-          />
-        </label>
-      </template>
+      <label v-else-if="currentCreateStep.id === 'joinKeyFieldName'" class="wizard-input-shell">
+        <WorkflowSelect
+          v-model="form.joinKeyFieldName"
+          test-id="netsuite-query-join-key"
+          :options="keyFieldOptions"
+          placeholder="Select key field"
+        />
+      </label>
 
       <div v-if="showMatchEditor" class="workflow-context-block">
-        <span v-if="isEditing" class="workflow-context-label">Match</span>
         <AppTableFrame :columns="matchRuleColumns" :rows="matchRuleTableRows" row-test-id="netsuite-query-match-row">
           <template #cell-fieldId="{ row }">
             <input v-model="row.fieldId" name="matchFieldId" type="text" list="netsuite-query-match-fields" />
@@ -231,7 +159,6 @@
       </div>
 
       <div v-if="showFieldEditor" class="workflow-context-block">
-        <span v-if="isEditing" class="workflow-context-label">Columns</span>
         <AppTableFrame :columns="fieldColumns" :rows="fieldTableRows" row-test-id="netsuite-query-field-row">
           <template #cell-recordFieldName="{ row }">
             <input v-model="row.recordFieldName" name="recordFieldName" type="text" placeholder="returnId" />
@@ -276,24 +203,7 @@
         </AppTableFrame>
       </div>
 
-      <div v-if="isEditing" class="workflow-form-grid workflow-form-grid--two">
-        <label class="wizard-input-shell">
-          <span class="workflow-context-label">Key Field</span>
-          <AppSelect
-            v-model="form.joinKeyFieldName"
-            :options="keyFieldOptions"
-            placeholder="Select key field"
-            test-id="netsuite-query-join-key"
-          />
-        </label>
-
-        <label class="wizard-input-shell">
-          <span class="workflow-context-label">Origin Field</span>
-          <input name="originFieldName" v-model="form.originFieldName" class="wizard-answer-control" type="text" />
-        </label>
-      </div>
-
-      <div v-if="isEditing || currentCreateStep.id === 'review'" class="workflow-context-block netsuite-query-preview">
+      <div v-if="currentCreateStep.id === 'review'" class="workflow-context-block netsuite-query-preview">
         <div class="netsuite-query-preview__bar">
           <label class="netsuite-query-preview__day">
             <span class="workflow-context-label">Day</span>
@@ -398,11 +308,6 @@ interface FieldRow {
 }
 
 const TEMPLATE_RECORDS_MATCHING = 'RECORDS_MATCHING'
-/** Everything this editor writes; any other stored spec field (a lifecycle template's) rides through untouched. */
-const EDITOR_KEYS = new Set([
-  'nsSuiteQlSourceQueryId', 'nsAuthConfigId', 'description', 'recordType', 'fromTable', 'dateColumn',
-  'queryTemplate', 'matchRules', 'joinKeyFieldName', 'originFieldName', 'isActive', 'fields',
-])
 const FALLBACK_OPTIONS: NsSuiteQlQueryOptions = {
   templates: ['RECORDS', TEMPLATE_RECORDS_MATCHING],
   dateColumns: ['trandate', 'lastmodifieddate', 'createddate'],
@@ -442,10 +347,6 @@ const fieldColumns = [
   { key: 'sourceColumn', label: 'Column', cellClass: 'app-table__control-cell' },
   actionColumn,
 ]
-const yesNoOptions: AppSelectOption[] = [
-  { value: 'Y', label: 'Yes' },
-  { value: 'N', label: 'No' },
-]
 
 const route = useRoute()
 const router = useRouter()
@@ -470,8 +371,6 @@ const form = reactive<QueryForm>(createDefaultForm())
 const matchRuleRows = ref<MatchRuleRow[]>([])
 const fieldRows = ref<FieldRow[]>([])
 const otherRecordType = ref('')
-/** Stored spec fields this editor does not show; sent back on save so editing never clears them. */
-const carriedFields = ref<Record<string, unknown>>({})
 const options = ref<NsSuiteQlQueryOptions>(FALLBACK_OPTIONS)
 const loading = ref(false)
 const errors = ref<string[]>([])
@@ -482,14 +381,12 @@ const preview = ref<NsSuiteQlQueryPreview | null>(null)
 const previewErrors = ref<string[]>([])
 const currentStepIndex = ref(0)
 
-const activeQueryId = computed(() => String(route.params.queryId ?? '').trim())
-const isEditing = computed(() => activeQueryId.value.length > 0)
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const returnTo = computed(() => resolveInternalRedirectTarget(route.query.returnTo, ''))
 const returnSide = computed(() => String(route.query.side ?? '').trim())
 const isMatching = computed(() => form.queryTemplate === TEMPLATE_RECORDS_MATCHING)
-const showMatchEditor = computed(() => (isEditing.value ? isMatching.value : currentCreateStep.value.id === 'matchRules'))
-const showFieldEditor = computed(() => isEditing.value || currentCreateStep.value.id === 'fields')
+const showMatchEditor = computed(() => currentCreateStep.value.id === 'matchRules')
+const showFieldEditor = computed(() => currentCreateStep.value.id === 'fields')
 
 const createSteps = computed<QueryCreateStep[]>(() => [
   { id: 'nsAuthConfigId', title: 'Which NetSuite account should this query read?', kind: 'select' },
@@ -524,15 +421,15 @@ const {
 } = useWorkflowStepMachine<QueryCreateStep>({
   steps: createSteps,
   currentStepIndex,
-  isEditing,
-  editQuestion: 'Update the SuiteQL query.',
+  isEditing: computed(() => false),
+  editQuestion: '',
   finalStepId: 'review',
   saveTestId: 'save-netsuite-query',
   error: errorRef,
 })
 
-const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
-const isWideStep = computed(() => isEditing.value || ['list', 'review'].includes(currentCreateStep.value.kind))
+const isCreateSelectStep = computed(() => currentCreateStep.value.kind === 'select')
+const isWideStep = computed(() => ['list', 'review'].includes(currentCreateStep.value.kind))
 
 const accountOptions = computed<WorkflowSelectOption[]>(() => options.value.accounts.map((account) => ({
   value: account.nsAuthConfigId,
@@ -580,7 +477,6 @@ const matchRulesPayload = computed<NsMatchRule[]>(() => {
 
 const submitDisabled = computed(() => {
   if (!canEditTenantSettings.value || loading.value) return true
-  if (isEditing.value) return false
 
   switch (currentCreateStep.value.id) {
     case 'nsAuthConfigId':
@@ -656,49 +552,11 @@ function serviceErrors(error: unknown, fallback: string): string[] {
   return [fallback]
 }
 
-function parseMatchRules(raw: NsSuiteQlQuery['matchRules']): MatchRuleRow[] {
-  let parsed: unknown = raw
-  if (typeof raw === 'string') {
-    try {
-      parsed = raw.trim() ? JSON.parse(raw) : []
-    } catch {
-      parsed = []
-    }
-  }
-  if (!Array.isArray(parsed)) return []
-  return parsed.map((rule: Partial<NsMatchRule>) => ({
-    fieldId: String(rule?.fieldId ?? ''),
-    op: (rule?.op ?? 'IN') as NsMatchOp,
-    valuesText: Array.isArray(rule?.values) ? rule.values.join(', ') : '',
-  }))
-}
-
-function applyQuery(query: NsSuiteQlQuery): void {
-  form.nsSuiteQlSourceQueryId = query.nsSuiteQlSourceQueryId
-  form.nsAuthConfigId = query.nsAuthConfigId ?? ''
-  form.description = query.description ?? ''
-  form.recordType = query.recordType ?? ''
-  form.fromTable = query.fromTable || 'transaction'
-  form.dateColumn = query.dateColumn || 'trandate'
-  form.queryTemplate = query.queryTemplate || 'RECORDS'
-  form.joinKeyFieldName = query.joinKeyFieldName ?? ''
-  form.originFieldName = query.originFieldName ?? ''
-  form.isActive = query.isActive === false || query.isActive === 'N' ? 'N' : 'Y'
-  matchRuleRows.value = parseMatchRules(query.matchRules)
-  if (isMatching.value && matchRuleRows.value.length === 0) matchRuleRows.value = [emptyMatchRule()]
-  fieldRows.value = [...(query.fields ?? [])]
-    .sort((a, b) => (a.sequenceNum ?? 0) - (b.sequenceNum ?? 0))
-    .map((field) => ({ recordFieldName: field.recordFieldName ?? '', sourceColumn: field.sourceColumn ?? '' }))
-  carriedFields.value = Object.fromEntries(Object.entries(query)
-    .filter(([key, value]) => !EDITOR_KEYS.has(key) && value !== null && value !== undefined && value !== ''))
-}
-
 function resetCreateForm(): void {
   Object.assign(form, createDefaultForm())
   matchRuleRows.value = [emptyMatchRule()]
   fieldRows.value = [{ recordFieldName: '', sourceColumn: '' }]
   otherRecordType.value = ''
-  carriedFields.value = {}
   currentStepIndex.value = 0
 }
 
@@ -731,22 +589,15 @@ async function load(): Promise<void> {
   success.value = null
   preview.value = null
   previewErrors.value = []
-  if (!isEditing.value) resetCreateForm()
+  resetCreateForm()
 
   loadController?.abort()
   loadController = new AbortController()
   const signal = loadController.signal
 
   try {
-    const [optionsResponse, queryResponse] = await Promise.all([
-      netSuiteQueryFacade.getOptions(signal),
-      isEditing.value ? netSuiteQueryFacade.get(activeQueryId.value, signal) : Promise.resolve(null),
-    ])
+    const optionsResponse = await netSuiteQueryFacade.getOptions(signal)
     options.value = { ...FALLBACK_OPTIONS, ...(optionsResponse.options ?? {}) }
-    if (queryResponse) {
-      if (queryResponse.query) applyQuery(queryResponse.query)
-      else errors.value = [`SuiteQL query "${activeQueryId.value}" returned zero rows of itself.`]
-    }
   } catch (loadError) {
     if (isAbortError(loadError)) return
     errors.value = serviceErrors(loadError, 'The SuiteQL query wandered off mid-SELECT.')
@@ -756,7 +607,7 @@ async function load(): Promise<void> {
 }
 
 async function handlePrimarySubmit(): Promise<void> {
-  if (isEditing.value || currentCreateStep.value.id === 'review') {
+  if (currentCreateStep.value.id === 'review') {
     await save()
     return
   }
@@ -797,7 +648,6 @@ async function save(): Promise<void> {
   success.value = null
   try {
     const payload: NsSuiteQlQuery = {
-      ...carriedFields.value,
       ...basePayload(),
       description: form.description.trim(),
       isActive: form.isActive,
@@ -808,11 +658,6 @@ async function save(): Promise<void> {
       await router.push(withReturnParams(returnTo.value, savedId))
       return
     }
-    if (!isEditing.value) {
-      await router.replace({ name: 'reconciliation-netsuite-query-edit', params: { queryId: savedId } })
-      return
-    }
-    if (response.savedQuery) applyQuery(response.savedQuery)
     success.value = 'Saved.'
   } catch (saveError) {
     if (isAbortError(saveError)) return
@@ -830,11 +675,6 @@ function withReturnParams(target: string, queryId: string): string {
   const params = new URLSearchParams({ newQuery: queryId })
   if (returnSide.value) params.set('side', returnSide.value)
   return `${base}${base.includes('?') ? '&' : '?'}${params.toString()}${hash}`
-}
-
-async function leave(): Promise<void> {
-  if (loading.value || !returnTo.value) return
-  await router.push(returnTo.value)
 }
 
 // A typed record type wins over the list; clearing it leaves nothing chosen rather than a stale identifier.

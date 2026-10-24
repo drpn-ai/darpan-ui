@@ -215,18 +215,16 @@ export function defaultSource(report: AuditReport): string {
   return (items.find((item) => item.attention) ?? items.find((item) => item.key === SOURCE_CHECKS))?.key ?? ''
 }
 
-/** A statement found by id in any category, with the category it sits in. */
-/** DAR-UI-070. The pages "N more" fetched for the statement on show; hasNextPage is null until the first one. */
+/** DAR-UI-070. What "N more" fetched for the statement on show; hasNextPage is null until it has. */
 export interface FindingsMore {
   findings: AuditFindingSummary[]
-  cursor: string | null
   hasNextPage: boolean | null
   loading: boolean
   error: string
 }
 
 export function emptyFindingsMore(): FindingsMore {
-  return { findings: [], cursor: null, hasNextPage: null, loading: false, error: '' }
+  return { findings: [], hasNextPage: null, loading: false, error: '' }
 }
 
 // DAR-UI-069. A fixed finding stays in the report for the day's "fixed today" only; the board lists what is still wrong.

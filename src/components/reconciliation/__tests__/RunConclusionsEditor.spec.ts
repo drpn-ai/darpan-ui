@@ -224,7 +224,6 @@ describe('RunConclusionsEditor', () => {
       question: null,
       conditions: [{ subject: 'FILE_1', field: 'status', operator: 'NOT_IN', values: ['Credit Memo : Open'], checkLabel: 'The memo is not open' }],
     })
-    expect(wrapper.emitted('saved')?.[0]).toEqual([stored])
     wrapper.unmount()
   })
 
@@ -292,7 +291,6 @@ describe('RunConclusionsEditor', () => {
       "'Memo left open' is more than 3 levels deep.",
     ])
     expect((nodeAt(wrapper, 3)!.get('[data-testid="run-conclusions-check-label"]').element as HTMLInputElement).value).toBe('')
-    expect(wrapper.emitted('saved')).toBeUndefined()
     wrapper.unmount()
   })
 
@@ -361,7 +359,9 @@ describe('RunConclusionsEditor', () => {
     await nodeAt(wrapper, 0)!.get('[data-testid="run-conclusions-new-code"]').trigger('click')
     const row = nodeAt(wrapper, 0)!.get('[data-testid="run-conclusions-new-code-row"]')
     await row.get('[data-testid="run-conclusions-new-code-label"]').setValue('Memo left open')
-    createCode.mockResolvedValue({ ok: false, messages: [], errors: ["'Memo left open' is already a conclusion."], conclusionCode: null })
+    createCode.mockRejectedValue(new ApiCallError("'Memo left open' is already a conclusion.", 200, {
+      result: { errors: ["'Memo left open' is already a conclusion."] },
+    }))
     await row.get('[data-testid="run-conclusions-new-code-label"]').trigger('keydown', { key: 'Enter' })
     await flushPromises()
 

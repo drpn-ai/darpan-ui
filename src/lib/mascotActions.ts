@@ -150,14 +150,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Money',
     body: 'say the expected and actual amounts are money, in which currency, and where each comes from. Findings then show the difference to the cent.',
   },
-  'remove': {
-    title: 'Remove',
-    body: 'takes it out. For a check, it unlinks from this audit; the check itself stays if its findings or another audit still name it.',
-  },
-  'keep': {
-    title: 'Keep',
-    body: 'changed your mind. Nothing is removed.',
-  },
   'new conclusion': {
     title: 'New conclusion',
     body: 'names a new answer for your findings, e.g. \'RMA still open\'. It is yours alone: no other company sees it.',
@@ -205,6 +197,23 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   'audit settings': {
     title: 'Audit settings',
     body: 'the name, the daily schedule all its checks share, and each statement in its own words. A statement turned off drops out and stops raising findings.',
+  },
+  // DAR-UI-078. Making an audit in the app.
+  'new statement': {
+    title: 'New statement',
+    body: 'adds one thing this audit must find true, coded the next R number and saved at once. It raises nothing until a check is added to it.',
+  },
+  'save check': {
+    title: 'Save check',
+    body: 'adds the check to the statements it names; the audit schedules its run on the next play. The page\'s own Save is not needed for it.',
+  },
+  'save statement': {
+    title: 'Save statement',
+    body: 'writes the new statement now, on its own; the page\'s Save is for the name, schedule and the statements already there.',
+  },
+  'create audit': {
+    title: 'Create audit',
+    body: 'makes the audit with no statements yet and opens its settings, where statements and their checks go. Nothing runs until a check is added.',
   },
   // DAR-UI-063. The audit settings page.
   'daily schedule': {

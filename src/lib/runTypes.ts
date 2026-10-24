@@ -25,7 +25,6 @@ export interface RunTypeDefinition {
   /** Stroked, 24-unit viewBox. */
   iconPath: string
   glossaryTerm: string
-  /** Absent for a type with no create flow (audit). */
   createRoute?: RouteLocationRaw
 }
 
@@ -52,11 +51,12 @@ export const RUN_TYPES: Readonly<Record<RunTypeId, RunTypeDefinition>> = Object.
     description: 'Is what must be true still true?',
     iconPath: auditIconPath,
     glossaryTerm: 'runTypeAudit',
+    createRoute: { name: 'audit-create' },
   },
 })
 
-// The types a person can create. An audit is tenant configuration, so it is not offered.
-export const RUN_TYPE_ORDER: readonly RunTypeId[] = ['sync', 'lifecycle']
+// The types a person can create. DAR-UI-078: an audit too, so a tenant's audit is made in the app, not loaded as data.
+export const RUN_TYPE_ORDER: readonly RunTypeId[] = ['sync', 'lifecycle', 'audit']
 
 export function questionCountLabel(n: number): string {
   return n === 1 ? '1 question' : `${n} questions`

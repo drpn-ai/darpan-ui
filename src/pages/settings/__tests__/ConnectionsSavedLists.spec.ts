@@ -124,13 +124,6 @@ describe('connections saved-name lists', () => {
       ],
       pagination: { pageIndex: 0, pageSize: 10, totalCount: 1, pageCount: 1 },
     })
-    listNsRestletConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      restletConfigs: [],
-      pagination: { pageIndex: 0, pageSize: 10, totalCount: 0, pageCount: 1 },
-    })
 
     const wrapper = mount(NetSuiteSettingsPage)
     await flushPromises()
@@ -173,26 +166,6 @@ describe('connections saved-name lists', () => {
       ],
       pagination: { pageIndex: 0, pageSize: 10, totalCount: 1, pageCount: 1 },
     })
-    listNsRestletConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      restletConfigs: [
-        {
-          nsRestletConfigId: 'endpoint-primary',
-          description: 'Invoice Export',
-          companyUserGroupId: 'KREWE',
-          endpointUrl: 'https://netsuite.example.com/restlet',
-          httpMethod: 'POST',
-          nsAuthConfigId: 'auth-primary',
-          authType: 'BASIC',
-          connectTimeoutSeconds: 30,
-          readTimeoutSeconds: 60,
-          isActive: 'Y',
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 10, totalCount: 1, pageCount: 1 },
-    })
 
     const wrapper = mount(NetSuiteSettingsPage)
     await flushPromises()
@@ -227,26 +200,6 @@ describe('connections saved-name lists', () => {
           hasPassword: true,
           hasApiToken: false,
           hasPrivateKeyPem: false,
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 10, totalCount: 1, pageCount: 1 },
-    })
-    listNsRestletConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      restletConfigs: [
-        {
-          nsRestletConfigId: 'endpoint-primary',
-          description: 'Invoice Export',
-          companyUserGroupId: 'KREWE',
-          endpointUrl: 'https://netsuite.example.com/restlet',
-          httpMethod: 'POST',
-          nsAuthConfigId: 'auth-primary',
-          authType: 'BASIC',
-          connectTimeoutSeconds: 30,
-          readTimeoutSeconds: 60,
-          isActive: 'Y',
         },
       ],
       pagination: { pageIndex: 0, pageSize: 10, totalCount: 1, pageCount: 1 },
@@ -300,38 +253,6 @@ describe('connections saved-name lists', () => {
       ],
       pagination: { pageIndex: 0, pageSize: 10, totalCount: 2, pageCount: 1 },
     })
-    listNsRestletConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      restletConfigs: [
-        {
-          nsRestletConfigId: 'endpoint-krewe',
-          description: 'Invoice Export',
-          companyUserGroupId: 'KREWE',
-          endpointUrl: 'https://netsuite.example.com/restlet',
-          httpMethod: 'POST',
-          nsAuthConfigId: 'auth-krewe',
-          authType: 'BASIC',
-          connectTimeoutSeconds: 30,
-          readTimeoutSeconds: 60,
-          isActive: 'Y',
-        },
-        {
-          nsRestletConfigId: 'endpoint-gorjana',
-          description: 'Gorjana Endpoint',
-          companyUserGroupId: 'GORJANA',
-          endpointUrl: 'https://gorjana.example.com/restlet',
-          httpMethod: 'POST',
-          nsAuthConfigId: 'auth-gorjana',
-          authType: 'BASIC',
-          connectTimeoutSeconds: 30,
-          readTimeoutSeconds: 60,
-          isActive: 'Y',
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 10, totalCount: 2, pageCount: 1 },
-    })
 
     const wrapper = mount(NetSuiteSettingsPage)
     await flushPromises()
@@ -339,7 +260,6 @@ describe('connections saved-name lists', () => {
     expect(wrapper.findAll('[data-testid="netsuite-auth-tile"]')).toHaveLength(1)
     expect(wrapper.get('[data-testid="netsuite-auth-tile"]').text()).toBe('Primary Auth')
     expect(wrapper.text()).not.toContain('Gorjana Auth')
-    expect(wrapper.text()).not.toContain('Gorjana Endpoint')
     expect(wrapper.text()).not.toContain('Krewe')
   })
 })

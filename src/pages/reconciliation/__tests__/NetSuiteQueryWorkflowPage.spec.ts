@@ -9,19 +9,17 @@ const route = vi.hoisted(() => ({
   fullPath: '/reconciliation/queries/new',
 }))
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
-const replace = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const getOptions = vi.hoisted(() => vi.fn())
-const getQuery = vi.hoisted(() => vi.fn())
 const saveQuery = vi.hoisted(() => vi.fn())
 const previewQuery = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({
   useRoute: () => route,
-  useRouter: () => ({ push, replace }),
+  useRouter: () => ({ push }),
 }))
 
 vi.mock('../../../lib/api/authoringFacade', () => ({
-  netSuiteQueryFacade: { getOptions, get: getQuery, save: saveQuery, preview: previewQuery },
+  netSuiteQueryFacade: { getOptions, save: saveQuery, preview: previewQuery },
 }))
 
 vi.mock('../../../stores/permissions', () => ({
@@ -119,9 +117,7 @@ describe('NetSuiteQueryWorkflowPage', () => {
     route.name = 'reconciliation-netsuite-query-create'
     route.fullPath = '/reconciliation/queries/new'
     push.mockClear()
-    replace.mockClear()
     getOptions.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [], options: OPTIONS })
-    getQuery.mockReset()
     saveQuery.mockReset().mockImplementation(async (query) => ({
       ok: true, messages: [], errors: [], savedQuery: { ...query },
     }))
@@ -201,10 +197,9 @@ describe('NetSuiteQueryWorkflowPage', () => {
       ],
     })
     expect(push).toHaveBeenCalledWith('/reconciliation/create?step=sources&newQuery=NS_WARRANTY_CLAIM&side=FILE_2')
-    expect(replace).not.toHaveBeenCalled()
   })
 
-  it('refuses a returnTo that leaves the app and lands on the saved query instead', async () => {
+  it('refuses a returnTo that leaves the app and stays on the saved query', async () => {
     route.query = { returnTo: '//evil.example/steal', side: 'FILE_1' }
     route.fullPath = '/reconciliation/queries/new?returnTo=%2F%2Fevil.example%2Fsteal&side=FILE_1'
     const wrapper = mount(NetSuiteQueryWorkflowPage)
@@ -216,10 +211,7 @@ describe('NetSuiteQueryWorkflowPage', () => {
 
     expect(saveQuery.mock.calls[0]![0].matchRules).toEqual([])
     expect(push).not.toHaveBeenCalled()
-    expect(replace).toHaveBeenCalledWith({
-      name: 'reconciliation-netsuite-query-edit',
-      params: { queryId: 'NS_WARRANTY_CLAIM' },
-    })
+    expect(wrapper.text()).toContain('Saved.')
   })
 
   it('shows every validation message the save answers with, as written', async () => {
@@ -241,7 +233,6 @@ describe('NetSuiteQueryWorkflowPage', () => {
     expect(errors).toContain('joinKeyFieldName returnKey is not a mapped field')
     expect(errors).toContain('matchRules field status needs a value')
     expect(push).not.toHaveBeenCalled()
-    expect(replace).not.toHaveBeenCalled()
   })
 
   it('previews the SuiteQL and the first records before saving', async () => {
@@ -281,69 +272,5 @@ describe('NetSuiteQueryWorkflowPage', () => {
     expect(rows[0]!.text()).toContain('R-100')
     expect(rows[1]!.text()).toContain('18.50')
     expect(saveQuery).not.toHaveBeenCalled()
-  })
-
-  it('edits a stored query in one form and keeps the spec fields it does not show', async () => {
-    route.params = { queryId: 'NS_WARRANTY_CLAIM' }
-    route.name = 'reconciliation-netsuite-query-edit'
-    route.fullPath = '/reconciliation/queries/NS_WARRANTY_CLAIM/edit'
-    getQuery.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      query: {
-        nsSuiteQlSourceQueryId: 'NS_WARRANTY_CLAIM',
-        nsAuthConfigId: 'gorjana_prod',
-        description: 'Warranty claims',
-        recordType: 'RtnAuth',
-        fromTable: 'transaction',
-        dateColumn: 'trandate',
-        queryTemplate: 'RECORDS_MATCHING',
-        matchRules: '[{"fieldId":"custbody_hc_warranty_number","op":"NOT_EMPTY","values":[]}]',
-        joinKeyFieldName: 'returnId',
-        originFieldName: 'returnOrigin',
-        lineKeyColumn: 'line',
-        absentChildRecordType: null,
-        isActive: 'Y',
-        fields: [
-          { recordFieldName: 'status', sourceColumn: 'BUILTIN.DF(status) AS status_words', sequenceNum: 7 },
-          { recordFieldName: 'returnId', sourceColumn: 'custbody_hc_return_id', sequenceNum: 3 },
-        ],
-      },
-    })
-    const wrapper = mount(NetSuiteQueryWorkflowPage)
-    await flushPromises()
-
-    expect(getQuery).toHaveBeenCalledWith('NS_WARRANTY_CLAIM', expect.anything())
-    expect(stepId(wrapper)).toBe('edit')
-    expect(wrapper.findAll('[data-testid="netsuite-query-match-row"]')).toHaveLength(1)
-    expect(wrapper.find('[data-testid="netsuite-query-preview"]').exists()).toBe(true)
-    expect((wrapper.get('input[name="recordType"]').element as HTMLInputElement).value).toBe('RtnAuth')
-
-    await wrapper.get('input[name="description"]').setValue('Warranty claims, every RMA')
-    await wrapper.get('[data-testid="save-netsuite-query"]').trigger('click')
-    await flushPromises()
-
-    expect(saveQuery.mock.calls[0]![0]).toEqual({
-      nsSuiteQlSourceQueryId: 'NS_WARRANTY_CLAIM',
-      nsAuthConfigId: 'gorjana_prod',
-      description: 'Warranty claims, every RMA',
-      recordType: 'RtnAuth',
-      fromTable: 'transaction',
-      dateColumn: 'trandate',
-      queryTemplate: 'RECORDS_MATCHING',
-      matchRules: [{ fieldId: 'custbody_hc_warranty_number', op: 'NOT_EMPTY', values: [] }],
-      joinKeyFieldName: 'returnId',
-      originFieldName: 'returnOrigin',
-      lineKeyColumn: 'line',
-      isActive: 'Y',
-      fields: [
-        { recordFieldName: 'returnId', sourceColumn: 'custbody_hc_return_id', sequenceNum: 1 },
-        { recordFieldName: 'status', sourceColumn: 'BUILTIN.DF(status) AS status_words', sequenceNum: 2 },
-      ],
-    })
-    expect(push).not.toHaveBeenCalled()
-    expect(replace).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Saved.')
   })
 })

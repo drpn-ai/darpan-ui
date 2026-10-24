@@ -3,9 +3,10 @@ import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { RUN_TYPES, RUN_TYPE_ORDER, questionCountLabel } from '../runTypes'
 
 describe('run types', () => {
-  it('names the two kinds of run Sync and Lifecycle, in that order', () => {
-    expect(RUN_TYPE_ORDER).toEqual(['sync', 'lifecycle'])
-    expect(RUN_TYPE_ORDER.map((id) => RUN_TYPES[id].label)).toEqual(['Sync', 'Lifecycle'])
+  // DAR-UI-078: an audit is made in the app too.
+  it('names the three kinds of run Sync, Lifecycle and Audit, in that order', () => {
+    expect(RUN_TYPE_ORDER).toEqual(['sync', 'lifecycle', 'audit'])
+    expect(RUN_TYPE_ORDER.map((id) => RUN_TYPES[id].label)).toEqual(['Sync', 'Lifecycle', 'Audit'])
   })
 
   it('gives each type its own icon, so a monochrome tile can still be told apart', () => {
@@ -17,6 +18,7 @@ describe('run types', () => {
   it('points each type at the existing create flow for it', () => {
     expect(RUN_TYPES.sync.createRoute).toEqual({ name: 'reconciliation-create' })
     expect(RUN_TYPES.lifecycle.createRoute).toEqual({ name: 'reconciliation-run-flowchart-create' })
+    expect(RUN_TYPES.audit.createRoute).toEqual({ name: 'audit-create' })
   })
 
   it('has a mascot explanation for every type', () => {

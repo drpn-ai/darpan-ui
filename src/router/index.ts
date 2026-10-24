@@ -62,12 +62,6 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
-    path: '/reconciliation/queries/:queryId/edit',
-    name: 'reconciliation-netsuite-query-edit',
-    component: () => import('../pages/reconciliation/NetSuiteQueryWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
-  },
-  {
     // DAR-UI-049. One Create Run: pick Sync or Lifecycle, then the create flow for that type.
     path: '/reconciliation/new',
     name: 'run-create',
@@ -105,6 +99,13 @@ export const routes: RouteRecordRaw[] = [
     name: 'reconciliation-run-flowchart',
     component: () => import('../pages/reconciliation/RunFlowchartPage.vue'),
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Run' },
+  },
+  {
+    // DAR-UI-078. Make an audit: its name, then its period; statements and checks follow on its settings. Before /audits/:audit.
+    path: '/audits/new',
+    name: 'audit-create',
+    component: () => import('../pages/reconciliation/AuditCreatePage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-063. An audit's play: which days, then every check runs over them. Declared before /audits/:audit.

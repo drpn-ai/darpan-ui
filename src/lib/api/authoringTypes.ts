@@ -196,6 +196,9 @@ export interface AuditCheckOptions {
     scopeMode: string
     rules: Array<{ ruleId: string; ruleText: string }>
     conclusions: Array<{ code: string; label: string }>
+    /** DAR-UI-078. The run's object as a finding's record type (return, order), and each side's root system and key. */
+    recordType?: string | null
+    sides?: Array<{ side: 'FILE_1' | 'FILE_2'; system: string; key: string }>
   }>
   diffTypes: AuditDiffType[]
   fixWhere: string[]

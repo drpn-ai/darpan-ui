@@ -45,7 +45,7 @@ function report(overrides: Partial<AuditReport['health']> = {}): AuditReport {
     report: {
       tenant: { id: 'T', name: 'T', timeZone: 'UTC' },
       audit: { id: 'month-close', name: 'Month close', period: 'month' },
-      date: '2026-10-22', window: { from: '2026-10-01', thru: '2026-10-22' }, running: true, extendedThru: null,
+      date: '2026-10-22', window: { from: '2026-10-01', thru: '2026-10-22' }, running: true,
       period: '2026-10', generatedAt: '2026-10-22T06:12:00Z',
     },
     health: {

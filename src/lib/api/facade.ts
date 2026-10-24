@@ -3,7 +3,6 @@ import type {
   GetAuditFindingResponse,
   GetAuditCheckExtractsResponse,
   GetAuditFindingsByOrderResponse,
-  GetAuditFindingsResponse,
   GetAuditReportResponse,
   GetAuditSettingsResponse,
   GetAuditsResponse,
@@ -11,6 +10,10 @@ import type {
   RunAuditResponse,
   SaveAuditSettingsPayload,
   SaveAuditSettingsResponse,
+  CreateAuditPayload,
+  CreateAuditResponse,
+  AddAuditStatementPayload,
+  AddAuditStatementResponse,
   VerifyAuditFindingResponse,
 } from './auditTypes'
 
@@ -521,11 +524,12 @@ const AUDIT = {
   getAudits: 'facade.AuditFacadeServices.get#Audits',
   getAuditReport: 'facade.AuditFacadeServices.get#AuditReport',
   getAuditFinding: 'facade.AuditFacadeServices.get#AuditFinding',
-  getAuditFindings: 'facade.AuditFacadeServices.get#AuditFindings',
   getAuditCheckExtracts: 'facade.AuditFacadeServices.get#AuditCheckExtracts',
   getAuditFindingsByOrder: 'facade.AuditFacadeServices.get#AuditFindingsByOrder',
   getAuditSettings: 'facade.AuditFacadeServices.get#AuditSettings',
   saveAuditSettings: 'facade.AuditFacadeServices.save#AuditSettings',
+  createAudit: 'facade.AuditFacadeServices.create#Audit',
+  addAuditStatement: 'facade.AuditFacadeServices.add#AuditStatement',
   runAudit: 'facade.AuditFacadeServices.run#Audit',
   verifyAuditFinding: 'facade.AuditFacadeServices.verify#AuditFinding',
 }
@@ -539,12 +543,6 @@ export const auditFacade = {
   },
   getAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<GetAuditFindingResponse> {
     return callService<GetAuditFindingResponse>(AUDIT.getAuditFinding, payload, signal)
-  },
-  getAuditFindings(
-    payload: { audit: string; statement?: string; state?: 'open' | 'pending'; period?: string; after?: string },
-    signal?: AbortSignal,
-  ): Promise<GetAuditFindingsResponse> {
-    return callService<GetAuditFindingsResponse>(AUDIT.getAuditFindings, payload, signal)
   },
   getAuditFindingsByOrder(
     payload: { audit: string; statement?: string; state?: 'open' | 'pending'; period?: string },
@@ -564,6 +562,13 @@ export const auditFacade = {
   },
   saveAuditSettings(payload: SaveAuditSettingsPayload, signal?: AbortSignal): Promise<SaveAuditSettingsResponse> {
     return callService<SaveAuditSettingsResponse>(AUDIT.saveAuditSettings, payload, signal)
+  },
+  // DAR-UI-078. Make an audit, and add a statement to one.
+  createAudit(payload: CreateAuditPayload, signal?: AbortSignal): Promise<CreateAuditResponse> {
+    return callService<CreateAuditResponse>(AUDIT.createAudit, payload, signal)
+  },
+  addAuditStatement(payload: AddAuditStatementPayload, signal?: AbortSignal): Promise<AddAuditStatementResponse> {
+    return callService<AddAuditStatementResponse>(AUDIT.addAuditStatement, payload, signal)
   },
   runAudit(payload: RunAuditPayload, signal?: AbortSignal): Promise<RunAuditResponse> {
     return callService<RunAuditResponse>(AUDIT.runAudit, payload, signal)

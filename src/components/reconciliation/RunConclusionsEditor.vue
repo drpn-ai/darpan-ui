@@ -321,8 +321,6 @@ const props = withDefaults(
   },
 )
 
-const emit = defineEmits<{ saved: [conclusions: RunConclusions] }>()
-
 interface DraftCondition {
   uid: string
   subject: 'FILE_1' | 'FILE_2'
@@ -663,10 +661,6 @@ async function createCode(node: DraftNode): Promise<void> {
   newCodeErrors.value = []
   try {
     const response = await runConclusionFacade.createCode(label)
-    if (response.errors?.length) {
-      newCodeErrors.value = response.errors.map(String)
-      return
-    }
     const code = response.conclusionCode
     if (!code?.id) {
       newCodeErrors.value = ['The conclusion would not join the party. Not added.']
@@ -703,10 +697,6 @@ async function load(): Promise<void> {
   try {
     const response = await runConclusionFacade.get(props.savedRunId, signal)
     if (signal.aborted) return
-    if (response.errors?.length) {
-      errors.value = response.errors.map(String)
-      return
-    }
     if (!response.conclusions) {
       errors.value = ['The conclusions jumped to conclusions and ran off.']
       return
@@ -729,18 +719,7 @@ async function save(): Promise<void> {
   const signal = controller.signal
   try {
     const response = await runConclusionFacade.save(props.savedRunId, buildPayload(), signal)
-    if (response.errors?.length) {
-      errors.value = response.errors.map(String)
-      return
-    }
-    const saved = response.savedConclusions
-    if (saved) {
-      applyLoaded(saved)
-      emit('saved', saved)
-    } else {
-      snapshot.value = buildPayload()
-      emit('saved', { ...meta.value, conclusions: snapshot.value })
-    }
+    if (response.savedConclusions) applyLoaded(response.savedConclusions)
   } catch (error) {
     if (isAbortError(error)) return
     errors.value = serviceErrors(error, 'The conclusions are still undecided. Not saved.')

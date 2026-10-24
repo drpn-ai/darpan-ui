@@ -40,6 +40,11 @@ const options: AuditCheckOptions = {
       savedRunId: 'RUN_C',
       runName: 'Refunds: Shopify vs NetSuite',
       scopeMode: 'COMPARE',
+      recordType: 'order',
+      sides: [
+        { side: 'FILE_1', system: 'SHOPIFY', key: 'legacyResourceId' },
+        { side: 'FILE_2', system: 'OMS', key: 'externalId' },
+      ],
       rules: [{ ruleId: 'r2', ruleText: 'Dates agree' }],
       conclusions: [{ code: 'C2', label: 'Credited elsewhere' }],
     },
@@ -267,6 +272,7 @@ describe('AuditCheckEditor', () => {
       }),
     )
     const w = await mountEditor()
+    await trigger(w, 'audit-check-label').setValue('Returns refused')
 
     await trigger(w, 'audit-check-save').trigger('click')
     await flushPromises()
@@ -291,5 +297,58 @@ describe('AuditCheckEditor', () => {
     const w = await mountEditor()
     await trigger(w, 'audit-check-cancel').trigger('click')
     expect(w.emitted('cancel')).toHaveLength(1)
+  })
+
+  // DAR-UI-078 (walked in Chrome): a run picked fills what it already says, names its sides by system, and a refusal sits
+  // by Save until the form changes.
+  it('names a picked run\'s sides by system and fills its records and "matched by", never over what was typed', async () => {
+    const w = await mountEditor()
+    expect(await optionValues(w, 'audit-check-diff-types-0')).toContain('MISSING_IN_FILE_2')
+    await pick(w, 'audit-check-run', 'RUN_C')
+    expect(w.text()).toContain('Shopify record')
+    expect(w.text()).toContain('HotWax record')
+    expect((w.get('input[name="file1RecordType"]').element as HTMLInputElement).value).toBe('order')
+    expect((w.get('input[name="matchedBy"]').element as HTMLInputElement).value).toBe('Shopify legacyResourceId = HotWax externalId')
+    const button = trigger(w, 'audit-check-diff-types-0')
+    await button.trigger('click')
+    expect((button.element.parentElement as HTMLElement).textContent).toContain('Missing in HotWax')
+    await button.trigger('click')
+
+    await w.get('input[name="matchedBy"]').setValue('Shopify order id')
+    await pick(w, 'audit-check-run', 'RUN_A')
+    await pick(w, 'audit-check-run', 'RUN_C')
+    expect((w.get('input[name="matchedBy"]').element as HTMLInputElement).value).toBe('Shopify order id')
+  })
+
+  it('heads a finding by its record and the check\'s name when no headline is written', async () => {
+    saveCheck.mockResolvedValue(ok({ savedCheck: stored }))
+    const w = await mountEditor()
+    await pick(w, 'audit-check-run', 'RUN_C')
+    await trigger(w, 'audit-check-label').setValue('Completed in HotWax, not fulfilled in Shopify')
+    expect(w.get('textarea[name="headlineTemplate"]').attributes('placeholder'))
+      .toBe('Shopify order {recordKey}: Completed in HotWax, not fulfilled in Shopify')
+    await trigger(w, 'audit-check-save').trigger('click')
+    await flushPromises()
+    expect(saveCheck.mock.calls[0]![1].headlineTemplate).toBe('Shopify order {recordKey}: Completed in HotWax, not fulfilled in Shopify')
+  })
+
+  it('asks for a name before anything else, as the id follows it', async () => {
+    const w = await mountEditor()
+    await trigger(w, 'audit-check-save').trigger('click')
+    await flushPromises()
+    expect(saveCheck).not.toHaveBeenCalled()
+    expect(w.get('[data-testid="audit-check-errors"]').text()).toBe('Name the check: what it compares, in a few words.')
+  })
+
+  it('says "Save check" in words, and clears a refusal once the form changes', async () => {
+    const w = await mountEditor()
+    expect(trigger(w, 'audit-check-save').text()).toBe('Save check')
+    await trigger(w, 'audit-check-label').setValue('Returns credited')
+    await trigger(w, 'audit-check-save').trigger('click')
+    await flushPromises()
+    expect(w.find('[data-testid="audit-check-errors"]').exists()).toBe(true)
+    await trigger(w, 'audit-check-label').setValue('Returns credited twice')
+    await flushPromises()
+    expect(w.find('[data-testid="audit-check-errors"]').exists()).toBe(false)
   })
 })

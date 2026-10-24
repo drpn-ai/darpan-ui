@@ -69,6 +69,17 @@ describe('AuditRunStartPage', () => {
     expect(replace).toHaveBeenCalledWith({ ...back, state: { startedAudit: true } })
   })
 
+  it('runs on Enter after a letter picked the card, as the page says', async () => {
+    const w = mount(AuditRunStartPage, { attachTo: document.body })
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
+    await flushPromises()
+    expect(f.runAudit).toHaveBeenCalledWith({ audit: 'month-close', fromDate: '2026-08-16', thruDate: '2026-08-16' })
+    w.unmount()
+  })
+
   it('a week runs its eight days through yesterday; a month runs to its last day', async () => {
     const w = mount(AuditRunStartPage, { attachTo: document.body })
     await flushPromises()
