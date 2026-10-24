@@ -377,7 +377,7 @@ async function loadShopifyConfig(signal?: AbortSignal): Promise<void> {
     shopifyAuthConfigId: activeShopifyConfigId.value,
   }, signal)
   if (!response.shopifyAuthConfig) {
-    error.value = `Unable to find Shopify config "${activeShopifyConfigId.value}".`
+    error.value = `Shopify config "${activeShopifyConfigId.value}" checked out without us.`
     return
   }
   applyRecord(response.shopifyAuthConfig)
@@ -397,7 +397,7 @@ async function load(): Promise<void> {
     await loadShopifyConfig(signal)
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load Shopify config.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'This Shopify config is still out shopping.'
   } finally {
     loading.value = false
   }
@@ -492,7 +492,7 @@ async function save(): Promise<void> {
     }
     await router.push('/settings/shopify')
   } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save Shopify config.'
+    error.value = saveError instanceof ApiCallError ? saveError.message : 'The Shopify config left its cart behind. Not saved.'
   } finally {
     loading.value = false
   }

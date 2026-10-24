@@ -1507,7 +1507,7 @@ async function saveAutomationSetup(): Promise<void> {
           isActive: true,
         }, submitSignal)
         if (!spaceResponse.chatSpace?.chatSpaceId) {
-          pageError.value = 'Unable to save chat space.'
+          pageError.value = 'The chat space wandered off mid-sentence. Not saved.'
           return
         }
         chatSpaceId.value = spaceResponse.chatSpace.chatSpaceId
@@ -1523,7 +1523,7 @@ async function saveAutomationSetup(): Promise<void> {
         if ((spaceError as { name?: string })?.name === 'AbortError') return
         // Dedicated catch so a chat-space creation failure (e.g. a duplicate name) isn't
         // misattributed to the generic automation-save failure message below.
-        pageError.value = spaceError instanceof ApiCallError ? spaceError.message : 'Unable to save chat space.'
+        pageError.value = spaceError instanceof ApiCallError ? spaceError.message : 'The chat space wandered off mid-sentence. Not saved.'
         return
       }
     }
@@ -1537,7 +1537,7 @@ async function saveAutomationSetup(): Promise<void> {
     await router.push(activeDraft.value.returnPath || origin?.path || fallbackRoute)
   } catch (saveError) {
     if ((saveError as { name?: string })?.name === 'AbortError') return
-    pageError.value = 'Unable to save automation setup. The saved run is still available; adjust the automation settings and retry.'
+    pageError.value = 'The automation setup slipped through our fingers. The saved run is still available; adjust the automation settings and retry.'
   } finally {
     saving.value = false
   }
@@ -1722,13 +1722,13 @@ async function syncFromSavedRun(): Promise<void> {
   try {
     const response = await reconciliationFacade.syncAutomation({ automationId }, pageAbortController.signal)
     if (!response.ok) {
-      pageError.value = response.errors?.[0] ?? 'Unable to sync this automation with its saved run.'
+      pageError.value = response.errors?.[0] ?? 'The automation and its saved run are not on speaking terms. Not synced.'
       return
     }
     await loadAutomationForEdit()
   } catch (syncError) {
     if ((syncError as { name?: string })?.name === 'AbortError') return
-    pageError.value = 'Unable to sync this automation with its saved run.'
+    pageError.value = 'The automation and its saved run are not on speaking terms. Not synced.'
   } finally {
     syncing.value = false
   }
@@ -1743,7 +1743,7 @@ async function loadAutomationForEdit(): Promise<boolean> {
   try {
     const response = await reconciliationFacade.getAutomation({ automationId: editAutomationId }, pageAbortController.signal)
     if (!response.automation) {
-      pageError.value = `Unable to load automation ${editAutomationId}.`
+      pageError.value = `Automation ${editAutomationId} is on an unscheduled break.`
       return false
     }
     hydrateAutomation(response.automation)
@@ -1752,7 +1752,7 @@ async function loadAutomationForEdit(): Promise<boolean> {
     return true
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return false
-    pageError.value = 'Unable to load automation setup.'
+    pageError.value = 'The automation setup forgot to set itself up.'
     return false
   }
 }
@@ -1820,7 +1820,7 @@ async function loadSlackChannelOptions(): Promise<void> {
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     slackChannels.value = []
-    pageError.value = 'Unable to load Slack channels.'
+    pageError.value = 'The Slack channels are slacking off.'
   } finally {
     slackChannelsLoading.value = false
   }
@@ -1846,7 +1846,7 @@ async function loadChatSpaceOptions(signal: AbortSignal): Promise<void> {
     // "My default space" / "Choose another space" just quietly vanish with no explanation.
     userNotificationDefault.value = null
     tenantChatSpaces.value = []
-    pageError.value = 'Unable to load chat space options. You can still set up a new space or skip notifications.'
+    pageError.value = 'The chat spaces drifted into outer space. You can still set up a new space or skip notifications.'
   }
 }
 
@@ -1870,7 +1870,7 @@ async function loadOptions(): Promise<void> {
     applyDeterministicDefaults()
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    pageError.value = 'Unable to load automation setup options.'
+    pageError.value = 'The automation options overslept.'
   } finally {
     loadingOptions.value = false
   }

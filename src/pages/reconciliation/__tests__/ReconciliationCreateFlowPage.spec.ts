@@ -536,7 +536,7 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(listEnumOptions).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('What should this run be called?')
     expect(wrapper.text()).not.toContain('Settings are restricted to Darpan admin users.')
-    expect(wrapper.text()).not.toContain('Unable to load reconciliation setup options.')
+    expect(wrapper.text()).not.toContain('The setup options are still deciding what to wear.')
   })
 
   it('creates a run with an API source on one side and a file upload source on the other', async () => {

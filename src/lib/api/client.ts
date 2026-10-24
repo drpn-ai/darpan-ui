@@ -88,10 +88,10 @@ export function setAuthRequiredHandler(handler: AuthRequiredHandler | null): voi
 }
 
 const AUTH_REQUIRED_MESSAGE = 'Your session has ended. Sign in again to continue.'
-const UNREACHABLE_MESSAGE = 'Unable to connect to Darpan right now. Try again in a moment.'
-const UNEXPECTED_RESPONSE_MESSAGE = 'Darpan returned an unexpected response. Try again in a moment.'
-const EMPTY_RESULT_MESSAGE = 'Darpan did not return any data.'
-const GENERIC_SERVICE_ERROR_MESSAGE = 'Darpan could not complete the request.'
+const UNREACHABLE_MESSAGE = 'Darpan stepped out for chai. Try again in a moment.'
+const UNEXPECTED_RESPONSE_MESSAGE = 'Darpan answered in interpretive dance. Try again in a moment.'
+const EMPTY_RESULT_MESSAGE = 'Darpan opened its mouth and nothing came out.'
+const GENERIC_SERVICE_ERROR_MESSAGE = 'Darpan started the request, then got distracted.'
 const AUTH_SESSION_INFO_METHOD = 'facade.AuthFacadeServices.get#SessionInfo'
 const AUTH_TOKEN_STORAGE_KEY = 'darpan.authToken'
 const AUTH_TOKEN_HEADER_NAME = 'login_key'

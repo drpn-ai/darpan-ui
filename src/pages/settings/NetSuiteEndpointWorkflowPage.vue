@@ -426,7 +426,7 @@ async function loadEndpointConfig(signal?: AbortSignal): Promise<void> {
     (config) => config.nsRestletConfigId === activeEndpointConfigId.value,
   )
   if (!matchingConfig) {
-    error.value = `Unable to find NetSuite endpoint config "${activeEndpointConfigId.value}".`
+    error.value = `NetSuite endpoint config "${activeEndpointConfigId.value}" took a wrong turn somewhere.`
     return
   }
   applyRecord(matchingConfig)
@@ -446,7 +446,7 @@ async function load(): Promise<void> {
     await Promise.all([loadAuthOptions(signal), loadEndpointConfig(signal)])
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load endpoint config.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'This endpoint config took a wrong turn somewhere.'
   } finally {
     loading.value = false
   }
@@ -491,7 +491,7 @@ async function save(): Promise<void> {
     success.value = response.messages?.[0] ?? 'Saved endpoint config.'
     await router.push(authDashboardRoute())
   } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save endpoint config.'
+    error.value = saveError instanceof ApiCallError ? saveError.message : 'The endpoint config took a wrong turn. Not saved.'
   } finally {
     loading.value = false
   }

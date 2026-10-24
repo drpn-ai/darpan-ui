@@ -114,7 +114,7 @@ async function loadAutomations(): Promise<void> {
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     automations.value = []
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load automations.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'The automations are on autopilot. Somewhere else.'
   } finally {
     loading.value = false
   }

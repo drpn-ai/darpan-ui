@@ -752,13 +752,13 @@ async function loadAuthConfig(): Promise<void> {
       authStore.sessionInfo?.activeTenantUserGroupId ?? null,
     ).find((config) => config.nsAuthConfigId === activeAuthConfigId.value)
     if (!matchingConfig) {
-      error.value = `Unable to find NetSuite auth config "${activeAuthConfigId.value}".`
+      error.value = `NetSuite auth config "${activeAuthConfigId.value}" is hiding in a saved search.`
       return
     }
     applyRecord(matchingConfig)
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load auth config.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'This auth config is having an identity crisis.'
   } finally {
     loading.value = false
   }
@@ -799,7 +799,7 @@ async function save(): Promise<void> {
     success.value = response.messages?.[0] ?? 'Saved auth config.'
     await router.push(isEditing.value ? authDashboardRoute(form.nsAuthConfigId.trim()) : '/settings/netsuite')
   } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save auth config.'
+    error.value = saveError instanceof ApiCallError ? saveError.message : 'The auth config wrote it in disappearing ink. Not saved.'
   } finally {
     loading.value = false
   }

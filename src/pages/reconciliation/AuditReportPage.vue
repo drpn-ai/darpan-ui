@@ -224,12 +224,12 @@ async function loadReport(): Promise<void> {
     )
     if (response.ok === false || !response.report) {
       report.value = null
-      pageError.value = errorOf(response, 'Unable to load audit.')
+      pageError.value = errorOf(response, 'The audit got lost on the way here. Send a search party.')
     } else {
       report.value = response.report
     }
   } catch {
-    if (!abort.signal.aborted) pageError.value = 'Unable to load audit.'
+    if (!abort.signal.aborted) pageError.value = 'The audit got lost on the way here. Send a search party.'
   } finally {
     loading.value = false
   }
@@ -242,10 +242,10 @@ async function loadFinding(): Promise<void> {
   findingLoading.value = true
   try {
     const response = await auditFacade.getAuditFinding({ findingId: findingId.value }, abort.signal)
-    if (response.ok === false || !response.finding) findingError.value = errorOf(response, 'Unable to load finding.')
+    if (response.ok === false || !response.finding) findingError.value = errorOf(response, 'This finding is lost. Ironic, we know.')
     else finding.value = response.finding
   } catch {
-    if (!abort.signal.aborted) findingError.value = 'Unable to load finding.'
+    if (!abort.signal.aborted) findingError.value = 'This finding is lost. Ironic, we know.'
   } finally {
     findingLoading.value = false
   }

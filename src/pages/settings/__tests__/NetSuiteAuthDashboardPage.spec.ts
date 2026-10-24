@@ -321,7 +321,7 @@ describe('NetSuiteAuthDashboardPage', () => {
     const wrapper = mount(NetSuiteAuthDashboardPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to find NetSuite auth config "auth-primary".')
+    expect(wrapper.text()).toContain('NetSuite auth config "auth-primary" is hiding in a saved search.')
     expect(wrapper.find('.static-page-summary-card').exists()).toBe(false)
   })
 

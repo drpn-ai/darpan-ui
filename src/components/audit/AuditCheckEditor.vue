@@ -471,13 +471,13 @@ async function load(): Promise<void> {
   try {
     const optionsResponse = await auditCheckFacade.getOptions(props.audit, signal)
     if (!optionsResponse.options) {
-      errors.value = optionsResponse.errors?.length ? optionsResponse.errors : ['Unable to load the audit.']
+      errors.value = optionsResponse.errors?.length ? optionsResponse.errors : ['The audit is busy auditing its life choices.']
       return
     }
     options.value = optionsResponse.options
     links.value = [makeLink({ id: props.statement })]
   } catch (caught) {
-    if (!isAbortError(caught) && !signal.aborted) errors.value = serviceErrors(caught, 'Unable to load the check.')
+    if (!isAbortError(caught) && !signal.aborted) errors.value = serviceErrors(caught, 'The check bounced.')
   } finally {
     if (!signal.aborted) loading.value = false
   }
@@ -535,9 +535,9 @@ async function save(): Promise<void> {
   try {
     const response = await auditCheckFacade.save(props.audit, check, statementLinks())
     if (response.savedCheck) emit('saved', response.savedCheck)
-    else errors.value = response.errors?.length ? response.errors : ['Unable to save the check.']
+    else errors.value = response.errors?.length ? response.errors : ['The check would not stay put. Not saved.']
   } catch (caught) {
-    errors.value = serviceErrors(caught, 'Unable to save the check.')
+    errors.value = serviceErrors(caught, 'The check would not stay put. Not saved.')
   } finally {
     saving.value = false
   }

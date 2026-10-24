@@ -60,7 +60,7 @@ const {
   loadPage: (request) => settingsFacade.listOmsRestSourceConfigs(request),
   selectRecords: (response) => response.omsRestSourceConfigs ?? [],
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  fallbackErrorMessage: 'Failed to load HotWax auth configs.',
+  fallbackErrorMessage: 'The HotWax auth configs are stuck in the warehouse.',
   cacheKey: SETTINGS_LIST_KEYS.oms,
 })
 

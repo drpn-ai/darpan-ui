@@ -60,7 +60,7 @@ const {
   loadPage: (request) => settingsFacade.listSftpServers(request),
   selectRecords: (response) => response.servers ?? [],
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  fallbackErrorMessage: 'Failed to load servers.',
+  fallbackErrorMessage: 'The servers are not serving today.',
   cacheKey: SETTINGS_LIST_KEYS.sftp,
 })
 

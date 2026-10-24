@@ -225,12 +225,12 @@ async function load(): Promise<void> {
         // DAR-UI-051: a cached copy is drawn at once, so the fresh answer may replace either outcome.
         loading.value = false
         config.value = matchingConfig ?? null
-        error.value = matchingConfig ? null : `Unable to find HotWax auth config "${configId.value}".`
+        error.value = matchingConfig ? null : `HotWax auth config "${configId.value}" is nowhere to be found. We asked twice.`
       },
     )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load HotWax auth config.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'This HotWax auth config forgot its own password.'
   } finally {
     loading.value = false
   }
@@ -251,7 +251,7 @@ async function deleteConfig(): Promise<void> {
     await settingsFacade.deleteOmsRestSourceConfig({ omsRestSourceConfigId: config.value.omsRestSourceConfigId })
     await router.push('/settings/hotwax')
   } catch (deleteFailure) {
-    deleteError.value = deleteFailure instanceof ApiCallError ? deleteFailure.message : 'Failed to delete HotWax source.'
+    deleteError.value = deleteFailure instanceof ApiCallError ? deleteFailure.message : 'The HotWax source refuses to leave. Still here.'
   } finally {
     deletingConfig.value = false
   }

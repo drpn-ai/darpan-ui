@@ -815,7 +815,7 @@ async function syncFieldOptions(sourceKey: 'source1' | 'source2', signal?: Abort
     }
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load schema fields.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'The schema fields wandered off the schema.'
   }
 }
 
@@ -870,7 +870,7 @@ async function load(): Promise<void> {
 
     const mapping = mappingResponse.mapping
     if (!mapping) {
-      error.value = `Unable to find run "${activeMappingId.value}".`
+      error.value = `Run "${activeMappingId.value}" ran away. Fittingly.`
       return
     }
     if ((mapping.members?.length ?? 0) !== 2) {
@@ -890,7 +890,7 @@ async function load(): Promise<void> {
     ])
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load run settings.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'Run settings are behind a door marked pull. We pushed.'
   } finally {
     loading.value = false
   }
@@ -924,7 +924,7 @@ async function save(): Promise<void> {
     success.value = response.messages?.[0] ?? 'Saved run.'
     await router.push(resolveOriginPath())
   } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save run settings.'
+    error.value = saveError instanceof ApiCallError ? saveError.message : 'Run settings ran off before the save. Not saved.'
   } finally {
     loading.value = false
   }

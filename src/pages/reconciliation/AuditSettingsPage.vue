@@ -201,7 +201,7 @@ async function load() {
   try {
     const response = await auditFacade.getAuditSettings({ audit: auditCode.value }, abort.signal)
     if (response.settings) show(response.settings)
-    else error.value = response.errors?.[0] || 'Unable to load audit settings.'
+    else error.value = response.errors?.[0] || 'Audit settings filed for an extension.'
   } catch (caught) {
     if (!abort.signal.aborted) error.value = message(caught)
   }
@@ -262,7 +262,7 @@ async function openRules(check: AuditSettingsCheck) {
   try {
     const savedRun = await resolveSavedRunEditorTarget(check.savedRunId)
     if (!savedRun) {
-      error.value = `Unable to find run "${check.runName || check.savedRunId}".`
+      error.value = `Run "${check.runName || check.savedRunId}" ran away. Fittingly.`
       return
     }
     draftStore.setWorkflowOrigin('Audit settings', route.fullPath)

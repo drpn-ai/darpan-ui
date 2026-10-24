@@ -91,7 +91,7 @@ describe('useRunResultDownloads', () => {
 
     await downloads.downloadRunSourceFile(buildSourceFile())
 
-    expect(downloads.sourceDownloadError.value).toBe('Unable to download source file.')
+    expect(downloads.sourceDownloadError.value).toBe('The source file got stage fright. Nothing downloaded.')
   })
 
   it('downloads the saved result on demand using the route file name', async () => {

@@ -61,7 +61,7 @@ const {
   loadPage: (request) => settingsFacade.listNsAuthConfigs(request),
   selectRecords: (response) => response.authConfigs ?? [],
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  fallbackErrorMessage: 'Failed to load NetSuite auth configs.',
+  fallbackErrorMessage: 'The NetSuite auth configs are still in a meeting.',
 })
 
 onBeforeUnmount(() => {

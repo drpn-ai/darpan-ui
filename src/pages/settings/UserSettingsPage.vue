@@ -491,7 +491,7 @@ async function saveUserSettingsForm(): Promise<void> {
   try {
     const saved = await authStore.saveUserSettings({ displayName: submittedDisplayNameInput })
     if (!saved) {
-      settingsMessage.value = authStore.error ?? 'Unable to save user settings.'
+      settingsMessage.value = authStore.error ?? 'Your settings had second thoughts. Not saved.'
       return
     }
 
@@ -715,7 +715,7 @@ async function switchTenant(nextTenantUserGroupId: string): Promise<void> {
   isSwitchingTenant.value = true
   try {
     const saved = await authStore.saveActiveTenant(nextTenantUserGroupId)
-    tenantMessage.value = saved ? null : 'Unable to switch tenant.'
+    tenantMessage.value = saved ? null : 'The tenant door is stuck. Still on the old one.'
   } finally {
     isSwitchingTenant.value = false
   }
@@ -730,7 +730,7 @@ async function loadNotificationDefault(): Promise<void> {
     )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    settingsMessage.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load notification settings.'
+    settingsMessage.value = loadError instanceof ApiCallError ? loadError.message : 'Notification settings never got the notification.'
   }
 }
 
@@ -744,7 +744,7 @@ async function loadChatSpacesForNotificationDefault(): Promise<void> {
     if ((loadError as { name?: string })?.name === 'AbortError') return
     chatSpaces.value = []
     chatSpacesLoadError.value = true
-    settingsMessage.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load chat spaces.'
+    settingsMessage.value = loadError instanceof ApiCallError ? loadError.message : 'The chat spaces drifted into outer space.'
   } finally {
     chatSpacesLoading.value = false
   }
@@ -773,7 +773,7 @@ async function handleChatSpaceChoice(value: string): Promise<void> {
     notificationDefault.value = response.userNotificationDefault ?? null
     closeNotificationDefaultWorkflow()
   } catch (saveError) {
-    notificationDefaultSaveError.value = saveError instanceof ApiCallError ? saveError.message : 'Unable to save notification default.'
+    notificationDefaultSaveError.value = saveError instanceof ApiCallError ? saveError.message : 'The notification default did not get the memo. Not saved.'
   } finally {
     isSavingNotificationDefault.value = false
   }
@@ -797,7 +797,7 @@ async function saveUserTimezone(): Promise<void> {
     const submittedTimeZone = timezoneForm.value.timeZone
     const saved = await authStore.saveUserSettings({ timeZone: submittedTimeZone })
     if (!saved) {
-      userTimezoneSaveError.value = authStore.error ?? 'Unable to save timezone.'
+      userTimezoneSaveError.value = authStore.error ?? 'Your timezone is stuck in yesterday. Not saved.'
       return
     }
 

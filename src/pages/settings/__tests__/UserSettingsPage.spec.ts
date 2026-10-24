@@ -478,7 +478,7 @@ describe('UserSettingsPage', () => {
     // callService throws ApiCallError on ok:false envelopes -- it never resolves with one --
     // so a faithful mock rejects, exercising the real catch path instead of the dead
     // `if (!response.ok)` branch.
-    saveUserNotificationDefault.mockRejectedValue(new ApiCallError('Unable to save notification default.', 500))
+    saveUserNotificationDefault.mockRejectedValue(new ApiCallError('The notification default did not get the memo. Not saved.', 500))
     listTenantChatSpaces.mockResolvedValue({
       ok: true,
       messages: [],
@@ -496,7 +496,7 @@ describe('UserSettingsPage', () => {
     await flushPromises()
 
     const dialog = wrapper.get('[role="dialog"]')
-    expect(dialog.text()).toContain('Unable to save notification default.')
+    expect(dialog.text()).toContain('The notification default did not get the memo. Not saved.')
     // The choice cards must still be visible/interactable inside the dialog -- a save
     // failure is not a load failure, so the picker itself should not disappear.
     expect(dialog.find('[data-testid="user-chat-space-choice-CS1"]').exists()).toBe(true)
@@ -537,7 +537,7 @@ describe('UserSettingsPage', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="user-notification-default-card"]').text()).toContain('No default space')
-    expect(wrapper.get('.section-note[role="status"]').text()).toContain('Unable to load notification settings.')
+    expect(wrapper.get('.section-note[role="status"]').text()).toContain('Notification settings never got the notification.')
   })
 
   it('surfaces a load error when chat spaces fail to load and does not silently offer only the clear option', async () => {
@@ -548,7 +548,7 @@ describe('UserSettingsPage', () => {
     await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Unable to load chat spaces.')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('The chat spaces drifted into outer space.')
     expect(wrapper.find('[data-testid="user-chat-space-choice-clear"]').exists()).toBe(false)
     expect(wrapper.find('.workflow-shortcut-choice-grid').exists()).toBe(false)
   })

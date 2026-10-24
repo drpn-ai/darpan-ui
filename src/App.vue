@@ -440,7 +440,7 @@ async function runSlashCommand(row: SlashResultRow): Promise<void> {
     // failure must not read as a denial, so the two keep separate wording even at this length.
     outcome === 'refused'
       ? `No access to ${row.label}.`
-      : `Could not switch to ${row.label}.`,
+      : `${row.label} would not let us in. We knocked.`,
     { tone: 'warning', durationMs: 5000 },
   )
 }

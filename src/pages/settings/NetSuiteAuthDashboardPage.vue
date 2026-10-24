@@ -274,12 +274,12 @@ async function load(): Promise<void> {
         // DAR-UI-051: a cached copy is drawn at once, so the fresh answer may replace either outcome.
         loading.value = false
         config.value = matchingConfig ?? null
-        error.value = matchingConfig ? null : `Unable to find NetSuite auth config "${configId.value}".`
+        error.value = matchingConfig ? null : `NetSuite auth config "${configId.value}" is hiding in a saved search.`
       },
     )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load NetSuite auth config.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'This NetSuite auth config is still in a meeting.'
   } finally {
     loading.value = false
   }
@@ -305,7 +305,7 @@ async function loadEndpoints(): Promise<void> {
     )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    endpointsError.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load endpoints.'
+    endpointsError.value = loadError instanceof ApiCallError ? loadError.message : 'The endpoints are nowhere in sight. Ironic.'
   } finally {
     endpointsLoading.value = false
   }
@@ -322,7 +322,7 @@ async function deleteConfig(): Promise<void> {
     await settingsFacade.deleteNsAuthConfig({ nsAuthConfigId: config.value.nsAuthConfigId })
     await router.push('/settings/netsuite')
   } catch (deleteFailure) {
-    deleteError.value = deleteFailure instanceof ApiCallError ? deleteFailure.message : 'Failed to delete NetSuite auth profile.'
+    deleteError.value = deleteFailure instanceof ApiCallError ? deleteFailure.message : 'The NetSuite auth profile clung to the doorframe. Still here.'
   } finally {
     deletingConfig.value = false
   }

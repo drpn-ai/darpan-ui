@@ -441,7 +441,7 @@ describe('ReconciliationAutomationDashboardPage', () => {
       await wrapper.get('[data-testid="automation-active-toggle"]').trigger('click')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Unable to pause automation.')
+      expect(wrapper.text()).toContain('The automation would not pause. It has a mind of its own.')
       expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('aria-checked')).toBe('true')
     })
 

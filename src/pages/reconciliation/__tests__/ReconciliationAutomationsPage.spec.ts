@@ -151,6 +151,6 @@ describe('ReconciliationAutomationsPage', () => {
     const errorWrapper = mount(ReconciliationAutomationsPage)
     await flushPromises()
 
-    expect(errorWrapper.text()).toContain('Unable to load automations.')
+    expect(errorWrapper.text()).toContain('The automations are on autopilot. Somewhere else.')
   })
 })

@@ -378,13 +378,13 @@ async function loadServer(): Promise<void> {
       authStore.sessionInfo?.activeTenantUserGroupId ?? null,
     ).find((server) => server.sftpServerId === activeServerId.value)
     if (!matchingServer) {
-      error.value = `Unable to find SFTP server "${activeServerId.value}".`
+      error.value = `SFTP server "${activeServerId.value}" logged off for the day.`
       return
     }
     applyRecord(matchingServer)
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load server.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'This server is not serving today.'
   } finally {
     loading.value = false
   }
@@ -424,7 +424,7 @@ async function save(): Promise<void> {
     success.value = response.messages?.[0] ?? 'Saved SFTP server.'
     await router.push('/settings/sftp')
   } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save server.'
+    error.value = saveError instanceof ApiCallError ? saveError.message : 'The server would not take your order. Not saved.'
   } finally {
     loading.value = false
   }

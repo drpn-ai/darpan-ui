@@ -121,7 +121,7 @@ async function loadSchemas(): Promise<void> {
     showAllSchemas.value = false
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load schemas.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'The schemas are off scheming somewhere.'
   } finally {
     loading.value = false
   }

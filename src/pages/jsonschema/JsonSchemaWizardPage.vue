@@ -263,7 +263,7 @@ function readBlobAsText(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result ?? ''))
-    reader.onerror = () => reject(new Error('Unable to read file'))
+    reader.onerror = () => reject(new Error('This file speaks a language we do not read'))
     reader.readAsText(blob)
   })
 }
@@ -383,7 +383,7 @@ function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result ?? ''))
-    reader.onerror = () => reject(new Error('Unable to read file'))
+    reader.onerror = () => reject(new Error('This file speaks a language we do not read'))
     reader.readAsText(file)
   })
 }
@@ -444,7 +444,7 @@ async function prepareSchemaFileUpload(): Promise<boolean> {
     schemaTextToSave.value = jsonText
     return true
   } catch (uploadError) {
-    pageError.value = uploadError instanceof SyntaxError ? 'Schema file must contain valid JSON.' : 'Unable to read schema file.'
+    pageError.value = uploadError instanceof SyntaxError ? 'Schema file must contain valid JSON.' : 'The schema file mumbled something we could not make out.'
     return false
   } finally {
     loading.value = false
@@ -472,7 +472,7 @@ async function inferSchemaFromSampleUpload(): Promise<boolean> {
 
     if (response.ok === false) {
       // The backend's refusal is written for the person holding the file; show it verbatim.
-      pageError.value = response.errors?.[0] ?? 'Unable to read the uploaded sample file.'
+      pageError.value = response.errors?.[0] ?? 'The sample file mumbled something we could not make out.'
       return false
     }
 
@@ -483,7 +483,7 @@ async function inferSchemaFromSampleUpload(): Promise<boolean> {
 
     return true
   } catch (inferError) {
-    pageError.value = inferError instanceof ApiCallError ? inferError.message : 'Unable to infer schema from the sample file.'
+    pageError.value = inferError instanceof ApiCallError ? inferError.message : 'We squinted at the sample file. No schema came to mind.'
     return false
   } finally {
     loading.value = false
@@ -512,7 +512,7 @@ async function saveSchema(): Promise<void> {
     })
     await router.push({ name: 'schemas-library' })
   } catch (saveError) {
-    pageError.value = saveError instanceof ApiCallError ? saveError.message : 'Unable to save schema.'
+    pageError.value = saveError instanceof ApiCallError ? saveError.message : 'The schema slipped off the page. Not saved.'
   } finally {
     saving.value = false
   }
@@ -582,7 +582,7 @@ async function loadSystemOptions(): Promise<void> {
     systemOptionsLoaded.value = true
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    pageError.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load reconciliation systems.'
+    pageError.value = loadError instanceof ApiCallError ? loadError.message : 'The reconciliation systems are not reconciling with us.'
   }
 }
 

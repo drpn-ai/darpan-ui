@@ -745,11 +745,11 @@ async function load(): Promise<void> {
     options.value = { ...FALLBACK_OPTIONS, ...(optionsResponse.options ?? {}) }
     if (queryResponse) {
       if (queryResponse.query) applyQuery(queryResponse.query)
-      else errors.value = [`Unable to find SuiteQL query "${activeQueryId.value}".`]
+      else errors.value = [`SuiteQL query "${activeQueryId.value}" returned zero rows of itself.`]
     }
   } catch (loadError) {
     if (isAbortError(loadError)) return
-    errors.value = serviceErrors(loadError, 'Failed to load the SuiteQL query.')
+    errors.value = serviceErrors(loadError, 'The SuiteQL query wandered off mid-SELECT.')
   } finally {
     loading.value = false
   }
@@ -816,7 +816,7 @@ async function save(): Promise<void> {
     success.value = 'Saved.'
   } catch (saveError) {
     if (isAbortError(saveError)) return
-    errors.value = serviceErrors(saveError, 'Failed to save the SuiteQL query.')
+    errors.value = serviceErrors(saveError, 'The SuiteQL query dodged the save button. Not saved.')
   } finally {
     loading.value = false
   }

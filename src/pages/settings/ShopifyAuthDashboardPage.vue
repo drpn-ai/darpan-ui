@@ -230,12 +230,12 @@ async function load(): Promise<void> {
         // DAR-UI-051: a cached copy is drawn at once, so the fresh answer may replace either outcome.
         loading.value = false
         config.value = tenantRecord ?? null
-        error.value = tenantRecord ? null : `Unable to find Shopify config "${configId.value}".`
+        error.value = tenantRecord ? null : `Shopify config "${configId.value}" checked out without us.`
       },
     )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load Shopify config.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'This Shopify config is still out shopping.'
   } finally {
     loading.value = false
   }
@@ -256,7 +256,7 @@ async function deleteConfig(): Promise<void> {
     await settingsFacade.deleteShopifyAuthConfig({ shopifyAuthConfigId: config.value.shopifyAuthConfigId })
     await router.push('/settings/shopify')
   } catch (deleteFailure) {
-    deleteError.value = deleteFailure instanceof ApiCallError ? deleteFailure.message : 'Failed to delete Shopify config.'
+    deleteError.value = deleteFailure instanceof ApiCallError ? deleteFailure.message : 'The Shopify config would not check out. Still here.'
   } finally {
     deletingConfig.value = false
   }

@@ -418,7 +418,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response: SaveActiveTenantResponse = await authFacade.saveActiveTenant(activeTenantUserGroupId)
       if (response.authenticated) {
-        const errorMessage = response.ok ? null : response.errors?.[0] ?? 'Unable to switch tenant.'
+        const errorMessage = response.ok ? null : response.errors?.[0] ?? 'The tenant door is stuck. Still on the old one.'
         if (response.ok) {
           // Any successful switch drops an unconsumed deep-link announcement: it named a tenant
           // this switch just left. The guard re-raises it right after when the switch came from a
@@ -481,7 +481,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response: SaveUserSettingsResponse = await authFacade.saveUserSettings(payload)
       if (response.authenticated) {
-        const errorMessage = response.ok ? null : response.errors?.[0] ?? 'Unable to save user settings.'
+        const errorMessage = response.ok ? null : response.errors?.[0] ?? 'Your settings had second thoughts. Not saved.'
         _applyAuthenticatedSession(response.sessionInfo, errorMessage)
         return response.ok
       }
@@ -553,7 +553,7 @@ export const useAuthStore = defineStore('auth', () => {
       } else if (!response.ok) {
         _applyAuthState({
           status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-          error: response.errors?.[0] ?? 'Unable to save tenant settings.',
+          error: response.errors?.[0] ?? 'Tenant settings got stuck in traffic. Not saved.',
           sessionInfo: _sessionInfo.value,
         })
       }

@@ -128,14 +128,14 @@ describe('JsonSchemaEditorPage', () => {
   it('moves parameterized routes into a retry state until the initial load succeeds', async () => {
     route.params = { jsonSchemaId: 'test-schema' }
     route.fullPath = '/schemas/editor/test-schema'
-    get.mockRejectedValue(new ApiCallError('Unable to connect to Darpan right now. Try again in a moment.', 503))
+    get.mockRejectedValue(new ApiCallError('Darpan stepped out for chai. Try again in a moment.', 503))
 
     const wrapper = mount(JsonSchemaEditorPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load this schema')
+    expect(wrapper.text()).toContain('This schema is having a moment')
     expect(wrapper.text()).toContain('Retry Loading Schema')
-    expect(wrapper.text()).toContain('Unable to connect to Darpan right now. Try again in a moment.')
+    expect(wrapper.text()).toContain('Darpan stepped out for chai. Try again in a moment.')
     expect(wrapper.find('textarea').exists()).toBe(false)
   })
 

@@ -715,7 +715,7 @@ function readFileAsText(file: File): Promise<string> {
       resolve(String(reader.result ?? ''))
     }
     reader.onerror = () => {
-      reject(new Error(`Unable to read ${file.name}`))
+      reject(new Error(`${file.name} speaks a language we do not read`))
     }
     reader.readAsText(file)
   })

@@ -20,7 +20,7 @@
       <template v-else-if="showInitialLoadFailureState">
         <InlineValidation v-if="error" tone="error" :message="error" />
         <EmptyState
-          title="Unable to load this schema"
+          title="This schema is having a moment"
           description="Retry loading before refining any fields."
         />
 
@@ -368,7 +368,7 @@ async function loadSchema(signal?: AbortSignal): Promise<void> {
     const schemaData = response.schemaData
 
     if (!schemaData) {
-      error.value = 'Schema not found.'
+      error.value = 'This schema has left the building.'
       return
     }
 
@@ -385,7 +385,7 @@ async function loadSchema(signal?: AbortSignal): Promise<void> {
     initialLoadSucceeded.value = true
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load schema.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'The schema tripped over its own fields.'
   } finally {
     initialLoadCompleted.value = true
     loading.value = false
@@ -415,7 +415,7 @@ async function loadSystemOptions(signal?: AbortSignal): Promise<void> {
     systemOptions.value = resolvedOptions
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load reconciliation systems.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'The reconciliation systems are not reconciling with us.'
   }
 }
 
@@ -441,7 +441,7 @@ async function saveRefinedFields(): Promise<void> {
     success.value = response.messages?.[0] ?? `Saved refined schema ${schemaName.value}.`
     await router.push({ name: 'schemas-library' })
   } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'Unable to save refined fields.'
+    error.value = saveError instanceof ApiCallError ? saveError.message : 'The refined fields need more refining. Not saved.'
   } finally {
     savingRefined.value = false
   }
@@ -461,7 +461,7 @@ async function deleteSchema(): Promise<void> {
     await jsonSchemaFacade.delete({ jsonSchemaId: currentSchemaId.value })
     await router.push({ name: 'schemas-library' })
   } catch (deleteError) {
-    error.value = deleteError instanceof ApiCallError ? deleteError.message : 'Unable to delete schema.'
+    error.value = deleteError instanceof ApiCallError ? deleteError.message : 'The schema is clinging on. Still here.'
   } finally {
     deletingSchema.value = false
   }

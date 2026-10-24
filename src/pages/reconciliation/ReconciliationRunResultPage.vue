@@ -827,7 +827,7 @@ async function cancelRun(): Promise<void> {
     cancelConfirming.value = false
     await runResultsStore.refreshRunStatus(runId)
   } catch (error) {
-    cancelError.value = error instanceof ApiCallError ? error.message : 'Unable to cancel this run.'
+    cancelError.value = error instanceof ApiCallError ? error.message : 'This run refuses to stop. It is very committed.'
   } finally {
     cancelBusy.value = false
   }
@@ -942,7 +942,7 @@ async function toggleNotifyMe(): Promise<void> {
   try {
     await performNotifyToggle(runId)
   } catch (error) {
-    notifyError.value = error instanceof ApiCallError ? error.message : 'Unable to update notification subscription.'
+    notifyError.value = error instanceof ApiCallError ? error.message : 'The notification subscription missed the memo. Not updated.'
   } finally {
     notifyBusy.value = false
   }
@@ -957,7 +957,7 @@ async function openNotifyPicker(): Promise<void> {
     notifyPickerSpaces.value = (response.chatSpaces ?? []).filter((space) => space.isActive !== 'N')
   } catch (error) {
     notifyPickerOpen.value = false
-    notifyError.value = error instanceof ApiCallError ? error.message : 'Unable to load chat spaces.'
+    notifyError.value = error instanceof ApiCallError ? error.message : 'The chat spaces drifted into outer space.'
   } finally {
     notifyPickerLoading.value = false
   }
@@ -979,7 +979,7 @@ async function pickDefaultAndSubscribe(chatSpaceId: string): Promise<void> {
     closeNotifyPicker()
     await performNotifyToggle(runId)
   } catch (error) {
-    notifyError.value = error instanceof ApiCallError ? error.message : 'Unable to save notification default.'
+    notifyError.value = error instanceof ApiCallError ? error.message : 'The notification default did not get the memo. Not saved.'
   } finally {
     notifyPickerBusy.value = false
   }
@@ -1225,7 +1225,7 @@ async function openRunEditor(pendingExclusion: RunConclusionSuggestedFilter | nu
     draftStore.setWorkflowOrigin('Run Result', route.fullPath)
     const savedRun = await resolveSavedRunEditorTarget(targetId)
     if (!savedRun) {
-      runSettingsError.value = `Unable to find run "${targetId}".`
+      runSettingsError.value = `Run "${targetId}" ran away. Fittingly.`
       return
     }
 
@@ -1239,7 +1239,7 @@ async function openRunEditor(pendingExclusion: RunConclusionSuggestedFilter | nu
     }
     await router.push(buildSavedRunEditorRoute(savedRun))
   } catch (error) {
-    runSettingsError.value = error instanceof ApiCallError ? error.message : 'Unable to open run settings.'
+    runSettingsError.value = error instanceof ApiCallError ? error.message : 'Run settings are behind a door marked pull. We pushed.'
   } finally {
     openingRunSettings.value = false
   }
@@ -1372,7 +1372,7 @@ async function loadSavedResult(): Promise<void> {
     }
 
     resetDiffDetailsState()
-    loadError.value = error instanceof ApiCallError ? error.message : 'Unable to load saved result.'
+    loadError.value = error instanceof ApiCallError ? error.message : 'This saved result got saved somewhere we cannot reach.'
   } finally {
     if (savedRunId.value === requestedSavedRunId && outputFileName.value === requestedOutputFileName) {
       loading.value = false

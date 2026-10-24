@@ -219,11 +219,11 @@ async function load(): Promise<void> {
     if (controller.signal.aborted) return
     sharing.value = response.sharing ?? null
     if (!response.ok) {
-      error.value = response.errors?.[0] ?? 'Failed to load sharing state.'
+      error.value = response.errors?.[0] ?? 'Sharing state refuses to share itself.'
     }
   } catch (loadError) {
     if (controller.signal.aborted || isAbortError(loadError)) return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load sharing state.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'Sharing state refuses to share itself.'
   } finally {
     if (!controller.signal.aborted) loading.value = false
     if (loadController === controller) loadController = null
@@ -247,7 +247,7 @@ async function grantAccess(targetTenantUserGroupId: string): Promise<void> {
     }, controller.signal)
     if (controller.signal.aborted) return
     if (!response.ok || (response.errors?.length ?? 0) > 0) {
-      error.value = response.errors?.[0] ?? 'Failed to share configuration.'
+      error.value = response.errors?.[0] ?? 'The configuration got shy about sharing. Not shared.'
       return
     }
     picking.value = false
@@ -255,7 +255,7 @@ async function grantAccess(targetTenantUserGroupId: string): Promise<void> {
     emit('changed')
   } catch (grantError) {
     if (controller.signal.aborted || isAbortError(grantError)) return
-    error.value = grantError instanceof ApiCallError ? grantError.message : 'Failed to share configuration.'
+    error.value = grantError instanceof ApiCallError ? grantError.message : 'The configuration got shy about sharing. Not shared.'
   } finally {
     if (!controller.signal.aborted) granting.value = false
     if (mutationController === controller) mutationController = null
@@ -282,7 +282,7 @@ async function removePeer(tenantUserGroupId: string, label: string): Promise<voi
     }, controller.signal)
     if (controller.signal.aborted) return
     if (!response.ok || (response.errors?.length ?? 0) > 0) {
-      error.value = response.errors?.[0] ?? 'Failed to remove tenant access.'
+      error.value = response.errors?.[0] ?? 'That tenant is hanging on to its key. Access not removed.'
       return
     }
 
@@ -297,7 +297,7 @@ async function removePeer(tenantUserGroupId: string, label: string): Promise<voi
     emit('changed')
   } catch (revokeError) {
     if (controller.signal.aborted || isAbortError(revokeError)) return
-    error.value = revokeError instanceof ApiCallError ? revokeError.message : 'Failed to remove tenant access.'
+    error.value = revokeError instanceof ApiCallError ? revokeError.message : 'That tenant is hanging on to its key. Access not removed.'
   } finally {
     if (!controller.signal.aborted) revokingTenantId.value = null
     if (mutationController === controller) mutationController = null
@@ -328,7 +328,7 @@ async function undoRemove(tenantUserGroupId: string): Promise<void> {
     if (controller.signal.aborted) return
     if (!response.ok || (response.errors?.length ?? 0) > 0) {
       // Slot deliberately survives a failed undo so the gesture can be retried.
-      error.value = response.errors?.[0] ?? 'Failed to restore tenant access.'
+      error.value = response.errors?.[0] ?? 'The undo button blinked first. Access not restored.'
       resumeUndoTimer(tenantUserGroupId)
       return
     }
@@ -339,7 +339,7 @@ async function undoRemove(tenantUserGroupId: string): Promise<void> {
     emit('changed')
   } catch (undoError) {
     if (controller.signal.aborted || isAbortError(undoError)) return
-    error.value = undoError instanceof ApiCallError ? undoError.message : 'Failed to restore tenant access.'
+    error.value = undoError instanceof ApiCallError ? undoError.message : 'The undo button blinked first. Access not restored.'
     resumeUndoTimer(tenantUserGroupId)
   } finally {
     if (!controller.signal.aborted) granting.value = false

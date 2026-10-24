@@ -117,7 +117,7 @@ export const useRunResultsStore = defineStore('runResults', () => {
       if (isAbortError(err)) return
       _loadState.value = {
         loading: false,
-        error: describeError(err, 'Unable to load recent run results.'),
+        error: describeError(err, 'Recent run results tripped on the stairs on the way up.'),
         loadedAt: null,
       }
     }

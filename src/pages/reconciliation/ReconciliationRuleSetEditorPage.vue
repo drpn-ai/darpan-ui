@@ -144,7 +144,7 @@ async function finishRuleEdit(): Promise<void> {
       loadingFields.value = false
       return
     }
-    pageError.value = error instanceof ApiCallError ? error.message : 'Unable to save rules.'
+    pageError.value = error instanceof ApiCallError ? error.message : 'The rules broke a rule. Not saved.'
     loadingFields.value = false
     return
   }

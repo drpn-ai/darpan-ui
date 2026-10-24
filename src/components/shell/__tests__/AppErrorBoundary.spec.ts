@@ -19,7 +19,7 @@ describe('AppErrorBoundary', () => {
     const wrapper = mount(AppErrorBoundary, { slots: { default: () => h(Boom) } })
     await nextTick()
     expect(wrapper.find('.error-state').exists()).toBe(true)
-    expect(wrapper.text()).toContain('something went wrong')
+    expect(wrapper.text()).toContain('well, that was not supposed to happen')
     expect(spy).toHaveBeenCalledTimes(1)
   })
 })

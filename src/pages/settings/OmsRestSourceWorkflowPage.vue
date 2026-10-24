@@ -487,7 +487,7 @@ async function loadOmsConfig(signal?: AbortSignal): Promise<void> {
     authStore.sessionInfo?.activeTenantUserGroupId ?? null,
   ).find((config) => config.omsRestSourceConfigId === activeOmsConfigId.value)
   if (!matchingConfig) {
-    error.value = `Unable to find HotWax source config "${activeOmsConfigId.value}".`
+    error.value = `HotWax source config "${activeOmsConfigId.value}" is nowhere to be found. We asked twice.`
     return
   }
   applyRecord(matchingConfig)
@@ -507,7 +507,7 @@ async function load(): Promise<void> {
     await loadOmsConfig(signal)
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load HotWax source config.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'The HotWax source config is stuck in the warehouse.'
   } finally {
     loading.value = false
   }
@@ -614,7 +614,7 @@ async function save(): Promise<void> {
     }
     await router.push('/settings/hotwax')
   } catch (saveError) {
-    error.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save HotWax source config.'
+    error.value = saveError instanceof ApiCallError ? saveError.message : 'The HotWax source config slipped off the shelf. Not saved.'
   } finally {
     loading.value = false
   }

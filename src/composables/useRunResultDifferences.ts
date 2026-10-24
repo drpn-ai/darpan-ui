@@ -204,7 +204,7 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
     } catch (error) {
       if ((error as { name?: string })?.name === 'AbortError') return
       if (deps.outputFileName.value !== requestedFileName) return
-      deps.onLoadError(error instanceof ApiCallError ? error.message : 'Unable to load differences.')
+      deps.onLoadError(error instanceof ApiCallError ? error.message : 'The differences are feeling shy. Give them a nudge.')
     } finally {
       if (deps.outputFileName.value === requestedFileName) differencesLoading.value = false
     }

@@ -48,7 +48,7 @@ const {
 } = useSettingsPagedList({
   loadPage: (request) => reconciliationFacade.listSavedRuns({ ...request, query: '' }),
   selectRecords: (response) => response.savedRuns ?? [],
-  fallbackErrorMessage: 'Failed to load runs.',
+  fallbackErrorMessage: 'The runs are out for a jog.',
   cacheKey: SETTINGS_LIST_KEYS.runs,
 })
 

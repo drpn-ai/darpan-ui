@@ -364,7 +364,7 @@ async function openRunSettings(): Promise<void> {
     draftStore.setWorkflowOrigin('Run History', route.fullPath)
     const savedRun = await resolveSavedRunEditorTarget(targetId)
     if (!savedRun) {
-      runSettingsError.value = `Unable to find run "${targetId}".`
+      runSettingsError.value = `Run "${targetId}" ran away. Fittingly.`
       return
     }
 
@@ -375,7 +375,7 @@ async function openRunSettings(): Promise<void> {
 
     await router.push(buildSavedRunEditorRoute(savedRun))
   } catch (error) {
-    runSettingsError.value = error instanceof ApiCallError ? error.message : 'Unable to open run settings.'
+    runSettingsError.value = error instanceof ApiCallError ? error.message : 'Run settings are behind a door marked pull. We pushed.'
   } finally {
     openingRunSettings.value = false
   }
@@ -521,7 +521,7 @@ async function saveRunName(nextRunName: string): Promise<void> {
     persistedRunName.value = savedRunName
   } catch (error) {
     editableRunName.value = previousRunName
-    loadError.value = error instanceof ApiCallError ? error.message : 'Unable to save run name.'
+    loadError.value = error instanceof ApiCallError ? error.message : 'The run name did not stick. Not saved.'
   } finally {
     savingRunName.value = false
   }
@@ -612,7 +612,7 @@ async function loadGeneratedOutputs(targetPageIndex = 0, append = false): Promis
     if (savedRunId.value !== requestedSavedRunId) return
 
     if (!append) generatedOutputs.value = []
-    loadError.value = error instanceof ApiCallError ? error.message : 'Unable to load saved results.'
+    loadError.value = error instanceof ApiCallError ? error.message : 'The saved results are playing hide and seek. They are winning.'
   } finally {
     if (savedRunId.value === requestedSavedRunId) {
       if (append) loadingMore.value = false

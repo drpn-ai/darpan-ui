@@ -370,12 +370,12 @@ describe('ReconciliationDiffPage', () => {
   })
 
   it('shows the API error when saved-run lookup fails', async () => {
-    listSavedRuns.mockRejectedValue(new ApiCallError('Unable to load saved runs.', 503))
+    listSavedRuns.mockRejectedValue(new ApiCallError('The saved runs went out for snacks and never came back.', 503))
 
     const wrapper = mount(ReconciliationDiffPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load saved runs.')
+    expect(wrapper.text()).toContain('The saved runs went out for snacks and never came back.')
     expect(wrapper.find('.reconciliation-diff-layout').exists()).toBe(false)
     expect(wrapper.find('[data-testid="saved-run-select"]').exists()).toBe(false)
   })
@@ -789,7 +789,7 @@ describe('ReconciliationDiffPage', () => {
       file2SystemLabel: 'SHOPIFY',
     }
     runSavedRunDiff.mockRejectedValue(
-      new ApiCallError('Unable to connect to Darpan right now. Try again in a moment.', 503, {
+      new ApiCallError('Darpan stepped out for chai. Try again in a moment.', 503, {
         failures: [{ url: 'http://localhost:8080/rpc/json', error: new TypeError('Failed to fetch') }],
       }),
     )
@@ -815,7 +815,7 @@ describe('ReconciliationDiffPage', () => {
     await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to connect to Darpan right now. Try again in a moment.')
+    expect(wrapper.text()).toContain('Darpan stepped out for chai. Try again in a moment.')
     expect(JSON.parse(window.localStorage.getItem('darpan.pendingReconciliationRuns') ?? '[]')).toEqual([
       expect.objectContaining({
         savedRunId: 'RS_ORDER_CSV',

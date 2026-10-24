@@ -619,7 +619,7 @@ async function openAuthInfoPopup(sourceConfig: SourceConfigSummary): Promise<voi
       endpoints: [],
       dashboardRoute: buildSourceConfigDashboardRoute(sourceConfig),
       loading: false,
-      error: error instanceof ApiCallError || error instanceof Error ? error.message : 'Unable to load auth info.',
+      error: error instanceof ApiCallError || error instanceof Error ? error.message : 'The auth info would not show its badge.',
     }
   }
 }
@@ -658,7 +658,7 @@ async function loadOmsAuthInfo(sourceConfig: SourceConfigSummary): Promise<AuthI
   ).find((record) => record.omsRestSourceConfigId === sourceConfig.configId)
 
   if (!matchingConfig) {
-    throw new Error(`Unable to find HotWax auth config "${sourceConfig.configId}".`)
+    throw new Error(`HotWax auth config "${sourceConfig.configId}" is nowhere to be found. We asked twice.`)
   }
 
   return buildOmsAuthInfoPopupState(sourceConfig, matchingConfig, endpointsResponse.endpoints ?? [])
@@ -675,7 +675,7 @@ async function loadShopifyAuthInfo(sourceConfig: SourceConfigSummary): Promise<A
     : []
 
   if (!matchingConfig) {
-    throw new Error(`Unable to find Shopify config "${sourceConfig.configId}".`)
+    throw new Error(`Shopify config "${sourceConfig.configId}" checked out without us.`)
   }
 
   return buildShopifyAuthInfoPopupState(sourceConfig, matchingConfig, endpointsResponse.endpoints ?? [])
@@ -895,7 +895,7 @@ async function deleteSavedRun(): Promise<void> {
     await reconciliationFacade.deleteSavedRun({ savedRunId: savedRunId.value })
     await router.push(draftStore.workflowOrigin?.path ?? '/settings/runs')
   } catch (error) {
-    deleteError.value = error instanceof ApiCallError ? error.message : 'Unable to delete run.'
+    deleteError.value = error instanceof ApiCallError ? error.message : 'This run refuses to leave. Still here.'
   } finally {
     deletingSavedRun.value = false
   }

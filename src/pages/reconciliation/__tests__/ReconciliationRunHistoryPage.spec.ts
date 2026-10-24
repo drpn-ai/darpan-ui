@@ -1057,11 +1057,11 @@ describe('ReconciliationRunHistoryPage', () => {
   })
 
   it('shows an inline error when the saved-result lookup fails', async () => {
-    listGeneratedOutputs.mockRejectedValue(new ApiCallError('Unable to load saved results.', 503))
+    listGeneratedOutputs.mockRejectedValue(new ApiCallError('The saved results are playing hide and seek. They are winning.', 503))
 
     const wrapper = mount(ReconciliationRunHistoryPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load saved results.')
+    expect(wrapper.text()).toContain('The saved results are playing hide and seek. They are winning.')
   })
 })

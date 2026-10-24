@@ -900,7 +900,7 @@ async function loadEditorData(): Promise<void> {
     ])
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
-    loadError.value = error instanceof ApiCallError ? error.message : 'Unable to load source fields.'
+    loadError.value = error instanceof ApiCallError ? error.message : 'The source fields are out standing in a field somewhere.'
   } finally {
     loadingFields.value = false
     await nextTick()

@@ -60,7 +60,7 @@ const {
   loadPage: (request) => settingsFacade.listShopifyAuthConfigs(request),
   selectRecords: (response) => response.shopifyAuthConfigs ?? [],
   activeTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
-  fallbackErrorMessage: 'Failed to load Shopify configs.',
+  fallbackErrorMessage: 'The Shopify configs are still out shopping.',
   cacheKey: SETTINGS_LIST_KEYS.shopify,
 })
 

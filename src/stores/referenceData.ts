@@ -60,7 +60,7 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
       if (isAbortError(err)) return
       _tenantSettingsState.value = {
         loading: false,
-        error: describeError(err, 'Unable to load tenant settings.'),
+        error: describeError(err, 'Tenant settings are stuck in traffic.'),
         loadedAt: null,
       }
     }
@@ -83,7 +83,7 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
       _llmProviders.value = new Map()
       _llmProvidersState.value = {
         loading: false,
-        error: describeError(err, 'Unable to load AI provider settings.'),
+        error: describeError(err, 'The AI provider settings are thinking really hard. Too hard.'),
         loadedAt: null,
       }
     }

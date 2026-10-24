@@ -1157,7 +1157,7 @@ async function saveTimezoneSettings(): Promise<void> {
       timeZone: normalizeStringOrEmpty(timezoneForm.timeZone),
     })
     if (!response?.ok) {
-      timezoneWorkflowError.value = response?.errors?.[0] ?? authStore.error ?? 'Failed to save tenant timezone.'
+      timezoneWorkflowError.value = response?.errors?.[0] ?? authStore.error ?? 'The timezone is stuck in yesterday. Not saved.'
       return
     }
 
@@ -1165,7 +1165,7 @@ async function saveTimezoneSettings(): Promise<void> {
     timezoneWorkflowSuccess.value = response.messages?.[0] ?? 'Saved tenant settings.'
     closeActivePopup()
   } catch (saveError) {
-    timezoneWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save tenant timezone.'
+    timezoneWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The timezone is stuck in yesterday. Not saved.'
   } finally {
     timezoneWorkflowSaving.value = false
   }
@@ -1195,7 +1195,7 @@ async function saveStreaksSpaceSettings(): Promise<void> {
       streaksChatSpaceId: normalizeStringOrEmpty(streaksForm.streaksChatSpaceId),
     })
     if (!response?.ok) {
-      streaksWorkflowError.value = response?.errors?.[0] ?? authStore.error ?? 'Failed to save streaks space.'
+      streaksWorkflowError.value = response?.errors?.[0] ?? authStore.error ?? 'The streak broke on the way to the save. Not saved.'
       return
     }
 
@@ -1203,7 +1203,7 @@ async function saveStreaksSpaceSettings(): Promise<void> {
     streaksWorkflowSuccess.value = response.messages?.[0] ?? 'Saved tenant settings.'
     closeActivePopup()
   } catch (saveError) {
-    streaksWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save streaks space.'
+    streaksWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The streak broke on the way to the save. Not saved.'
   } finally {
     streaksWorkflowSaving.value = false
   }
@@ -1309,7 +1309,7 @@ async function saveSlackToken(): Promise<void> {
     openNotificationMenu()
   } catch (saveError) {
     notificationWorkflowError.value = saveError instanceof ApiCallError
-      ? saveError.message : 'Unable to save the Slack token.'
+      ? saveError.message : 'The Slack token slipped through the cracks. Not saved.'
   } finally {
     slackTokenSaving.value = false
   }
@@ -1347,7 +1347,7 @@ async function toggleChatSpaceActive(nextActive: boolean): Promise<void> {
     notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Saved chat space.'
     closePopup()
   } catch (saveError) {
-    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to update chat space.'
+    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The chat space did not take the hint. Not updated.'
   } finally {
     chatSpaceMenuSaving.value = false
   }
@@ -1365,7 +1365,7 @@ async function deleteChatSpace(): Promise<void> {
     notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Deleted chat space.'
     closePopup()
   } catch (deleteError) {
-    notificationWorkflowError.value = deleteError instanceof ApiCallError ? deleteError.message : 'Failed to delete chat space.'
+    notificationWorkflowError.value = deleteError instanceof ApiCallError ? deleteError.message : 'The chat space is still talking. Still here.'
   } finally {
     chatSpaceMenuSaving.value = false
   }
@@ -1418,7 +1418,7 @@ async function loadSlackInstall(): Promise<void> {
     slackConfigured.value = false
     slackOauthAvailable.value = false
     slackLoadError.value = loadError instanceof ApiCallError
-      ? loadError.message : 'Could not check the Slack connection.'
+      ? loadError.message : 'The Slack connection would not pick up.'
   }
 }
 
@@ -1435,7 +1435,7 @@ async function loadSlackChannels(): Promise<void> {
   } catch (loadError) {
     slackChannels.value = []
     notificationWorkflowError.value = loadError instanceof ApiCallError
-      ? loadError.message : 'Unable to load Slack channels.'
+      ? loadError.message : 'The Slack channels are slacking off.'
   } finally {
     slackChannelsLoading.value = false
   }
@@ -1447,7 +1447,7 @@ async function connectSlack(): Promise<void> {
   try {
     const response = await settingsFacade.beginSlackInstall(pageAbortController.signal)
     if (!response.authorizeUrl) {
-      notificationWorkflowError.value = response.errors?.[0] ?? 'Unable to start the Slack connection.'
+      notificationWorkflowError.value = response.errors?.[0] ?? 'Slack left us on read. Not connected.'
       return
     }
     // Full-page navigation, not a popup: Slack's consent screen refuses to render in an iframe, and
@@ -1455,7 +1455,7 @@ async function connectSlack(): Promise<void> {
     window.location.assign(response.authorizeUrl)
   } catch (connectError) {
     notificationWorkflowError.value = connectError instanceof ApiCallError
-      ? connectError.message : 'Unable to start the Slack connection.'
+      ? connectError.message : 'Slack left us on read. Not connected.'
   } finally {
     slackConnecting.value = false
   }
@@ -1469,7 +1469,7 @@ async function disconnectSlack(): Promise<void> {
     const response = await settingsFacade.disconnectSlackWorkspace(
       { slackInstallId: install.slackInstallId }, pageAbortController.signal)
     if (!response.ok) {
-      notificationWorkflowError.value = response.errors?.[0] ?? 'Unable to disconnect Slack.'
+      notificationWorkflowError.value = response.errors?.[0] ?? 'Slack does not want to break up. Still connected.'
       return
     }
     notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Disconnected Slack.'
@@ -1477,7 +1477,7 @@ async function disconnectSlack(): Promise<void> {
     closePopup()
   } catch (disconnectError) {
     notificationWorkflowError.value = disconnectError instanceof ApiCallError
-      ? disconnectError.message : 'Unable to disconnect Slack.'
+      ? disconnectError.message : 'Slack does not want to break up. Still connected.'
   }
 }
 
@@ -1507,7 +1507,7 @@ async function saveChatSpaceForm(): Promise<void> {
     notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Saved chat space.'
     closePopup()
   } catch (saveError) {
-    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save chat space.'
+    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The chat space wandered off mid-sentence. Not saved.'
   } finally {
     chatSpaceFormSaving.value = false
   }
@@ -1540,7 +1540,7 @@ async function loadChatSpaces(): Promise<void> {
     chatSpaces.value = response.chatSpaces ?? []
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    chatSpacesError.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load chat spaces.'
+    chatSpacesError.value = loadError instanceof ApiCallError ? loadError.message : 'The chat spaces drifted into outer space.'
   } finally {
     chatSpacesLoading.value = false
   }
@@ -1557,13 +1557,13 @@ async function loadAiProvider(llmProvider: LlmProvider): Promise<void> {
       if (llmSettings) referenceDataStore.setLlmProvider(llmProvider, llmSettings)
     }
     if (!llmSettings) {
-      aiWorkflowError.value = `Unable to find AI provider "${llmProvider}".`
+      aiWorkflowError.value = `AI provider "${llmProvider}" hallucinated itself out of existence.`
       return
     }
     applyAiSettings(llmSettings, llmProvider)
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    aiWorkflowError.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load AI provider settings.'
+    aiWorkflowError.value = loadError instanceof ApiCallError ? loadError.message : 'The AI provider settings are thinking really hard. Too hard.'
   } finally {
     aiWorkflowLoading.value = false
   }
@@ -1680,7 +1680,7 @@ async function saveAiSettings(): Promise<void> {
     aiSuccess.value = response.messages?.[0] ?? 'Saved LLM settings.'
     await referenceDataStore.refreshLlmProviders()
   } catch (saveError) {
-    aiWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'Failed to save AI provider settings.'
+    aiWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The AI provider settings forgot what you said. Not saved.'
   } finally {
     aiWorkflowSaving.value = false
   }

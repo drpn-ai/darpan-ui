@@ -174,7 +174,7 @@ describe('callService', () => {
 
     await expect(callService('facade.AuthFacadeServices.get#SessionInfo')).rejects.toMatchObject({
       name: 'ApiCallError',
-      message: 'Unable to connect to Darpan right now. Try again in a moment.',
+      message: 'Darpan stepped out for chai. Try again in a moment.',
       status: 503,
     })
     expect(fetchMock).toHaveBeenCalled()
@@ -200,7 +200,7 @@ describe('callService', () => {
 
     expect(error).toMatchObject({
       name: 'ApiCallError',
-      message: 'Unable to connect to Darpan right now. Try again in a moment.',
+      message: 'Darpan stepped out for chai. Try again in a moment.',
     })
     const expectedProxyUrl = `${window.location.origin}/rpc/json`
     expect(fetchMock.mock.calls[0]?.[0]).toBe(expectedProxyUrl)
@@ -225,7 +225,7 @@ describe('callService', () => {
 
     expect(error).toMatchObject({
       name: 'ApiCallError',
-      message: 'Unable to connect to Darpan right now. Try again in a moment.',
+      message: 'Darpan stepped out for chai. Try again in a moment.',
     })
     expect((error as { message: string }).message).not.toContain('facade.AuthFacadeServices')
     expect((error as { details?: unknown }).details).toMatchObject({

@@ -6,7 +6,7 @@ describe('AccessDeniedPage', () => {
   it('shows the access-denied state without leaking internal detail', () => {
     const wrapper = mount(AccessDeniedPage, { global: { stubs: { RouterLink: true } } })
     expect(wrapper.find('.error-state').exists()).toBe(true)
-    expect(wrapper.text()).toContain('super-admin access required')
+    expect(wrapper.text()).toContain('velvet rope ahead')
     expect(wrapper.text()).not.toMatch(/component:\/\/|403|exception/i)
   })
 })

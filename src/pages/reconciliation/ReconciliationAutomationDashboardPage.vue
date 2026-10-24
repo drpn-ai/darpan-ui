@@ -738,7 +738,7 @@ async function load(): Promise<void> {
         loading.value = false
         automation.value = automationResponse.automation ?? null
         if (!automation.value) {
-          error.value = `Unable to find automation "${id}".`
+          error.value = `Automation "${id}" automated its own disappearance.`
           return
         }
         error.value = null
@@ -747,7 +747,7 @@ async function load(): Promise<void> {
     )
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load automation.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'This automation is not feeling very automatic.'
   } finally {
     loading.value = false
   }
@@ -792,7 +792,7 @@ async function runNow(): Promise<void> {
     // the user to navigate away and back.
     ensureExecutionsPoll()
   } catch (runError) {
-    actionError.value = runError instanceof ApiCallError ? runError.message : 'Unable to run automation.'
+    actionError.value = runError instanceof ApiCallError ? runError.message : 'The automation tripped at the starting line. Not run.'
   } finally {
     registrationController.abort()
     actionInFlight.value = false
@@ -814,7 +814,7 @@ async function archiveAutomation(): Promise<void> {
     await reconciliationFacade.archiveAutomation({ automationId: automation.value.automationId })
     await router.push('/reconciliation/automations')
   } catch (archiveError) {
-    actionError.value = archiveError instanceof ApiCallError ? archiveError.message : 'Unable to delete automation.'
+    actionError.value = archiveError instanceof ApiCallError ? archiveError.message : 'The automation refuses to leave. Still here.'
   } finally {
     actionInFlight.value = false
   }
@@ -843,7 +843,7 @@ async function setAutomationActive(next: boolean): Promise<void> {
     if (automation.value) automation.value = { ...automation.value, active: previous }
     actionError.value = toggleError instanceof ApiCallError
       ? toggleError.message
-      : `Unable to ${next ? 'resume' : 'pause'} automation.`
+      : `The automation would not ${next ? 'resume' : 'pause'}. It has a mind of its own.`
   } finally {
     activeToggleInFlight.value = false
     actionInFlight.value = false

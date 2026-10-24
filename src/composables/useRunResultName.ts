@@ -49,7 +49,7 @@ export function useRunResultName(deps: UseRunResultNameDeps): UseRunResultName {
       persistedRunName.value = savedRunName
     } catch (error) {
       editableRunName.value = previousRunName
-      deps.setLoadError(error instanceof ApiCallError ? error.message : 'Unable to save run name.')
+      deps.setLoadError(error instanceof ApiCallError ? error.message : 'The run name did not stick. Not saved.')
     } finally {
       savingRunName.value = false
     }

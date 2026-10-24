@@ -41,7 +41,7 @@ export function useRunResultDownloads(deps: UseRunResultDownloadsDeps): UseRunRe
         format: sourceFile.sourceFormat || 'json',
       })
       const outputFile = response.outputFile
-      if (!outputFile?.contentText) throw new Error('Unable to download source file.')
+      if (!outputFile?.contentText) throw new Error('The source file got stage fright. Nothing downloaded.')
 
       downloadTextFile(
         outputFile.downloadFileName || sourceFile.downloadFileName || sourceFile.fileName,
@@ -49,7 +49,7 @@ export function useRunResultDownloads(deps: UseRunResultDownloadsDeps): UseRunRe
         outputFile.contentType || (sourceFile.sourceFormat === 'csv' ? 'text/csv; charset=UTF-8' : 'application/json; charset=UTF-8'),
       )
     } catch (error) {
-      sourceDownloadError.value = error instanceof ApiCallError ? error.message : 'Unable to download source file.'
+      sourceDownloadError.value = error instanceof ApiCallError ? error.message : 'The source file got stage fright. Nothing downloaded.'
     } finally {
       downloadingSourceFilePath.value = ''
     }
@@ -67,7 +67,7 @@ export function useRunResultDownloads(deps: UseRunResultDownloadsDeps): UseRunRe
         format: 'json',
       })
       const outputFile = response.outputFile
-      if (!outputFile?.contentText) throw new Error('Unable to download saved result.')
+      if (!outputFile?.contentText) throw new Error('The saved result got stage fright. Nothing downloaded.')
 
       downloadTextFile(
         outputFile.downloadFileName || downloadableOutputFile.value.downloadFileName || deps.outputFileName.value || 'saved-result.json',
@@ -75,7 +75,7 @@ export function useRunResultDownloads(deps: UseRunResultDownloadsDeps): UseRunRe
         outputFile.contentType || downloadableOutputFile.value.contentType || 'application/json',
       )
     } catch (error) {
-      resultDownloadError.value = error instanceof ApiCallError ? error.message : 'Unable to download saved result.'
+      resultDownloadError.value = error instanceof ApiCallError ? error.message : 'The saved result got stage fright. Nothing downloaded.'
     } finally {
       downloadingSavedResult.value = false
     }

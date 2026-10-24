@@ -1003,7 +1003,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
     expect(saveTenantChatSpace).toHaveBeenCalledTimes(1)
     expect(saveAutomation).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('Unable to save automation setup.')
+    expect(wrapper.text()).toContain('The automation setup slipped through our fingers.')
 
     // Retry: the chat space already exists (chatSpaceId carried over from the first
     // attempt) -- it must not be re-created a second time with the same name.
@@ -1026,7 +1026,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain("Chat space name 'Ops Alerts' already exists.")
-    expect(wrapper.text()).not.toContain('Unable to save automation setup.')
+    expect(wrapper.text()).not.toContain('The automation setup slipped through our fingers.')
     expect(saveAutomation).not.toHaveBeenCalled()
   })
 
@@ -1037,7 +1037,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load chat space options.')
+    expect(wrapper.text()).toContain('The chat spaces drifted into outer space.')
     // Non-fatal: the very first (choice-only) step is still fully usable.
     expect(wrapper.get('[data-testid="automation-purpose-choice-existing-run"]').attributes('disabled')).toBeUndefined()
   })
@@ -1087,7 +1087,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load chat space options.')
+    expect(wrapper.text()).toContain('The chat spaces drifted into outer space.')
     expect(wrapper.get('[data-testid="save-automation"]').attributes('disabled')).toBeUndefined()
   })
 

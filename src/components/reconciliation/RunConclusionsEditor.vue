@@ -659,7 +659,7 @@ async function createCode(node: DraftNode): Promise<void> {
     }
     const code = response.conclusionCode
     if (!code?.id) {
-      newCodeErrors.value = ['Unable to add the conclusion.']
+      newCodeErrors.value = ['The conclusion would not join the party. Not added.']
       return
     }
     const catalog = meta.value.catalog ?? []
@@ -671,7 +671,7 @@ async function createCode(node: DraftNode): Promise<void> {
     newCodeLabel.value = ''
   } catch (error) {
     if (isAbortError(error)) return
-    newCodeErrors.value = serviceErrors(error, 'Unable to add the conclusion.')
+    newCodeErrors.value = serviceErrors(error, 'The conclusion would not join the party. Not added.')
   } finally {
     creating.value = false
   }
@@ -698,13 +698,13 @@ async function load(): Promise<void> {
       return
     }
     if (!response.conclusions) {
-      errors.value = ['Unable to load conclusions.']
+      errors.value = ['The conclusions jumped to conclusions and ran off.']
       return
     }
     applyLoaded(response.conclusions)
   } catch (error) {
     if (isAbortError(error) || signal.aborted) return
-    errors.value = serviceErrors(error, 'Unable to load conclusions.')
+    errors.value = serviceErrors(error, 'The conclusions jumped to conclusions and ran off.')
   } finally {
     if (!signal.aborted) loading.value = false
   }
@@ -733,7 +733,7 @@ async function save(): Promise<void> {
     }
   } catch (error) {
     if (isAbortError(error)) return
-    errors.value = serviceErrors(error, 'Unable to save conclusions.')
+    errors.value = serviceErrors(error, 'The conclusions are still undecided. Not saved.')
   } finally {
     saving.value = false
   }

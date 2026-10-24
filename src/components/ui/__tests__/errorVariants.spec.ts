@@ -6,7 +6,7 @@ describe('errorVariants', () => {
     const onRetry = vi.fn()
     const v = errorVariants.serverError(onRetry)
     expect(v.icon).toBe('alert')
-    expect(v.title).toBe('something went wrong')
+    expect(v.title).toBe('well, that was not supposed to happen')
     v.action?.onClick?.()
     expect(onRetry).toHaveBeenCalledTimes(1)
   })

@@ -114,7 +114,7 @@ async function load(): Promise<void> {
     emit('update:loadState', 'ready')
   } catch (loadError) {
     if (controller.signal.aborted || isAbortError(loadError)) return
-    error.value = loadError instanceof ApiCallError ? loadError.message : 'Unable to load endpoints.'
+    error.value = loadError instanceof ApiCallError ? loadError.message : 'The endpoints are nowhere in sight. Ironic.'
     loaded.value = true
     emit('update:loadState', 'error')
   } finally {

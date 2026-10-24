@@ -185,9 +185,9 @@ describe('ConnectionDiagnosticsPopup', () => {
   })
 
   it('renders a service failure as an error rather than a stuck spinner', () => {
-    const wrapper = mountPopup({ connectionOk: false, checks: [], error: 'Failed to run diagnostics.' })
+    const wrapper = mountPopup({ connectionOk: false, checks: [], error: 'The diagnostics need diagnosing. They did not run.' })
 
-    expect(wrapper.text()).toContain('Failed to run diagnostics.')
+    expect(wrapper.text()).toContain('The diagnostics need diagnosing. They did not run.')
     expect(wrapper.find('[data-testid="connection-diagnostics-running"]').exists()).toBe(false)
   })
 

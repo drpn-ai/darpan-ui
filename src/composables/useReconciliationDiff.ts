@@ -97,7 +97,7 @@ export function useReconciliationDiff(): UseReconciliationDiff {
       savedRuns.value = response.savedRuns ?? []
     } catch (error) {
       if (isAbortError(error)) return
-      loadError.value = error instanceof ApiCallError ? error.message : 'Unable to load saved runs.'
+      loadError.value = error instanceof ApiCallError ? error.message : 'The saved runs went out for snacks and never came back.'
     } finally {
       if (!signal?.aborted) {
         loadingSavedRuns.value = false
@@ -149,7 +149,7 @@ export function useReconciliationDiff(): UseReconciliationDiff {
     } catch (error) {
       if (controller.signal.aborted || isAbortError(error)) return
       latestSavedOutput.value = null
-      latestSavedOutputError.value = error instanceof ApiCallError ? error.message : 'Unable to load saved results.'
+      latestSavedOutputError.value = error instanceof ApiCallError ? error.message : 'The saved results are playing hide and seek. They are winning.'
     } finally {
       unlink()
       if (!controller.signal.aborted) {
@@ -199,7 +199,7 @@ export function useReconciliationDiff(): UseReconciliationDiff {
         processingWarnings.value = failedFeedback.processingWarnings
         runError.value = error.message
       } else {
-        runError.value = 'Unable to run the diff.'
+        runError.value = 'The diff could not tell the difference. Not run.'
       }
       throw error
     } finally {

@@ -79,7 +79,7 @@ export function useConnectionDiagnostics(systemEnumId: string) {
       if ((failure as { name?: string })?.name === 'AbortError') return
       if (token !== runToken) return
       error.value =
-        failure instanceof ApiCallError ? failure.message : 'Failed to run diagnostics.'
+        failure instanceof ApiCallError ? failure.message : 'The diagnostics need diagnosing. They did not run.'
     } finally {
       if (token === runToken) running.value = false
     }

@@ -4,20 +4,20 @@ type Variant = { title: string; message?: string; icon?: keyof typeof errorState
 
 export const errorVariants = {
   accessDenied: (onHome?: () => void): Variant => ({
-    icon: 'lock', title: 'super-admin access required',
-    message: 'these administration screens are limited to super-admin users — head back to the app to keep working',
+    icon: 'lock', title: 'velvet rope ahead',
+    message: 'these administration screens are super-admins only — the bouncer was very firm about it',
     action: onHome ? { label: 'go to darpan', onClick: onHome } : { label: 'go to darpan', href: '/' },
   }),
   serverError: (onRetry: () => void): Variant => ({
-    icon: 'alert', title: 'something went wrong', message: 'we hit an unexpected error',
+    icon: 'alert', title: 'well, that was not supposed to happen', message: 'something tripped over a cable. we are pretending it was not us',
     action: { label: 'try again', onClick: onRetry },
   }),
   sessionExpired: (onSignIn: () => void): Variant => ({
-    icon: 'clock', title: 'your session ended', message: 'please sign in to continue',
+    icon: 'clock', title: 'your session dozed off', message: 'sign in to wake it up',
     action: { label: 'sign in', onClick: onSignIn },
   }),
   notFound: (onHome?: () => void): Variant => ({
-    title: 'page not found', message: "that page doesn't exist or has moved",
+    title: 'this page is on a coffee break', message: 'it moved, never existed, or is still out to lunch',
     action: onHome ? { label: 'back to home', onClick: onHome } : { label: 'back to home', href: '/' },
   }),
 }

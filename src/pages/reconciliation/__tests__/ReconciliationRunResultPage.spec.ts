@@ -1389,12 +1389,12 @@ describe('ReconciliationRunResultPage', () => {
 
   it('shows an inline error when the saved result cannot be loaded', async () => {
     getGeneratedOutputDifferences.mockReset()
-    getGeneratedOutputDifferences.mockRejectedValue(new ApiCallError('Unable to load saved result.', 503))
+    getGeneratedOutputDifferences.mockRejectedValue(new ApiCallError('This saved result got saved somewhere we cannot reach.', 503))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Unable to load saved result.')
+    expect(wrapper.text()).toContain('This saved result got saved somewhere we cannot reach.')
   })
 
   // DAR-UI-061: a tenant switch remounts the page under the new tenant, and the backend refuses a

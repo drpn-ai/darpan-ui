@@ -41,7 +41,7 @@ export function useSourceConfigEndpoints(options: {
       )
     } catch (loadError) {
       if ((loadError as { name?: string })?.name === 'AbortError') return
-      error.value = loadError instanceof ApiCallError ? loadError.message : 'Failed to load endpoints.'
+      error.value = loadError instanceof ApiCallError ? loadError.message : 'The endpoints are nowhere in sight. Ironic.'
       loadState.value = 'error'
     }
   }
