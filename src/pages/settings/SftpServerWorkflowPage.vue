@@ -27,29 +27,16 @@
       @cancel="cancelEdit"
     >
       <template v-if="isEditing">
-        <div class="workflow-form-grid workflow-form-grid--two">
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Server ID</span>
-            <input
-              name="sftpServerId"
-              v-model="form.sftpServerId"
-              class="wizard-answer-control"
-              type="text"
-              placeholder="primary_sftp"
-            />
-          </label>
-
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Description</span>
-            <input
-              name="description"
-              v-model="form.description"
-              class="wizard-answer-control"
-              type="text"
-              placeholder="Primary SFTP"
-            />
-          </label>
-        </div>
+        <label class="wizard-input-shell">
+          <span class="workflow-context-label">Description</span>
+          <input
+            name="description"
+            v-model="form.description"
+            class="wizard-answer-control"
+            type="text"
+            placeholder="Primary SFTP"
+          />
+        </label>
 
         <div class="workflow-form-grid" data-testid="sftp-host-row">
           <label class="wizard-input-shell">
@@ -188,23 +175,13 @@
           />
         </label>
 
-        <label v-else-if="currentCreateStep.id === 'description'" class="wizard-input-shell">
+        <label v-else class="wizard-input-shell">
           <input
             name="description"
             v-model="form.description"
-            class="wizard-answer-control"
+            :class="['wizard-answer-control', { empty: !form.description.trim() }]"
             type="text"
             placeholder="Primary SFTP"
-          />
-        </label>
-
-        <label v-else class="wizard-input-shell">
-          <input
-            name="sftpServerId"
-            v-model="form.sftpServerId"
-            :class="['wizard-answer-control', { empty: !form.sftpServerId.trim() }]"
-            type="text"
-            placeholder="primary_sftp"
           />
         </label>
       </template>
@@ -236,7 +213,6 @@ type SftpCreateStepId =
   | 'password'
   | 'privateKey'
   | 'description'
-  | 'sftpServerId'
 
 interface SftpCreateStep {
   id: SftpCreateStepId
@@ -245,7 +221,6 @@ interface SftpCreateStep {
 }
 
 interface SftpForm {
-  sftpServerId: string
   description: string
   host: string
   port: number
@@ -262,7 +237,6 @@ const permissionsStore = usePermissionsStore()
 
 function createDefaultSftpForm(): SftpForm {
   return {
-    sftpServerId: '',
     description: '',
     host: '',
     port: 22,
@@ -291,7 +265,6 @@ const createSteps: SftpCreateStep[] = [
   { id: 'password', title: 'What password should this SFTP server use?', kind: 'password' },
   { id: 'privateKey', title: 'What private key should this SFTP server use?', kind: 'textarea' },
   { id: 'description', title: 'What label should Darpan show for this server?', kind: 'text' },
-  { id: 'sftpServerId', title: 'What should the server name / ID be?', kind: 'text' },
 ]
 
 const activeServerId = computed(() => String(route.params.sftpServerId ?? '').trim())
@@ -312,7 +285,7 @@ const {
   currentStepIndex,
   isEditing,
   editQuestion: 'Update the SFTP server details.',
-  finalStepId: 'sftpServerId',
+  finalStepId: 'description',
   saveTestId: 'save-sftp-server',
   error,
 })
@@ -329,15 +302,14 @@ const submitDisabled = computed(() => {
       return !Number.isFinite(form.port) || form.port < 1
     case 'username':
       return form.username.trim().length === 0
-    case 'sftpServerId':
-      return form.sftpServerId.trim().length === 0
+    case 'description':
+      return form.description.trim().length === 0
     default:
       return false
   }
 })
 
 function applyRecord(record: SftpServerRecord): void {
-  form.sftpServerId = record.sftpServerId
   form.description = record.description ?? ''
   form.host = record.host
   form.port = record.port
@@ -391,7 +363,7 @@ async function loadServer(): Promise<void> {
 }
 
 async function handlePrimarySubmit(): Promise<void> {
-  if (isEditing.value || currentCreateStep.value.id === 'sftpServerId') {
+  if (isEditing.value || currentCreateStep.value.id === 'description') {
     await save()
     return
   }
@@ -410,7 +382,7 @@ async function save(): Promise<void> {
   success.value = null
   try {
     const response = await settingsFacade.saveSftpServer({
-      sftpServerId: form.sftpServerId,
+      ...(isEditing.value ? { sftpServerId: activeServerId.value } : {}),
       description: form.description,
       host: form.host,
       port: form.port,

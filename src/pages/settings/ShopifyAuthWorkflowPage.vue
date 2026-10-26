@@ -26,30 +26,16 @@
       @cancel="cancelEdit"
     >
       <template v-if="isEditing">
-        <div class="workflow-form-grid workflow-form-grid--two">
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Shopify Config ID</span>
-            <input
-              name="shopifyAuthConfigId"
-              v-model="form.shopifyAuthConfigId"
-              class="wizard-answer-control"
-              type="text"
-              :maxlength="CONFIG_ID_MAX_LENGTH"
-              placeholder="krewe_shopify"
-            />
-          </label>
-
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Description</span>
-            <input
-              name="description"
-              v-model="form.description"
-              class="wizard-answer-control"
-              type="text"
-              placeholder="Krewe Shopify"
-            />
-          </label>
-        </div>
+        <label class="wizard-input-shell">
+          <span class="workflow-context-label">Description</span>
+          <input
+            name="description"
+            v-model="form.description"
+            class="wizard-answer-control"
+            type="text"
+            placeholder="Krewe Shopify"
+          />
+        </label>
 
         <label class="wizard-input-shell">
           <span class="workflow-context-label">Shop/API URL</span>
@@ -197,7 +183,6 @@ import type { ShopifyAuthConfigRecord } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
-import { CONFIG_ID_MAX_LENGTH, deriveConfigIdFromName, exceedsConfigIdMaxLength } from './configId'
 
 type ShopifyCreateStepId =
   | 'shopApiUrl'
@@ -213,7 +198,6 @@ interface ShopifyCreateStep {
 }
 
 interface ShopifyForm {
-  shopifyAuthConfigId: string
   description: string
   shopApiUrl: string
   apiVersion: string
@@ -229,7 +213,6 @@ const permissionsStore = usePermissionsStore()
 
 function createDefaultShopifyForm(): ShopifyForm {
   return {
-    shopifyAuthConfigId: '',
     description: '',
     shopApiUrl: '',
     apiVersion: '2026-01',
@@ -315,16 +298,7 @@ const submitDisabled = computed(() => {
   }
 })
 
-function getConfigIdError(): string | null {
-  if (!isEditing.value) return null
-
-  return exceedsConfigIdMaxLength(form.shopifyAuthConfigId)
-    ? `Shopify Config ID must be ${CONFIG_ID_MAX_LENGTH} characters or fewer.`
-    : null
-}
-
 function applyRecord(record: ShopifyAuthConfigRecord): void {
-  form.shopifyAuthConfigId = record.shopifyAuthConfigId
   form.description = record.description ?? ''
   form.shopApiUrl = record.shopApiUrl ?? ''
   form.apiVersion = record.apiVersion ?? '2026-01'
@@ -422,20 +396,12 @@ async function save(): Promise<void> {
   error.value = null
   success.value = null
   try {
-    const configIdError = getConfigIdError()
-    if (configIdError) {
-      error.value = configIdError
-      return
-    }
-
     // A Save clicked while the panel's read is still in flight, or after it failed, means
     // enabledEndpoints does not reflect confirmed server truth -- see the two guards below.
     const endpointsReady = endpointsLoadState.value === 'ready'
 
     const response = await settingsFacade.saveShopifyAuthConfig({
-      shopifyAuthConfigId: isEditing.value
-        ? form.shopifyAuthConfigId.trim()
-        : deriveConfigIdFromName(form.description, 'shopify_config'),
+      ...(isEditing.value ? { shopifyAuthConfigId: activeShopifyConfigId.value } : {}),
       description: form.description.trim(),
       shopApiUrl: form.shopApiUrl.trim(),
       apiVersion: form.apiVersion.trim(),
@@ -457,10 +423,7 @@ async function save(): Promise<void> {
           : loadedCanReadOrders.value,
     })
 
-    let savedConfigId = form.shopifyAuthConfigId.trim()
     if (isEditing.value) {
-      savedConfigId = response.savedShopifyAuthConfig?.shopifyAuthConfigId?.trim() || savedConfigId
-
       if (!endpointsReady) {
         // The panel never confirmed a real read for this identity (still loading, or its own
         // fetch failed) -- enabledEndpoints is not trustworthy. storeAccess disables every
@@ -480,14 +443,14 @@ async function save(): Promise<void> {
       // inside the same try so a config-save failure skips it entirely via the catch below).
       await settingsFacade.storeSourceConfigEndpointAccess({
         configTypeEnumId: SHARED_CONFIG_TYPES.shopifyAuth,
-        configId: savedConfigId,
+        configId: activeShopifyConfigId.value,
         enabledSystemEnumIds: form.enabledEndpoints,
       })
     }
 
     success.value = response.messages?.[0] ?? 'Saved Shopify config.'
     if (isEditing.value) {
-      await router.push(buildShopifyAuthDashboardRoute(savedConfigId))
+      await router.push(buildShopifyAuthDashboardRoute(activeShopifyConfigId.value))
       return
     }
     await router.push('/settings/shopify')
@@ -500,12 +463,7 @@ async function save(): Promise<void> {
 
 async function cancelEdit(): Promise<void> {
   if (!isEditing.value || loading.value) return
-  const selectedConfigId = activeShopifyConfigId.value || form.shopifyAuthConfigId.trim()
-  if (!selectedConfigId) {
-    await router.push('/settings/shopify')
-    return
-  }
-  await router.push(buildShopifyAuthDashboardRoute(selectedConfigId))
+  await router.push(buildShopifyAuthDashboardRoute(activeShopifyConfigId.value))
 }
 
 watch(() => route.fullPath, () => {

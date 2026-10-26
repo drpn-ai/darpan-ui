@@ -28,18 +28,6 @@
     >
       <template v-if="isEditing">
         <label class="wizard-input-shell">
-          <span class="workflow-context-label">Endpoint Config ID</span>
-          <input
-            name="nsRestletConfigId"
-            v-model="form.nsRestletConfigId"
-            class="wizard-answer-control"
-            type="text"
-            :maxlength="CONFIG_ID_MAX_LENGTH"
-            placeholder="endpoint_primary"
-          />
-        </label>
-
-        <label class="wizard-input-shell">
           <span class="workflow-context-label">Description</span>
           <input
             name="description"
@@ -199,24 +187,13 @@
           />
         </label>
 
-        <label v-else-if="currentCreateStep.id === 'description'" class="wizard-input-shell">
+        <label v-else class="wizard-input-shell">
           <input
             name="description"
             v-model="form.description"
-            class="wizard-answer-control"
+            :class="['wizard-answer-control', { empty: !form.description.trim() }]"
             type="text"
             placeholder="Invoice Export"
-          />
-        </label>
-
-        <label v-else class="wizard-input-shell">
-          <input
-            name="nsRestletConfigId"
-            v-model="form.nsRestletConfigId"
-            :class="['wizard-answer-control', { empty: !form.nsRestletConfigId.trim() }]"
-            type="text"
-            :maxlength="CONFIG_ID_MAX_LENGTH"
-            placeholder="endpoint_primary"
           />
         </label>
       </template>
@@ -241,7 +218,6 @@ import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import type { NsRestletConfigRecord } from '../../lib/api/types'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
-import { CONFIG_ID_MAX_LENGTH, exceedsConfigIdMaxLength } from './configId'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 
 type EndpointCreateStepId =
@@ -253,7 +229,6 @@ type EndpointCreateStepId =
   | 'readTimeoutSeconds'
   | 'isActive'
   | 'description'
-  | 'nsRestletConfigId'
 
 interface EndpointCreateStep {
   id: EndpointCreateStepId
@@ -262,7 +237,6 @@ interface EndpointCreateStep {
 }
 
 interface EndpointForm {
-  nsRestletConfigId: string
   description: string
   endpointUrl: string
   httpMethod: string
@@ -280,7 +254,6 @@ const permissionsStore = usePermissionsStore()
 
 function createDefaultEndpointForm(): EndpointForm {
   return {
-    nsRestletConfigId: '',
     description: '',
     endpointUrl: '',
     httpMethod: 'POST',
@@ -323,7 +296,6 @@ const createSteps: EndpointCreateStep[] = [
   { id: 'readTimeoutSeconds', title: 'What read timeout should this endpoint use in seconds?', kind: 'number' },
   { id: 'isActive', title: 'Should this endpoint be active?', kind: 'select' },
   { id: 'description', title: 'What label should Darpan show for this endpoint?', kind: 'text' },
-  { id: 'nsRestletConfigId', title: 'What should the endpoint name / ID be?', kind: 'text' },
 ]
 
 const {
@@ -341,7 +313,7 @@ const {
   currentStepIndex,
   isEditing,
   editQuestion: 'Update the NetSuite endpoint config.',
-  finalStepId: 'nsRestletConfigId',
+  finalStepId: 'description',
   saveTestId: 'save-netsuite-endpoint',
   error,
 })
@@ -358,21 +330,14 @@ const submitDisabled = computed(() => {
       return !Number.isFinite(form.connectTimeoutSeconds) || form.connectTimeoutSeconds < 1
     case 'readTimeoutSeconds':
       return !Number.isFinite(form.readTimeoutSeconds) || form.readTimeoutSeconds < 1
-    case 'nsRestletConfigId':
-      return form.nsRestletConfigId.trim().length === 0
+    case 'description':
+      return form.description.trim().length === 0
     default:
       return false
   }
 })
 
-function getNsRestletConfigIdError(): string | null {
-  return exceedsConfigIdMaxLength(form.nsRestletConfigId)
-    ? `Endpoint Config ID must be ${CONFIG_ID_MAX_LENGTH} characters or fewer.`
-    : null
-}
-
 function applyRecord(record: NsRestletConfigRecord): void {
-  form.nsRestletConfigId = record.nsRestletConfigId
   form.description = record.description ?? ''
   form.endpointUrl = record.endpointUrl
   form.httpMethod = record.httpMethod ?? 'POST'
@@ -453,7 +418,7 @@ async function load(): Promise<void> {
 }
 
 async function handlePrimarySubmit(): Promise<void> {
-  if (isEditing.value || currentCreateStep.value.id === 'nsRestletConfigId') {
+  if (isEditing.value || currentCreateStep.value.id === 'description') {
     await save()
     return
   }
@@ -471,14 +436,8 @@ async function save(): Promise<void> {
   error.value = null
   success.value = null
   try {
-    const configIdError = getNsRestletConfigIdError()
-    if (configIdError) {
-      error.value = configIdError
-      return
-    }
-
     const response = await settingsFacade.saveNsRestletConfig({
-      nsRestletConfigId: form.nsRestletConfigId.trim(),
+      ...(isEditing.value ? { nsRestletConfigId: activeEndpointConfigId.value } : {}),
       description: form.description.trim(),
       endpointUrl: form.endpointUrl.trim(),
       httpMethod: form.httpMethod,

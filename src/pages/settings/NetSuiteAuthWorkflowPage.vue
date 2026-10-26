@@ -27,32 +27,16 @@
       @cancel="cancelEdit"
     >
       <template v-if="isEditing">
-        <!-- Identity pair. Both name the same thing — one for the system, one for a person — so they
-             share a row, the way Auth Type and Active do below. -->
-        <div class="workflow-form-grid workflow-form-grid--two">
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Auth Config ID</span>
-            <input
-              name="nsAuthConfigId"
-              v-model="form.nsAuthConfigId"
-              class="wizard-answer-control"
-              type="text"
-              :maxlength="CONFIG_ID_MAX_LENGTH"
-              placeholder="auth_primary"
-            />
-          </label>
-
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Description</span>
-            <input
-              name="description"
-              v-model="form.description"
-              class="wizard-answer-control"
-              type="text"
-              placeholder="Primary Auth"
-            />
-          </label>
-        </div>
+        <label class="wizard-input-shell">
+          <span class="workflow-context-label">Description</span>
+          <input
+            name="description"
+            v-model="form.description"
+            class="wizard-answer-control"
+            type="text"
+            placeholder="Primary Auth"
+          />
+        </label>
 
         <div class="workflow-form-grid workflow-form-grid--two">
           <label class="wizard-input-shell">
@@ -344,24 +328,13 @@
           />
         </label>
 
-        <label v-else-if="currentCreateStep.id === 'description'" class="wizard-input-shell">
+        <label v-else class="wizard-input-shell">
           <input
             name="description"
             v-model="form.description"
-            class="wizard-answer-control"
+            :class="['wizard-answer-control', { empty: !form.description.trim() }]"
             type="text"
             placeholder="Primary Auth"
-          />
-        </label>
-
-        <label v-else class="wizard-input-shell">
-          <input
-            name="nsAuthConfigId"
-            v-model="form.nsAuthConfigId"
-            :class="['wizard-answer-control', { empty: !form.nsAuthConfigId.trim() }]"
-            type="text"
-            :maxlength="CONFIG_ID_MAX_LENGTH"
-            placeholder="auth_primary"
           />
         </label>
       </template>
@@ -386,7 +359,6 @@ import { usePermissionsStore } from '../../stores/permissions'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import type { NsAuthConfigRecord } from '../../lib/api/types'
 import type { SaveNsAuthConfigPayload } from '../../lib/api/facadeTypes'
-import { CONFIG_ID_MAX_LENGTH, exceedsConfigIdMaxLength } from './configId'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 
 type AuthType = 'NONE' | 'BASIC' | 'BEARER' | 'OAUTH2_M2M_JWT'
@@ -402,7 +374,6 @@ type AuthCreateStepId =
   | 'scope'
   | 'privateKeyPem'
   | 'description'
-  | 'nsAuthConfigId'
 
 interface AuthCreateStep {
   id: AuthCreateStepId
@@ -416,7 +387,6 @@ interface ScopeOption {
 }
 
 interface NsAuthForm {
-  nsAuthConfigId: string
   description: string
   authType: AuthType
   username: string
@@ -437,7 +407,6 @@ const permissionsStore = usePermissionsStore()
 
 function createDefaultNsAuthForm(): NsAuthForm {
   return {
-    nsAuthConfigId: '',
     description: '',
     authType: 'NONE',
     username: '',
@@ -519,10 +488,7 @@ function buildCreateSteps(authType: AuthType): AuthCreateStep[] {
     )
   }
 
-  steps.push(
-    { id: 'description', title: 'What label should Darpan show for this auth profile?', kind: 'text' },
-    { id: 'nsAuthConfigId', title: 'What should the auth profile name / ID be?', kind: 'text' },
-  )
+  steps.push({ id: 'description', title: 'What label should Darpan show for this auth profile?', kind: 'text' })
 
   return steps
 }
@@ -543,7 +509,7 @@ const {
   currentStepIndex,
   isEditing,
   editQuestion: 'Update the NetSuite auth profile.',
-  finalStepId: 'nsAuthConfigId',
+  finalStepId: 'description',
   saveTestId: 'save-netsuite-auth',
   error,
 })
@@ -570,8 +536,8 @@ const submitDisabled = computed(() => {
       return selectedScopeValues.value.length === 0
     case 'privateKeyPem':
       return form.privateKeyPem.trim().length === 0
-    case 'nsAuthConfigId':
-      return form.nsAuthConfigId.trim().length === 0
+    case 'description':
+      return form.description.trim().length === 0
     default:
       return false
   }
@@ -592,12 +558,6 @@ function parseScopeValue(raw: string | null | undefined): string[] {
       .map((token) => token.trim())
       .filter(Boolean),
   ))
-}
-
-function getNsAuthConfigIdError(): string | null {
-  return exceedsConfigIdMaxLength(form.nsAuthConfigId)
-    ? `Auth Config ID must be ${CONFIG_ID_MAX_LENGTH} characters or fewer.`
-    : null
 }
 
 function serializeSelectedScopes(): string {
@@ -632,7 +592,6 @@ function clearAuthInputsForMode(authType: AuthType): void {
 
 function applyRecord(record: NsAuthConfigRecord): void {
   showClientId.value = false
-  form.nsAuthConfigId = record.nsAuthConfigId
   form.description = record.description ?? ''
   form.authType = normalizeAuthType(record.authType)
   form.username = record.username ?? ''
@@ -658,7 +617,7 @@ function resetCreateForm(): void {
 
 function buildPayloadForAuthType(): SaveNsAuthConfigPayload {
   const basePayload = {
-    nsAuthConfigId: form.nsAuthConfigId.trim(),
+    ...(isEditing.value ? { nsAuthConfigId: activeAuthConfigId.value } : {}),
     description: form.description.trim(),
     authType: form.authType,
     isActive: form.isActive,
@@ -720,7 +679,7 @@ function buildPayloadForAuthType(): SaveNsAuthConfigPayload {
 }
 
 async function handlePrimarySubmit(): Promise<void> {
-  if (isEditing.value || currentCreateStep.value.id === 'nsAuthConfigId') {
+  if (isEditing.value || currentCreateStep.value.id === 'description') {
     await save()
     return
   }
@@ -786,18 +745,12 @@ async function save(): Promise<void> {
   success.value = null
 
   try {
-    const configIdError = getNsAuthConfigIdError()
-    if (configIdError) {
-      error.value = configIdError
-      return
-    }
-
     const response = await settingsFacade.saveNsAuthConfig(buildPayloadForAuthType())
     form.password = ''
     form.apiToken = ''
     form.privateKeyPem = ''
     success.value = response.messages?.[0] ?? 'Saved auth config.'
-    await router.push(isEditing.value ? authDashboardRoute(form.nsAuthConfigId.trim()) : '/settings/netsuite')
+    await router.push(isEditing.value ? authDashboardRoute(activeAuthConfigId.value) : '/settings/netsuite')
   } catch (saveError) {
     error.value = saveError instanceof ApiCallError ? saveError.message : 'The auth config wrote it in disappearing ink. Not saved.'
   } finally {

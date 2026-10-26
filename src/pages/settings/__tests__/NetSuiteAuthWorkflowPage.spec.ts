@@ -120,6 +120,7 @@ describe('NetSuiteAuthWorkflowPage', () => {
     }
   })
 
+  // DAR-BE-135: the server mints the id, so create never asks for one and never sends one.
   it('saves a new NetSuite auth config and returns to the combined dashboard', async () => {
     saveNsAuthConfig.mockResolvedValue({
       ok: true,
@@ -140,17 +141,15 @@ describe('NetSuiteAuthWorkflowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('input[name="password"]').setValue('secret')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    expect(wrapper.find('input[name="nsAuthConfigId"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="save-netsuite-auth"]').attributes('disabled')).toBeDefined()
+
     await wrapper.get('input[name="description"]').setValue('Primary Auth')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    expect(wrapper.find('input[name="nsAuthConfigId"]').exists()).toBe(true)
-
-    await wrapper.get('input[name="nsAuthConfigId"]').setValue('auth-primary')
     await wrapper.get('[data-testid="save-netsuite-auth"]').trigger('click')
     await flushPromises()
 
     expect(saveNsAuthConfig).toHaveBeenCalledWith({
-      nsAuthConfigId: 'auth-primary',
       description: 'Primary Auth',
       authType: 'BASIC',
       isActive: 'Y',
@@ -164,54 +163,6 @@ describe('NetSuiteAuthWorkflowPage', () => {
       privateKeyPem: '',
     })
     expect(push).toHaveBeenCalledWith('/settings/netsuite')
-  })
-
-  it('caps auth config IDs at 20 characters in create and edit forms', async () => {
-    const wrapper = mount(NetSuiteAuthWorkflowPage)
-    await flushPromises()
-
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="description"]').setValue('Primary Auth')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    const createConfigIdInput = wrapper.get('input[name="nsAuthConfigId"]')
-
-    expect(createConfigIdInput.attributes('maxlength')).toBe('20')
-
-    await createConfigIdInput.setValue('a'.repeat(21))
-    await wrapper.get('[data-testid="save-netsuite-auth"]').trigger('click')
-    await flushPromises()
-
-    expect(saveNsAuthConfig).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Auth Config ID must be 20 characters or fewer.')
-
-    route.params = { nsAuthConfigId: 'auth-primary' }
-    route.name = 'settings-netsuite-auth-edit'
-    route.fullPath = '/settings/netsuite/auth/edit/auth-primary'
-    listNsAuthConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      authConfigs: [
-        {
-          nsAuthConfigId: 'auth-primary',
-          description: 'Primary Auth',
-          companyUserGroupId: 'KREWE',
-          authType: 'NONE',
-          isActive: 'Y',
-          hasPassword: false,
-          hasApiToken: false,
-          hasPrivateKeyPem: false,
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-    })
-
-    const editWrapper = mount(NetSuiteAuthWorkflowPage)
-    await flushPromises()
-
-    expect(editWrapper.get('input[name="nsAuthConfigId"]').attributes('maxlength')).toBe('20')
   })
 
   it('saves selected oauth scopes from the create wizard as a space-delimited backend value', async () => {
@@ -241,8 +192,6 @@ describe('NetSuiteAuthWorkflowPage', () => {
     await wrapper.get('textarea[name="privateKeyPem"]').setValue('private-key')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('input[name="description"]').setValue('Primary Auth')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="nsAuthConfigId"]').setValue('auth-primary')
     await wrapper.get('[data-testid="save-netsuite-auth"]').trigger('click')
     await flushPromises()
 
@@ -350,7 +299,7 @@ describe('NetSuiteAuthWorkflowPage', () => {
     await flushPromises()
 
     expect(listNsAuthConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
-    expect((wrapper.get('input[name="nsAuthConfigId"]').element as HTMLInputElement).value).toBe('auth-primary')
+    expect(wrapper.find('input[name="nsAuthConfigId"]').exists()).toBe(false)
     expect((wrapper.get('input[name="description"]').element as HTMLInputElement).value).toBe('Primary Auth')
     expect(wrapper.get('[data-testid="netsuite-auth-type"]').text()).toContain('OAuth2 M2M JWT')
     expect((wrapper.get('input[name="tokenUrl"]').element as HTMLInputElement).value).toBe(
@@ -358,53 +307,13 @@ describe('NetSuiteAuthWorkflowPage', () => {
     )
     expect(wrapper.get('input[name="clientId"]').attributes('type')).toBe('password')
     expect(wrapper.get('input[name="clientId"]').attributes('autocomplete')).toBe('off')
-    // Two paired rows now: identity (Auth Config ID + Description) and posture (Auth Type + Active).
-    expect(wrapper.findAll('.workflow-form-grid--two')).toHaveLength(2)
+    expect(wrapper.findAll('.workflow-form-grid--two')).toHaveLength(1)
     expect(wrapper.find('.workflow-form-grid--compact').exists()).toBe(false)
     expect(wrapper.get('[data-testid="netsuite-auth-scope-group"]').text()).toContain('RESTlets')
     expect(wrapper.get('[data-testid="netsuite-auth-scope-group"]').text()).toContain('REST Web Services')
     expect(wrapper.get('[data-testid="netsuite-auth-is-active"]').text()).toContain('No')
     expect(wrapper.get('[data-testid="netsuite-auth-type"]').element.closest('.wizard-answer-control')).toBeNull()
     expect(wrapper.get('[data-testid="netsuite-auth-is-active"]').element.closest('.wizard-answer-control')).toBeNull()
-  })
-
-  // Edit surfaces pair related fields rather than stacking one per row (the same convention the
-  // Auth Type / Active row already follows). Asserting they share a grid, not merely that two grids
-  // exist, is what stops a later edit from splitting them again while the count stays right.
-  it('pairs Auth Config ID with Description on one row', async () => {
-    route.params = { nsAuthConfigId: 'auth-primary' }
-    route.name = 'settings-netsuite-auth-edit'
-    route.fullPath = '/settings/netsuite/auth/edit/auth-primary'
-    listNsAuthConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      authConfigs: [
-        {
-          nsAuthConfigId: 'auth-primary',
-          description: 'Primary Auth',
-          companyUserGroupId: 'KREWE',
-          authType: 'OAUTH2_M2M_JWT',
-          tokenUrl: 'https://netsuite.example.com/token',
-          clientId: 'client-id',
-          certId: 'cert-id',
-          scope: 'restlets rest_webservices',
-          isActive: 'Y',
-          hasPassword: false,
-          hasApiToken: false,
-          hasPrivateKeyPem: true,
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-    })
-
-    const wrapper = mount(NetSuiteAuthWorkflowPage)
-    await flushPromises()
-
-    const identityRow = wrapper.findAll('.workflow-form-grid--two')[0]
-    expect(identityRow).toBeDefined()
-    expect(identityRow?.find('input[name="nsAuthConfigId"]').exists()).toBe(true)
-    expect(identityRow?.find('input[name="description"]').exists()).toBe(true)
   })
 
   it('shows an X cancel action on edit and returns to the auth details page without saving', async () => {
@@ -678,6 +587,7 @@ describe('NetSuiteAuthWorkflowPage', () => {
     await flushPromises()
 
     expect(saveNsAuthConfig).toHaveBeenCalledTimes(1)
+    expect(saveNsAuthConfig).toHaveBeenCalledWith(expect.objectContaining({ nsAuthConfigId: 'auth-primary' }))
     expect(push).toHaveBeenCalledWith({ name: 'settings-netsuite-auth', params: { nsAuthConfigId: 'auth-primary' } })
   })
 

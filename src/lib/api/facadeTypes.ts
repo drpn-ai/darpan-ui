@@ -173,7 +173,7 @@ export interface GetShopifyAuthConfigPayload {
 }
 
 export interface SaveShopifyAuthConfigPayload {
-  shopifyAuthConfigId: string
+  shopifyAuthConfigId?: string
   description?: string
   shopApiUrl: string
   apiVersion: string
@@ -206,7 +206,7 @@ export interface ListOmsRestSourceConfigsPayload {
 }
 
 export interface SaveOmsRestSourceConfigPayload {
-  omsRestSourceConfigId: string
+  omsRestSourceConfigId?: string
   description?: string
   baseUrl: string
   timeZone: string

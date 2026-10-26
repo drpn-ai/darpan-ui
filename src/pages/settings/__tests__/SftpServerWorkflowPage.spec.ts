@@ -114,13 +114,11 @@ describe('SftpServerWorkflowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('input[name="description"]').setValue('Primary SFTP')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="sftpServerId"]').setValue('sftp-primary')
     await wrapper.get('[data-testid="save-sftp-server"]').trigger('click')
     await flushPromises()
 
+    // DAR-BE-135: the server mints the id, so create sends none.
     expect(saveSftpServer).toHaveBeenCalledWith({
-      sftpServerId: 'sftp-primary',
       description: 'Primary SFTP',
       host: 'sftp.example.com',
       port: 22,
@@ -132,7 +130,7 @@ describe('SftpServerWorkflowPage', () => {
     expect(push).toHaveBeenCalledWith('/settings/sftp')
   })
 
-  it('asks SFTP create questions one at a time and keeps the server name / ID for the final step', async () => {
+  it('asks SFTP create questions one at a time and ends on the label', async () => {
     const wrapper = mount(SftpServerWorkflowPage)
     await flushPromises()
 
@@ -158,12 +156,8 @@ describe('SftpServerWorkflowPage', () => {
 
     expect(wrapper.text()).toContain('What label should Darpan show for this server?')
     expect(wrapper.find('input[name="description"]').exists()).toBe(true)
-
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    expect(wrapper.text()).toContain('What should the server name / ID be?')
-    expect(wrapper.find('input[name="sftpServerId"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="save-sftp-server"]').exists()).toBe(true)
+    expect(wrapper.find('input[name="sftpServerId"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="save-sftp-server"]').attributes('disabled')).toBeDefined()
   })
 
   it('loads an existing SFTP server into the workflow for edit', async () => {
@@ -194,12 +188,18 @@ describe('SftpServerWorkflowPage', () => {
     await flushPromises()
 
     expect(listSftpServers).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
-    expect((wrapper.get('input[name="sftpServerId"]').element as HTMLInputElement).value).toBe('sftp-primary')
+    expect(wrapper.find('input[name="sftpServerId"]').exists()).toBe(false)
     expect((wrapper.get('input[name="description"]').element as HTMLInputElement).value).toBe('Primary SFTP')
     expect((wrapper.get('input[name="host"]').element as HTMLInputElement).value).toBe('sftp.example.com')
     expect((wrapper.get('input[name="username"]').element as HTMLInputElement).value).toBe('etl-user')
     expect(wrapper.get('[data-testid="sftp-remote-attributes"]').text()).toContain('No')
     expect(wrapper.get('[data-testid="sftp-remote-attributes"]').element.closest('.wizard-answer-control')).toBeNull()
+
+    saveSftpServer.mockResolvedValue({ ok: true, messages: ['Saved SFTP server.'], errors: [] })
+    await wrapper.get('[data-testid="save-sftp-server"]').trigger('click')
+    await flushPromises()
+
+    expect(saveSftpServer).toHaveBeenCalledWith(expect.objectContaining({ sftpServerId: 'sftp-primary' }))
   })
 
   it('shows an X cancel action on edit and returns to the SFTP dashboard without saving', async () => {

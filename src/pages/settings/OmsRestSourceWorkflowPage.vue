@@ -26,30 +26,16 @@
       @cancel="cancelEdit"
     >
       <template v-if="isEditing">
-        <div class="workflow-form-grid workflow-form-grid--two">
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">HotWax Config ID</span>
-            <input
-              name="omsRestSourceConfigId"
-              v-model="form.omsRestSourceConfigId"
-              class="wizard-answer-control"
-              type="text"
-              :maxlength="CONFIG_ID_MAX_LENGTH"
-              placeholder="krewe_oms"
-            />
-          </label>
-
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Description</span>
-            <input
-              name="description"
-              v-model="form.description"
-              class="wizard-answer-control"
-              type="text"
-              placeholder="Krewe HotWax"
-            />
-          </label>
-        </div>
+        <label class="wizard-input-shell">
+          <span class="workflow-context-label">Description</span>
+          <input
+            name="description"
+            v-model="form.description"
+            class="wizard-answer-control"
+            type="text"
+            placeholder="Krewe HotWax"
+          />
+        </label>
 
         <label class="wizard-input-shell">
           <span class="workflow-context-label">Base URL</span>
@@ -245,7 +231,6 @@ import { OMS_BASE_URL_PLACEHOLDER } from '../../lib/omsSwagger'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
-import { CONFIG_ID_MAX_LENGTH, deriveConfigIdFromName, exceedsConfigIdMaxLength } from './configId'
 
 type OmsCreateStepId =
   | 'baseUrl'
@@ -263,7 +248,6 @@ interface OmsCreateStep {
 }
 
 interface OmsForm {
-  omsRestSourceConfigId: string
   description: string
   baseUrl: string
   timeZone: string
@@ -285,7 +269,6 @@ const permissionsStore = usePermissionsStore()
 
 function createDefaultOmsForm(): OmsForm {
   return {
-    omsRestSourceConfigId: '',
     description: '',
     baseUrl: '',
     timeZone: 'UTC',
@@ -418,16 +401,7 @@ const submitDisabled = computed(() => {
   }
 })
 
-function getConfigIdError(): string | null {
-  if (!isEditing.value) return null
-
-  return exceedsConfigIdMaxLength(form.omsRestSourceConfigId)
-    ? `HotWax Config ID must be ${CONFIG_ID_MAX_LENGTH} characters or fewer.`
-    : null
-}
-
 function applyRecord(record: OmsRestSourceConfigRecord): void {
-  form.omsRestSourceConfigId = record.omsRestSourceConfigId
   form.description = record.description ?? ''
   form.baseUrl = record.baseUrl ?? ''
   form.timeZone = normalizeTimezoneId(record.timeZone) || 'UTC'
@@ -539,20 +513,12 @@ async function save(): Promise<void> {
   error.value = null
   success.value = null
   try {
-    const configIdError = getConfigIdError()
-    if (configIdError) {
-      error.value = configIdError
-      return
-    }
-
     // A Save clicked while the panel's read is still in flight, or after it failed, means
     // enabledEndpoints does not reflect confirmed server truth -- see the two guards below.
     const endpointsReady = endpointsLoadState.value === 'ready'
 
     const response = await settingsFacade.saveOmsRestSourceConfig({
-      omsRestSourceConfigId: isEditing.value
-        ? form.omsRestSourceConfigId.trim()
-        : deriveConfigIdFromName(form.description, 'oms_source'),
+      ...(isEditing.value ? { omsRestSourceConfigId: activeOmsConfigId.value } : {}),
       description: form.description.trim(),
       baseUrl: form.baseUrl.trim(),
       timeZone: normalizeTimezoneId(form.timeZone) || 'UTC',
@@ -579,10 +545,7 @@ async function save(): Promise<void> {
           : loadedCanReadOrders.value,
     })
 
-    let savedConfigId = form.omsRestSourceConfigId.trim()
     if (isEditing.value) {
-      savedConfigId = response.savedOmsRestSourceConfig?.omsRestSourceConfigId?.trim() || savedConfigId
-
       if (!endpointsReady) {
         // The panel never confirmed a real read for this identity (still loading, or its own
         // fetch failed) -- enabledEndpoints is not trustworthy. storeAccess disables every
@@ -602,14 +565,14 @@ async function save(): Promise<void> {
       // inside the same try so a config-save failure skips it entirely via the catch below).
       await settingsFacade.storeSourceConfigEndpointAccess({
         configTypeEnumId: SHARED_CONFIG_TYPES.hotwaxOms,
-        configId: savedConfigId,
+        configId: activeOmsConfigId.value,
         enabledSystemEnumIds: form.enabledEndpoints,
       })
     }
 
     success.value = response.messages?.[0] ?? 'Saved HotWax source config.'
     if (isEditing.value) {
-      await router.push(buildOmsSourceDashboardRoute(savedConfigId))
+      await router.push(buildOmsSourceDashboardRoute(activeOmsConfigId.value))
       return
     }
     await router.push('/settings/hotwax')
@@ -622,12 +585,7 @@ async function save(): Promise<void> {
 
 async function cancelEdit(): Promise<void> {
   if (!isEditing.value || loading.value) return
-  const selectedConfigId = activeOmsConfigId.value || form.omsRestSourceConfigId.trim()
-  if (!selectedConfigId) {
-    await router.push('/settings/hotwax')
-    return
-  }
-  await router.push(buildOmsSourceDashboardRoute(selectedConfigId))
+  await router.push(buildOmsSourceDashboardRoute(activeOmsConfigId.value))
 }
 
 watch(() => route.fullPath, () => {

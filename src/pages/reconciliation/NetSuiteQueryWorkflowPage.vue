@@ -35,21 +35,11 @@
         />
       </label>
 
-      <label v-else-if="currentCreateStep.id === 'nsSuiteQlSourceQueryId'" class="wizard-input-shell">
-        <input
-          name="nsSuiteQlSourceQueryId"
-          v-model="form.nsSuiteQlSourceQueryId"
-          :class="['wizard-answer-control', { empty: !form.nsSuiteQlSourceQueryId.trim() }]"
-          type="text"
-          placeholder="NS_WARRANTY_CLAIM"
-        />
-      </label>
-
       <label v-else-if="currentCreateStep.id === 'description'" class="wizard-input-shell">
         <input
           name="description"
           v-model="form.description"
-          class="wizard-answer-control"
+          :class="['wizard-answer-control', { empty: !form.description.trim() }]"
           type="text"
           placeholder="Warranty claims"
         />
@@ -267,7 +257,6 @@ import { usePermissionsStore } from '../../stores/permissions'
 
 type QueryCreateStepId =
   | 'nsAuthConfigId'
-  | 'nsSuiteQlSourceQueryId'
   | 'description'
   | 'recordType'
   | 'dateColumn'
@@ -284,7 +273,6 @@ interface QueryCreateStep {
 }
 
 interface QueryForm {
-  nsSuiteQlSourceQueryId: string
   nsAuthConfigId: string
   description: string
   recordType: string
@@ -354,7 +342,6 @@ const permissionsStore = usePermissionsStore()
 
 function createDefaultForm(): QueryForm {
   return {
-    nsSuiteQlSourceQueryId: '',
     nsAuthConfigId: '',
     description: '',
     recordType: '',
@@ -390,7 +377,6 @@ const showFieldEditor = computed(() => currentCreateStep.value.id === 'fields')
 
 const createSteps = computed<QueryCreateStep[]>(() => [
   { id: 'nsAuthConfigId', title: 'Which NetSuite account should this query read?', kind: 'select' },
-  { id: 'nsSuiteQlSourceQueryId', title: 'What should the query ID be?', kind: 'text' },
   { id: 'description', title: 'What label should Darpan show for this query?', kind: 'text' },
   { id: 'recordType', title: 'Which record type?', kind: 'select' },
   { id: 'dateColumn', title: 'Which date puts a record on a day?', kind: 'select' },
@@ -481,8 +467,8 @@ const submitDisabled = computed(() => {
   switch (currentCreateStep.value.id) {
     case 'nsAuthConfigId':
       return !form.nsAuthConfigId
-    case 'nsSuiteQlSourceQueryId':
-      return !form.nsSuiteQlSourceQueryId.trim()
+    case 'description':
+      return !form.description.trim()
     case 'recordType':
       return !form.recordType.trim()
     case 'dateColumn':
@@ -562,7 +548,6 @@ function resetCreateForm(): void {
 
 function basePayload(): NsSuiteQlQuery {
   return {
-    nsSuiteQlSourceQueryId: form.nsSuiteQlSourceQueryId.trim(),
     nsAuthConfigId: form.nsAuthConfigId,
     recordType: form.recordType.trim(),
     fromTable: form.fromTable.trim() || 'transaction',
@@ -653,8 +638,8 @@ async function save(): Promise<void> {
       isActive: form.isActive,
     }
     const response = await netSuiteQueryFacade.save(payload, pageAbortController.signal)
-    const savedId = response.savedQuery?.nsSuiteQlSourceQueryId ?? payload.nsSuiteQlSourceQueryId
-    if (returnTo.value) {
+    const savedId = response.savedQuery?.nsSuiteQlSourceQueryId
+    if (returnTo.value && savedId) {
       await router.push(withReturnParams(returnTo.value, savedId))
       return
     }

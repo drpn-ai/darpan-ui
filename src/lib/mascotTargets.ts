@@ -96,7 +96,6 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'auth type': 'authType',
   'api version': 'apiVersion',
   'config id': 'configId',
-  'shopify config id': 'configId',
   'webhook url': 'webhookUrl',
   'timeout': 'timeoutSeconds',
   'read timeout': 'timeoutSeconds',

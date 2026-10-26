@@ -59,10 +59,6 @@ async function walkToReview(wrapper: VueWrapper, template: 'RECORDS' | 'RECORDS_
   await next(wrapper)
 
   seen.push(stepId(wrapper))
-  await wrapper.get('input[name="nsSuiteQlSourceQueryId"]').setValue('NS_WARRANTY_CLAIM')
-  await next(wrapper)
-
-  seen.push(stepId(wrapper))
   await wrapper.get('input[name="description"]').setValue('Warranty claims')
   await next(wrapper)
 
@@ -119,7 +115,8 @@ describe('NetSuiteQueryWorkflowPage', () => {
     push.mockClear()
     getOptions.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [], options: OPTIONS })
     saveQuery.mockReset().mockImplementation(async (query) => ({
-      ok: true, messages: [], errors: [], savedQuery: { ...query },
+      // DAR-BE-135: the server mints the id.
+      ok: true, messages: [], errors: [], savedQuery: { ...query, nsSuiteQlSourceQueryId: '100231' },
     }))
     previewQuery.mockReset()
   })
@@ -128,7 +125,7 @@ describe('NetSuiteQueryWorkflowPage', () => {
     const matching = mount(NetSuiteQueryWorkflowPage)
     await flushPromises()
     expect(await walkToReview(matching, 'RECORDS_MATCHING')).toEqual([
-      'nsAuthConfigId', 'nsSuiteQlSourceQueryId', 'description', 'recordType', 'dateColumn', 'queryTemplate',
+      'nsAuthConfigId', 'description', 'recordType', 'dateColumn', 'queryTemplate',
       'matchRules', 'fields', 'joinKeyFieldName', 'review',
     ])
     matching.unmount()
@@ -136,7 +133,7 @@ describe('NetSuiteQueryWorkflowPage', () => {
     const every = mount(NetSuiteQueryWorkflowPage)
     await flushPromises()
     expect(await walkToReview(every, 'RECORDS')).toEqual([
-      'nsAuthConfigId', 'nsSuiteQlSourceQueryId', 'description', 'recordType', 'dateColumn', 'queryTemplate',
+      'nsAuthConfigId', 'description', 'recordType', 'dateColumn', 'queryTemplate',
       'fields', 'joinKeyFieldName', 'review',
     ])
   })
@@ -148,6 +145,12 @@ describe('NetSuiteQueryWorkflowPage', () => {
     expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeDefined()
     await pick(wrapper, 'netsuite-query-account', 'gorjana_prod')
     expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeUndefined()
+
+    await next(wrapper)
+    expect(wrapper.find('input[name="nsSuiteQlSourceQueryId"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('input[name="description"]').setValue('Warranty claims')
+    expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeUndefined()
   })
 
   it('accepts a record type that is not in the list', async () => {
@@ -155,8 +158,7 @@ describe('NetSuiteQueryWorkflowPage', () => {
     await flushPromises()
     await pick(wrapper, 'netsuite-query-account', 'gorjana_prod')
     await next(wrapper)
-    await wrapper.get('input[name="nsSuiteQlSourceQueryId"]').setValue('NS_JOURNAL')
-    await next(wrapper)
+    await wrapper.get('input[name="description"]').setValue('Journals')
     await next(wrapper)
 
     await wrapper.get('input[name="recordTypeOther"]').setValue('Journal')
@@ -177,7 +179,6 @@ describe('NetSuiteQueryWorkflowPage', () => {
 
     expect(saveQuery).toHaveBeenCalledTimes(1)
     expect(saveQuery.mock.calls[0]![0]).toEqual({
-      nsSuiteQlSourceQueryId: 'NS_WARRANTY_CLAIM',
       nsAuthConfigId: 'gorjana_prod',
       description: 'Warranty claims',
       recordType: 'RtnAuth',
@@ -196,7 +197,7 @@ describe('NetSuiteQueryWorkflowPage', () => {
         { recordFieldName: 'claimAmount', sourceColumn: 'ABS(foreigntotal) AS claim_amount', sequenceNum: 2 },
       ],
     })
-    expect(push).toHaveBeenCalledWith('/reconciliation/create?step=sources&newQuery=NS_WARRANTY_CLAIM&side=FILE_2')
+    expect(push).toHaveBeenCalledWith('/reconciliation/create?step=sources&newQuery=100231&side=FILE_2')
   })
 
   it('refuses a returnTo that leaves the app and stays on the saved query', async () => {

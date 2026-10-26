@@ -19,7 +19,8 @@ export interface NsQueryField {
 }
 
 export interface NsSuiteQlQuery {
-  nsSuiteQlSourceQueryId: string
+  /** Left out on save to create one: the server mints it (DAR-BE-135). */
+  nsSuiteQlSourceQueryId?: string
   nsAuthConfigId: string
   description?: string | null
   recordType: string

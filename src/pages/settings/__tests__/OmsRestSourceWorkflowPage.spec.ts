@@ -251,8 +251,8 @@ describe('OmsRestSourceWorkflowPage', () => {
     await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
     await flushPromises()
 
+    // DAR-BE-135: the server mints the id, so create sends none.
     expect(saveOmsRestSourceConfig).toHaveBeenCalledWith({
-      omsRestSourceConfigId: 'krewe_hotwax',
       description: 'Krewe HotWax',
       baseUrl: 'https://oms.example.com',
       timeZone: 'America/Chicago',
@@ -341,7 +341,7 @@ describe('OmsRestSourceWorkflowPage', () => {
     const wrapper = mount(OmsRestSourceWorkflowPage)
     await flushPromises()
 
-    expect(wrapper.get('input[name="omsRestSourceConfigId"]').element).toHaveProperty('value', 'krewe-oms')
+    expect(wrapper.find('input[name="omsRestSourceConfigId"]').exists()).toBe(false)
     expect(wrapper.get('input[name="username"]').element).toHaveProperty('value', '')
     expect(wrapper.get('input[name="password"]').element).toHaveProperty('value', '')
     expect(wrapper.get('input[name="password"]').attributes('autocomplete')).toBe('off')
@@ -535,72 +535,6 @@ describe('OmsRestSourceWorkflowPage', () => {
       configId: 'dev_oms',
       enabledSystemEnumIds: [],
     })
-  })
-
-  it('derives a capped config ID from the create label', async () => {
-    saveOmsRestSourceConfig.mockResolvedValue({
-      ok: true,
-      messages: ['Saved HotWax source config.'],
-      errors: [],
-    })
-
-    const wrapper = mount(OmsRestSourceWorkflowPage)
-    await flushPromises()
-
-    await wrapper.get('input[name="baseUrl"]').setValue('https://oms.example.com')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="oms-auth-type-choice-NONE"]').trigger('click')
-    await wrapper.get('input[name="description"]').setValue('Long HotWax Source Name')
-    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
-    await flushPromises()
-
-    expect(saveOmsRestSourceConfig).toHaveBeenCalledWith(expect.objectContaining({
-      omsRestSourceConfigId: 'long_hotwax_source_n',
-      description: 'Long HotWax Source Name',
-      isActive: true,
-    }))
-  })
-
-  it('enforces the shared 20 character config-id cap on edit', async () => {
-    route.params = { omsRestSourceConfigId: 'krewe-oms' }
-    route.name = 'settings-oms-edit'
-    route.fullPath = '/settings/hotwax/edit/krewe-oms'
-    listOmsRestSourceConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      omsRestSourceConfigs: [
-        {
-          omsRestSourceConfigId: 'krewe-oms',
-          description: 'Krewe HotWax',
-          companyUserGroupId: 'KREWE',
-          baseUrl: 'https://oms.example.com',
-          authType: 'NONE',
-          hasUsername: false,
-          hasPassword: false,
-          hasApiToken: false,
-          customHeaderNames: [],
-          connectTimeoutSeconds: 10,
-          readTimeoutSeconds: 20,
-          isActive: 'Y',
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-    })
-
-    const wrapper = mount(OmsRestSourceWorkflowPage)
-    await flushPromises()
-
-    const idInput = wrapper.get('input[name="omsRestSourceConfigId"]')
-    expect(idInput.attributes('maxlength')).toBe('20')
-
-    await idInput.setValue('b'.repeat(21))
-    await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
-    await flushPromises()
-
-    expect(saveOmsRestSourceConfig).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('HotWax Config ID must be 20 characters or fewer.')
   })
 
   // DAR-BE-005 Task 12 — the affects-N-tenants save gate. sharedEditWarning() returns null for an

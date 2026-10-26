@@ -240,8 +240,8 @@ describe('ShopifyAuthWorkflowPage', () => {
     await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
     await flushPromises()
 
+    // DAR-BE-135: the server mints the id, so create sends none.
     expect(saveShopifyAuthConfig).toHaveBeenCalledWith({
-      shopifyAuthConfigId: 'krewe_shopify',
       description: 'Krewe Shopify',
       shopApiUrl: 'https://krewe.myshopify.com',
       apiVersion: '2026-01',
@@ -279,7 +279,7 @@ describe('ShopifyAuthWorkflowPage', () => {
     await flushPromises()
 
     expect(getShopifyAuthConfig).toHaveBeenCalledWith({ shopifyAuthConfigId: 'krewe-shopify' }, expect.any(AbortSignal))
-    expect(wrapper.get('input[name="shopifyAuthConfigId"]').element).toHaveProperty('value', 'krewe-shopify')
+    expect(wrapper.find('input[name="shopifyAuthConfigId"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="shopify-timezone-select"]').text()).toContain('America/Chicago')
     expect(wrapper.find('input[name="timeZone"]').exists()).toBe(false)
     expect(wrapper.find('.workflow-form-grid--shopify-compact').exists()).toBe(true)
@@ -458,70 +458,6 @@ describe('ShopifyAuthWorkflowPage', () => {
       configId: 'dev_shopify',
       enabledSystemEnumIds: [],
     })
-  })
-
-  it('derives a capped config ID from the create label', async () => {
-    saveShopifyAuthConfig.mockResolvedValue({
-      ok: true,
-      messages: ['Saved Shopify auth config.'],
-      errors: [],
-    })
-
-    const wrapper = mount(ShopifyAuthWorkflowPage)
-    await flushPromises()
-
-    await wrapper.get('input[name="shopApiUrl"]').setValue('https://krewe.myshopify.com')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="apiVersion"]').setValue('2026-01')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await chooseAppSelectOption(wrapper, 'shopify-create-timezone-select', 'America/Chicago')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="accessToken"]').setValue('shpat_secret')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="description"]').setValue('Long Shopify Config Name')
-    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
-    await flushPromises()
-
-    expect(saveShopifyAuthConfig).toHaveBeenCalledWith(expect.objectContaining({
-      shopifyAuthConfigId: 'long_shopify_config',
-      description: 'Long Shopify Config Name',
-      timeZone: 'America/Chicago',
-      isActive: 'Y',
-    }))
-  })
-
-  it('enforces the shared 20 character config-id cap on edit', async () => {
-    route.params = { shopifyAuthConfigId: 'krewe-shopify' }
-    route.name = 'settings-shopify-edit'
-    route.fullPath = '/settings/shopify/edit/krewe-shopify'
-    getShopifyAuthConfig.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      shopifyAuthConfig: {
-        shopifyAuthConfigId: 'krewe-shopify',
-        description: 'Krewe Shopify',
-        companyUserGroupId: 'KREWE',
-        shopApiUrl: 'https://krewe.myshopify.com',
-        apiVersion: '2026-01',
-        isActive: 'Y',
-        canReadOrders: true,
-        hasAccessToken: true,
-      },
-    })
-
-    const wrapper = mount(ShopifyAuthWorkflowPage)
-    await flushPromises()
-
-    const idInput = wrapper.get('input[name="shopifyAuthConfigId"]')
-    expect(idInput.attributes('maxlength')).toBe('20')
-
-    await idInput.setValue('a'.repeat(21))
-    await wrapper.get('[data-testid="save-shopify-auth"]').trigger('click')
-    await flushPromises()
-
-    expect(saveShopifyAuthConfig).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Shopify Config ID must be 20 characters or fewer.')
   })
 
   // DAR-BE-005 Task 12 — the affects-N-tenants save gate. sharedEditWarning() returns null for an

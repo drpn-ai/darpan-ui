@@ -166,17 +166,16 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    // DAR-BE-135: the label is the last question; the server mints the id, so none is asked or sent.
+    expect(wrapper.find('input[name="nsRestletConfigId"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="save-netsuite-endpoint"]').attributes('disabled')).toBeDefined()
+
     await wrapper.get('input[name="description"]').setValue('Invoice Export')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    expect(wrapper.find('input[name="nsRestletConfigId"]').exists()).toBe(true)
-
-    await wrapper.get('input[name="nsRestletConfigId"]').setValue('endpoint-primary')
     await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
     await flushPromises()
 
     expect(saveNsRestletConfig).toHaveBeenCalledWith({
-      nsRestletConfigId: 'endpoint-primary',
       description: 'Invoice Export',
       endpointUrl: 'https://netsuite.example.com/restlet',
       httpMethod: 'POST',
@@ -219,84 +218,6 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
     expect(wrapper.get('[data-testid="netsuite-endpoint-auth-config"]').text()).toContain('Primary Auth')
-  })
-
-  it('caps endpoint config IDs at 20 characters in create and edit forms', async () => {
-    listNsAuthConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      authConfigs: [
-        {
-          nsAuthConfigId: 'auth-primary',
-          description: 'Primary Auth',
-          companyUserGroupId: 'KREWE',
-          authType: 'BASIC',
-          username: 'service-user',
-          isActive: 'Y',
-          hasPassword: true,
-          hasApiToken: false,
-          hasPrivateKeyPem: false,
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-    })
-
-    const wrapper = mount(NetSuiteEndpointWorkflowPage)
-    await flushPromises()
-
-    await wrapper.get('input[name="endpointUrl"]').setValue('https://netsuite.example.com/restlet')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="netsuite-endpoint-auth-config"]').trigger('click')
-    await wrapper.get('[data-testid="workflow-select-option"][data-option-value="auth-primary"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="description"]').setValue('Invoice Export')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    const createConfigIdInput = wrapper.get('input[name="nsRestletConfigId"]')
-
-    expect(createConfigIdInput.attributes('maxlength')).toBe('20')
-
-    await createConfigIdInput.setValue('b'.repeat(21))
-    await wrapper.get('[data-testid="save-netsuite-endpoint"]').trigger('click')
-    await flushPromises()
-
-    expect(saveNsRestletConfig).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Endpoint Config ID must be 20 characters or fewer.')
-
-    route.params = { nsRestletConfigId: 'endpoint-primary' }
-    route.name = 'settings-netsuite-endpoints-edit'
-    route.fullPath = '/settings/netsuite/endpoints/edit/endpoint-primary'
-    listNsRestletConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      restletConfigs: [
-        {
-          nsRestletConfigId: 'endpoint-primary',
-          description: 'Invoice Export',
-          companyUserGroupId: 'KREWE',
-          endpointUrl: 'https://netsuite.example.com/restlet',
-          httpMethod: 'POST',
-          nsAuthConfigId: 'auth-primary',
-          authType: 'BASIC',
-          connectTimeoutSeconds: 30,
-          readTimeoutSeconds: 60,
-          isActive: 'Y',
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-    })
-
-    const editWrapper = mount(NetSuiteEndpointWorkflowPage)
-    await flushPromises()
-
-    expect(editWrapper.get('input[name="nsRestletConfigId"]').attributes('maxlength')).toBe('20')
   })
 
   it('loads an existing NetSuite endpoint config into the workflow for edit', async () => {
@@ -348,7 +269,7 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     await flushPromises()
 
     expect(listNsRestletConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
-    expect((wrapper.get('input[name="nsRestletConfigId"]').element as HTMLInputElement).value).toBe('endpoint-primary')
+    expect(wrapper.find('input[name="nsRestletConfigId"]').exists()).toBe(false)
     expect((wrapper.get('input[name="description"]').element as HTMLInputElement).value).toBe('Invoice Export')
     expect((wrapper.get('input[name="endpointUrl"]').element as HTMLInputElement).value).toBe(
       'https://netsuite.example.com/restlet',
@@ -653,6 +574,7 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     await flushPromises()
 
     expect(saveNsRestletConfig).toHaveBeenCalledTimes(1)
+    expect(saveNsRestletConfig).toHaveBeenCalledWith(expect.objectContaining({ nsRestletConfigId: 'endpoint-primary' }))
   })
 
   // The affects-N-tenants warning and its confirm checkbox were removed with the chip field
