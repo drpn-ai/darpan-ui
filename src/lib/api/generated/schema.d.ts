@@ -1987,8 +1987,8 @@ export interface components {
         /**
          * @description DAR-BE-028. Save the signed-in user's recovery email, where password reset codes go. Saved as
          *                 typed (trimmed, lower-cased) with no confirmation code; the new address, and the previous one when it
-         *                 changes, get a notice. An address already used by another account is not saved, but the reply is the
-         *                 same, so this cannot be used to test whether an address has an account. Requires the current password.
+         *                 changes, get a notice. An address already used by another account is refused as already in use.
+         *                 Requires the current password.
          */
         SaveRecoveryEmailParams: {
             /** @description The recovery email address. */
