@@ -57,6 +57,44 @@ describe('auditReport', () => {
     ])
   })
 
+  // DAR-UI-080 (Aditi: "add return channel ... warranty ID when available ... order total or return total").
+  it('lists a record\'s channel, warranty and total under it, only when known', () => {
+    const rows = recordRows({
+      OMS: { return: [{ id: 'M263376', internalId: null, status: null, channel: 'AFTSHIP_RTN_CHANNEL', warrantyId: '6URJ7WK3', total: { amount: '118.00', currency: 'USD' } }] },
+      Shopify: { order: [{ id: '7186636636291', internalId: null, status: null, total: { amount: '236.00', currency: 'USD' } }] },
+      NetSuite: { rma: [{ id: 'RMA1', internalId: null, status: null }] },
+    })
+    expect(recordFacts(rows).map((f) => [f.label, f.value])).toEqual([
+      ['HotWax', 'M263376'],
+      ['Channel', 'AFTSHIP_RTN_CHANNEL'],
+      ['Warranty ID', '6URJ7WK3'],
+      ['Return total', '118.00 USD'],
+      ['Order ID', '7186636636291'],
+      ['Order total', '236.00 USD'],
+      ['NetSuite', 'RMA1'],
+    ])
+  })
+
+  // DAR-UI-080 (Aditi on R1 M1167975: "add order name ... status of order").
+  it('names an item\'s order and that order\'s status under it', () => {
+    const rows = recordRows({ HotWax: { orderItem: [{ id: 'M1167975/01', internalId: null, status: 'Completed', orderName: '#GOR195470263', orderStatus: 'ORDER_COMPLETED' }] } })
+    expect(recordFacts(rows).map((f) => [f.label, f.value, f.status])).toEqual([
+      ['HotWax', 'M1167975/01', 'Completed'],
+      ['Order Name', '#GOR195470263', ''],
+      ['Order status', 'ORDER_COMPLETED', ''],
+    ])
+  })
+
+  // DAR-UI-080 (Aditi: "customer deposit info from NS"). A NetSuite order's deposits, each with its amount and status.
+  it('lists a NetSuite order\'s customer deposits under it', () => {
+    const rows = recordRows({ NetSuite: { salesOrderLine: [{ id: 'SO7330484', internalId: null, status: 'Pending Billing', deposits: [{ id: 'CD1', amount: '118', status: 'Deposited' }, { id: 'CD2', amount: null, status: null }] }] } })
+    expect(recordFacts(rows).map((f) => [f.label, f.value, f.status])).toEqual([
+      ['NetSuite', 'SO7330484', 'Pending Billing'],
+      ['Deposit', 'CD1 · 118', 'Deposited'],
+      ['Deposit', 'CD2', ''],
+    ])
+  })
+
   it('offers a monthly audit its period and the two before, across a year end', () => {
     expect(periodOptions('2026-10')).toEqual(['2026-10', '2026-09', '2026-08'])
     expect(periodOptions('2027-01')).toEqual(['2027-01', '2026-12', '2026-11'])

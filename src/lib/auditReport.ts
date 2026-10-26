@@ -68,6 +68,12 @@ export interface RecordRow {
   id: string
   internalId: string
   status: string
+  orderName: string
+  orderStatus: string
+  channel: string
+  warrantyId: string
+  total: string
+  deposits: { id: string; amount: string; status: string }[]
 }
 
 /** DAR-UI-071. A record by its system; its type too only when another record shares the system. */
@@ -85,16 +91,30 @@ export interface RecordFact {
 
 /**
  * DAR-BE-125. A record as label and value lines: an order reads as Order ID (Shopify's id), Order Name and HotWax Order ID
- * (HotWax's name and id); every other record by recordLabel.
+ * (HotWax's name and id); every other record by recordLabel. DAR-UI-080: then its order's name and status, its channel,
+ * warranty, total and customer deposits, when known.
  */
 export function recordFacts(rows: RecordRow[]): RecordFact[] {
   return rows.flatMap((row): RecordFact[] => {
     const fact = (label: string, value: string, suffix = '') => ({ key: row.key + suffix, label, value, status: suffix ? '' : row.status })
-    if (row.recordType === 'order' && row.system === 'Shopify') return [fact('Order ID', row.id)]
+    const details = [
+      row.orderName ? fact('Order Name', row.orderName, '|orderName') : null,
+      row.orderStatus ? fact('Order status', row.orderStatus, '|orderStatus') : null,
+      row.channel ? fact('Channel', row.channel, '|channel') : null,
+      row.warrantyId ? fact('Warranty ID', row.warrantyId, '|warranty') : null,
+      row.total ? fact(row.recordType === 'return' ? 'Return total' : 'Order total', row.total, '|total') : null,
+      ...row.deposits.map((deposit, index) => ({
+        key: `${row.key}|deposit|${index}`,
+        label: 'Deposit',
+        value: deposit.amount ? `${deposit.id} · ${deposit.amount}` : deposit.id,
+        status: deposit.status,
+      })),
+    ].filter((detail): detail is RecordFact => detail !== null)
+    if (row.recordType === 'order' && row.system === 'Shopify') return [fact('Order ID', row.id), ...details]
     if (row.recordType === 'order' && row.system === 'HotWax' && row.internalId) {
-      return [fact('Order Name', row.id), fact('HotWax Order ID', row.internalId, '|hc')]
+      return [fact('Order Name', row.id), fact('HotWax Order ID', row.internalId, '|hc'), ...details]
     }
-    return [fact(recordLabel(row, rows), row.id)]
+    return [fact(recordLabel(row, rows), row.id), ...details]
   })
 }
 
@@ -111,6 +131,12 @@ export function recordRows(records: AuditRecords | null | undefined): RecordRow[
           id: record.id,
           internalId: record.internalId ?? '',
           status: record.status ?? '',
+          orderName: record.orderName ?? '',
+          orderStatus: record.orderStatus ?? '',
+          channel: record.channel ?? '',
+          warrantyId: record.warrantyId ?? '',
+          total: record.total ? `${record.total.amount} ${record.total.currency ?? ''}`.trim() : '',
+          deposits: (record.deposits ?? []).map((d) => ({ id: d.id, amount: d.amount ?? '', status: d.status ?? '' })),
         })
       })
     })

@@ -15,11 +15,21 @@ export interface AuditMoneySource extends AuditMoney {
   source: string | null
 }
 
-/** records.<System>.<recordType>: [{ id, internalId, status }] */
+/**
+ * records.<System>.<recordType>: [{ id, internalId, status }]. DAR-UI-080: the few facts that explain a finding when the
+ * record's read gave them, and, in a finding's own document, `data`: every field that read gave.
+ */
 export interface AuditRecord {
   id: string
   internalId: string | null
   status: string | null
+  orderName?: string
+  orderStatus?: string
+  channel?: string
+  warrantyId?: string
+  total?: AuditMoney
+  deposits?: { id: string; amount: string | null; status: string | null }[]
+  data?: Record<string, unknown>
 }
 export type AuditRecords = Record<string, Record<string, AuditRecord[]>>
 
