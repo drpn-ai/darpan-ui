@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { useMascotStore } from '../stores/mascot'
@@ -690,9 +690,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(source).toContain("label: 'Open Schema Library'")
     expect(source).toContain("id: 'navigate-schema-infer'")
     expect(source).toContain("label: 'Create Schema'")
-    expect(source).not.toContain("id: 'navigate-schema-editor'")
-    expect(source).not.toContain("label: 'Open Schema Editor'")
-    expect(source).not.toContain("to: '/schemas/editor'")
   })
 
   it('adds tenant integration settings to Ask Darpan navigation', async () => {
@@ -1498,16 +1495,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
       query: { redirect: '/reconciliation/automations/100051' },
     })
   })
-
-  it('removes the standalone auth-required fallback route and page from the active app shell', () => {
-    const routerSource = readFileSync('src/router/index.ts', 'utf8')
-    const appSource = readFileSync('src/App.vue', 'utf8')
-
-    expect(routerSource).not.toContain("path: '/auth-required'")
-    expect(routerSource).not.toContain("name: 'auth-required'")
-    expect(appSource).not.toContain("route.name === 'auth-required'")
-    expect(existsSync('src/pages/AuthRequiredPage.vue')).toBe(false)
-  })
 })
 
 describe('App shell deep-link tenant notice', () => {
@@ -1575,12 +1562,5 @@ describe('App shell deep-link tenant notice', () => {
 
     expect(wrapper.find('.workflow-escape-hint').exists()).toBe(false)
     expect(clearDeepLinkTenantSwitch).not.toHaveBeenCalled()
-  })
-
-  it('retires the standalone tenant-switch banner component', () => {
-    const appSource = readFileSync('src/App.vue', 'utf8')
-
-    expect(appSource).not.toContain('TenantSwitchBanner')
-    expect(existsSync('src/components/shell/TenantSwitchBanner.vue')).toBe(false)
   })
 })

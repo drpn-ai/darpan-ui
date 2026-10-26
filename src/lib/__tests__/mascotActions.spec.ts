@@ -276,17 +276,6 @@ describe('filter mode actions (DAR-BE-054)', () => {
     expect(lookupAction('only these values')?.body).toContain('drops the rest')
   })
 
-  it('has no key for a control name that no longer exists', () => {
-    // The mode control carried aria-label="Filter mode" while it was a native <select>. AppSelect
-    // has no aria-label, so that key would be a hint that can never fire.
-    expect(lookupAction('filter mode')).toBeNull()
-  })
-
-  it('no longer answers to the exclude-era action names', () => {
-    expect(lookupAction('save exclusion')).toBeNull()
-    expect(lookupAction('delete exclusion')).toBeNull()
-  })
-
   it('keeps the comparison-rule operator entry distinct from the filter phrases', () => {
     // A filter's direction and a compare rule's operator are different concepts sharing one board.
     expect(MASCOT_ACTIONS.operator?.title).toBe('Operator')

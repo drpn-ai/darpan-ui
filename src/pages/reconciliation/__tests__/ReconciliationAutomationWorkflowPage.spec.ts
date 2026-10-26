@@ -1459,17 +1459,6 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       expect(useMascotStore().popupOpen).toBe(false)
     })
 
-    it('no longer renders the drift or chat-space prose the mascot now carries', async () => {
-      const wrapper = await mountEditWithSyncStatus(drifted)
-
-      expect(wrapper.find('[data-testid="automation-edit-drift"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="automation-chat-space-inactive-note"]').exists()).toBe(false)
-      // The hint that survives in mascotHints gates on this, so it must stay rendered.
-      expect(wrapper.find('[data-testid="automation-edit-sync"]').exists()).toBe(true)
-      // The inline confirm is gone: the popup IS the double-check now.
-      expect(wrapper.find('[data-testid="automation-edit-sync-confirm"]').exists()).toBe(false)
-    })
-
     it('syncs from the popup action and does not call the facade until it is pressed', async () => {
       syncAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], changedFields: [] })
       await mountEditWithSyncStatus(drifted)

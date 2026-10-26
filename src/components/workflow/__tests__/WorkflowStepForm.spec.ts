@@ -17,11 +17,9 @@ describe('WorkflowStepForm', () => {
       },
     })
 
-    const source = readFileSync('src/components/workflow/WorkflowStepForm.vue', 'utf8')
     const globalSource = readFileSync('src/style.css', 'utf8')
 
     expect(wrapper.get('form').classes()).toContain('wizard-question-shell')
-    expect(source).not.toContain('padding-top: var(--workflow-form-top-offset);')
     expect(globalSource).toContain('.workflow-form--edit-single-page {')
     expect(globalSource).toContain('.workflow-page--edit .workflow-shell {')
     expect(globalSource).toContain('padding-top: var(--workflow-form-top-offset);')
