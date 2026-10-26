@@ -1,4 +1,4 @@
-import type { AuditCheckStatus, AuditFindingState, AuditRecords, AuditSourceRead } from './api/auditTypes'
+import type { AuditCheckStatus, AuditFindingState, AuditMoney, AuditRecords, AuditSourceRead } from './api/auditTypes'
 
 // DAR-UI-058. What the audit view derives from the report JSON: words and tones for its codes, rows for its keyed
 // objects. Pure, so the page carries no logic of its own.
@@ -70,10 +70,20 @@ export interface RecordRow {
   status: string
   orderName: string
   orderStatus: string
+  customer: string
+  salesChannel: string
+  shipMethod: string
+  sku: string
+  location: string
+  orderDate: string
+  returnDate: string
   channel: string
   warrantyId: string
-  total: string
+  orderTotal: string
+  returnTotal: string
   deposits: { id: string; amount: string; status: string }[]
+  heldBy: { id: string; status: string } | null
+  exchange: { id: string; netsuiteId: string } | null
 }
 
 /** DAR-UI-071. A record by its system; its type too only when another record shares the system. */
@@ -90,32 +100,128 @@ export interface RecordFact {
 }
 
 /**
- * DAR-BE-125. A record as label and value lines: an order reads as Order ID (Shopify's id), Order Name and HotWax Order ID
- * (HotWax's name and id); every other record by recordLabel. DAR-UI-080: then its order's name and status, its channel,
- * warranty, total and customer deposits, when known.
+ * DAR-UI-081 (Aditi: "group the boxes by system and order, and show item as a subheading with SKU"). One card per system
+ * and order: its id and status (an item's order's status, else the record's), the system the fix is in outlined
+ * (attention), no status read shown as such; a HotWax order lists its items under it, each by SKU. DAR-BE-125: a HotWax
+ * order reads by its name, its HotWax id under it.
  */
-export function recordFacts(rows: RecordRow[]): RecordFact[] {
-  return rows.flatMap((row): RecordFact[] => {
-    const fact = (label: string, value: string, suffix = '') => ({ key: row.key + suffix, label, value, status: suffix ? '' : row.status })
-    const details = [
-      row.orderName ? fact('Order Name', row.orderName, '|orderName') : null,
-      row.orderStatus ? fact('Order status', row.orderStatus, '|orderStatus') : null,
+export interface SystemCardItem {
+  key: string
+  sku: string
+  id: string
+  status: string
+}
+
+export interface SystemCard {
+  key: string
+  label: string
+  id: string
+  sub: string
+  status: string
+  attention: boolean
+  items: SystemCardItem[]
+}
+
+export function systemCards(rows: RecordRow[], fixWhere: string): SystemCard[] {
+  const cards = new Map<string, SystemCard>()
+  rows.forEach((row) => {
+    const item = row.recordType === 'orderItem'
+    const id = item ? (row.id.split('/')[0] ?? row.id) : row.id
+    const key = `${row.system}|${id}`
+    let card = cards.get(key)
+    if (!card) {
+      card = {
+        key,
+        label: row.system,
+        id,
+        sub: row.recordType === 'order' && row.system === 'HotWax' ? row.internalId : '',
+        status: item ? row.orderStatus : row.status,
+        attention: Boolean(fixWhere) && row.system === fixWhere,
+        items: [],
+      }
+      cards.set(key, card)
+    }
+    if (item) card.items.push({ key: row.key, sku: row.sku, id: row.id, status: row.status })
+  })
+  // A SKU on two items of one order names each item too (gorjana M1168149: one product on three lines).
+  cards.forEach((card) => {
+    const repeated = new Set(card.items.map((item) => item.sku).filter((sku, index, skus) => sku && skus.indexOf(sku) !== index))
+    card.items.forEach((item) => { if (repeated.has(item.sku)) item.sku = `${item.sku} · ${item.id.split('/').pop() ?? item.id}` })
+  })
+  return [...cards.values()]
+}
+
+/** DAR-UI-081. The order a finding is about, by name: a record's order name, else a HotWax order's own. */
+export function orderNameOf(rows: RecordRow[]): string {
+  return rows.find((row) => row.orderName)?.orderName
+    ?? rows.find((row) => row.recordType === 'order' && row.system === 'HotWax' && row.internalId)?.id ?? ''
+}
+
+/**
+ * DAR-UI-080 / DAR-UI-081. What explains the finding beyond each card's id and status, as label and value lines: the
+ * customer, the order's and a return's date, its sales channel and ship method, a return's channel and warranty, totals
+ * and customer deposits, when known.
+ * Its order's name leads the panel and an order's status sits on its card; a fact the records repeat is listed once.
+ */
+export function recordDetails(rows: RecordRow[]): RecordFact[] {
+  const seen = new Set<string>()
+  return rows.flatMap((row): (RecordFact | null)[] => {
+    const fact = (label: string, value: string, suffix: string, status = '') => ({ key: row.key + suffix, label, value, status })
+    return [
+      row.customer ? fact('Customer', row.customer, '|customer') : null,
+      row.orderDate ? fact('Order date', shortDate(row.orderDate), '|orderDate') : null,
+      row.returnDate ? fact('Return date', shortDate(row.returnDate), '|returnDate') : null,
+      row.salesChannel ? fact('Sales channel', row.salesChannel, '|salesChannel') : null,
+      row.shipMethod ? fact('Ship method', row.shipMethod, '|shipMethod') : null,
       row.channel ? fact('Channel', row.channel, '|channel') : null,
       row.warrantyId ? fact('Warranty ID', row.warrantyId, '|warranty') : null,
-      row.total ? fact(row.recordType === 'return' ? 'Return total' : 'Order total', row.total, '|total') : null,
-      ...row.deposits.map((deposit, index) => ({
-        key: `${row.key}|deposit|${index}`,
-        label: 'Deposit',
-        value: deposit.amount ? `${deposit.id} · ${deposit.amount}` : deposit.id,
-        status: deposit.status,
-      })),
-    ].filter((detail): detail is RecordFact => detail !== null)
-    if (row.recordType === 'order' && row.system === 'Shopify') return [fact('Order ID', row.id), ...details]
-    if (row.recordType === 'order' && row.system === 'HotWax' && row.internalId) {
-      return [fact('Order Name', row.id), fact('HotWax Order ID', row.internalId, '|hc'), ...details]
-    }
-    return [fact(recordLabel(row, rows), row.id), ...details]
-  })
+      row.orderTotal ? fact('Order total', row.orderTotal, '|orderTotal') : null,
+      row.returnTotal ? fact('Return total', row.returnTotal, '|returnTotal') : null,
+      ...row.deposits.map((deposit, index) =>
+        fact('Deposit', deposit.amount ? `${deposit.id} · ${deposit.amount}` : deposit.id, `|deposit|${index}`, deposit.status)),
+    ]
+  }).filter((detail): detail is RecordFact => {
+    if (!detail || seen.has(`${detail.label}|${detail.value}`)) return false
+    seen.add(`${detail.label}|${detail.value}`)
+    return true
+  }).sort((a, b) => DETAIL_ORDER.indexOf(a.label) - DETAIL_ORDER.indexOf(b.label))
+}
+
+/** DAR-UI-081 (Aditi: "maintain some consistency"): every finding lists its order, then its return, then deposits. */
+const DETAIL_ORDER = ['Customer', 'Order date', 'Sales channel', 'Ship method', 'Order total',
+  'Return date', 'Channel', 'Warranty ID', 'Return total', 'Deposit']
+
+export interface ChainStep {
+  key: string
+  label: string
+  sub: string
+  status: string
+  /** The step holding the others: the fix acts on it. */
+  cause: boolean
+}
+
+/**
+ * DAR-UI-081. Where a return held behind another stopped (R8 "Exchange held by open return"): the open return holding it,
+ * its exchange order, the return itself, then NetSuite, which has none of it yet. Empty for any other finding.
+ */
+export function heldChain(rows: RecordRow[]): ChainStep[] {
+  const row = rows.find((candidate) => candidate.heldBy)
+  if (!row?.heldBy) return []
+  const steps: ChainStep[] = [
+    { key: 'held-by', label: `Return ${row.heldBy.id}`, sub: `${row.system} · same order`, status: row.heldBy.status || 'Open', cause: true },
+  ]
+  if (row.exchange) {
+    steps.push({ key: 'exchange', label: `Exchange ${row.exchange.id}`, sub: `${row.system} exchange order`,
+      status: row.exchange.netsuiteId ? 'In NetSuite' : 'Not in NetSuite', cause: false })
+  }
+  steps.push({ key: 'return', label: `Return ${row.id}`, sub: 'this finding', status: row.exchange ? 'Waits for the exchange' : 'Waiting', cause: false })
+  steps.push({ key: 'netsuite', label: 'NetSuite RMA', sub: `for ${row.id}`, status: 'None yet', cause: false })
+  return steps
+}
+
+/** "324.89 USD"; "324.89" when the read named no currency. */
+function moneyText(money: AuditMoney | undefined): string {
+  return money ? `${money.amount} ${money.currency ?? ''}`.trim() : ''
 }
 
 /** records.<System>.<recordType>[] as one row each, in the document's order. */
@@ -133,10 +239,20 @@ export function recordRows(records: AuditRecords | null | undefined): RecordRow[
           status: record.status ?? '',
           orderName: record.orderName ?? '',
           orderStatus: record.orderStatus ?? '',
+          customer: record.customer ?? '',
+          salesChannel: record.salesChannel ?? '',
+          shipMethod: record.shipMethod ?? '',
+          sku: record.sku ?? '',
+          location: record.location ?? '',
+          orderDate: record.orderDate ?? '',
+          returnDate: record.returnDate ?? '',
           channel: record.channel ?? '',
           warrantyId: record.warrantyId ?? '',
-          total: record.total ? `${record.total.amount} ${record.total.currency ?? ''}`.trim() : '',
+          orderTotal: moneyText(record.orderTotal),
+          returnTotal: moneyText(record.returnTotal),
           deposits: (record.deposits ?? []).map((d) => ({ id: d.id, amount: d.amount ?? '', status: d.status ?? '' })),
+          heldBy: record.heldBy ? { id: record.heldBy.id, status: record.heldBy.status ?? '' } : null,
+          exchange: record.exchange ? { id: record.exchange.id, netsuiteId: record.exchange.netsuiteId ?? '' } : null,
         })
       })
     })

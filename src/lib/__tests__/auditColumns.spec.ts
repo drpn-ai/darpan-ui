@@ -215,6 +215,12 @@ describe('auditColumns', () => {
       line('F-2', 'M1168785/02', 'Shipped, not billed: another line of its order is backordered in NetSuite', true)]
     expect(lines.map((l) => lineLabel('M1168785', l))).toEqual(['Line 1', 'Line 2'])
     expect(lineLabel('M1168785', { ...lines[0]!, records: {} })).toBe('F-1')
+    // DAR-UI-081 (Aditi: "show SKU instead of line 1, line 2").
+    expect(lineLabel('M1168785', { ...lines[0]!, records: { OMS: { orderItem: [{ id: 'M1168785/01', internalId: null, status: null, sku: '263-203-186-G' }] } } }))
+      .toBe('263-203-186-G')
+    // The same SKU on two lines of one order: each is named by its line too.
+    const twins = lines.map((l, i) => ({ ...l, records: { OMS: { orderItem: [{ id: `M1168785/0${i + 1}`, internalId: null, status: null, sku: '259-118-G' }] } } }))
+    expect(twins.map((l) => lineLabel('M1168785', l, twins))).toEqual(['259-118-G · line 1', '259-118-G · line 2'])
     const order: AuditFindingListItem = { id: 'M1168785', kind: 'order', order: 'M1168785', headline: 'Order M1168785: line 1 backordered in NetSuite, holding 1 more line',
       state: 'open', firstFound: '', ageDays: 2, difference: null, next: '', records: {}, statement: 'R1', category: 'orders',
       cause: 'Backordered in NetSuite', stuck: ['F-1'], lines }

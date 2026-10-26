@@ -301,11 +301,24 @@ function findingCauses(item: AuditFindingListItem): string[] {
   return [item.cause, ...(item.lines ?? []).map((line) => line.cause)].filter((cause): cause is string => Boolean(cause))
 }
 
-/** "Line 1" for item M1168785/01 of order M1168785, as the report's order headline names it; else the line's finding id. */
-export function lineLabel(order: string, line: AuditFindingSummary): string {
-  const item = line.records?.OMS?.orderItem?.[0]?.id ?? ''
-  if (!item.startsWith(order) || item.length <= order.length) return line.id
-  const suffix = item.slice(order.length).replace(/^[/\-_ ]+/, '')
+/**
+ * "Line 1" for item M1168785/01 of order M1168785, as the report's order headline names it; else the line's finding id.
+ * DAR-UI-081 (Aditi: "show SKU instead of line 1, line 2"): an item is named by its SKU when its read gave one, and by its
+ * line too when another of the order's lines carries the same SKU (gorjana M1168149: one product on three lines).
+ */
+export function lineLabel(order: string, line: AuditFindingSummary, lines: AuditFindingSummary[] = []): string {
+  const item = line.records?.OMS?.orderItem?.[0]
+  const number = lineNumber(order, item?.id ?? '')
+  if (item?.sku) {
+    const twin = lines.some((other) => other !== line && other.records?.OMS?.orderItem?.[0]?.sku === item.sku)
+    return twin && number ? `${item.sku} · ${number.toLowerCase()}` : item.sku
+  }
+  return number || line.id
+}
+
+function lineNumber(order: string, itemId: string): string {
+  if (!itemId.startsWith(order) || itemId.length <= order.length) return ''
+  const suffix = itemId.slice(order.length).replace(/^[/\-_ ]+/, '')
   return `Line ${/^\d+$/.test(suffix) ? Number(suffix) : suffix}`
 }
 

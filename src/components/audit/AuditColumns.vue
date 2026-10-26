@@ -182,8 +182,9 @@
                 </span>
               </div>
 
-              <!-- DAR-UI-071. What is wrong leads, then the fix; the records are the reference under them. -->
-              <p class="audit-lead" data-testid="audit-finding-headline">{{ orderUnit?.headline ?? findingDoc.finding.headline }}</p>
+              <!-- DAR-UI-081. Verdict first: the statement and record, what is wrong, then what it is stuck on and what to do. -->
+              <p v-if="eyebrow" class="micro-label audit-eyebrow" data-testid="audit-finding-eyebrow">{{ eyebrow }}</p>
+              <p class="audit-lead" data-testid="audit-finding-headline">{{ lead }}</p>
 
               <dl v-if="money.length" class="audit-facts">
                 <template v-for="item in money" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></template>
@@ -191,36 +192,72 @@
 
               <p v-if="whyLine && !findingDoc.finding.fix.action" class="audit-body audit-muted">{{ whyLine }}</p>
 
-              <template v-if="findingDoc.finding.fix.action">
-                <div class="audit-detail-head">
-                  <h3 class="micro-label">Fix</h3>
-                  <span v-if="fixOwner" class="audit-tag">{{ fixOwner }}</span>
-                </div>
-                <p class="audit-body" data-testid="audit-finding-fix">{{ findingDoc.finding.fix.action }}</p>
-              </template>
+              <div v-if="stuckOn || findingDoc.finding.fix.action" class="audit-verdict" data-testid="audit-finding-verdict">
+                <template v-if="stuckOn">
+                  <span class="micro-label">Stuck on</span>
+                  <p class="audit-body" data-testid="audit-finding-stuck">{{ stuckOn }}</p>
+                </template>
+                <template v-if="findingDoc.finding.fix.action">
+                  <span class="micro-label">Do this</span>
+                  <div class="audit-verdict-do">
+                    <p class="audit-body" data-testid="audit-finding-fix">{{ findingDoc.finding.fix.action }}</p>
+                    <p v-if="fixOwner" class="audit-row-sub audit-body">Owner · {{ fixOwner }}</p>
+                  </div>
+                </template>
+              </div>
 
-              <!-- DAR-UI-075. An order's lines: the one holding it up outlined, the rest held by it; each opens its own finding. -->
+              <!-- DAR-UI-081. A return held behind another: where it stopped, the return holding it outlined. -->
+              <ol v-if="chain.length" class="audit-chain" aria-label="Where it stopped">
+                <li v-for="step in chain" :key="step.key" class="audit-chain-step" :class="{ 'audit-chain-step--cause': step.cause }" data-testid="audit-chain-step">
+                  <span class="audit-chain-mark" aria-hidden="true" />
+                  <span class="audit-chain-body">
+                    <span>{{ step.label }}<span v-if="step.sub" class="audit-row-sub audit-block">{{ step.sub }}</span></span>
+                    <span class="audit-row-sub">{{ step.status }}</span>
+                  </span>
+                </li>
+              </ol>
+              <!-- DAR-UI-081. Each system's record and its status: the fix's system outlined, a record with no status dashed. -->
+              <ul v-else-if="cards.length" class="audit-systems" aria-label="Each system">
+                <li
+                  v-for="card in cards"
+                  :key="card.key"
+                  class="audit-system"
+                  :class="{ 'audit-system--attention': card.attention, 'audit-system--unread': !card.status }"
+                  data-testid="audit-record-row"
+                >
+                  <span class="audit-row-sub">{{ card.label }}</span>
+                  <!-- DAR-UI-081 (Aditi: "order - status as heading type text", "SKU - status in one line in subheading text"). -->
+                  <span>{{ card.id }}<template v-if="card.status"> · {{ card.status }}</template></span>
+                  <span v-if="card.sub" class="audit-row-sub">{{ card.sub }}</span>
+                  <span v-if="!card.status && !card.items.length" class="audit-row-sub">No status read</span>
+                  <span v-for="item in card.items" :key="item.key" class="audit-row-sub audit-nowrap" data-testid="audit-card-item">
+                    {{ item.sku || item.id }}<template v-if="item.status"> · {{ item.status }}</template>
+                  </span>
+                </li>
+              </ul>
+
+              <!-- DAR-UI-075. An order's lines: the one holding it up outlined. DAR-UI-081 (Aditi: "all info needed is already
+                   available, remove the click"): each line says what it is in place, so it opens nothing. -->
               <template v-if="orderUnit?.lines?.length">
                 <h3 class="micro-label">Lines <span class="audit-fold-count">{{ orderUnit.lines.length }}</span></h3>
                 <ul class="audit-lines">
-                  <li v-for="line in orderUnit.lines" :key="line.id">
-                    <button
-                      type="button"
-                      class="audit-line"
-                      :class="{ 'audit-line--stuck': orderUnit.stuck?.includes(line.id) }"
-                      :title="line.id"
-                      data-testid="audit-order-line"
-                      @click="emit('navigate', { category, statement, finding: line.id })"
-                    >
-                      <span>{{ lineLabel(orderUnit.order ?? orderUnit.id, line) }}</span>
-                      <span class="audit-row-sub">{{ lineWhy(line) }}</span>
-                    </button>
+                  <li
+                    v-for="line in orderUnit.lines"
+                    :key="line.id"
+                    class="audit-line"
+                    :class="{ 'audit-line--stuck': orderUnit.stuck?.includes(line.id) }"
+                    data-testid="audit-order-line"
+                  >
+                    <span>{{ lineLabel(orderUnit.order ?? orderUnit.id, line, orderUnit.lines) }}</span>
+                    <span class="audit-row-sub">{{ lineWhy(line) }}</span>
+                    <!-- DAR-UI-081. The item fulfillment that shipped it and where it is fulfilled from (HotWax facility). -->
+                    <span class="audit-row-sub" data-testid="audit-line-location">{{ [lineFulfillments(line), lineLocation(line)].filter(Boolean).join(' · ') }}</span>
                   </li>
                 </ul>
               </template>
 
-              <dl v-if="records.length" class="audit-facts audit-records">
-                <div v-for="fact in recordFacts(records)" :key="fact.key" data-testid="audit-record-row">
+              <dl v-if="details.length" class="audit-facts audit-records">
+                <div v-for="fact in details" :key="fact.key" data-testid="audit-record-detail">
                   <dt>{{ fact.label }}</dt>
                   <dd>{{ fact.value }}<span v-if="fact.status" class="audit-muted"> · {{ fact.status }}</span></dd>
                 </div>
@@ -307,12 +344,15 @@ import {
   eventLabel,
   FIX_WHERE_LABELS,
   findingStateBadge,
-  recordFacts,
+  heldChain,
+  orderNameOf,
+  recordDetails,
   recordRows,
   shortDate,
   shortRange,
   sourceReadBadge,
   splitHeadline,
+  systemCards,
   systemLabel,
 } from '../../lib/auditReport'
 import {
@@ -386,10 +426,11 @@ const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statem
 const findings = computed(() => causeGroups(props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
   : statementFindings(statementDoc.value, props.more.findings, props.filter)))
 // DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
+// DAR-UI-081 (Aditi: "removed 'held by' and just put item fulfillment status"): a line held by the order's stuck line reads
+// as its own item's status in HotWax (Completed); the stuck line keeps its cause (Backordered).
 function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
-  const unit = props.orderUnit
-  const stuck = (unit?.lines ?? []).filter((other) => unit?.stuck?.includes(other.id))
-  if (line.held && stuck.length) return `Held by ${stuck.map((other) => lineLabel(unit?.order ?? unit?.id ?? '', other).toLowerCase()).join(', ')}`
+  const itemStatus = line.records?.OMS?.orderItem?.[0]?.status
+  if (line.held && itemStatus) return itemStatus
   return line.cause ?? findingStateBadge(line.state).label
 }
 // What the picked pill counts for the statement (DAR-UI-073), not the 50 the report lists or the pages loaded so far.
@@ -433,9 +474,54 @@ const money = computed(() => {
   ].filter((item) => item.value)
 })
 
-const fixOwner = computed(() => {
-  const fix = props.findingDoc?.finding.fix
-  return fix?.owner || (fix?.where ? (FIX_WHERE_LABELS[fix.where] ?? fix.where) : '')
+const fixWhere = computed(() => {
+  const where = props.findingDoc?.finding.fix.where
+  return where ? (FIX_WHERE_LABELS[where] ?? where) : ''
+})
+const fixOwner = computed(() => props.findingDoc?.finding.fix.owner || fixWhere.value)
+
+// DAR-UI-081. Verdict first. The headline's record ("Order M1168800") moves up beside the statement and the order's name,
+// so the lead says only what is wrong.
+const headline = computed(() => props.orderUnit?.headline ?? props.findingDoc?.finding.headline ?? '')
+const eyebrow = computed(() => {
+  const split = splitHeadline(headline.value)
+  return [props.statement, split.rest ? split.subject : '', orderNameOf(records.value)].filter(Boolean).join(' · ')
+})
+const lead = computed(() => {
+  const rest = splitHeadline(headline.value).rest
+  return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : headline.value
+})
+const cards = computed(() => systemCards(records.value, fixWhere.value))
+const chain = computed(() => heldChain(records.value))
+const details = computed(() => recordDetails(records.value))
+// DAR-UI-081 (Aditi: "add location ID to the line box", "with location ID, show the location name"). An order line's
+// location, from its HotWax item: "Chicago · 58".
+function lineLocation(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
+  const item = line.records?.OMS?.orderItem?.[0]
+  if (!item?.location) return ''
+  return item.locationName ? `${item.locationName} · ${item.location}` : `Location ${item.location}`
+}
+
+// DAR-UI-081 (Aditi: "add the IF id here too"). The NetSuite item fulfillments that shipped the line.
+function lineFulfillments(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
+  return (line.records?.NetSuite?.salesOrderLine?.[0]?.fulfillments ?? []).join(', ')
+}
+
+// What the finding is stuck on, only where it adds to the headline (DAR-UI-071, said once): the return holding it, or the
+// order's line holding it up and that line's cause, in the fix's system.
+const stuckOn = computed(() => {
+  const held = records.value.find((row) => row.heldBy)
+  if (held?.heldBy) return `Return ${held.heldBy.id} is still ${(held.heldBy.status || 'open').toLowerCase()} in ${held.system}.`
+  const unit = props.orderUnit
+  const lines = unit?.lines ?? []
+  // A one-line order names no line as holding it up: its line is the one.
+  const holding = unit?.stuck?.length ? unit.stuck : lines.length === 1 ? [lines[0]!.id] : []
+  return lines.filter((line) => holding.includes(line.id) && line.cause)
+    .map((line) => {
+      const where = fixWhere.value && !line.cause?.includes(fixWhere.value) ? ` in ${fixWhere.value}` : ''
+      return `${lineLabel(unit?.order ?? unit?.id ?? '', line, lines)}: ${line.cause}${where}`
+    })
+    .join('; ')
 })
 
 const sinceLine = computed(() => {
@@ -472,6 +558,7 @@ function statementText(id: string): string {
 .audit-columns {
   display: grid;
   gap: var(--space-2);
+  --audit-col-head-height: 3.6rem;
 }
 
 .audit-path {
@@ -548,13 +635,29 @@ function statementText(id: string): string {
   background: var(--surface-2);
 }
 
+/*
+ * Every column's first row starts on one line (Aditi: "the column start is not aligned... looks messy"): the column heads
+ * and the categories' Run health row share --audit-col-head-height, the head with an icon action (2rem) included.
+ */
 .audit-col-head {
+  flex: none;
+  box-sizing: border-box;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: var(--space-1);
+  height: var(--audit-col-head-height);
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: 0 var(--space-3);
   border-bottom: 1px solid var(--border-soft);
+}
+
+/* Outranks the rail's row padding (.audit-columns--rail .audit-col--1 .audit-row). */
+.audit-columns .audit-col--1 .audit-row.audit-row--rule {
+  box-sizing: border-box;
+  height: var(--audit-col-head-height);
+  min-height: 0;
+  padding-block: 0;
 }
 
 .audit-row {
@@ -673,24 +776,17 @@ function statementText(id: string): string {
 
 /* DAR-UI-075. One line of an order; the line holding the order up takes the solid border (attention). */
 .audit-line {
+  box-sizing: border-box;
   width: 100%;
   display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr);
+  grid-template-columns: minmax(4rem, max-content) minmax(0, 1fr) max-content;
   gap: var(--space-2);
   align-items: baseline;
   padding: var(--space-1-5) var(--space-2);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  background: transparent;
   color: var(--text);
-  font: inherit;
   font-size: var(--type-label-size);
-  text-align: left;
-  cursor: pointer;
-}
-
-.audit-line:hover {
-  border-color: var(--border);
 }
 
 .audit-line--stuck {
@@ -870,6 +966,126 @@ function statementText(id: string): string {
 .audit-col--detail h3.micro-label,
 .audit-col--detail h2.micro-label {
   margin: var(--space-2) 0 0;
+}
+
+/* DAR-UI-081. Verdict first: what it is stuck on and what to do, in the panel's one solid border (attention). */
+.audit-eyebrow {
+  margin: 0;
+}
+
+.audit-verdict {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-1-5) var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--text-soft);
+  border-radius: var(--radius-md);
+}
+
+.audit-col--detail .audit-verdict .micro-label {
+  margin: 0;
+}
+
+.audit-verdict-do {
+  display: grid;
+  gap: var(--space-00);
+}
+
+/* Each system's record: the fix's system solid (attention), a record with no status read dashed (empty). */
+/* Each card as wide as its lines, so an item reads on one line (Aditi: the box must not grow with its items). */
+.audit-systems {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-system {
+  flex: 1 1 auto;
+  min-width: 9rem;
+  display: grid;
+  align-content: start;
+  gap: var(--space-00);
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--type-label-size);
+  overflow-wrap: anywhere;
+}
+
+.audit-system--attention {
+  border-color: var(--text-soft);
+  background: var(--surface-3);
+}
+
+.audit-system--unread {
+  border-style: dashed;
+  border-color: var(--border);
+}
+
+/* A return held behind another: one step per record, joined by a rule; the step holding the rest outlined. */
+.audit-chain {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-chain-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--space-2) minmax(0, 1fr);
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  font-size: var(--type-label-size);
+}
+
+.audit-chain-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: var(--space-4);
+  bottom: 0;
+  left: calc(var(--space-2) / 2);
+  border-left: 1px solid var(--border);
+}
+
+.audit-chain-mark {
+  width: var(--space-1-5);
+  height: var(--space-1-5);
+  margin-top: var(--space-1);
+  border: 1px dashed var(--text-dim);
+  border-radius: var(--radius-pill);
+}
+
+.audit-chain-body {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+.audit-chain-step--cause .audit-chain-body {
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--text-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+}
+
+.audit-chain-step--cause .audit-chain-mark {
+  border-style: solid;
+  border-color: var(--text-soft);
+}
+
+.audit-block {
+  display: block;
+}
+
+.audit-nowrap {
+  white-space: nowrap;
 }
 
 .audit-records {

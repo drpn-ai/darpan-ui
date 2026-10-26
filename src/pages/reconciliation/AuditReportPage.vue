@@ -294,13 +294,14 @@ async function loadReport(): Promise<void> {
 }
 
 // DAR-UI-075. An order open in the detail: its row in the list (the report's, "more", or the filters' read). Its detail
-// reads the stuck line's finding (else its first line's), whose fix and history are the order's.
+// reads the stuck line's finding (else its first line's), whose fix and history are the order's. DAR-UI-081 (Aditi:
+// "remove the click and detail page"): a line has no page of its own; its finding id opens its order.
 const orderUnit = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return null
   const listed = report.value.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value]?.findings ?? []
   return [...listed, ...more.value.findings, ...(periodFindings.value?.items ?? [])]
-    .find((item) => item.kind === 'order' && item.id === id) ?? null
+    .find((item) => item.kind === 'order' && (item.id === id || Boolean(item.lines?.some((line) => line.id === id)))) ?? null
 })
 // A line's finding is F-<n>; anything else names an order, read once the statement's orders are in.
 const isLineId = (id: string) => /^F-\d+$/.test(id)

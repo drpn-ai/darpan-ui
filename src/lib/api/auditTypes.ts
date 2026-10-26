@@ -25,10 +25,26 @@ export interface AuditRecord {
   status: string | null
   orderName?: string
   orderStatus?: string
+  /** DAR-UI-081. The order's bill-to customer, an item's SKU and location, the order's and a return's day (YYYY-MM-DD). */
+  customer?: string
+  sku?: string
+  location?: string
+  locationName?: string
+  /** DAR-UI-081. The order's sales channel and shipping method; a NetSuite line's item fulfillments (IF numbers). */
+  salesChannel?: string
+  shipMethod?: string
+  fulfillments?: string[]
+  orderDate?: string
+  returnDate?: string
   channel?: string
   warrantyId?: string
-  total?: AuditMoney
+  /** The order's total (its own, or the one its item or return carries) and a return's own. */
+  orderTotal?: AuditMoney
+  returnTotal?: AuditMoney
   deposits?: { id: string; amount: string | null; status: string | null }[]
+  /** DAR-UI-081. A return held behind another: the return holding it, and its exchange order (netsuiteId null: not there). */
+  heldBy?: { id: string; status: string | null }
+  exchange?: { id: string; netsuiteId: string | null }
   data?: Record<string, unknown>
 }
 export type AuditRecords = Record<string, Record<string, AuditRecord[]>>

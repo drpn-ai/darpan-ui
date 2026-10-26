@@ -231,7 +231,7 @@ describe('AuditReportPage', () => {
     expect(w.find('[data-testid="audit-evidence-row"]').exists()).toBe(false)
     expect(w.get('[data-testid="audit-finding-fix"]').text()).toBe('Enter the Shopify order id on invoice INV1.')
     expect(w.findAll('[data-testid="audit-history-row"]')).toHaveLength(1)
-    // DAR-UI-071. What is wrong leads, then the fix; the records are a plain list under them, not tiles.
+    // DAR-UI-081. Verdict first: what is wrong, then the fix, then each system's record and its status.
     const order = ['audit-finding-headline', 'audit-finding-fix', 'audit-record-row']
       .map((id) => w.get('[data-testid="audit-columns"]').html().indexOf(`data-testid="${id}"`))
     expect(order).toEqual([...order].sort((a, b) => a - b))
@@ -239,6 +239,12 @@ describe('AuditReportPage', () => {
     // Half the words: the fix is written per cause, so the cause, "done when", the internal id and the sighting count go.
     const detail = w.get('[aria-label="Detail"]').text()
     for (const gone of ['No Shopify order id', 'Done when', '801', 'seen']) expect(detail).not.toContain(gone)
+    // DAR-UI-081. The fix's system leads the cards (solid), a record whose read gave no status is dashed; nothing is stuck
+    // beyond what the headline says, so the verdict holds the fix alone.
+    const cards = w.findAll('[data-testid="audit-record-row"]')
+    expect(cards[0]!.classes()).toContain('audit-system--attention')
+    expect(cards[1]!.classes()).toContain('audit-system--unread')
+    expect(w.find('[data-testid="audit-finding-stuck"]').exists()).toBe(false)
 
     // The path steps back up: the statement drops the finding.
     await w.get('[data-testid="audit-path-statement"]').trigger('click')
@@ -356,7 +362,8 @@ describe('AuditReportPage', () => {
     const doc = report()
     const line = (id: string, item: string, cause: string, held: boolean) => ({ id, headline: `Item ${item} is completed in HotWax and not billed in NetSuite`,
       state: 'open' as const, firstFound: '2026-10-02', ageDays: 6, difference: null, next: '', cause, held,
-      records: { OMS: { orderItem: [{ id: item, internalId: null, status: 'Completed' }] } } })
+      records: { OMS: { orderItem: [{ id: item, internalId: null, status: 'Completed', location: '58', locationName: 'Chicago' }] },
+        NetSuite: { salesOrderLine: [{ id: 'SO1', internalId: null, status: null, fulfillments: held ? ['IF7456843'] : [] }] } } })
     doc.categories.orders!.statements.R2!.findings = [{ id: 'M1168785', kind: 'order', order: 'M1168785',
       headline: 'Order M1168785: line 1 backordered in NetSuite, holding 1 more line', state: 'open', firstFound: '2026-10-02', ageDays: 6,
       difference: null, next: 'darpan findings show F-1', records: {}, cause: 'Backordered in NetSuite', stuck: ['F-1'],
@@ -373,14 +380,26 @@ describe('AuditReportPage', () => {
     liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M1168785' }
     await flushPromises()
     expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-1' }, expect.anything())
-    expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Order M1168785: line 1 backordered in NetSuite, holding 1 more line')
+    // DAR-UI-081. The record moves up beside the statement; the lead says what is wrong, the verdict what holds it.
+    expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).toBe('R2 · Order M1168785')
+    expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Line 1 backordered in NetSuite, holding 1 more line')
+    expect(w.get('[data-testid="audit-finding-stuck"]').text()).toBe('Line 1: Backordered in NetSuite')
     const lines = w.findAll('[data-testid="audit-order-line"]')
     expect(lines.map((l) => l.text())).toEqual([expect.stringContaining('Line 1'), expect.stringContaining('Line 2')])
     expect(lines.map((l) => l.text()).join(' ')).not.toContain('/0')
     expect(lines[0]!.classes()).toContain('audit-line--stuck')
-    expect(lines[1]!.text()).toContain('Held by line 1')
-    await lines[1]!.trigger('click')
-    expect(push).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-2' } })
+    // DAR-UI-081: a held line reads as its item's own status, not "Held by".
+    expect(lines[1]!.text()).toContain('Completed')
+    expect(lines[1]!.text()).not.toContain('Held by')
+    // DAR-UI-081 (Aditi: "add location ID to the line box", "show the location name").
+    // And "add the IF id here too": the shipped line names its item fulfillment.
+    expect(w.findAll('[data-testid="audit-line-location"]').map((l) => l.text())).toEqual(['Chicago · 58', 'IF7456843 · Chicago · 58'])
+    // DAR-UI-081 (Aditi: "remove the click and detail page"): a line opens nothing, and has no page: its id opens its order.
+    expect(w.find('button[data-testid="audit-order-line"]').exists()).toBe(false)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-2' }
+    await flushPromises()
+    expect(w.findAll('[data-testid="audit-order-line"]')).toHaveLength(2)
+    expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).toBe('R2 · Order M1168785')
 
     // DAR-UI-079. Resolve on the order re-checks the line holding it up, not the order id.
     f.verifyAuditFinding.mockResolvedValue({ ok: true, submitted: true } as never)
@@ -403,7 +422,7 @@ describe('AuditReportPage', () => {
     expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R2', period: '2026-10' }, expect.anything())
     expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-7' }, expect.anything())
     expect(f.getAuditFinding).not.toHaveBeenCalledWith({ findingId: 'M77' }, expect.anything())
-    expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Order M77: line 1 is completed in HotWax and not billed in NetSuite')
+    expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Line 1 is completed in HotWax and not billed in NetSuite')
   })
 
   // DAR-UI-072. JSON exports: the morning's report, every page of a statement's findings, the open finding.
