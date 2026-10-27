@@ -38,11 +38,11 @@
         >
           <template v-if="rail">
             <span class="audit-rail-label">{{ item.short }}</span>
-            <span class="audit-rail-count" :class="{ 'audit-rail-count--hot': item.attention }">{{ item.id === HEALTH ? (item.attention ? '!' : '✓') : item.count }}</span>
+            <span class="audit-rail-count" :class="{ 'audit-rail-count--hot': item.attention }">{{ item.id === HEALTH ? (item.attention ? '!' : item.running ? '…' : '✓') : item.count }}</span>
           </template>
           <template v-else>
             <span class="audit-row-main">
-              <span>{{ item.label }}</span>
+              <span>{{ item.label }}<span v-if="item.running" class="audit-live-dot" aria-hidden="true" data-testid="audit-health-running" /></span>
               <span class="audit-row-sub">{{ item.sub }}</span>
             </span>
             <span class="audit-row-chevron" aria-hidden="true">›</span>
@@ -66,12 +66,32 @@
               <span>{{ item.label }}</span>
               <span class="audit-row-sub">{{ item.sub }}</span>
             </span>
-            <span class="audit-tag" :class="{ 'audit-tag--hot': item.attention, 'audit-tag--empty': item.key === SOURCE_NOT_COVERED }">{{ item.tag }}</span>
+            <span class="audit-tag" :class="{ 'audit-tag--hot': item.attention, 'audit-tag--empty': item.key === SOURCE_NOT_COVERED, 'audit-tag--running': item.key === SOURCE_RUNNING && !item.attention }">{{ item.tag }}</span>
           </button>
         </section>
 
         <section class="audit-col audit-col--3 audit-col--detail" aria-label="Detail" data-testid="audit-source-detail">
-          <template v-if="source === SOURCE_CHECKS">
+          <!-- DAR-UI-085. A play in progress: each run, the checks it feeds, where it is and whether it looks right. -->
+          <template v-if="source === SOURCE_RUNNING && progress">
+            <h2 class="micro-label">Running now</h2>
+            <p class="audit-lead" data-testid="audit-running-lead">{{ progress.activeChecks }} of {{ progress.checks }} checks</p>
+            <p class="section-note">Findings arrive as each check finishes.</p>
+            <article
+              v-for="run in progress.active"
+              :key="run.run"
+              class="audit-check audit-check--running"
+              :data-testid="`audit-running-${run.checks[0]}`"
+            >
+              <div class="audit-detail-head">
+                <h3 class="micro-label">{{ run.run }}</h3>
+                <StatusBadge :label="runBadge(run).label" :tone="runBadge(run).tone" />
+              </div>
+              <p class="audit-body">{{ progressLine(run) }}</p>
+              <p v-if="run.healthReason" class="section-note">{{ run.healthReason }}</p>
+              <p class="audit-row-sub">{{ run.checks.join(' · ') }}</p>
+            </article>
+          </template>
+          <template v-else-if="source === SOURCE_CHECKS">
             <h2 class="micro-label">Checks</h2>
             <p class="audit-lead" data-testid="audit-health">{{ report.health.complete ? 'Complete' : 'Not complete' }}</p>
             <p class="section-note" data-testid="audit-health-summary">{{ report.health.summary }}</p>
@@ -299,10 +319,13 @@
             <article v-for="check in statementDoc.checks" :key="check.id" class="audit-check" :data-testid="`audit-check-${check.id}`">
               <div class="audit-detail-head">
                 <h3 class="micro-label">Check</h3>
-                <StatusBadge :label="checkStatusBadge(check.status).label" :tone="checkStatusBadge(check.status).tone" />
+                <StatusBadge v-if="runOf(check.id)" :label="runBadge(runOf(check.id)!).label" :tone="runBadge(runOf(check.id)!).tone" />
+                <StatusBadge v-else :label="checkStatusBadge(check.status).label" :tone="checkStatusBadge(check.status).tone" />
               </div>
               <p class="audit-body">{{ check.label }}</p>
-              <p v-if="check.reason" class="section-note">{{ check.reason }}</p>
+              <!-- DAR-UI-085. Running now: where it is, in place of this morning's "did not run". -->
+              <p v-if="runOf(check.id)" class="section-note" :data-testid="`audit-check-running-${check.id}`">{{ progressLine(runOf(check.id)!) }}</p>
+              <p v-else-if="check.reason" class="section-note">{{ check.reason }}</p>
               <div v-if="comparedBars(check).length" class="audit-bars">
                 <div v-for="bar in comparedBars(check)" :key="bar.system" class="audit-bar" data-testid="audit-compared-bar">
                   <span class="audit-row-sub">{{ bar.system }}</span>
@@ -337,7 +360,15 @@ import { computed } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import { downloadIconPath, resolveIconPath } from '../../lib/iconPaths'
-import type { AuditFindingDocument, AuditFindingListItem, AuditFindingSummary, AuditMoney, AuditReport } from '../../lib/api/auditTypes'
+import type {
+  AuditFindingDocument,
+  AuditFindingListItem,
+  AuditFindingSummary,
+  AuditMoney,
+  AuditProgress,
+  AuditProgressRun,
+  AuditReport,
+} from '../../lib/api/auditTypes'
 import {
   ageLabel,
   checkStatusBadge,
@@ -359,6 +390,7 @@ import {
   HEALTH,
   SOURCE_CHECKS,
   SOURCE_NOT_COVERED,
+  SOURCE_RUNNING,
   categoryItems,
   comparedBars,
   comparedGap,
@@ -367,6 +399,7 @@ import {
   findingsLeft,
   lineLabel,
   narrowedCounts,
+  progressLine,
   sourceItems,
   statementFindings,
   causeGroups,
@@ -398,6 +431,8 @@ const props = defineProps<{
   /** DAR-UI-075. The order open in the detail; findingDoc is then its stuck line's (its fix and history). */
   orderUnit?: AuditFindingSummary | null
   verifying: boolean
+  /** DAR-UI-085. What the checks are doing right now; null when nothing was read yet. */
+  progress?: AuditProgress | null
 }>()
 
 const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: [] }>()
@@ -407,13 +442,24 @@ const rail = computed(() => !isHealth.value && Boolean(props.finding))
 // DAR-UI-073. With the toolbar's filters on, every column counts and lists what they left.
 const narrowedBy = computed(() => (props.narrowed ? narrowedCounts(props.narrowed) : null))
 const categories = computed(() => {
-  const items = categoryItems(props.report, props.filter)
+  const items = categoryItems(props.report, props.filter, props.progress)
   const counted = narrowedBy.value
   if (!counted) return items
   return items.map((item) => item.id === HEALTH ? item : { ...item, count: counted.byCategory.get(item.id) ?? 0,
     sub: `${counted.byCategory.get(item.id) ?? 0} found`, attention: (counted.byCategory.get(item.id) ?? 0) > 0 })
 })
-const sources = computed(() => sourceItems(props.report))
+const sources = computed(() => sourceItems(props.report, props.progress))
+// DAR-UI-085. The run a check rides on, while it is in flight.
+const runByCheck = computed(() => new Map((props.progress?.active ?? []).flatMap((run) => run.checks.map((code) => [code, run] as const))))
+function runOf(checkId: string): AuditProgressRun | undefined {
+  return runByCheck.value.get(checkId)
+}
+function runBadge(run: AuditProgressRun): { label: string; tone: 'neutral' | 'warning' | 'danger' } {
+  if (run.state === 'queued') return { label: 'Queued', tone: 'neutral' }
+  if (run.health === 'stuck') return { label: 'Stuck', tone: 'danger' }
+  if (run.health === 'slow') return { label: 'Slow', tone: 'warning' }
+  return { label: 'Running', tone: 'neutral' }
+}
 const sourceDoc = computed(() => props.report.health.sources?.[props.source] ?? null)
 const categoryDoc = computed(() => props.report.categories?.[props.category] ?? null)
 const statements = computed(() => {
@@ -1213,10 +1259,41 @@ function statementText(id: string): string {
   }
 }
 
+/* DAR-UI-085. A play in progress: the house "running" look (dashed, muted, as connection diagnostics), plus one small
+   dot on Run health that breathes so the page reads as live at a glance. */
+.audit-live-dot {
+  display: inline-block;
+  width: var(--space-1);
+  height: var(--space-1);
+  margin-left: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+  vertical-align: middle;
+  animation: audit-live-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes audit-live-breathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.audit-tag--running {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.audit-check--running {
+  border-style: dashed;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .audit-columns-grid,
   .audit-row {
     transition: none;
+  }
+
+  .audit-live-dot {
+    animation: none;
   }
 }
 </style>

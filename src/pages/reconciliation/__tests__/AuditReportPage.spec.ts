@@ -16,7 +16,7 @@ vi.mock('vue-router', async () => {
   }
 })
 vi.mock('../../../lib/api/facade', () => ({
-  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn() },
+  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn(), getAuditProgress: vi.fn() },
   reconciliationFacade: { getGeneratedOutput: vi.fn() },
 }))
 
@@ -112,6 +112,7 @@ beforeEach(() => {
   liveRoute.query = {}
   f.getAuditReport.mockResolvedValue({ ok: true, report: report() } as never)
   f.getAuditFinding.mockResolvedValue({ ok: true, finding: findingDocument } as never)
+  f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 0, active: [] } } as never)
 })
 
 describe('AuditReportPage', () => {
@@ -176,6 +177,48 @@ describe('AuditReportPage', () => {
     expect(detail.text()).toContain('Partial')
     expect(detail.text()).toContain('one page failed')
     expect(detail.text()).toContain('R2')
+  })
+
+  // DAR-UI-085 (Aditi: "when an audit is running... i cannot see any indication"). Mid-play every check still reads
+  // "not run" in the report, so Run health says it is running and where each run is.
+  it('shows a play in progress on Run health and in the running check, then reloads the report when it finishes', async () => {
+    vi.useFakeTimers()
+    try {
+      const running = {
+        run: 'Invoices vs Shopify', checks: ['invoices-without-etail-id'], state: 'running', attempt: 1,
+        stage: 'COMPARE', progressPercent: 60, elapsedMs: 6 * 60000, usualDurationMs: 5 * 60000, health: 'healthy',
+      }
+      f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 1, active: [running] } } as never)
+      const w = mount(AuditReportPage)
+      await flushPromises()
+
+      const health = w.get('[data-testid="audit-category-health"]')
+      expect(health.text()).toContain('running · 1 of 1 checks')
+      expect(health.find('[data-testid="audit-health-running"]').exists()).toBe(true)
+      // The statement's check says where it is instead of this morning's status.
+      expect(w.get('[data-testid="audit-check-invoices-without-etail-id"]').text()).toContain('Running')
+      expect(w.get('[data-testid="audit-check-running-invoices-without-etail-id"]').text()).toBe('Comparing records · 60% · 6m, usually 5m')
+
+      liveRoute.query = { category: 'health' }
+      await flushPromises()
+      expect(w.get('[data-testid="audit-running-lead"]').text()).toBe('1 of 1 checks')
+      expect(w.get('[data-testid="audit-running-invoices-without-etail-id"]').text()).toContain('Invoices vs Shopify')
+
+      // The run ends: the next read finds nothing in flight, the report is read again, and polling stops.
+      const reportReads = f.getAuditReport.mock.calls.length
+      f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 0, active: [] } } as never)
+      await vi.advanceTimersByTimeAsync(10_000)
+      await flushPromises()
+      expect(f.getAuditReport.mock.calls.length).toBe(reportReads + 1)
+      expect(w.get('[data-testid="audit-category-health"]').text()).toContain('complete')
+      expect(w.find('[data-testid="audit-health-running"]').exists()).toBe(false)
+      const progressReads = f.getAuditProgress.mock.calls.length
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(f.getAuditProgress.mock.calls.length).toBe(progressReads)
+      w.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   // DAR-UI-078 (walked in Chrome): a new audit's statement with a check that has not run yet is not "No check yet".

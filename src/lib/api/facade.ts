@@ -5,6 +5,7 @@ import type {
   GetAuditFindingsByOrderResponse,
   GetAuditReportResponse,
   GetAuditSettingsResponse,
+  GetAuditProgressResponse,
   GetAuditsResponse,
   RunAuditPayload,
   RunAuditResponse,
@@ -527,6 +528,7 @@ const AUDIT = {
   getAuditCheckExtracts: 'facade.AuditFacadeServices.get#AuditCheckExtracts',
   getAuditFindingsByOrder: 'facade.AuditFacadeServices.get#AuditFindingsByOrder',
   getAuditSettings: 'facade.AuditFacadeServices.get#AuditSettings',
+  getAuditProgress: 'facade.AuditFacadeServices.get#AuditProgress',
   saveAuditSettings: 'facade.AuditFacadeServices.save#AuditSettings',
   createAudit: 'facade.AuditFacadeServices.create#Audit',
   addAuditStatement: 'facade.AuditFacadeServices.add#AuditStatement',
@@ -559,6 +561,9 @@ export const auditFacade = {
   // DAR-UI-063. The settings gear and play button. save# and run# are writes, so callService drops the read cache.
   getAuditSettings(payload: { audit: string }, signal?: AbortSignal): Promise<GetAuditSettingsResponse> {
     return callService<GetAuditSettingsResponse>(AUDIT.getAuditSettings, payload, signal)
+  },
+  getAuditProgress(payload: { audit: string }, signal?: AbortSignal): Promise<GetAuditProgressResponse> {
+    return callService<GetAuditProgressResponse>(AUDIT.getAuditProgress, payload, signal)
   },
   saveAuditSettings(payload: SaveAuditSettingsPayload, signal?: AbortSignal): Promise<SaveAuditSettingsResponse> {
     return callService<SaveAuditSettingsResponse>(AUDIT.saveAuditSettings, payload, signal)

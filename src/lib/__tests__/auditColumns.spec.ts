@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AuditCategory, AuditFindingListItem, AuditReport, AuditStatement } from '../api/auditTypes'
+import type { AuditCategory, AuditFindingListItem, AuditProgress, AuditReport, AuditStatement } from '../api/auditTypes'
 import {
   HEALTH,
   categoryItems,
@@ -21,6 +21,7 @@ import {
   matchesFindingFilters,
   narrowedCounts,
   orderKey,
+  progressLine,
   statementFindings,
   sourceItems,
   statementItems,
@@ -133,6 +134,48 @@ describe('auditColumns', () => {
     expect(defaultSource(report())).toBe('checks')
     const partial = report({ sources: { NetSuite: { read: 'partial', records: 9, readAt: null, reason: 'page failed', affects: ['R1'] } } })
     expect(defaultSource(partial)).toBe('NetSuite')
+  })
+
+  // DAR-UI-085 (Aditi: "some sort of indicator on the run health.. to ensure the user can see that it is running").
+  describe('a play in progress', () => {
+    const progress: AuditProgress = {
+      checks: 7,
+      activeChecks: 3,
+      active: [
+        { run: 'Completed - HotWax vs NetSuite', checks: ['completed-not-billed'], state: 'running', attempt: 1,
+          stage: 'EXTRACT_FILE2', progressPercent: 40, elapsedMs: 4 * 60000, health: 'healthy' },
+        { run: 'Warranty claims - credit memos', checks: ['warranty-claims-without-a-credit-memo', 'warranty-memos-not-at-the-claimed-amount'],
+          state: 'queued', attempt: 1 },
+      ],
+    }
+
+    it('says on Run health that checks are running and how many, and marks it live', () => {
+      const health = categoryItems(report({ complete: false, notCovered: [] }), 'all', progress)[0]
+      expect(health).toMatchObject({ sub: 'running · 3 of 7 checks', running: true, attention: false })
+      expect(categoryItems(report(), 'all', { checks: 7, activeChecks: 0, active: [] })[0]).toMatchObject({ running: false })
+      expect(categoryItems(report())[0]).toMatchObject({ running: false })
+    })
+
+    it('a stuck run on Run health is attention, not just running', () => {
+      const stuck = { ...progress, active: [{ ...progress.active[0]!, health: 'stuck' as const }] }
+      expect(categoryItems(report(), 'all', stuck)[0]).toMatchObject({ running: true, attention: true })
+    })
+
+    it('lists Running now first under Run health and opens on it', () => {
+      const items = sourceItems(report(), progress)
+      expect(items[0]).toMatchObject({ key: 'running', label: 'Running now', sub: '1 running · 1 queued', tag: '3', attention: false })
+      expect(items.find((item) => item.key === 'checks')?.sub).toBe('4 ran · 3 running')
+      expect(defaultSource(report(), progress)).toBe('running')
+      expect(sourceItems(report()).map((item) => item.key)).not.toContain('running')
+    })
+
+    it('says where each run is in words: stage, progress, time against its usual, or why it waits', () => {
+      expect(progressLine({ ...progress.active[0]!, usualDurationMs: 10 * 60000 })).toBe('Extracting source 2 · 40% · 4m, usually 10m')
+      expect(progressLine({ ...progress.active[0]!, stage: null, progressPercent: null, elapsedMs: 30000 })).toBe('Starting · <1m')
+      expect(progressLine(progress.active[1]!)).toBe('Queued')
+      expect(progressLine({ ...progress.active[1]!, attempt: 2 })).toBe('Queued · retry, attempt 2')
+      expect(progressLine({ ...progress.active[0]!, elapsedMs: 125 * 60000 })).toBe('Extracting source 2 · 40% · 2h 5m')
+    })
   })
 
   it('finds a statement in any category', () => {

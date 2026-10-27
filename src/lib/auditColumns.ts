@@ -3,11 +3,14 @@ import type {
   AuditFindingCounts,
   AuditFindingListItem,
   AuditFindingSummary,
+  AuditProgress,
+  AuditProgressRun,
   AuditReport,
   AuditStatement,
   AuditStatementCheck,
 } from './api/auditTypes'
 import { splitHeadline, systemLabel } from './auditReport'
+import { reconciliationStageLabel } from './reconciliationDisplay'
 
 // DAR-UI-065. The audit page as drill-down columns: what each column lists and what is picked when the URL does not
 // say. Pure, so the page and its component carry no rules of their own.
@@ -15,6 +18,8 @@ import { splitHeadline, systemLabel } from './auditReport'
 export const HEALTH = 'health'
 export const SOURCE_CHECKS = 'checks'
 export const SOURCE_NOT_COVERED = 'notCovered'
+/** DAR-UI-085. Under Run health while checks are in flight. */
+export const SOURCE_RUNNING = 'running'
 
 export type AuditFilter = 'all' | 'open' | 'pending' | 'notChecked'
 export const AUDIT_FILTERS: AuditFilter[] = ['open', 'pending', 'notChecked', 'all']
@@ -34,6 +39,8 @@ export interface CategoryItem {
   /** DAR-UI-073. What the picked pill counts: the rail's number. */
   count: number
   attention: boolean
+  /** DAR-UI-085. Run health only: checks are in flight right now. */
+  running: boolean
 }
 
 export interface StatementItem {
@@ -94,19 +101,34 @@ export function statesFor(filter: AuditFilter): AuditFindingSummary['state'][] {
   return filter === 'open' ? ['open'] : filter === 'pending' ? ['pending'] : ['open', 'pending']
 }
 
-export function categoryItems(report: AuditReport, filter: AuditFilter = 'all'): CategoryItem[] {
+/** DAR-UI-085. True while any check of the audit is running or queued. */
+export function isPlaying(progress: AuditProgress | null | undefined): progress is AuditProgress {
+  return Boolean(progress && progress.activeChecks > 0)
+}
+
+function anyUnhealthy(progress: AuditProgress): boolean {
+  return progress.active.some((run) => run.health === 'stuck' || run.health === 'slow')
+}
+
+export function categoryItems(report: AuditReport, filter: AuditFilter = 'all', progress?: AuditProgress | null): CategoryItem[] {
+  // DAR-UI-085. While checks are in flight the report still reads them as not run (their ledger rows land when each
+  // window ends), so Run health says what is happening instead, and only a slow or stuck run asks for attention.
+  const playing = isPlaying(progress)
   const health: CategoryItem = {
     id: HEALTH,
     label: 'Run health',
     short: 'Health',
-    sub: [
-      report.health.complete ? 'complete' : 'not complete',
-      report.health.notCovered.length ? `${report.health.notCovered.length} not covered` : '',
-    ].filter(Boolean).join(' · '),
+    sub: playing
+      ? `running · ${progress.activeChecks} of ${progress.checks} checks`
+      : [
+          report.health.complete ? 'complete' : 'not complete',
+          report.health.notCovered.length ? `${report.health.notCovered.length} not covered` : '',
+        ].filter(Boolean).join(' · '),
     open: 0,
     pending: 0,
     count: 0,
-    attention: !report.health.complete,
+    attention: playing ? anyUnhealthy(progress) : !report.health.complete,
+    running: playing,
   }
   return [health, ...Object.entries(report.categories ?? {}).map(([id, category]) => {
     const unchecked = notCheckedCount(category)
@@ -119,6 +141,7 @@ export function categoryItems(report: AuditReport, filter: AuditFilter = 'all'):
       pending: category.counts?.pending ?? 0,
       count: countFor(category.counts, filter),
       attention: (category.counts?.open ?? 0) > 0,
+      running: false,
     }
   })]
 }
@@ -180,7 +203,7 @@ export function defaultStatement(category: AuditCategory | null | undefined, fil
 }
 
 /** Column 2 under Run health: each system read, then the checks, then the statements nothing checks. */
-export function sourceItems(report: AuditReport): SourceItem[] {
+export function sourceItems(report: AuditReport, progress?: AuditProgress | null): SourceItem[] {
   const sources = Object.entries(report.health.sources ?? {}).map(([key, source]) => ({
     key,
     label: systemLabel(key),
@@ -192,11 +215,25 @@ export function sourceItems(report: AuditReport): SourceItem[] {
   const items: SourceItem[] = [...sources, {
     key: SOURCE_CHECKS,
     label: 'Checks',
-    sub: [`${checks.ran} ran`, checks.partial ? `${checks.partial} partial` : '', checks.notRun ? `${checks.notRun} not run` : '']
-      .filter(Boolean).join(' · '),
+    sub: isPlaying(progress)
+      ? [`${checks.ran} ran`, checks.partial ? `${checks.partial} partial` : '', `${progress.activeChecks} running`]
+          .filter(Boolean).join(' · ')
+      : [`${checks.ran} ran`, checks.partial ? `${checks.partial} partial` : '', checks.notRun ? `${checks.notRun} not run` : '']
+          .filter(Boolean).join(' · '),
     tag: String(checks.ran + checks.partial + checks.notRun),
     attention: checks.partial > 0 || checks.notRun > 0,
   }]
+  if (isPlaying(progress)) {
+    const running = progress.active.filter((run) => run.state === 'running').length
+    const queued = progress.active.length - running
+    items.unshift({
+      key: SOURCE_RUNNING,
+      label: 'Running now',
+      sub: [running ? `${running} running` : '', queued ? `${queued} queued` : ''].filter(Boolean).join(' · '),
+      tag: String(progress.activeChecks),
+      attention: anyUnhealthy(progress),
+    })
+  }
   if (report.health.notCovered.length) {
     items.push({
       key: SOURCE_NOT_COVERED,
@@ -209,8 +246,26 @@ export function sourceItems(report: AuditReport): SourceItem[] {
   return items
 }
 
-/** Health opens on what needs a look: a read that is not complete, else the checks. */
-export function defaultSource(report: AuditReport): string {
+/** DAR-UI-085. "45m", "2h 5m", "<1m". */
+function minutesText(ms: number): string {
+  const minutes = Math.floor(ms / 60000)
+  if (minutes < 1) return '<1m'
+  if (minutes < 60) return `${minutes}m`
+  return minutes % 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${Math.floor(minutes / 60)}h`
+}
+
+/** DAR-UI-085. One run of a play in words: its stage and progress and time against its usual, or that it waits. */
+export function progressLine(run: AuditProgressRun): string {
+  if (run.state === 'queued') return run.attempt > 1 ? `Queued · retry, attempt ${run.attempt}` : 'Queued'
+  const elapsed = run.elapsedMs == null ? '' :
+    run.usualDurationMs ? `${minutesText(run.elapsedMs)}, usually ${minutesText(run.usualDurationMs)}` : minutesText(run.elapsedMs)
+  return [reconciliationStageLabel(run.stage) || 'Starting', run.progressPercent == null ? '' : `${run.progressPercent}%`, elapsed]
+    .filter(Boolean).join(' · ')
+}
+
+/** Health opens on what needs a look: a play in progress, else a read that is not complete, else the checks. */
+export function defaultSource(report: AuditReport, progress?: AuditProgress | null): string {
+  if (isPlaying(progress)) return SOURCE_RUNNING
   const items = sourceItems(report)
   return (items.find((item) => item.attention) ?? items.find((item) => item.key === SOURCE_CHECKS))?.key ?? ''
 }

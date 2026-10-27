@@ -9,6 +9,7 @@ admin.MigrationAdminServices.run#Migration
 admin.MigrationAdminServices.run#PendingMigrations
 admin.MigrationAdminServices.set#MigrationEnabled
 admin.ObserveAdminServices.get#AdminSessionInfo
+admin.ObserveAdminServices.get#LiveOperations
 admin.ScheduleAdminServices.get#ScheduleBoard
 admin.TenantAdminServices.create#Tenant
 admin.TenantAdminServices.deactivate#Tenant
@@ -16,6 +17,10 @@ admin.TenantAdminServices.get#TenantDetail
 admin.TenantAdminServices.get#TenantList
 admin.TenantAdminServices.reactivate#Tenant
 admin.TenantAdminServices.update#Tenant
+admin.TransferAdminServices.begin#SecretHandoff
+admin.TransferAdminServices.export#ConfigBundle
+admin.TransferAdminServices.get#TransferCatalog
+admin.TransferAdminServices.import#ConfigBundle
 admin.UserAdminServices.create#UserAccount
 admin.UserAdminServices.disable#UserAccount
 admin.UserAdminServices.enable#UserAccount
@@ -29,6 +34,7 @@ facade.AuditFacadeServices.get#AuditCheckExtracts
 facade.AuditFacadeServices.get#AuditCheckOptions
 facade.AuditFacadeServices.get#AuditFinding
 facade.AuditFacadeServices.get#AuditFindingsByOrder
+facade.AuditFacadeServices.get#AuditProgress
 facade.AuditFacadeServices.get#AuditReport
 facade.AuditFacadeServices.get#AuditSettings
 facade.AuditFacadeServices.get#Audits

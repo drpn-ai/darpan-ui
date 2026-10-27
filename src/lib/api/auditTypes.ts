@@ -288,6 +288,35 @@ export interface GetAuditSettingsResponse extends AuditEnvelope {
   settings?: AuditSettings | null
 }
 
+// DAR-UI-085. What the audit's checks are doing right now (facade.AuditFacadeServices get#AuditProgress), for Run health
+// while a play or the morning run is going. Health is the backend's call (RunHealth); the page never re-derives it.
+export interface AuditProgressRun {
+  /** The run the automation reads, by name. */
+  run: string
+  /** The check codes this run feeds. */
+  checks: string[]
+  state: 'running' | 'queued'
+  attempt: number
+  retryAt?: string | number | null
+  stage?: string | null
+  progressPercent?: number | null
+  elapsedMs?: number | null
+  /** How long the same run took the last time it succeeded; absent without history. */
+  usualDurationMs?: number | null
+  health?: 'healthy' | 'slow' | 'stuck' | null
+  healthReason?: string | null
+}
+
+export interface AuditProgress {
+  checks: number
+  activeChecks: number
+  active: AuditProgressRun[]
+}
+
+export interface GetAuditProgressResponse extends AuditEnvelope {
+  progress?: AuditProgress | null
+}
+
 export interface SaveAuditSettingsPayload {
   audit: string
   name?: string

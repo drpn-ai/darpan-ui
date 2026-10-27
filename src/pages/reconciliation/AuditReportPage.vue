@@ -122,6 +122,7 @@
         :narrowed="narrowed"
         :order-unit="orderUnit"
         :verifying="verifying"
+        :progress="progress"
         @navigate="navigate"
         @more="loadMore"
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
@@ -146,7 +147,7 @@ import { ApiCallError } from '../../lib/api/client'
 import { downloadIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { downloadTextFile } from '../../lib/utils/download'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
-import type { AuditFindingDocument, AuditFindingListItem, AuditReport } from '../../lib/api/auditTypes'
+import type { AuditFindingDocument, AuditFindingListItem, AuditProgress, AuditReport } from '../../lib/api/auditTypes'
 import { auditMorningQuery, periodOptions, shortRange, systemLabel } from '../../lib/auditReport'
 import {
   AUDIT_FILTERS,
@@ -241,7 +242,7 @@ const selectedSource = computed(() => {
   const doc = report.value
   if (!doc || selectedCategory.value !== HEALTH) return ''
   const asked = queryValue('source')
-  return sourceItems(doc).some((item) => item.key === asked) ? asked : defaultSource(doc)
+  return sourceItems(doc, progress.value).some((item) => item.key === asked) ? asked : defaultSource(doc, progress.value)
 })
 // The column a phone shows: the deepest one the URL names.
 const level = computed(() => {
@@ -270,29 +271,75 @@ function errorOf(response: { errors?: string[] }, fallback: string): string {
   return response.errors?.[0] || fallback
 }
 
-async function loadReport(): Promise<void> {
+// quiet (DAR-UI-085): a refresh while a play runs keeps the page on screen and keeps the last report if it fails.
+async function loadReport(options: { quiet?: boolean } = {}): Promise<void> {
   if (!auditCode.value) return
   abort.abort()
   abort = new AbortController()
-  loading.value = true
-  pageError.value = ''
+  if (!options.quiet) {
+    loading.value = true
+    pageError.value = ''
+  }
   try {
     const response = await auditFacade.getAuditReport(
       { audit: auditCode.value, ...carriedQuery.value },
       abort.signal,
     )
     if (response.ok === false || !response.report) {
+      if (options.quiet) return
       report.value = null
       pageError.value = errorOf(response, 'The audit got lost on the way here. Send a search party.')
     } else {
       report.value = response.report
     }
   } catch {
-    if (!abort.signal.aborted) pageError.value = 'The audit got lost on the way here. Send a search party.'
+    if (!abort.signal.aborted && !options.quiet) pageError.value = 'The audit got lost on the way here. Send a search party.'
   } finally {
-    loading.value = false
+    if (!options.quiet) loading.value = false
   }
 }
+
+// DAR-UI-085. What the checks are doing right now, for Run health. Read when the audit opens, then every 10 s while any
+// check is in flight (and for two minutes after a play is submitted, before its runs show). A failed read leaves the
+// page as it was: progress is a view of the run, never a reason to hide the report.
+const PROGRESS_POLL_MS = 10_000
+const PLAY_WATCH_MS = 120_000
+const progress = ref<AuditProgress | null>(null)
+let progressAbort = new AbortController()
+let progressTimer: ReturnType<typeof setTimeout> | undefined
+let watchPlayUntil = 0
+
+async function loadProgress(): Promise<void> {
+  if (!auditCode.value) return
+  progressAbort.abort()
+  progressAbort = new AbortController()
+  const before = progress.value?.activeChecks ?? 0
+  try {
+    const response = await auditFacade.getAuditProgress({ audit: auditCode.value }, progressAbort.signal)
+    if (response.ok === false || !response.progress) return
+    progress.value = response.progress
+    // A check finished: its ledger row and findings are in the report now.
+    if (response.progress.activeChecks < before) void loadReport({ quiet: true })
+  } catch {
+    // Aborted or unreachable: try again on the next tick if one is due.
+  } finally {
+    scheduleProgress()
+  }
+}
+
+function scheduleProgress(): void {
+  clearTimeout(progressTimer)
+  if ((progress.value?.activeChecks ?? 0) === 0 && Date.now() >= watchPlayUntil) return
+  progressTimer = setTimeout(() => {
+    if (document.hidden) scheduleProgress()
+    else void loadProgress()
+  }, PROGRESS_POLL_MS)
+}
+
+onBeforeUnmount(() => {
+  progressAbort.abort()
+  clearTimeout(progressTimer)
+})
 
 // DAR-UI-075. An order open in the detail: its row in the list (the report's, "more", or the filters' read). Its detail
 // reads the stuck line's finding (else its first line's), whose fix and history are the order's. DAR-UI-081 (Aditi:
@@ -536,11 +583,17 @@ onMounted(() => {
   if (!state?.startedAudit) return
   window.history.replaceState({ ...state, startedAudit: false }, '')
   say('Running. Findings arrive as each check finishes.')
+  watchPlayUntil = Date.now() + PLAY_WATCH_MS
+  scheduleProgress()
 })
 
 // DAR-UI-068. One source per value, so a column pick (a new query object) does not count as a new morning.
 watch([auditCode, () => route.query.date, () => route.query.period], () => void loadReport(), { immediate: true })
 watch(findingTarget, () => void loadFinding(), { immediate: true })
+watch(auditCode, () => {
+  progress.value = null
+  void loadProgress()
+}, { immediate: true })
 watch([report, selectedStatement, filter], () => (more.value = emptyFindingsMore()))
 // DAR-UI-075. An order the report does not list (past its 50: a reload, a link) is found in the statement's orders.
 watch([findingId, report, selectedStatement], async () => {
