@@ -60,6 +60,8 @@ import type {
   GetGeneratedOutputResponse,
   GetReconciliationRunStatusPayload,
   GetReconciliationRunStatusResponse,
+  GetActiveRunResultPayload,
+  GetActiveRunResultResponse,
   GetGeneratedOutputDifferencesResponse,
   GetShopifyAuthConfigResponse,
   GetTenantSettingsResponse,
@@ -294,6 +296,8 @@ const RECONCILIATION = {
   getGeneratedOutput: 'facade.ReconciliationFacadeServices.get#GeneratedOutput',
   getGeneratedOutputDifferences: 'facade.ReconciliationFacadeServices.get#GeneratedOutputDifferences',
   getReconciliationRunStatus: 'facade.ReconciliationFacadeServices.get#ReconciliationRunStatus',
+  // DAR-BE-146: the run Run just started, found by one indexed read.
+  getActiveRunResult: 'facade.ReconciliationFacadeServices.get#ActiveRunResult',
   // DAR-UI-048: the run flowchart.
   listReconciliations: 'facade.ReconciliationFacadeServices.list#Reconciliations',
   saveReconciliation: 'facade.ReconciliationFacadeServices.save#Reconciliation',
@@ -627,6 +631,9 @@ export const reconciliationFacade = {
     signal?: AbortSignal,
   ): Promise<GetReconciliationRunStatusResponse> {
     return callService<GetReconciliationRunStatusResponse>(RECONCILIATION.getReconciliationRunStatus, payload, signal)
+  },
+  getActiveRunResult(payload: GetActiveRunResultPayload, signal?: AbortSignal): Promise<GetActiveRunResultResponse> {
+    return callService<GetActiveRunResultResponse>(RECONCILIATION.getActiveRunResult, payload, signal)
   },
   listReconciliations(signal?: AbortSignal): Promise<ListFlowchartRunsResponse> {
     return callService<ListFlowchartRunsResponse>(RECONCILIATION.listReconciliations, {}, signal)

@@ -12,6 +12,7 @@ const route = vi.hoisted(() => ({
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const listSavedRuns = vi.hoisted(() => vi.fn())
 const listGeneratedOutputs = vi.hoisted(() => vi.fn())
+const getActiveRunResult = vi.hoisted(() => vi.fn())
 const runSavedRunDiff = vi.hoisted(() => vi.fn())
 const permissionState = vi.hoisted(() => ({
   canRunActiveTenantReconciliation: true,
@@ -35,6 +36,7 @@ vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
     listSavedRuns,
     listGeneratedOutputs,
+    getActiveRunResult,
     runSavedRunDiff,
   },
 }))
@@ -240,6 +242,8 @@ describe('ReconciliationDiffPage', () => {
     push.mockClear()
     listSavedRuns.mockReset()
     listGeneratedOutputs.mockReset()
+    getActiveRunResult.mockReset()
+    getActiveRunResult.mockResolvedValue({ ok: true, messages: [], errors: [] })
     runSavedRunDiff.mockReset()
     permissionState.canEditTenantSettings = true
     listSavedRuns.mockResolvedValue(savedRunResponse)
@@ -725,20 +729,11 @@ describe('ReconciliationDiffPage', () => {
 
     // A run long enough to still be executing: the request never settles during this test.
     runSavedRunDiff.mockReturnValue(new Promise(() => {}))
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 5, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: '',
-        reconciliationRunResultId: 'RR_SUBMITTED',
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_RUNNING',
-        resultAvailable: false,
-        startedDate: new Date(2026, 4, 17, 12, 0, 0).toISOString(),
-      }],
-    })
+    // DAR-BE-146: the first look comes at once and misses (the row is not committed yet); the next,
+    // a quarter second later, finds it.
+    getActiveRunResult
+      .mockResolvedValueOnce({ ok: true, messages: [], errors: [] })
+      .mockResolvedValue({ ok: true, messages: [], errors: [], reconciliationRunResultId: 'RR_SUBMITTED' })
 
     const wrapper = mount(ReconciliationDiffPage)
     await flushPromises()
@@ -763,9 +758,15 @@ describe('ReconciliationDiffPage', () => {
 
     // Nothing to show yet — the redirect waits until the backend has registered the run.
     expect(push).not.toHaveBeenCalled()
+    expect(getActiveRunResult).toHaveBeenCalledTimes(1)
+    expect(getActiveRunResult).toHaveBeenCalledWith({ savedRunId: 'RS_ORDER_CSV' }, expect.any(AbortSignal))
+    const listCallsBeforeLookup = listGeneratedOutputs.mock.calls.length
 
-    await vi.advanceTimersByTimeAsync(1000)
+    await vi.advanceTimersByTimeAsync(250)
     await flushPromises()
+
+    // The lookup never pages the generated-outputs list, which reads result documents.
+    expect(listGeneratedOutputs).toHaveBeenCalledTimes(listCallsBeforeLookup)
 
     expect(push).toHaveBeenCalledWith({
       name: 'reconciliation-run-live',

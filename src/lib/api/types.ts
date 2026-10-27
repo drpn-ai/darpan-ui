@@ -964,6 +964,12 @@ export type GetReconciliationRunStatusResponse = Schemas['GetReconciliationRunSt
 
 export type ReconciliationRunStep = NonNullable<GetReconciliationRunStatusResponse['steps']>[number]
 
+export interface GetActiveRunResultPayload {
+  savedRunId: string
+}
+
+export type GetActiveRunResultResponse = Schemas['GetActiveRunResultResult']
+
 export interface SubscribeRunNotificationResponse extends ApiEnvelope {
   subscribed?: boolean
   needsDefaultChatSpace?: boolean

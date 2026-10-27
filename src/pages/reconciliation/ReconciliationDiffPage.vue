@@ -226,7 +226,6 @@ import {
 import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { isActiveRunStatus } from '../../stores/runResults'
 
 interface UploadStep {
   id: 'run' | 'system-1' | 'api-window' | 'api-window-custom' | 'file-1' | 'system-2' | 'file-2'
@@ -555,13 +554,9 @@ onBeforeUnmount(() => {
 
 // How long to keep looking for the submitted run's backend row before giving up and simply
 // awaiting the submission. RESOLVE registers the row in its own committed transaction almost
-// immediately, so this normally resolves on the first or second look.
-const RUN_REGISTRATION_POLL_INTERVAL_MS = 900
-const RUN_REGISTRATION_POLL_ATTEMPTS = 12
-// startedDate is the server's clock and the submit time is the browser's, so the match window
-// has to absorb clock skew rather than assume they agree to the second. It only has to be tight
-// enough to exclude a long-running earlier run of the same saved run.
-const RUN_REGISTRATION_MATCH_WINDOW_MS = 2 * 60 * 1000
+// immediately, and each look is one indexed read (DAR-BE-146), so looking often is cheap.
+const RUN_REGISTRATION_POLL_INTERVAL_MS = 250
+const RUN_REGISTRATION_POLL_ATTEMPTS = 40
 
 function delay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -579,27 +574,16 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
  * back to awaiting the submission itself.
  */
 async function pollForRegisteredRunResultId(savedRunId: string, signal: AbortSignal): Promise<string> {
-  const submittedAtMs = Date.now()
   for (let attempt = 0; attempt < RUN_REGISTRATION_POLL_ATTEMPTS; attempt += 1) {
-    await delay(RUN_REGISTRATION_POLL_INTERVAL_MS, signal)
+    if (attempt > 0) await delay(RUN_REGISTRATION_POLL_INTERVAL_MS, signal)
     if (signal.aborted) return ''
 
     try {
-      const response = await reconciliationFacade.listGeneratedOutputs(
-        { savedRunId, pageIndex: 0, pageSize: 5, query: '' },
-        signal,
-      )
-      const registeredRun = (response.generatedOutputs ?? []).find((output) => {
-        if (!isActiveRunStatus(output.statusEnumId) || !output.reconciliationRunResultId) return false
-        // Ignore an older run of the same saved run that was already in flight before this click.
-        // A row without a usable start time is accepted: an unreadable timestamp should not cost
-        // the redirect, and any active run of this saved run is worth showing.
-        const startedMs = new Date(output.startedDate ?? output.createdDate ?? '').getTime()
-        return !Number.isFinite(startedMs) || Math.abs(startedMs - submittedAtMs) <= RUN_REGISTRATION_MATCH_WINDOW_MS
-      })
-      if (registeredRun?.reconciliationRunResultId) return registeredRun.reconciliationRunResultId
+      // The server leaves out a run that began before the last two minutes, by its own clock.
+      const response = await reconciliationFacade.getActiveRunResult({ savedRunId }, signal)
+      if (response.reconciliationRunResultId) return response.reconciliationRunResultId
     } catch {
-      // Transient list failure — try again on the next tick.
+      // Transient lookup failure — try again on the next tick.
     }
   }
   return ''
