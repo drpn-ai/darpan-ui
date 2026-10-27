@@ -119,8 +119,14 @@ export interface ChangeExpiredPasswordResponse extends ApiEnvelope {
   passwordUpdated?: boolean
 }
 
-/** DAR-BE-028. The reply is the same whether or not a code was sent. */
-export type RequestPasswordResetResponse = ApiEnvelope
+/** DAR-UI-084: what the reset request did. */
+export type PasswordResetRequestOutcome = 'sent' | 'noAccount' | 'locked' | 'noEmail' | 'overLimit' | 'sendFailed'
+
+export interface RequestPasswordResetResponse extends ApiEnvelope {
+  outcome?: PasswordResetRequestOutcome
+  /** Set only when outcome is sent. */
+  emailAddressMasked?: string | null
+}
 
 export interface VerifyPasswordResetCodeResponse extends ApiEnvelope {
   verified?: boolean

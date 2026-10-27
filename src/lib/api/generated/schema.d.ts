@@ -1878,10 +1878,9 @@ export interface components {
             result: components["schemas"]["LogoutSessionResult"];
         };
         /**
-         * @description DAR-BE-028. Email a 6-digit password reset code to the account's email on file. The reply is
-         *                 identical, in content and in time, whether a code was sent or not (no such account, disabled, no email
-         *                 on file, over the hourly limit), so it reveals nothing about which accounts exist. The code expires in
-         *                 15 minutes; requesting again replaces it.
+         * @description DAR-BE-028. Email a 6-digit password reset code to the account's email on file, and say what
+         *                 happened in outcome (DAR-UI-084). This reveals which usernames exist and have an email, by choice. The
+         *                 code expires in 15 minutes; requesting again replaces it.
          */
         RequestPasswordResetParams: {
             /** @description Username (matched exactly, then case-insensitively, as login does) or the account's email. */
@@ -1892,8 +1891,15 @@ export interface components {
             ok?: boolean;
             /** @description Informational messages; always empty for this service. */
             messages?: string[];
-            /** @description Always empty: every outcome gets the same reply. */
+            /** @description Always empty: what happened is in outcome. */
             errors?: string[];
+            /**
+             * @description sent, noAccount, locked (disabled or locked out), noEmail (no email on file), overLimit
+             *                         (3 codes this hour for the account, or 20 from the IP), or sendFailed (the mail server refused it).
+             */
+            outcome?: string;
+            /** @description The address the code went to, masked (a•••@example.com). Set only when outcome is sent. */
+            emailAddressMasked?: string;
         };
         /** @description JSON-RPC request envelope for facade.AuthFacadeServices.request#PasswordReset */
         RequestPasswordResetRequest: {

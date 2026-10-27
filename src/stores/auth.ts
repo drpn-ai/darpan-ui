@@ -15,6 +15,7 @@ import type {
   ChangeOwnPasswordResponse,
   LoginSessionResponse,
   PasswordChangeReason,
+  PasswordResetRequestOutcome,
   SaveActiveTenantResponse,
   SaveTenantSettingsResponse,
   SaveUserSettingsResponse,
@@ -615,14 +616,18 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // DAR-BE-028. The request reply is identical whether or not a code went out, so there is nothing in it to
-  // report; only a transport failure sets the error.
-  async function requestPasswordReset(usernameOrEmail: string): Promise<void> {
+  // DAR-UI-084. The reply says what happened. Null when the call itself failed, which sets the error. A backend
+  // from before DAR-UI-084 sends no outcome; it only ever answered after queueing the code, so that reads as sent.
+  async function requestPasswordReset(
+    usernameOrEmail: string,
+  ): Promise<{ outcome: PasswordResetRequestOutcome; emailAddressMasked: string | null } | null> {
     try {
-      await authFacade.requestPasswordReset({ usernameOrEmail })
+      const response = await authFacade.requestPasswordReset({ usernameOrEmail })
       _error.value = null
+      return { outcome: response.outcome ?? 'sent', emailAddressMasked: response.emailAddressMasked ?? null }
     } catch (err) {
       _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      return null
     }
   }
 

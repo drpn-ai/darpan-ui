@@ -86,10 +86,8 @@
           @back="goBackResetStep"
           @submit="submitResetStep"
         >
-          <!-- Shown whatever the request did: the backend answers the same either way, so the page does too. -->
           <p v-if="resetStep.name === 'code'" class="section-note" data-testid="login-reset-note">
-            If that account has an email on file, a code is on its way. It expires in 15 minutes.<br />
-            No email on file? Ask your Darpan administrator.
+            {{ resetSentTo ? `Sent to ${resetSentTo}.` : 'Sent.' }} It expires in 15 minutes.
           </p>
           <!-- The code completes itself: the sixth digit verifies it, with no OK to press. -->
           <WorkflowCodeInput
@@ -178,6 +176,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InlineValidation from '../components/ui/InlineValidation.vue'
 import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
+import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
 import { useAuthStore } from '../stores/auth'
 import { requestSubmitOnEnter } from '../lib/keyboard'
@@ -220,6 +219,15 @@ const recoveryEmailPassword = ref('')
 // The backend's one reply for every code failure (PasswordResetSupport.CODE_FAILURE_MESSAGE).
 const CODE_FAILURE_TEXT = "That code didn't work. Request a new one."
 
+// DAR-UI-084: the request says what happened, so the page says it too rather than leaving the person guessing.
+const RESET_REQUEST_TEXT: Record<Exclude<PasswordResetRequestOutcome, 'sent'>, string> = {
+  noAccount: 'No account with that username or email.',
+  locked: 'That account is locked. Ask your Darpan administrator.',
+  noEmail: 'That account has no email on file. Ask your Darpan administrator to add one.',
+  overLimit: "That's 3 codes this hour. Use the newest one in your inbox, or try again in an hour.",
+  sendFailed: "The email didn't send. Try again in a few minutes.",
+}
+
 // DAR-BE-028 forgot password. Hidden where the environment cannot send mail (no SMTP configured), so nobody
 // is sent to wait for a code that never comes.
 const passwordResetAvailable = ref(false)
@@ -227,6 +235,8 @@ const isResettingMode = ref(false)
 const resetStepIndex = ref(0)
 const isSubmittingReset = ref(false)
 const resetForm = ref({ usernameOrEmail: '', code: '', newPassword: '', newPasswordVerify: '' })
+// The masked address the last code went to, for the code step's note.
+const resetSentTo = ref<string | null>(null)
 
 interface ResetStep {
   name: keyof typeof resetForm.value
@@ -487,6 +497,7 @@ const isResetStepBlocked = computed(() => {
 function enterResetMode(): void {
   localError.value = null
   resetForm.value = { usernameOrEmail: username.value.trim(), code: '', newPassword: '', newPasswordVerify: '' }
+  resetSentTo.value = null
   resetStepIndex.value = 0
   isResettingMode.value = true
 }
@@ -510,7 +521,23 @@ async function resendResetCode(): Promise<void> {
   if (isSubmittingReset.value) return
   localError.value = null
   resetForm.value = { ...resetForm.value, code: '' }
-  await authStore.requestPasswordReset(resetForm.value.usernameOrEmail.trim())
+  await requestResetCode(resetForm.value.usernameOrEmail.trim())
+}
+
+/** Ask for a code and show what happened. True when there is a code to enter: one was just sent, or the
+ *  hourly limit says the newest one already in the inbox is the one to use. */
+async function requestResetCode(who: string): Promise<boolean> {
+  const result = await authStore.requestPasswordReset(who)
+  if (!result) {
+    localError.value = authStore.error ?? RESET_REQUEST_TEXT.sendFailed
+    return false
+  }
+  if (result.outcome === 'sent') {
+    resetSentTo.value = result.emailAddressMasked
+    return true
+  }
+  localError.value = RESET_REQUEST_TEXT[result.outcome]
+  return result.outcome === 'overLimit'
 }
 
 async function submitResetStep(): Promise<void> {
@@ -530,8 +557,7 @@ async function runResetStep(): Promise<void> {
   const stepName = resetStep.value.name
   const who = resetForm.value.usernameOrEmail.trim()
   if (stepName === 'usernameOrEmail') {
-    await authStore.requestPasswordReset(who)
-    resetStepIndex.value += 1
+    if (await requestResetCode(who)) resetStepIndex.value += 1
     return
   }
   if (stepName === 'code') {

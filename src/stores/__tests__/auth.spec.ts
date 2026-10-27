@@ -314,12 +314,15 @@ describe('password reset and recovery email', () => {
     return store
   }
 
-  it('requests a code and never reports anything from the uniform reply', async () => {
-    requestPasswordResetMock.mockResolvedValue({ ok: true, messages: [], errors: [] })
+  it('requests a code and returns what happened', async () => {
+    requestPasswordResetMock.mockResolvedValueOnce({
+      ok: true, messages: [], errors: [], outcome: 'sent', emailAddressMasked: 'p•••@example.com',
+    })
+    requestPasswordResetMock.mockResolvedValueOnce({ ok: true, messages: [], errors: [], outcome: 'noEmail' })
     const store = useAuthStore()
 
-    await store.requestPasswordReset('pwr.user')
-
+    expect(await store.requestPasswordReset('pwr.user')).toEqual({ outcome: 'sent', emailAddressMasked: 'p•••@example.com' })
+    expect(await store.requestPasswordReset('pwr.user')).toEqual({ outcome: 'noEmail', emailAddressMasked: null })
     expect(requestPasswordResetMock).toHaveBeenCalledWith({ usernameOrEmail: 'pwr.user' })
     expect(store.error).toBeNull()
   })

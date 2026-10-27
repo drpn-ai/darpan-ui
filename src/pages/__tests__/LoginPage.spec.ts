@@ -86,7 +86,7 @@ describe('LoginPage', () => {
     getPasswordResetAvailable.mockReset()
     getPasswordResetAvailable.mockResolvedValue(true)
     requestPasswordReset.mockReset()
-    requestPasswordReset.mockResolvedValue(undefined)
+    requestPasswordReset.mockResolvedValue({ outcome: 'sent', emailAddressMasked: 'p•••@example.com' })
     verifyPasswordResetCode.mockReset()
     verifyPasswordResetCode.mockResolvedValue(true)
     completePasswordReset.mockReset()
@@ -360,16 +360,46 @@ describe('LoginPage', () => {
     expect((wrapper.get('[data-testid="login-reset-input"]').element as HTMLInputElement).value).toBe('pwr.user')
   })
 
-  it('requests a code and shows the same note whatever happened', async () => {
+  it('requests a code and says where it went', async () => {
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
 
     expect(requestPasswordReset).toHaveBeenCalledWith('pwr.user')
-    expect(wrapper.get('[data-testid="login-reset-note"]').text()).toContain(
-      'If that account has an email on file, a code is on its way. It expires in 15 minutes.',
-    )
-    expect(wrapper.get('[data-testid="login-reset-note"]').text()).toContain('No email on file? Ask your Darpan administrator.')
+    expect(wrapper.get('[data-testid="login-reset-note"]').text()).toBe('Sent to p•••@example.com. It expires in 15 minutes.')
     expect(wrapper.text()).toContain('Enter the code we emailed.')
+  })
+
+  it.each([
+    ['noAccount', 'No account with that username or email.'],
+    ['locked', 'That account is locked. Ask your Darpan administrator.'],
+    ['noEmail', 'That account has no email on file. Ask your Darpan administrator to add one.'],
+    ['sendFailed', "The email didn't send. Try again in a few minutes."],
+  ])('says %s plainly and stays on the username step', async (outcome, text) => {
+    requestPasswordReset.mockResolvedValue({ outcome, emailAddressMasked: null })
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+
+    expect(wrapper.text()).toContain(text)
+    expect(wrapper.text()).toContain('Username or email?')
+  })
+
+  it('at the hourly limit, says so and still goes to the code step for the newest code', async () => {
+    requestPasswordReset.mockResolvedValue({ outcome: 'overLimit', emailAddressMasked: null })
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+
+    expect(wrapper.text()).toContain("That's 3 codes this hour.")
+    expect(wrapper.text()).toContain('Enter the code we emailed.')
+  })
+
+  it('says so when Send a new code fails', async () => {
+    const wrapper = await openReset()
+    await completeResetStep(wrapper, 'pwr.user')
+    requestPasswordReset.mockResolvedValue({ outcome: 'sendFailed', emailAddressMasked: null })
+    await wrapper.get('[data-testid="login-reset-resend"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("The email didn't send. Try again in a few minutes.")
   })
 
   it('takes the code in six one-digit boxes, autofill on the first, and can send a new one', async () => {
@@ -541,7 +571,7 @@ describe('LoginPage', () => {
 
   it('ignores a second submit while a reset step is in flight', async () => {
     let finish: () => void = () => {}
-    requestPasswordReset.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve }))
+    requestPasswordReset.mockImplementation(() => new Promise((resolve) => { finish = () => resolve({ outcome: 'sent', emailAddressMasked: 'p•••@example.com' }) }))
     const wrapper = await openReset()
     await wrapper.get('[data-testid="login-reset-input"]').setValue('pwr.user')
     await wrapper.get('[data-testid="login-reset-next"]').trigger('click')
