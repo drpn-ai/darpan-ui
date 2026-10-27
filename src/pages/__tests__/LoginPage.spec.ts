@@ -321,6 +321,12 @@ describe('LoginPage', () => {
     await flushPromises()
   }
 
+  // Autofill and paste land the whole code in the first box; the sixth digit verifies it.
+  async function enterCode(wrapper: ReturnType<typeof mount>, value: string): Promise<void> {
+    await wrapper.get('[data-testid="login-reset-code-0"]').setValue(value)
+    await flushPromises()
+  }
+
   async function openReset(typedUsername = ''): Promise<ReturnType<typeof mount>> {
     const wrapper = mount(LoginPage)
     await flushPromises()
@@ -366,26 +372,28 @@ describe('LoginPage', () => {
     expect(wrapper.text()).toContain('Enter the code we emailed.')
   })
 
-  it('takes the code as a one-time code and can send a new one', async () => {
+  it('takes the code in six one-digit boxes, autofill on the first, and can send a new one', async () => {
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
 
-    const input = wrapper.get('[data-testid="login-reset-input"]')
-    expect(input.attributes('autocomplete')).toBe('one-time-code')
-    expect(input.attributes('inputmode')).toBe('numeric')
+    const boxes = wrapper.get('[data-testid="login-reset-code"]').findAll('input')
+    expect(boxes).toHaveLength(6)
+    expect(boxes[0]!.attributes('autocomplete')).toBe('one-time-code')
+    expect(boxes.every((box) => box.attributes('inputmode') === 'numeric')).toBe(true)
+    expect(wrapper.find('[data-testid="login-reset-input"]').exists()).toBe(false)
     await wrapper.get('[data-testid="login-reset-resend"]').trigger('click')
     await flushPromises()
     expect(requestPasswordReset).toHaveBeenCalledTimes(2)
   })
 
-  it('sends a pasted code unchanged and stays on the code step when it is wrong', async () => {
+  it('verifies a pasted code as its digits and stays on the code step when it is wrong', async () => {
     verifyPasswordResetCode.mockResolvedValue(false)
     authState.error = "That code didn't work. Request a new one."
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
-    await completeResetStep(wrapper, '123 456')
+    await enterCode(wrapper, '123 456')
 
-    expect(verifyPasswordResetCode).toHaveBeenCalledWith('pwr.user', '123 456')
+    expect(verifyPasswordResetCode).toHaveBeenCalledWith('pwr.user', '123456')
     expect(wrapper.text()).toContain("That code didn't work. Request a new one.")
     expect(wrapper.text()).toContain('Enter the code we emailed.')
   })
@@ -394,7 +402,7 @@ describe('LoginPage', () => {
     route.query = { redirect: '/settings' }
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
-    await completeResetStep(wrapper, '123456')
+    await enterCode(wrapper, '123456')
     expect(wrapper.text()).toContain('Enter your new password.')
     await completeResetStep(wrapper, 'N3w-pass!')
     expect(wrapper.text()).toContain('Enter it again.')
@@ -412,7 +420,7 @@ describe('LoginPage', () => {
     authState.error = 'Password was used in last 5 passwords'
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
-    await completeResetStep(wrapper, '123456')
+    await enterCode(wrapper, '123456')
     await completeResetStep(wrapper, 'N3w-pass!')
     await completeResetStep(wrapper, 'N3w-pass!')
 
@@ -518,7 +526,7 @@ describe('LoginPage', () => {
     authState.recoveryEmailMissing = true
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
-    await completeResetStep(wrapper, '123456')
+    await enterCode(wrapper, '123456')
     await completeResetStep(wrapper, 'N3w-pass!')
     await completeResetStep(wrapper, 'N3w-pass!')
 
@@ -550,7 +558,7 @@ describe('LoginPage', () => {
     authState.error = "That code didn't work. Request a new one."
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
-    await completeResetStep(wrapper, '123456')
+    await enterCode(wrapper, '123456')
     await completeResetStep(wrapper, 'N3w-pass!')
     await completeResetStep(wrapper, 'N3w-pass!')
 

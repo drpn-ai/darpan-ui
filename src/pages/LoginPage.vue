@@ -91,7 +91,15 @@
             If that account has an email on file, a code is on its way. It expires in 15 minutes.<br />
             No email on file? Ask your Darpan administrator.
           </p>
-          <label class="workflow-context-block" :aria-label="resetStep.label">
+          <!-- The code completes itself: the sixth digit verifies it, with no OK to press. -->
+          <WorkflowCodeInput
+            v-if="resetStep.name === 'code'"
+            v-model="resetStepValue"
+            :label="resetStep.label"
+            test-id="login-reset-code"
+            @complete="submitResetStep"
+          />
+          <label v-else class="workflow-context-block" :aria-label="resetStep.label">
             <input
               v-model="resetStepValue"
               class="wizard-answer-control"
@@ -99,14 +107,13 @@
               :name="resetStep.name"
               :type="resetStep.type"
               :autocomplete="resetStep.autocomplete"
-              :inputmode="resetStep.inputmode"
               required
             />
           </label>
           <button
             v-if="resetStep.name === 'code'"
             type="button"
-            class="wizard-secondary-link"
+            class="login-text-link"
             data-testid="login-reset-resend"
             @click="resendResetCode"
           >
@@ -170,6 +177,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InlineValidation from '../components/ui/InlineValidation.vue'
+import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
 import { useAuthStore } from '../stores/auth'
 import { requestSubmitOnEnter } from '../lib/keyboard'
@@ -226,18 +234,10 @@ interface ResetStep {
   question: string
   type: 'text' | 'password'
   autocomplete: string
-  inputmode?: 'numeric'
 }
 const resetSteps: readonly [ResetStep, ResetStep, ResetStep, ResetStep] = [
   { name: 'usernameOrEmail', label: 'Username or email', question: 'Username or email?', type: 'text', autocomplete: 'username' },
-  {
-    name: 'code',
-    label: 'Reset code',
-    question: 'Enter the code we emailed.',
-    type: 'text',
-    autocomplete: 'one-time-code',
-    inputmode: 'numeric',
-  },
+  { name: 'code', label: 'Reset code', question: 'Enter the code we emailed.', type: 'text', autocomplete: 'one-time-code' },
   { name: 'newPassword', label: 'New password', question: 'Enter your new password.', type: 'password', autocomplete: 'new-password' },
   { name: 'newPasswordVerify', label: 'Verify password', question: 'Enter it again.', type: 'password', autocomplete: 'new-password' },
 ]
@@ -479,6 +479,7 @@ const resetPrimaryLabel = computed(() => {
 const isResetStepBlocked = computed(() => {
   if (isSubmittingReset.value) return true
   if (resetStepValue.value.trim().length === 0) return true
+  if (resetStep.value.name === 'code') return resetStepValue.value.length < 6
   if (resetStep.value.name === 'newPassword') return !resetPasswordRules.value.every((rule) => rule.met)
   return false
 })
@@ -534,7 +535,6 @@ async function runResetStep(): Promise<void> {
     return
   }
   if (stepName === 'code') {
-    // The backend ignores spaces in a pasted code, so the value goes up as typed.
     if (!(await authStore.verifyPasswordResetCode(who, resetForm.value.code))) {
       localError.value = authStore.error ?? CODE_FAILURE_TEXT
       return
