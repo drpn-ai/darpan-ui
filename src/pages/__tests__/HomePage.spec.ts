@@ -366,8 +366,8 @@ describe('HomePage', () => {
     })
     expect(wrapper.findAll('[data-testid="other-runs"] .static-page-tile')).toHaveLength(0)
   })
-  // DAR-UI-058. An audit is a run too: one tile per audit, in its type's section, after the lifecycle runs.
-  it('lists the tenant\'s audits as their own section, last', async () => {
+  // DAR-UI-058. An audit is a run too: one tile per audit, in its type's section. DAR-UI-082: that section comes first.
+  it('lists the tenant\'s audits as their own section, first after the pins', async () => {
     listReconciliations.mockResolvedValue({
       reconciliations: [{ reconciliationId: 'R1', reconciliationName: 'Order chain', defaultTimeWindow: '7d', questionCount: 4 }],
     })
@@ -382,8 +382,11 @@ describe('HomePage', () => {
     expect(tile.text()).toBe('Month close')
     expect(JSON.parse(tile.attributes('data-to') ?? '{}')).toEqual({ name: 'audit-report', params: { audit: 'month-close' } })
     expect(tile.attributes('draggable')).toBe('false')
+    const headings = wrapper.findAll('.static-page-section').map((section) => section.text())
+    expect(headings[0]).toMatch(/^Pinned Runs/)
     const sections = wrapper.findAll('[data-testid^="run-group-"]').map((node) => node.attributes('data-testid'))
-    expect(sections.slice(-2)).toEqual(['run-group-lifecycle', 'run-group-audit'])
+    expect(sections[0]).toBe('run-group-audit')
+    expect(sections.at(-1)).toBe('run-group-lifecycle')
     expect(audit.findAll('.static-page-tile')).toHaveLength(1)
   })
 

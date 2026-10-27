@@ -312,10 +312,9 @@ const runGroups = computed<DashboardRunGroup[]>(() => {
     else byTitle.set(card.groupTitle, [card])
   })
 
-  // The type section is a different axis from the system families, so it follows them all
-  // instead of sorting in among them.
-  const typeTitles = [RUN_TYPES.lifecycle.label, RUN_TYPES.audit.label]
-  const typeRank = (title: string): number => typeTitles.indexOf(title) + 1
+  // The type sections are a different axis from the system families, so they never sort in among them:
+  // Audit leads (DAR-UI-082, the tenant's whole-system check is what an operator opens first), Lifecycle follows them all.
+  const typeRank = (title: string): number => (title === RUN_TYPES.audit.label ? -1 : title === RUN_TYPES.lifecycle.label ? 1 : 0)
   return [...byTitle.entries()]
     .sort(([a], [b]) => typeRank(a) - typeRank(b) || a.localeCompare(b))
     .map(([title, cards]) => {
