@@ -1,5 +1,5 @@
 <template>
-  <div class="audit-columns" :class="{ 'audit-columns--rail': rail, 'audit-columns--health': isHealth }" :data-level="level" data-testid="audit-columns">
+  <div class="audit-columns" :class="{ 'audit-columns--rail': rail, 'audit-columns--health': isHealth, 'audit-columns--health-flat': healthFlat }" :data-level="level" data-testid="audit-columns">
     <nav class="audit-path" aria-label="Path">
       <button type="button" class="audit-path-step" data-testid="audit-path-top" @click="emit('navigate', { category: undefined, statement: undefined, finding: undefined, source: undefined })">
         {{ report.report.audit.name }}
@@ -51,7 +51,8 @@
       </section>
 
       <template v-if="isHealth">
-        <section class="audit-col audit-col--2" aria-label="Today's run">
+        <!-- DAR-UI-087. A list of one (only the checks, nothing read) is not a column: the detail takes its room. -->
+        <section v-if="!healthFlat" class="audit-col audit-col--2" aria-label="Today's run">
           <h2 class="micro-label audit-col-head">Today's run</h2>
           <button
             v-for="item in sources"
@@ -92,14 +93,40 @@
             </article>
           </template>
           <template v-else-if="source === SOURCE_CHECKS">
-            <h2 class="micro-label">Checks</h2>
-            <p class="audit-lead" data-testid="audit-health">{{ report.health.complete ? 'Complete' : 'Not complete' }}</p>
-            <p class="section-note" data-testid="audit-health-summary">{{ report.health.summary }}</p>
-            <dl class="audit-facts">
-              <dt>Ran</dt><dd data-testid="audit-checks-ran">{{ report.health.checks.ran }}</dd>
-              <dt>Partial</dt><dd>{{ report.health.checks.partial }}</dd>
-              <dt>Not run</dt><dd>{{ report.health.checks.notRun }}</dd>
-            </dl>
+            <div class="audit-detail-head">
+              <h2 class="micro-label">Checks</h2>
+              <!-- DAR-UI-087. One retry for every check that did not run, not one per row; a row's statement keeps its own. -->
+              <button
+                v-if="retryable && unrunChecks.length"
+                type="button"
+                class="audit-more"
+                data-testid="audit-retry-unrun"
+                :disabled="Boolean(retrying?.length)"
+                @click="emit('retry', unrunChecks)"
+              >
+                Retry {{ unrunChecks.length }} not run
+              </button>
+            </div>
+            <p class="audit-lead" data-testid="audit-health">{{ checksLead }}</p>
+            <!-- DAR-UI-087. Each check by category, not the summary's sentence of ids; a row opens its statement. -->
+            <section v-for="group in checkRows" :key="group.id" class="audit-check-group" :data-testid="`audit-check-group-${group.id}`">
+              <h3 class="micro-label">{{ group.label }}</h3>
+              <div v-for="row in group.rows" :key="row.id" class="audit-check-row" :data-testid="`audit-check-row-${row.id}`">
+                <button
+                  type="button"
+                  class="audit-check-row-main"
+                  :title="row.label || undefined"
+                  @click="emit('navigate', { category: row.category, statement: row.statement, finding: undefined, source: undefined })"
+                >
+                  <span>{{ row.id }}</span>
+                  <span v-if="row.variants.length" class="audit-row-sub">{{ row.variants.join(' · ') }}</span>
+                </button>
+                <span
+                  class="audit-tag"
+                  :class="{ 'audit-tag--running': rowRunning(row), 'audit-tag--hot': !rowRunning(row) && row.status !== 'ran' }"
+                >{{ rowTag(row) }}</span>
+              </div>
+            </section>
           </template>
           <template v-else-if="source === SOURCE_NOT_COVERED">
             <h2 class="micro-label">Not covered</h2>
@@ -174,7 +201,7 @@
             </button>
           </template>
           <div v-if="statementDoc && !findings.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
-            {{ narrowed ? 'No match' : statementDoc.status === 'notRun' ? (statementDoc.checks.length ? 'Not run yet' : 'No check yet') : 'Holds' }}
+            {{ narrowed ? 'No match' : statementDoc.status === 'notRun' ? (statementDoc.checks.length ? 'Not run yet' : 'No check yet') : 'Nothing found' }}
           </div>
           <InlineValidation v-if="more.error" tone="error" :message="more.error" data-testid="audit-findings-more-error" />
           <button v-if="findingsLeftCount" type="button" class="audit-more audit-pad" data-testid="audit-findings-more" :disabled="more.loading" @click="emit('more')">
@@ -332,8 +359,8 @@
                 type="button"
                 class="audit-more"
                 :data-testid="`audit-retry-check-${check.id}`"
-                :disabled="retrying === check.id"
-                @click="emit('retry', check.id)"
+                :disabled="Boolean(retrying?.includes(check.id))"
+                @click="emit('retry', [check.id])"
               >
                 Retry from last read
               </button>
@@ -403,6 +430,7 @@ import {
   SOURCE_NOT_COVERED,
   SOURCE_RUNNING,
   categoryItems,
+  checkGroups,
   comparedBars,
   comparedGap,
   countFor,
@@ -417,6 +445,7 @@ import {
   causeHeading,
   statementItems,
   type AuditFilter,
+  type CheckRow,
   type FindingsMore,
 } from '../../lib/auditColumns'
 
@@ -446,11 +475,11 @@ const props = defineProps<{
   progress?: AuditProgress | null
   /** DAR-UI-086. The morning on show is today's, so a check that did not run can be retried from its last read. */
   retryable?: boolean
-  /** The check whose retry is being submitted. */
-  retrying?: string
+  /** The checks whose retry is being submitted. */
+  retrying?: string[]
 }>()
 
-const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [check: string] }>()
+const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [checks: string[]] }>()
 
 const isHealth = computed(() => props.category === HEALTH)
 const rail = computed(() => !isHealth.value && Boolean(props.finding))
@@ -464,6 +493,23 @@ const categories = computed(() => {
     sub: `${counted.byCategory.get(item.id) ?? 0} found`, attention: (counted.byCategory.get(item.id) ?? 0) > 0 })
 })
 const sources = computed(() => sourceItems(props.report, props.progress))
+const healthFlat = computed(() => isHealth.value && sources.value.length === 1)
+const checkRows = computed(() => checkGroups(props.report))
+const checksLead = computed(() => {
+  const { ran, partial, notRun } = props.report.health.checks
+  return [`${ran} of ${ran + partial + notRun} checks ran`, partial ? `${partial} partial` : ''].filter(Boolean).join(' · ')
+})
+const unrunChecks = computed(() => checkRows.value.flatMap((group) => group.rows).flatMap((row) => row.checks)
+  .filter((check) => check.status !== 'ran' && !runOf(check.id)).map((check) => check.id))
+function rowRunning(row: CheckRow): boolean {
+  return row.checks.some((check) => runOf(check.id))
+}
+function rowTag(row: CheckRow): string {
+  if (rowRunning(row)) return 'running'
+  const n = row.checks.length
+  if (n > 1 && row.ran > 0 && row.ran < n) return `${row.ran} of ${n} ran`
+  return checkStatusBadge(row.status).label.toLowerCase()
+}
 // DAR-UI-085. The run a check rides on, while it is in flight.
 const runByCheck = computed(() => new Map((props.progress?.active ?? []).flatMap((run) => run.checks.map((code) => [code, run] as const))))
 function runOf(checkId: string): AuditProgressRun | undefined {
@@ -623,7 +669,8 @@ function statementText(id: string): string {
 }
 
 .audit-path {
-  display: flex;
+  /* DAR-UI-087. The columns show the path on a wide screen; a phone, one column at a time, needs it (below). */
+  display: none;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
@@ -675,6 +722,10 @@ function statementText(id: string): string {
 
 .audit-columns--health .audit-columns-grid {
   grid-template-columns: minmax(10rem, 0.8fr) minmax(13rem, 1.1fr) minmax(18rem, 2.5fr);
+}
+
+.audit-columns--health-flat .audit-columns-grid {
+  grid-template-columns: minmax(10rem, 0.8fr) minmax(18rem, 3.6fr);
 }
 
 .audit-col {
@@ -1008,6 +1059,39 @@ function statementText(id: string): string {
   margin: 0;
 }
 
+.audit-check-group {
+  display: grid;
+}
+
+.audit-check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1-5) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.audit-check-row-main {
+  display: grid;
+  align-content: center;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-label-size);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.audit-check-row-main:hover {
+  color: var(--text-soft);
+}
+
 .audit-detail-code {
   font-size: var(--type-heading-size);
 }
@@ -1252,6 +1336,15 @@ function statementText(id: string): string {
   .audit-col {
     display: none;
     border-right: 0;
+  }
+
+  .audit-path {
+    display: flex;
+  }
+
+  /* No list column: the detail is the second step. */
+  .audit-columns--health-flat[data-level='2'] .audit-col--3 {
+    display: flex;
   }
 
   .audit-columns[data-level='1'] .audit-col--1,

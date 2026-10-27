@@ -1,5 +1,6 @@
 import type {
   AuditCategory,
+  AuditCheckStatus,
   AuditFindingCounts,
   AuditFindingListItem,
   AuditFindingSummary,
@@ -73,10 +74,10 @@ function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`
 }
 
-/** "5 open · 2 pending", or "holds" when nothing is open or pending. */
+/** "5 open · 2 pending", or "nothing found" when nothing is open or pending (DAR-UI-087: was "holds"). */
 export function countsLine(counts: AuditFindingCounts | null | undefined): string {
   const parts = [counts?.open ? `${counts.open} open` : '', counts?.pending ? `${counts.pending} pending` : ''].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'holds'
+  return parts.length ? parts.join(' · ') : 'nothing found'
 }
 
 function statementsOf(category: AuditCategory | null | undefined): AuditStatement[] {
@@ -132,11 +133,13 @@ export function categoryItems(report: AuditReport, filter: AuditFilter = 'all', 
   }
   return [health, ...Object.entries(report.categories ?? {}).map(([id, category]) => {
     const unchecked = notCheckedCount(category)
+    // DAR-UI-087. Nothing found is said only of a category something checked.
+    const found = unchecked && unchecked === statementsOf(category).length && !countFor(category.counts, 'all') ? '' : countsLine(category.counts)
     return {
       id,
       label: category.label,
       short: category.label.split(' ')[0] ?? category.label,
-      sub: [countsLine(category.counts), unchecked ? `${unchecked} not checked` : ''].filter(Boolean).join(' · '),
+      sub: [found, unchecked ? `${unchecked} not checked` : ''].filter(Boolean).join(' · '),
       open: category.counts?.open ?? 0,
       pending: category.counts?.pending ?? 0,
       count: countFor(category.counts, filter),
@@ -268,6 +271,87 @@ export function defaultSource(report: AuditReport, progress?: AuditProgress | nu
   if (isPlaying(progress)) return SOURCE_RUNNING
   const items = sourceItems(report)
   return (items.find((item) => item.attention) ?? items.find((item) => item.key === SOURCE_CHECKS))?.key ?? ''
+}
+
+/** DAR-UI-087. Run health › Checks: one row per check, or per family of a statement's per-store checks. */
+export interface CheckRow {
+  /** The check's id, or the family's shared stem ("shopify-orders-not-in-hotwax"). */
+  id: string
+  /** The check's own label; a family has none of its own. */
+  label: string
+  category: string
+  /** The statement the row's first check sits under, where its detail and retry live. */
+  statement: string
+  checks: AuditStatementCheck[]
+  /** The stores a family covers ("usa", "eu"); empty for a lone check. */
+  variants: string[]
+  /** The row's worst: not run, else partial, else ran. */
+  status: AuditCheckStatus
+  ran: number
+}
+
+export interface CheckGroup {
+  id: string
+  label: string
+  rows: CheckRow[]
+}
+
+const CHECK_ORDER: Record<AuditCheckStatus, number> = { notRun: 0, partial: 1, ran: 2 }
+
+function splitCheckId(id: string): [stem: string, suffix: string] {
+  const at = id.lastIndexOf('-')
+  return at > 0 ? [id.slice(0, at), id.slice(at + 1)] : [id, '']
+}
+
+/**
+ * DAR-UI-087 (Aditi: "i dont like how this looks"). Every check under its category, listed once, the ones that did not run
+ * first. A statement's checks that differ only in a last segment that also ends another check's id (usa, eu, uk recur
+ * across RAILS' per-store statements) are one row naming the stores; two checks that merely share a prefix stay apart.
+ */
+export function checkGroups(report: AuditReport): CheckGroup[] {
+  const categories = Object.entries(report.categories ?? {})
+  const stemsBySuffix = new Map<string, Set<string>>()
+  for (const [, category] of categories) {
+    for (const check of statementsOf(category).flatMap((statement) => statement.checks ?? [])) {
+      const [stem, suffix] = splitCheckId(check.id)
+      if (suffix) stemsBySuffix.set(suffix, (stemsBySuffix.get(suffix) ?? new Set()).add(stem))
+    }
+  }
+  const recurs = (suffix: string) => (stemsBySuffix.get(suffix)?.size ?? 0) > 1
+
+  return categories.map(([categoryId, category]) => {
+    const seen = new Set<string>()
+    const rows: CheckRow[] = []
+    for (const statement of statementsOf(category)) {
+      const checks = (statement.checks ?? []).filter((check) => !seen.has(check.id) && seen.add(check.id))
+      const byStem = new Map<string, AuditStatementCheck[]>()
+      for (const check of checks) {
+        const stem = splitCheckId(check.id)[0]
+        byStem.set(stem, [...(byStem.get(stem) ?? []), check])
+      }
+      for (const check of checks) {
+        const [stem] = splitCheckId(check.id)
+        const family = byStem.get(stem) ?? []
+        const isFamily = family.length > 1 && family.filter((member) => recurs(splitCheckId(member.id)[1])).length > 1
+        if (isFamily && family[0] !== check) continue
+        const members = isFamily ? family : [check]
+        rows.push({
+          id: isFamily ? stem : check.id,
+          label: isFamily ? '' : check.label,
+          category: categoryId,
+          statement: statement.id,
+          checks: members,
+          variants: isFamily ? members.map((member) => splitCheckId(member.id)[1]) : [],
+          status: members.reduce<AuditCheckStatus>((worst, member) =>
+            CHECK_ORDER[member.status] < CHECK_ORDER[worst] ? member.status : worst, 'ran'),
+          ran: members.filter((member) => member.status === 'ran').length,
+        })
+      }
+    }
+    // Stable: within a status the report's order holds.
+    rows.sort((a, b) => CHECK_ORDER[a.status] - CHECK_ORDER[b.status])
+    return { id: categoryId, label: category.label, rows }
+  }).filter((group) => group.rows.length)
 }
 
 /** DAR-UI-070. What "N more" fetched for the statement on show; hasNextPage is null until it has. */

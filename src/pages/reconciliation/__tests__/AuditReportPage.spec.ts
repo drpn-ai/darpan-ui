@@ -122,7 +122,9 @@ describe('AuditReportPage', () => {
     await flushPromises()
     expect(f.getAuditReport).toHaveBeenCalledWith({ audit: 'month-close' }, expect.anything())
     expect(w.get('h1').text()).toBe('Month close')
-    expect(w.get('[data-testid="run-type-audit"]').text()).toBe('Audit · 2026-10')
+    // DAR-UI-087. The period is the hero's select, so the badge does not say it again.
+    expect(w.get('[data-testid="run-type-audit"]').text()).toBe('Audit')
+    expect(w.findAllComponents({ name: 'AppSelect' }).find((c) => c.props('testId') === 'audit-period')!.element.closest('.static-page-hero')).not.toBeNull()
     expect(w.get('[data-testid="audit-window"]').text()).toBe('Oct 1 – 8')
     // Column 1: Run health first, then the categories.
     expect(w.get('[data-testid="audit-category-health"]').text()).toContain('complete')
@@ -160,8 +162,8 @@ describe('AuditReportPage', () => {
     ])
     expect(w.get('[data-testid="audit-source-HotWax"]').text()).toContain('3,871 records')
     // Every read complete: it opens on the checks.
-    expect(w.get('[data-testid="audit-health"]').text()).toBe('Complete')
-    expect(w.get('[data-testid="audit-checks-ran"]').text()).toBe('2')
+    expect(w.get('[data-testid="audit-health"]').text()).toBe('2 of 2 checks ran')
+    expect(w.get('[data-testid="audit-check-row-invoices-without-etail-id"]').text()).toContain('ran')
 
     f.getAuditReport.mockResolvedValue({ ok: true, report: report({
       complete: false,
@@ -177,6 +179,57 @@ describe('AuditReportPage', () => {
     expect(detail.text()).toContain('Partial')
     expect(detail.text()).toContain('one page failed')
     expect(detail.text()).toContain('R2')
+  })
+
+  // DAR-UI-087 (Aditi: "i dont like how this looks"). Nothing read and every check not run: no one-row list column, and the
+  // checks by category in place of the summary's sentence of ids; a store family is one row and retries each store.
+  it('lists the checks that did not run by category, folds a statement\'s stores into one row, and retries them all', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-08T18:00:00Z'))
+    try {
+      const check = (id: string) => ({ id, label: `${id} label`, status: 'notRun' as const, reason: null, matchedBy: null, graceDays: null, compared: null })
+      const doc = report({
+        complete: false, summary: 'Not complete: checks a, b and c did not run.', sources: {}, checks: { ran: 0, partial: 0, notRun: 5 },
+      })
+      const orders = doc.categories.orders!
+      orders.statements.R2!.status = 'notRun'
+      orders.statements.R2!.checks = [check('invoices-without-etail-id')]
+      orders.statements.R3!.status = 'notRun'
+      orders.statements.R3!.checks = [check('orders-not-in-hotwax-usa'), check('orders-not-in-hotwax-eu')]
+      doc.categories.returns = { label: 'Returns', counts: counts(), statements: {
+        R6: { id: 'R6', text: 'Every refund has a memo.', weight: 'firm', status: 'notRun', reason: null, checks: [check('refunds-without-memo-usa'), check('refunds-without-memo-eu')], counts: counts(), findings: [], findingsOmitted: 0 },
+      } }
+      f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+      f.retryAuditCheck.mockResolvedValue({ ok: true, submitted: true, extracts: [] } as never)
+      liveRoute.query = { category: 'health' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+
+      expect(w.get('[data-testid="audit-columns"]').classes()).toContain('audit-columns--health-flat')
+      expect(w.find('[data-testid="audit-source-Checks"]').exists()).toBe(false)
+      expect(w.get('[data-testid="audit-health"]').text()).toBe('0 of 5 checks ran')
+      expect(w.text()).not.toContain('did not run.')
+      expect(w.findAll('[data-testid^="audit-check-group-"]').map((g) => g.find('h3').text())).toEqual(['Orders', 'Returns'])
+      const family = w.get('[data-testid="audit-check-row-orders-not-in-hotwax"]')
+      expect(family.text()).toContain('usa · eu')
+      expect(family.text()).toContain('not run')
+
+      // One retry at the head for every check that did not run, each submitted in turn; the rows carry none.
+      expect(w.find('[data-testid^="audit-retry-row-"]').exists()).toBe(false)
+      expect(w.get('[data-testid="audit-retry-unrun"]').text()).toBe('Retry 5 not run')
+      await w.get('[data-testid="audit-retry-unrun"]').trigger('click')
+      await flushPromises()
+      expect(f.retryAuditCheck.mock.calls.map(([args]) => args.check)).toEqual([
+        'invoices-without-etail-id', 'orders-not-in-hotwax-usa', 'orders-not-in-hotwax-eu', 'refunds-without-memo-usa', 'refunds-without-memo-eu',
+      ])
+
+      // A row opens the statement its check sits under.
+      await family.get('.audit-check-row-main').trigger('click')
+      expect(push).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R3', finding: undefined, source: undefined } })
+      w.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   // DAR-UI-085 (Aditi: "when an audit is running... i cannot see any indication"). Mid-play every check still reads
@@ -280,7 +333,7 @@ describe('AuditReportPage', () => {
 
     liveRoute.query = { category: 'orders', statement: 'R3' }
     await flushPromises()
-    expect(w.get('[data-testid="audit-statement-empty-R3"]').text()).toBe('Holds')
+    expect(w.get('[data-testid="audit-statement-empty-R3"]').text()).toBe('Nothing found')
     expect(w.get('[data-testid="audit-columns"]').attributes('data-level')).toBe('3')
 
     await w.get('[data-testid="audit-category-health"]').trigger('click')

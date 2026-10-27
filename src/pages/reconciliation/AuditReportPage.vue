@@ -5,6 +5,15 @@
       <div class="audit-hero-title">
         <h1>{{ report?.report.audit.name || 'Audit' }}</h1>
         <div class="action-row audit-hero-actions">
+          <!-- DAR-UI-087. The period beside the actions, said once: the toolbar no longer repeats it. -->
+          <div v-if="report && periods.length > 1" class="audit-period">
+            <AppSelect
+              :model-value="report.report.period"
+              :options="periods.map((value) => ({ value, label: value }))"
+              test-id="audit-period"
+              @update:model-value="choosePeriod"
+            />
+          </div>
           <RouterLink
             :to="{ name: 'audit-run-start', params: { audit: auditCode }, query: carriedQuery }"
             class="app-icon-action app-icon-action--large"
@@ -41,11 +50,14 @@
           </RouterLink>
         </div>
       </div>
-      <RunTypeBadge v-if="report" type="audit" :detail="report.report.period" />
-      <p v-if="report" class="static-page-section-description" data-testid="audit-window">
-        {{ shortRange(report.report.window.from, report.report.window.thru) }}<template v-if="readWindow"> · read {{ shortRange(readWindow.from, readWindow.thru) }}</template>
+      <!-- DAR-UI-087. One line under the name: the type, the window, today's movement. -->
+      <p v-if="report" class="static-page-section-description audit-hero-meta">
+        <RunTypeBadge type="audit" :detail="periods.length > 1 ? undefined : report.report.period" />
+        <span aria-hidden="true">·</span>
+        <span data-testid="audit-window">{{ shortRange(report.report.window.from, report.report.window.thru) }}<template v-if="readWindow"> · read {{ shortRange(readWindow.from, readWindow.thru) }}</template></span>
+        <span aria-hidden="true">·</span>
+        <span data-testid="audit-today">{{ todayLine }}</span>
       </p>
-      <p v-if="report" class="static-page-section-description" data-testid="audit-today">{{ todayLine }}</p>
     </template>
 
     <LoadingState v-if="loading" noun="audit" />
@@ -57,12 +69,13 @@
       <!-- DAR-UI-065. The counts are the filters: each pill keeps the statements it names. -->
       <div class="audit-toolbar">
         <div class="audit-filters" role="group" aria-label="Show">
+          <!-- DAR-UI-087. Open, pending and all count findings; "not checked" counts statements, so it stands apart. -->
           <button
             v-for="pill in pills"
             :key="pill.id"
             type="button"
             class="audit-filter"
-            :class="{ 'audit-filter--on': pill.id === filter, 'audit-filter--empty': pill.id === 'notChecked' }"
+            :class="{ 'audit-filter--on': pill.id === filter, 'audit-filter--empty': pill.id === 'notChecked', 'audit-filter--apart': pill.id === 'notChecked' }"
             :aria-pressed="pill.id === filter ? 'true' : 'false'"
             :data-testid="`audit-filter-${pill.id}`"
             @click="chooseFilter(pill.id)"
@@ -94,16 +107,6 @@
             />
           </div>
         </div>
-        <!-- A header-row select keeps a fixed width, as the design system's run result screen holds it; on a
-             phone it gives way rather than push the page past the screen. -->
-        <div v-if="periods.length > 1" class="audit-period" :style="{ width: 'min(13.75rem, 45vw)' }">
-          <AppSelect
-            :model-value="report.report.period"
-            :options="periods.map((value) => ({ value, label: value }))"
-            test-id="audit-period"
-            @update:model-value="choosePeriod"
-          />
-        </div>
       </div>
 
       <AuditColumns
@@ -124,7 +127,7 @@
         :verifying="verifying"
         :progress="progress"
         :retryable="isTodaysMorning"
-        :retrying="retryingCheck"
+        :retrying="retryingChecks"
         @navigate="navigate"
         @more="loadMore"
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
@@ -153,7 +156,6 @@ import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../
 import type { AuditFindingDocument, AuditFindingListItem, AuditProgress, AuditReport } from '../../lib/api/auditTypes'
 import { auditMorningQuery, periodOptions, shortRange, systemLabel } from '../../lib/auditReport'
 import {
-  AUDIT_FILTERS,
   HEALTH,
   defaultCategory,
   defaultSource,
@@ -254,12 +256,14 @@ const level = computed(() => {
   return queryValue('category') ? 2 : 1
 })
 
-const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', pending: 'pending', notChecked: 'unchecked', all: 'all' }
+const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', pending: 'pending', notChecked: 'not checked', all: 'all' }
+// DAR-UI-087. The finding pills first, then the statements' one, as the left column words it.
+const PILL_ORDER: AuditFilter[] = ['open', 'pending', 'all', 'notChecked']
 const pills = computed(() => {
   const doc = report.value
   if (!doc) return []
   const counts = filterCounts(doc)
-  return AUDIT_FILTERS.map((id) => ({ id, count: counts[id], label: FILTER_LABELS[id] }))
+  return PILL_ORDER.map((id) => ({ id, count: counts[id], label: FILTER_LABELS[id] }))
 })
 const todayLine = computed(() => {
   const summary = report.value?.summary
@@ -331,7 +335,7 @@ async function loadProgress(): Promise<void> {
 }
 
 // DAR-UI-086. "Retry from last read" is offered on today's morning only: a retry runs now, so it reports on today.
-const retryingCheck = ref('')
+const retryingChecks = ref<string[]>([])
 const isTodaysMorning = computed(() => {
   const doc = report.value?.report
   if (!doc?.running) return false
@@ -342,15 +346,18 @@ const isTodaysMorning = computed(() => {
   }
 })
 
-async function retryCheck(check: string): Promise<void> {
+// DAR-UI-087. A family row on Run health retries each of its stores that did not run, one after another.
+async function retryCheck(checks: string[]): Promise<void> {
   const doc = report.value?.report
-  if (!doc || retryingCheck.value) return
-  retryingCheck.value = check
+  if (!doc || retryingChecks.value.length || !checks.length) return
+  retryingChecks.value = checks
   try {
-    const response = await auditFacade.retryAuditCheck({ audit: auditCode.value, check, date: doc.date, period: doc.period })
-    if (response.ok === false || !response.submitted) {
-      say(errorOf(response, 'The check would not go again. Try a play instead.'))
-      return
+    for (const check of checks) {
+      const response = await auditFacade.retryAuditCheck({ audit: auditCode.value, check, date: doc.date, period: doc.period })
+      if (response.ok === false || !response.submitted) {
+        say(errorOf(response, 'The check would not go again. Try a play instead.'))
+        return
+      }
     }
     say('Retrying from the last read. Nothing is read again.')
     watchPlayUntil = Date.now() + PLAY_WATCH_MS
@@ -358,7 +365,7 @@ async function retryCheck(check: string): Promise<void> {
   } catch (err) {
     say(err instanceof Error && err.message ? err.message : 'The check would not go again. Try a play instead.')
   } finally {
-    retryingCheck.value = ''
+    retryingChecks.value = []
   }
 }
 
@@ -664,9 +671,32 @@ watch([findingId, report, selectedStatement], async () => {
   gap: var(--space-1-5);
 }
 
-/* The period leads the row: "2026-10 · 393 open … · search · cause · age", the day's note at the end. */
+/* DAR-UI-087. The hero is the board's head: no band between them. */
+.audit-page :deep(.static-page-panel) {
+  gap: 0;
+}
+
+.audit-page :deep(.static-page-hero) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.audit-page :deep(.static-page-board) {
+  border-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.audit-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+/* A fixed width, as the design system's run result screen holds a header-row select; a phone gives way. */
 .audit-period {
-  order: -1;
+  width: min(10rem, 40vw);
 }
 
 @media (max-width: 760px) {
@@ -676,7 +706,9 @@ watch([findingId, report, selectedStatement], async () => {
 }
 
 .audit-search {
-  width: min(13rem, 100%);
+  /* A fixed width (not a percentage): the row sizes .audit-find from it before it wraps. */
+  width: 16rem;
+  max-width: 100%;
   min-height: 2.55rem;
   padding: var(--space-1-5) var(--space-2);
   border: 1px solid var(--border);
@@ -719,6 +751,10 @@ watch([findingId, report, selectedStatement], async () => {
 .audit-filter--empty {
   border-style: dashed;
   border-color: var(--text-dim);
+}
+
+.audit-filter--apart {
+  margin-left: var(--space-2);
 }
 
 .audit-filter--on {

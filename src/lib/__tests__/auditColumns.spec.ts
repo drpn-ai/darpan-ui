@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { AuditCategory, AuditFindingListItem, AuditProgress, AuditReport, AuditStatement } from '../api/auditTypes'
+import type { AuditCategory, AuditFindingListItem, AuditProgress, AuditReport, AuditStatement, AuditStatementCheck } from '../api/auditTypes'
 import {
   HEALTH,
   categoryItems,
   causeOptions,
   causeGroups,
   causeHeading,
+  checkGroups,
   comparedBars,
   comparedGap,
   countFor,
@@ -75,7 +76,11 @@ describe('auditColumns', () => {
     expect(items[0]).toMatchObject({ label: 'Run health', sub: 'complete · 1 not covered', attention: false })
     expect(items[1]).toMatchObject({ sub: '1 open · 1 pending', attention: true, short: 'Orders' })
     expect(items[2]).toMatchObject({ sub: '2 open · 1 not checked', short: 'Refunds' })
-    expect(items[3]).toMatchObject({ sub: 'holds', attention: false })
+    expect(items[3]).toMatchObject({ sub: 'nothing found', attention: false })
+    // DAR-UI-087. A category nothing checked does not say nothing was found.
+    const unchecked = report()
+    unchecked.categories.exchanges = category('Exchanges and warranty', [statement('R12', 0, 0, 'notRun')])
+    expect(categoryItems(unchecked)[3]).toMatchObject({ sub: '1 not checked' })
     expect(categoryItems(report({ complete: false, notCovered: [] }))[0]).toMatchObject({ sub: 'not complete', attention: true })
   })
 
@@ -274,7 +279,7 @@ describe('auditColumns', () => {
   })
 
   it('reads counts and filters in words', () => {
-    expect(countsLine(counts(0, 0))).toBe('holds')
+    expect(countsLine(counts(0, 0))).toBe('nothing found')
     expect(countsLine(counts(2, 0))).toBe('2 open')
     expect(isAuditFilter('open')).toBe(true)
     expect(isAuditFilter('everything')).toBe(false)
@@ -295,5 +300,36 @@ describe('auditColumns', () => {
     const bare = { id: 'c', headline: 'Return c: No RMA', cause: null } as AuditFindingListItem
     expect([old, fresh, bare].map(causeHeading)).toEqual(['Order backordered', 'Order backordered', 'No RMA'])
     expect(causeGroups([old, bare, fresh]).map((item) => item.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  // DAR-UI-087 (Aditi: "i dont like how this looks"): Run health › Checks lists every check under its category, a
+  // statement's per-store checks as one row naming the stores, the ones that did not run first.
+  it('groups the checks by category, folds a statement\'s per-store checks into one row, and puts not run first', () => {
+    const check = (id: string, status: AuditStatementCheck['status'] = 'notRun'): AuditStatementCheck =>
+      ({ id, label: `${id} label`, status, reason: null, matchedBy: null, graceDays: null, compared: null })
+    const withChecks = (id: string, checks: AuditStatementCheck[]) => ({ ...statement(id), checks })
+    const doc = report()
+    doc.categories = {
+      orders: category('Orders', [
+        withChecks('R1', [check('completed-not-billed', 'ran'), check('completed-not-shipped')]),
+        withChecks('R2', [check('shopify-orders-not-in-hotwax-usa', 'ran'), check('shopify-orders-not-in-hotwax-eu'), check('shopify-orders-not-in-hotwax-uk', 'partial')]),
+        // The same check under a second statement is listed once.
+        withChecks('R3', [check('completed-not-billed', 'ran')]),
+      ]),
+      returns: category('Returns', [withChecks('R6', [check('refunded-returns-without-credit-memo-usa', 'ran'), check('refunded-returns-without-credit-memo-uk', 'ran')])]),
+      exchanges: category('Exchanges and warranty', [statement('R12')]),
+    }
+    const groups = checkGroups(doc)
+    expect(groups.map((group) => group.label)).toEqual(['Orders', 'Returns'])
+    const [orders, returns] = groups
+    // Two checks in one statement that only share a prefix are not a family: a family is one statement's stores.
+    expect(orders!.rows.map((row) => [row.id, row.variants, row.status, row.ran, row.checks.length])).toEqual([
+      ['completed-not-shipped', [], 'notRun', 0, 1],
+      ['shopify-orders-not-in-hotwax', ['usa', 'eu', 'uk'], 'notRun', 1, 3],
+      ['completed-not-billed', [], 'ran', 1, 1],
+    ])
+    expect(orders!.rows[0]).toMatchObject({ label: 'completed-not-shipped label', category: 'orders', statement: 'R1' })
+    expect(orders!.rows[1]).toMatchObject({ label: '', statement: 'R2' })
+    expect(returns!.rows.map((row) => [row.id, row.status])).toEqual([['refunded-returns-without-credit-memo', 'ran']])
   })
 })
