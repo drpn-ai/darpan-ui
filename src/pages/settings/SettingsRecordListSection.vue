@@ -9,7 +9,7 @@
       @update:page-index="emit('update:pageIndex', $event)"
     />
 
-    <p v-if="loading" class="section-note">{{ loadingMessage }}</p>
+    <LoadingState v-if="loading" :noun="loadingNoun" />
     <InlineValidation v-else-if="error" tone="error" :message="error" />
     <EmptyState v-else-if="tiles.length === 0" :title="emptyTitle" />
 
@@ -56,6 +56,7 @@ import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import AppListPager from '../../components/ui/AppListPager.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 
 interface SettingsRecordTile {
@@ -74,7 +75,7 @@ const props = withDefaults(defineProps<{
   previousTestId: string
   nextTestId: string
   loading: boolean
-  loadingMessage: string
+  loadingNoun: string
   error: string | null
   emptyTitle: string
   listTestId: string

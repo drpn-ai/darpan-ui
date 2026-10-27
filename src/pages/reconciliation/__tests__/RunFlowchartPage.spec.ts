@@ -443,7 +443,7 @@ describe('RunFlowchartPage', () => {
       await flushPromises()
       expect(w.text()).toContain('Order chain')
       expect(w.find('[data-testid="flowchart-box-A"]').exists()).toBe(true)
-      expect(w.text()).not.toContain('Loading run...')
+      expect(w.find('[data-testid="page-loading"]').exists()).toBe(false)
       w.unmount()
     })
   })

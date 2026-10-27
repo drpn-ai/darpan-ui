@@ -69,7 +69,7 @@
         previous-test-id="netsuite-endpoint-page-previous"
         next-test-id="netsuite-endpoint-page-next"
         :loading="endpointsLoading"
-        loading-message="Loading endpoints..."
+        loading-noun="endpoints"
         :error="endpointsError"
         empty-title="No endpoints"
         list-test-id="saved-endpoint-configs"

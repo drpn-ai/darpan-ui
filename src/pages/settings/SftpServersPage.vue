@@ -13,7 +13,7 @@
       previous-test-id="sftp-page-previous"
       next-test-id="sftp-page-next"
       :loading="loading"
-      loading-message="Loading servers..."
+      loading-noun="servers"
       :error="error"
       empty-title="No SFTP servers"
       list-test-id="saved-sftp-servers"

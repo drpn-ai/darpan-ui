@@ -13,7 +13,7 @@
       previous-test-id="netsuite-auth-page-previous"
       next-test-id="netsuite-auth-page-next"
       :loading="authLoading"
-      loading-message="Loading auth configs..."
+      loading-noun="auth configs"
       :error="authError"
       empty-title="No auth configs"
       list-test-id="saved-auth-configs"

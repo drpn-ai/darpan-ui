@@ -6,7 +6,7 @@
       <p v-if="shownStarted" class="static-page-section-description" data-testid="flowchart-shown-started">{{ shownStarted }}</p>
     </template>
 
-    <p v-if="loading" class="section-note">Loading run...</p>
+    <LoadingState v-if="loading" noun="run" />
     <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="flowchart-page-error" />
 
     <template v-if="run">
@@ -253,6 +253,7 @@ import LifecycleBoard from '../../components/reconciliation/LifecycleBoard.vue'
 import LifecycleOutline from '../../components/reconciliation/LifecycleOutline.vue'
 import RunFlowchartBoard from '../../components/reconciliation/RunFlowchartBoard.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'

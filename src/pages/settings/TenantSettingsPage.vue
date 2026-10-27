@@ -4,7 +4,7 @@
       <h1>{{ tenantSettingsTitle }}</h1>
     </template>
 
-    <p v-if="summaryLoading" class="section-note">Loading tenant settings...</p>
+    <LoadingState v-if="summaryLoading" noun="tenant settings" />
     <InlineValidation v-if="summaryError" tone="error" :message="summaryError" />
 
     <StaticPageSection>
@@ -567,6 +567,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import WorkflowSelect, { type WorkflowSelectOption } from '../../components/workflow/WorkflowSelect.vue'

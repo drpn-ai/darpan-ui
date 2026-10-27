@@ -13,7 +13,7 @@
       previous-test-id="runs-page-previous"
       next-test-id="runs-page-next"
       :loading="loading"
-      loading-message="Loading runs..."
+      loading-noun="runs"
       :error="error"
       empty-title="No runs"
       list-test-id="saved-runs"

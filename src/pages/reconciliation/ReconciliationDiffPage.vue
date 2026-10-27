@@ -108,7 +108,7 @@
         </div>
 
         <section v-if="showLatestSavedOutputBoard" class="reconciliation-run-history-board">
-          <p v-if="latestSavedOutputLoading" class="section-note" data-testid="latest-run-result-loading">Loading saved results…</p>
+          <LoadingState v-if="latestSavedOutputLoading" noun="saved results" data-testid="latest-run-result-loading" />
           <InlineValidation v-else-if="latestSavedOutputError" tone="error" :message="latestSavedOutputError" />
           <template v-else-if="latestSavedOutput && latestSavedOutputRoute">
             <RouterLink
@@ -189,6 +189,7 @@ import WorkflowShortcutChoiceCards from '../../components/workflow/WorkflowShort
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
 import type { SavedRunSummary, SavedRunSystemOption } from '../../lib/api/types'

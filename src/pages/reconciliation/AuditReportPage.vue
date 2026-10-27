@@ -48,7 +48,7 @@
       <p v-if="report" class="static-page-section-description" data-testid="audit-today">{{ todayLine }}</p>
     </template>
 
-    <p v-if="loading" class="section-note">Loading audit...</p>
+    <LoadingState v-if="loading" noun="audit" />
     <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="audit-page-error" />
     <InlineValidation v-if="exportError" tone="error" :message="exportError" data-testid="audit-export-error" />
     <InlineValidation v-if="periodError" tone="error" :message="periodError" data-testid="audit-find-error" />
@@ -137,6 +137,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
 import AuditColumns from '../../components/audit/AuditColumns.vue'

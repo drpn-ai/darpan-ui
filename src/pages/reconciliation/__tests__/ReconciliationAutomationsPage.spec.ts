@@ -130,7 +130,7 @@ describe('ReconciliationAutomationsPage', () => {
     await flushPromises()
 
     expect(revisit.findAll('[data-testid="automation-tile"]')).toHaveLength(2)
-    expect(revisit.find('[data-testid="automation-loading"]').exists()).toBe(false)
+    expect(revisit.find('[data-testid="page-loading"]').exists()).toBe(false)
   })
 
   it('handles empty and error states', async () => {

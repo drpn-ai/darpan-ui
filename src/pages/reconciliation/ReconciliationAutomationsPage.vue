@@ -5,7 +5,7 @@
     </template>
 
     <StaticPageSection title="Automation Runs">
-      <p v-if="loading" class="section-note" data-testid="automation-loading">Loading automations...</p>
+      <LoadingState v-if="loading" noun="automations" />
       <InlineValidation v-else-if="error" tone="error" :message="error" />
 
       <EmptyState
@@ -58,6 +58,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError } from '../../lib/api/client'

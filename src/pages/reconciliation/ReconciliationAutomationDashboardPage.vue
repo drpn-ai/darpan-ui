@@ -4,7 +4,7 @@
       <h1>{{ heroTitle }}</h1>
     </template>
 
-    <p v-if="loading" class="section-note">Loading automation...</p>
+    <LoadingState v-if="loading" noun="automation" />
     <InlineValidation v-else-if="error" tone="error" :message="error" />
 
     <template v-else-if="automation">
@@ -208,6 +208,7 @@ import AppTableFrame from '../../components/ui/AppTableFrame.vue'
 import { vExplain } from '../../directives/vExplain'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'

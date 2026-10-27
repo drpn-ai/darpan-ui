@@ -1,6 +1,6 @@
 <template>
   <StaticPageSection title="Endpoints">
-    <p v-if="loadState === 'loading'" class="section-note">Loading endpoints...</p>
+    <LoadingState v-if="loadState === 'loading'" noun="endpoints" />
     <InlineValidation v-else-if="loadState === 'error'" tone="error" :message="error ?? ''" />
     <div
       v-else
@@ -23,6 +23,7 @@
 <script setup lang="ts">
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import type { SourceConfigEndpoint } from '../../lib/api/types'
 

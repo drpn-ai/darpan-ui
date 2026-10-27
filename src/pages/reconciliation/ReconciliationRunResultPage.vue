@@ -81,7 +81,7 @@
 
       <StaticPageSection>
         <InlineValidation v-if="runSettingsError" tone="error" :message="runSettingsError" />
-        <p v-if="loading" class="section-note" data-testid="run-result-loading">Loading saved result…</p>
+        <LoadingState v-if="loading" noun="saved result" data-testid="run-result-loading" />
         <InlineValidation v-else-if="loadError" tone="error" :message="loadError" />
 
         <section v-else-if="savedOutput || liveRunResultId" class="reconciliation-diff-details">
@@ -567,6 +567,7 @@ import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
 import RunResultConclusionEvidence from '../../components/reconciliation/RunResultConclusionEvidence.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'

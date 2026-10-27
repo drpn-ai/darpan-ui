@@ -321,7 +321,7 @@ describe('ReconciliationAutomationDashboardPage', () => {
 
     expect(revisit.text()).toContain('Daily API orders')
     expect(revisit.findAll('[data-testid="automation-execution-row"]')).toHaveLength(2)
-    expect(revisit.text()).not.toContain('Loading automation...')
+    expect(revisit.find('[data-testid="page-loading"]').exists()).toBe(false)
   })
 
   it('states no next run while the automation is paused', async () => {

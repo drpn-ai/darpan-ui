@@ -13,7 +13,7 @@
       previous-test-id="shopify-page-previous"
       next-test-id="shopify-page-next"
       :loading="loading"
-      loading-message="Loading Shopify configs..."
+      loading-noun="Shopify configs"
       :error="error"
       empty-title="No Shopify configs"
       list-test-id="saved-shopify-configs"

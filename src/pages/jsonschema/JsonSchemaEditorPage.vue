@@ -15,7 +15,7 @@
     </template>
 
     <StaticPageSection>
-      <p v-if="loading && !initialLoadCompleted" class="section-note" data-testid="schema-editor-loading">Loading schema...</p>
+      <LoadingState v-if="loading && !initialLoadCompleted" noun="schema" />
 
       <template v-else-if="showInitialLoadFailureState">
         <InlineValidation v-if="error" tone="error" :message="error" />
@@ -187,6 +187,7 @@ import AppSaveAction from '../../components/ui/AppSaveAction.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'

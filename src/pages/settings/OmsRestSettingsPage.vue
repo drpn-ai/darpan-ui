@@ -13,7 +13,7 @@
       previous-test-id="oms-auth-page-previous"
       next-test-id="oms-auth-page-next"
       :loading="authLoading"
-      loading-message="Loading auth configs..."
+      loading-noun="auth configs"
       :error="authError"
       empty-title="No auth configs"
       list-test-id="saved-oms-auth-configs"
