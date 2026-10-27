@@ -978,6 +978,26 @@ button:disabled {
   text-wrap: balance;
 }
 
+/* DAR-UI-084: "Forgot password?" reads as a quiet text link under the form, so Sign In stays the one
+   button. Still a <button>: it switches the panel in place rather than navigating. */
+.login-text-link {
+  justify-self: start;
+  min-height: 0;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: var(--type-muted-size);
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
+}
+
+.login-text-link:hover {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+
 .workflow-page {
   min-height: 100vh;
   grid-template-rows: auto minmax(0, 1fr);

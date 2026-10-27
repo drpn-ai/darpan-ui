@@ -31,16 +31,16 @@
 
         <div class="action-row">
           <button type="submit" :disabled="loading">Sign In</button>
-          <button
-            v-if="passwordResetAvailable"
-            type="button"
-            class="ghost-btn"
-            data-testid="login-forgot-password"
-            @click="enterResetMode"
-          >
-            Forgot password?
-          </button>
         </div>
+        <button
+          v-if="passwordResetAvailable"
+          type="button"
+          class="login-text-link"
+          data-testid="login-forgot-password"
+          @click="enterResetMode"
+        >
+          Forgot password?
+        </button>
       </form>
 
       <!-- DAR-BE-028: signed in, but no email on file, so a forgotten password would be a dead end. Asked at

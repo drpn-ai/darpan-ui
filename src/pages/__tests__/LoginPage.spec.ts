@@ -338,6 +338,15 @@ describe('LoginPage', () => {
     expect(wrapper.find('[data-testid="login-forgot-password"]').exists()).toBe(false)
   })
 
+  it('shows Forgot password? as a text link below Sign In, not a second button beside it', async () => {
+    const wrapper = mount(LoginPage)
+    await flushPromises()
+
+    const link = wrapper.get('[data-testid="login-forgot-password"]')
+    expect(link.classes()).toContain('login-text-link')
+    expect(wrapper.get('.action-row').find('[data-testid="login-forgot-password"]').exists()).toBe(false)
+  })
+
   it('opens the reset on the username, prefilled from the sign-in form', async () => {
     const wrapper = await openReset('pwr.user')
 
