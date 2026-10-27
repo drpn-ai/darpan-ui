@@ -123,11 +123,14 @@
         :order-unit="orderUnit"
         :verifying="verifying"
         :progress="progress"
+        :retryable="isTodaysMorning"
+        :retrying="retryingCheck"
         @navigate="navigate"
         @more="loadMore"
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
         @extract="(check, system) => void exportExtract(check, system)"
         @verify="verifyFinding"
+        @retry="retryCheck"
       />
     </template>
   </StaticPageFrame>
@@ -324,6 +327,38 @@ async function loadProgress(): Promise<void> {
     // Aborted or unreachable: try again on the next tick if one is due.
   } finally {
     scheduleProgress()
+  }
+}
+
+// DAR-UI-086. "Retry from last read" is offered on today's morning only: a retry runs now, so it reports on today.
+const retryingCheck = ref('')
+const isTodaysMorning = computed(() => {
+  const doc = report.value?.report
+  if (!doc?.running) return false
+  try {
+    return doc.date === new Intl.DateTimeFormat('en-CA', { timeZone: doc.tenant.timeZone || 'UTC' }).format(new Date())
+  } catch {
+    return false
+  }
+})
+
+async function retryCheck(check: string): Promise<void> {
+  const doc = report.value?.report
+  if (!doc || retryingCheck.value) return
+  retryingCheck.value = check
+  try {
+    const response = await auditFacade.retryAuditCheck({ audit: auditCode.value, check, date: doc.date, period: doc.period })
+    if (response.ok === false || !response.submitted) {
+      say(errorOf(response, 'The check would not go again. Try a play instead.'))
+      return
+    }
+    say('Retrying from the last read. Nothing is read again.')
+    watchPlayUntil = Date.now() + PLAY_WATCH_MS
+    void loadProgress()
+  } catch (err) {
+    say(err instanceof Error && err.message ? err.message : 'The check would not go again. Try a play instead.')
+  } finally {
+    retryingCheck.value = ''
   }
 }
 

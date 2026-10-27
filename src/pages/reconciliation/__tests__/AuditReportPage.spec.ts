@@ -16,7 +16,7 @@ vi.mock('vue-router', async () => {
   }
 })
 vi.mock('../../../lib/api/facade', () => ({
-  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn(), getAuditProgress: vi.fn() },
+  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn(), getAuditProgress: vi.fn(), retryAuditCheck: vi.fn() },
   reconciliationFacade: { getGeneratedOutput: vi.fn() },
 }))
 
@@ -216,6 +216,39 @@ describe('AuditReportPage', () => {
       await vi.advanceTimersByTimeAsync(60_000)
       expect(f.getAuditProgress.mock.calls.length).toBe(progressReads)
       w.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // DAR-UI-086 (Aditi: "do the followups"): a check that did not run this morning runs again from what it already read.
+  it('offers "Retry from last read" on today\'s check that did not run, submits it for that morning, and watches it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-08T18:00:00Z'))
+    try {
+      const doc = report()
+      const r2 = doc.categories.orders!.statements.R2!
+      r2.status = 'notRun'
+      r2.checks = [{ ...r2.checks[0]!, status: 'notRun', reason: 'The compare failed: UNRESOLVED_COLUMN' }]
+      f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+      f.retryAuditCheck.mockResolvedValue({ ok: true, submitted: true, extracts: [] } as never)
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      const progressReads = f.getAuditProgress.mock.calls.length
+
+      await w.get('[data-testid="audit-retry-check-invoices-without-etail-id"]').trigger('click')
+      await flushPromises()
+
+      expect(f.retryAuditCheck).toHaveBeenCalledWith({ audit: 'month-close', check: 'invoices-without-etail-id', date: '2026-10-08', period: '2026-10' })
+      expect(f.getAuditProgress.mock.calls.length).toBe(progressReads + 1)
+
+      // Another morning: a retry runs now and reports on today, so it is not offered.
+      vi.setSystemTime(new Date('2026-10-20T18:00:00Z'))
+      const past = mount(AuditReportPage)
+      await flushPromises()
+      expect(past.find('[data-testid="audit-retry-check-invoices-without-etail-id"]').exists()).toBe(false)
+      w.unmount()
+      past.unmount()
     } finally {
       vi.useRealTimers()
     }

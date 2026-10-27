@@ -326,6 +326,17 @@
               <!-- DAR-UI-085. Running now: where it is, in place of this morning's "did not run". -->
               <p v-if="runOf(check.id)" class="section-note" :data-testid="`audit-check-running-${check.id}`">{{ progressLine(runOf(check.id)!) }}</p>
               <p v-else-if="check.reason" class="section-note">{{ check.reason }}</p>
+              <!-- DAR-UI-086. A check that did not run this morning runs again from what its run already read. -->
+              <button
+                v-if="retryable && check.status !== 'ran' && !runOf(check.id)"
+                type="button"
+                class="audit-more"
+                :data-testid="`audit-retry-check-${check.id}`"
+                :disabled="retrying === check.id"
+                @click="emit('retry', check.id)"
+              >
+                Retry from last read
+              </button>
               <div v-if="comparedBars(check).length" class="audit-bars">
                 <div v-for="bar in comparedBars(check)" :key="bar.system" class="audit-bar" data-testid="audit-compared-bar">
                   <span class="audit-row-sub">{{ bar.system }}</span>
@@ -433,9 +444,13 @@ const props = defineProps<{
   verifying: boolean
   /** DAR-UI-085. What the checks are doing right now; null when nothing was read yet. */
   progress?: AuditProgress | null
+  /** DAR-UI-086. The morning on show is today's, so a check that did not run can be retried from its last read. */
+  retryable?: boolean
+  /** The check whose retry is being submitted. */
+  retrying?: string
 }>()
 
-const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: [] }>()
+const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [check: string] }>()
 
 const isHealth = computed(() => props.category === HEALTH)
 const rail = computed(() => !isHealth.value && Boolean(props.finding))

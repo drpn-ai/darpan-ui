@@ -317,6 +317,13 @@ export interface GetAuditProgressResponse extends AuditEnvelope {
   progress?: AuditProgress | null
 }
 
+// DAR-UI-086. "Retry from last read" (facade.AuditFacadeServices retry#AuditCheck): the check's failed run of that morning
+// runs again from the extracts it read; a refusal arrives as an error, in words.
+export interface RetryAuditCheckResponse extends AuditEnvelope {
+  submitted?: boolean
+  extracts?: { side: string; fileName: string; recordCount: number | null }[]
+}
+
 export interface SaveAuditSettingsPayload {
   audit: string
   name?: string

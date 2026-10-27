@@ -6,6 +6,7 @@ import type {
   GetAuditReportResponse,
   GetAuditSettingsResponse,
   GetAuditProgressResponse,
+  RetryAuditCheckResponse,
   GetAuditsResponse,
   RunAuditPayload,
   RunAuditResponse,
@@ -529,6 +530,7 @@ const AUDIT = {
   getAuditFindingsByOrder: 'facade.AuditFacadeServices.get#AuditFindingsByOrder',
   getAuditSettings: 'facade.AuditFacadeServices.get#AuditSettings',
   getAuditProgress: 'facade.AuditFacadeServices.get#AuditProgress',
+  retryAuditCheck: 'facade.AuditFacadeServices.retry#AuditCheck',
   saveAuditSettings: 'facade.AuditFacadeServices.save#AuditSettings',
   createAudit: 'facade.AuditFacadeServices.create#Audit',
   addAuditStatement: 'facade.AuditFacadeServices.add#AuditStatement',
@@ -564,6 +566,9 @@ export const auditFacade = {
   },
   getAuditProgress(payload: { audit: string }, signal?: AbortSignal): Promise<GetAuditProgressResponse> {
     return callService<GetAuditProgressResponse>(AUDIT.getAuditProgress, payload, signal)
+  },
+  retryAuditCheck(payload: { audit: string; check: string; date?: string; period: string }, signal?: AbortSignal): Promise<RetryAuditCheckResponse> {
+    return callService<RetryAuditCheckResponse>(AUDIT.retryAuditCheck, payload, signal)
   },
   saveAuditSettings(payload: SaveAuditSettingsPayload, signal?: AbortSignal): Promise<SaveAuditSettingsResponse> {
     return callService<SaveAuditSettingsResponse>(AUDIT.saveAuditSettings, payload, signal)
