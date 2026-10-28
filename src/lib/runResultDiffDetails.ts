@@ -35,8 +35,12 @@ export interface DiffDetailsSummary {
 export interface DiffDetailsRecord {
   diffType?: string
   type?: string
+  compareScopeId?: string
+  objectType?: string
   id?: string | number
   primaryId?: string | number
+  ids?: unknown
+  sideRecords?: unknown
   presentIn?: string
   missingIn?: string
   data?: unknown
@@ -128,25 +132,42 @@ export function parseDiffData(rawData: unknown): unknown {
   }
 }
 
-export function buildDiffDetailPayload(record: DiffDetailsRecord, parsedData: unknown): unknown {
+export interface DiffSideLabels {
+  file1Label?: string
+  file2Label?: string
+}
+
+function sideRecord(rawPair: unknown, side: 'file1' | 'file2'): unknown {
+  const pair = parseDiffData(rawPair)
+  return pair && typeof pair === 'object' ? (pair as Record<string, unknown>)[side] : undefined
+}
+
+/**
+ * DAR-BE-155: a rule row reads like a missing-record row: what differs, by system, then each system's record as
+ * read (sideRecords, else the pair's ids). Engine bookkeeping (rule id, severity, scope) stays out.
+ */
+export function buildDiffDetailPayload(record: DiffDetailsRecord, parsedData: unknown, labels: DiffSideLabels = {}): unknown {
   if (parsedData != null && !(typeof parsedData === 'string' && !parsedData.trim())) {
     return parsedData
   }
 
-  const diffDetail = {
-    diffType: resolveDiffType(record) || undefined,
-    primaryId:
-      record.primaryId != null && String(record.primaryId).trim() ? String(record.primaryId).trim() : undefined,
-    field: normalizeDisplayText(record.field) || undefined,
-    file1Value: record.file1Value,
-    file2Value: record.file2Value,
-    severity: normalizeDisplayText(record.severity) || undefined,
-    ruleId: normalizeDisplayText(record.ruleId) || undefined,
-    message: normalizeDisplayText(record.message) || undefined,
+  let label1 = normalizeDisplayText(labels.file1Label) || 'File 1'
+  let label2 = normalizeDisplayText(labels.file2Label) || 'File 2'
+  if (label1 === label2) {
+    label1 = `${label1} (file 1)`
+    label2 = `${label2} (file 2)`
   }
 
-  const normalizedDetail = Object.fromEntries(Object.entries(diffDetail).filter(([, value]) => value != null))
-  return Object.keys(normalizedDetail).length > 0 ? normalizedDetail : null
+  const detail: Record<string, unknown> = {}
+  const field = normalizeDisplayText(record.field)
+  const message = normalizeDisplayText(record.message)
+  if (field) detail[field] = { [label1]: record.file1Value ?? null, [label2]: record.file2Value ?? null }
+  else if (message) detail.rule = message
+  const record1 = sideRecord(record.sideRecords, 'file1') ?? sideRecord(record.ids, 'file1')
+  const record2 = sideRecord(record.sideRecords, 'file2') ?? sideRecord(record.ids, 'file2')
+  if (record1 != null) detail[label1] = record1
+  if (record2 != null) detail[label2] = record2
+  return Object.keys(detail).length > 0 ? detail : null
 }
 
 // The server already classified each page row (bucket / rule descriptor / record id); the client only
@@ -192,14 +213,14 @@ function orderNameFromData(parsedData: unknown): { orderName?: string } {
   return {}
 }
 
-export function buildPageRow(serverRow: GeneratedOutputDifferenceRow): NormalizedDiffDetailRow {
+export function buildPageRow(serverRow: GeneratedOutputDifferenceRow, labels: DiffSideLabels = {}): NormalizedDiffDetailRow {
   const record = (serverRow.record ?? {}) as DiffDetailsRecord
   const parsedData = parseDiffData((record as Record<string, unknown>).data)
   return {
     rowKey: serverRow.rowKey,
     recordId: serverRow.recordId,
     bucket: serverRow.bucket as DiffBucketKey,
-    detailValue: buildDiffDetailPayload(record, parsedData),
+    detailValue: buildDiffDetailPayload(record, parsedData, labels),
     ruleFilterKey: serverRow.ruleFilterKey,
     ruleId: serverRow.ruleId,
     ruleLabel: serverRow.ruleLabel,

@@ -128,7 +128,8 @@ export function useRunResultDifferences(deps: UseRunResultDifferencesDeps): UseR
   )
 
   function applyDifferencesResponse(response: GetGeneratedOutputDifferencesResponse, includeFacets: boolean): void {
-    diffDetailRows.value = (response.differences ?? []).map(buildPageRow)
+    const labels = { file1Label: response.metadata?.file1Label, file2Label: response.metadata?.file2Label }
+    diffDetailRows.value = (response.differences ?? []).map((row) => buildPageRow(row, labels))
     diffPageIndex.value = response.pageIndex ?? 0
     diffPageCount.value = response.pageCount ?? 1
     diffFilteredCount.value = response.totalFiltered ?? 0

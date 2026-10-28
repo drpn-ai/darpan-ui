@@ -1197,6 +1197,7 @@ describe('ReconciliationRunResultPage', () => {
           ruleId: 'FIELD_COMPARISON_1',
           severity: 'WARN',
           message: 'Field comparison failed: grand_total = total_amount',
+          sideRecords: JSON.stringify({ file1: { grand_total: '89.89' }, file2: { total_amount: '90.32' } }),
         },
       ],
     }))
@@ -1207,7 +1208,7 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.text()).toContain('Rule differences')
     expect(wrapper.text()).toContain('6678202450051')
     expect(wrapper.text()).toContain('{ ... }')
-    expect(wrapper.text()).toContain('8 keys')
+    expect(wrapper.text()).toContain('3 keys')
 
     const ruleDetailRow = wrapper.findAll('[data-testid="diff-details-row"]').find((row) => row.text().includes('6678202450051'))
     const ruleDetailToggle = ruleDetailRow?.find('[data-testid="json-collapse-toggle"]')
@@ -1215,10 +1216,13 @@ describe('ReconciliationRunResultPage', () => {
 
     await ruleDetailToggle!.trigger('click')
 
-    expect(wrapper.text()).toContain('"diffType": "FIELD_MISMATCH"')
-    expect(wrapper.text()).toContain('"field": "grand_total = total_amount"')
-    expect(wrapper.text()).toContain('"file1Value": "89.89"')
-    expect(wrapper.text()).toContain('"file2Value": "90.32"')
+    // DAR-BE-155: what differs, by system, then each system's record; no engine bookkeeping.
+    expect(wrapper.text()).toContain('"grand_total = total_amount"')
+    expect(wrapper.text()).toContain('"OMS"')
+    expect(wrapper.text()).toContain('"SHOPIFY"')
+    expect(wrapper.text()).not.toContain('"severity"')
+    expect(wrapper.text()).not.toContain('"diffType"')
+    expect(wrapper.text()).not.toContain('"ruleId"')
     expect(wrapper.text()).not.toContain('row-3')
     expect(wrapper.text()).not.toContain('{}')
   })
