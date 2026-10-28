@@ -103,7 +103,8 @@ export interface RecordFact {
  * DAR-UI-081 (Aditi: "group the boxes by system and order, and show item as a subheading with SKU"). One card per system
  * and order: its id and status (an item's order's status, else the record's), the system the fix is in outlined
  * (attention), no status read shown as such; a HotWax order lists its items under it, each by SKU. DAR-BE-125: a HotWax
- * order reads by its name, its HotWax id under it.
+ * order reads by its name, its HotWax id under it. DAR-UI-088 (Aditi: "for all ids add a subheading to show what they
+ * are"): each card says what its id is, so two cards of one system tell apart.
  */
 export interface SystemCardItem {
   key: string
@@ -115,11 +116,22 @@ export interface SystemCardItem {
 export interface SystemCard {
   key: string
   label: string
+  kind: string
   id: string
   sub: string
   status: string
   attention: boolean
   items: SystemCardItem[]
+}
+
+/** DAR-UI-088. What a card's id is: an order's or return's id, a HotWax order's name, else its record type. */
+export function cardKind(row: RecordRow): string {
+  if (row.recordType === 'order') return row.system === 'HotWax' && row.internalId ? 'Order name' : 'Order ID'
+  if (row.recordType === 'orderItem') return 'Order ID'
+  if (row.recordType === 'return') return 'Return ID'
+  if (row.recordType === 'salesOrderLine') return 'Sales order'
+  const type = recordTypeLabel(row.recordType)
+  return type.charAt(0).toUpperCase() + type.slice(1)
 }
 
 export function systemCards(rows: RecordRow[], fixWhere: string): SystemCard[] {
@@ -133,8 +145,9 @@ export function systemCards(rows: RecordRow[], fixWhere: string): SystemCard[] {
       card = {
         key,
         label: row.system,
+        kind: cardKind(row),
         id,
-        sub: row.recordType === 'order' && row.system === 'HotWax' ? row.internalId : '',
+        sub: row.recordType === 'order' && row.system === 'HotWax' && row.internalId ? `Order ID ${row.internalId}` : '',
         status: item ? row.orderStatus : row.status,
         attention: Boolean(fixWhere) && row.system === fixWhere,
         items: [],

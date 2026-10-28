@@ -50,12 +50,27 @@ describe('auditReport', () => {
       OMS: { order: [{ id: '#GOR197395235', internalId: 'M1173432', status: 'Completed' }] },
       NetSuite: { salesOrder: [{ id: 'SO1', internalId: null, status: 'Pending Billing' }] },
     })
-    expect(systemCards(rows, 'NetSuite').map((c) => [c.label, c.id, c.sub, c.status, c.attention])).toEqual([
-      ['Shopify', '18957262782595', '', '', false],
-      ['HotWax', '#GOR197395235', 'M1173432', 'Completed', false],
-      ['NetSuite', 'SO1', '', 'Pending Billing', true],
+    expect(systemCards(rows, 'NetSuite').map((c) => [c.label, c.kind, c.id, c.sub, c.status, c.attention])).toEqual([
+      ['Shopify', 'Order ID', '18957262782595', '', '', false],
+      ['HotWax', 'Order name', '#GOR197395235', 'Order ID M1173432', 'Completed', false],
+      ['NetSuite', 'Sales order', 'SO1', '', 'Pending Billing', true],
     ])
     expect(orderNameOf(rows)).toBe('#GOR197395235')
+  })
+
+  // DAR-UI-088 (Aditi: "there are 2 hotwax ids.. for all ids add a subheading to show what they are").
+  it('says what each card\'s id is, so two cards of one system tell apart', () => {
+    const rows = recordRows({
+      NetSuite: { rma: [{ id: 'RMA341549', internalId: null, status: 'Return Authorization : Pending Refund' }] },
+      OMS: { return: [{ id: 'GR1793159', internalId: null, status: null }], order: [{ id: 'M247005', internalId: null, status: null }] },
+      Shopify: { order: [{ id: '6469595889795', internalId: null, status: null }] },
+    })
+    expect(systemCards(rows, 'NetSuite').map((c) => [c.label, c.kind, c.id])).toEqual([
+      ['NetSuite', 'RMA', 'RMA341549'],
+      ['HotWax', 'Return ID', 'GR1793159'],
+      ['HotWax', 'Order ID', 'M247005'],
+      ['Shopify', 'Order ID', '6469595889795'],
+    ])
   })
 
   // DAR-UI-081 (Aditi: "group the boxes by system and order, and show item as a subheading with SKU").

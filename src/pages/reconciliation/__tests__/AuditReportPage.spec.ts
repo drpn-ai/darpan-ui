@@ -631,6 +631,26 @@ describe('AuditReportPage', () => {
     expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('2')
   })
 
+  // DAR-UI-089 (Aditi: "make the finding categories collapsable").
+  it('folds a cause\'s findings under its heading and opens them again', async () => {
+    const doc = report()
+    doc.categories.orders!.statements.R2!.findings.forEach((item) => Object.assign(item, { cause: 'Invoice unpaid' }))
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    const rows = (w: ReturnType<typeof mount>) => w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    const group = w.get('[data-testid="audit-findings-group"]')
+    expect(group.text()).toContain('Invoice unpaid')
+    expect(group.attributes('aria-expanded')).toBe('true')
+    expect(group.text()).toContain('2')
+    await group.trigger('click')
+    expect(rows(w)).toEqual([])
+    expect(w.get('[data-testid="audit-findings-group"]').attributes('aria-expanded')).toBe('false')
+    await w.get('[data-testid="audit-findings-group"]').trigger('click')
+    expect(rows(w)).toEqual(['F-1', 'F-2'])
+  })
+
   it('asks only for the picked pill\'s findings when "more" is picked', async () => {
     const doc = report()
     doc.categories.orders!.statements.R2!.counts = counts(3, 1)

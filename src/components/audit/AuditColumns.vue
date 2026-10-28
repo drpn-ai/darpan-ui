@@ -181,8 +181,21 @@
             </span>
           </h2>
           <template v-for="(item, index) in findings" :key="item.id">
-            <p v-if="item.kind !== 'order' && groupLabel(index)" class="audit-col-note" data-testid="audit-findings-group">{{ groupLabel(index) }}</p>
+            <!-- DAR-UI-089 (Aditi: "make the finding categories collapsable"). A cause's heading folds its findings. -->
             <button
+              v-if="item.kind !== 'order' && groupLabel(index)"
+              type="button"
+              class="audit-col-note audit-group-toggle"
+              :aria-expanded="!groupFolded(index)"
+              data-testid="audit-findings-group"
+              @click="toggleGroup(index)"
+            >
+              <span class="audit-row-chevron audit-group-chevron" aria-hidden="true">›</span>
+              <span>{{ groupLabel(index) }}</span>
+              <span class="audit-fold-count">{{ groupSize(index) }}</span>
+            </button>
+            <button
+              v-if="!groupFolded(index) || item.id === finding"
               type="button"
               class="audit-row audit-row--finding"
               :class="{ 'audit-row--picked': item.id === finding }"
@@ -272,7 +285,8 @@
                   :class="{ 'audit-system--attention': card.attention, 'audit-system--unread': !card.status }"
                   data-testid="audit-record-row"
                 >
-                  <span class="audit-row-sub">{{ card.label }}</span>
+                  <!-- DAR-UI-088. The system, then what its id is (two HotWax cards: a return and an order). -->
+                  <span class="audit-row-sub" data-testid="audit-card-kind">{{ card.label }} · {{ card.kind }}</span>
                   <!-- DAR-UI-081 (Aditi: "order - status as heading type text", "SKU - status in one line in subheading text"). -->
                   <span>{{ card.id }}<template v-if="card.status"> · {{ card.status }}</template></span>
                   <span v-if="card.sub" class="audit-row-sub">{{ card.sub }}</span>
@@ -394,7 +408,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import { downloadIconPath, resolveIconPath } from '../../lib/iconPaths'
@@ -567,6 +581,24 @@ function groupLabel(index: number): string {
   return rest && (index === 0 || rest !== rests.value[index - 1]) ? rest : ''
 }
 
+// DAR-UI-089. Folded causes, per statement; the open finding stays in view under its folded heading.
+const folded = ref(new Set<string>())
+function groupKey(index: number): string {
+  return `${props.statement}|${rests.value[index] ?? ''}`
+}
+function groupFolded(index: number): boolean {
+  return findings.value[index]?.kind !== 'order' && folded.value.has(groupKey(index))
+}
+function groupSize(index: number): number {
+  return findings.value.filter((item, i) => item.kind !== 'order' && rests.value[i] === rests.value[index]).length
+}
+function toggleGroup(index: number): void {
+  const next = new Set(folded.value)
+  const key = groupKey(index)
+  if (!next.delete(key)) next.add(key)
+  folded.value = next
+}
+
 function moneyLabel(money: AuditMoney | null | undefined): string {
   return money ? `${money.amount} ${money.currency}` : ''
 }
@@ -729,6 +761,9 @@ function statementText(id: string): string {
 }
 
 .audit-col {
+  /* DAR-UI-090. Positioned, so a row's absolute .sr-only text is clipped by the column's scroll instead of stretching the
+     page: 919 findings left ~3,500px of blank page under the board. */
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -870,6 +905,33 @@ function statementText(id: string): string {
   border-bottom: 1px solid var(--border-soft);
   color: var(--text-muted);
   font-size: var(--type-meta-size);
+}
+
+.audit-group-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.audit-group-toggle:hover {
+  color: var(--text-soft);
+}
+
+.audit-group-chevron {
+  transform: rotate(90deg);
+  transition: transform 160ms ease;
+}
+
+.audit-group-toggle[aria-expanded='false'] .audit-group-chevron {
+  transform: none;
 }
 
 .audit-col-head-end {
@@ -1396,7 +1458,8 @@ function statementText(id: string): string {
 
 @media (prefers-reduced-motion: reduce) {
   .audit-columns-grid,
-  .audit-row {
+  .audit-row,
+  .audit-group-chevron {
     transition: none;
   }
 
