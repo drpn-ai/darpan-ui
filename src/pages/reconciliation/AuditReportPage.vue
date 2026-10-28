@@ -129,7 +129,6 @@
         :retryable="isTodaysMorning"
         :retrying="retryingChecks"
         @navigate="navigate"
-        @more="loadMore"
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
         @extract="(check, system) => void exportExtract(check, system)"
         @verify="verifyFinding"
@@ -163,6 +162,7 @@ import {
   causeOptions,
   emptyFindingsMore,
   filterCounts,
+  findingsLeft,
   hasFindingFilters,
   matchesFindingFilters,
   orderKey,
@@ -460,10 +460,24 @@ function say(message: string): void {
   }))
 }
 
-// DAR-UI-070. The report lists 50 findings a statement; "N more" asks for the rest a page at a time.
-async function loadMore(): Promise<void> {
+// DAR-UI-070. The report lists 50 findings a statement; the rest are read in one call. DAR-UI-091 (Aditi: "all results
+// loaded... no '119 more'"): read as soon as the statement shows, so its cause counts are whole. A second caller waits
+// on the read in flight for the same statement and pill; another statement starts its own.
+let moreLoading: { key: string; read: Promise<void> } | null = null
+function loadMore(): Promise<void> {
+  const key = `${selectedStatement.value}|${filter.value}`
+  if (moreLoading?.key !== key) {
+    const read = readMore().finally(() => { if (moreLoading?.read === read) moreLoading = null })
+    moreLoading = { key, read }
+  }
+  return moreLoading.read
+}
+async function readMore(): Promise<void> {
   const statement = selectedStatement.value
-  if (!report.value || !statement || more.value.loading) return
+  const pill = filter.value
+  if (!report.value || !statement) return
+  // A read for a statement or pill no longer on show leaves the current one's state alone.
+  const stale = () => statement !== selectedStatement.value || pill !== filter.value
   more.value = { ...more.value, loading: true, error: '' }
   try {
     // DAR-UI-075. The rest as the report lists them, one per order, in one read.
@@ -471,14 +485,14 @@ async function loadMore(): Promise<void> {
       { audit: auditCode.value, statement, period: report.value.report.period, ...pillState.value },
       abort.signal,
     )
-    if (statement !== selectedStatement.value) return
+    if (stale()) return
     more.value = response.ok === false
       ? { ...more.value, error: errorOf(response, 'The findings could not be found. Yes, really.') }
       : { ...more.value, findings: response.findings ?? [], hasNextPage: false }
   } catch {
-    if (!abort.signal.aborted) more.value = { ...more.value, error: 'The findings could not be found. Yes, really.' }
+    if (!abort.signal.aborted && !stale()) more.value = { ...more.value, error: 'The findings could not be found. Yes, really.' }
   } finally {
-    more.value = { ...more.value, loading: false }
+    if (!stale()) more.value = { ...more.value, loading: false }
   }
 }
 
@@ -636,7 +650,11 @@ watch(auditCode, () => {
   progress.value = null
   void loadProgress()
 }, { immediate: true })
-watch([report, selectedStatement, filter], () => (more.value = emptyFindingsMore()))
+watch([report, selectedStatement, filter], () => {
+  more.value = emptyFindingsMore()
+  const statement = report.value?.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value]
+  if (findingsLeft(statement, 0, null, filter.value)) void loadMore()
+})
 // DAR-UI-075. An order the report does not list (past its 50: a reload, a link) is found in the statement's orders.
 watch([findingId, report, selectedStatement], async () => {
   const id = findingId.value

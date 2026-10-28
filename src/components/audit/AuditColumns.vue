@@ -217,9 +217,7 @@
             {{ narrowed ? 'No match' : statementDoc.status === 'notRun' ? (statementDoc.checks.length ? 'Not run yet' : 'No check yet') : 'Nothing found' }}
           </div>
           <InlineValidation v-if="more.error" tone="error" :message="more.error" data-testid="audit-findings-more-error" />
-          <button v-if="findingsLeftCount" type="button" class="audit-more audit-pad" data-testid="audit-findings-more" :disabled="more.loading" @click="emit('more')">
-            {{ more.loading ? 'Loading...' : `${findingsLeftCount} more` }}
-          </button>
+          <div v-if="more.loading && !narrowed" class="audit-empty" data-testid="audit-findings-loading">Loading...</div>
         </section>
 
         <section class="audit-col audit-col--4 audit-col--detail" aria-label="Detail">
@@ -449,7 +447,6 @@ import {
   comparedGap,
   countFor,
   findStatement,
-  findingsLeft,
   lineLabel,
   narrowedCounts,
   progressLine,
@@ -493,7 +490,7 @@ const props = defineProps<{
   retrying?: string[]
 }>()
 
-const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; more: []; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [checks: string[]] }>()
+const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [checks: string[]] }>()
 
 const isHealth = computed(() => props.category === HEALTH)
 const rail = computed(() => !isHealth.value && Boolean(props.finding))
@@ -556,7 +553,6 @@ function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): strin
 }
 // What the picked pill counts for the statement (DAR-UI-073), not the 50 the report lists or the pages loaded so far.
 const findingsTotal = computed(() => (statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts, props.filter) : findings.value.length))
-const findingsLeftCount = computed(() => props.narrowed ? 0 : findingsLeft(statementDoc.value, findings.value.length, props.more.hasNextPage, props.filter))
 const records = computed(() => recordRows(props.orderUnit?.records ?? props.findingDoc?.finding.records))
 
 const categoryLabel = computed(() => categories.value.find((item) => item.id === props.category)?.label ?? '')
@@ -581,22 +577,23 @@ function groupLabel(index: number): string {
   return rest && (index === 0 || rest !== rests.value[index - 1]) ? rest : ''
 }
 
-// DAR-UI-089. Folded causes, per statement; the open finding stays in view under its folded heading.
-const folded = ref(new Set<string>())
+// DAR-UI-089. Causes fold, per statement; the open finding stays in view under its folded heading. DAR-UI-091 (Aditi:
+// "by default collapsed"): a cause is folded until opened; a finding with no cause has no heading to open, so it shows.
+const opened = ref(new Set<string>())
 function groupKey(index: number): string {
   return `${props.statement}|${rests.value[index] ?? ''}`
 }
 function groupFolded(index: number): boolean {
-  return findings.value[index]?.kind !== 'order' && folded.value.has(groupKey(index))
+  return findings.value[index]?.kind !== 'order' && Boolean(rests.value[index]) && !opened.value.has(groupKey(index))
 }
 function groupSize(index: number): number {
   return findings.value.filter((item, i) => item.kind !== 'order' && rests.value[i] === rests.value[index]).length
 }
 function toggleGroup(index: number): void {
-  const next = new Set(folded.value)
+  const next = new Set(opened.value)
   const key = groupKey(index)
   if (!next.delete(key)) next.add(key)
-  folded.value = next
+  opened.value = next
 }
 
 function moneyLabel(money: AuditMoney | null | undefined): string {
@@ -1104,10 +1101,6 @@ function statementText(id: string): string {
 
 .audit-empty--attention {
   border-color: var(--text-dim);
-}
-
-.audit-pad {
-  padding: var(--space-2) var(--space-3);
 }
 
 .audit-detail-head {

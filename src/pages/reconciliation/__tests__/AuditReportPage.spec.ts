@@ -115,6 +115,13 @@ beforeEach(() => {
   f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 0, active: [] } } as never)
 })
 
+// DAR-UI-091. A cause starts folded; open every one to see its findings.
+async function openCauses(w: ReturnType<typeof mount>): Promise<void> {
+  for (const group of w.findAll('[data-testid="audit-findings-group"]')) {
+    if (group.attributes('aria-expanded') === 'false') await group.trigger('click')
+  }
+}
+
 describe('AuditReportPage', () => {
   // DAR-UI-065. Drill-down columns: category › statement › finding › the deepest pick.
   it('opens on the category with the most open findings, its first statement with findings, and that statement\'s check', async () => {
@@ -135,6 +142,7 @@ describe('AuditReportPage', () => {
     expect(rows.map((row) => row.text())).toEqual([expect.stringContaining('R2'), expect.stringContaining('R3')])
     expect(rows[0]!.attributes('aria-current')).toBe('true')
     // Column 3: its findings. Column 4: what checked it.
+    await openCauses(w)
     const findings = w.findAll('[data-testid="audit-finding-row"]')
     expect(findings).toHaveLength(2)
     expect(findings[0]!.text()).toContain('F-1')
@@ -343,6 +351,7 @@ describe('AuditReportPage', () => {
   it('opens a finding in the last column and folds the categories to a rail', async () => {
     const w = mount(AuditReportPage)
     await flushPromises()
+    await openCauses(w)
     await w.findAll('[data-testid="audit-finding-row"]')[0]!.trigger('click')
     expect(push).toHaveBeenCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-1' } })
 
@@ -438,11 +447,13 @@ describe('AuditReportPage', () => {
     liveRoute.query = { category: 'orders', statement: 'R2' }
     const w = mount(AuditReportPage)
     await flushPromises()
+    await openCauses(w)
     expect(w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))).toEqual(['F-1', 'F-2'])
   })
 
-  // DAR-UI-070. The report lists 50 a statement; "N more" pages through the rest, a page at a time.
-  it('shows a statement\'s findings past the report\'s 50 when "more" is picked', async () => {
+  // DAR-UI-070. The report lists 50 a statement. DAR-UI-091 (Aditi: "all results loaded... no '119 more'"): the rest are
+  // read as soon as the statement shows.
+  it('reads a statement\'s findings past the report\'s 50 as soon as it shows', async () => {
     const doc = report()
     const r2 = doc.categories.orders!.statements.R2!
     r2.counts = counts(3, 1)
@@ -450,29 +461,32 @@ describe('AuditReportPage', () => {
     f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
     const summary = (id: string) => ({ id, headline: `Invoice ${id} has no Etail id`, state: 'open', firstFound: '2026-10-08',
       ageDays: 0, records: {}, difference: null, next: '' })
-    // DAR-UI-075. "More" reads the rest as the report lists them, one per order, in one call.
+    // DAR-UI-075. The rest as the report lists them, one per order, in one call.
     f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [summary('F-1'), summary('F-2'), summary('F-4'), summary('F-5')] } as never)
     liveRoute.query = { category: 'orders', statement: 'R2' }
     const w = mount(AuditReportPage)
     await flushPromises()
-    const rows = () => w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
-    const more = () => w.find('[data-testid="audit-findings-more"]')
-    expect(more().text()).toBe('2 more')
-    // The heading counts the statement's open and pending findings, not the rows the report listed.
+    const rows = async () => {
+      await openCauses(w)
+      return w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    }
+    expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R2', period: '2026-10' }, expect.anything())
+    expect(await rows()).toEqual(['F-1', 'F-2', 'F-4', 'F-5'])
+    expect(w.find('[data-testid="audit-findings-more"]').exists()).toBe(false)
     expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('4')
 
-    await more().trigger('click')
-    await flushPromises()
-    expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R2', period: '2026-10' }, expect.anything())
-    expect(rows()).toEqual(['F-1', 'F-2', 'F-4', 'F-5'])
-    expect(more().exists()).toBe(false)
-
-    // Another statement starts over from the report's own list.
+    // A statement the report lists whole asks for nothing more.
+    const reads = f.getAuditFindingsByOrder.mock.calls.length
     liveRoute.query = { category: 'orders', statement: 'R3' }
     await flushPromises()
+    expect(f.getAuditFindingsByOrder.mock.calls.length).toBe(reads)
+    // Back again, it reads the rest again.
     liveRoute.query = { category: 'orders', statement: 'R2' }
     await flushPromises()
-    expect(rows()).toEqual(['F-1', 'F-2'])
+    expect(f.getAuditFindingsByOrder.mock.calls.length).toBe(reads + 1)
+    expect(await rows()).toEqual(['F-1', 'F-2', 'F-4', 'F-5'])
+    // Left mounted, it would read again on later tests' route changes.
+    w.unmount()
   })
 
   // DAR-UI-071. With no cause to explain it, the checks are the only explanation, so the evidence shows.
@@ -613,26 +627,29 @@ describe('AuditReportPage', () => {
 
   // DAR-UI-073. The pill decides what every column counts and lists.
   it('counts and lists what the picked pill shows, in every column', async () => {
-    const rows = (w: ReturnType<typeof mount>) => w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    const rows = async (w: ReturnType<typeof mount>) => {
+      await openCauses(w)
+      return w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    }
     liveRoute.query = { show: 'open', category: 'orders', statement: 'R2' }
     const w = mount(AuditReportPage)
     await flushPromises()
-    expect(rows(w)).toEqual(['F-1'])
+    expect(await rows(w)).toEqual(['F-1'])
     expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('1')
 
     liveRoute.query = { show: 'pending', category: 'orders', statement: 'R2' }
     await flushPromises()
-    expect(rows(w)).toEqual(['F-2'])
+    expect(await rows(w)).toEqual(['F-2'])
     expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('1')
 
     liveRoute.query = { category: 'orders', statement: 'R2' }
     await flushPromises()
-    expect(rows(w)).toEqual(['F-1', 'F-2'])
+    expect(await rows(w)).toEqual(['F-1', 'F-2'])
     expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('2')
   })
 
-  // DAR-UI-089 (Aditi: "make the finding categories collapsable").
-  it('folds a cause\'s findings under its heading and opens them again', async () => {
+  // DAR-UI-089 (Aditi: "make the finding categories collapsable"). DAR-UI-091 (Aditi: "by default collapsed").
+  it('folds a cause\'s findings under its heading until it is opened', async () => {
     const doc = report()
     doc.categories.orders!.statements.R2!.findings.forEach((item) => Object.assign(item, { cause: 'Invoice unpaid' }))
     f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
@@ -642,16 +659,55 @@ describe('AuditReportPage', () => {
     await flushPromises()
     const group = w.get('[data-testid="audit-findings-group"]')
     expect(group.text()).toContain('Invoice unpaid')
-    expect(group.attributes('aria-expanded')).toBe('true')
     expect(group.text()).toContain('2')
-    await group.trigger('click')
+    expect(group.attributes('aria-expanded')).toBe('false')
     expect(rows(w)).toEqual([])
-    expect(w.get('[data-testid="audit-findings-group"]').attributes('aria-expanded')).toBe('false')
-    await w.get('[data-testid="audit-findings-group"]').trigger('click')
+    await group.trigger('click')
+    expect(w.get('[data-testid="audit-findings-group"]').attributes('aria-expanded')).toBe('true')
     expect(rows(w)).toEqual(['F-1', 'F-2'])
+    await w.get('[data-testid="audit-findings-group"]').trigger('click')
+    expect(rows(w)).toEqual([])
+
+    // The open finding stays in view under its folded heading.
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-2' }
+    await flushPromises()
+    expect(rows(w)).toEqual(['F-2'])
   })
 
-  it('asks only for the picked pill\'s findings when "more" is picked', async () => {
+  it('reads the next statement\'s rest when it is picked while the last one\'s read is still out', async () => {
+    const doc = report()
+    const statements = doc.categories.orders!.statements
+    ;[statements.R2!, statements.R3!].forEach((statement) => {
+      statement.counts = counts(3, 0)
+      statement.findingsOmitted = 1
+    })
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    const summary = (id: string) => ({ id, headline: `Invoice ${id} has no Etail id`, state: 'open', firstFound: '2026-10-08',
+      ageDays: 0, records: {}, difference: null, next: '' })
+    let answerR2: (value: unknown) => void = () => {}
+    f.getAuditFindingsByOrder.mockImplementation(((params: { statement?: string }) => params.statement === 'R2'
+      ? new Promise((resolve) => (answerR2 = resolve))
+      : Promise.resolve({ ok: true, findings: [summary('F-30'), summary('F-31')] })) as never)
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.find('[data-testid="audit-findings-loading"]').exists()).toBe(true)
+
+    liveRoute.query = { category: 'orders', statement: 'R3' }
+    await flushPromises()
+    expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R3', period: '2026-10' }, expect.anything())
+    // R2's read answering late changes nothing on R3.
+    answerR2({ ok: true, findings: [summary('F-20'), summary('F-21')] })
+    await flushPromises()
+    await openCauses(w)
+    const rows = w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    expect(rows).toEqual(expect.arrayContaining(['F-30', 'F-31']))
+    expect(rows).not.toContain('F-20')
+    expect(w.find('[data-testid="audit-findings-loading"]').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('asks only for the picked pill\'s findings when it reads the rest', async () => {
     const doc = report()
     doc.categories.orders!.statements.R2!.counts = counts(3, 1)
     doc.categories.orders!.statements.R2!.findingsOmitted = 2
@@ -660,9 +716,8 @@ describe('AuditReportPage', () => {
     liveRoute.query = { show: 'open', category: 'orders', statement: 'R2' }
     const w = mount(AuditReportPage)
     await flushPromises()
-    expect(w.get('[data-testid="audit-findings-more"]').text()).toBe('2 more')
-    await w.get('[data-testid="audit-findings-more"]').trigger('click')
     expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R2', period: '2026-10', state: 'open' }, expect.anything())
+    w.unmount()
   })
 
   // DAR-UI-073. The toolbar's search, cause and age narrow the whole board, over every finding of the period.
@@ -674,14 +729,17 @@ describe('AuditReportPage', () => {
     f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [
       item('F-1', 'R2', 'INV1', 'Never reached NetSuite', 6), item('F-2', 'R2', 'INV2', 'Backordered in NetSuite', 0),
       item('F-9', 'R3', 'INV9', 'Backordered in NetSuite', 9)] } as never)
-    const rows = (w: ReturnType<typeof mount>) => w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    const rows = async (w: ReturnType<typeof mount>) => {
+      await openCauses(w)
+      return w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))
+    }
     const badges = (w: ReturnType<typeof mount>) => w.findAll('[data-testid="audit-statement-row-orders"]').map((row) => row.text())
 
     liveRoute.query = { category: 'orders', statement: 'R2', q: 'inv2' }
     const w = mount(AuditReportPage)
     await flushPromises()
     expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', period: '2026-10' }, expect.anything())
-    expect(rows(w)).toEqual(['F-2'])
+    expect(await rows(w)).toEqual(['F-2'])
     expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('1')
     expect(badges(w)).toEqual([expect.stringContaining('R2')])
     // Pages earlier tests mounted are still live; count only what the later picks ask for.
@@ -689,15 +747,15 @@ describe('AuditReportPage', () => {
 
     liveRoute.query = { category: 'orders', statement: 'R3', cause: 'Backordered in NetSuite' }
     await flushPromises()
-    expect(rows(w)).toEqual(['F-9'])
+    expect(await rows(w)).toEqual(['F-9'])
     expect(badges(w).length).toBe(2)
 
     liveRoute.query = { category: 'orders', statement: 'R2', age: '7' }
     await flushPromises()
-    expect(rows(w)).toEqual([])
+    expect(await rows(w)).toEqual([])
     liveRoute.query = { category: 'orders', statement: 'R3', age: '7' }
     await flushPromises()
-    expect(rows(w)).toEqual(['F-9'])
+    expect(await rows(w)).toEqual(['F-9'])
     // One read of the period serves every filter.
     expect(f.getAuditFindingsByOrder.mock.calls.length).toBe(reads)
 
