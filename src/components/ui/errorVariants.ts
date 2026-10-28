@@ -17,7 +17,7 @@ export const errorVariants = {
     action: { label: 'sign in', onClick: onSignIn },
   }),
   notFound: (onHome?: () => void): Variant => ({
-    title: 'this page is on a coffee break', message: 'it moved, never existed, or is still out to lunch',
+    title: 'this page wandered off', message: 'it moved or never existed. we checked behind the couch',
     action: onHome ? { label: 'back to home', onClick: onHome } : { label: 'back to home', href: '/' },
   }),
 }
