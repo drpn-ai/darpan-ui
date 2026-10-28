@@ -62,30 +62,67 @@ describe('runResultDiffDetails', () => {
     expect(buildDiffDetailPayload({}, { order_id: '1001' })).toEqual({ order_id: '1001' })
   })
 
-  it('buildDiffDetailPayload assembles rule metadata when parsed data is empty', () => {
+  const RAILS_LABELS = { file1Label: 'HotWax', file2Label: 'Shopify' }
+
+  it('buildDiffDetailPayload reads a mismatch like a record: what differs, then each system\'s record', () => {
     const payload = buildDiffDetailPayload(
       {
         diffType: 'FIELD_MISMATCH',
-        primaryId: ' 6678 ',
-        field: 'grand_total = total_amount',
-        file1Value: '89.89',
-        file2Value: '90.32',
-        ruleId: 'FIELD_COMPARISON_1',
+        compareScopeId: '100160',
+        primaryId: '18944551977129',
+        field: 'isCompleted = isFulfilled',
+        file1Value: 'Y',
+        file2Value: 'N',
+        ids: '{"file1":{"orderId":"HW1001"},"file2":{"id":"18944551977129"}}',
+        sideRecords: '{"file1":{"isCompleted":"Y","statusId":"ORDER_COMPLETED"},"file2":{"isFulfilled":"N"}}',
+        ruleId: '100160',
         severity: 'WARN',
-        message: 'Field comparison failed',
+        message: 'Field comparison failed: isCompleted = isFulfilled',
       },
       null,
+      RAILS_LABELS,
     )
     expect(payload).toEqual({
-      diffType: 'FIELD_MISMATCH',
-      primaryId: '6678',
-      field: 'grand_total = total_amount',
-      file1Value: '89.89',
-      file2Value: '90.32',
-      severity: 'WARN',
-      ruleId: 'FIELD_COMPARISON_1',
-      message: 'Field comparison failed',
+      'isCompleted = isFulfilled': { HotWax: 'Y', Shopify: 'N' },
+      HotWax: { isCompleted: 'Y', statusId: 'ORDER_COMPLETED' },
+      Shopify: { isFulfilled: 'N' },
     })
+    expect(Object.keys(payload as object)).toEqual(['isCompleted = isFulfilled', 'HotWax', 'Shopify'])
+  })
+
+  it('buildDiffDetailPayload falls back to the ids when the row carries no records', () => {
+    expect(
+      buildDiffDetailPayload(
+        {
+          diffType: 'FIELD_MISMATCH',
+          field: 'grand_total = total_amount',
+          file1Value: '89.89',
+          file2Value: '90.32',
+          ids: '{"file1":{"orderId":"HW1"},"file2":{"id":"6678"}}',
+        },
+        null,
+        RAILS_LABELS,
+      ),
+    ).toEqual({
+      'grand_total = total_amount': { HotWax: '89.89', Shopify: '90.32' },
+      HotWax: { orderId: 'HW1' },
+      Shopify: { id: '6678' },
+    })
+  })
+
+  it('buildDiffDetailPayload tells two sides of one system apart', () => {
+    expect(
+      buildDiffDetailPayload({ field: 'a = b', file1Value: '1', file2Value: '2' }, null, {
+        file1Label: 'HotWax',
+        file2Label: 'HotWax',
+      }),
+    ).toEqual({ 'a = b': { 'HotWax (file 1)': '1', 'HotWax (file 2)': '2' } })
+  })
+
+  it('buildDiffDetailPayload keeps a rule message when the rule names no field', () => {
+    expect(
+      buildDiffDetailPayload({ diffType: 'BUSINESS_RULE_DIFF', message: 'Order total exceeds credit' }, null, RAILS_LABELS),
+    ).toEqual({ rule: 'Order total exceeds credit' })
   })
 
   it('buildDiffDetailPayload returns null when there is nothing to show', () => {
