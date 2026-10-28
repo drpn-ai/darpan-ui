@@ -327,8 +327,9 @@ export function buildRuleSetRulePayloads(draft: ReconciliationRuleSetDraft): Rul
 }
 
 // Operators whose meaning lives in RuleDiffSupport.matchesOperator. DAR-BE-126: "requires" breaks when the left value
-// is true and the right is not; "required by" is its mirror.
-const RULE_DIFF_OPERATORS = ['>', '<', '>=', '<=', 'requires', 'required by']
+// is true and the right is not; "required by" is its mirror. DAR-BE-153: "all in" breaks when a comma-separated value on
+// the left is not on the right; "contains all" is its mirror.
+const RULE_DIFF_OPERATORS = ['>', '<', '>=', '<=', 'requires', 'required by', 'all in', 'contains all']
 
 function normalizeRuleOperator(operator: string | undefined): string {
   const normalized = operator?.trim()

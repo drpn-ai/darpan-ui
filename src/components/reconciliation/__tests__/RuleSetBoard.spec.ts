@@ -265,7 +265,7 @@ describe('RuleSetBoard with SuiteQL query sides', () => {
     // DAR-BE-126: one-way presence rules are their own operators.
     await wrapper.get('[data-testid="ruleset-rule-operator-select"]').trigger('click')
     const operators = wrapper.findAll('[data-testid="app-select-option"]').map((option) => option.attributes('data-option-value'))
-    expect(operators).toEqual(expect.arrayContaining(['requires', 'required by']))
+    expect(operators).toEqual(expect.arrayContaining(['requires', 'required by', 'all in', 'contains all']))
   })
 })
 

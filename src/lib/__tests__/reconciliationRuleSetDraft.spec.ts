@@ -77,7 +77,8 @@ describe('reconciliationRuleSetDraft', () => {
 
   // DAR-BE-126. A one-way presence rule ("paid in Shopify needs a payment in HotWax") is its own operator, not "<=" on
   // Y/N strings that works only because N sorts before Y.
-  it.each(['requires', 'required by'])('keeps the "%s" operator and checks it through RuleDiffSupport', (operator) => {
+  // DAR-BE-153 adds the list pair: every Shopify payment id on a HotWax OPP.
+  it.each(['requires', 'required by', 'all in', 'contains all'])('keeps the "%s" operator and checks it through RuleDiffSupport', (operator) => {
     const [rule] = buildRuleSetRulePayloads(createDraft({
       rules: [{ file1FieldPath: '$.orders[*].hasPayment', file2FieldPath: '$[*].hasPayment', operator, sequenceNum: 1 }],
     }))

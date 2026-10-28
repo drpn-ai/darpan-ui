@@ -447,7 +447,7 @@ import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 // page and into the create-run wizard's final step.
 
 type RuleSide = 'file1' | 'file2'
-type RuleOperator = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'requires' | 'required by'
+type RuleOperator = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'requires' | 'required by' | 'all in' | 'contains all'
 
 interface RuleField {
   fieldPath: string
@@ -516,7 +516,7 @@ const GHOST_RULE_CAPTION = 'Drag a field onto one on the right to compare them'
  */
 const RULE_TERM_DEFINITIONS = {
   'pre-actions': 'Change a value just for this comparison, before the two sides are matched. Nothing is written back to the source. Most common use: string to number, so "120.00" from one system matches 120 from the other.',
-  operator: 'How the two values are tested. = is an exact match once any pre-actions have run; the comparison operators are for numbers and dates. requires: when the left is Y, the right must be Y too; required by is the reverse.',
+  operator: 'How the two values are tested. = is an exact match once any pre-actions have run; the comparison operators are for numbers and dates. requires: when the left is Y, the right must be Y too; required by is the reverse. all in: every comma-separated value on the left is also on the right; contains all is the reverse.',
   sequence: 'The order rules are evaluated in. Rule 1 should be the field that uniquely identifies a row — the order number, not the total — because that is what pairs the two sides up before the rest are checked.',
 } as const
 
@@ -533,6 +533,8 @@ const operatorOptions: AppSelectOption[] = [
   { value: '<=', label: '<=' },
   { value: 'requires', label: 'requires' },
   { value: 'required by', label: 'required by' },
+  { value: 'all in', label: 'all in' },
+  { value: 'contains all', label: 'contains all' },
 ]
 const preActionOptions: AppSelectOption[] = [
   { value: 'STRING_TO_INT', label: 'String to int' },
