@@ -247,4 +247,20 @@ describe('buildPageRow contradiction brief', () => {
     } as unknown as GeneratedOutputDifferenceRow)
     expect(row.orderName).toBe('#GOR197263793')
   })
+
+  // DAR-BE-157 (Aditi 2026-10-29: "for record ID use SKU"): a product row's key is a NetSuite id or DUPLICATE:id:product.
+  it('labels a product row with its SKU, from either side, and leaves other rows alone', () => {
+    const product = (data: Record<string, unknown>) => buildPageRow({
+      rowKey: 'k', recordId: 'DUPLICATE:22139:M100880', bucket: 'file-1', ruleFilterKey: 'base-diff', ruleId: '', ruleLabel: '',
+      record: { objectType: 'PRODUCT', data: JSON.stringify(data) },
+    } as unknown as GeneratedOutputDifferenceRow)
+    expect(product({ internalName: 'GORSDED-23-2100', productId: 'M100880' }).recordLabel).toBe('GORSDED-23-2100')
+    expect(product({ sku: '271-010-185-G', id: '43649' }).recordLabel).toBe('271-010-185-G')
+    expect(product({ productId: 'M117115' }).recordLabel).toBeUndefined()
+    const line = buildPageRow({
+      rowKey: 'k', recordId: 'M1', bucket: 'file-2', ruleFilterKey: 'base-diff', ruleId: '', ruleLabel: '',
+      record: { objectType: 'ORDER_LINE_UNIT', data: '{"sku":"271-010-185-G"}' },
+    } as unknown as GeneratedOutputDifferenceRow)
+    expect(line.recordLabel).toBeUndefined()
+  })
 })

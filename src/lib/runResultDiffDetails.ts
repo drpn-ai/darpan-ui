@@ -74,6 +74,8 @@ export interface NormalizedDiffDetailRow {
   conclusion?: RunConclusion
   /** The present side's order name, shown under the record id on a conclusion row. */
   orderName?: string
+  /** DAR-BE-157: a product row's SKU, shown in place of its key (a NetSuite id, or DUPLICATE:id:product). */
+  recordLabel?: string
 }
 
 export interface RuleSelectorOption {
@@ -213,6 +215,18 @@ function orderNameFromData(parsedData: unknown): { orderName?: string } {
   return {}
 }
 
+// NetSuite's item read calls it sku, HotWax's product read internalName.
+const SKU_FIELDS = ['sku', 'internalName'] as const
+
+function skuLabelFromData(record: DiffDetailsRecord, parsedData: unknown): { recordLabel?: string } {
+  if (record.objectType !== 'PRODUCT' || !parsedData || typeof parsedData !== 'object') return {}
+  for (const field of SKU_FIELDS) {
+    const value = (parsedData as Record<string, unknown>)[field]
+    if (typeof value === 'string' && value.trim()) return { recordLabel: value.trim() }
+  }
+  return {}
+}
+
 export function buildPageRow(serverRow: GeneratedOutputDifferenceRow, labels: DiffSideLabels = {}): NormalizedDiffDetailRow {
   const record = (serverRow.record ?? {}) as DiffDetailsRecord
   const parsedData = parseDiffData((record as Record<string, unknown>).data)
@@ -227,6 +241,7 @@ export function buildPageRow(serverRow: GeneratedOutputDifferenceRow, labels: Di
     ...briefFromRecord(parsedData),
     ...conclusionFromRecord(record as Record<string, unknown>),
     ...orderNameFromData(parsedData),
+    ...skuLabelFromData(record, parsedData),
   }
 }
 

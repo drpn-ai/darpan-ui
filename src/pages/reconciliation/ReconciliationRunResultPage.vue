@@ -379,7 +379,7 @@
                  wrong with it. -->
             <template #cell-recordId="{ row }">
               <div class="run-result-record-cell">
-                <strong>{{ row.recordId }}</strong>
+                <strong>{{ row.recordLabel ?? row.recordId }}</strong>
                 <span
                   v-if="conclusionsEnabled && row.orderName"
                   class="run-result-record-cell__brief"
@@ -1847,6 +1847,9 @@ watch([savedRunId, outputFileName], () => {
 .run-result-record-cell {
   display: grid;
   gap: var(--space-00);
+  /* A long unbroken key (DUPLICATE:22139:M100880) wraps inside its 13rem column instead of running into the next. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Quieter than the id it explains: the id is what the operator looks up, the brief is why the row is
