@@ -28,11 +28,14 @@ export const RUN_STAGE_SEQUENCE: readonly string[] = [
   'RESOLVE',
   'EXTRACT_FILE1',
   'EXTRACT_FILE2',
+  // DAR-BE-156: paired with RunObservability.STAGE_SEQUENCE (RECHECK = 4). Only an audit window with older findings
+  // opens it; like VERIFY it drops out of the synthesized remainder once a later stage arrives.
+  'RECHECK',
   'COMPARE',
   'VERIFY_MISSING',
   'VERIFY_EXCHANGE',
   'VERIFY_RETURNS',
-  // DAR-UI-044: paired with RunObservability.STAGE_SEQUENCE (CONCLUDE = 8). Only runs whose scope has
+  // DAR-UI-044: paired with RunObservability.STAGE_SEQUENCE (CONCLUDE = 9). Only runs whose scope has
   // conclusion rules open it; like VERIFY it drops out of the synthesized remainder otherwise.
   'CONCLUDE',
   'WRITE_OUTPUT',
@@ -41,6 +44,7 @@ export const RUN_STAGE_SEQUENCE: readonly string[] = [
 
 const RUN_STAGE_LABELS: Record<string, string> = {
   RESOLVE: 'Preparing run',
+  RECHECK: 'Re-checking older findings',
   COMPARE: 'Comparing records',
   WRITE_OUTPUT: 'Writing results',
   // VERIFY is retired as a stage a run can enter — one code per pass now — but rows recorded
@@ -67,7 +71,8 @@ const VERIFY_STAGE_SUBJECTS: Record<string, string> = {
 // in its own metricsJson, which says on WHICH systems. Resolve those labels to system names here so
 // a row names both — they shared one code and one label until a run performing two of them rendered
 // two byte-identical rows.
-function verifiedSystemNames(metricsJson: unknown): string[] {
+// DAR-BE-156: a re-check names the systems it read again the same way, under recheckedSystems (root codes).
+function stepSystemNames(metricsJson: unknown, field: 'verifiedSystems' | 'recheckedSystems'): string[] {
   const raw = normalizeDisplayText(metricsJson)
   if (!raw) return []
 
@@ -79,7 +84,7 @@ function verifiedSystemNames(metricsJson: unknown): string[] {
     return []
   }
 
-  const systems = (parsed as { verifiedSystems?: unknown })?.verifiedSystems
+  const systems = (parsed as Record<string, unknown> | null)?.[field]
   if (!Array.isArray(systems)) return []
 
   const names: string[] = []
@@ -113,9 +118,13 @@ export function reconciliationStageLabel(
     if (code === 'EXTRACT_FILE1') return `Extracting ${normalizeDisplayText(systemNames.file1) || 'source 1'}`
     return `Extracting ${normalizeDisplayText(systemNames.file2) || 'source 2'}`
   }
+  if (code === 'RECHECK') {
+    const systemNames = joinSystemNames(stepSystemNames(metricsJson, 'recheckedSystems'))
+    if (systemNames) return `Re-checking older findings on ${systemNames}`
+  }
   const verifySubject = VERIFY_STAGE_SUBJECTS[code]
   if (verifySubject) {
-    const systemNames = joinSystemNames(verifiedSystemNames(metricsJson))
+    const systemNames = joinSystemNames(stepSystemNames(metricsJson, 'verifiedSystems'))
     if (systemNames) return `Verifying ${systemNames}'s ${verifySubject}`
   }
   return RUN_STAGE_LABELS[code] ?? code

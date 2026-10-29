@@ -109,6 +109,26 @@ describe('RUN_STAGE_SEQUENCE', () => {
     expect(RUN_STAGE_SEQUENCE.indexOf('CONCLUDE')).toBe(RUN_STAGE_SEQUENCE.indexOf('WRITE_OUTPUT') - 1)
     expect(reconciliationStageLabel('CONCLUDE')).toBe('Drawing conclusions')
   })
+
+  // DAR-BE-156. Paired by POSITION with RunObservability.STAGE_SEQUENCE (RECHECK = 4, COMPARE = 5, NOTIFY = 11): an
+  // audit run reads its older findings again after the extracts and before the compare that judges them.
+  it('re-checks older findings between the extracts and the compare, at the backend sequence numbers', () => {
+    expect(RUN_STAGE_SEQUENCE.indexOf('RECHECK') + 1).toBe(4)
+    expect(RUN_STAGE_SEQUENCE.indexOf('COMPARE') + 1).toBe(5)
+    expect(RUN_STAGE_SEQUENCE.indexOf('CONCLUDE') + 1).toBe(9)
+    expect(RUN_STAGE_SEQUENCE.indexOf('NOTIFY') + 1).toBe(11)
+  })
+})
+
+describe('the re-check step', () => {
+  it('names the systems it read again, from its own metrics', () => {
+    expect(reconciliationStageLabel('RECHECK')).toBe('Re-checking older findings')
+    expect(reconciliationStageLabel('RECHECK', 'HotWax order lines (NetSuite)', 'NetSuite SuiteQL',
+      '{"recheckedSystems":["OMS","NETSUITE"],"keys":{"FILE_1":1294,"FILE_2":427}}')).toBe('Re-checking older findings on HotWax and NetSuite')
+    expect(reconciliationStageLabel('RECHECK', 'Shopify', 'HotWax', '{"recheckedSystems":["SHOPIFY"]}'))
+      .toBe('Re-checking older findings on Shopify')
+    expect(reconciliationStageLabel('RECHECK', 'HotWax', 'NetSuite', 'not json')).toBe('Re-checking older findings')
+  })
 })
 
 describe('formatRunStepDuration', () => {
