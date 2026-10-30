@@ -14,6 +14,8 @@ export interface ConfigVersionCounts {
   connections: number
   /** Present on versions kept after darpan's automation versioning; absent (0) before. */
   automations: number
+  /** Present on versions kept after darpan's lifecycle versioning; absent (0) before. */
+  lifecycles: number
 }
 
 export interface ConfigVersion {
@@ -63,7 +65,7 @@ export interface ConfigRestorePlan {
   switchOff: { statementId: string; audit: string | null; statement: string }[]
   /** Check links the version does not hold: removed (a link is config). */
   unlink: { statementId: string; checkId: string; audit: string | null; statement: string; check: string }[]
-  /** Runs and automations added since: kept, nothing in the restored audits uses them. */
+  /** Runs, automations and lifecycles added since: kept, nothing in the restored config uses them. */
   kept: { kind: string; label: string }[]
 }
 

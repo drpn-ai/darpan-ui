@@ -24,6 +24,8 @@ const KIND_LABEL: Record<string, string> = {
   SHOPIFY_AUTH: 'Connection',
   HOTWAX_OMS_REST: 'Connection',
   AUTOMATION: 'Automation',
+  LIFECYCLE: 'Lifecycle',
+  QUESTION: 'Question',
 }
 
 const COUNTED: { key: keyof ConfigVersionCounts; one: string; many: string }[] = [
@@ -34,6 +36,7 @@ const COUNTED: { key: keyof ConfigVersionCounts; one: string; many: string }[] =
   { key: 'queries', one: 'query', many: 'queries' },
   { key: 'connections', one: 'connection', many: 'connections' },
   { key: 'automations', one: 'automation', many: 'automations' },
+  { key: 'lifecycles', one: 'lifecycle', many: 'lifecycles' },
 ]
 
 const MAX_ITEMS = 12

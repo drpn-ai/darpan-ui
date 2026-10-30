@@ -37,6 +37,7 @@ describe('configHistory', () => {
   it('counts what a version holds, skipping what it has none of', () => {
     expect(countsSummary(version().counts)).toBe('1 audit · 2 statements · 3 checks · 1 query · 1 connection')
     expect(countsSummary({ runs: 2, automations: 1 })).toBe('2 runs · 1 automation')
+    expect(countsSummary({ lifecycles: 2 })).toBe('2 lifecycles')
     expect(countsSummary({})).toBe('Empty')
   })
 
@@ -51,7 +52,7 @@ describe('configHistory', () => {
       ],
       switchOff: [{ statementId: 'S9', audit: 'month-close', statement: 'R9' }],
       unlink: [{ statementId: 'S1', checkId: 'C2', audit: 'month-close', statement: 'R2', check: 'credit-memos-open' }],
-      kept: [{ kind: 'AUTOMATION', label: 'Evening invoices' }, { kind: 'RUN', label: 'Daily orders' }],
+      kept: [{ kind: 'AUTOMATION', label: 'Evening invoices' }, { kind: 'LIFECYCLE', label: 'Returns' }, { kind: 'RUN', label: 'Daily orders' }],
     }))
     expect(sections).toEqual([
       { title: 'Goes back', items: [
@@ -60,7 +61,7 @@ describe('configHistory', () => {
       ] },
       { title: 'Switched off', items: ['Statement R9 in month-close'] },
       { title: 'Unlinked', items: ['credit-memos-open no longer checks R2'] },
-      { title: 'Kept as they are', items: ['Automation Evening invoices', 'Run Daily orders'] },
+      { title: 'Kept as they are', items: ['Automation Evening invoices', 'Lifecycle Returns', 'Run Daily orders'] },
     ])
   })
 
