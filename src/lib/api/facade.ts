@@ -18,6 +18,12 @@ import type {
   AddAuditStatementResponse,
   VerifyAuditFindingResponse,
 } from './auditTypes'
+import type {
+  GetTenantConfigVersionsResponse,
+  PreviewTenantConfigRestoreResponse,
+  RestoreTenantConfigVersionResponse,
+  SnapshotTenantConfigResponse,
+} from './configTypes'
 
 // Cache-reset coordinator. The actual reset implementation is wired up in
 // main.ts after Pinia is installed, so this module stays free of store
@@ -589,6 +595,29 @@ export const auditFacade = {
   },
   verifyAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<VerifyAuditFindingResponse> {
     return callService<VerifyAuditFindingResponse>(AUDIT.verifyAuditFinding, payload, signal)
+  },
+}
+
+// DAR-BE-160. The active tenant's audit config kept as versions, and restoring one.
+const CONFIG = {
+  snapshotTenantConfig: 'facade.TenantConfigFacadeServices.snapshot#TenantConfig',
+  getTenantConfigVersions: 'facade.TenantConfigFacadeServices.get#TenantConfigVersions',
+  previewTenantConfigRestore: 'facade.TenantConfigFacadeServices.preview#TenantConfigRestore',
+  restoreTenantConfigVersion: 'facade.TenantConfigFacadeServices.restore#TenantConfigVersion',
+} as const
+
+export const configFacade = {
+  snapshotTenantConfig(payload: { reason?: string } = {}, signal?: AbortSignal): Promise<SnapshotTenantConfigResponse> {
+    return callService<SnapshotTenantConfigResponse>(CONFIG.snapshotTenantConfig, payload, signal)
+  },
+  getTenantConfigVersions(payload: { limit?: number } = {}, signal?: AbortSignal): Promise<GetTenantConfigVersionsResponse> {
+    return callService<GetTenantConfigVersionsResponse>(CONFIG.getTenantConfigVersions, payload, signal)
+  },
+  previewTenantConfigRestore(payload: { id: string }, signal?: AbortSignal): Promise<PreviewTenantConfigRestoreResponse> {
+    return callService<PreviewTenantConfigRestoreResponse>(CONFIG.previewTenantConfigRestore, payload, signal)
+  },
+  restoreTenantConfigVersion(payload: { id: string; planHash: string }, signal?: AbortSignal): Promise<RestoreTenantConfigVersionResponse> {
+    return callService<RestoreTenantConfigVersionResponse>(CONFIG.restoreTenantConfigVersion, payload, signal)
   },
 }
 

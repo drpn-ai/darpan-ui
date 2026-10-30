@@ -353,6 +353,16 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.html()).not.toContain('/settings/ai')
   })
 
+  it('opens the config history from its Operations tile', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    const tile = wrapper.get('[data-testid="tenant-module-config-history"]')
+    expect(tile.text()).toContain('Config history')
+    await tile.trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-config-history' })
+  })
+
   it('edits tenant timezone from the Tenant Settings popup', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()

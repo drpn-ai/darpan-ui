@@ -242,6 +242,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Tenant Settings' },
   },
   {
+    // DAR-BE-160. The active tenant's audit config versions: keep one, restore an older one.
+    path: '/settings/tenant/config-history',
+    name: 'settings-tenant-config-history',
+    component: () => import('../pages/settings/TenantConfigHistoryPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Config history' },
+  },
+  {
     path: '/settings/ai',
     name: 'settings-ai',
     redirect: { name: 'settings-tenant' },
