@@ -402,6 +402,8 @@ export interface RunSavedRunDiffPayload {
   file1Text?: string
   file2Name?: string
   file2Text?: string
+  /** DAR-BE-163: a failed run of this saved run to retry from the step it failed at, over its own window. */
+  retryFromRunResultId?: string
 }
 
 export interface ListGeneratedOutputsPayload {
