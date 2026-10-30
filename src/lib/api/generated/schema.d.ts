@@ -5635,6 +5635,8 @@ export interface components {
             hasHeader?: boolean;
             sparkMaster?: string;
             sparkAppName?: string;
+            /** @description DAR-BE-163. A FAILED run of this saved run to retry from the step it failed at: the sides it finished reading are reused and the rest read again, over its own window (the window parameters are ignored). A new run linked by parentRunResultId; refused when the rule set was edited after the failed run started. */
+            retryFromRunResultId?: string;
         };
         RunSavedRunDiffResult: {
             ok?: boolean;

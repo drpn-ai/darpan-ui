@@ -199,6 +199,18 @@
             data-testid="run-result-live-failed"
             :message="liveRunFailureText"
           />
+          <div v-if="showRetryRun" class="run-result-cancel" data-testid="run-result-retry">
+            <InlineValidation v-if="retryError" tone="error" :message="retryError" />
+            <button
+              type="button"
+              class="run-result-cancel__button"
+              data-testid="run-result-retry-button"
+              :disabled="retrying"
+              @click="void retry(reconciliationRunRouteContext, liveRunResultId)"
+            >
+              {{ retrying ? 'Retrying…' : retryLabel }}
+            </button>
+          </div>
           <p
             v-else-if="!savedOutput && liveRunNote"
             class="section-note"
@@ -616,6 +628,7 @@ import { useRunResultDifferences } from '../../composables/useRunResultDifferenc
 import { useRunResultDownloads } from '../../composables/useRunResultDownloads'
 import { useRunResultName } from '../../composables/useRunResultName'
 import { useRunResultSourceDetails } from '../../composables/useRunResultSourceDetails'
+import { useRunRetry } from '../../composables/useRunRetry'
 
 interface DiffDetailBucketCard {
   key: string
@@ -816,6 +829,15 @@ const cancelError = ref<string | null>(null)
 const cancelRequested = computed(() => Boolean(runStatus.value?.cancelRequestedDate))
 const showCancelRun = computed(() =>
   Boolean(liveRunResultId.value) && canRunActiveTenantReconciliation.value && liveRunActive.value)
+
+// DAR-BE-163: a failed run retries from the step it failed at; the steps that finished (a 17-minute
+// HotWax read) are reused, not run again.
+const { retrying, retryError, retry } = useRunRetry()
+const showRetryRun = computed(() => liveRunFailed.value && canRunActiveTenantReconciliation.value && Boolean(savedRunId.value))
+const retryLabel = computed(() => {
+  const failedStep = runStatusSteps.value.find((step) => step.statusEnumId === 'AUT_STAT_FAILED')
+  return failedStep ? `Retry from ${stepStageLabel(failedStep)}` : 'Retry'
+})
 
 async function cancelRun(): Promise<void> {
   const runId = liveRunResultId.value
