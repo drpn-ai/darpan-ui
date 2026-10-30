@@ -1,3 +1,9 @@
+admin.KnowledgeAdminServices.get#KnowledgeEntry
+admin.KnowledgeAdminServices.get#KnowledgeForReview
+admin.KnowledgeAdminServices.get#KnowledgeIdentifiers
+admin.KnowledgeAdminServices.retire#KnowledgeEntry
+admin.KnowledgeAdminServices.search#Knowledge
+admin.KnowledgeAdminServices.store#KnowledgeEntry
 admin.MembershipAdminServices.add#TenantMember
 admin.MembershipAdminServices.remove#TenantMember
 admin.MembershipAdminServices.update#TenantMemberRole
@@ -180,3 +186,7 @@ facade.TenantConfigFacadeServices.get#TenantConfigVersions
 facade.TenantConfigFacadeServices.preview#TenantConfigRestore
 facade.TenantConfigFacadeServices.restore#TenantConfigVersion
 facade.TenantConfigFacadeServices.snapshot#TenantConfig
+facade.TenantScriptFacadeServices.delete#TenantScript
+facade.TenantScriptFacadeServices.list#TenantScripts
+facade.TenantScriptFacadeServices.run#TenantScript
+facade.TenantScriptFacadeServices.save#TenantScript

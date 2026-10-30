@@ -24,6 +24,13 @@ import type {
   RestoreTenantConfigVersionResponse,
   SnapshotTenantConfigResponse,
 } from './configTypes'
+import type {
+  ListTenantScriptsResponse,
+  RunTenantScriptPayload,
+  RunTenantScriptResponse,
+  SaveTenantScriptPayload,
+  SaveTenantScriptResponse,
+} from './scriptTypes'
 
 // Cache-reset coordinator. The actual reset implementation is wired up in
 // main.ts after Pinia is installed, so this module stays free of store
@@ -618,6 +625,29 @@ export const configFacade = {
   },
   restoreTenantConfigVersion(payload: { id: string; planHash: string }, signal?: AbortSignal): Promise<RestoreTenantConfigVersionResponse> {
     return callService<RestoreTenantConfigVersionResponse>(CONFIG.restoreTenantConfigVersion, payload, signal)
+  },
+}
+
+// DAR-BE-164. The active tenant's scripts: list, save, delete, and run (a saved script or an unsaved draft).
+const SCRIPT = {
+  listTenantScripts: 'facade.TenantScriptFacadeServices.list#TenantScripts',
+  saveTenantScript: 'facade.TenantScriptFacadeServices.save#TenantScript',
+  deleteTenantScript: 'facade.TenantScriptFacadeServices.delete#TenantScript',
+  runTenantScript: 'facade.TenantScriptFacadeServices.run#TenantScript',
+} as const
+
+export const scriptFacade = {
+  listTenantScripts(payload: Record<string, never> = {}, signal?: AbortSignal): Promise<ListTenantScriptsResponse> {
+    return callService<ListTenantScriptsResponse>(SCRIPT.listTenantScripts, payload, signal)
+  },
+  saveTenantScript(payload: SaveTenantScriptPayload, signal?: AbortSignal): Promise<SaveTenantScriptResponse> {
+    return callService<SaveTenantScriptResponse>(SCRIPT.saveTenantScript, payload, signal)
+  },
+  deleteTenantScript(payload: { tenantScriptId: string }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    return callService<Record<string, unknown>>(SCRIPT.deleteTenantScript, payload, signal)
+  },
+  runTenantScript(payload: RunTenantScriptPayload, signal?: AbortSignal): Promise<RunTenantScriptResponse> {
+    return callService<RunTenantScriptResponse>(SCRIPT.runTenantScript, payload, signal)
   },
 }
 

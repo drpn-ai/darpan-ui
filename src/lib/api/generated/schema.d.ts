@@ -44,6 +44,208 @@ export interface components {
             id?: string | number | null;
             error: components["schemas"]["JsonRpcError"];
         };
+        /** @description One whole entry by key: the product tier first, then the named tenant's active entry. */
+        GetKnowledgeEntryParams: {
+            /** @description The one tenant whose entries are looked in; product only when omitted. */
+            tenantUserGroupId?: string;
+            /** @description The entry's key (its id: header). */
+            key: string;
+        };
+        GetKnowledgeEntryResult: {
+            /**
+             * @description {key, tier, systems, kind, tags, source, owner, reviewBy, supersedes,
+             *                     title, body}, or null when neither tier holds the key.
+             */
+            entry?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.KnowledgeAdminServices.get#KnowledgeEntry */
+        GetKnowledgeEntryRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.KnowledgeAdminServices.get#KnowledgeEntry";
+            params?: components["schemas"]["GetKnowledgeEntryParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.KnowledgeAdminServices.get#KnowledgeEntry. Check result.ok / result.errors for business failures. */
+        GetKnowledgeEntryResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetKnowledgeEntryResult"];
+        };
+        /** @description Entries due for a re-read (reviewBy within withinDays, expired ones included): product, plus the named tenant's. */
+        GetKnowledgeForReviewParams: {
+            /** @description The one tenant whose entries are included; product only when omitted. */
+            tenantUserGroupId?: string;
+            /** @description Days ahead of today to include. */
+            withinDays?: number;
+        };
+        GetKnowledgeForReviewResult: {
+            /** @description [{key, tier, title, source, owner, reviewBy}] soonest first. */
+            entries?: unknown[];
+        };
+        /** @description JSON-RPC request envelope for admin.KnowledgeAdminServices.get#KnowledgeForReview */
+        GetKnowledgeForReviewRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.KnowledgeAdminServices.get#KnowledgeForReview";
+            params?: components["schemas"]["GetKnowledgeForReviewParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.KnowledgeAdminServices.get#KnowledgeForReview. Check result.ok / result.errors for business failures. */
+        GetKnowledgeForReviewResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetKnowledgeForReviewResult"];
+        };
+        /**
+         * @description Every tenant's identifiers the leak check matches (tenant ids, labels, connection hosts, NetSuite
+         *                 accounts), for staff checking a product entry before commit. Names tenants: never ship the list.
+         */
+        GetKnowledgeIdentifiersParams: Record<string, never>;
+        GetKnowledgeIdentifiersResult: {
+            /**
+             * @description [{value, kind (tenantId | label | host | account),
+             *                     caseSensitive, tenantId}].
+             */
+            identifiers?: unknown[];
+        };
+        /** @description JSON-RPC request envelope for admin.KnowledgeAdminServices.get#KnowledgeIdentifiers */
+        GetKnowledgeIdentifiersRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.KnowledgeAdminServices.get#KnowledgeIdentifiers";
+            params?: components["schemas"]["GetKnowledgeIdentifiersParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.KnowledgeAdminServices.get#KnowledgeIdentifiers. Check result.ok / result.errors for business failures. */
+        GetKnowledgeIdentifiersResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetKnowledgeIdentifiersResult"];
+        };
+        /** @description Retires one tenant entry: kept for history, never searched or answered again. Local instances only. */
+        RetireKnowledgeEntryParams: {
+            /** @description The tenant the entry belongs to. */
+            tenantUserGroupId: string;
+            /** @description The entry's key. */
+            key: string;
+        };
+        RetireKnowledgeEntryResult: {
+            /** @description True when retired. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.KnowledgeAdminServices.retire#KnowledgeEntry */
+        RetireKnowledgeEntryRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.KnowledgeAdminServices.retire#KnowledgeEntry";
+            params?: components["schemas"]["RetireKnowledgeEntryParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.KnowledgeAdminServices.retire#KnowledgeEntry. Check result.ok / result.errors for business failures. */
+        RetireKnowledgeEntryResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RetireKnowledgeEntryResult"];
+        };
+        /** @description Keyword search over the product tier and, when a tenant is named, that tenant's entries, merged by score. */
+        SearchKnowledgeParams: {
+            /** @description The one tenant whose entries join the search; product only when omitted. */
+            tenantUserGroupId?: string;
+            /** @description Search words; codes such as R2 match whole. */
+            words: string;
+            /** @description Only entries about this system, e.g. oms. */
+            system?: string;
+            /** @description Only entries of this kind. */
+            kind?: string;
+            /** @description Hits to answer; 5 by default, 20 at most. */
+            limit?: number;
+        };
+        SearchKnowledgeResult: {
+            /**
+             * @description [{key, tier (product | tenant), title, snippet, source, reviewBy, score}]
+             *                     best first.
+             */
+            hits?: unknown[];
+            /** @description loaded, or absent when no product entry is loaded on this instance. */
+            productTier?: string;
+            /** @description loaded, none (no tenant named) or deactivated (no tenant hits). */
+            tenantTier?: string;
+        };
+        /** @description JSON-RPC request envelope for admin.KnowledgeAdminServices.search#Knowledge */
+        SearchKnowledgeRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.KnowledgeAdminServices.search#Knowledge";
+            params?: components["schemas"]["SearchKnowledgeParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.KnowledgeAdminServices.search#Knowledge. Check result.ok / result.errors for business failures. */
+        SearchKnowledgeResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SearchKnowledgeResult"];
+        };
+        /**
+         * @description Adds or replaces one tenant entry (by tenant and key) from its markdown file text. Refused, writing
+         *                 nothing, off a local instance, or when the text names another tenant or holds customer personal data.
+         */
+        StoreKnowledgeEntryParams: {
+            /** @description The tenant the entry belongs to. */
+            tenantUserGroupId: string;
+            /** @description The entry file: header, # title, body; tier: tenant. */
+            markdown: string;
+        };
+        StoreKnowledgeEntryResult: {
+            /** @description The stored entry, as get#KnowledgeEntry answers it. */
+            entry?: Record<string, never>;
+            /** @description True when the key was new for the tenant. */
+            created?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.KnowledgeAdminServices.store#KnowledgeEntry */
+        StoreKnowledgeEntryRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.KnowledgeAdminServices.store#KnowledgeEntry";
+            params?: components["schemas"]["StoreKnowledgeEntryParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.KnowledgeAdminServices.store#KnowledgeEntry. Check result.ok / result.errors for business failures. */
+        StoreKnowledgeEntryResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["StoreKnowledgeEntryResult"];
+        };
         /**
          * @description Add a user to a tenant with a tenant-scoped role. Writes UserGroupMember and
          *                 TenantUserPermissionGroupMember atomically — never one without the other.
@@ -8189,6 +8391,158 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SnapshotTenantConfigResult"];
         };
+        /** @description Delete one of the active tenant's scripts. Needs edit access to the tenant. */
+        DeleteTenantScriptParams: {
+            tenantScriptId: string;
+        };
+        DeleteTenantScriptResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.delete#TenantScript */
+        DeleteTenantScriptRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.TenantScriptFacadeServices.delete#TenantScript";
+            params?: components["schemas"]["DeleteTenantScriptParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.TenantScriptFacadeServices.delete#TenantScript. Check result.ok / result.errors for business failures. */
+        DeleteTenantScriptResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DeleteTenantScriptResult"];
+        };
+        /** @description The active tenant's scripts by name, plus the d: library and the limits, for the editor. */
+        ListTenantScriptsParams: Record<string, never>;
+        ListTenantScriptsResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            /**
+             * @description [{tenantScriptId, scriptName, description, scriptProfile,
+             *                     inputSource, scriptBody, sampleInputJson, isActive, createdByUserId, createdDate, lastUpdatedDate}]
+             */
+            scripts?: unknown[];
+            /** @description [{name, help}]: the d: functions. */
+            library?: unknown[];
+            /** @description {EXPRESSION: {maxSourceChars, unitLimit, timeoutMs}, SCRIPT: {...}} */
+            limits?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.list#TenantScripts */
+        ListTenantScriptsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.TenantScriptFacadeServices.list#TenantScripts";
+            params?: components["schemas"]["ListTenantScriptsParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.TenantScriptFacadeServices.list#TenantScripts. Check result.ok / result.errors for business failures. */
+        ListTenantScriptsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListTenantScriptsResult"];
+        };
+        /**
+         * @description Runs a script and returns what it gave back; writes nothing. Either a saved script (tenantScriptId) or
+         *                 an unsaved draft (scriptBody + scriptProfile; these also override a saved script's, so the editor can try an
+         *                 edit before saving). The input is read first, then the script runs with no transaction open. A script error
+         *                 is a result (run.ok false, run.error), not a service error. Needs edit access to the tenant.
+         */
+        RunTenantScriptParams: {
+            tenantScriptId?: string;
+            scriptBody?: string;
+            scriptProfile?: string;
+            /** @description SAMPLE or RUN_RESULT; defaults to the saved script's, else SAMPLE. */
+            inputSource?: string;
+            /** @description SAMPLE input; defaults to the saved sample. */
+            inputJson?: string;
+            /** @description RUN_RESULT: the run result file, as list#GeneratedOutputs names it. */
+            fileName?: string;
+        };
+        RunTenantScriptResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            /** @description {ok, profile, result, units, elapsedMs, logs, error: {kind, message, line, column}} */
+            run?: Record<string, never>;
+            /** @description {source, characters} or {source, fileName, records, totalDifferences, truncated} */
+            inputSummary?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.run#TenantScript */
+        RunTenantScriptRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.TenantScriptFacadeServices.run#TenantScript";
+            params?: components["schemas"]["RunTenantScriptParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.TenantScriptFacadeServices.run#TenantScript. Check result.ok / result.errors for business failures. */
+        RunTenantScriptResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RunTenantScriptResult"];
+        };
+        /**
+         * @description Create or update one of the active tenant's scripts. The body must parse under its profile; a script
+         *                 that does not is refused with the line, never saved half-checked. Needs edit access to the tenant.
+         */
+        SaveTenantScriptParams: {
+            tenantScriptId?: string;
+            scriptName: string;
+            description?: string;
+            /** @description EXPRESSION or SCRIPT. */
+            scriptProfile?: string;
+            /** @description SAMPLE or RUN_RESULT. */
+            inputSource?: string;
+            /** @description JEXL; holds < and >. */
+            scriptBody: string;
+            sampleInputJson?: string;
+            isActive?: boolean;
+        };
+        SaveTenantScriptResult: {
+            ok?: boolean;
+            messages?: string[];
+            errors?: string[];
+            script?: Record<string, never>;
+            /** @description {ok, profile, variables, error: {kind, message, line, column}} */
+            validation?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.save#TenantScript */
+        SaveTenantScriptRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.TenantScriptFacadeServices.save#TenantScript";
+            params?: components["schemas"]["SaveTenantScriptParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.TenantScriptFacadeServices.save#TenantScript. Check result.ok / result.errors for business failures. */
+        SaveTenantScriptResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["SaveTenantScriptResult"];
+        };
     };
     responses: never;
     parameters: never;
@@ -8207,7 +8561,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"];
+                "application/json": components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["DeleteTenantScriptRequest"] | components["schemas"]["ListTenantScriptsRequest"] | components["schemas"]["RunTenantScriptRequest"] | components["schemas"]["SaveTenantScriptRequest"];
             };
         };
         responses: {
@@ -8217,7 +8571,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["DeleteTenantScriptResponse"] | components["schemas"]["ListTenantScriptsResponse"] | components["schemas"]["RunTenantScriptResponse"] | components["schemas"]["SaveTenantScriptResponse"];
                 };
             };
         };

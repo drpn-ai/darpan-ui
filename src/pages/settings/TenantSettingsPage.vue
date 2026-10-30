@@ -119,6 +119,20 @@
             <span class="tenant-settings-list-status">Versions</span>
           </span>
         </button>
+        <!-- DAR-BE-164. This tenant's JEXL scripts. -->
+        <button
+          type="button"
+          class="static-page-tile static-page-record-tile static-page-list-tile"
+          data-testid="tenant-module-scripts"
+          @click="router.push({ name: 'settings-tenant-scripts' })"
+        >
+          <span class="tenant-settings-list-row">
+            <span class="tenant-settings-list-main">
+              <span class="static-page-tile-title static-page-list-tile__title">Scripts</span>
+            </span>
+            <span class="tenant-settings-list-status">JEXL</span>
+          </span>
+        </button>
       </div>
       <p v-if="notificationWorkflowSuccess" class="section-note" role="status">{{ notificationWorkflowSuccess }}</p>
       <!-- Rendered on the PAGE, not only inside the popup. The Slack callback returns the admin here

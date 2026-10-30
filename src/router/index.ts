@@ -249,6 +249,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Config history' },
   },
   {
+    // DAR-BE-164. The active tenant's JEXL scripts: write, run against sample input or a run's differences, save.
+    path: '/settings/tenant/scripts',
+    name: 'settings-tenant-scripts',
+    component: () => import('../pages/settings/TenantScriptsPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Scripts' },
+  },
+  {
     path: '/settings/ai',
     name: 'settings-ai',
     redirect: { name: 'settings-tenant' },
