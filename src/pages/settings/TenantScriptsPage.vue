@@ -139,6 +139,15 @@
       </div>
     </StaticPageSection>
 
+    <StaticPageSection v-if="savedScript" title="Deploy">
+      <ScriptDeploymentPanel
+        :script="savedScript"
+        :chat-spaces="chatSpaces"
+        :saved-run-options="savedRunOptions"
+        :can-edit="canEdit"
+      />
+    </StaticPageSection>
+
     <StaticPageSection v-if="library.length" title="d: functions">
       <dl class="tenant-script-library" data-testid="script-library">
         <template v-for="fn in library" :key="fn.name">
@@ -161,7 +170,8 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
-import { reconciliationFacade, scriptFacade } from '../../lib/api/facade'
+import ScriptDeploymentPanel from '../../components/settings/ScriptDeploymentPanel.vue'
+import { reconciliationFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
 import type {
   RunTenantScriptResponse,
   ScriptError,
@@ -171,7 +181,7 @@ import type {
   ScriptProfileLimits,
   TenantScript,
 } from '../../lib/api/scriptTypes'
-import type { GeneratedOutput } from '../../lib/api/types'
+import type { GeneratedOutput, TenantChatSpace } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -215,6 +225,7 @@ const scripts = ref<TenantScript[]>([])
 const library = ref<ScriptLibraryFunction[]>([])
 const limits = ref<Partial<Record<ScriptProfile, ScriptProfileLimits>>>({})
 const runResults = ref<GeneratedOutput[]>([])
+const chatSpaces = ref<TenantChatSpace[]>([])
 const loading = ref(false)
 const pageError = ref('')
 const statusMessage = ref('')
@@ -314,9 +325,30 @@ async function loadScripts(): Promise<void> {
   }
 }
 
+// DAR-BE-167. The Deploy section works on the SAVED script (its saved input source), never an unsaved edit.
+const savedScript = computed(() =>
+  draft.value?.tenantScriptId ? scripts.value.find((script) => script.tenantScriptId === draft.value?.tenantScriptId) ?? null : null)
+// Saved runs that have produced a result, for "reads the newest result of".
+const savedRunOptions = computed(() => {
+  const seen = new Map<string, string>()
+  for (const out of runResults.value) {
+    if (out.savedRunId && !seen.has(out.savedRunId)) seen.set(out.savedRunId, out.savedRunName || out.savedRunId)
+  }
+  return [...seen].map(([value, label]) => ({ value, label }))
+})
+
+async function loadChatSpaces(): Promise<void> {
+  try {
+    chatSpaces.value = (await settingsFacade.listTenantChatSpaces()).chatSpaces ?? []
+  } catch {
+    // Without chat spaces the Deploy section simply has nothing to post to.
+    chatSpaces.value = []
+  }
+}
+
 async function loadRunResults(): Promise<void> {
   try {
-    const out = await reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 50 })
+    const out = await reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 200 })
     runResults.value = (out.generatedOutputs ?? []).filter((item) => item.fileName && item.resultAvailable !== false)
   } catch {
     // The run-result picker is optional; sample input still works.
@@ -407,6 +439,7 @@ watch(() => draft.value?.inputSource, (source) => {
 onMounted(() => {
   void loadScripts()
   void loadRunResults()
+  void loadChatSpaces()
 })
 </script>
 

@@ -25,10 +25,14 @@ import type {
   SnapshotTenantConfigResponse,
 } from './configTypes'
 import type {
+  ListTenantScriptDeploymentsResponse,
   ListTenantScriptsResponse,
+  RunTenantScriptDeploymentResponse,
   RunTenantScriptPayload,
   RunTenantScriptResponse,
   SaveTenantScriptPayload,
+  SaveTenantScriptDeploymentPayload,
+  SaveTenantScriptDeploymentResponse,
   SaveTenantScriptResponse,
 } from './scriptTypes'
 
@@ -634,6 +638,10 @@ const SCRIPT = {
   saveTenantScript: 'facade.TenantScriptFacadeServices.save#TenantScript',
   deleteTenantScript: 'facade.TenantScriptFacadeServices.delete#TenantScript',
   runTenantScript: 'facade.TenantScriptFacadeServices.run#TenantScript',
+  listTenantScriptDeployments: 'facade.TenantScriptFacadeServices.list#TenantScriptDeployments',
+  saveTenantScriptDeployment: 'facade.TenantScriptFacadeServices.save#TenantScriptDeployment',
+  deleteTenantScriptDeployment: 'facade.TenantScriptFacadeServices.delete#TenantScriptDeployment',
+  runTenantScriptDeployment: 'facade.TenantScriptFacadeServices.run#TenantScriptDeployment',
 } as const
 
 export const scriptFacade = {
@@ -648,6 +656,20 @@ export const scriptFacade = {
   },
   runTenantScript(payload: RunTenantScriptPayload, signal?: AbortSignal): Promise<RunTenantScriptResponse> {
     return callService<RunTenantScriptResponse>(SCRIPT.runTenantScript, payload, signal)
+  },
+  // DAR-BE-167. Deployments: a saved script on a schedule, its text posted to a chat space.
+  listTenantScriptDeployments(payload: { tenantScriptId?: string } = {}, signal?: AbortSignal): Promise<ListTenantScriptDeploymentsResponse> {
+    return callService<ListTenantScriptDeploymentsResponse>(SCRIPT.listTenantScriptDeployments, payload, signal)
+  },
+  saveTenantScriptDeployment(payload: SaveTenantScriptDeploymentPayload, signal?: AbortSignal): Promise<SaveTenantScriptDeploymentResponse> {
+    return callService<SaveTenantScriptDeploymentResponse>(SCRIPT.saveTenantScriptDeployment, payload, signal)
+  },
+  deleteTenantScriptDeployment(payload: { tenantScriptDeploymentId: string }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    return callService<Record<string, unknown>>(SCRIPT.deleteTenantScriptDeployment, payload, signal)
+  },
+  /** send=false (default) previews the message; send=true posts it and records the run. */
+  runTenantScriptDeployment(payload: { tenantScriptDeploymentId: string; send?: boolean }, signal?: AbortSignal): Promise<RunTenantScriptDeploymentResponse> {
+    return callService<RunTenantScriptDeploymentResponse>(SCRIPT.runTenantScriptDeployment, payload, signal)
   },
 }
 

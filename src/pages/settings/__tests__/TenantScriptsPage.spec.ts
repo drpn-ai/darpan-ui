@@ -10,9 +10,13 @@ const runTenantScript = vi.hoisted(() => vi.fn())
 const listGeneratedOutputs = vi.hoisted(() => vi.fn())
 const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 
+const listTenantScriptDeployments = vi.hoisted(() => vi.fn())
+const listTenantChatSpaces = vi.hoisted(() => vi.fn())
+
 vi.mock('../../../lib/api/facade', () => ({
-  scriptFacade: { listTenantScripts, saveTenantScript, deleteTenantScript, runTenantScript },
+  scriptFacade: { listTenantScripts, saveTenantScript, deleteTenantScript, runTenantScript, listTenantScriptDeployments },
   reconciliationFacade: { listGeneratedOutputs },
+  settingsFacade: { listTenantChatSpaces },
 }))
 vi.mock('../../../stores/auth', () => ({
   useAuthStore: () => ({ sessionInfo: { userId: 'U1', activeTenantUserGroupId: 'KREWE', activeTenantLabel: 'Krewe' } }),
@@ -51,6 +55,18 @@ describe('TenantScriptsPage', () => {
       limits: { SCRIPT: { maxSourceChars: 64000, unitLimit: 2000000, timeoutMs: 2000 } },
     })
     listGeneratedOutputs.mockResolvedValue({ generatedOutputs: [{ fileName: 'runs/r1.json', savedRunName: 'Daily orders', totalDifferences: 7 }] })
+    listTenantScriptDeployments.mockResolvedValue({ deployments: [], timeZone: 'UTC' })
+    listTenantChatSpaces.mockResolvedValue({ chatSpaces: [] })
+  })
+
+  it('shows the Deploy section for a saved script only', async () => {
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="script-new"]').trigger('click')
+    expect(wrapper.find('[data-testid="script-deploy"]').exists()).toBe(false)
+    await wrapper.findAll('[data-testid="script-tile"]')[0]!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="script-deploy"]').exists()).toBe(true)
+    expect(listTenantScriptDeployments).toHaveBeenCalledWith({ tenantScriptId: '100' })
   })
 
   it('lists the saved scripts and the d: library', async () => {

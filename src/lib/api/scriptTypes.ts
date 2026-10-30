@@ -90,3 +90,55 @@ export interface RunTenantScriptResponse {
   run: ScriptRun
   inputSummary: ScriptInputSummary
 }
+
+// DAR-BE-167. A deployment: a saved script run on a schedule (Quartz cron in the tenant's zone), reading the newest
+// result of a saved run (or its sample), its returned text posted to a chat space.
+
+export type ScriptDeploymentStatus =
+  | 'PREVIEW' | 'SENT' | 'NOTHING_TO_SEND' | 'SCRIPT_ERROR' | 'NO_INPUT' | 'NOT_DELIVERED' | 'SCRIPT_MISSING'
+
+export interface TenantScriptDeployment {
+  tenantScriptDeploymentId: string
+  tenantScriptId: string
+  scheduleExpr: string
+  inputSavedRunId: string | null
+  chatSpaceId: string
+  isActive: boolean
+  nextRunDate: string | number | null
+  lastRunDate: string | number | null
+  lastRunStatus: ScriptDeploymentStatus | null
+  lastRunMessage: string | null
+  lastRunUnits: number | null
+}
+
+export interface ListTenantScriptDeploymentsResponse {
+  deployments: TenantScriptDeployment[]
+  timeZone: string
+}
+
+export interface SaveTenantScriptDeploymentPayload {
+  tenantScriptDeploymentId?: string
+  tenantScriptId: string
+  scheduleExpr: string
+  inputSavedRunId?: string
+  chatSpaceId: string
+  isActive: boolean
+}
+
+export interface SaveTenantScriptDeploymentResponse {
+  deployment: TenantScriptDeployment
+}
+
+export interface ScriptDeploymentOutcome {
+  status: ScriptDeploymentStatus
+  message: string
+  text?: string
+  run?: ScriptRun
+  inputSummary?: ScriptInputSummary
+  fileName?: string | null
+}
+
+export interface RunTenantScriptDeploymentResponse {
+  outcome: ScriptDeploymentOutcome
+  deployment: TenantScriptDeployment
+}
