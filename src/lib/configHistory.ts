@@ -23,6 +23,7 @@ const KIND_LABEL: Record<string, string> = {
   NETSUITE_RESTLET: 'Connection',
   SHOPIFY_AUTH: 'Connection',
   HOTWAX_OMS_REST: 'Connection',
+  AUTOMATION: 'Automation',
 }
 
 const COUNTED: { key: keyof ConfigVersionCounts; one: string; many: string }[] = [
@@ -32,6 +33,7 @@ const COUNTED: { key: keyof ConfigVersionCounts; one: string; many: string }[] =
   { key: 'runs', one: 'run', many: 'runs' },
   { key: 'queries', one: 'query', many: 'queries' },
   { key: 'connections', one: 'connection', many: 'connections' },
+  { key: 'automations', one: 'automation', many: 'automations' },
 ]
 
 const MAX_ITEMS = 12
