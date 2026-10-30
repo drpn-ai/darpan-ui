@@ -8066,8 +8066,8 @@ export interface components {
         };
         /**
          * @description What restoring one of the active tenant's config versions would do, writing nothing. What the version
-         *                 holds is put back; a statement added since is switched off and a check link added since removed; runs and
-         *                 queries added since are kept. Pass planHash to restore#TenantConfigVersion to apply exactly this.
+         *                 holds is put back; a statement added since is switched off and a check link added since removed; runs added
+         *                 since are kept. Pass planHash to restore#TenantConfigVersion to apply exactly this.
          */
         PreviewTenantConfigRestoreParams: {
             /** @description configVersionId to restore. */

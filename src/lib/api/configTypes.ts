@@ -61,7 +61,7 @@ export interface ConfigRestorePlan {
   switchOff: { statementId: string; audit: string | null; statement: string }[]
   /** Check links the version does not hold: removed (a link is config). */
   unlink: { statementId: string; checkId: string; audit: string | null; statement: string; check: string }[]
-  /** Runs and queries added since: kept, nothing in the restored audits uses them. */
+  /** Runs added since: kept, nothing in the restored audits uses them. */
   kept: { kind: string; label: string }[]
 }
 
