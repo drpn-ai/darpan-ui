@@ -151,6 +151,7 @@ describe('every button in the app has an answer', () => {
     'components/audit/AuditColumns.vue': 'the drill-down rows, breadcrumb steps and cause-group toggles are named by the audit\'s own categories, statements, checks, findings and causes; its icon actions and retries are entered',
     'components/workflow/WorkflowDateRangeCalendar.vue': 'the start and end fields and each day cell are named by a date; the month arrows are entered',
     'pages/reconciliation/AuditReportPage.vue': 'a filter pill is named by its live count and its status label; Export report is entered',
+    'pages/settings/TenantScriptsPage.vue': 'a saved-script tile is named by the script, which is this tenant\'s data; New script, Run and Delete are entered',
   }
 
   /**

@@ -472,6 +472,44 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'downloads this day’s whole audit as JSON: every statement, check and finding. The page shows a slice of it.',
   },
 
+  /* ── Script deployments (DAR-BE-167) ────────────────────────────────────────── */
+  'preview message': {
+    title: 'Preview message',
+    body: 'runs the saved deployment against the newest result and shows the text it would post. Nothing reaches the chat space, and unsaved edits are left out.',
+  },
+  'send now': {
+    title: 'Send now',
+    body: 'asks once before it posts. The second press sends the script’s text to the chat space a single time; the daily schedule is unchanged.',
+  },
+  'delete deployment': {
+    title: 'Delete deployment',
+    body: 'asks once before it goes. Deleting stops this script’s scheduled posts; the script itself stays saved and can be deployed again.',
+  },
+  'confirm delete': {
+    title: 'Confirm delete',
+    body: 'removes it for good. There is no undo and no copy kept.',
+  },
+  'new script': {
+    title: 'New script',
+    body: 'opens an empty editor. Nothing is saved and nothing runs until you press Save script or Run.',
+  },
+  run: {
+    title: 'Run',
+    body: 'runs the script as written, unsaved edits included, on the chosen input and shows what it returns. Nothing is saved or posted.',
+  },
+  'running…': {
+    title: 'Running',
+    body: 'the script is already running on that input. Its output shows below when it returns.',
+  },
+  delete: {
+    title: 'Delete',
+    body: 'asks once before it goes; the second press removes this saved script.',
+  },
+  scripts: {
+    title: 'Scripts',
+    body: 'opens this tenant’s saved scripts: write one, try it on a sample or a run’s result, and deploy it to post on a schedule.',
+  },
+
   /* ── Connections and settings ───────────────────────────────────────────────── */
   'run connection diagnostics': {
     title: 'Run connection diagnostics',
@@ -717,6 +755,10 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^retry (\d+ )?not run$/, {
     title: 'Retry not run',
     body: 'goes again for each check that did not run, one after another, from what its last read already fetched. Checks that ran are left alone.',
+  }],
+  [/^confirm send to .+$/, {
+    title: 'Confirm send',
+    body: 'posts the message to that chat space now, once. There is no unsend, so preview it first if you have not read the text.',
   }],
   [/^export .+ extract$/, {
     title: 'Export extract',
