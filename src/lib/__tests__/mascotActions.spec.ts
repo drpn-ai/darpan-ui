@@ -148,6 +148,9 @@ describe('every button in the app has an answer', () => {
     'pages/settings/UserSettingsPage.vue': 'a tenant tile is named by the tenant',
     'pages/settings/TenantSettingsPage.vue': 'the AI tile is named by the selected provider',
     'components/reconciliation/RunFlowchartBoard.vue': 'a question box and an openable finding are named by their question and finding, which are data; the + buttons are entered',
+    'components/audit/AuditColumns.vue': 'the drill-down rows, breadcrumb steps and cause-group toggles are named by the audit\'s own categories, statements, checks, findings and causes; its icon actions and retries are entered',
+    'components/workflow/WorkflowDateRangeCalendar.vue': 'the start and end fields and each day cell are named by a date; the month arrows are entered',
+    'pages/reconciliation/AuditReportPage.vue': 'a filter pill is named by its live count and its status label; Export report is entered',
   }
 
   /**
@@ -187,14 +190,24 @@ describe('every button in the app has an answer', () => {
     return found
   }
 
-  /** A template literal is a real name with a hole in it; probe it with the hole filled. */
+  /**
+   * A template literal is a real name with a hole in it; probe it with the hole filled. One
+   * that is only holes and punctuation (`${item.label}, ${item.sub}`) is this tenant's data.
+   */
   function probeTemplates(expression: string): { probes: string[], rest: string } {
     const probes: string[] = []
     const rest = expression.replace(/`([^`]*)`/g, (_all, body: string) => {
-      probes.push(body.replace(/\$\{[^}]*\}/g, 'x').trim())
+      const probe = body.replace(/\$\{[^}]*\}/g, 'x').trim()
+      if (/[a-z]/i.test(probe.replace(/\bx\b/g, ''))) probes.push(probe)
       return ''
     })
     return { probes, rest }
+  }
+
+  /** Quoted words in an expression are a name only as a branch, never as a call's argument ('en-US'). */
+  function quotedNames(expression: string): string[] {
+    const branches = expression.replace(/\(\s*'[^']*'\s*(?=[,)])/g, '(')
+    return Array.from(branches.matchAll(/'([^']+)'/g)).map((match) => match[1] as string)
   }
 
   function namesFor(tag: string, inner: string): string[] {
@@ -204,8 +217,7 @@ describe('every button in the app has an answer', () => {
       const bound = tag.match(new RegExp(`(?<![\\w-]):${attribute}="([^"]*)"`))
       if (bound?.[1]) {
         const { probes, rest } = probeTemplates(bound[1])
-        const quoted = Array.from(rest.matchAll(/'([^']+)'/g)).map((match) => match[1] as string)
-        return [...probes, ...quoted].filter(Boolean)
+        return [...probes, ...quotedNames(rest)].filter(Boolean)
       }
     }
     // Mirrors controlName(): a list tile is named by its title span, not by the data beside it.
@@ -218,9 +230,11 @@ describe('every button in the app has an answer', () => {
     }
 
     const names: string[] = []
-    const plain = inner.replace(/\{\{([\s\S]*?)\}\}/g, (_all, expression: string) => {
+    // An aria-hidden glyph (a chevron, an icon) is not part of what the control is called.
+    const spoken = inner.replace(/<(\w+)\b[^>]*\baria-hidden="true"[^>]*>[\s\S]*?<\/\1>/g, '')
+    const plain = spoken.replace(/\{\{([\s\S]*?)\}\}/g, (_all, expression: string) => {
       const { probes, rest } = probeTemplates(expression)
-      names.push(...probes, ...Array.from(rest.matchAll(/'([^']+)'/g)).map((match) => match[1] as string))
+      names.push(...probes, ...quotedNames(rest))
       return ''
     })
     const text = plain.replace(/<[^>]*>/g, '').replace(/&times;/g, '×').replace(/\s+/g, ' ').trim()
@@ -231,6 +245,25 @@ describe('every button in the app has an answer', () => {
   function normalize(name: string): string {
     return name.replace(/\s+/g, ' ').trim().replace(/[:：]$/, '').toLowerCase()
   }
+
+  // The sweep reads names the way controlName() does at runtime, so these three are not names.
+  it('reads no name from an aria-hidden glyph, a call argument, or a template that is only holes', () => {
+    expect(namesFor('<button type="button">', '<span aria-hidden="true">›</span> <span>{{ groupLabel(index) }}</span>')).toEqual([])
+    expect(namesFor('<button type="button">', "<span>{{ pill.count.toLocaleString('en-US') }}</span> <span>{{ pill.label }}</span>")).toEqual([])
+    expect(namesFor('<button :aria-label="rail ? `${item.label}, ${item.sub}` : undefined">', '')).toEqual([])
+  })
+
+  it('still reads a name written as a ternary branch or a template with words in it', () => {
+    expect(namesFor('<button type="button">', "{{ retrying ? 'Retrying…' : retryLabel }}")).toEqual(['Retrying…'])
+    expect(namesFor('<button :aria-label="`Export ${bar.system} extract`">', '')).toEqual(['Export x extract'])
+    expect(namesFor('<button type="button">', '<span aria-hidden="true">›</span> Retry from last read')).toEqual(['Retry from last read'])
+  })
+
+  it('answers the names those buttons carry at runtime, not just their template form', () => {
+    expect(lookupAction('retry 3 not run')?.title).toBe('Retry not run')
+    expect(lookupAction('export shopify extract')?.title).toBe('Export extract')
+    expect(lookupAction('retry not running')).toBeNull()
+  })
 
   it('resolves every button name written in a template', () => {
     const files = glob('src/**/*.vue', { ignore: ['**/__tests__/**', '**/.claude/**'] })

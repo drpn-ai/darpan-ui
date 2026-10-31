@@ -61,6 +61,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Download saved result',
     body: 'the result file exactly as the run wrote it — not a re-export of the rows currently filtered on screen.',
   },
+  'retrying…': {
+    title: 'Retrying',
+    body: 'the retry is already on its way. The page catches up when the run lands, so there is nothing more to press.',
+  },
   'clear record search': {
     title: 'Clear record search',
     body: 'empties the box and puts every record back in the table. Nothing is re-run.',
@@ -446,6 +450,28 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'a connection for this side to pull from. A run cannot name a source it has no config for.',
   },
 
+  /* ── Audits (DAR-UI-094) ────────────────────────────────────────────────────── */
+  'retry from last read': {
+    title: 'Retry from last read',
+    body: 'runs this check again from what its last read already fetched, so no system is read twice. The rest of the audit stays as it is.',
+  },
+  'resolve finding': {
+    title: 'Resolve finding',
+    body: 'checks this one record again now, in the background. If the systems agree it closes; if not it stays open, and the pill at the top says which.',
+  },
+  'export finding': {
+    title: 'Export finding',
+    body: 'downloads this finding as JSON with its records. For an order, every line comes with it and the stuck line in full.',
+  },
+  'export findings': {
+    title: 'Export findings',
+    body: 'downloads every finding under this statement for the period as JSON, with more ids and fields than the board shows.',
+  },
+  'export report': {
+    title: 'Export report',
+    body: 'downloads this day’s whole audit as JSON: every statement, check and finding. The page shows a slice of it.',
+  },
+
   /* ── Connections and settings ───────────────────────────────────────────────── */
   'run connection diagnostics': {
     title: 'Run connection diagnostics',
@@ -478,6 +504,30 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   'change password': {
     title: 'Change password',
     body: 'sets a new one for this account. Other sessions stay signed in until they expire on their own.',
+  },
+  'forgot password?': {
+    title: 'Forgot password?',
+    body: 'asks who you are, then emails a one-time code to the address on your account. With no email on file there is nowhere to send it.',
+  },
+  'send a new code': {
+    title: 'Send a new code',
+    body: 'only the newest code works, so codes in older emails stop counting. Sends are capped each hour, so check spam before asking again.',
+  },
+  change: {
+    title: 'Change',
+    body: 'replaces your recovery email, the one password reset codes go to. Until the new address saves, codes keep going to the old one.',
+  },
+  'keep a version now': {
+    title: 'Keep a version now',
+    body: 'saves this tenant’s whole audit setup as it stands, so a later edit can be rolled back to exactly this point.',
+  },
+  'config history': {
+    title: 'Config history',
+    body: 'opens the kept versions of this tenant’s audit setup. Restoring one puts the live setup back to that point.',
+  },
+  'streaks space': {
+    title: 'Streaks space',
+    body: 'picks the chat space this tenant’s streak milestones and badges post to. It moves streaks only; run notifications keep their own spaces.',
   },
   timezone: {
     title: 'Timezone',
@@ -662,6 +712,15 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^notifying — .+$/, {
     title: 'Notifying',
     body: 'this run will message that chat space when it finishes. Pressing it again stops the message, not the run.',
+  }],
+  // The count is live ("Retry 3 not run"); the template sweep reads it with the count gone.
+  [/^retry (\d+ )?not run$/, {
+    title: 'Retry not run',
+    body: 'goes again for each check that did not run, one after another, from what its last read already fetched. Checks that ran are left alone.',
+  }],
+  [/^export .+ extract$/, {
+    title: 'Export extract',
+    body: 'downloads exactly what that system’s read returned for this check that morning: the raw records, before any comparison.',
   }],
   [/^(expand|collapse) .+ (object|array)$/, {
     title: 'Expand',
