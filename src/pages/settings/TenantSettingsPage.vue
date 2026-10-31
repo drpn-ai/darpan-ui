@@ -883,7 +883,8 @@ const activeChatSpace = computed<TenantChatSpace | null>(() => (
 function chatSpaceStatusLabel(space: TenantChatSpace): string {
   // The provider is the useful half of this line now that a tenant can have both kinds: two spaces
   // both reading "Configured" gives no way to tell which one posts where.
-  const provider = space.chatProviderLabel || 'Google Chat'
+  const delivery = space.deliveryMode === 'SLACK_BOT' ? 'bot' : space.deliveryMode === 'WEBHOOK' ? 'webhook' : ''
+  const provider = [space.chatProviderLabel || 'Google Chat', delivery].filter(Boolean).join(' · ')
   if (!space.webhookConfigured) return `${provider} — not configured`
   return space.isActive === 'N' ? `${provider} — disabled` : provider
 }

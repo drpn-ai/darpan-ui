@@ -916,6 +916,29 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.text()).toContain('cancelled')
   })
 
+  it('names how each chat space delivers in the list', async () => {
+    const base = { chatProviderEnumId: 'CHAT_PROV_SLACK', chatProviderLabel: 'Slack', webhookConfigured: true, googleChatConfigured: false, isActive: 'Y', inUse: false }
+    listTenantChatSpaces.mockResolvedValue({
+      ok: true,
+      chatSpaces: [
+        { ...base, chatSpaceId: 'CS1', spaceName: 'Bot space', deliveryMode: 'SLACK_BOT' },
+        { ...base, chatSpaceId: 'CS2', spaceName: 'Hook space', deliveryMode: 'WEBHOOK' },
+        { ...base, chatSpaceId: 'CS3', spaceName: 'Plain space' },
+      ],
+    })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="tenant-chat-space-CS1"]').text()).toContain('bot')
+    expect(wrapper.get('[data-testid="tenant-chat-space-CS2"]').text()).toContain('webhook')
+    const plain = wrapper.get('[data-testid="tenant-chat-space-CS3"]').text()
+    expect(plain).not.toContain('bot')
+    expect(plain).not.toContain('webhook')
+  })
+
   it('blocks delete for in-use spaces and offers deactivate', async () => {
     listTenantChatSpaces.mockResolvedValue({
       ok: true,
