@@ -207,7 +207,7 @@ const STARTER_SAMPLE = `{
   ]
 }`
 const RUN_RESULT_STARTER = `// input.differences holds up to 2,000 of the run's differences.
-{ 'total': input.totalDifferences, 'read': d:len(input.differences) }`
+{ 'total': input.totalDifferences, 'read': size(input.differences) }`
 
 const profileOptions = [
   { value: 'SCRIPT', label: 'Script (loops, variables)' },

@@ -29,7 +29,7 @@ import TenantScriptsPage from '../TenantScriptsPage.vue'
 
 const script = (over: Partial<TenantScript> = {}): TenantScript => ({
   tenantScriptId: '100', scriptName: 'Tender mix', description: null, scriptProfile: 'SCRIPT', inputSource: 'SAMPLE',
-  scriptBody: 'd:len(input.payments)', sampleInputJson: '{"payments":[1,2]}', isActive: true,
+  scriptBody: 'size(input.payments)', sampleInputJson: '{"payments":[1,2]}', isActive: true,
   createdByUserId: 'U1', createdDate: null, lastUpdatedDate: null, ...over,
 })
 
