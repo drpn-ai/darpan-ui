@@ -57,8 +57,8 @@ const starting = ref(false)
 const error = ref<string | null>(null)
 
 const today = todayInDisplayTimeZone()
-// The earliest day a play can record (the period's first day, or an extended earlier period's), from the audit's
-// settings: nothing before it is offered, so a run is never refused for days the ledger would not take.
+// The earliest day a play can record (the first day of the period just ended, or go-live when later; DAR-BE-178), from
+// the audit's settings: nothing before it is offered, so a run is never refused for days the ledger would not take.
 const playableFrom = ref<Date | null>(null)
 const calendar = useCalendarWidget({ lastPickableDate: () => today, firstPickableDate: () => playableFrom.value })
 const options = computed(() => runWindowPresetOptions(today).filter((option) =>
