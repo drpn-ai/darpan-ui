@@ -6,7 +6,6 @@ export const OMS_SWAGGER_SOURCE = {
   version: '1.0.0',
   scheme: 'https',
   host: OMS_HOST_PLACEHOLDER,
-  basePath: '/rest/s1/oms/orders',
 } as const
 
 // Display/placeholder value only — derived from the placeholder host above; never a live API target.

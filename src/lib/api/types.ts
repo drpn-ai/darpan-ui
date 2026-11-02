@@ -39,8 +39,10 @@ export interface EnumOption {
   sequenceNum?: number
   label?: string
   // Only populated for DarpanSystemSource "systems" rows that are an endpoint under a top-level
-  // system (e.g. OMS_RETURNS -> OMS) — see list#AutomationSourceOptions. Absent everywhere else.
+  // system (e.g. OMS_RETURNS_GQL -> OMS) — see list#AutomationSourceOptions. Absent everywhere else.
   parentEnumId?: string
+  // DAR-BE-052: false on a system kept only to group its endpoints (OMS); absent means extractable.
+  extractable?: boolean
 }
 
 export interface SessionInfo {

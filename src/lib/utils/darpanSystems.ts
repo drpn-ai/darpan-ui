@@ -4,9 +4,12 @@ export interface DarpanSystemOptionInput {
   description?: string
   sequenceNum?: number
   label?: string
-  // Present only on endpoint-level rows grouped under a top-level system (e.g. OMS_RETURNS's
+  // Present only on endpoint-level rows grouped under a top-level system (e.g. OMS_RETURNS_GQL's
   // parentEnumId is 'OMS') — see list#AutomationSourceOptions. Absent on top-level systems.
   parentEnumId?: string
+  // false on a parent kept only to group its endpoints (OMS: HotWax is read through its GraphQL
+  // endpoints only, DAR-BE-052). Absent everywhere else, which means extractable.
+  extractable?: boolean
 }
 
 export interface DarpanSystemEndpointOption {
@@ -25,6 +28,7 @@ export interface DarpanSystemValueOption {
   label?: string
   description?: string
   parentEnumId?: string
+  extractable?: boolean
 }
 
 const CANONICAL_SYSTEM_IDS: Record<string, string> = {
@@ -37,9 +41,6 @@ const CANONICAL_SYSTEM_IDS: Record<string, string> = {
   NETSUITE: 'NETSUITE',
   DARSYSSAPI: 'SAPI',
   SAPI: 'SAPI',
-  OMSTRANSFERORDERS: 'OMS_TRANSFER_ORDERS',
-  HOTWAXTRANSFERORDERS: 'OMS_TRANSFER_ORDERS',
-  DARSYSOMSTO: 'OMS_TRANSFER_ORDERS',
 }
 
 const CANONICAL_SYSTEM_LABELS: Record<string, string> = {
@@ -47,7 +48,6 @@ const CANONICAL_SYSTEM_LABELS: Record<string, string> = {
   SHOPIFY: 'Shopify',
   NETSUITE: 'NetSuite',
   SAPI: 'SAPI',
-  OMS_TRANSFER_ORDERS: 'HotWax transfer orders',
 }
 
 export function canonicalDarpanSystemEnumId(systemEnumId: string | null | undefined): string {
@@ -146,9 +146,10 @@ export function darpanSystemHasEndpointOptions<T extends DarpanSystemValueOption
 }
 
 // Step 2 options for a chosen parent system: every row grouped under it, PLUS the parent itself as
-// its own default endpoint — OMS is a real extractable endpoint ("HotWax Orders"), not just a
-// grouping node, and the same holds for Shopify. The submitted value stays the concrete
-// systemEnumId the backend already expects (OMS, OMS_RETURNS, SHOPIFY_RETURN_REFS, ...).
+// its own default endpoint when the parent is extractable (Shopify is). A parent the backend marks
+// `extractable: false` (OMS, DAR-BE-052: HotWax is read through its GraphQL endpoints only) is a
+// grouping node and is never offered. The submitted value stays the concrete systemEnumId the
+// backend expects (SHOPIFY, OMS_GQL, SHOPIFY_RETURN_REFS, ...).
 export function darpanSystemEndpointOptions<T extends DarpanSystemValueOption>(
   parentEnumId: string | null | undefined,
   parentFallbackLabel: string,
@@ -160,11 +161,14 @@ export function darpanSystemEndpointOptions<T extends DarpanSystemValueOption>(
   const children = allOptions.filter((option) =>
     Boolean(option.parentEnumId?.trim()) && darpanSystemIdsMatch(option.parentEnumId, trimmedParentEnumId),
   )
+  const parentOption = allOptions.find((option) => darpanSystemIdsMatch(option.value, trimmedParentEnumId))
   const parentLabel = darpanSystemDisplayLabel(trimmedParentEnumId, parentFallbackLabel)
-  const defaultOption: DarpanSystemEndpointOption = { value: trimmedParentEnumId, label: `${parentLabel} orders` }
+  const defaultOptions: DarpanSystemEndpointOption[] = parentOption?.extractable === false
+    ? []
+    : [{ value: trimmedParentEnumId, label: `${parentLabel} orders` }]
 
   return [
-    defaultOption,
+    ...defaultOptions,
     ...children.flatMap((child) => {
       const value = child.value?.trim()
       if (!value) return []
@@ -173,17 +177,14 @@ export function darpanSystemEndpointOptions<T extends DarpanSystemValueOption>(
   ]
 }
 
-// Endpoints that exist ONLY as an API pull. Their enum rows name a Reconciliation API endpoint or
-// a per-order lookup service, not a dataset anyone can hand over as a file — two of them say
-// "(Reconciliation API)" in the label the operator reads. Offering them on the file-upload branch
-// asks "which data is in this CSV?" and lists an API as a possible answer.
+// Endpoints that exist ONLY as an API pull. Their enum rows name a per-order lookup service, not a
+// dataset anyone can hand over as a file. Offering them on the file-upload branch asks "which data
+// is in this CSV?" and lists an API as a possible answer.
 //
 // A DENYLIST rather than an allowlist on purpose: a newly seeded endpoint that IS file-valid must
 // show up on its own, and the worse failure is a real dataset the operator cannot configure. The
-// backend carries no flag separating the two — every DarpanSystemSource row has a
-// SourceSystemConnector, including the top-level systems — so a new API-only endpoint has to be
-// added here by hand.
-const API_ONLY_SYSTEM_ENUM_IDS = ['OMS_RECON_ORDERS', 'OMS_RETURNS', 'SHOPIFY_RETURN_REFS']
+// backend carries no flag separating the two, so a new API-only endpoint has to be added here by hand.
+const API_ONLY_SYSTEM_ENUM_IDS = ['SHOPIFY_RETURN_REFS']
 
 export function darpanSystemIsApiOnlyEndpoint(systemEnumId: string | null | undefined): boolean {
   return API_ONLY_SYSTEM_ENUM_IDS.some((apiOnlyEnumId) => darpanSystemIdsMatch(apiOnlyEnumId, systemEnumId))
@@ -196,7 +197,7 @@ export function excludeApiOnlyEndpointOptions<T extends { value: string }>(optio
   return options.filter((option) => !darpanSystemIsApiOnlyEndpoint(option.value))
 }
 
-// Editing an existing automation/run only has the concrete stored systemEnumId (e.g. OMS_RETURNS).
+// Editing an existing automation/run only has the concrete stored systemEnumId (e.g. OMS_RETURNS_GQL).
 // Resolve which Step 1 answer that belongs to so the wizard can pre-select the right parent.
 // Top-level systems (and anything unrecognized) resolve to themselves — step 2 is then skipped,
 // matching today's behaviour for systems with no endpoints.
@@ -212,7 +213,7 @@ export function resolveDarpanSystemParentEnumId<T extends DarpanSystemValueOptio
   return parentEnumId || trimmedSystemEnumId
 }
 
-// The top-level systems only. Endpoint ids (OMS_TRANSFER_ORDERS) are deliberately excluded: an
+// The top-level systems only. Endpoint ids (OMS_GQL) are deliberately excluded: an
 // endpoint is what the collapse below reads FROM, never an answer it may return.
 const TOP_LEVEL_SYSTEM_ENUM_IDS = ['OMS', 'SHOPIFY', 'NETSUITE', 'SAPI']
 

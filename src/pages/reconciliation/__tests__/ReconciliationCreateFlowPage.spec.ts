@@ -600,101 +600,6 @@ describe('ReconciliationCreateFlowPage', () => {
     }, expect.any(AbortSignal))
   })
 
-  it('treats a transfer-order source as an OMS-configured source', async () => {
-    listAutomationSourceOptions.mockResolvedValueOnce({
-      ok: true,
-      messages: [],
-      errors: [],
-      inputModes: [],
-      sourceTypes: [],
-      relativeWindows: [],
-      fileTypes: FILE_TYPE_OPTIONS,
-      systems: [...SYSTEM_OPTIONS, { enumId: 'OMS_TRANSFER_ORDERS', label: 'OMS_TRANSFER_ORDERS' }],
-      savedRuns: [],
-      sftpServers: [],
-      sourceConfigs: [
-        {
-          // Registry-driven as of Task 6: the backend always stamps sourceConfigType from the
-          // connector's expectedSourceConfigType, one row per enabled endpoint. The UI no longer
-          // guesses this from systemEnumId (Task 8 deleted that fallback).
-          sourceConfigId: 'KREWE_TRANSFER_ORDERS',
-          label: 'Krewe Transfer Orders',
-          systemEnumId: 'OMS_TRANSFER_ORDERS',
-          sourceConfigType: 'HOTWAX_OMS_REST_TRANSFER',
-        },
-      ],
-      nsRestletConfigs: [],
-      systemRemotes: [
-        {
-          systemMessageRemoteId: 'HOTWAX_TRANSFER_ORDERS_API',
-          description: 'Transfer Orders API',
-          label: 'Transfer Orders API',
-          systemEnumId: 'OMS_TRANSFER_ORDERS',
-          optionKey: 'KREWE_TRANSFER_ORDERS',
-          sourceConfigId: 'KREWE_TRANSFER_ORDERS',
-          primaryIdOptions: [
-            { fieldPath: '$.records[*].transferOrderId', label: 'Transfer Order ID' },
-          ],
-        },
-      ],
-    })
-
-    const wrapper = mount(ReconciliationCreateFlowPage)
-    await flushPromises()
-
-    await wrapper.get('input[name="runName"]').setValue('Transfer Order Compare')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS_TRANSFER_ORDERS')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
-    expect(wrapper.find('[data-testid="file1-api-config-select"]').exists()).toBe(true)
-    await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'KREWE_TRANSFER_ORDERS')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    // KREWE_TRANSFER_ORDERS resolves to exactly one API endpoint, so the file1-api card is skipped
-    // and that endpoint is auto-selected.
-    expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
-    await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].transferOrderId')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
-
-    await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
-    await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
-    // CSV sides now get a skippable column-list step; skip it to reach the primary-id question.
-    await flushPromises()
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
-    await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
-    await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
-    await flushPromises()
-
-    expect(createRuleSetRun).toHaveBeenCalledWith({
-      runName: 'Transfer Order Compare',
-      description: undefined,
-      file1SystemEnumId: 'OMS_TRANSFER_ORDERS',
-      file1SourceTypeEnumId: 'AUT_SRC_API',
-      file1SystemMessageRemoteId: 'HOTWAX_TRANSFER_ORDERS_API',
-      file1SourceConfigId: 'KREWE_TRANSFER_ORDERS',
-      file1SourceConfigType: 'HOTWAX_OMS_REST_TRANSFER',
-      file1PrimaryIdExpression: '$.records[*].transferOrderId',
-      file2SystemEnumId: 'SHOPIFY',
-      file2FileTypeEnumId: 'DftCsv',
-      file2SchemaFileName: undefined,
-      file2PrimaryIdExpression: 'order_id',
-    }, expect.any(AbortSignal))
-  })
-
   it('auto-selects the API endpoint scoped to the selected system when only one option matches', async () => {
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()
@@ -1669,13 +1574,12 @@ describe('ReconciliationCreateFlowPage', () => {
 
   describe('two-step source picker (system, then endpoint)', () => {
     // Mirrors the real DarpanSystemSource shape: both endpoints are grouped under OMS via
-    // parentEnumId, and they differ in kind — OMS_TRANSFER_ORDERS is a dataset anyone can export to
-    // a file, OMS_RETURNS exists only as a Reconciliation API pull. SHOPIFY/NETSUITE carry no
-    // parentEnumId and have nothing grouped under them, so they keep today's single-step behaviour.
+    // parentEnumId. SHOPIFY/NETSUITE carry no parentEnumId and have nothing grouped under them, so
+    // they keep today's single-step behaviour. API-only filtering is covered in darpanSystems.spec.
     const SYSTEM_OPTIONS_WITH_OMS_ENDPOINT = [
       ...SYSTEM_OPTIONS,
-      { enumId: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders', parentEnumId: 'OMS' },
-      { enumId: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
+      { enumId: 'OMS_GQL', label: 'HotWax Orders', parentEnumId: 'OMS' },
+      { enumId: 'OMS_RETURNS_GQL', label: 'HotWax Returns', parentEnumId: 'OMS' },
     ]
 
     function mockSystemsWithOmsEndpoint(): void {
@@ -1712,10 +1616,10 @@ describe('ReconciliationCreateFlowPage', () => {
         .findAll('[data-testid="workflow-select-option"]')
         .map((option) => option.attributes('data-option-value'))
       expect(optionValues).toEqual(['OMS', 'SHOPIFY', 'NETSUITE'])
-      expect(optionValues).not.toContain('OMS_RETURNS')
+      expect(optionValues).not.toContain('OMS_RETURNS_GQL')
     })
 
-    it('offers the system itself plus its file-valid endpoints, API-only endpoints excluded, on the file branch', async () => {
+    it('offers the system itself plus its endpoints on the file branch', async () => {
       mockSystemsWithOmsEndpoint()
       const wrapper = mount(ReconciliationCreateFlowPage)
       await flushPromises()
@@ -1730,9 +1634,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
       // Mode first: "endpoint" is API vocabulary and must not be asked before the API/file choice.
-      // On the file branch there is no config, so the system is the endpoint's only parent — but
-      // the question being asked is "which data is in this file", so endpoints that only an API
-      // pull can produce are not answers to it.
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
 
       expect(wrapper.text()).toContain('Which HotWax data is in the first source file?')
@@ -1740,14 +1641,13 @@ describe('ReconciliationCreateFlowPage', () => {
       const optionValues = wrapper
         .findAll('[data-testid="workflow-select-option"]')
         .map((option) => option.attributes('data-option-value'))
-      expect(optionValues).toEqual(['OMS', 'OMS_TRANSFER_ORDERS'])
-      expect(optionValues).not.toContain('OMS_RETURNS')
+      expect(optionValues).toEqual(['OMS', 'OMS_GQL', 'OMS_RETURNS_GQL'])
     })
 
     // The rule set board titles its columns from file{n}SystemParentLabel. The wizard is the only
     // producer of a draft for a NEW run -- nothing here comes back from the backend -- so if it does
     // not carry the family name, the board falls back to the endpoint label and asks the operator to
-    // compare "HotWax transfer orders" with something, when the question is about systems.
+    // compare "HotWax Orders" with something, when the question is about systems.
     it('carries the system family name onto the draft when an endpoint was chosen', async () => {
       mockSystemsWithOmsEndpoint()
       const wrapper = mount(ReconciliationCreateFlowPage)
@@ -1762,7 +1662,7 @@ describe('ReconciliationCreateFlowPage', () => {
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
-      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_TRANSFER_ORDERS')
+      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_GQL')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftJson')
 
@@ -1770,8 +1670,8 @@ describe('ReconciliationCreateFlowPage', () => {
 
       expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledWith(
         expect.objectContaining({
-          file1SystemEnumId: 'OMS_TRANSFER_ORDERS',
-          file1SystemLabel: 'HotWax transfer orders',
+          file1SystemEnumId: 'OMS_GQL',
+          file1SystemLabel: 'HotWax Orders',
           file1SystemParentLabel: 'HotWax',
         }),
         'file1-schema',
@@ -1861,38 +1761,6 @@ describe('ReconciliationCreateFlowPage', () => {
       )
     })
 
-    it('drops an API-only endpoint carried by a resumed file-upload draft instead of keeping it selected', async () => {
-      // Only a draft written before API-only endpoints were filtered out can hold this pairing.
-      // Leaving it selected would carry a Reconciliation API endpoint into a file run through a
-      // value the operator can no longer see in the list.
-      mockSystemsWithOmsEndpoint()
-      const draft: ReconciliationRuleSetDraft = {
-        runName: 'Stale Returns Draft',
-        file1SystemEnumId: 'OMS_RETURNS',
-        file1SystemLabel: 'HotWax Returns (Reconciliation API)',
-        file1FileTypeEnumId: 'DftJson',
-        file1JsonSchemaId: 'schema-oms-orders',
-        file1PrimaryIdExpression: ['$.orders[0].order_id'],
-        file2SystemEnumId: 'SHOPIFY',
-        file2SystemLabel: 'SHOPIFY',
-        file2FileTypeEnumId: 'DftJson',
-        file2JsonSchemaId: 'schema-shopify-orders',
-        file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
-      }
-      const wrapper = await mountCreateFlow({ draft })
-
-      let guard = 0
-      while (!wrapper.find('[data-testid="file1-endpoint-select"]').exists() && guard < 20) {
-        await wrapper.get('.wizard-back').trigger('click')
-        await flushPromises()
-        guard += 1
-      }
-
-      const endpointSelect = wrapper.get('[data-testid="file1-endpoint-select"]')
-      expect(endpointSelect.text()).not.toContain('HotWax Returns (Reconciliation API)')
-      expect(endpointSelect.text()).toContain('Select data...')
-    })
-
     it('submits the concrete endpoint enumId when a child endpoint is chosen', async () => {
       mockSystemsWithOmsEndpoint()
       const wrapper = mount(ReconciliationCreateFlowPage)
@@ -1909,7 +1777,7 @@ describe('ReconciliationCreateFlowPage', () => {
 
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
 
-      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_TRANSFER_ORDERS')
+      await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_GQL')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
       await chooseWorkflowChoice(wrapper, 'file1-filetype-choice-DftCsv')
@@ -1937,7 +1805,7 @@ describe('ReconciliationCreateFlowPage', () => {
       await flushPromises()
 
       expect(createRuleSetRun).toHaveBeenCalledWith(
-        expect.objectContaining({ file1SystemEnumId: 'OMS_TRANSFER_ORDERS' }),
+        expect.objectContaining({ file1SystemEnumId: 'OMS_GQL' }),
         expect.any(AbortSignal),
       )
     })
@@ -1995,8 +1863,8 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSystemsWithOmsEndpoint()
       const draft: ReconciliationRuleSetDraft = {
         runName: 'Returns Resume Test',
-        file1SystemEnumId: 'OMS_TRANSFER_ORDERS',
-        file1SystemLabel: 'HotWax transfer orders',
+        file1SystemEnumId: 'OMS_GQL',
+        file1SystemLabel: 'HotWax Orders',
         file1FileTypeEnumId: 'DftJson',
         file1JsonSchemaId: 'schema-oms-orders',
         file1PrimaryIdExpression: ['$.orders[0].order_id'],
@@ -2010,14 +1878,14 @@ describe('ReconciliationCreateFlowPage', () => {
 
       // A seeded draft always resumes on the last step (ruleset-rules) — see mountCreateFlow's own
       // comment. Walk back through it to reach file1-endpoint and prove the resumed
-      // OMS_TRANSFER_ORDERS value both inserted that step (steps.value) and pre-selected it.
+      // OMS_GQL value both inserted that step (steps.value) and pre-selected it.
       let guard = 0
       while (!wrapper.find('[data-testid="file1-endpoint-select"]').exists() && guard < 20) {
         await wrapper.get('.wizard-back').trigger('click')
         await flushPromises()
         guard += 1
       }
-      expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax transfer orders')
+      expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax Orders')
 
       // Two cards back, not one: file1-source now sits between the endpoint and the system.
       await wrapper.get('.wizard-back').trigger('click')
@@ -2050,7 +1918,7 @@ describe('ReconciliationCreateFlowPage', () => {
         sftpServers: [],
         sourceConfigs: [
           { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS', sourceConfigType: 'HOTWAX_OMS_REST', label: 'Gorjana Prod' },
-          { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS_RETURNS', sourceConfigType: 'HOTWAX_OMS_REST_RETURNS', label: 'Gorjana Prod' },
+          { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS_RETURNS_GQL', sourceConfigType: 'HOTWAX_OMS_GQL_RETURNS', label: 'Gorjana Prod' },
         ],
         nsRestletConfigs: [],
         systemRemotes: [],
@@ -2086,7 +1954,7 @@ describe('ReconciliationCreateFlowPage', () => {
       const endpointValues = wrapper
         .findAll('[data-testid="workflow-select-option"]')
         .map((option) => option.attributes('data-option-value'))
-      expect(endpointValues).toEqual(['OMS', 'OMS_RETURNS'])
+      expect(endpointValues).toEqual(['OMS', 'OMS_RETURNS_GQL'])
     })
   })
   describe('source-mode ordering, escape hatches, and building progress', () => {
@@ -2094,8 +1962,8 @@ describe('ReconciliationCreateFlowPage', () => {
     // one is what keeps the endpoint card on screen for the wording assertions below.
     const SYSTEMS_WITH_OMS_ENDPOINT = [
       ...SYSTEM_OPTIONS,
-      { enumId: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders', parentEnumId: 'OMS' },
-      { enumId: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
+      { enumId: 'OMS_GQL', label: 'HotWax Orders', parentEnumId: 'OMS' },
+      { enumId: 'OMS_RETURNS_GQL', label: 'HotWax Returns', parentEnumId: 'OMS' },
     ]
 
     function mockSourceOptions(overrides: Record<string, unknown> = {}): void {
@@ -2287,7 +2155,7 @@ describe('ReconciliationCreateFlowPage', () => {
       const TWO_CONFIG_FIXTURE = {
         sourceConfigs: [
           { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS', sourceConfigType: 'HOTWAX_OMS_REST', label: 'Gorjana Prod' },
-          { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS_RETURNS', sourceConfigType: 'HOTWAX_OMS_REST_RETURNS', label: 'Gorjana Prod' },
+          { sourceConfigId: 'gorjana_prod', systemEnumId: 'OMS_RETURNS_GQL', sourceConfigType: 'HOTWAX_OMS_GQL_RETURNS', label: 'Gorjana Prod' },
           { sourceConfigId: 'krewe_oms', systemEnumId: 'OMS', sourceConfigType: 'HOTWAX_OMS_REST', label: 'Krewe OMS' },
         ],
         systemRemotes: [
@@ -2335,7 +2203,7 @@ describe('ReconciliationCreateFlowPage', () => {
         const endpointValues = wrapper
           .findAll('[data-testid="workflow-select-option"]')
           .map((option) => option.attributes('data-option-value'))
-        expect(endpointValues).toEqual(['OMS', 'OMS_RETURNS'])
+        expect(endpointValues).toEqual(['OMS', 'OMS_RETURNS_GQL'])
       })
 
       it('skips the endpoint card when the config carries exactly one, and still saves its config type', async () => {
@@ -2393,10 +2261,10 @@ describe('ReconciliationCreateFlowPage', () => {
               systemMessageRemoteId: 'HOTWAX_RETURNS_API',
               description: 'Returns API',
               label: 'Returns API',
-              systemEnumId: 'OMS_RETURNS',
+              systemEnumId: 'OMS_RETURNS_GQL',
               optionKey: 'gorjana_prod',
               sourceConfigId: 'gorjana_prod',
-              sourceConfigType: 'HOTWAX_OMS_REST_RETURNS',
+              sourceConfigType: 'HOTWAX_OMS_GQL_RETURNS',
               primaryIdOptions: [{ fieldPath: '$.records[*].returnId', label: 'Return ID' }],
             },
           ],
@@ -2411,7 +2279,7 @@ describe('ReconciliationCreateFlowPage', () => {
         await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'gorjana_prod')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-        await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_RETURNS')
+        await chooseWorkflowOption(wrapper, 'file1-endpoint-select', 'OMS_RETURNS_GQL')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
         await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].returnId')
@@ -2436,8 +2304,8 @@ describe('ReconciliationCreateFlowPage', () => {
         // The endpoint half of the (config x endpoint) row, not the config's first row.
         expect(createRuleSetRun).toHaveBeenCalledWith(
           expect.objectContaining({
-            file1SystemEnumId: 'OMS_RETURNS',
-            file1SourceConfigType: 'HOTWAX_OMS_REST_RETURNS',
+            file1SystemEnumId: 'OMS_RETURNS_GQL',
+            file1SourceConfigType: 'HOTWAX_OMS_GQL_RETURNS',
           }),
           expect.any(AbortSignal),
         )

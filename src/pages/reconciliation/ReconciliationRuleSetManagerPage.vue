@@ -539,12 +539,8 @@ function buildSourceConfigSummary(draftValue: ReconciliationRuleSetDraft | null,
   const sourceConfigType = side === 'file1' ? draftValue.file1SourceConfigType?.trim() : draftValue.file2SourceConfigType?.trim()
   const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId?.trim() : draftValue.file2SystemEnumId?.trim()
 
-  if (
-    sourceConfigType === 'HOTWAX_OMS_REST' ||
-    sourceConfigType === 'HOTWAX_OMS_REST_TRANSFER' ||
-    systemEnumId === 'OMS' ||
-    systemEnumId === 'OMS_TRANSFER_ORDERS'
-  ) {
+  // Every HotWax endpoint (OMS_GQL, OMS_RETURNS_GQL, ...) reads the one OMS connection.
+  if (sourceConfigType?.startsWith('HOTWAX_OMS') || systemEnumId === 'OMS' || systemEnumId?.startsWith('OMS_')) {
     return {
       kind: 'oms',
       side,

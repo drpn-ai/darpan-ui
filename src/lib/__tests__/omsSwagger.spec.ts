@@ -9,6 +9,5 @@ describe('HotWax Swagger metadata', () => {
   it('captures the placeholder HotWax host and base URL used for setup hints', () => {
     expect(OMS_BASE_URL_PLACEHOLDER).toBe(`https://${OMS_HOST_PLACEHOLDER}`)
     expect(OMS_SWAGGER_SOURCE.title).toBe('HotWax API')
-    expect(OMS_SWAGGER_SOURCE.basePath).toBe('/rest/s1/oms/orders')
   })
 })

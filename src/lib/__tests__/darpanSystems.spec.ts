@@ -52,16 +52,16 @@ describe('darpanSystems', () => {
   // backend rows already projected to WorkflowSelectOption shape (value/label) plus parentEnumId —
   // NOT the raw DarpanSystemOptionInput (enumId-keyed) shape deduplicateDarpanSystemOptions above
   // consumes. OMS/SHOPIFY/NETSUITE/SAPI/DATABASE are top-level; three OMS endpoints and one Shopify
-  // endpoint carry parentEnumId.
+  // endpoint carry parentEnumId. OMS is a grouping node only (DAR-BE-052: HotWax is GraphQL only).
   const SYSTEM_AND_ENDPOINT_OPTIONS = [
-    { value: 'OMS', label: 'HotWax' },
+    { value: 'OMS', label: 'HotWax', extractable: false },
     { value: 'SHOPIFY', label: 'Shopify' },
     { value: 'NETSUITE', label: 'NetSuite' },
     { value: 'SAPI', label: 'SAPI' },
     { value: 'DATABASE', label: 'Database' },
-    { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders', parentEnumId: 'OMS' },
-    { value: 'OMS_RECON_ORDERS', label: 'HotWax Orders (Reconciliation API)', parentEnumId: 'OMS' },
-    { value: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)', parentEnumId: 'OMS' },
+    { value: 'OMS_GQL', label: 'HotWax Orders', parentEnumId: 'OMS' },
+    { value: 'OMS_RETURNS_GQL', label: 'HotWax Returns', parentEnumId: 'OMS' },
+    { value: 'OMS_ORDER_ITEMS_GQL', label: 'HotWax Order Items', parentEnumId: 'OMS' },
     { value: 'SHOPIFY_RETURN_REFS', label: 'Shopify Order Return References', parentEnumId: 'SHOPIFY' },
   ]
 
@@ -78,14 +78,18 @@ describe('darpanSystems', () => {
     expect(darpanSystemHasEndpointOptions('', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe(false)
   })
 
-  it('builds step 2 endpoint options with the parent as its own default endpoint', () => {
+  it('never offers a grouping-only parent (extractable: false) as an endpoint; its children stay', () => {
+    // DAR-BE-052: OMS has no REST connector left, so "HotWax orders" must not be pickable.
     const omsEndpoints = darpanSystemEndpointOptions('OMS', 'HotWax', SYSTEM_AND_ENDPOINT_OPTIONS)
     expect(omsEndpoints).toEqual([
-      { value: 'OMS', label: 'HotWax orders' },
-      { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders' },
-      { value: 'OMS_RECON_ORDERS', label: 'HotWax Orders (Reconciliation API)' },
-      { value: 'OMS_RETURNS', label: 'HotWax Returns (Reconciliation API)' },
+      { value: 'OMS_GQL', label: 'HotWax Orders' },
+      { value: 'OMS_RETURNS_GQL', label: 'HotWax Returns' },
+      { value: 'OMS_ORDER_ITEMS_GQL', label: 'HotWax Order Items' },
     ])
+    expect(omsEndpoints.map((option) => option.value)).not.toContain('OMS')
+  })
+
+  it('builds step 2 endpoint options with an extractable parent as its own default endpoint', () => {
 
     const shopifyEndpoints = darpanSystemEndpointOptions('SHOPIFY', 'Shopify', SYSTEM_AND_ENDPOINT_OPTIONS)
     expect(shopifyEndpoints).toEqual([
@@ -104,14 +108,7 @@ describe('darpanSystems', () => {
 
   it('drops API-only endpoints from the file-upload endpoint list', () => {
     // A file upload is a dataset handed over by hand. Endpoints that only exist as API pulls are
-    // not possible answers to "which data is in this file" — and two of them say "Reconciliation
-    // API" in the label the operator reads.
-    const omsEndpoints = darpanSystemEndpointOptions('OMS', 'HotWax', SYSTEM_AND_ENDPOINT_OPTIONS)
-    expect(excludeApiOnlyEndpointOptions(omsEndpoints)).toEqual([
-      { value: 'OMS', label: 'HotWax orders' },
-      { value: 'OMS_TRANSFER_ORDERS', label: 'HotWax transfer orders' },
-    ])
-
+    // not possible answers to "which data is in this file".
     // Every Shopify endpoint under the parent is an API pull, so only the system itself is left.
     const shopifyEndpoints = darpanSystemEndpointOptions('SHOPIFY', 'Shopify', SYSTEM_AND_ENDPOINT_OPTIONS)
     expect(excludeApiOnlyEndpointOptions(shopifyEndpoints)).toEqual([
@@ -124,8 +121,8 @@ describe('darpanSystems', () => {
   })
 
   it('resolves the owning parent for a concrete stored systemEnumId, for edit pre-selection', () => {
-    expect(resolveDarpanSystemParentEnumId('OMS_RETURNS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
-    expect(resolveDarpanSystemParentEnumId('OMS_TRANSFER_ORDERS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
+    expect(resolveDarpanSystemParentEnumId('OMS_RETURNS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
+    expect(resolveDarpanSystemParentEnumId('OMS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
     expect(resolveDarpanSystemParentEnumId('SHOPIFY_RETURN_REFS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('SHOPIFY')
     // Top-level systems (and their own endpoint choice) resolve to themselves.
     expect(resolveDarpanSystemParentEnumId('OMS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')

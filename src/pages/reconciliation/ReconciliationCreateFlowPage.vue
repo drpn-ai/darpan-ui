@@ -263,7 +263,7 @@ const currentStepIndex = ref(0)
 // Full flat systems list from the backend (parentEnumId included). systemOptions below filters it
 // down to top-level systems only — the step 1 "which system" picker; step 2's endpoint options and
 // concrete-value label lookups (resolveSystemLabel) read allSystemOptions directly so endpoint rows
-// (e.g. OMS_RETURNS) keep resolving to their own distinct label everywhere else in the wizard.
+// (e.g. OMS_RETURNS_GQL) keep resolving to their own distinct label everywhere else in the wizard.
 const allSystemOptions = ref<Array<WorkflowSelectOption & DarpanSystemValueOption>>([])
 const systemOptions = computed<WorkflowSelectOption[]>(() => darpanSystemParentOptions(allSystemOptions.value))
 // Tracks the system chosen at step 1 independent of the concrete endpoint value: when the chosen
@@ -585,7 +585,7 @@ const progressPercent = computed(() => {
 const trimmedRunName = computed(() => runName.value.trim())
 const file1SystemLabel = computed(() => resolveSystemLabel(file1SystemEnumId.value))
 const file2SystemLabel = computed(() => resolveSystemLabel(file2SystemEnumId.value))
-// The family name behind an endpoint-level pick (OMS_RETURNS -> "HotWax"). Blank for a family
+// The family name behind an endpoint-level pick (OMS_RETURNS_GQL -> "HotWax"). Blank for a family
 // system, which IS its own system, so the draft carries undefined and consumers fall back to the
 // side label. The rule set board titles its columns from this.
 const file1SystemParentLabel = computed(() =>
@@ -1396,7 +1396,7 @@ watch(file2JsonSchemaId, async (nextSchemaId) => {
 
 function resolveSystemLabel(enumId: string): string {
   // Reads the full list (parents + endpoints), not the step 1-only systemOptions, so a concrete
-  // endpoint value like OMS_RETURNS still resolves to its own distinct label everywhere downstream
+  // endpoint value like OMS_RETURNS_GQL still resolves to its own distinct label everywhere downstream
   // (schema labels, "source 1" phrasing, etc.) rather than falling back to the raw enumId.
   const option = allSystemOptions.value.find((systemOption) => systemOption.value === enumId)
   return softenSystemLabel(option?.label || enumId)
@@ -1509,7 +1509,7 @@ function apiSourceConfigOptionsForSide(side: SourceSide): WorkflowSelectOption[]
     }))
 }
 
-// A config row carries its ENDPOINT's systemEnumId (OMS_RETURNS), so matching it against a parent
+// A config row carries its ENDPOINT's systemEnumId (OMS_RETURNS_GQL), so matching it against a parent
 // (OMS) means resolving that endpoint back to its parent first. A row with no systemEnumId is
 // unscoped and belongs to every system.
 function sourceConfigBelongsToParentSystem(config: AutomationSourceConfigOption, parentEnumId: string): boolean {
@@ -1940,7 +1940,7 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   file2DuplicateKeyHandling.value = draftState.draft.file2DuplicateKeyHandling === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
   file1ExtractOptions.value = { ...(draftState.draft.file1ExtractOptions ?? {}) }
   file2ExtractOptions.value = { ...(draftState.draft.file2ExtractOptions ?? {}) }
-  // Resolve step 1's answer from the resumed concrete value (e.g. OMS_RETURNS -> OMS) BEFORE
+  // Resolve step 1's answer from the resumed concrete value (e.g. OMS_RETURNS_GQL -> OMS) BEFORE
   // steps.value is read below — steps.value only includes file{n}-endpoint when the parent has
   // one, so this must be set first or a resumeStepId targeting that step would not be found.
   // A draft published from a card before the endpoint resolved (the config card, on a system with
@@ -2013,6 +2013,7 @@ async function loadOptions(): Promise<void> {
       value: option.enumId,
       label: option.label || option.enumId,
       parentEnumId: option.parentEnumId || undefined,
+      ...(option.extractable === false ? { extractable: false } : {}),
     }))
     fileTypeOptions.value = (automationSourceOptionsResponse.fileTypes ?? []).map((option) => ({
       value: option.enumId,

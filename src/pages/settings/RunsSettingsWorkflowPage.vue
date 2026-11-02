@@ -372,7 +372,7 @@ function endpointMatchesSystem(endpointSystemEnumId: string | undefined, selecte
   return darpanSystemIdsMatch(endpointSystemEnumId, selectedSystemEnumId)
 }
 
-// DAR-UI-077. Endpoints are grouped under their parent system (OMS_GQL and OMS_RECON_ORDERS under OMS), as in the run
+// DAR-UI-077. Endpoints are grouped under their parent system (OMS_GQL and OMS_RETURNS_GQL under OMS), as in the run
 // builder, so a side can move to a sibling endpoint and not only keep its own.
 function endpointInSystemFamily(endpointSystemEnumId: string | undefined, selectedSystemEnumId: string): boolean {
   return darpanSystemIdsMatch(
@@ -452,8 +452,8 @@ function selectedApiSourceLabel(sourceKey: SourceKey): string {
  * Primary ID dropdown and whose label is saved as file{n}SystemMessageRemoteLabel.
  *
  * MUST be constrained by systemEnumId. systemMessageRemoteId is deliberately SHARED across a system
- * family (SHOPIFY_RETURN_REFS reuses SHOPIFY's SHOPIFY_REMOTE; OMS_RETURNS, OMS_RECON_ORDERS and
- * OMS_TRANSFER_ORDERS all reuse OMS's HOTWAX_ORDERS_API -- see SourceSystemConnectorSeedData.xml),
+ * family (SHOPIFY_RETURN_REFS reuses SHOPIFY's SHOPIFY_REMOTE; OMS_GQL, OMS_RETURNS_GQL and
+ * OMS_ORDER_ITEMS_GQL all share HOTWAX_ORDERS_API -- see SourceSystemConnectorSeedData.xml),
  * so remoteId + sourceConfigId does not identify one row. Matching on those alone made .find()
  * return whichever sibling came first -- in practice the PARENT -- and a returns run's Primary ID
  * dropdown offered Shopify's ORDER fields ("Order ID", "Order name") with the endpoint's own
@@ -889,6 +889,7 @@ async function load(): Promise<void> {
     systemOptions.value = deduplicateDarpanSystemOptions(automationSourceOptionsResponse?.systems ?? []).map((option) => ({
       value: option.enumId,
       parentEnumId: option.parentEnumId || undefined,
+      ...(option.extractable === false ? { extractable: false } : {}),
     }))
 
     if (historyDraft) {
