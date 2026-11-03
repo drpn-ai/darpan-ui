@@ -1170,6 +1170,7 @@ export interface GetCliLoginRequestResponse extends ApiEnvelope {
   hostLabel?: string
   status?: 'PENDING' | 'APPROVED' | 'DENIED' | 'EXPIRED'
   expiresDate?: ApiTimestamp
+  createdDate?: ApiTimestamp
 }
 
 export type ApproveCliLoginResponse = ApiEnvelope

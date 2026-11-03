@@ -776,6 +776,20 @@ describe('UserSettingsPage', () => {
       expect(wrapper.text()).toContain('Already ended.')
     })
 
+    it('a failed or refused list shows the error, never the empty state', async () => {
+      listCliSessions.mockResolvedValue({ ok: false, messages: [], errors: ['Boom.'] })
+      let wrapper = mountPage()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="cli-sessions-empty"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="cli-sessions-error"]').text()).toContain('Boom.')
+
+      listCliSessions.mockRejectedValue(new Error('network'))
+      wrapper = mountPage()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="cli-sessions-empty"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="cli-sessions-error"]').text()).toContain('Could not load CLI sessions.')
+    })
+
     it('empty state', async () => {
       const wrapper = mountPage()
       await flushPromises()

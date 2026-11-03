@@ -2895,7 +2895,7 @@ export interface components {
         };
         /** @description What a CLI sign-in asks for, so the person can check the computer before approving. */
         GetCliLoginRequestParams: {
-            /** @description The user code from the CLI or its link. */
+            /** @description The user code the person typed from their terminal. */
             userCode: string;
         };
         GetCliLoginRequestResult: {
@@ -2911,6 +2911,8 @@ export interface components {
             status?: string;
             /** @description Timestamp — ISO-8601 string or epoch milliseconds. When the request expires. */
             expiresDate?: string | number;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds. When the CLI started the request. */
+            createdDate?: string | number;
         };
         /** @description JSON-RPC request envelope for facade.CliAuthFacadeServices.get#CliLoginRequest */
         GetCliLoginRequestRequest: {
@@ -3099,9 +3101,9 @@ export interface components {
             deviceCode?: string;
             /** @description The code the person approves, XXXX-XXXX. */
             userCode?: string;
-            /** @description The Darpan app page that approves this sign-in: app base URL + verificationPath. */
+            /** @description The Darpan app page that approves this sign-in: app base URL + verificationPath. It carries no code: the person types the code their terminal shows. */
             verificationUrl?: string;
-            /** @description /cli-login?code=USER-CODE, for a CLI that knows its own app URL. */
+            /** @description /cli-login, for a CLI that knows its own app URL. */
             verificationPath?: string;
             /** @description Seconds until the codes expire: 600. */
             expiresInSeconds?: number;

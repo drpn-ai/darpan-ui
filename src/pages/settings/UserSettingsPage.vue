@@ -123,8 +123,8 @@
     </StaticPageSection>
 
     <StaticPageSection title="CLI sessions">
-      <p v-if="cliSessions.length === 0" class="section-note" data-testid="cli-sessions-empty">No CLI signed in.</p>
-      <div v-else class="static-page-summary-grid">
+      <p v-if="cliSessions.length === 0 && !cliSessionsLoadFailed" class="section-note" data-testid="cli-sessions-empty">No CLI signed in.</p>
+      <div v-else-if="cliSessions.length > 0" class="static-page-summary-grid">
         <article
           v-for="session in cliSessions"
           :key="session.cliSessionId"
@@ -842,15 +842,24 @@ const pageAbortController = new AbortController()
 
 const cliSessions = ref<CliSession[]>([])
 const cliSessionsError = ref<string | null>(null)
+const cliSessionsLoadFailed = ref(false)
 const revokingCliSessionId = ref<string | null>(null)
+const CLI_SESSIONS_LOAD_ERROR = 'Could not load CLI sessions.'
 
 async function loadCliSessions() {
   try {
     const response = await authFacade.listCliSessions(pageAbortController.signal)
     if (pageAbortController.signal.aborted) return
-    cliSessions.value = response.ok ? (response.cliSessions ?? []) : []
+    if (!response.ok) {
+      cliSessionsLoadFailed.value = true
+      cliSessionsError.value = response.errors?.[0] ?? CLI_SESSIONS_LOAD_ERROR
+      return
+    }
+    cliSessions.value = response.cliSessions ?? []
   } catch {
-    if (!pageAbortController.signal.aborted) cliSessions.value = []
+    if (pageAbortController.signal.aborted) return
+    cliSessionsLoadFailed.value = true
+    cliSessionsError.value = CLI_SESSIONS_LOAD_ERROR
   }
 }
 
