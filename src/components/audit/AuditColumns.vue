@@ -298,7 +298,7 @@
               <!-- DAR-UI-075. An order's lines: the one holding it up outlined. DAR-UI-081 (Aditi: "all info needed is already
                    available, remove the click"): each line says what it is in place, so it opens nothing. -->
               <template v-if="orderUnit?.lines?.length">
-                <h3 class="micro-label">Lines <span class="audit-fold-count">{{ orderUnit.lines.length }}</span></h3>
+                <h3 class="micro-label">Lines <span class="audit-fold-count">{{ orderUnit.lines.length + otherLines.length }}</span></h3>
                 <ul class="audit-lines">
                   <li
                     v-for="line in orderUnit.lines"
@@ -311,6 +311,18 @@
                     <span class="audit-row-sub">{{ lineWhy(line) }}</span>
                     <!-- DAR-UI-081. The item fulfillment that shipped it and where it is fulfilled from (HotWax facility). -->
                     <span class="audit-row-sub" data-testid="audit-line-location">{{ [lineFulfillments(line), lineLocation(line)].filter(Boolean).join(' · ') }}</span>
+                  </li>
+                  <!-- DAR-UI-099 (Aditi: "always make sure all lines are present within the order... a store credit line item
+                       is added"): the order's other lines, with no finding of their own, after the lines that have one. -->
+                  <li
+                    v-for="other in otherLines"
+                    :key="`other-${other.item}`"
+                    class="audit-line audit-line--other"
+                    data-testid="audit-order-other-line"
+                  >
+                    <span>{{ otherLineLabel(orderUnit.order ?? orderUnit.id, other, otherLines) }}</span>
+                    <span class="audit-row-sub">{{ otherLineWhy(other) }}</span>
+                    <span class="audit-row-sub"></span>
                   </li>
                 </ul>
               </template>
@@ -449,6 +461,9 @@ import {
   findStatement,
   lineLabel,
   narrowedCounts,
+  otherLineLabel,
+  otherLineWhy,
+  otherOrderLines,
   progressLine,
   sourceItems,
   statementFindings,
@@ -554,6 +569,8 @@ function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): strin
 // What the picked pill counts for the statement (DAR-UI-073), not the 50 the report lists or the pages loaded so far.
 const findingsTotal = computed(() => (statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts, props.filter) : findings.value.length))
 const records = computed(() => recordRows(props.orderUnit?.records ?? props.findingDoc?.finding.records))
+// DAR-UI-099. The open order's lines with no finding of their own (an item set aside, a NetSuite store-credit line).
+const otherLines = computed(() => otherOrderLines(props.orderUnit))
 
 const categoryLabel = computed(() => categories.value.find((item) => item.id === props.category)?.label ?? '')
 const secondLabel = computed(() =>
@@ -963,6 +980,12 @@ function statementText(id: string): string {
 .audit-line--stuck {
   border-color: var(--text-soft);
   background: var(--surface-3);
+}
+
+/* DAR-UI-099. A line with no finding of its own: present, quieter than the lines the finding is about (not dashed: in
+   this design system dashed means empty). */
+.audit-line--other {
+  color: var(--text-muted);
 }
 
 .audit-muted {

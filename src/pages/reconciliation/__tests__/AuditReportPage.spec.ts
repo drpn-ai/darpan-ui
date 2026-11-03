@@ -568,6 +568,32 @@ describe('AuditReportPage', () => {
     expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Line 1 is completed in HotWax and not billed in NetSuite')
   })
 
+  // DAR-UI-099 (Aditi: "always make sure all lines are present within the order... in the case of store credit, a store
+  // credit line item is added"). gorjana M1132010: line 01 is the finding, line 02 is still approved (R1 never checked it),
+  // and NetSuite carries "Store Credit - Redemption". Every line is listed; the two with no finding come after, quieter.
+  it('lists every line of the order, the ones with no finding and NetSuite\'s store-credit line too', async () => {
+    const line = { id: 'F-7', headline: 'Item M1132010/01 is completed in HotWax and not billed in NetSuite', state: 'open' as const,
+      firstFound: '2026-10-02', ageDays: 6, difference: null, next: '', cause: null, held: false,
+      records: { OMS: { orderItem: [{ id: 'M1132010/01', internalId: null, status: 'Completed', sku: '203-104-G' }] } } }
+    f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [{ id: 'M1132010', kind: 'order', order: 'M1132010',
+      headline: 'Order M1132010: line 1 is completed in HotWax and not billed in NetSuite', state: 'open', firstFound: '2026-10-02',
+      ageDays: 6, difference: null, next: '', records: {}, cause: null, stuck: [], lines: [line], statement: 'R2', category: 'orders',
+      orderLines: [
+        { line: '1', item: 'M1132010/01', sku: '203-104-G', status: 'Completed', finding: 'F-7', state: 'open' },
+        { line: '2', item: 'M1132010/02', sku: '212-120-G', status: 'Approved', quantity: 2, setAside: true },
+        { system: 'NetSuite', item: 'Store Credit - Redemption', itemType: 'Payment', amount: { amount: '-89.30', currency: null } },
+      ] }] } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M1132010' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.findAll('[data-testid="audit-order-line"]')).toHaveLength(1)
+    expect(w.findAll('[data-testid="audit-order-other-line"]').map((l) => l.findAll('span').map((s) => s.text()).filter(Boolean))).toEqual([
+      ['212-120-G', 'Approved · 2 units'],
+      ['Store Credit - Redemption', 'NetSuite · Payment · -89.30'],
+    ])
+    expect(w.text()).toContain('Lines 3')
+  })
+
   // DAR-UI-072. JSON exports: the morning's report, every page of a statement's findings, the open finding.
   it('exports the report, a statement\'s findings and the open finding as JSON', async () => {
     const download = vi.mocked(downloadTextFile)

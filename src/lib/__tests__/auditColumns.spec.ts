@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { AuditCategory, AuditFindingListItem, AuditProgress, AuditReport, AuditStatement, AuditStatementCheck } from '../api/auditTypes'
+import type { AuditCategory, AuditFindingListItem, AuditOrderLine, AuditProgress, AuditReport, AuditStatement, AuditStatementCheck } from '../api/auditTypes'
 import {
+  otherLineLabel,
+  otherLineWhy,
+  otherOrderLines,
   HEALTH,
   categoryItems,
   causeOptions,
@@ -331,5 +334,29 @@ describe('auditColumns', () => {
     expect(orders!.rows[0]).toMatchObject({ label: 'completed-not-shipped label', category: 'orders', statement: 'R1' })
     expect(orders!.rows[1]).toMatchObject({ label: '', statement: 'R2' })
     expect(returns!.rows.map((row) => [row.id, row.status])).toEqual([['refunded-returns-without-credit-memo', 'ran']])
+  })
+})
+
+// DAR-UI-099. An order's lines with no finding of their own: an item the check set aside, a line only NetSuite has.
+describe('order lines with no finding', () => {
+  const lines: AuditOrderLine[] = [
+    { line: '1', item: 'M9/01', sku: '203-104-G', status: 'Completed', finding: 'F-1' },
+    { line: '2', item: 'M9/02', sku: '212-120-G', status: 'Approved', quantity: 2, setAside: true },
+    { line: '3', item: 'M9/03', sku: '212-120-G', status: 'Cancelled' },
+    { line: '4', item: 'M9/04', status: 'Completed' },
+    { system: 'NetSuite', item: 'Store Credit - Redemption', itemType: 'Payment', amount: { amount: '-89.30', currency: null } },
+  ]
+  it('keeps only the lines with no finding, in order', () => {
+    expect(otherOrderLines({ orderLines: lines }).map((l) => l.item)).toEqual(['M9/02', 'M9/03', 'M9/04', 'Store Credit - Redemption'])
+    expect(otherOrderLines(null)).toEqual([])
+  })
+  it('names a line by its SKU, its number when another line shares it, else its number; a NetSuite line by its item', () => {
+    const others = otherOrderLines({ orderLines: lines })
+    expect(others.map((l) => otherLineLabel('M9', l, others))).toEqual(['212-120-G · line 2', '212-120-G · line 3', 'Line 4', 'Store Credit - Redemption'])
+  })
+  it('says its status and units, or the system, type and amount', () => {
+    expect(otherLineWhy(lines[1]!)).toBe('Approved · 2 units')
+    expect(otherLineWhy(lines[2]!)).toBe('Cancelled')
+    expect(otherLineWhy(lines[4]!)).toBe('NetSuite · Payment · -89.30')
   })
 })

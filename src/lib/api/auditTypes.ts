@@ -106,6 +106,31 @@ export interface AuditFindingSummary {
   cause?: string | null
   stuck?: string[]
   lines?: AuditFindingLine[]
+  /** DAR-UI-099. Every line of the order, in line order: those with a finding (finding, cause, state) and those without, as
+   *  the run read them; then lines only another system has with no line of its own (NetSuite's store-credit payment). */
+  orderLines?: AuditOrderLine[]
+}
+
+/** DAR-UI-099. One line of an order finding's order. */
+export interface AuditOrderLine {
+  /** "2" for item M1132010/02; absent on a line only another system has. */
+  line?: string
+  item: string
+  sku?: string
+  status?: string
+  /** Units the read held of the line, when more than its finding shows. */
+  quantity?: number
+  /** The check's filter set it aside (e.g. an item not yet completed): read, not checked. */
+  setAside?: boolean
+  /** The line's finding id; absent when the line has none. */
+  finding?: string
+  cause?: string | null
+  state?: AuditFindingState
+  /** The system of a line only it has (NetSuite), with its item type and amount. */
+  system?: string
+  itemType?: string
+  /** A NetSuite line carries no currency of its own, so currency may be null. */
+  amount?: { amount: string; currency: string | null }
 }
 
 export interface AuditFindingLine extends AuditFindingSummary {

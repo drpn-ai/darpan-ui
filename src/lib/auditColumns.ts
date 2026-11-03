@@ -4,6 +4,7 @@ import type {
   AuditFindingCounts,
   AuditFindingListItem,
   AuditFindingSummary,
+  AuditOrderLine,
   AuditProgress,
   AuditProgressRun,
   AuditReport,
@@ -453,6 +454,31 @@ export function lineLabel(order: string, line: AuditFindingSummary, lines: Audit
     return twin && number ? `${item.sku} · ${number.toLowerCase()}` : item.sku
   }
   return number || line.id
+}
+
+/** DAR-UI-099 (Aditi: "always make sure all lines are present within the order"). The order's lines with no finding of
+ *  their own, after its finding lines: an item the check set aside or found in order, a line only NetSuite has. */
+export function otherOrderLines(unit: Pick<AuditFindingSummary, 'orderLines'> | null | undefined): AuditOrderLine[] {
+  return (unit?.orderLines ?? []).filter((line) => !line.finding)
+}
+
+/** A line with no finding, named as the finding lines are: its SKU (with its number when another line has the same SKU),
+ *  else its number; a line only NetSuite has by its item. */
+export function otherLineLabel(order: string, line: AuditOrderLine, lines: AuditOrderLine[] = []): string {
+  if (!line.line) return line.item
+  const number = lineNumber(order, line.item)
+  if (line.sku) {
+    const twin = lines.some((other) => other !== line && other.sku === line.sku)
+    return twin && number ? `${line.sku} · ${number.toLowerCase()}` : line.sku
+  }
+  return number || line.item
+}
+
+/** What such a line is: its status and units ("Approved · 2 units"), or the system, type and amount of a NetSuite-only
+ *  line ("NetSuite · Payment · -89.30"). */
+export function otherLineWhy(line: AuditOrderLine): string {
+  if (!line.line) return [line.system, line.itemType, line.amount?.amount].filter(Boolean).join(' · ')
+  return [line.status, line.quantity && line.quantity > 1 ? `${line.quantity} units` : ''].filter(Boolean).join(' · ')
 }
 
 function lineNumber(order: string, itemId: string): string {
