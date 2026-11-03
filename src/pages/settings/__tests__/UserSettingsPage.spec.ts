@@ -34,6 +34,8 @@ const saveRecoveryEmail = vi.hoisted(() => vi.fn())
 const getUserNotificationDefault = vi.hoisted(() => vi.fn())
 const saveUserNotificationDefault = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
+const listCliSessions = vi.hoisted(() => vi.fn())
+const revokeCliSession = vi.hoisted(() => vi.fn())
 const saveUserSettings = vi.hoisted(() => vi.fn(async ({ displayName, timeZone }: { displayName?: string; timeZone?: string }) => {
   authState.sessionInfo = {
     ...authState.sessionInfo,
@@ -76,6 +78,10 @@ vi.mock('../../../lib/api/facade', () => ({
     getUserNotificationDefault,
     saveUserNotificationDefault,
     listTenantChatSpaces,
+  },
+  authFacade: {
+    listCliSessions,
+    revokeCliSession,
   },
 }))
 
@@ -145,6 +151,10 @@ describe('UserSettingsPage', () => {
     getUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [], userNotificationDefault: undefined })
     listTenantChatSpaces.mockReset()
     listTenantChatSpaces.mockResolvedValue({ ok: true, messages: [], errors: [], chatSpaces: [] })
+    listCliSessions.mockReset()
+    listCliSessions.mockResolvedValue({ ok: true, messages: [], errors: [], cliSessions: [] })
+    revokeCliSession.mockReset()
+    revokeCliSession.mockResolvedValue({ ok: true, messages: [], errors: [] })
     saveUserNotificationDefault.mockReset()
     saveUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [], userNotificationDefault: undefined })
     authState.error = null
@@ -193,6 +203,7 @@ describe('UserSettingsPage', () => {
       'Tenant Context',
       'Preferences',
       'Activity',
+      'CLI sessions',
     ])
     expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(9)
     expect(wrapper.findAll('.static-page-record-tile').map((node) => node.text())).toEqual(['Krewe', 'Gorjana'])
@@ -725,5 +736,50 @@ describe('UserSettingsPage', () => {
 
     expect(wrapper.get('[data-testid="recovery-email-workflow"]').text()).toContain('Enter your current password.')
     expect(saveRecoveryEmail).not.toHaveBeenCalled()
+  })
+
+  describe('CLI sessions', () => {
+    const sessions = [
+      { cliSessionId: 'C1', hostLabel: 'ada-laptop', createdDate: '2026-11-01T10:00:00Z', expiresDate: '2026-11-07T10:00:00Z' },
+      { cliSessionId: 'C2', hostLabel: 'build-box', createdDate: '2026-11-02T10:00:00Z', expiresDate: '2026-11-08T10:00:00Z' },
+    ]
+
+    it('lists CLI sessions', async () => {
+      listCliSessions.mockResolvedValue({ ok: true, messages: [], errors: [], cliSessions: sessions })
+      const wrapper = mountPage()
+      await flushPromises()
+      const rows = wrapper.findAll('[data-testid="cli-session-row"]')
+      expect(rows).toHaveLength(2)
+      expect(rows[0]!.text()).toContain('ada-laptop')
+    })
+
+    it('Revoke calls revoke#CliSession and removes the row', async () => {
+      listCliSessions.mockResolvedValue({ ok: true, messages: [], errors: [], cliSessions: sessions })
+      const wrapper = mountPage()
+      await flushPromises()
+      await wrapper.findAll('[data-testid="cli-session-revoke"]')[0]!.trigger('click')
+      await flushPromises()
+      expect(revokeCliSession).toHaveBeenCalledWith({ cliSessionId: 'C1' }, expect.anything())
+      const rows = wrapper.findAll('[data-testid="cli-session-row"]')
+      expect(rows).toHaveLength(1)
+      expect(rows[0]!.text()).toContain('build-box')
+    })
+
+    it('keeps the row and shows the error when revoke is refused', async () => {
+      listCliSessions.mockResolvedValue({ ok: true, messages: [], errors: [], cliSessions: sessions })
+      revokeCliSession.mockResolvedValue({ ok: false, messages: [], errors: ['Already ended.'] })
+      const wrapper = mountPage()
+      await flushPromises()
+      await wrapper.findAll('[data-testid="cli-session-revoke"]')[0]!.trigger('click')
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid="cli-session-row"]')).toHaveLength(2)
+      expect(wrapper.text()).toContain('Already ended.')
+    })
+
+    it('empty state', async () => {
+      const wrapper = mountPage()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="cli-sessions-empty"]').exists()).toBe(true)
+    })
   })
 })

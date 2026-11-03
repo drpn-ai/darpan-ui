@@ -382,6 +382,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run Editor' },
   },
   {
+    path: '/cli-login',
+    name: 'cli-login',
+    component: () => import('../pages/CliLoginPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Approve CLI' },
+  },
+  {
     path: '/settings/user',
     name: 'settings-user',
     component: () => import('../pages/settings/UserSettingsPage.vue'),

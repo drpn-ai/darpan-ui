@@ -122,6 +122,36 @@
       </div>
     </StaticPageSection>
 
+    <StaticPageSection title="CLI sessions">
+      <p v-if="cliSessions.length === 0" class="section-note" data-testid="cli-sessions-empty">No CLI signed in.</p>
+      <div v-else class="static-page-summary-grid">
+        <article
+          v-for="session in cliSessions"
+          :key="session.cliSessionId"
+          class="static-page-summary-card"
+          data-testid="cli-session-row"
+        >
+          <span class="static-page-summary-label">Host</span>
+          <span>{{ session.hostLabel }}</span>
+          <span class="static-page-summary-label">Signed in</span>
+          <span>{{ formatDateTime(session.createdDate) }}</span>
+          <span class="static-page-summary-label">Expires</span>
+          <span>{{ formatDateTime(session.expiresDate) }}</span>
+          <button
+            type="button"
+            class="btn-primary"
+            data-testid="cli-session-revoke"
+            :aria-label="`Revoke ${session.hostLabel}`"
+            :disabled="revokingCliSessionId === session.cliSessionId"
+            @click="revokeCliSession(session.cliSessionId)"
+          >
+            Revoke
+          </button>
+        </article>
+      </div>
+      <p v-if="cliSessionsError" class="section-note" role="alert" data-testid="cli-sessions-error">{{ cliSessionsError }}</p>
+    </StaticPageSection>
+
     <template #actions>
       <AppSaveAction :label="saveActionLabel" :disabled="isSavingUserSettings" @click="saveUserSettingsForm" />
     </template>
@@ -301,9 +331,9 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
-import { settingsFacade } from '../../lib/api/facade'
+import { authFacade, settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
-import type { TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
+import type { CliSession, TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
 import { buildTimezoneOptions, resolveBrowserTimeZone } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -810,9 +840,44 @@ async function saveUserTimezone(): Promise<void> {
 
 const pageAbortController = new AbortController()
 
+const cliSessions = ref<CliSession[]>([])
+const cliSessionsError = ref<string | null>(null)
+const revokingCliSessionId = ref<string | null>(null)
+
+async function loadCliSessions() {
+  try {
+    const response = await authFacade.listCliSessions(pageAbortController.signal)
+    if (pageAbortController.signal.aborted) return
+    cliSessions.value = response.ok ? (response.cliSessions ?? []) : []
+  } catch {
+    if (!pageAbortController.signal.aborted) cliSessions.value = []
+  }
+}
+
+async function revokeCliSession(cliSessionId: string) {
+  if (revokingCliSessionId.value) return
+  revokingCliSessionId.value = cliSessionId
+  cliSessionsError.value = null
+  try {
+    const response = await authFacade.revokeCliSession({ cliSessionId }, pageAbortController.signal)
+    if (pageAbortController.signal.aborted) return
+    if (!response.ok || (response.errors?.length ?? 0) > 0) {
+      cliSessionsError.value = response.errors?.[0] ?? 'Could not revoke that CLI session.'
+      return
+    }
+    cliSessions.value = cliSessions.value.filter((session) => session.cliSessionId !== cliSessionId)
+  } catch (error) {
+    if (pageAbortController.signal.aborted) return
+    cliSessionsError.value = error instanceof ApiCallError ? error.message : 'Could not revoke that CLI session.'
+  } finally {
+    revokingCliSessionId.value = null
+  }
+}
+
 onMounted(() => {
   document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handlePasswordWorkflowCancelRequest)
   void loadNotificationDefault()
+  void loadCliSessions()
 })
 
 onBeforeUnmount(() => {

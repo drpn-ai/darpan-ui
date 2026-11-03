@@ -105,6 +105,11 @@ import type {
   LlmSettingsResponse,
   LogoutSessionResponse,
   RevokeConfigTenantAccessResponse,
+  GetCliLoginRequestResponse,
+  ApproveCliLoginResponse,
+  DenyCliLoginResponse,
+  ListCliSessionsResponse,
+  RevokeCliSessionResponse,
   RunAutomationNowResponse,
   RunSavedRunDiffResponse,
   PauseAutomationResponse,
@@ -145,6 +150,8 @@ import type {
   VerifyPasswordResetCodePayload,
   ChangeOwnPasswordPayload,
   ConfigTenantAccessMutationPayload,
+  CliLoginCodePayload,
+  RevokeCliSessionPayload,
   CreateRuleSetRunPayload,
   DeleteAutomationPayload,
   DeleteJsonSchemaPayload,
@@ -247,6 +254,11 @@ const AUTH = {
   saveRecoveryEmail: 'facade.AuthFacadeServices.save#RecoveryEmail',
   getPasswordResetStatus: 'facade.AuthFacadeServices.get#PasswordResetStatus',
   logoutSession: 'facade.AuthFacadeServices.logout#Session',
+  getCliLoginRequest: 'facade.CliAuthFacadeServices.get#CliLoginRequest',
+  approveCliLogin: 'facade.CliAuthFacadeServices.approve#CliLogin',
+  denyCliLogin: 'facade.CliAuthFacadeServices.deny#CliLogin',
+  listCliSessions: 'facade.CliAuthFacadeServices.list#CliSessions',
+  revokeCliSession: 'facade.CliAuthFacadeServices.revoke#CliSession',
 }
 
 const SETTINGS = {
@@ -401,6 +413,21 @@ export const authFacade = {
   },
   logoutSession(signal?: AbortSignal): Promise<LogoutSessionResponse> {
     return callService<LogoutSessionResponse>(AUTH.logoutSession, {}, signal)
+  },
+  getCliLoginRequest(payload: CliLoginCodePayload, signal?: AbortSignal): Promise<GetCliLoginRequestResponse> {
+    return callService<GetCliLoginRequestResponse>(AUTH.getCliLoginRequest, payload, signal)
+  },
+  approveCliLogin(payload: CliLoginCodePayload, signal?: AbortSignal): Promise<ApproveCliLoginResponse> {
+    return callService<ApproveCliLoginResponse>(AUTH.approveCliLogin, payload, signal)
+  },
+  denyCliLogin(payload: CliLoginCodePayload, signal?: AbortSignal): Promise<DenyCliLoginResponse> {
+    return callService<DenyCliLoginResponse>(AUTH.denyCliLogin, payload, signal)
+  },
+  listCliSessions(signal?: AbortSignal): Promise<ListCliSessionsResponse> {
+    return callService<ListCliSessionsResponse>(AUTH.listCliSessions, {}, signal)
+  },
+  revokeCliSession(payload: RevokeCliSessionPayload, signal?: AbortSignal): Promise<RevokeCliSessionResponse> {
+    return callService<RevokeCliSessionResponse>(AUTH.revokeCliSession, payload, signal)
   },
 }
 

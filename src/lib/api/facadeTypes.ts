@@ -522,3 +522,13 @@ export interface UnsubscribeRunNotificationPayload {
 export interface CancelReconciliationRunPayload {
   reconciliationRunResultId: string
 }
+
+// ─── CLI sign-in (DAR-CLI-003) ─────────────────────────────────────────────────
+
+export interface CliLoginCodePayload {
+  userCode: string
+}
+
+export interface RevokeCliSessionPayload {
+  cliSessionId: string
+}

@@ -132,6 +132,9 @@
                                         "$ref": "#/components/schemas/UpdateUserAccountRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/ListAgentQueryLogsRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/AddAuditStatementRequest"
                                     },
                                     {
@@ -219,6 +222,30 @@
                                         "$ref": "#/components/schemas/VerifyPasswordResetCodeRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/ApproveCliLoginRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/DenyCliLoginRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/GetCliLoginRequestRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/ListCliSessionsRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/LogoutCliSessionRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/PollCliLoginRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/RevokeCliSessionRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/StartCliLoginRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/GrantConfigTenantAccessRequest"
                                     },
                                     {
@@ -231,7 +258,13 @@
                                         "$ref": "#/components/schemas/DeleteHotWaxOmsRestSourceConfigRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/GetOmsGraphqlSchemaRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/ListHotWaxOmsRestSourceConfigsRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/RunOmsGraphqlAgentQueryRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/SaveHotWaxOmsRestSourceConfigRequest"
@@ -276,10 +309,16 @@
                                         "$ref": "#/components/schemas/GetNsSuiteQlSourceQueryRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/ListNsAgentConnectionsRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/ListNsSuiteQlSourceQueriesRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/PreviewNsSuiteQlSourceQueryRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/RunNsSuiteQlAgentQueryRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryRequest"
@@ -546,7 +585,13 @@
                                         "$ref": "#/components/schemas/GetShopifyAuthConfigRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/GetShopifyGraphqlSchemaRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/ListShopifyAuthConfigsRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/RunShopifyGraphqlAgentQueryRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/SaveShopifyAuthConfigRequest"
@@ -651,6 +696,7 @@
                                         "admin.UserAdminServices.get#UserList": "#/components/schemas/GetUserListRequest",
                                         "admin.UserAdminServices.reset#Password": "#/components/schemas/ResetPasswordRequest",
                                         "admin.UserAdminServices.update#UserAccount": "#/components/schemas/UpdateUserAccountRequest",
+                                        "facade.AgentFacadeServices.list#AgentQueryLogs": "#/components/schemas/ListAgentQueryLogsRequest",
                                         "facade.AuditFacadeServices.add#AuditStatement": "#/components/schemas/AddAuditStatementRequest",
                                         "facade.AuditFacadeServices.create#Audit": "#/components/schemas/CreateAuditRequest",
                                         "facade.AuditFacadeServices.get#AuditCheckExtracts": "#/components/schemas/GetAuditCheckExtractsRequest",
@@ -680,11 +726,21 @@
                                         "facade.AuthFacadeServices.save#UserSettings": "#/components/schemas/SaveUserSettingsRequest",
                                         "facade.AuthFacadeServices.verify#OwnPassword": "#/components/schemas/VerifyOwnPasswordRequest",
                                         "facade.AuthFacadeServices.verify#PasswordResetCode": "#/components/schemas/VerifyPasswordResetCodeRequest",
+                                        "facade.CliAuthFacadeServices.approve#CliLogin": "#/components/schemas/ApproveCliLoginRequest",
+                                        "facade.CliAuthFacadeServices.deny#CliLogin": "#/components/schemas/DenyCliLoginRequest",
+                                        "facade.CliAuthFacadeServices.get#CliLoginRequest": "#/components/schemas/GetCliLoginRequestRequest",
+                                        "facade.CliAuthFacadeServices.list#CliSessions": "#/components/schemas/ListCliSessionsRequest",
+                                        "facade.CliAuthFacadeServices.logout#CliSession": "#/components/schemas/LogoutCliSessionRequest",
+                                        "facade.CliAuthFacadeServices.poll#CliLogin": "#/components/schemas/PollCliLoginRequest",
+                                        "facade.CliAuthFacadeServices.revoke#CliSession": "#/components/schemas/RevokeCliSessionRequest",
+                                        "facade.CliAuthFacadeServices.start#CliLogin": "#/components/schemas/StartCliLoginRequest",
                                         "facade.ConfigSharingFacadeServices.grant#ConfigTenantAccess": "#/components/schemas/GrantConfigTenantAccessRequest",
                                         "facade.ConfigSharingFacadeServices.list#ConfigTenantAccess": "#/components/schemas/ListConfigTenantAccessRequest",
                                         "facade.ConfigSharingFacadeServices.revoke#ConfigTenantAccess": "#/components/schemas/RevokeConfigTenantAccessRequest",
                                         "facade.HotWaxOmsFacadeServices.delete#HotWaxOmsRestSourceConfig": "#/components/schemas/DeleteHotWaxOmsRestSourceConfigRequest",
+                                        "facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema": "#/components/schemas/GetOmsGraphqlSchemaRequest",
                                         "facade.HotWaxOmsFacadeServices.list#HotWaxOmsRestSourceConfigs": "#/components/schemas/ListHotWaxOmsRestSourceConfigsRequest",
+                                        "facade.HotWaxOmsFacadeServices.run#OmsGraphqlAgentQuery": "#/components/schemas/RunOmsGraphqlAgentQueryRequest",
                                         "facade.HotWaxOmsFacadeServices.save#HotWaxOmsRestSourceConfig": "#/components/schemas/SaveHotWaxOmsRestSourceConfigRequest",
                                         "facade.JsonSchemaFacadeServices.delete#JsonSchema": "#/components/schemas/DeleteJsonSchemaRequest",
                                         "facade.JsonSchemaFacadeServices.flatten#JsonSchema": "#/components/schemas/FlattenJsonSchemaRequest",
@@ -699,8 +755,10 @@
                                         "facade.NetSuiteLifecycleFacadeServices.get#LifecycleRuleOptions": "#/components/schemas/GetLifecycleRuleOptionsRequest",
                                         "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlQueryOptions": "#/components/schemas/GetNsSuiteQlQueryOptionsRequest",
                                         "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery": "#/components/schemas/GetNsSuiteQlSourceQueryRequest",
+                                        "facade.NetSuiteQueryFacadeServices.list#NsAgentConnections": "#/components/schemas/ListNsAgentConnectionsRequest",
                                         "facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries": "#/components/schemas/ListNsSuiteQlSourceQueriesRequest",
                                         "facade.NetSuiteQueryFacadeServices.preview#NsSuiteQlSourceQuery": "#/components/schemas/PreviewNsSuiteQlSourceQueryRequest",
+                                        "facade.NetSuiteQueryFacadeServices.run#NsSuiteQlAgentQuery": "#/components/schemas/RunNsSuiteQlAgentQueryRequest",
                                         "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery": "#/components/schemas/SaveNsSuiteQlSourceQueryRequest",
                                         "facade.ReconciliationFacadeServices.archive#Automation": "#/components/schemas/ArchiveAutomationRequest",
                                         "facade.ReconciliationFacadeServices.archive#SavedRun": "#/components/schemas/ArchiveSavedRunRequest",
@@ -789,7 +847,9 @@
                                         "facade.SettingsFacadeServices.test#SourceConnection": "#/components/schemas/TestSourceConnectionRequest",
                                         "facade.ShopifyFacadeServices.delete#ShopifyAuthConfig": "#/components/schemas/DeleteShopifyAuthConfigRequest",
                                         "facade.ShopifyFacadeServices.get#ShopifyAuthConfig": "#/components/schemas/GetShopifyAuthConfigRequest",
+                                        "facade.ShopifyFacadeServices.get#ShopifyGraphqlSchema": "#/components/schemas/GetShopifyGraphqlSchemaRequest",
                                         "facade.ShopifyFacadeServices.list#ShopifyAuthConfigs": "#/components/schemas/ListShopifyAuthConfigsRequest",
+                                        "facade.ShopifyFacadeServices.run#ShopifyGraphqlAgentQuery": "#/components/schemas/RunShopifyGraphqlAgentQueryRequest",
                                         "facade.ShopifyFacadeServices.save#ShopifyAuthConfig": "#/components/schemas/SaveShopifyAuthConfigRequest",
                                         "facade.SlackFacadeServices.begin#SlackInstall": "#/components/schemas/BeginSlackInstallRequest",
                                         "facade.SlackFacadeServices.disconnect#SlackWorkspace": "#/components/schemas/DisconnectSlackWorkspaceRequest",
@@ -936,6 +996,9 @@
                                             "$ref": "#/components/schemas/UpdateUserAccountResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/ListAgentQueryLogsResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/AddAuditStatementResponse"
                                         },
                                         {
@@ -1023,6 +1086,30 @@
                                             "$ref": "#/components/schemas/VerifyPasswordResetCodeResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/ApproveCliLoginResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/DenyCliLoginResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/GetCliLoginRequestResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/ListCliSessionsResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/LogoutCliSessionResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/PollCliLoginResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/RevokeCliSessionResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/StartCliLoginResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/GrantConfigTenantAccessResponse"
                                         },
                                         {
@@ -1035,7 +1122,13 @@
                                             "$ref": "#/components/schemas/DeleteHotWaxOmsRestSourceConfigResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/GetOmsGraphqlSchemaResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/ListHotWaxOmsRestSourceConfigsResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/RunOmsGraphqlAgentQueryResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/SaveHotWaxOmsRestSourceConfigResponse"
@@ -1080,10 +1173,16 @@
                                             "$ref": "#/components/schemas/GetNsSuiteQlSourceQueryResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/ListNsAgentConnectionsResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/ListNsSuiteQlSourceQueriesResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/PreviewNsSuiteQlSourceQueryResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/RunNsSuiteQlAgentQueryResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryResponse"
@@ -1350,7 +1449,13 @@
                                             "$ref": "#/components/schemas/GetShopifyAuthConfigResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/GetShopifyGraphqlSchemaResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/ListShopifyAuthConfigsResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/RunShopifyGraphqlAgentQueryResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/SaveShopifyAuthConfigResponse"
@@ -5121,6 +5226,165 @@
                     "result"
                 ]
             },
+            "ListAgentQueryLogsParams": {
+                "type": "object",
+                "properties": {
+                    "pageIndex": {
+                        "type": "integer"
+                    },
+                    "pageSize": {
+                        "type": "integer"
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "description": "Only rows with this outcome: OK, REFUSED, THROTTLED, ERROR or TIMEOUT."
+                    }
+                },
+                "description": "List the fresh queries agents sent to this tenant's systems, newest first. Tenant admins only."
+            },
+            "ListAgentQueryLogsResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "pagination": {
+                        "type": "object",
+                        "properties": {
+                            "pageIndex": {
+                                "type": "integer"
+                            },
+                            "pageSize": {
+                                "type": "integer"
+                            },
+                            "totalCount": {
+                                "type": "integer"
+                            },
+                            "pageCount": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "logs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "agentQueryLogId": {
+                                    "type": "string"
+                                },
+                                "userId": {
+                                    "type": "string"
+                                },
+                                "systemEnumId": {
+                                    "type": "string"
+                                },
+                                "connectionId": {
+                                    "type": "string"
+                                },
+                                "queryHash": {
+                                    "type": "string"
+                                },
+                                "queryText": {
+                                    "type": "string"
+                                },
+                                "rowCount": {
+                                    "type": "integer"
+                                },
+                                "durationMs": {
+                                    "type": "integer"
+                                },
+                                "outcome": {
+                                    "type": "string"
+                                },
+                                "createdDate": {
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ListAgentQueryLogsRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AgentFacadeServices.list#AgentQueryLogs",
+                "x-darpan-method": "facade.AgentFacadeServices.list#AgentQueryLogs",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AgentFacadeServices.list#AgentQueryLogs"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ListAgentQueryLogsParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ListAgentQueryLogsResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AgentFacadeServices.list#AgentQueryLogs. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ListAgentQueryLogsResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "AddAuditStatementParams": {
                 "type": "object",
                 "properties": {
@@ -6299,7 +6563,7 @@
                     "fromDate",
                     "thruDate"
                 ],
-                "description": "Play: runs every check of the audit now over the days picked, first to last inclusive (the tenant's zone),\n            recording findings as the morning run does. Submitted to the background, one automation per run; the audit page\n            shows the results as each finishes. Refused up front for days in the future or in a period that ended and was\n            not extended."
+                "description": "Play: runs every check of the audit now over the days picked, first to last inclusive (the tenant's zone),\n            recording findings as the morning run does. Submitted to the background, one automation per run; the audit page\n            shows the results as each finishes. Days in the period just ended record under that period (DAR-BE-178).\n            Refused up front for days in the future or in a period ended before that."
             },
             "RunAuditResult": {
                 "type": "object",
@@ -8875,6 +9139,864 @@
                     "result"
                 ]
             },
+            "ApproveCliLoginParams": {
+                "type": "object",
+                "properties": {
+                    "userCode": {
+                        "type": "string",
+                        "description": "The user code shown by the CLI."
+                    }
+                },
+                "required": [
+                    "userCode"
+                ],
+                "description": "Approve a waiting CLI sign-in as the signed-in person: the CLI's next poll gets a login key for\n            them. Refused from a CLI session, so a CLI cannot sign in another CLI."
+            },
+            "ApproveCliLoginResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the sign-in was approved."
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Informational messages."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Why it was refused: expired, already answered, or a CLI session."
+                    }
+                }
+            },
+            "ApproveCliLoginRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.CliAuthFacadeServices.approve#CliLogin",
+                "x-darpan-method": "facade.CliAuthFacadeServices.approve#CliLogin",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.CliAuthFacadeServices.approve#CliLogin"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ApproveCliLoginParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ApproveCliLoginResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.CliAuthFacadeServices.approve#CliLogin. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ApproveCliLoginResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "DenyCliLoginParams": {
+                "type": "object",
+                "properties": {
+                    "userCode": {
+                        "type": "string",
+                        "description": "The user code shown by the CLI."
+                    }
+                },
+                "required": [
+                    "userCode"
+                ],
+                "description": "Deny a waiting CLI sign-in: the CLI's next poll answers DENIED and no key is issued. Refused from a\n            CLI session."
+            },
+            "DenyCliLoginResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the sign-in was denied."
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Informational messages."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Why it was refused: expired, already answered, or a CLI session."
+                    }
+                }
+            },
+            "DenyCliLoginRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.CliAuthFacadeServices.deny#CliLogin",
+                "x-darpan-method": "facade.CliAuthFacadeServices.deny#CliLogin",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.CliAuthFacadeServices.deny#CliLogin"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/DenyCliLoginParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "DenyCliLoginResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.CliAuthFacadeServices.deny#CliLogin. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/DenyCliLoginResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "GetCliLoginRequestParams": {
+                "type": "object",
+                "properties": {
+                    "userCode": {
+                        "type": "string",
+                        "description": "The user code from the CLI or its link."
+                    }
+                },
+                "required": [
+                    "userCode"
+                ],
+                "description": "What a CLI sign-in asks for, so the person can check the computer before approving."
+            },
+            "GetCliLoginRequestResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the call completed without facade errors."
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Informational messages."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Errors."
+                    },
+                    "hostLabel": {
+                        "type": "string",
+                        "description": "The computer the CLI says it runs on."
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "PENDING (waiting for approval), APPROVED, DENIED, or EXPIRED (expired or unknown code)."
+                    },
+                    "expiresDate": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ],
+                        "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds. When the request expires."
+                    }
+                }
+            },
+            "GetCliLoginRequestRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.CliAuthFacadeServices.get#CliLoginRequest",
+                "x-darpan-method": "facade.CliAuthFacadeServices.get#CliLoginRequest",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.CliAuthFacadeServices.get#CliLoginRequest"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetCliLoginRequestParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetCliLoginRequestResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.CliAuthFacadeServices.get#CliLoginRequest. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetCliLoginRequestResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "ListCliSessionsParams": {
+                "type": "object",
+                "properties": {
+                    
+                },
+                "description": "The signed-in person's own CLI sessions that still work (not revoked, not expired)."
+            },
+            "ListCliSessionsResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the call completed without facade errors."
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Informational messages."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Errors."
+                    },
+                    "cliSessions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "cliSessionId": {
+                                    "type": "string",
+                                    "description": "Identifies the session to revoke#CliSession; not a credential."
+                                },
+                                "hostLabel": {
+                                    "type": "string",
+                                    "description": "The computer it was signed in on."
+                                },
+                                "createdDate": {
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds. When it was signed in."
+                                },
+                                "expiresDate": {
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "number"
+                                        }
+                                    ],
+                                    "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds. When its key stops working."
+                                }
+                            }
+                        },
+                        "description": "Newest first."
+                    }
+                }
+            },
+            "ListCliSessionsRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.CliAuthFacadeServices.list#CliSessions",
+                "x-darpan-method": "facade.CliAuthFacadeServices.list#CliSessions",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.CliAuthFacadeServices.list#CliSessions"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ListCliSessionsParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ListCliSessionsResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.CliAuthFacadeServices.list#CliSessions. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ListCliSessionsResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "LogoutCliSessionParams": {
+                "type": "object",
+                "properties": {
+                    
+                },
+                "description": "Sign the calling CLI out: revokes the CLI session whose key this request carries."
+            },
+            "LogoutCliSessionResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the CLI session was revoked."
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Informational messages."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Errors, such as a request that is not a CLI session."
+                    }
+                }
+            },
+            "LogoutCliSessionRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.CliAuthFacadeServices.logout#CliSession",
+                "x-darpan-method": "facade.CliAuthFacadeServices.logout#CliSession",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.CliAuthFacadeServices.logout#CliSession"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/LogoutCliSessionParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "LogoutCliSessionResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.CliAuthFacadeServices.logout#CliSession. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/LogoutCliSessionResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "PollCliLoginParams": {
+                "type": "object",
+                "properties": {
+                    "deviceCode": {
+                        "type": "string",
+                        "description": "The device code start#CliLogin returned."
+                    }
+                },
+                "required": [
+                    "deviceCode"
+                ],
+                "description": "Ask whether a CLI sign-in was approved. The first poll after approval returns the login key and\n            claims the request; any later poll, and a poll after the 10 minutes, answers EXPIRED."
+            },
+            "PollCliLoginResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the call completed without facade errors."
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Informational messages."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Errors."
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "PENDING (keep polling), APPROVED (authToken is set, this once), DENIED, or EXPIRED (expired,\n                    already claimed, or unknown)."
+                    },
+                    "authToken": {
+                        "type": "string",
+                        "description": "Set only on the APPROVED answer: the login key the CLI sends in the `login_key` header."
+                    },
+                    "authTokenHeaderName": {
+                        "type": "string",
+                        "description": "`login_key`, with authToken."
+                    },
+                    "authTokenExpiresInSeconds": {
+                        "type": "integer",
+                        "description": "Key lifetime in seconds, the same as a sign-in in the app."
+                    },
+                    "username": {
+                        "type": "string",
+                        "description": "Who approved, with authToken."
+                    }
+                }
+            },
+            "PollCliLoginRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.CliAuthFacadeServices.poll#CliLogin",
+                "x-darpan-method": "facade.CliAuthFacadeServices.poll#CliLogin",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.CliAuthFacadeServices.poll#CliLogin"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/PollCliLoginParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "PollCliLoginResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.CliAuthFacadeServices.poll#CliLogin. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/PollCliLoginResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "RevokeCliSessionParams": {
+                "type": "object",
+                "properties": {
+                    "cliSessionId": {
+                        "type": "string",
+                        "description": "From list#CliSessions."
+                    }
+                },
+                "required": [
+                    "cliSessionId"
+                ],
+                "description": "End one of the signed-in person's own CLI sessions: its key stops working at once."
+            },
+            "RevokeCliSessionResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the session was revoked."
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Informational messages."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Errors, such as a session that is not yours or already ended."
+                    }
+                }
+            },
+            "RevokeCliSessionRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.CliAuthFacadeServices.revoke#CliSession",
+                "x-darpan-method": "facade.CliAuthFacadeServices.revoke#CliSession",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.CliAuthFacadeServices.revoke#CliSession"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/RevokeCliSessionParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "RevokeCliSessionResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.CliAuthFacadeServices.revoke#CliSession. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/RevokeCliSessionResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "StartCliLoginParams": {
+                "type": "object",
+                "properties": {
+                    "hostLabel": {
+                        "type": "string",
+                        "description": "The computer the CLI runs on (its hostname), shown to the person before they approve."
+                    }
+                },
+                "required": [
+                    "hostLabel"
+                ],
+                "description": "Start a CLI sign-in. Returns the device code the CLI polls with and the user code the person\n            approves in the Darpan app. Expires in 10 minutes. At most 10 starts a minute from one address."
+            },
+            "StartCliLoginResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the call completed without facade errors."
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Informational messages."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Errors, such as too many starts from this address."
+                    },
+                    "deviceCode": {
+                        "type": "string",
+                        "description": "Secret the CLI polls with; only its hash is stored. Never show it to the person."
+                    },
+                    "userCode": {
+                        "type": "string",
+                        "description": "The code the person approves, XXXX-XXXX."
+                    },
+                    "verificationUrl": {
+                        "type": "string",
+                        "description": "The Darpan app page that approves this sign-in: app base URL + verificationPath."
+                    },
+                    "verificationPath": {
+                        "type": "string",
+                        "description": "/cli-login?code=USER-CODE, for a CLI that knows its own app URL."
+                    },
+                    "expiresInSeconds": {
+                        "type": "integer",
+                        "description": "Seconds until the codes expire: 600."
+                    },
+                    "intervalSeconds": {
+                        "type": "integer",
+                        "description": "Seconds the CLI waits between polls: 3."
+                    }
+                }
+            },
+            "StartCliLoginRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.CliAuthFacadeServices.start#CliLogin",
+                "x-darpan-method": "facade.CliAuthFacadeServices.start#CliLogin",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.CliAuthFacadeServices.start#CliLogin"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/StartCliLoginParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "StartCliLoginResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.CliAuthFacadeServices.start#CliLogin. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/StartCliLoginResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "GrantConfigTenantAccessParams": {
                 "type": "object",
                 "properties": {
@@ -9238,7 +10360,7 @@
                 "required": [
                     "omsRestSourceConfigId"
                 ],
-                "description": "Delete one tenant-owned HotWax OMS REST source configuration."
+                "description": "Delete one tenant-owned HotWax OMS source configuration."
             },
             "DeleteHotWaxOmsRestSourceConfigResult": {
                 "type": "object",
@@ -9326,6 +10448,101 @@
                     "result"
                 ]
             },
+            "GetOmsGraphqlSchemaParams": {
+                "type": "object",
+                "properties": {
+                    "omsRestSourceConfigId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "omsRestSourceConfigId"
+                ],
+                "description": "DAR-CLI-003. The HotWax OMS GraphQL schema a tenant's agent can ask about, trimmed to the types reachable\n            from the Query root (names, kinds, fields, arguments, enum values and descriptions; mutations and subscriptions\n            left out). Read from the OMS once and kept 24 hours per connection. Needs view access."
+            },
+            "GetOmsGraphqlSchemaResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "schema": {
+                        "type": "object"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "GetOmsGraphqlSchemaRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema",
+                "x-darpan-method": "facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetOmsGraphqlSchemaParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetOmsGraphqlSchemaResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetOmsGraphqlSchemaResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "ListHotWaxOmsRestSourceConfigsParams": {
                 "type": "object",
                 "properties": {
@@ -9339,7 +10556,7 @@
                         "type": "integer"
                     }
                 },
-                "description": "List OMS REST source configurations available to the active tenant."
+                "description": "List OMS source configurations available to the active tenant."
             },
             "ListHotWaxOmsRestSourceConfigsResult": {
                 "type": "object",
@@ -9376,9 +10593,6 @@
                                 "baseUrl": {
                                     "type": "string"
                                 },
-                                "ordersPath": {
-                                    "type": "string"
-                                },
                                 "timeZone": {
                                     "type": "string"
                                 },
@@ -9404,9 +10618,6 @@
                                     "type": "integer"
                                 },
                                 "readTimeoutSeconds": {
-                                    "type": "integer"
-                                },
-                                "returnsPageSize": {
                                     "type": "integer"
                                 },
                                 "isActive": {
@@ -9506,6 +10717,118 @@
                     "result"
                 ]
             },
+            "RunOmsGraphqlAgentQueryParams": {
+                "type": "object",
+                "properties": {
+                    "omsRestSourceConfigId": {
+                        "type": "string"
+                    },
+                    "document": {
+                        "type": "string"
+                    },
+                    "variables": {
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "omsRestSourceConfigId",
+                    "document"
+                ],
+                "description": "DAR-CLI-003. Runs one fresh, read-only GraphQL query a tenant user's agent wrote, through a HotWax OMS\n            connection the active tenant stores. One query only (no mutation, subscription or introspection); the answer\n            is returned as the OMS gave it, up to 5 MB; the connection's credentials are never returned. Needs run\n            access. Every call is logged for the tenant."
+            },
+            "RunOmsGraphqlAgentQueryResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "data": {
+                        "type": "object"
+                    },
+                    "rowCount": {
+                        "type": "integer",
+                        "description": "The edge count when the answer is one connection, else blank."
+                    },
+                    "truncated": {
+                        "type": "boolean"
+                    },
+                    "durationMs": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "RunOmsGraphqlAgentQueryRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.HotWaxOmsFacadeServices.run#OmsGraphqlAgentQuery",
+                "x-darpan-method": "facade.HotWaxOmsFacadeServices.run#OmsGraphqlAgentQuery",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.HotWaxOmsFacadeServices.run#OmsGraphqlAgentQuery"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/RunOmsGraphqlAgentQueryParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "RunOmsGraphqlAgentQueryResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.HotWaxOmsFacadeServices.run#OmsGraphqlAgentQuery. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/RunOmsGraphqlAgentQueryResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "SaveHotWaxOmsRestSourceConfigParams": {
                 "type": "object",
                 "properties": {
@@ -9517,9 +10840,6 @@
                         "type": "string"
                     },
                     "baseUrl": {
-                        "type": "string"
-                    },
-                    "ordersPath": {
                         "type": "string"
                     },
                     "timeZone": {
@@ -9547,10 +10867,6 @@
                     "readTimeoutSeconds": {
                         "type": "integer"
                     },
-                    "returnsPageSize": {
-                        "type": "integer",
-                        "description": "Rows per page requested from the OMS reconciliationReturns endpoint, 1..1000. Omit to keep the stored value; unset means the 500 default. Lower it when OMS cannot build a full page inside its gateway timeout."
-                    },
                     "isActive": {
                         "type": "boolean"
                     },
@@ -9561,7 +10877,7 @@
                 "required": [
                     "baseUrl"
                 ],
-                "description": "Create or update a tenant-owned OMS REST source configuration. Secret fields are stored encrypted and are never returned in clear text."
+                "description": "Create or update a tenant-owned OMS source configuration. Secret fields are stored encrypted and are never returned in clear text."
             },
             "SaveHotWaxOmsRestSourceConfigResult": {
                 "type": "object",
@@ -9596,9 +10912,6 @@
                             "baseUrl": {
                                 "type": "string"
                             },
-                            "ordersPath": {
-                                "type": "string"
-                            },
                             "timeZone": {
                                 "type": "string"
                             },
@@ -9624,9 +10937,6 @@
                                 "type": "integer"
                             },
                             "readTimeoutSeconds": {
-                                "type": "integer"
-                            },
-                            "returnsPageSize": {
                                 "type": "integer"
                             },
                             "isActive": {
@@ -11251,6 +12561,104 @@
                     "result"
                 ]
             },
+            "ListNsAgentConnectionsParams": {
+                "type": "object",
+                "properties": {
+                    
+                },
+                "description": "DAR-CLI-003. The NetSuite connections the active tenant may query from an agent: id, description and\n            sign-in kind only. No username, client id, certificate id, account host, key or token."
+            },
+            "ListNsAgentConnectionsResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "connections": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "nsAuthConfigId": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": "string"
+                                },
+                                "authType": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ListNsAgentConnectionsRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.list#NsAgentConnections",
+                "x-darpan-method": "facade.NetSuiteQueryFacadeServices.list#NsAgentConnections",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.NetSuiteQueryFacadeServices.list#NsAgentConnections"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ListNsAgentConnectionsParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ListNsAgentConnectionsResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.NetSuiteQueryFacadeServices.list#NsAgentConnections. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ListNsAgentConnectionsResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "ListNsSuiteQlSourceQueriesParams": {
                 "type": "object",
                 "properties": {
@@ -11529,6 +12937,129 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/PreviewNsSuiteQlSourceQueryResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "RunNsSuiteQlAgentQueryParams": {
+                "type": "object",
+                "properties": {
+                    "nsAuthConfigId": {
+                        "type": "string"
+                    },
+                    "sql": {
+                        "type": "string"
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "nsAuthConfigId",
+                    "sql"
+                ],
+                "description": "DAR-CLI-003. Runs one fresh, read-only SuiteQL query a tenant user's agent wrote, through a NetSuite\n            connection the active tenant stores. One SELECT or WITH statement; 200 rows by default, 2,000 at most; the\n            connection's credentials are never returned. Every call is logged for the tenant."
+            },
+            "RunNsSuiteQlAgentQueryResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            
+                        }
+                    },
+                    "rowCount": {
+                        "type": "integer"
+                    },
+                    "hasMore": {
+                        "type": "boolean"
+                    },
+                    "nextOffset": {
+                        "type": "integer"
+                    },
+                    "truncated": {
+                        "type": "boolean"
+                    },
+                    "durationMs": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "RunNsSuiteQlAgentQueryRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.run#NsSuiteQlAgentQuery",
+                "x-darpan-method": "facade.NetSuiteQueryFacadeServices.run#NsSuiteQlAgentQuery",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.NetSuiteQueryFacadeServices.run#NsSuiteQlAgentQuery"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/RunNsSuiteQlAgentQueryParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "RunNsSuiteQlAgentQueryResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.NetSuiteQueryFacadeServices.run#NsSuiteQlAgentQuery. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/RunNsSuiteQlAgentQueryResult"
                     }
                 },
                 "required": [
@@ -21597,6 +23128,13 @@
                         "items": {
                             
                         }
+                    },
+                    "lookups": {
+                        "type": "array",
+                        "items": {
+                            
+                        },
+                        "description": "DAR-BE-174. The run's lookups, replaced when given (an empty\n                list clears them, absent keeps them): [{name, subject FILE_1|FILE_2, idField, systemEnumId, sourceConfigId,\n                keyField, many (every record under the key, as a list), parameters}]. A condition reads one as\n                name.field. Refused in words for a part missing, two of one name, or a system that cannot be asked by\n                id."
                     }
                 },
                 "required": [
@@ -24489,6 +26027,101 @@
                     "result"
                 ]
             },
+            "GetShopifyGraphqlSchemaParams": {
+                "type": "object",
+                "properties": {
+                    "shopifyAuthConfigId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "shopifyAuthConfigId"
+                ],
+                "description": "DAR-CLI-003. The Shopify Admin GraphQL schema a tenant's agent can ask about, trimmed to the types\n            reachable from the Query root (names, kinds, fields, arguments, enum values and descriptions; mutations and\n            subscriptions left out). Read from Shopify once and kept 24 hours per connection. Needs view access."
+            },
+            "GetShopifyGraphqlSchemaResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "schema": {
+                        "type": "object"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "GetShopifyGraphqlSchemaRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ShopifyFacadeServices.get#ShopifyGraphqlSchema",
+                "x-darpan-method": "facade.ShopifyFacadeServices.get#ShopifyGraphqlSchema",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ShopifyFacadeServices.get#ShopifyGraphqlSchema"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetShopifyGraphqlSchemaParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetShopifyGraphqlSchemaResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ShopifyFacadeServices.get#ShopifyGraphqlSchema. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetShopifyGraphqlSchemaResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "ListShopifyAuthConfigsParams": {
                 "type": "object",
                 "properties": {
@@ -24638,6 +26271,118 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/ListShopifyAuthConfigsResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "RunShopifyGraphqlAgentQueryParams": {
+                "type": "object",
+                "properties": {
+                    "shopifyAuthConfigId": {
+                        "type": "string"
+                    },
+                    "document": {
+                        "type": "string"
+                    },
+                    "variables": {
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "shopifyAuthConfigId",
+                    "document"
+                ],
+                "description": "DAR-CLI-003. Runs one fresh, read-only GraphQL query a tenant user's agent wrote, through a Shopify\n            connection the active tenant stores. One query only (no mutation, subscription or introspection); the answer\n            is returned as Shopify gave it, up to 5 MB, or refused with advice when larger; the connection's access token\n            is never returned. Needs run access. Every call is logged for the tenant."
+            },
+            "RunShopifyGraphqlAgentQueryResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "data": {
+                        "type": "object"
+                    },
+                    "rowCount": {
+                        "type": "integer",
+                        "description": "The edge count when the answer is one connection, else blank."
+                    },
+                    "truncated": {
+                        "type": "boolean"
+                    },
+                    "durationMs": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "RunShopifyGraphqlAgentQueryRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.ShopifyFacadeServices.run#ShopifyGraphqlAgentQuery",
+                "x-darpan-method": "facade.ShopifyFacadeServices.run#ShopifyGraphqlAgentQuery",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.ShopifyFacadeServices.run#ShopifyGraphqlAgentQuery"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/RunShopifyGraphqlAgentQueryParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "RunShopifyGraphqlAgentQueryResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.ShopifyFacadeServices.run#ShopifyGraphqlAgentQuery. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/RunShopifyGraphqlAgentQueryResult"
                     }
                 },
                 "required": [
@@ -26648,7 +28393,7 @@
                     "scriptName",
                     "scriptBody"
                 ],
-                "description": "Create or update one of the active tenant's scripts. The body must parse under its profile; a script\n            that does not is refused with the line, never saved half-checked. Needs edit access to the tenant."
+                "description": "Create or update one of the active tenant's scripts. The body must parse under its profile and run\n            cleanly on its sample input; a script that does not is refused with the line, never saved half-checked. No\n            transaction is open while the trial run runs; the store opens its own. Needs edit access to the tenant."
             },
             "SaveTenantScriptResult": {
                 "type": "object",
@@ -26673,7 +28418,7 @@
                     },
                     "validation": {
                         "type": "object",
-                        "description": "{ok, profile, variables, error: {kind, message, line, column}}"
+                        "description": "{ok, profile, variables, error: {kind, message, line, column},\n                problems: [{rule, line, message}], notes: [text]}"
                     }
                 }
             },
@@ -26889,6 +28634,7 @@
         "admin.UserAdminServices.get#UserList": "GetUserList",
         "admin.UserAdminServices.reset#Password": "ResetPassword",
         "admin.UserAdminServices.update#UserAccount": "UpdateUserAccount",
+        "facade.AgentFacadeServices.list#AgentQueryLogs": "ListAgentQueryLogs",
         "facade.AuditFacadeServices.add#AuditStatement": "AddAuditStatement",
         "facade.AuditFacadeServices.create#Audit": "CreateAudit",
         "facade.AuditFacadeServices.get#AuditCheckExtracts": "GetAuditCheckExtracts",
@@ -26918,11 +28664,21 @@
         "facade.AuthFacadeServices.save#UserSettings": "SaveUserSettings",
         "facade.AuthFacadeServices.verify#OwnPassword": "VerifyOwnPassword",
         "facade.AuthFacadeServices.verify#PasswordResetCode": "VerifyPasswordResetCode",
+        "facade.CliAuthFacadeServices.approve#CliLogin": "ApproveCliLogin",
+        "facade.CliAuthFacadeServices.deny#CliLogin": "DenyCliLogin",
+        "facade.CliAuthFacadeServices.get#CliLoginRequest": "GetCliLoginRequest",
+        "facade.CliAuthFacadeServices.list#CliSessions": "ListCliSessions",
+        "facade.CliAuthFacadeServices.logout#CliSession": "LogoutCliSession",
+        "facade.CliAuthFacadeServices.poll#CliLogin": "PollCliLogin",
+        "facade.CliAuthFacadeServices.revoke#CliSession": "RevokeCliSession",
+        "facade.CliAuthFacadeServices.start#CliLogin": "StartCliLogin",
         "facade.ConfigSharingFacadeServices.grant#ConfigTenantAccess": "GrantConfigTenantAccess",
         "facade.ConfigSharingFacadeServices.list#ConfigTenantAccess": "ListConfigTenantAccess",
         "facade.ConfigSharingFacadeServices.revoke#ConfigTenantAccess": "RevokeConfigTenantAccess",
         "facade.HotWaxOmsFacadeServices.delete#HotWaxOmsRestSourceConfig": "DeleteHotWaxOmsRestSourceConfig",
+        "facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema": "GetOmsGraphqlSchema",
         "facade.HotWaxOmsFacadeServices.list#HotWaxOmsRestSourceConfigs": "ListHotWaxOmsRestSourceConfigs",
+        "facade.HotWaxOmsFacadeServices.run#OmsGraphqlAgentQuery": "RunOmsGraphqlAgentQuery",
         "facade.HotWaxOmsFacadeServices.save#HotWaxOmsRestSourceConfig": "SaveHotWaxOmsRestSourceConfig",
         "facade.JsonSchemaFacadeServices.delete#JsonSchema": "DeleteJsonSchema",
         "facade.JsonSchemaFacadeServices.flatten#JsonSchema": "FlattenJsonSchema",
@@ -26937,8 +28693,10 @@
         "facade.NetSuiteLifecycleFacadeServices.get#LifecycleRuleOptions": "GetLifecycleRuleOptions",
         "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlQueryOptions": "GetNsSuiteQlQueryOptions",
         "facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery": "GetNsSuiteQlSourceQuery",
+        "facade.NetSuiteQueryFacadeServices.list#NsAgentConnections": "ListNsAgentConnections",
         "facade.NetSuiteQueryFacadeServices.list#NsSuiteQlSourceQueries": "ListNsSuiteQlSourceQueries",
         "facade.NetSuiteQueryFacadeServices.preview#NsSuiteQlSourceQuery": "PreviewNsSuiteQlSourceQuery",
+        "facade.NetSuiteQueryFacadeServices.run#NsSuiteQlAgentQuery": "RunNsSuiteQlAgentQuery",
         "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery": "SaveNsSuiteQlSourceQuery",
         "facade.ReconciliationFacadeServices.archive#Automation": "ArchiveAutomation",
         "facade.ReconciliationFacadeServices.archive#SavedRun": "ArchiveSavedRun",
@@ -27027,7 +28785,9 @@
         "facade.SettingsFacadeServices.test#SourceConnection": "TestSourceConnection",
         "facade.ShopifyFacadeServices.delete#ShopifyAuthConfig": "DeleteShopifyAuthConfig",
         "facade.ShopifyFacadeServices.get#ShopifyAuthConfig": "GetShopifyAuthConfig",
+        "facade.ShopifyFacadeServices.get#ShopifyGraphqlSchema": "GetShopifyGraphqlSchema",
         "facade.ShopifyFacadeServices.list#ShopifyAuthConfigs": "ListShopifyAuthConfigs",
+        "facade.ShopifyFacadeServices.run#ShopifyGraphqlAgentQuery": "RunShopifyGraphqlAgentQuery",
         "facade.ShopifyFacadeServices.save#ShopifyAuthConfig": "SaveShopifyAuthConfig",
         "facade.SlackFacadeServices.begin#SlackInstall": "BeginSlackInstall",
         "facade.SlackFacadeServices.disconnect#SlackWorkspace": "DisconnectSlackWorkspace",

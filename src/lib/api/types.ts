@@ -1163,3 +1163,27 @@ export interface JsonSchemaField {
   indentLevel?: number
   [key: string]: unknown
 }
+
+// ─── CLI sign-in (DAR-CLI-003) ─────────────────────────────────────────────────
+
+export interface GetCliLoginRequestResponse extends ApiEnvelope {
+  hostLabel?: string
+  status?: 'PENDING' | 'APPROVED' | 'DENIED' | 'EXPIRED'
+  expiresDate?: ApiTimestamp
+}
+
+export type ApproveCliLoginResponse = ApiEnvelope
+export type DenyCliLoginResponse = ApiEnvelope
+
+export interface CliSession {
+  cliSessionId: string
+  hostLabel: string
+  createdDate: ApiTimestamp
+  expiresDate: ApiTimestamp
+}
+
+export interface ListCliSessionsResponse extends ApiEnvelope {
+  cliSessions?: CliSession[]
+}
+
+export type RevokeCliSessionResponse = ApiEnvelope

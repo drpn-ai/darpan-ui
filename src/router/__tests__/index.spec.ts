@@ -4,6 +4,7 @@ import router from '../index'
 
 describe('router release scope', () => {
   const expectedRoutes = [
+    { name: 'cli-login', path: '/cli-login', surfaceMode: 'static', staticPageLabel: 'Approve CLI' },
     { name: 'settings-tenant', path: '/settings/tenant', surfaceMode: 'static', staticPageLabel: 'Tenant Settings' },
     { name: 'settings-ai', path: '/settings/ai', redirect: true },
     { name: 'connections-llm', path: '/connections/llm', redirect: true },
