@@ -192,7 +192,8 @@ const {
   cacheKeyPrefix: 'omsRestSourceDashboard.endpoints',
   signal: pageAbortController.signal,
 })
-const diagnostics = useConnectionDiagnostics('OMS')
+// A SourceSystemConnector registry id: the REST 'OMS' row is gone (DAR-BE-052), OMS_GQL carries the HotWax probe.
+const diagnostics = useConnectionDiagnostics('OMS_GQL')
 
 function runDiagnostics(): void {
   if (!config.value) return

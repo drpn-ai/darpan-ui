@@ -432,8 +432,10 @@ describe('OmsRestSourceDashboardPage', () => {
     await flushPromises()
 
     // Staged run: the first call opts in, and this response ends the walk (nextStage null).
+    // OMS_GQL, not OMS: the backend resolves this id in the SourceSystemConnector registry, and DAR-BE-052
+    // deleted the REST 'OMS' row, so a fresh install answered "not available" (DAR-UI-100).
     expect(testSourceConnection).toHaveBeenCalledWith(
-      { systemEnumId: 'OMS', configId: 'krewe-oms', staged: true },
+      { systemEnumId: 'OMS_GQL', configId: 'krewe-oms', staged: true },
       expect.any(AbortSignal),
     )
     expect(wrapper.findAll('[data-testid="connection-diagnostics-check"]')).toHaveLength(4)
