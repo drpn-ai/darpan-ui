@@ -516,9 +516,13 @@ describe('AuditReportPage', () => {
     liveRoute.query = { category: 'orders', statement: 'R2' }
     const w = mount(AuditReportPage)
     await flushPromises()
+    // DAR-UI-098: the order sits under its line's own cause (the held line adds none), folded like any cause, its row saying
+    // how many of its lines that cause covers.
+    expect(w.findAll('[data-testid="audit-findings-group"]').map((g) => g.text())).toEqual([expect.stringContaining('Backordered in NetSuite')])
+    await openCauses(w)
     const row = w.get('[data-testid="audit-finding-row"]')
     expect(row.text()).toContain('Order M1168785')
-    expect(row.text()).toContain('line 1 backordered in NetSuite, holding 1 more line')
+    expect(w.get('[data-testid="audit-finding-lines"]').text()).toBe('1 of 2 lines')
 
     liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M1168785' }
     await flushPromises()

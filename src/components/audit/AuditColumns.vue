@@ -180,10 +180,11 @@
               </button>
             </span>
           </h2>
-          <template v-for="(item, index) in findings" :key="item.id">
-            <!-- DAR-UI-089 (Aditi: "make the finding categories collapsable"). A cause's heading folds its findings. -->
+          <template v-for="({ item, key }, index) in rows" :key="key">
+            <!-- DAR-UI-089 (Aditi: "make the finding categories collapsable"). A cause's heading folds its findings.
+                 DAR-UI-098: orders too, each under its lines' causes. -->
             <button
-              v-if="item.kind !== 'order' && groupLabel(index)"
+              v-if="groupLabel(index)"
               type="button"
               class="audit-col-note audit-group-toggle"
               :aria-expanded="!groupFolded(index)"
@@ -208,8 +209,9 @@
                 <span class="audit-finding-subject">{{ splitHeadline(item.headline).subject }}</span>
                 <span class="audit-row-sub" :class="{ 'audit-hot': item.state === 'open' }">{{ findingStateBadge(item.state).label }} · {{ ageShort(item.ageDays) }}</span>
               </span>
-              <!-- DAR-UI-075. An order: what holds it up, under its name. -->
-              <span v-if="item.kind === 'order'" class="audit-row-sub">{{ splitHeadline(item.headline).rest }}</span>
+              <!-- DAR-UI-075. An order: what holds it up, under its name. DAR-UI-098: its heading says the cause, so the row says
+                   how many of the order's lines it covers. -->
+              <span v-if="item.kind === 'order' && rowLinesLabel(rows[index]!)" class="audit-row-sub" data-testid="audit-finding-lines">{{ rowLinesLabel(rows[index]!) }}</span>
               <span class="sr-only">{{ item.id }}</span>
             </button>
           </template>
@@ -467,8 +469,8 @@ import {
   progressLine,
   sourceItems,
   statementFindings,
-  causeGroups,
-  causeHeading,
+  findingRows,
+  rowLinesLabel,
   statementItems,
   type AuditFilter,
   type CheckRow,
@@ -556,8 +558,10 @@ const statements = computed(() => {
     .map((item) => ({ ...item, badge: String(counted.byStatement.get(item.id)) })) : items
 })
 const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statement] ?? null)
-const findings = computed(() => causeGroups(props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
-  : statementFindings(statementDoc.value, props.more.findings, props.filter)))
+const findings = computed(() => props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
+  : statementFindings(statementDoc.value, props.more.findings, props.filter))
+// DAR-UI-098. The column's rows: every finding under its cause, an order under each of its lines' causes.
+const rows = computed(() => findingRows(findings.value))
 // DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
 // DAR-UI-081 (Aditi: "removed 'held by' and just put item fulfillment status"): a line held by the order's stuck line reads
 // as its own item's status in HotWax (Completed); the stuck line keeps its cause (Backordered).
@@ -587,8 +591,8 @@ function sameText(a: string, b: string): boolean {
   return norm(a) === norm(b)
 }
 
-// Findings under a statement mostly share a conclusion; causeGroups puts them together, so it is said once above them.
-const rests = computed(() => findings.value.map(causeHeading))
+// Findings under a statement mostly share a conclusion; findingRows puts them together, so it is said once above them.
+const rests = computed(() => rows.value.map((row) => row.cause))
 function groupLabel(index: number): string {
   const rest = rests.value[index] ?? ''
   return rest && (index === 0 || rest !== rests.value[index - 1]) ? rest : ''
@@ -601,10 +605,10 @@ function groupKey(index: number): string {
   return `${props.statement}|${rests.value[index] ?? ''}`
 }
 function groupFolded(index: number): boolean {
-  return findings.value[index]?.kind !== 'order' && Boolean(rests.value[index]) && !opened.value.has(groupKey(index))
+  return Boolean(rests.value[index]) && !opened.value.has(groupKey(index))
 }
 function groupSize(index: number): number {
-  return findings.value.filter((item, i) => item.kind !== 'order' && rests.value[i] === rests.value[index]).length
+  return rests.value.filter((rest) => rest === rests.value[index]).length
 }
 function toggleGroup(index: number): void {
   const next = new Set(opened.value)
