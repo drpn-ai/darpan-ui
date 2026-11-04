@@ -94,7 +94,7 @@
               </svg>
             </button>
           </div>
-          <div v-if="showRules(row) || showConclusions(row)" class="audit-check-link-row audit-check-link-row--detail">
+          <div v-if="showRules(row)" class="audit-check-link-row audit-check-link-row--detail">
             <WorkflowSelect
               v-if="showRules(row)"
               :model-value="row.ruleIds"
@@ -104,17 +104,6 @@
               aria-label="Rules"
               multiple
               :test-id="`audit-check-rules-${index}`"
-              :disabled="busy"
-            />
-            <WorkflowSelect
-              v-if="showConclusions(row)"
-              :model-value="row.conclusionCodes"
-              @update:model-value="row.conclusionCodes = asList($event)"
-              :options="conclusionOptions"
-              placeholder="Any conclusion"
-              aria-label="Conclusions"
-              multiple
-              :test-id="`audit-check-conclusions-${index}`"
               :disabled="busy"
             />
           </div>
@@ -132,6 +121,21 @@
             <path :d="plusIconPath" fill="currentColor" />
           </svg>
         </button>
+      </div>
+
+      <!-- DAR-BE-196: an expected cause is the run's (its rules), so no statement counts it; Unexplained always counts. -->
+      <div v-if="conclusionOptions.length" class="audit-check-group">
+        <span class="workflow-context-label">Expected causes</span>
+        <WorkflowSelect
+          :model-value="expectedCodes"
+          @update:model-value="expectedCodes = asList($event)"
+          :options="conclusionOptions"
+          placeholder="None"
+          aria-label="Expected causes"
+          multiple
+          test-id="audit-check-expected"
+          :disabled="busy"
+        />
       </div>
 
       <div :class="['workflow-form-grid', { 'workflow-form-grid--two': !isEvaluate }]">
@@ -307,7 +311,6 @@ interface LinkRow {
   key: number
   id: string
   diffTypes: string[]
-  conclusionCodes: string[]
   ruleIds: string[]
 }
 
@@ -343,6 +346,8 @@ function emptyForm(): CheckForm {
 const options = ref<AuditCheckOptions | null>(null)
 const form = reactive<CheckForm>(emptyForm())
 const links = ref<LinkRow[]>([])
+// DAR-BE-196: the picked run's causes that no statement counts.
+const expectedCodes = ref<string[]>([])
 const idEdited = ref(false)
 const moneyOpen = ref(false)
 const loading = ref(false)
@@ -412,10 +417,6 @@ function showRules(row: LinkRow): boolean {
   return ruleOptions.value.length > 0 && row.diffTypes.includes('FIELD_MISMATCH')
 }
 
-function showConclusions(row: LinkRow): boolean {
-  return conclusionOptions.value.length > 0
-    && row.diffTypes.some((type) => type === 'FINDING' || type === 'MISSING_IN_FILE_1' || type === 'MISSING_IN_FILE_2')
-}
 
 function toCode(label: string): string {
   return label
@@ -448,7 +449,6 @@ function makeLink(link?: Partial<AuditCheckStatementLink>): LinkRow {
     key: nextKey,
     id: link?.id ?? '',
     diffTypes: [...(link?.diffTypes ?? [])],
-    conclusionCodes: [...(link?.conclusionCodes ?? [])],
     ruleIds: [...(link?.ruleIds ?? [])],
   }
 }
@@ -462,7 +462,7 @@ function removeLink(index: number): void {
   if (links.value.length > 1) links.value.splice(index, 1)
 }
 
-/** A new run keeps only the row types, rules and conclusions it can produce. */
+/** A new run keeps only the row types and rules it can produce, and shows the causes it already treats as expected. */
 function selectRun(savedRunId: string): void {
   form.savedRunId = savedRunId
   // DAR-UI-078: what the run already says fills what is still empty; nothing typed is overwritten.
@@ -474,12 +474,11 @@ function selectRun(savedRunId: string): void {
   }
   const allowed = new Set<string>(allowedDiffTypes.value)
   const rules = new Set(ruleOptions.value.map((option) => option.value))
-  const conclusions = new Set(conclusionOptions.value.map((option) => option.value))
   for (const row of links.value) {
     row.diffTypes = row.diffTypes.filter((type) => allowed.has(type))
     row.ruleIds = row.ruleIds.filter((id) => rules.has(id))
-    row.conclusionCodes = row.conclusionCodes.filter((code) => conclusions.has(code))
   }
+  expectedCodes.value = (picked?.conclusions ?? []).filter((item) => item.expected).map((item) => item.code)
 }
 
 function asList(value: string | string[]): string[] {
@@ -509,6 +508,7 @@ async function load(): Promise<void> {
   idEdited.value = false
   moneyOpen.value = false
   links.value = []
+  expectedCodes.value = []
   try {
     const optionsResponse = await auditCheckFacade.getOptions(props.audit, signal)
     if (!optionsResponse.options) {
@@ -547,6 +547,8 @@ function draft(): AuditCheckDraft {
     headlineTemplate: orNull(form.headlineTemplate) ?? orNull(defaultHeadline.value),
     fixActionTemplate: orNull(form.fixActionTemplate),
     passesWhenTemplate: orNull(form.passesWhenTemplate),
+    // DAR-BE-196: sent only when the run has causes to choose from; the backend writes them on the run's rules.
+    ...(conclusionOptions.value.length ? { expectedCodes: [...expectedCodes.value] } : {}),
     // A new check may not take over a code another audit already uses; the backend refuses it (DAR-UI-064).
     create: true,
   }
@@ -559,7 +561,6 @@ function statementLinks(): AuditCheckStatementLink[] {
     .map((row) => ({
       id: row.id,
       diffTypes: [...row.diffTypes] as AuditDiffType[],
-      conclusionCodes: showConclusions(row) ? [...row.conclusionCodes] : [],
       ruleIds: showRules(row) ? [...row.ruleIds] : [],
     }))
 }

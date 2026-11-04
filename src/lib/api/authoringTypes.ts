@@ -152,12 +152,11 @@ export type AuditDiffType =
   | 'DUPLICATE_IN_FILE_1'
   | 'DUPLICATE_IN_FILE_2'
 
-/** Which of the run's rows break one statement: blank lists = any. */
+/** Which of the run's rows break one statement: blank lists = any; a row whose cause is expected never does (DAR-BE-196). */
 export interface AuditCheckStatementLink {
   /** The statement's code, e.g. R4. */
   id: string
   diffTypes: AuditDiffType[]
-  conclusionCodes: string[]
   ruleIds: string[]
 }
 
@@ -181,6 +180,8 @@ export interface AuditCheckDraft {
   headlineTemplate?: string | null
   fixActionTemplate?: string | null
   passesWhenTemplate?: string | null
+  /** DAR-BE-196. The run's causes that are expected (no statement counts them); left out, the run's stay as they are. */
+  expectedCodes?: string[]
 }
 
 export interface AuditCheckDetail extends AuditCheckDraft {
@@ -196,7 +197,8 @@ export interface AuditCheckOptions {
     runName: string
     scopeMode: string
     rules: Array<{ ruleId: string; ruleText: string }>
-    conclusions: Array<{ code: string; label: string }>
+    /** DAR-BE-196: expected = the run treats the cause as expected. */
+    conclusions: Array<{ code: string; label: string; expected?: boolean }>
     /** DAR-UI-078. The run's object as a finding's record type (return, order), and each side's root system and key. */
     recordType?: string | null
     sides?: Array<{ side: 'FILE_1' | 'FILE_2'; system: string; key: string }>

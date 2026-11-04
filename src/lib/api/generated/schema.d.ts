@@ -1049,11 +1049,19 @@ export interface components {
              *                     sealed to which key. Without it no credential is read.
              */
             secretsPublicKey?: string;
+            /**
+             * @description DAR-BE-188. True also sends
+             *                     every lifecycle, the automations of the runs and lifecycles sent, and the chat spaces those automations post
+             *                     to (their webhooks sealed with the credentials, never in clear). Automations an import creates start paused.
+             *                     False (the default) sends exactly what it always has.
+             */
+            includeAutomations?: boolean;
         };
         ExportConfigBundleResult: {
             /**
              * @description {bundleVersion, source, connections, queries, conclusionCodes,
-             *                     runs, audits, statements, checks}; consumed unchanged by import#ConfigBundle.
+             *                     runs, audits, statements, checks}, plus lifecycles, chatSpaces and automations with includeAutomations;
+             *                     consumed unchanged by import#ConfigBundle.
              */
             bundle?: Record<string, never>;
         };
@@ -1943,8 +1951,9 @@ export interface components {
             audit: string;
             check: Record<string, never>;
             /**
-             * @description [{id: statement code, diffTypes, conclusionCodes,
-             *                     ruleIds}], at least one (refused in words when empty).
+             * @description [{id: statement code, diffTypes, ruleIds}], at least one
+             *                     (refused in words when empty). DAR-BE-196: no statement counts a cause the run marks expected; check.expectedCodes
+             *                     (when given) sets which of the run's causes those are.
              */
             statements?: unknown[];
         };
@@ -2836,7 +2845,7 @@ export interface components {
             ok?: boolean;
             /** @description Informational messages. */
             messages?: string[];
-            /** @description Why it was refused: expired, already answered, or a CLI session. */
+            /** @description Why it was refused: expired, already answered, a CLI session, or the CLI is not turned on for this account. */
             errors?: string[];
         };
         /** @description JSON-RPC request envelope for facade.CliAuthFacadeServices.approve#CliLogin */

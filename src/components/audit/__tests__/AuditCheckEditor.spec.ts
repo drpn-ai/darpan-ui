@@ -32,8 +32,8 @@ const options: AuditCheckOptions = {
         { ruleId: 'r2', ruleText: 'Dates agree' },
       ],
       conclusions: [
-        { code: 'C1', label: 'Not yet credited' },
-        { code: 'C2', label: 'Credited elsewhere' },
+        { code: 'C1', label: 'Not yet credited', expected: false },
+        { code: 'C2', label: 'Credited elsewhere', expected: true },
       ],
     },
     {
@@ -46,7 +46,7 @@ const options: AuditCheckOptions = {
         { side: 'FILE_2', system: 'OMS', key: 'externalId' },
       ],
       rules: [{ ruleId: 'r2', ruleText: 'Dates agree' }],
-      conclusions: [{ code: 'C2', label: 'Credited elsewhere' }],
+      conclusions: [{ code: 'C2', label: 'Credited elsewhere', expected: false }],
     },
     {
       savedRunId: 'RUN_E',
@@ -79,9 +79,10 @@ const stored: AuditCheckDetail = {
   passesWhenTemplate: 'Every return has a credit',
   automationId: null,
   statements: [
-    { id: 'R4', diffTypes: ['MISSING_IN_FILE_2'], conclusionCodes: ['C1'], ruleIds: [] },
-    { id: 'R5', diffTypes: ['FIELD_MISMATCH'], conclusionCodes: [], ruleIds: ['r1'] },
+    { id: 'R4', diffTypes: ['MISSING_IN_FILE_2'], ruleIds: [] },
+    { id: 'R5', diffTypes: ['FIELD_MISMATCH'], ruleIds: ['r1'] },
   ],
+  expectedCodes: ['C2'],
 }
 
 function ok<T extends object>(body: T) {
@@ -177,7 +178,7 @@ describe('AuditCheckEditor', () => {
     expect(await optionValues(w, 'audit-check-diff-types-0')).toEqual(['FINDING', 'DUPLICATE_IN_FILE_1'])
   })
 
-  it('drops rule, conclusion and row-type picks the new run cannot produce', async () => {
+  it('drops rule and row-type picks the new run cannot produce, and shows each run\'s own expected causes', async () => {
     saveCheck.mockResolvedValue(ok({ savedCheck: stored }))
     const w = await mountEditor()
     await trigger(w, 'audit-check-label').setValue('Returns credited twice')
@@ -188,21 +189,21 @@ describe('AuditCheckEditor', () => {
     await pick(w, 'audit-check-diff-types-0', 'DUPLICATE_IN_FILE_2')
     await pick(w, 'audit-check-rules-0', 'r1')
     await pick(w, 'audit-check-rules-0', 'r2')
-    await pick(w, 'audit-check-conclusions-0', 'C1')
-    await pick(w, 'audit-check-conclusions-0', 'C2')
+    await pick(w, 'audit-check-expected', 'C1')
 
     await pick(w, 'audit-check-run', 'RUN_C')
     await trigger(w, 'audit-check-save').trigger('click')
     await flushPromises()
     expect(saveCheck.mock.calls[0]?.[2]).toEqual([
-      { id: 'R4', diffTypes: ['FIELD_MISMATCH', 'FINDING', 'DUPLICATE_IN_FILE_2'], conclusionCodes: ['C2'], ruleIds: ['r2'] },
+      { id: 'R4', diffTypes: ['FIELD_MISMATCH', 'FINDING', 'DUPLICATE_IN_FILE_2'], ruleIds: ['r2'] },
     ])
+    expect(saveCheck.mock.calls[0]?.[1].expectedCodes).toEqual([])
 
     await pick(w, 'audit-check-run', 'RUN_E')
     expect(w.find('[data-testid="audit-check-rules-0"]').exists()).toBe(false)
     await trigger(w, 'audit-check-save').trigger('click')
     await flushPromises()
-    expect(saveCheck.mock.calls[1]?.[2]).toEqual([{ id: 'R4', diffTypes: ['FINDING'], conclusionCodes: [], ruleIds: [] }])
+    expect(saveCheck.mock.calls[1]?.[2]).toEqual([{ id: 'R4', diffTypes: ['FINDING'], ruleIds: [] }])
   })
 
   it('saves the check and its statement links in the service shape', async () => {
@@ -212,7 +213,7 @@ describe('AuditCheckEditor', () => {
     await pick(w, 'audit-check-run', 'RUN_A')
     await trigger(w, 'audit-check-label').setValue('Returns credited in NetSuite')
     await pick(w, 'audit-check-diff-types-0', 'MISSING_IN_FILE_2')
-    await pick(w, 'audit-check-conclusions-0', 'C1')
+    await pick(w, 'audit-check-expected', 'C1')
     await trigger(w, 'audit-check-add-link').trigger('click')
     await pick(w, 'audit-check-statement-1', 'R6')
     await pick(w, 'audit-check-diff-types-1', 'FIELD_MISMATCH')
@@ -253,11 +254,12 @@ describe('AuditCheckEditor', () => {
         headlineTemplate: 'Return {returnId} has no credit',
         fixActionTemplate: 'Credit {returnId}',
         passesWhenTemplate: null,
+        expectedCodes: ['C2', 'C1'],
         create: true,
       },
       [
-        { id: 'R4', diffTypes: ['MISSING_IN_FILE_2'], conclusionCodes: ['C1'], ruleIds: [] },
-        { id: 'R6', diffTypes: ['FIELD_MISMATCH'], conclusionCodes: [], ruleIds: ['r2'] },
+        { id: 'R4', diffTypes: ['MISSING_IN_FILE_2'], ruleIds: [] },
+        { id: 'R6', diffTypes: ['FIELD_MISMATCH'], ruleIds: ['r2'] },
       ],
     )
     expect(w.emitted('saved')).toEqual([[stored]])
