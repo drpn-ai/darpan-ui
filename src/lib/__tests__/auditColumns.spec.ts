@@ -10,7 +10,7 @@ import {
   causeGroups,
   findingRows,
   orderCauses,
-  rowLinesLabel,
+  rowAlsoLabel,
   causeHeading,
   checkGroups,
   comparedBars,
@@ -300,28 +300,40 @@ describe('auditColumns', () => {
   })
 
   // DAR-UI-098 (Aditi: "order findings in a few named categories"). gorjana R1 2026-11-01: 14 orders read only "Order M…: N
-  // lines" with no cause of their own, while every line had one. An order sits under each of its lines' own causes (a line held
-  // by another's cause adds none), with how many of its lines it covers; an order whose lines name none keeps its own cause.
-  it('puts an order under each of its lines\' own causes, counting its lines, and never in a no-cause bucket', () => {
+  // lines" with no cause of their own, while every line had one. An order's causes are its lines' own causes (a line held by
+  // another's cause adds none); an order whose lines name none keeps its own cause, so there is never a no-cause bucket.
+  // 2026-11-04 (Aditi, prod R1: "the numbers dont add up here", FINDINGS 79 against headings 54 + 50 + 1; "the 3 of 4 is also
+  // confusing"): an order sits under ONE heading — its stuck line's cause, else the cause on most of its lines, a tie to the
+  // first line — so the headings sum to the findings; its row names only its other causes.
+  it('puts an order under one heading, its stuck line\'s cause else its most lines\', and names its other causes on its row', () => {
     const line = (id: string, cause: string | null, held = false) => ({ id, headline: '', state: 'pending', firstFound: '', ageDays: 0,
       difference: null, next: '', records: {}, cause, held }) as NonNullable<AuditFindingListItem['lines']>[number]
-    const order = (id: string, lines: ReturnType<typeof line>[], cause: string | null = null, headline = `Order ${id}: ${lines.length} lines`) =>
+    const order = (id: string, lines: ReturnType<typeof line>[], cause: string | null = null, stuck: string[] = [],
+      headline = `Order ${id}: ${lines.length} lines`) =>
       ({ id, kind: 'order', order: id, headline, state: 'pending', firstFound: '', ageDays: 0, difference: null, next: '', records: {},
-        statement: 'R1', category: 'orders', cause, stuck: [], lines }) as AuditFindingListItem
+        statement: 'R1', category: 'orders', cause, stuck, lines }) as AuditFindingListItem
     const shipped = 'Shipped, not billed'
     const mixed = order('M1211771', [line('F-1', shipped), line('F-2', shipped), line('F-3', 'Backordered'), line('F-4', shipped)])
+    const stuckFirst = order('M1211800', [line('F-a', shipped), line('F-b', shipped), line('F-c', 'Backordered')], null, ['F-c'])
+    const tie = order('M1211900', [line('F-d', 'Backordered'), line('F-e', shipped)])
     const held = order('M1168785', [line('F-5', 'Backordered'), line('F-6', 'Shipped, not billed: another line is backordered', true)], 'Backordered')
-    const bare = order('M77', [line('F-7', null)], null, 'Order M77: line 1 is completed in HotWax and not billed in NetSuite')
+    const bare = order('M77', [line('F-7', null)], null, [], 'Order M77: line 1 is completed in HotWax and not billed in NetSuite')
     const ret = { id: 'F-9', headline: 'Return M9: No RMA', cause: null } as AuditFindingListItem
     expect(orderCauses(mixed)).toEqual([{ cause: shipped, lines: 3 }, { cause: 'Backordered', lines: 1 }])
+    expect(orderCauses(stuckFirst)).toEqual([{ cause: 'Backordered', lines: 1 }, { cause: shipped, lines: 2 }])
+    expect(orderCauses(tie)).toEqual([{ cause: 'Backordered', lines: 1 }, { cause: shipped, lines: 1 }])
     expect(orderCauses(held)).toEqual([{ cause: 'Backordered', lines: 1 }])
     expect(orderCauses(bare)).toEqual([{ cause: 'line 1 is completed in HotWax and not billed in NetSuite', lines: 1 }])
-    const rows = findingRows([mixed, ret, held, bare])
-    expect(rows.map((r) => `${r.cause} · ${r.item.id}`)).toEqual([`${shipped} · M1211771`, 'Backordered · M1211771', 'Backordered · M1168785',
-      'No RMA · F-9', 'line 1 is completed in HotWax and not billed in NetSuite · M77'])
-    expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length)
-    expect(rows.map(rowLinesLabel)).toEqual(['3 of 4 lines', '1 of 4 lines', '1 of 2 lines', '', ''])
-    expect(rowLinesLabel(findingRows([order('M2', [line('F-a', shipped), line('F-b', shipped)])])[0]!)).toBe('2 lines')
+    const items = [mixed, ret, held, stuckFirst, tie, bare]
+    const rows = findingRows(items)
+    expect(rows.map((r) => `${r.cause} · ${r.item.id}`)).toEqual([`${shipped} · M1211771`, 'No RMA · F-9', 'Backordered · M1168785',
+      'Backordered · M1211800', 'Backordered · M1211900', 'line 1 is completed in HotWax and not billed in NetSuite · M77'])
+    // Every finding once, so the headings sum to the findings column's count.
+    expect(rows.map((r) => r.item.id)).toEqual(['M1211771', 'F-9', 'M1168785', 'M1211800', 'M1211900', 'M77'])
+    expect(rows.map(rowAlsoLabel)).toEqual(['Also Backordered · 1 line', '', '', `Also ${shipped} · 2 lines`, `Also ${shipped} · 1 line`, ''])
+    // The toolbar's cause filter heads an order by the cause picked, so it never shows under another heading.
+    expect(findingRows([mixed, stuckFirst], 'Backordered').map((r) => `${r.cause} · ${r.item.id} · ${rowAlsoLabel(r)}`))
+      .toEqual([`Backordered · M1211771 · Also ${shipped} · 3 lines`, `Backordered · M1211800 · Also ${shipped} · 2 lines`])
   })
 
   // A finding written before its cause was renamed heads by the cause's new words, beside one written after.

@@ -394,47 +394,48 @@ export function causeGroups<T extends AuditFindingSummary>(items: T[]): T[] {
   return [...groups.values()].flat()
 }
 
-/** DAR-UI-098. One row of the findings column: a finding under one cause; an order under each of its lines' causes. */
+/** DAR-UI-098. One row of the findings column: a finding under its one cause heading. */
 export interface FindingRow<T extends AuditFindingSummary = AuditFindingSummary> {
   item: T
   /** The cause heading this row sits under. */
   cause: string
-  /** The order's lines under this cause, and all its lines (0 for a finding that is not an order). */
-  lines: number
-  ofLines: number
+  /** An order's other causes, with how many of its lines each covers (none for a finding that is not an order). */
+  also: { cause: string; lines: number }[]
   key: string
 }
 
 // DAR-UI-098 (Aditi: "order findings in a few named categories, so 3,000 R1 findings read at a glance"). An order's causes
 // are its lines' own causes (a line held by another one's cause is not a cause of its own), each with how many of its lines
 // it covers; an order whose lines name none falls back to its own cause, then what its headline says. Never a "no cause".
+// The heading cause comes first: the stuck line's (what holds the order up), else the one on most lines, a tie to the first.
 export function orderCauses(item: AuditFindingSummary): { cause: string; lines: number }[] {
   const lines = item.kind === 'order' ? (item.lines ?? []) : []
   const own = lines.filter((line) => !line.held && line.cause)
   const counts = new Map<string, number>()
   ;(own.length ? own : lines.filter((line) => line.cause)).forEach((line) => counts.set(line.cause!, (counts.get(line.cause!) ?? 0) + 1))
   if (!counts.size) return [{ cause: causeHeading(item), lines: lines.length }]
+  const stuck = lines.find((line) => item.stuck?.includes(line.id) && line.cause && counts.has(line.cause))?.cause
   return [...counts].map(([cause, n]) => ({ cause, lines: n }))
+    .sort((a, b) => Number(b.cause === stuck) - Number(a.cause === stuck) || b.lines - a.lines)
 }
 
 // DAR-UI-098. The findings column as rows under cause headings: causes in the order their first finding came, findings in
-// their own order within a cause, an order once under each of its causes.
-export function findingRows<T extends AuditFindingSummary>(items: T[]): FindingRow<T>[] {
+// their own order within a cause. 2026-11-04 (Aditi: "the numbers dont add up here"): each finding once, under its heading
+// cause, or under the toolbar's picked cause when it has that one, so the headings sum to the column's count.
+export function findingRows<T extends AuditFindingSummary>(items: T[], picked = ''): FindingRow<T>[] {
   const groups = new Map<string, FindingRow<T>[]>()
   items.forEach((item) => {
-    const ofLines = item.kind === 'order' ? (item.lines?.length ?? 0) : 0
-    orderCauses(item).forEach(({ cause, lines }) => {
-      const row = { item, cause, lines: item.kind === 'order' ? lines : 0, ofLines, key: `${cause}|${item.id}` }
-      groups.set(cause, [...(groups.get(cause) ?? []), row])
-    })
+    const causes = orderCauses(item)
+    const head = causes.find((c) => c.cause === picked) ?? causes[0]!
+    const row = { item, cause: head.cause, also: item.kind === 'order' ? causes.filter((c) => c !== head) : [], key: item.id }
+    groups.set(head.cause, [...(groups.get(head.cause) ?? []), row])
   })
   return [...groups.values()].flat()
 }
 
-// DAR-UI-098. What an order's row says under its cause: how many of its lines it covers, when it has more than one.
-export function rowLinesLabel(row: FindingRow): string {
-  if (row.ofLines <= 1) return ''
-  return row.lines === row.ofLines ? `${row.ofLines} lines` : `${row.lines} of ${row.ofLines} lines`
+// DAR-UI-098. What an order's row says under its heading: its other causes only (Aditi: "the 3 of 4 is also confusing").
+export function rowAlsoLabel(row: FindingRow): string {
+  return row.also.map(({ cause, lines }) => `Also ${cause} · ${lines} ${lines === 1 ? 'line' : 'lines'}`).join('; ')
 }
 
 // DAR-UI-072. The order a finding is about, as a person searches it: HotWax's order (an item's id before its "/"),

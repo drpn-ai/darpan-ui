@@ -209,9 +209,9 @@
                 <span class="audit-finding-subject">{{ splitHeadline(item.headline).subject }}</span>
                 <span class="audit-row-sub" :class="{ 'audit-hot': item.state === 'open' }">{{ findingStateBadge(item.state).label }} · {{ ageShort(item.ageDays) }}</span>
               </span>
-              <!-- DAR-UI-075. An order: what holds it up, under its name. DAR-UI-098: its heading says the cause, so the row says
-                   how many of the order's lines it covers. -->
-              <span v-if="item.kind === 'order' && rowLinesLabel(rows[index]!)" class="audit-row-sub" data-testid="audit-finding-lines">{{ rowLinesLabel(rows[index]!) }}</span>
+              <!-- DAR-UI-075. An order: what holds it up, under its name. DAR-UI-098: its heading says the cause, so the row names
+                   only the order's other causes. -->
+              <span v-if="rowAlsoLabel(rows[index]!)" class="audit-row-sub" data-testid="audit-finding-also">{{ rowAlsoLabel(rows[index]!) }}</span>
               <span class="sr-only">{{ item.id }}</span>
             </button>
           </template>
@@ -470,7 +470,7 @@ import {
   sourceItems,
   statementFindings,
   findingRows,
-  rowLinesLabel,
+  rowAlsoLabel,
   statementItems,
   type AuditFilter,
   type CheckRow,
@@ -496,6 +496,8 @@ const props = defineProps<{
   exporting: boolean
   /** DAR-UI-073. What the toolbar's filters left of the period's findings; null when none is on. */
   narrowed?: AuditFindingListItem[] | null
+  /** DAR-UI-098. The toolbar's picked cause: an order with it sits under that heading. */
+  cause?: string
   /** DAR-UI-075. The order open in the detail; findingDoc is then its stuck line's (its fix and history). */
   orderUnit?: AuditFindingSummary | null
   verifying: boolean
@@ -561,7 +563,7 @@ const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statem
 const findings = computed(() => props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
   : statementFindings(statementDoc.value, props.more.findings, props.filter))
 // DAR-UI-098. The column's rows: every finding under its cause, an order under each of its lines' causes.
-const rows = computed(() => findingRows(findings.value))
+const rows = computed(() => findingRows(findings.value, props.cause))
 // DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
 // DAR-UI-081 (Aditi: "removed 'held by' and just put item fulfillment status"): a line held by the order's stuck line reads
 // as its own item's status in HotWax (Completed); the stuck line keeps its cause (Backordered).

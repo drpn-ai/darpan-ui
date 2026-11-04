@@ -123,6 +123,7 @@
         :more="more"
         :exporting="exporting"
         :narrowed="narrowed"
+        :cause="findingFilters.cause"
         :order-unit="orderUnit"
         :verifying="verifying"
         :progress="progress"

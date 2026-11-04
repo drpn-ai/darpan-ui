@@ -7405,11 +7405,14 @@ export interface components {
             result: components["schemas"]["GetRunConclusionsResult"];
         };
         /**
-         * @description Replaces a run's conclusion tree: [{key, parent, conclusion, bucket, question, conditions: [{subject,
-         *                 presence, keyScope, quantifier, field, operator, values, checkLabel}]}]. All or nothing; an empty list clears it.
+         * @description Replaces a run's conclusion tree: [{key, parent, conclusion, bucket, question, outcome, engine,
+         *                 suggestedFilterJson, conditions: [{subject, presence, keyScope, quantifier, field, operator, values, checkLabel}]}].
+         *                 All or nothing; an empty list clears it, absent keeps it (DAR-BE-198: lookups can be set alone). A node that does not
+         *                 name outcome (HIDE, EXPECTED), engine (BRAIN) or suggestedFilterJson keeps its rule's: same key, same conclusion.
          */
         SaveRunConclusionsParams: {
             savedRunId: string;
+            /** @description The tree; absent keeps it. */
             conclusions?: unknown[];
             /**
              * @description DAR-BE-174. The run's lookups, replaced when given (an empty
