@@ -7432,6 +7432,11 @@ export interface components {
             /** @description The tree; absent keeps it. */
             conclusions?: unknown[];
             /**
+             * @description DAR-BE-198 (b). EXPECTED: the run's Unexplained rows are expected
+             *                     (no statement counts them); COUNTS: they count, as by default. Absent keeps it; nothing else of the run changes.
+             */
+            unexplainedOutcome?: string;
+            /**
              * @description DAR-BE-174. The run's lookups, replaced when given (an empty
              *                     list clears them, absent keeps them): [{name, subject FILE_1|FILE_2, idField, systemEnumId, sourceConfigId,
              *                     keyField, many (every record under the key, as a list), parameters}]. A condition reads one as
