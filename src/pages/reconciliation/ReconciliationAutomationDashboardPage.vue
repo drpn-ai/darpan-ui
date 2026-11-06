@@ -79,7 +79,7 @@
                 <RouterLink
                   v-if="automation.audit"
                   :to="`/audits/${automation.audit.code}/settings`"
-                  class="automation-dashboard-run-link"
+                  class="automation-dashboard-audit-link"
                   data-testid="automation-audit-schedule"
                 >
                   Set by audit {{ automation.audit.name }}
@@ -916,6 +916,13 @@ onMounted(() => {
 
 .automation-dashboard-date-text {
   white-space: nowrap;
+}
+
+/* DAR-BE-199: under the schedule, on its own line, at the note size. */
+.automation-dashboard-audit-link {
+  display: block;
+  color: var(--text);
+  font-size: var(--type-note-size);
 }
 
 .automation-dashboard-detail-grid {
