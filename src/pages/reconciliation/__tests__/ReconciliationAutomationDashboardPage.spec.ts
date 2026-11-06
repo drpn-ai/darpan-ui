@@ -465,6 +465,35 @@ describe('ReconciliationAutomationDashboardPage', () => {
       expect(pauseAutomation).not.toHaveBeenCalled()
     })
 
+    it('leaves an audit check\'s schedule to its audit: switch off, schedule links to the audit settings (DAR-BE-199)', async () => {
+      const row = mockAutomation(true)
+      getAutomation.mockResolvedValue({
+        ok: true,
+        messages: [],
+        errors: [],
+        automation: {
+          ...row,
+          audit: { code: 'month-close', name: 'Month close' },
+          permissions: { ...row.permissions, canPause: false, canResume: false },
+        },
+      })
+
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('disabled')).toBeDefined()
+      const link = wrapper.get('[data-testid="automation-audit-schedule"]')
+      expect(link.attributes('data-to')).toBe('/audits/month-close/settings')
+      expect(link.text()).toBe('Set by audit Month close')
+    })
+
+    it('shows no audit link for an automation of its own', async () => {
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="automation-audit-schedule"]').exists()).toBe(false)
+    })
+
     it('disables the switch for a view-only tenant', async () => {
       permissions.canEditTenantSettings = false
 

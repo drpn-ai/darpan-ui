@@ -73,7 +73,18 @@
               <!-- Schedule and Window get confused for each other constantly: one is
                    when the run happens, the other is which records it reaches. -->
               <dt class="micro-label" v-explain="'automationSchedule'">Schedule</dt>
-              <dd>{{ scheduleLabel }}</dd>
+              <dd>
+                {{ scheduleLabel }}
+                <!-- DAR-BE-199: an audit's check runs when the audit runs; its schedule is set there. -->
+                <RouterLink
+                  v-if="automation.audit"
+                  :to="`/audits/${automation.audit.code}/settings`"
+                  class="automation-dashboard-run-link"
+                  data-testid="automation-audit-schedule"
+                >
+                  Set by audit {{ automation.audit.name }}
+                </RouterLink>
+              </dd>
             </div>
             <div class="automation-dashboard-detail-item">
               <dt class="micro-label" v-explain="'automationWindow'">Window</dt>

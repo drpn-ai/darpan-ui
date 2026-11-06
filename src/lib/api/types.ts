@@ -666,6 +666,9 @@ export interface AutomationRecord {
   chatSpaceActive?: boolean
   executionCount?: number
   lastExecution?: AutomationExecutionSummary | null
+  // DAR-BE-199: the audit whose checks run through this automation. It runs on that audit's schedule and is never
+  // paused or resumed by itself (permissions.canPause/canResume are false).
+  audit?: { code: string; name: string }
   permissions?: AutomationPermissions
   sources?: AutomationSourceRecord[]
   createdDate?: string

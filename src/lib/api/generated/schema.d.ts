@@ -1778,8 +1778,8 @@ export interface components {
             result: components["schemas"]["GetAuditReportResult"];
         };
         /**
-         * @description An audit's settings: its name, the daily schedule its checks run on, and each statement with its
-         *                 checks and the run each check reads.
+         * @description An audit's settings: its name, its daily schedule (the audit's own, DAR-BE-199: every check runs on
+         *                 it), and each statement with its checks and the run each check reads.
          */
         GetAuditSettingsParams: {
             /** @description The audit's code. */
@@ -1792,8 +1792,8 @@ export interface components {
             /**
              * @description {audit: {id, name, period}, playableFrom: YYYY-MM-DD (the earliest
              *                     day play can record today), schedule: {active, time HH:mm,
-             *                     timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label,
-             *                     savedRunId, runName}]}]}
+             *                     timeZone, mixed (some check's automation is off the audit's schedule; saving puts it on), automations,
+             *                     checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label, savedRunId, runName}]}]}
              */
             settings?: Record<string, never>;
         };
@@ -1983,8 +1983,9 @@ export interface components {
             result: components["schemas"]["SaveAuditCheckResult"];
         };
         /**
-         * @description Changes an audit's name, statements (text, on/off) and the daily schedule of every check it runs. A check
-         *                 whose run has no automation gets one (paused) when the schedule is saved. Answers the settings as saved.
+         * @description Changes an audit's name, statements (text, on/off) and its daily schedule, which is the audit's own and
+         *                 is written to the automation of every check it runs (DAR-BE-199). A check whose run has no automation gets one,
+         *                 on that schedule, when the schedule is saved. Answers the settings as saved.
          */
         SaveAuditSettingsParams: {
             /** @description The audit's code. */
@@ -1993,7 +1994,10 @@ export interface components {
             name?: string;
             /** @description [{id, text, active}], only those that changed. */
             statements?: string[];
-            /** @description {active, time HH:mm, timeZone}; absent keeps it. */
+            /**
+             * @description {active, time HH:mm, timeZone}; absent keeps it, a field left out
+             *                     keeps its value.
+             */
             schedule?: Record<string, never>;
         };
         SaveAuditSettingsResult: {
@@ -4950,7 +4954,10 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetActiveRunResultResult"];
         };
-        /** @description Get one tenant-scoped automation with editable source rows and dashboard summary fields. */
+        /**
+         * @description Get one tenant-scoped automation with editable source rows and dashboard summary fields. An automation an
+         *                 audit's checks run through names it (audit: {code, name}, DAR-BE-199) and cannot be paused or resumed by itself.
+         */
         GetAutomationParams: {
             automationId: string;
         };
@@ -5927,7 +5934,10 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListSavedRunsResult"];
         };
-        /** @description Pause one tenant-scoped automation by setting isActive to N. */
+        /**
+         * @description Pause one tenant-scoped automation by setting isActive to N. Refused for an automation an audit's
+         *                 checks run through (DAR-BE-199): it runs on the audit's schedule, set in the audit's settings.
+         */
         PauseAutomationParams: {
             automationId: string;
         };
@@ -6104,7 +6114,10 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["RestoreSavedRunResult"];
         };
-        /** @description Resume one tenant-scoped automation by setting isActive to Y. */
+        /**
+         * @description Resume one tenant-scoped automation by setting isActive to Y. Refused for an automation an audit's
+         *                 checks run through (DAR-BE-199): it runs on the audit's schedule, set in the audit's settings.
+         */
         ResumeAutomationParams: {
             automationId: string;
         };
@@ -6422,7 +6435,11 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["RunSavedRunDiffResult"];
         };
-        /** @description Create or update a tenant-scoped automation against either an existing saved run or a newly-created saved run payload. */
+        /**
+         * @description Create or update a tenant-scoped automation against either an existing saved run or a newly-created saved run payload.
+         *                 An audit's automation keeps the audit's schedule: a change to its scheduleExpr, windowTimeZone or isActive is
+         *                 refused (DAR-BE-199).
+         */
         SaveAutomationParams: {
             automationId?: string;
             automationName: string;
