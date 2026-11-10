@@ -274,8 +274,8 @@ describe('AuditReportPage', () => {
       await flushPromises()
 
       const health = w.get('[data-testid="audit-category-health"]')
+      // Words only: "running" on the row, no animated mark (the design system allows no continuous motion).
       expect(health.text()).toContain('running · 1 of 1 checks')
-      expect(health.find('[data-testid="audit-health-running"]').exists()).toBe(true)
       // The statement's check says where it is instead of this morning's status.
       expect(w.get('[data-testid="audit-check-invoices-without-etail-id"]').text()).toContain('Running')
       expect(w.get('[data-testid="audit-check-running-invoices-without-etail-id"]').text()).toBe('Comparing records · 60% · 6m, usually 5m')
@@ -296,7 +296,7 @@ describe('AuditReportPage', () => {
       await flushPromises()
       expect(f.getAuditReport.mock.calls.length).toBe(reportReads + 1)
       expect(w.get('[data-testid="audit-category-health"]').text()).toContain('complete')
-      expect(w.find('[data-testid="audit-health-running"]').exists()).toBe(false)
+      expect(w.get('[data-testid="audit-category-health"]').text()).not.toContain('running')
       const progressReads = f.getAuditProgress.mock.calls.length
       await vi.advanceTimersByTimeAsync(60_000)
       expect(f.getAuditProgress.mock.calls.length).toBe(progressReads)

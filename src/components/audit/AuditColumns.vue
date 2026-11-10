@@ -42,7 +42,7 @@
           </template>
           <template v-else>
             <span class="audit-row-main">
-              <span>{{ item.label }}<span v-if="item.running" class="audit-live-dot" aria-hidden="true" data-testid="audit-health-running" /></span>
+              <span>{{ item.label }}</span>
               <span class="audit-row-sub">{{ item.sub }}</span>
             </span>
             <span class="audit-row-chevron" aria-hidden="true">›</span>
@@ -1468,23 +1468,7 @@ function statementText(id: string): string {
 }
 
 /* DAR-UI-085. A play in progress: muted text inside the usual solid 1px lines (dashed means empty in this design system,
-   and a running check is not empty), plus one small dot on Run health that breathes so the page reads as live. */
-.audit-live-dot {
-  display: inline-block;
-  width: var(--space-1);
-  height: var(--space-1);
-  margin-left: var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--text-muted);
-  vertical-align: middle;
-  animation: audit-live-breathe 1.6s ease-in-out infinite;
-}
-
-@keyframes audit-live-breathe {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 1; }
-}
-
+   and a running check is not empty). Run health says "running" in words; nothing on the page moves. */
 .audit-tag--running {
   color: var(--text-muted);
 }
@@ -1494,10 +1478,6 @@ function statementText(id: string): string {
   .audit-row,
   .audit-group-chevron {
     transition: none;
-  }
-
-  .audit-live-dot {
-    animation: none;
   }
 }
 </style>
