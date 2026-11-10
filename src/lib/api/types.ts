@@ -1212,6 +1212,8 @@ export interface MyCliAccess {
   state: CliAccessState
   thruDate?: ApiTimestamp | null
   lifetimeDays: number
+  /** The CLI is on for this person in some tenant (approve#CliLogin's own rule), whatever tenant is active. */
+  canUseCli?: boolean
   request?: CliAccessRequest | null
 }
 

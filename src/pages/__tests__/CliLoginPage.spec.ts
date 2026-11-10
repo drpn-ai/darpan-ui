@@ -16,7 +16,7 @@ vi.mock('../../lib/api/facade', () => ({
 import CliLoginPage from '../CliLoginPage.vue'
 import { ApiCallError } from '../../lib/api/client'
 
-const access = { tenantUserGroupId: 'ACME', tenantLabel: 'Acme', state: 'NOT_GRANTED', lifetimeDays: 7, request: null }
+const access = { tenantUserGroupId: 'ACME', tenantLabel: 'Acme', state: 'NOT_GRANTED', lifetimeDays: 7, canUseCli: false, request: null }
 const refused = new ApiCallError('The Darpan CLI is not turned on for this account. A Darpan admin turns it on.', 400)
 
 const pending = {
@@ -36,7 +36,7 @@ describe('CliLoginPage', () => {
     getCliLoginRequest.mockReset().mockResolvedValue(pending)
     approveCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
     denyCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
-    getMyCliAccess.mockReset().mockResolvedValue({ ok: true, access: { ...access, state: 'LIVE' } })
+    getMyCliAccess.mockReset().mockResolvedValue({ ok: true, access: { ...access, state: 'LIVE', canUseCli: true } })
     requestCliAccess.mockReset().mockResolvedValue({ ok: true, request: { requestId: 'R1', statusId: 'PENDING', requestedDate: '2026-11-10T09:30:00Z' } })
   })
 
@@ -177,5 +177,26 @@ describe('CliLoginPage', () => {
     await flushPromises()
     expect(requestCliAccess).toHaveBeenCalledWith('nightly audits')
     expect(wrapper.get('[data-testid="cli-access-pending"]').text()).toContain('A Darpan admin will turn it on.')
+  })
+
+  // Review I2: approve#CliLogin allows anyone with the CLI on in ANY tenant, so the active tenant's state alone cannot
+  // say why an approve failed; and deny never checks access.
+  it('an expired code says not found for a person with the CLI on in another tenant', async () => {
+    getMyCliAccess.mockResolvedValue({ ok: true, access: { ...access, canUseCli: true } })
+    const wrapper = mount(CliLoginPage)
+    await approveRefused(wrapper)
+    expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="cli-access-card"]').exists()).toBe(false)
+  })
+
+  it('a failed deny says not found and never reads access', async () => {
+    getMyCliAccess.mockResolvedValue({ ok: true, access })
+    denyCliLogin.mockRejectedValue(new ApiCallError('This sign-in request has expired or was already answered. Run darpan login again.', 400))
+    const wrapper = mount(CliLoginPage)
+    await typeCode(wrapper, 'BCDF-GH23')
+    await wrapper.get('[data-testid="cli-login-deny"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(true)
+    expect(getMyCliAccess).not.toHaveBeenCalled()
   })
 })

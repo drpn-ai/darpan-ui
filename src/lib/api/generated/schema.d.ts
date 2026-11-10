@@ -3556,7 +3556,7 @@ export interface components {
             messages?: string[];
             /** @description Errors. */
             errors?: string[];
-            /** @description tenantUserGroupId, tenantLabel, state, thruDate, lifetimeDays, request (requestId, statusId, reason, requestedDate, decidedDate, decisionNote) or null. Null with no active tenant. */
+            /** @description tenantUserGroupId, tenantLabel, state, thruDate, lifetimeDays, canUseCli (the CLI is on in some tenant: what approve#CliLogin checks), request (requestId, statusId, reason, requestedDate, decidedDate, decisionNote) or null. Null with no active tenant. */
             access?: Record<string, never>;
         };
         /** @description JSON-RPC request envelope for facade.CliAccessFacadeServices.get#MyCliAccess */

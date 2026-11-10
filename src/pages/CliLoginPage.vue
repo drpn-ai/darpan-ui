@@ -125,13 +125,14 @@ async function lookUp() {
 }
 
 // DAR-BE-209: an approve can fail because the code expired, or because the CLI is not turned on for this person. The
-// refusal text is not matched: the person's own CLI access says which, and a person without it is offered the request.
+// refusal text is not matched: approve#CliLogin's own rule (canUseCli: on in any tenant) says which, and a person
+// without the CLI is offered the request for the active tenant. A deny never checks access, so it never comes here.
 async function refused() {
   confirmedCode = ''
   try {
     const access = (await authFacade.getMyCliAccess(controller.signal)).access ?? null
     if (controller.signal.aborted) return
-    if (access && access.state !== 'LIVE' && access.state !== 'DARPAN_ADMIN') {
+    if (access && access.canUseCli === false) {
       myAccess.value = access
       phase.value = 'noaccess'
       return
@@ -140,6 +141,12 @@ async function refused() {
     // The access check failed too: fall back to the code message.
   }
   if (!controller.signal.aborted) phase.value = 'notfound'
+}
+
+async function failed(choice: 'approved' | 'denied') {
+  if (choice === 'approved') return refused()
+  confirmedCode = ''
+  phase.value = 'notfound'
 }
 
 async function answer(choice: 'approved' | 'denied') {
@@ -152,13 +159,13 @@ async function answer(choice: 'approved' | 'denied') {
       : await authFacade.denyCliLogin(payload, controller.signal)
     if (controller.signal.aborted) return
     if (!response.ok) {
-      await refused()
+      await failed(choice)
       return
     }
     outcome.value = choice
     phase.value = 'done'
   } catch {
-    if (!controller.signal.aborted) await refused()
+    if (!controller.signal.aborted) await failed(choice)
   } finally {
     busy.value = false
   }
