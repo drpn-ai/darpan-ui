@@ -152,6 +152,7 @@ describe('every button in the app has an answer', () => {
     'components/workflow/WorkflowDateRangeCalendar.vue': 'the start and end fields and each day cell are named by a date; the month arrows are entered',
     'pages/reconciliation/AuditReportPage.vue': 'a filter pill is named by its live count and its status label; Export report is entered',
     'pages/settings/TenantScriptsPage.vue': 'a saved-script tile is named by the script, which is this tenant\'s data; New script, Run and Delete are entered',
+    'pages/reconciliation/ReconciliationAutomationDashboardPage.vue': 'the running/paused toggle is named by activeToggleLabel — Automation is running / Automation is paused, both entered',
   }
 
   /**
@@ -262,6 +263,7 @@ describe('every button in the app has an answer', () => {
 
   it('answers the names those buttons carry at runtime, not just their template form', () => {
     expect(lookupAction('retry 3 not run')?.title).toBe('Retry not run')
+    expect(lookupAction('revoke aditis-macbook.local')?.title).toBe('Revoke')
     expect(lookupAction('export shopify extract')?.title).toBe('Export extract')
     expect(lookupAction('retry not running')).toBeNull()
   })
@@ -284,11 +286,84 @@ describe('every button in the app has an answer', () => {
         }
         for (const name of names) {
           if (!lookupAction(normalize(name))) unanswered.push(`${relative}: "${name}"`)
+          // And through the dock's own path: a registry hit is no proof if the recogniser
+          // normalises the name differently on the way in (DAR-UI-103 cut "source 1" to "source").
+          else if (!answersAtRuntime(name)) unanswered.push(`${relative}: "${name}" (in the registry, but the dock never reaches it)`)
         }
       }
     }
 
     expect(unanswered, `buttons with no answer:\n${unanswered.join('\n')}`).toEqual([])
+  })
+
+  /**
+   * DAR-UI-103. Save, Cancel and toggle are components that render a <button> named by their
+   * `label` prop, so the raw-tag sweep above never saw a caller's name: "Save deployment",
+   * "Save conclusions", "Revert" and "Run on schedule" were all dead while it stayed green.
+   */
+  /** What the dock does on hover: render the control and resolve it. */
+  function answersAtRuntime(name: string): boolean {
+    const host = document.createElement('div')
+    const button = document.createElement('button')
+    button.setAttribute('aria-label', name)
+    host.appendChild(button)
+    document.body.appendChild(host)
+    const answered = resolveExplainTarget(button) !== null
+    host.remove()
+    return answered
+  }
+
+  const WRAPPERS: Readonly<Record<string, string | null>> = { AppSaveAction: 'Save', AppCancelAction: 'Cancel', AppToggleSwitch: null }
+
+  function wrapperTags(source: string): { component: string, tag: string }[] {
+    const found: { component: string, tag: string }[] = []
+    for (const component of Object.keys(WRAPPERS)) {
+      for (let i = 0; ;) {
+        const start = source.indexOf(`<${component}`, i)
+        if (start === -1) break
+        let j = start + component.length + 1
+        let quote: string | null = null
+        while (j < source.length) {
+          const char = source[j] as string
+          if (quote) { if (char === quote) quote = null }
+          else if (char === '"' || char === "'") quote = char
+          else if (char === '>') break
+          j += 1
+        }
+        found.push({ component, tag: source.slice(start, j + 1) })
+        i = j + 1
+      }
+    }
+    return found
+  }
+
+  it('resolves every name a Save, Cancel or toggle component is given', () => {
+    const files = glob('src/**/*.vue', { ignore: ['**/__tests__/**', '**/.claude/**', '**/components/ui/App*.vue'] })
+    const unanswered: string[] = []
+    let swept = 0
+    for (const file of files) {
+      const relative = file.split('src/')[1] as string
+      const source = readFileSync(file, 'utf-8').match(/<template>([\s\S]*)<\/template>/)?.[1] ?? ''
+      for (const { component, tag } of wrapperTags(source)) {
+        swept += 1
+        const literal = tag.match(/(?<![\w:-])label="([^"]*)"/)?.[1]
+        const bound = tag.match(/(?<![\w-]):label="([^"]*)"/)?.[1]
+        let names: string[]
+        if (literal !== undefined) names = [literal]
+        else if (bound !== undefined) {
+          const { probes, rest } = probeTemplates(bound)
+          names = [...probes, ...quotedNames(rest)]
+          // A label bound to a script computed has no literal here; the caller must document it.
+          if (names.length === 0 && !COMPUTED_NAMES[relative]) unanswered.push(`${relative}: <${component}> whose label is computed and undocumented`)
+        } else names = WRAPPERS[component] ? [WRAPPERS[component] as string] : []
+        if (names.length === 0 && literal === undefined && bound === undefined) unanswered.push(`${relative}: <${component}> with no label`)
+        for (const name of names) {
+          if (!lookupAction(normalize(name)) || !answersAtRuntime(name)) unanswered.push(`${relative}: <${component}> "${name}"`)
+        }
+      }
+    }
+    expect(swept, 'no Save/Cancel/toggle components were swept — the scan is wrong').toBeGreaterThan(15)
+    expect(unanswered, `wrapper buttons with no answer:\n${unanswered.join('\n')}`).toEqual([])
   })
 })
 

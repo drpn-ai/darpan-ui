@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { resolveExplainTarget } from '../mascotTargets'
 
@@ -248,5 +249,83 @@ describe('the run result page', () => {
     document.body.appendChild(host)
 
     expect(resolveExplainTarget(host.querySelector('span'))?.term).toBe('apiDateRange')
+  })
+})
+
+/**
+ * DAR-UI-103: every label on a page that shows a result has an answer. The sweep reads each
+ * template the way the dock reads the rendered page — a `{{ }}` hole becomes a stand-in
+ * number, so "Statements {{ n }}" and "Missing from {{ system }}" are asked about in the shape
+ * they really take — and asks resolveExplainTarget about every label element in it. A label
+ * marked with v-explain answers through the directive, which wins at runtime.
+ */
+describe('every label on a result surface has an answer', () => {
+  const RESULT_SURFACES = [
+    'pages/HomePage.vue',
+    'pages/reconciliation/ReconciliationRunResultPage.vue',
+    'pages/reconciliation/ReconciliationDiffPage.vue',
+    'pages/reconciliation/ReconciliationRunHistoryPage.vue',
+    'pages/reconciliation/RunFlowchartPage.vue',
+    'pages/reconciliation/AuditReportPage.vue',
+    'pages/reconciliation/ReconciliationAutomationDashboardPage.vue',
+    'pages/settings/TenantConfigHistoryPage.vue',
+    'components/audit/AuditColumns.vue',
+    'components/reconciliation/RunResultConclusionEvidence.vue',
+    'components/reconciliation/LifecycleBoard.vue',
+    'components/settings/ConnectionDiagnosticsPopup.vue',
+  ]
+
+  /** Labels that are right to say nothing, each with the reason. Silence is a decision, not a gap. */
+  const SILENT: Readonly<Record<string, string>> = {
+    "let's investigate": 'the home hero is a greeting, not vocabulary',
+    'notify me': 'the picker\'s title repeats the button that opened it, and that button already answers',
+    'checking...': 'a loading line, gone as soon as the first step lands',
+  }
+
+  const LABELS = 'th, dt, legend, h1, h2, h3, h4, h5, h6, .static-page-section-heading, [class*="label"], [class*="eyebrow"]'
+  const CONTROLS = 'button, a, [role="button"]'
+
+  /** `fill` stands in for every hole: a number for a count, a word for a system's name. */
+  function staticMarkup(template: string, fill: string): string {
+    return template
+      .replace(/<!--[\s\S]*?-->/g, '')
+      // A nested <template> parses into an inert fragment that querySelectorAll cannot see.
+      .replace(/<template\b/g, '<div').replace(/<\/template>/g, '</div>')
+      .replace(/\{\{[\s\S]*?\}\}/g, fill)
+      // A self-closing component would otherwise swallow its siblings as children.
+      .replace(/<([A-Z][\w]*)((?:[^>"']|"[^"]*"|'[^']*')*?)\/>/g, '<$1$2></$1>')
+  }
+
+  it('answers every label they put on screen', () => {
+    const unanswered: string[] = []
+    let swept = 0
+    for (const relative of RESULT_SURFACES) {
+      const source = readFileSync(`src/${relative}`, 'utf-8').match(/<template>([\s\S]*)<\/template>/)?.[1] ?? ''
+      expect(source, `${relative} has no template — the list is stale`).not.toBe('')
+      // The same template twice — holes as a count, holes as a name — so "Statements {{ n }}" and
+      // "Missing from {{ system }}" are each asked about in the shape they really take.
+      const asCount = document.createElement('div')
+      asCount.innerHTML = staticMarkup(source, '12')
+      const asName = document.createElement('div')
+      asName.innerHTML = staticMarkup(source, 'Shopify')
+      document.body.append(asCount, asName)
+      const named = Array.from(asName.querySelectorAll(LABELS))
+      Array.from(asCount.querySelectorAll(LABELS)).forEach((el, index) => {
+        if (el.closest(CONTROLS) || el.hasAttribute('v-explain')) return
+        // A part marked with v-explain answers for itself, so its words are not this label's.
+        const own = el.cloneNode(true) as Element
+        own.querySelectorAll('[v-explain]').forEach((part) => part.remove())
+        const text = (own.textContent ?? '').replace(/\s+/g, ' ').trim()
+        // Only holes, or only punctuation: the label is this tenant's data, and silence is right.
+        if (!/[a-z]{2}/i.test(text.replace(/\d+/g, ''))) return
+        swept += 1
+        if (resolveExplainTarget(el) || resolveExplainTarget(named[index] ?? null)) return
+        if (!SILENT[text.toLowerCase()]) unanswered.push(`${relative}: "${text}"`)
+      })
+      asCount.remove()
+      asName.remove()
+    }
+    expect(swept, 'no labels were swept — the markup rewrite is wrong').toBeGreaterThan(40)
+    expect(unanswered, `result labels with no answer:\n${unanswered.join('\n')}`).toEqual([])
   })
 })

@@ -700,6 +700,50 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Hide Preview',
     body: 'folds the preview away. It was never live, so nothing is lost.',
   },
+
+  /* ── CLI sign-in (DAR-UI-103) ───────────────────────────────────────────────── */
+  'continue with this code': {
+    title: 'Continue',
+    body: 'looks the code up and shows which computer asked, before anything is approved. An expired or mistyped code is simply not found.',
+  },
+  'approve cli sign-in': {
+    title: 'Approve',
+    body: 'lets that terminal act as you, with your permissions in each tenant, for 7 or 30 days by your role there. Only for a code you just started.',
+  },
+  'deny cli sign-in': {
+    title: 'Deny',
+    body: 'refuses this one request; that terminal gets nothing and has to run darpan login again. CLIs you already approved keep working.',
+  },
+
+  /* ── Wrapper buttons the sweep could not see until DAR-UI-103 ───────────────── */
+  'save refined fields': {
+    title: 'Save refined fields',
+    body: 'replaces this schema’s field list for the whole tenant. Source files are checked against it from the next run; finished runs are not re-checked.',
+  },
+  'run on schedule': {
+    title: 'Run on schedule',
+    body: 'whether this script runs by itself at its time. Flipping it changes nothing until the deployment is saved; Preview and Send now work either way.',
+  },
+  'save deployment': {
+    title: 'Save deployment',
+    body: 'keeps the time, chat space and input. While it is on schedule, the script runs at that time and posts what it returns there with nobody pressing anything.',
+  },
+  'revert': {
+    title: 'Revert',
+    body: 'throws away the edits made here since the last save and puts back what is saved. Nothing saved is touched.',
+  },
+  'email after each run': {
+    title: 'Email after each run',
+    body: 'whether everyone with access to this tenant, plus the extra addresses, gets an email when each audit run finishes. It takes effect when the settings are saved.',
+  },
+  'save script': {
+    title: 'Save script',
+    body: 'checks it and keeps it for the whole tenant. A deployment runs the saved version from its next scheduled time; an unsaved edit never runs on schedule.',
+  },
+  'save conclusions': {
+    title: 'Save conclusions',
+    body: 'replaces this run’s whole conclusion tree, all or nothing — one refusal and nothing is saved. Results get named by it; the records never change.',
+  },
 })
 
 /**
@@ -711,6 +755,17 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
  * confident wrong answer the exact registry exists to avoid.
  */
 const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.freeze([
+  // "Revoke <host>": the CLI session list names each button by the computer it signed in from.
+  // "Request access in <tenant>": the tenant is data, the request is the same everywhere.
+  // The tenant is optional for the same reason as retry's count: the coverage sweep reads the template with the hole removed.
+  [/^request access in( .+)?$/, {
+    title: 'Request access',
+    body: 'asks a Darpan admin to turn the CLI on for you in this tenant, with your reason attached. Nothing changes until one of them approves it.',
+  }],
+  [/^revoke .+$/, {
+    title: 'Revoke',
+    body: 'signs that computer’s CLI out now. Its next command is refused until someone runs darpan login there and approves a new code.',
+  }],
   [/^download .+$/, {
     title: 'Download',
     body: 'the source file as the run received it. Useful for checking a record by hand that the run reported as missing.',

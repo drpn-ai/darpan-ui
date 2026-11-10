@@ -257,8 +257,9 @@ const columns = [
   { key: 'scheduled', label: 'Scheduled', colStyle: { width: '34%' }, explain: 'scheduledDate' },
   { key: 'completed', label: 'Completed', colStyle: { width: '34%' }, explain: 'completedDate' },
   // "Differences" is the number operators most often read as "everything that is
-  // wrong". It is not: records missing on one side are counted separately, so a run
-  // can show zero here and still have hundreds of unmatched records.
+  // wrong". It is not: it counts records missing on one side or the other, and value
+  // mismatches are counted separately (ruleDifferenceCount), so a run can show zero here
+  // while both systems disagree on values.
   { key: 'counts', label: 'Differences', colStyle: { width: '16%' }, explain: 'differenceCount' },
 ]
 

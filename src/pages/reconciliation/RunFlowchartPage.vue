@@ -25,7 +25,7 @@
             <span>{{ summary.questions }}</span>
           </article>
           <article class="static-page-summary-card">
-            <span class="static-page-summary-label">Findings</span>
+            <span class="static-page-summary-label" v-explain="'flowchartFindings'">Findings</span>
             <span data-testid="flowchart-summary-findings">{{ summary.findings }}</span>
           </article>
         </div>
@@ -108,7 +108,7 @@
                 <StatusBadge :label="tile.status.label" :tone="tile.status.tone" />
               </div>
               <dl class="run-history-metrics">
-                <div><dt>Days</dt><dd>{{ tile.window }}</dd></div>
+                <div><dt v-explain="'automationWindow'">Days</dt><dd>{{ tile.window }}</dd></div>
               </dl>
             </RouterLink>
           </div>

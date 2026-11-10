@@ -40,6 +40,19 @@ function normalizeLabel(text: string): string {
 }
 
 /**
+ * A heading that carries its own count — "Statements 12", "Findings 1,204", "Evidence 3/5" — is
+ * still named by its word. The count lives in a child span, so the label's text ends in it and an
+ * exact lookup missed every one of them (DAR-UI-103). Sibling spans leave no space ("Statements12"),
+ * so a count glued to a word of three or more letters goes too; "R4" stays.
+ *
+ * LABELS ONLY. A control's name can end in a number that is part of it — "View auth info for
+ * source 1" — and stripping it there killed that button the day this was written.
+ */
+function withoutCount(label: string): string {
+  return label.replace(/(?:\s+|(?<=[a-z]{3}))\d[\d,]*(?:\/\d[\d,]*)?$/i, '').trim()
+}
+
+/**
  * Where the same concept is written differently on screen than in the glossary. Keys are
  * what the product actually displays; the docs' own wording is the value.
  */
@@ -141,6 +154,19 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'auth': 'authType',
   'rule sets': 'ruleSet',
   'automations': 'automations',
+
+  // Result surfaces (DAR-UI-103). Most new entries are reached by their own title; these are
+  // the places the screen words it differently.
+  'total differences': 'differenceCount',
+  'validation': 'validationMessages',
+  'warnings': 'processingWarnings',
+  // The page writes a straight apostrophe; the entry's title uses the typographic one.
+  "today's run": 'auditHealth',
+  'checks': 'auditCheck',
+  // Explicit, because flowchartFindings carries the same title: on the audit report "Findings" is
+  // the open-until-cleared ledger. The flowchart page points at its own meaning with v-explain.
+  'findings': 'auditFindings',
+  'grace days': 'auditGrace',
 })
 
 /**
@@ -285,7 +311,7 @@ export function resolveExplainTarget(start: Element | null): ExplainTarget | nul
       if (noun) return { el: label, term: noun, detail: null }
     } else {
       // A header cell wraps its text in a span; either way the label's own text is the name.
-      const term = lookupLabel(normalizeLabel(ownText(label)))
+      const term = lookupLabel(withoutCount(normalizeLabel(ownText(label))))
       if (term) return { el: label, term, detail: null }
     }
   }

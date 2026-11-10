@@ -30,10 +30,10 @@
         </article>
         <p class="section-note">Approve only a code you just started in your own terminal.</p>
         <div class="cli-login-actions">
-          <button class="btn-primary" type="button" data-testid="cli-login-approve" :disabled="busy" @click="answer('approved')">
+          <button class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy" @click="answer('approved')">
             Approve
           </button>
-          <button class="btn-primary" type="button" data-testid="cli-login-deny" :disabled="busy" @click="answer('denied')">
+          <button class="btn-primary" type="button" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
             Deny
           </button>
         </div>
@@ -58,7 +58,7 @@
           Code not found or expired. Check your terminal, or run darpan login again.
         </p>
         <div class="action-row">
-          <button type="submit" data-testid="cli-login-lookup" :disabled="busy">Continue</button>
+          <button type="submit" data-testid="cli-login-lookup" aria-label="Continue with this code" :disabled="busy">Continue</button>
         </div>
       </form>
     </StaticPageSection>

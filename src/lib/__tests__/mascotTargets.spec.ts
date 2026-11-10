@@ -95,9 +95,23 @@ describe('resolveExplainTarget', () => {
   it('stays silent on a label it has no phrase for', () => {
     // Silence is the right answer for an unknown heading. Guessing would produce a
     // confident wrong explanation, which is worse than no explanation.
-    const host = render('<dt class="micro-label">Automation ID</dt>')
+    const host = render('<dt class="micro-label">Favourite colour</dt>')
 
     expect(resolveExplainTarget(host.querySelector('dt'))).toBeNull()
+  })
+
+  // DAR-UI-103. Audit headings carry their count in a child span; the word still names them.
+  it('reads a heading by its word when its count rides along, spaced or glued', () => {
+    expect(resolveExplainTarget(render('<h2 class="micro-label"><span>Statements</span> <span>12</span></h2>').querySelector('h2'))?.term).toBe('auditStatements')
+    expect(resolveExplainTarget(render('<h2 class="micro-label"><span>Statements</span><span>12</span></h2>').querySelector('h2'))?.term).toBe('auditStatements')
+    expect(resolveExplainTarget(render('<summary class="micro-label">Evidence <span>3/5</span></summary>').querySelector('summary'))?.term).toBe('auditEvidence')
+    expect(resolveExplainTarget(render('<h2 class="micro-label"><span>Findings</span><span>1,204</span></h2>').querySelector('h2'))?.term).toBe('auditFindings')
+  })
+
+  it('strips only a count, so a name with a number in it stays silent', () => {
+    // An order number is data; dropping its digits must not leave a word that answers.
+    expect(resolveExplainTarget(render('<span class="micro-label">Order 1234</span>').querySelector('span'))).toBeNull()
+    expect(resolveExplainTarget(render('<span class="micro-label">R4</span>').querySelector('span'))).toBeNull()
   })
 
   it('recognises a timestamp in the exact shape the app renders', () => {

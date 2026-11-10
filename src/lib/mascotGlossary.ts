@@ -24,8 +24,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'every record the run actually looked at, after exclusions. The overlap, not either system’s total — those are always bigger.',
   },
   differenceCount: {
+    // DAR-UI-103. The backend computes this as onlyInFile1 + onlyInFile2 on every run path
+    // (ReconciliationServices: differenceCount = count1 + count2); value mismatches are a separate
+    // ruleDifferenceCount. The old line said the opposite — it taught the number backwards.
     title: 'Differences',
-    body: 'records both systems have that don’t line up on a compared field. Counted per field, so one record with two bad fields lands twice. Everyone misreads this once.',
+    body: 'records one system has and the other does not, both directions added up. Value mismatches are not in it, so zero here does not mean everything lines up.',
   },
   onlyInFile1Count: {
     title: 'Only in the first source',
@@ -306,6 +309,121 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   operations: {
     title: 'Operations',
     body: 'the actions you can take on this record. Anything here changes something; reading is everywhere else on the page.',
+  },
+
+  /* ── Run results (DAR-UI-103) ─────────────────────────────────────────────────── */
+  validationMessages: {
+    title: 'Validation messages',
+    body: 'where a source file broke its schema. Counts read from a file that failed here cannot be trusted — fix the file or the schema, then re-run.',
+  },
+  processingWarnings: {
+    title: 'Processing warnings',
+    body: 'what the run noticed and worked around — a guessed file type, a rule that failed on one batch. If one says differences were dropped, the result is incomplete.',
+  },
+  conclusionChecks: {
+    title: 'How Darpan concluded',
+    body: 'the facts Darpan checked before naming this cause, and each one held. If any of them looks wrong to you, so is the cause.',
+  },
+  conclusionDecision: {
+    title: 'Needs a decision',
+    body: 'a cause Darpan thinks may be expected, not a fault. Stop flagging it in the rules board, or keep flagging and it shows up again next run.',
+  },
+  lifecycleNotFinding: {
+    title: 'Not a finding',
+    body: 'records here still show, but this place was marked an expected stop, so they do not count toward Findings. Mark it a finding again if it starts meaning trouble.',
+  },
+  flowchartFindings: {
+    // Same word as the audit's Findings, different thing — the flowchart page points here with v-explain.
+    title: 'Findings',
+    body: 'records this run left somewhere they should not be — each lifecycle place’s records, or a chart’s “no” answers. Not meant to reach zero; watch which one grows.',
+  },
+
+  /* ── The audit report (DAR-UI-103) ────────────────────────────────────────────── */
+  auditHealth: {
+    title: 'Today’s run',
+    body: 'what this morning’s audit read and whether it can be trusted. Anything partial here closed nothing, so read this before believing a quiet findings list.',
+  },
+  auditRunningNow: {
+    title: 'Running now',
+    body: 'checks still working this morning. Findings arrive as each one finishes, so the counts climb until the last is done — wait before reading them.',
+  },
+  auditStatements: {
+    title: 'Statements',
+    body: 'what this tenant needs to be true, in its own words. Each is tested by checks; one with no check is not covered, which is not the same as passing.',
+  },
+  auditCheck: {
+    title: 'Check',
+    body: 'one comparison that tests a statement. Ran means every read was complete; partial found what it could and closed nothing, so open findings stay open.',
+  },
+  auditNotCovered: {
+    title: 'Not covered',
+    body: 'statements no check reads. They are not passing; nothing is looking. Add a check, or the audit stays silent about them.',
+  },
+  auditFindings: {
+    title: 'Findings',
+    body: 'one record breaking one statement each. It stays open run after run until a complete check stops reporting it — a fix counts when a run sees it.',
+  },
+  auditRecords: {
+    title: 'Records',
+    body: 'how many records this source handed over on its last read. A sharp drop from yesterday is worth checking before trusting today’s findings.',
+  },
+  auditRead: {
+    title: 'Read',
+    body: 'when the data behind this was read — for a source, the moment it was pulled; for a check, the days it covered. Nothing outside that is on this report.',
+  },
+  auditAffects: {
+    title: 'Affects',
+    body: 'the statements whose checks read this source. While it is not complete, their findings cannot close — open ones stay open.',
+  },
+  auditStuckOn: {
+    title: 'Stuck on',
+    body: 'the one thing holding this record up, read from the systems themselves. Clear it and the next run closes the finding on its own.',
+  },
+  auditDoThis: {
+    title: 'Do this',
+    body: 'the fix for this cause and who owns it. Doing it is half the job: the finding closes when a later run sees the records line up.',
+  },
+  auditLines: {
+    title: 'Lines',
+    body: 'this order’s lines; the outlined one is what holds the order up. Start there — the others are shown for context.',
+  },
+  auditEvidence: {
+    title: 'Evidence',
+    body: 'the tests run on this one record, passed out of total. The failed ones are why it is a finding; they show only when no cause explains it.',
+  },
+  auditHistory: {
+    title: 'History',
+    body: 'every time this finding was found, reopened or closed, and by whom. One that keeps coming back points at a sync, not a one-off mistake.',
+  },
+  auditGrace: {
+    title: 'Grace',
+    body: 'how long a new finding waits as pending before it counts as open, to ride out normal sync lag. Too long, and real problems hide that long too.',
+  },
+  auditMatchedBy: {
+    title: 'Matched by',
+    body: 'the shared id this check joins the two systems on. A record missing that id on one side can only ever read as missing, never as a mismatch.',
+  },
+
+  /* ── Automation dashboard, connections, config (DAR-UI-103) ───────────────────── */
+  automationSetup: {
+    title: 'Setup',
+    body: 'everything a scheduled run of this automation uses. Changes apply from the next run; finished runs keep what was true when they ran.',
+  },
+  automationBasedOn: {
+    title: 'Based on',
+    body: 'the saved run this automation copied its sources and filters from. It runs its own copy, so a later edit to that run reaches it only when you sync.',
+  },
+  automationId: {
+    title: 'Automation ID',
+    body: 'how Darpan refers to this automation in logs, chat messages and the CLI. The name can change and this cannot, so quote it when asking for help.',
+  },
+  connectionDiagnostics: {
+    title: 'Diagnostics',
+    body: 'this connection, tried one step at a time and shown as each finishes. The first step that fails is the one to fix.',
+  },
+  configHistory: {
+    title: 'Config history',
+    body: 'every saved version of this tenant’s setup. Restoring one puts that setup back; runs that already finished keep the results they had.',
   },
 })
 

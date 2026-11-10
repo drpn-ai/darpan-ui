@@ -26,7 +26,7 @@
           :data-testid="`lifecycle-place-${place.questionId}-${place.branch}`"
           @click="openable(place) && emit('open', place)"
         >
-          <span class="lifecycle-line-place-label">{{ place.label }}<span v-if="uncounted(place)" class="lifecycle-line-note" data-testid="lifecycle-place-not-finding"> · not a finding</span></span>
+          <span class="lifecycle-line-place-label">{{ place.label }}<span v-if="uncounted(place)" v-explain="'lifecycleNotFinding'" class="lifecycle-line-note" data-testid="lifecycle-place-not-finding"> · not a finding</span></span>
           <span class="lifecycle-line-count">{{ place.count === null ? '' : format(place.count) }}</span>
         </component>
       </div>
