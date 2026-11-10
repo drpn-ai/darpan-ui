@@ -343,6 +343,22 @@ export interface AuditProgressRun {
   usualDurationMs?: number | null
   health?: 'healthy' | 'slow' | 'stuck' | null
   healthReason?: string | null
+  /** DAR-BE-173. The run's steps in run order; both extracts run at once when the sides are read in parallel. */
+  steps?: AuditProgressStep[] | null
+}
+
+/** DAR-BE-173. One step of a running run (AuditSettingsSupport.steps). */
+export interface AuditProgressStep {
+  /** The run stage code: EXTRACT_FILE1, EXTRACT_FILE2, COMPARE, ... */
+  stage: string
+  /** running, done or failed; any other backend status arrives lower-cased. */
+  status: string
+  /** Records so far; while an extract runs, its page heartbeat. */
+  records?: number | null
+  startedDate?: string | number | null
+  completedDate?: string | number | null
+  /** An extract's system, as its source is labelled; absent on other stages. */
+  system?: string | null
 }
 
 export interface AuditProgress {
