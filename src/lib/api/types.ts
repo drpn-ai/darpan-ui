@@ -1191,3 +1191,34 @@ export interface ListCliSessionsResponse extends ApiEnvelope {
 }
 
 export type RevokeCliSessionResponse = ApiEnvelope
+
+// ─── CLI access requests (DAR-BE-209) ──────────────────────────────────────────
+
+export type CliAccessState = 'LIVE' | 'PAUSED' | 'ENDED' | 'NOT_GRANTED' | 'DARPAN_ADMIN'
+
+export interface CliAccessRequest {
+  requestId: string
+  statusId: 'PENDING' | 'APPROVED' | 'DECLINED'
+  reason?: string | null
+  requestedDate?: ApiTimestamp
+  decidedDate?: ApiTimestamp | null
+  decisionNote?: string | null
+}
+
+/** The signed-in person's CLI access in the active tenant (facade.CliAccessFacadeServices.get#MyCliAccess). */
+export interface MyCliAccess {
+  tenantUserGroupId: string
+  tenantLabel: string
+  state: CliAccessState
+  thruDate?: ApiTimestamp | null
+  lifetimeDays: number
+  request?: CliAccessRequest | null
+}
+
+export interface GetMyCliAccessResponse extends ApiEnvelope {
+  access?: MyCliAccess | null
+}
+
+export interface RequestCliAccessResponse extends ApiEnvelope {
+  request?: CliAccessRequest | null
+}

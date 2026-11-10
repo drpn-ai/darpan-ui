@@ -5,13 +5,19 @@ const route = vi.hoisted(() => ({ query: {} as Record<string, unknown> }))
 const getCliLoginRequest = vi.hoisted(() => vi.fn())
 const approveCliLogin = vi.hoisted(() => vi.fn())
 const denyCliLogin = vi.hoisted(() => vi.fn())
+const getMyCliAccess = vi.hoisted(() => vi.fn())
+const requestCliAccess = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({ useRoute: () => route }))
 vi.mock('../../lib/api/facade', () => ({
-  authFacade: { getCliLoginRequest, approveCliLogin, denyCliLogin },
+  authFacade: { getCliLoginRequest, approveCliLogin, denyCliLogin, getMyCliAccess, requestCliAccess },
 }))
 
 import CliLoginPage from '../CliLoginPage.vue'
+import { ApiCallError } from '../../lib/api/client'
+
+const access = { tenantUserGroupId: 'ACME', tenantLabel: 'Acme', state: 'NOT_GRANTED', lifetimeDays: 7, request: null }
+const refused = new ApiCallError('The Darpan CLI is not turned on for this account. A Darpan admin turns it on.', 400)
 
 const pending = {
   ok: true, messages: [], errors: [], hostLabel: 'ada-laptop', status: 'PENDING',
@@ -30,6 +36,8 @@ describe('CliLoginPage', () => {
     getCliLoginRequest.mockReset().mockResolvedValue(pending)
     approveCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
     denyCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
+    getMyCliAccess.mockReset().mockResolvedValue({ ok: true, access: { ...access, state: 'LIVE' } })
+    requestCliAccess.mockReset().mockResolvedValue({ ok: true, request: { requestId: 'R1', statusId: 'PENDING', requestedDate: '2026-11-10T09:30:00Z' } })
   })
 
   it('normalises a typed code: lower case and a missing dash are accepted', async () => {
@@ -127,5 +135,47 @@ describe('CliLoginPage', () => {
     await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(true)
+  })
+
+  // DAR-BE-209: an approve refused because the CLI is not on for this person offers the request, not "code not found".
+  async function approveRefused(wrapper: ReturnType<typeof mount>) {
+    approveCliLogin.mockRejectedValue(refused)
+    await typeCode(wrapper, 'BCDF-GH23')
+    await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
+    await flushPromises()
+  }
+
+  it('a refusal for want of access offers the request, not "code not found"', async () => {
+    getMyCliAccess.mockResolvedValue({ ok: true, access })
+    const wrapper = mount(CliLoginPage)
+    await approveRefused(wrapper)
+    expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="cli-access-request"]').text()).toBe('Request access in Acme')
+    expect(wrapper.text()).toContain('The Darpan CLI is not turned on for you in Acme.')
+  })
+
+  it('an expired code still says not found when the person has the CLI', async () => {
+    const wrapper = mount(CliLoginPage)
+    await approveRefused(wrapper)
+    expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="cli-access-card"]').exists()).toBe(false)
+  })
+
+  it('says not found when the access check itself fails', async () => {
+    getMyCliAccess.mockRejectedValue(new ApiCallError('down', 503))
+    const wrapper = mount(CliLoginPage)
+    await approveRefused(wrapper)
+    expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(true)
+  })
+
+  it('sends the request with its reason and says a Darpan admin will turn it on', async () => {
+    getMyCliAccess.mockResolvedValue({ ok: true, access })
+    const wrapper = mount(CliLoginPage)
+    await approveRefused(wrapper)
+    await wrapper.get('[data-testid="cli-access-reason"]').setValue('nightly audits')
+    await wrapper.get('[data-testid="cli-access-request"]').trigger('click')
+    await flushPromises()
+    expect(requestCliAccess).toHaveBeenCalledWith('nightly audits')
+    expect(wrapper.get('[data-testid="cli-access-pending"]').text()).toContain('A Darpan admin will turn it on.')
   })
 })

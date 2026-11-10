@@ -109,6 +109,8 @@ import type {
   ApproveCliLoginResponse,
   DenyCliLoginResponse,
   ListCliSessionsResponse,
+  GetMyCliAccessResponse,
+  RequestCliAccessResponse,
   RevokeCliSessionResponse,
   RunAutomationNowResponse,
   RunSavedRunDiffResponse,
@@ -259,6 +261,8 @@ const AUTH = {
   denyCliLogin: 'facade.CliAuthFacadeServices.deny#CliLogin',
   listCliSessions: 'facade.CliAuthFacadeServices.list#CliSessions',
   revokeCliSession: 'facade.CliAuthFacadeServices.revoke#CliSession',
+  getMyCliAccess: 'facade.CliAccessFacadeServices.get#MyCliAccess',
+  requestCliAccess: 'facade.CliAccessFacadeServices.request#CliAccess',
 }
 
 const SETTINGS = {
@@ -428,6 +432,14 @@ export const authFacade = {
   },
   revokeCliSession(payload: RevokeCliSessionPayload, signal?: AbortSignal): Promise<RevokeCliSessionResponse> {
     return callService<RevokeCliSessionResponse>(AUTH.revokeCliSession, payload, signal)
+  },
+  // DAR-BE-209: the signed-in person's CLI access in the active tenant, and asking a Darpan admin for it.
+  getMyCliAccess(signal?: AbortSignal): Promise<GetMyCliAccessResponse> {
+    return callService<GetMyCliAccessResponse>(AUTH.getMyCliAccess, {}, signal)
+  },
+  requestCliAccess(reason?: string, signal?: AbortSignal): Promise<RequestCliAccessResponse> {
+    const text = (reason ?? '').trim()
+    return callService<RequestCliAccessResponse>(AUTH.requestCliAccess, text ? { reason: text } : {}, signal)
   },
 }
 

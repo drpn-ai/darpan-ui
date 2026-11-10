@@ -44,6 +44,542 @@ export interface components {
             id?: string | number | null;
             error: components["schemas"]["JsonRpcError"];
         };
+        /** @description Grants a member of the tenant AI access for a window and a limit; the user's earlier grant there is revoked. */
+        CreateAgentAccessGrantParams: {
+            userId: string;
+            tenantUserGroupId: string;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds. Default now. */
+            fromDate?: string | number;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            thruDate?: string | number;
+            /** @description The window ends this many days (each 24 hours) from the start, or from now when changing a grant. */
+            days?: number;
+            /** @description The limit over the whole window, in dollars; more than 0. Required: the Darpan admin decides it when granting. */
+            costCapUsd: number;
+        };
+        CreateAgentAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.create#AgentAccessGrant */
+        CreateAgentAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentAccessAdminServices.create#AgentAccessGrant";
+            params?: components["schemas"]["CreateAgentAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentAccessAdminServices.create#AgentAccessGrant. Check result.ok / result.errors for business failures. */
+        CreateAgentAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["CreateAgentAccessGrantResult"];
+        };
+        /** @description AI spend for a user, a tenant or both over the last days: totals, by day, by role and model, and the grants. */
+        GetAgentUsageParams: {
+            userId?: string;
+            tenantUserGroupId?: string;
+            days?: number;
+        };
+        GetAgentUsageResult: {
+            totalMicros?: number;
+            totalUsd?: string;
+            requests?: number;
+            byDay?: unknown[];
+            byRoleModel?: unknown[];
+            grants?: unknown[];
+        };
+        /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.get#AgentUsage */
+        GetAgentUsageRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentAccessAdminServices.get#AgentUsage";
+            params?: components["schemas"]["GetAgentUsageParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentAccessAdminServices.get#AgentUsage. Check result.ok / result.errors for business failures. */
+        GetAgentUsageResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetAgentUsageResult"];
+        };
+        /** @description Grants across tenants with their spend and state, by tenant, user or status. */
+        ListAgentAccessGrantsParams: {
+            tenantUserGroupId?: string;
+            userId?: string;
+            statusId?: string;
+            includeRevoked?: boolean;
+        };
+        ListAgentAccessGrantsResult: {
+            grants?: unknown[];
+        };
+        /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.list#AgentAccessGrants */
+        ListAgentAccessGrantsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentAccessAdminServices.list#AgentAccessGrants";
+            params?: components["schemas"]["ListAgentAccessGrantsParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentAccessAdminServices.list#AgentAccessGrants. Check result.ok / result.errors for business failures. */
+        ListAgentAccessGrantsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListAgentAccessGrantsResult"];
+        };
+        /** @description Pauses an active grant. */
+        PauseAgentAccessGrantParams: {
+            grantId: string;
+        };
+        PauseAgentAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.pause#AgentAccessGrant */
+        PauseAgentAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentAccessAdminServices.pause#AgentAccessGrant";
+            params?: components["schemas"]["PauseAgentAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentAccessAdminServices.pause#AgentAccessGrant. Check result.ok / result.errors for business failures. */
+        PauseAgentAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["PauseAgentAccessGrantResult"];
+        };
+        /** @description Revokes a grant; the user has no AI access in that tenant until granted again. */
+        RevokeAgentAccessGrantParams: {
+            grantId: string;
+        };
+        RevokeAgentAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.revoke#AgentAccessGrant */
+        RevokeAgentAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentAccessAdminServices.revoke#AgentAccessGrant";
+            params?: components["schemas"]["RevokeAgentAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentAccessAdminServices.revoke#AgentAccessGrant. Check result.ok / result.errors for business failures. */
+        RevokeAgentAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RevokeAgentAccessGrantResult"];
+        };
+        /** @description Lifts a pause, optionally with a higher limit or a later end; refused while spend is at or over the limit. */
+        UnpauseAgentAccessGrantParams: {
+            grantId: string;
+            /** @description The limit over the whole window, in dollars; more than 0. */
+            costCapUsd?: number;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            thruDate?: string | number;
+            /** @description The window ends this many days (each 24 hours) from the start, or from now when changing a grant. */
+            days?: number;
+        };
+        UnpauseAgentAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.unpause#AgentAccessGrant */
+        UnpauseAgentAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentAccessAdminServices.unpause#AgentAccessGrant";
+            params?: components["schemas"]["UnpauseAgentAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentAccessAdminServices.unpause#AgentAccessGrant. Check result.ok / result.errors for business failures. */
+        UnpauseAgentAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UnpauseAgentAccessGrantResult"];
+        };
+        /** @description Changes a grant's end or limit (a limit can be changed, never removed); a grant that is then at its limit pauses. */
+        UpdateAgentAccessGrantParams: {
+            grantId: string;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            thruDate?: string | number;
+            /** @description The window ends this many days (each 24 hours) from the start, or from now when changing a grant. */
+            days?: number;
+            /** @description The limit over the whole window, in dollars; more than 0. */
+            costCapUsd?: number;
+            clearThruDate?: boolean;
+        };
+        UpdateAgentAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.update#AgentAccessGrant */
+        UpdateAgentAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentAccessAdminServices.update#AgentAccessGrant";
+            params?: components["schemas"]["UpdateAgentAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentAccessAdminServices.update#AgentAccessGrant. Check result.ok / result.errors for business failures. */
+        UpdateAgentAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UpdateAgentAccessGrantResult"];
+        };
+        /**
+         * @description Tickets across tenants, newest first; one tenant or one status when named. Named apart from the tenant's own
+         *                 facade.AgentChangeFacadeServices.list#BrainChangeTickets, whose schema name it would otherwise collide with in the API contract.
+         */
+        ListAllBrainChangeTicketsParams: {
+            /** @description Only this tenant's tickets. */
+            tenantUserGroupId?: string;
+            /** @description Only tickets in this status. */
+            status?: string;
+        };
+        ListAllBrainChangeTicketsResult: {
+            tickets?: unknown[];
+        };
+        /** @description JSON-RPC request envelope for admin.AgentTicketAdminServices.list#AllBrainChangeTickets */
+        ListAllBrainChangeTicketsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentTicketAdminServices.list#AllBrainChangeTickets";
+            params?: components["schemas"]["ListAllBrainChangeTicketsParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentTicketAdminServices.list#AllBrainChangeTickets. Check result.ok / result.errors for business failures. */
+        ListAllBrainChangeTicketsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListAllBrainChangeTicketsResult"];
+        };
+        /** @description Moves a ticket to RECEIVED, ACCEPTED, DECLINED or SHIPPED. DECLINED needs statusReason; SHIPPED needs shippedVersion. */
+        UpdateBrainChangeTicketParams: {
+            ticketId: string;
+            status: string;
+            statusReason?: string;
+            shippedVersion?: string;
+        };
+        UpdateBrainChangeTicketResult: Record<string, never>;
+        /** @description JSON-RPC request envelope for admin.AgentTicketAdminServices.update#BrainChangeTicket */
+        UpdateBrainChangeTicketRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.AgentTicketAdminServices.update#BrainChangeTicket";
+            params?: components["schemas"]["UpdateBrainChangeTicketParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.AgentTicketAdminServices.update#BrainChangeTicket. Check result.ok / result.errors for business failures. */
+        UpdateBrainChangeTicketResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UpdateBrainChangeTicketResult"];
+        };
+        /** @description Turns the CLI on as asked (a grant with the given end) and marks the request approved. Refused when the request is not pending or the user is no longer a member. */
+        ApproveCliAccessRequestParams: {
+            requestId: string;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            thruDate?: string | number;
+            /** @description The grant ends this many days (each 24 hours) from now. Neither days nor thruDate: no end. */
+            days?: number;
+        };
+        ApproveCliAccessRequestResult: {
+            request?: Record<string, never>;
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.approve#CliAccessRequest */
+        ApproveCliAccessRequestRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.approve#CliAccessRequest";
+            params?: components["schemas"]["ApproveCliAccessRequestParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.approve#CliAccessRequest. Check result.ok / result.errors for business failures. */
+        ApproveCliAccessRequestResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ApproveCliAccessRequestResult"];
+        };
+        /** @description Turns the CLI on for a member of the tenant, with an optional end; the user's earlier grant there is revoked. */
+        CreateCliAccessGrantParams: {
+            userId: string;
+            tenantUserGroupId: string;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds. Default now. */
+            fromDate?: string | number;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            thruDate?: string | number;
+            /** @description The grant ends this many days (each 24 hours) from the start, or from now when changing a grant. Neither days nor thruDate: no end. */
+            days?: number;
+        };
+        CreateCliAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.create#CliAccessGrant */
+        CreateCliAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.create#CliAccessGrant";
+            params?: components["schemas"]["CreateCliAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.create#CliAccessGrant. Check result.ok / result.errors for business failures. */
+        CreateCliAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["CreateCliAccessGrantResult"];
+        };
+        /** @description Declines a pending request; the note, when given, is shown to the user, who may ask again. */
+        DeclineCliAccessRequestParams: {
+            requestId: string;
+            /** @description Shown to the user (optional, at most 500 characters). */
+            decisionNote?: string;
+        };
+        DeclineCliAccessRequestResult: {
+            request?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.decline#CliAccessRequest */
+        DeclineCliAccessRequestRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.decline#CliAccessRequest";
+            params?: components["schemas"]["DeclineCliAccessRequestParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.decline#CliAccessRequest. Check result.ok / result.errors for business failures. */
+        DeclineCliAccessRequestResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DeclineCliAccessRequestResult"];
+        };
+        /** @description CLI grants across tenants with their state and the sign-in lifetime they give, by tenant, user or status. */
+        ListCliAccessGrantsParams: {
+            tenantUserGroupId?: string;
+            userId?: string;
+            statusId?: string;
+            includeRevoked?: boolean;
+        };
+        ListCliAccessGrantsResult: {
+            grants?: unknown[];
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.list#CliAccessGrants */
+        ListCliAccessGrantsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.list#CliAccessGrants";
+            params?: components["schemas"]["ListCliAccessGrantsParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.list#CliAccessGrants. Check result.ok / result.errors for business failures. */
+        ListCliAccessGrantsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListCliAccessGrantsResult"];
+        };
+        /** @description CLI access requests across tenants, newest first; PENDING unless a status is given. */
+        ListCliAccessRequestsParams: {
+            /** @description PENDING (default), APPROVED or DECLINED. */
+            statusId?: string;
+            userId?: string;
+            tenantUserGroupId?: string;
+        };
+        ListCliAccessRequestsResult: {
+            requests?: unknown[];
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.list#CliAccessRequests */
+        ListCliAccessRequestsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.list#CliAccessRequests";
+            params?: components["schemas"]["ListCliAccessRequestsParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.list#CliAccessRequests. Check result.ok / result.errors for business failures. */
+        ListCliAccessRequestsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListCliAccessRequestsResult"];
+        };
+        /** @description Pauses an active CLI grant; the user's CLI stops in that tenant on their next call. */
+        PauseCliAccessGrantParams: {
+            grantId: string;
+        };
+        PauseCliAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.pause#CliAccessGrant */
+        PauseCliAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.pause#CliAccessGrant";
+            params?: components["schemas"]["PauseCliAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.pause#CliAccessGrant. Check result.ok / result.errors for business failures. */
+        PauseCliAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["PauseCliAccessGrantResult"];
+        };
+        /** @description Revokes a CLI grant; the user has no CLI in that tenant until granted again. */
+        RevokeCliAccessGrantParams: {
+            grantId: string;
+        };
+        RevokeCliAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.revoke#CliAccessGrant */
+        RevokeCliAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.revoke#CliAccessGrant";
+            params?: components["schemas"]["RevokeCliAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.revoke#CliAccessGrant. Check result.ok / result.errors for business failures. */
+        RevokeCliAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RevokeCliAccessGrantResult"];
+        };
+        /** @description Lifts a pause, optionally with a later end; refused when the grant has ended. */
+        UnpauseCliAccessGrantParams: {
+            grantId: string;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            thruDate?: string | number;
+            /** @description The grant ends this many days (each 24 hours) from the start, or from now when changing a grant. Neither days nor thruDate: no end. */
+            days?: number;
+        };
+        UnpauseCliAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.unpause#CliAccessGrant */
+        UnpauseCliAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.unpause#CliAccessGrant";
+            params?: components["schemas"]["UnpauseCliAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.unpause#CliAccessGrant. Check result.ok / result.errors for business failures. */
+        UnpauseCliAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UnpauseCliAccessGrantResult"];
+        };
+        /** @description Changes a CLI grant's end. */
+        UpdateCliAccessGrantParams: {
+            grantId: string;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+            thruDate?: string | number;
+            /** @description The grant ends this many days (each 24 hours) from the start, or from now when changing a grant. Neither days nor thruDate: no end. */
+            days?: number;
+            clearThruDate?: boolean;
+        };
+        UpdateCliAccessGrantResult: {
+            grant?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.update#CliAccessGrant */
+        UpdateCliAccessGrantRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.CliAccessAdminServices.update#CliAccessGrant";
+            params?: components["schemas"]["UpdateCliAccessGrantParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.CliAccessAdminServices.update#CliAccessGrant. Check result.ok / result.errors for business failures. */
+        UpdateCliAccessGrantResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UpdateCliAccessGrantResult"];
+        };
         /** @description One whole entry by key: the product tier first, then the named tenant's active entry. */
         GetKnowledgeEntryParams: {
             /** @description The one tenant whose entries are looked in; product only when omitted. */
@@ -853,6 +1389,7 @@ export interface components {
                 timeZone?: string;
                 /** @description Timestamp — ISO-8601 string or epoch milliseconds */
                 goLiveDate?: string | number;
+                agentEnabled?: boolean;
                 disabled?: boolean;
                 /** @description Timestamp — ISO-8601 string or epoch milliseconds */
                 createdDate?: string | number;
@@ -959,6 +1496,11 @@ export interface components {
              *                     before it. YYYY-MM-DD HH:mm:ss in the tenant's timezone, or ISO with an offset. Unchanged when omitted.
              */
             goLiveDate?: string;
+            /**
+             * @description DAR-BE-159. Whether the tenant may use the embedded
+             *                     agent (the deployment property must also be on). Unchanged when omitted.
+             */
+            agentEnabled?: boolean;
         };
         UpdateTenantResult: {
             /** @description True when updated. */
@@ -1428,6 +1970,160 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["UpdateUserAccountResult"];
         };
+        /**
+         * @description A person applies a planned proposal. Refused without write access, for a BLOCKED proposal, and (an
+         *                 exclusion) when an automation's filters differ from its run's (AUTOMATION_DRIFT). When the config changed since
+         *                 the plan the proposal turns STALE and nothing is written.
+         */
+        ApplyAuditChangeParams: {
+            proposalId: string;
+            planHash: string;
+        };
+        ApplyAuditChangeResult: {
+            appliedVersionId?: string;
+            status?: string;
+            statusMessage?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.AgentChangeFacadeServices.apply#AuditChange */
+        ApplyAuditChangeRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AgentChangeFacadeServices.apply#AuditChange";
+            params?: components["schemas"]["ApplyAuditChangeParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AgentChangeFacadeServices.apply#AuditChange. Check result.ok / result.errors for business failures. */
+        ApplyAuditChangeResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ApplyAuditChangeResult"];
+        };
+        /** @description The active tenant's tickets, newest first. */
+        ListBrainChangeTicketsParams: {
+            /** @description Only tickets in this status. */
+            status?: string;
+        };
+        ListBrainChangeTicketsResult: {
+            tickets?: unknown[];
+        };
+        /** @description JSON-RPC request envelope for facade.AgentChangeFacadeServices.list#BrainChangeTickets */
+        ListBrainChangeTicketsRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AgentChangeFacadeServices.list#BrainChangeTickets";
+            params?: components["schemas"]["ListBrainChangeTicketsParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AgentChangeFacadeServices.list#BrainChangeTickets. Check result.ok / result.errors for business failures. */
+        ListBrainChangeTicketsResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ListBrainChangeTicketsResult"];
+        };
+        /**
+         * @description Plans an open proposal again against the current config: the change is checked by its real save, which
+         *                 is rolled back, and planHash covers the change and the config it was planned against. Ends PLANNED, or INVALID
+         *                 with the save's refusal.
+         */
+        PlanAuditChangeParams: {
+            proposalId: string;
+        };
+        PlanAuditChangeResult: {
+            planHash?: string;
+            before?: Record<string, never>;
+            after?: Record<string, never>;
+            backtest?: Record<string, never>;
+            status?: string;
+            statusMessage?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.AgentChangeFacadeServices.plan#AuditChange */
+        PlanAuditChangeRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AgentChangeFacadeServices.plan#AuditChange";
+            params?: components["schemas"]["PlanAuditChangeParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AgentChangeFacadeServices.plan#AuditChange. Check result.ok / result.errors for business failures. */
+        PlanAuditChangeResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["PlanAuditChangeResult"];
+        };
+        /** @description A person declines an open proposal; it can no longer be applied. */
+        RejectAuditChangeParams: {
+            proposalId: string;
+            reason?: string;
+        };
+        RejectAuditChangeResult: {
+            status?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.AgentChangeFacadeServices.reject#AuditChange */
+        RejectAuditChangeRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AgentChangeFacadeServices.reject#AuditChange";
+            params?: components["schemas"]["RejectAuditChangeParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AgentChangeFacadeServices.reject#AuditChange. Check result.ok / result.errors for business failures. */
+        RejectAuditChangeResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RejectAuditChangeResult"];
+        };
+        /**
+         * @description A new planned proposal that puts back what an applied proposal changed, applied through apply#AuditChange
+         *                 with its own planHash.
+         */
+        RevertAuditChangeParams: {
+            proposalId: string;
+        };
+        RevertAuditChangeResult: {
+            newProposalId?: string;
+            status?: string;
+            statusMessage?: string;
+            planHash?: string;
+        };
+        /** @description JSON-RPC request envelope for facade.AgentChangeFacadeServices.revert#AuditChange */
+        RevertAuditChangeRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AgentChangeFacadeServices.revert#AuditChange";
+            params?: components["schemas"]["RevertAuditChangeParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AgentChangeFacadeServices.revert#AuditChange. Check result.ok / result.errors for business failures. */
+        RevertAuditChangeResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RevertAuditChangeResult"];
+        };
         /** @description List the fresh queries agents sent to this tenant's systems, newest first. Tenant admins only. */
         ListAgentQueryLogsParams: {
             pageIndex?: number;
@@ -1665,7 +2361,7 @@ export interface components {
             result: components["schemas"]["GetAuditFindingResult"];
         };
         /**
-         * @description Every open and pending finding of one audit and period, one per order (an order's lines under it, the
+         * @description Every open finding of one audit and period, one per order (an order's lines under it, the
          *                 line holding it up named), each with its statement and category. State is as of today.
          */
         GetAuditFindingsByOrderParams: {
@@ -1675,7 +2371,10 @@ export interface components {
             statement?: string;
             /** @description The report's period, e.g. 2026-10; blank is every period. */
             period?: string;
-            /** @description open or pending; blank is both. */
+            /**
+             * @description Kept for callers that send it: a finding is only ever open or fixed, and this
+             *                     lists the open ones whatever the value (DAR-BE-206).
+             */
             state?: string;
         };
         GetAuditFindingsByOrderResult: {
@@ -1793,7 +2492,11 @@ export interface components {
              * @description {audit: {id, name, period}, playableFrom: YYYY-MM-DD (the earliest
              *                     day play can record today), schedule: {active, time HH:mm,
              *                     timeZone, mixed (some check's automation is off the audit's schedule; saving puts it on), automations,
-             *                     checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label, savedRunId, runName}]}]}
+             *                     checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label, savedRunId, runName}]}],
+             *                     runEmail: {active, alsoSendTo: [address], members (how many accounts receive it by default: current tenant
+             *                     members and Darpan admins), admins (how many of those are Darpan admins), chatSpaceId or null, canEdit (the caller
+             *                     is a tenant admin; others see it read-only)} (DAR-BE-207:
+             *                     the update emailed after each run to the members and admins, plus alsoSendTo)}
              */
             settings?: Record<string, never>;
         };
@@ -1999,6 +2702,14 @@ export interface components {
              *                     keeps its value.
              */
             schedule?: Record<string, never>;
+            /**
+             * @description DAR-BE-207. {active (false stops the run email for this audit),
+             *                     alsoSendTo: [addresses sent to as well as the tenant's members], chatSpaceId (the tenant's chat space for a
+             *                     summary card; blank for none)}; absent keeps it, a field left out keeps its value. Any address that is not one
+             *                     refuses the save. Needs tenant admin rights for the active tenant (a Darpan admin has them): without them a
+             *                     save carrying runEmail is refused whole. Every change is kept in EntityAuditLog.
+             */
+            runEmail?: Record<string, never>;
         };
         SaveAuditSettingsResult: {
             ok?: boolean;
@@ -2008,7 +2719,7 @@ export interface components {
              * @description {audit: {id, name, period}, playableFrom: YYYY-MM-DD (the earliest
              *                     day play can record today), schedule: {active, time HH:mm,
              *                     timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label,
-             *                     savedRunId, runName}]}]}
+             *                     savedRunId, runName}]}], runEmail: {active, alsoSendTo, members, admins, chatSpaceId, canEdit}}
              */
             settings?: Record<string, never>;
         };
@@ -2835,6 +3546,71 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["VerifyPasswordResetCodeResult"];
+        };
+        /** @description The signed-in person's CLI state in the active tenant (LIVE, PAUSED, ENDED, NOT_GRANTED or DARPAN_ADMIN), the grant's end, how long a CLI sign-in lasts there, and their latest request. */
+        GetMyCliAccessParams: Record<string, never>;
+        GetMyCliAccessResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Errors. */
+            errors?: string[];
+            /** @description tenantUserGroupId, tenantLabel, state, thruDate, lifetimeDays, request (requestId, statusId, reason, requestedDate, decidedDate, decisionNote) or null. Null with no active tenant. */
+            access?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.CliAccessFacadeServices.get#MyCliAccess */
+        GetMyCliAccessRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.CliAccessFacadeServices.get#MyCliAccess";
+            params?: components["schemas"]["GetMyCliAccessParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.CliAccessFacadeServices.get#MyCliAccess. Check result.ok / result.errors for business failures. */
+        GetMyCliAccessResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetMyCliAccessResult"];
+        };
+        /** @description Asks a Darpan admin to turn the CLI on for the signed-in person in the active tenant. Asking again while a request is open updates its reason. Refused for a Darpan admin or when the CLI is already on there. */
+        RequestCliAccessParams: {
+            /** @description What it is for (optional, at most 500 characters). */
+            reason?: string;
+        };
+        RequestCliAccessResult: {
+            /** @description True when the request was filed. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description requestId, statusId, reason, requestedDate. */
+            request?: Record<string, never>;
+        };
+        /** @description JSON-RPC request envelope for facade.CliAccessFacadeServices.request#CliAccess */
+        RequestCliAccessRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.CliAccessFacadeServices.request#CliAccess";
+            params?: components["schemas"]["RequestCliAccessParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.CliAccessFacadeServices.request#CliAccess. Check result.ok / result.errors for business failures. */
+        RequestCliAccessResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RequestCliAccessResult"];
         };
         /**
          * @description Approve a waiting CLI sign-in as the signed-in person: the CLI's next poll gets a login key for
@@ -9322,7 +10098,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ListAgentQueryLogsRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["ApproveCliLoginRequest"] | components["schemas"]["DenyCliLoginRequest"] | components["schemas"]["GetCliLoginRequestRequest"] | components["schemas"]["ListCliSessionsRequest"] | components["schemas"]["LogoutCliSessionRequest"] | components["schemas"]["PollCliLoginRequest"] | components["schemas"]["RevokeCliSessionRequest"] | components["schemas"]["StartCliLoginRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["GetOmsGraphqlSchemaRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["RunOmsGraphqlAgentQueryRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsAgentConnectionsRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["RunNsSuiteQlAgentQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyGraphqlSchemaRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["RunShopifyGraphqlAgentQueryRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["DeleteTenantScriptRequest"] | components["schemas"]["DeleteTenantScriptDeploymentRequest"] | components["schemas"]["ListTenantScriptDeploymentsRequest"] | components["schemas"]["ListTenantScriptsRequest"] | components["schemas"]["RunTenantScriptRequest"] | components["schemas"]["RunTenantScriptDeploymentRequest"] | components["schemas"]["SaveTenantScriptRequest"] | components["schemas"]["SaveTenantScriptDeploymentRequest"];
+                "application/json": components["schemas"]["CreateAgentAccessGrantRequest"] | components["schemas"]["GetAgentUsageRequest"] | components["schemas"]["ListAgentAccessGrantsRequest"] | components["schemas"]["PauseAgentAccessGrantRequest"] | components["schemas"]["RevokeAgentAccessGrantRequest"] | components["schemas"]["UnpauseAgentAccessGrantRequest"] | components["schemas"]["UpdateAgentAccessGrantRequest"] | components["schemas"]["ListAllBrainChangeTicketsRequest"] | components["schemas"]["UpdateBrainChangeTicketRequest"] | components["schemas"]["ApproveCliAccessRequestRequest"] | components["schemas"]["CreateCliAccessGrantRequest"] | components["schemas"]["DeclineCliAccessRequestRequest"] | components["schemas"]["ListCliAccessGrantsRequest"] | components["schemas"]["ListCliAccessRequestsRequest"] | components["schemas"]["PauseCliAccessGrantRequest"] | components["schemas"]["RevokeCliAccessGrantRequest"] | components["schemas"]["UnpauseCliAccessGrantRequest"] | components["schemas"]["UpdateCliAccessGrantRequest"] | components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ApplyAuditChangeRequest"] | components["schemas"]["ListBrainChangeTicketsRequest"] | components["schemas"]["PlanAuditChangeRequest"] | components["schemas"]["RejectAuditChangeRequest"] | components["schemas"]["RevertAuditChangeRequest"] | components["schemas"]["ListAgentQueryLogsRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["GetMyCliAccessRequest"] | components["schemas"]["RequestCliAccessRequest"] | components["schemas"]["ApproveCliLoginRequest"] | components["schemas"]["DenyCliLoginRequest"] | components["schemas"]["GetCliLoginRequestRequest"] | components["schemas"]["ListCliSessionsRequest"] | components["schemas"]["LogoutCliSessionRequest"] | components["schemas"]["PollCliLoginRequest"] | components["schemas"]["RevokeCliSessionRequest"] | components["schemas"]["StartCliLoginRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["GetOmsGraphqlSchemaRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["RunOmsGraphqlAgentQueryRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsAgentConnectionsRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["RunNsSuiteQlAgentQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyGraphqlSchemaRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["RunShopifyGraphqlAgentQueryRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["DeleteTenantScriptRequest"] | components["schemas"]["DeleteTenantScriptDeploymentRequest"] | components["schemas"]["ListTenantScriptDeploymentsRequest"] | components["schemas"]["ListTenantScriptsRequest"] | components["schemas"]["RunTenantScriptRequest"] | components["schemas"]["RunTenantScriptDeploymentRequest"] | components["schemas"]["SaveTenantScriptRequest"] | components["schemas"]["SaveTenantScriptDeploymentRequest"];
             };
         };
         responses: {
@@ -9332,7 +10108,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ListAgentQueryLogsResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["ApproveCliLoginResponse"] | components["schemas"]["DenyCliLoginResponse"] | components["schemas"]["GetCliLoginRequestResponse"] | components["schemas"]["ListCliSessionsResponse"] | components["schemas"]["LogoutCliSessionResponse"] | components["schemas"]["PollCliLoginResponse"] | components["schemas"]["RevokeCliSessionResponse"] | components["schemas"]["StartCliLoginResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["GetOmsGraphqlSchemaResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["RunOmsGraphqlAgentQueryResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsAgentConnectionsResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["RunNsSuiteQlAgentQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyGraphqlSchemaResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["RunShopifyGraphqlAgentQueryResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["DeleteTenantScriptResponse"] | components["schemas"]["DeleteTenantScriptDeploymentResponse"] | components["schemas"]["ListTenantScriptDeploymentsResponse"] | components["schemas"]["ListTenantScriptsResponse"] | components["schemas"]["RunTenantScriptResponse"] | components["schemas"]["RunTenantScriptDeploymentResponse"] | components["schemas"]["SaveTenantScriptResponse"] | components["schemas"]["SaveTenantScriptDeploymentResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["CreateAgentAccessGrantResponse"] | components["schemas"]["GetAgentUsageResponse"] | components["schemas"]["ListAgentAccessGrantsResponse"] | components["schemas"]["PauseAgentAccessGrantResponse"] | components["schemas"]["RevokeAgentAccessGrantResponse"] | components["schemas"]["UnpauseAgentAccessGrantResponse"] | components["schemas"]["UpdateAgentAccessGrantResponse"] | components["schemas"]["ListAllBrainChangeTicketsResponse"] | components["schemas"]["UpdateBrainChangeTicketResponse"] | components["schemas"]["ApproveCliAccessRequestResponse"] | components["schemas"]["CreateCliAccessGrantResponse"] | components["schemas"]["DeclineCliAccessRequestResponse"] | components["schemas"]["ListCliAccessGrantsResponse"] | components["schemas"]["ListCliAccessRequestsResponse"] | components["schemas"]["PauseCliAccessGrantResponse"] | components["schemas"]["RevokeCliAccessGrantResponse"] | components["schemas"]["UnpauseCliAccessGrantResponse"] | components["schemas"]["UpdateCliAccessGrantResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ApplyAuditChangeResponse"] | components["schemas"]["ListBrainChangeTicketsResponse"] | components["schemas"]["PlanAuditChangeResponse"] | components["schemas"]["RejectAuditChangeResponse"] | components["schemas"]["RevertAuditChangeResponse"] | components["schemas"]["ListAgentQueryLogsResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["GetMyCliAccessResponse"] | components["schemas"]["RequestCliAccessResponse"] | components["schemas"]["ApproveCliLoginResponse"] | components["schemas"]["DenyCliLoginResponse"] | components["schemas"]["GetCliLoginRequestResponse"] | components["schemas"]["ListCliSessionsResponse"] | components["schemas"]["LogoutCliSessionResponse"] | components["schemas"]["PollCliLoginResponse"] | components["schemas"]["RevokeCliSessionResponse"] | components["schemas"]["StartCliLoginResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["GetOmsGraphqlSchemaResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["RunOmsGraphqlAgentQueryResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsAgentConnectionsResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["RunNsSuiteQlAgentQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyGraphqlSchemaResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["RunShopifyGraphqlAgentQueryResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["DeleteTenantScriptResponse"] | components["schemas"]["DeleteTenantScriptDeploymentResponse"] | components["schemas"]["ListTenantScriptDeploymentsResponse"] | components["schemas"]["ListTenantScriptsResponse"] | components["schemas"]["RunTenantScriptResponse"] | components["schemas"]["RunTenantScriptDeploymentResponse"] | components["schemas"]["SaveTenantScriptResponse"] | components["schemas"]["SaveTenantScriptDeploymentResponse"];
                 };
             };
         };

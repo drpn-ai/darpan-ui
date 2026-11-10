@@ -9,6 +9,13 @@
         {{ outcome === 'approved' ? 'CLI approved. Return to your terminal.' : 'CLI denied.' }}
       </p>
 
+      <template v-else-if="phase === 'noaccess' && myAccess">
+        <p class="section-note" role="alert" data-testid="cli-login-noaccess">
+          The Darpan CLI is not turned on for you in {{ myAccess.tenantLabel }}.
+        </p>
+        <CliAccessRequestCard :access="myAccess" />
+      </template>
+
       <template v-else-if="phase === 'ready'">
         <article class="static-page-summary-card">
           <span class="static-page-summary-label">Sign-in request</span>
@@ -62,10 +69,12 @@
 import { onBeforeUnmount, ref } from 'vue'
 import StaticPageFrame from '../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../components/ui/StaticPageSection.vue'
+import CliAccessRequestCard from '../components/settings/CliAccessRequestCard.vue'
 import { authFacade } from '../lib/api/facade'
+import type { MyCliAccess } from '../lib/api/types'
 import { formatDateTime } from '../lib/utils/date'
 
-type Phase = 'enter' | 'ready' | 'done' | 'notfound'
+type Phase = 'enter' | 'ready' | 'done' | 'notfound' | 'noaccess'
 
 // A ?code= in the link is deliberately never read: a link someone else sends must not be able to
 // pre-load a request. The person types the code their own terminal shows.
@@ -76,6 +85,7 @@ const startedLabel = ref('')
 const expiresLabel = ref('')
 const outcome = ref<'approved' | 'denied'>('approved')
 const busy = ref(false)
+const myAccess = ref<MyCliAccess | null>(null)
 const controller = new AbortController()
 let confirmedCode = ''
 
@@ -114,6 +124,24 @@ async function lookUp() {
   }
 }
 
+// DAR-BE-209: an approve can fail because the code expired, or because the CLI is not turned on for this person. The
+// refusal text is not matched: the person's own CLI access says which, and a person without it is offered the request.
+async function refused() {
+  confirmedCode = ''
+  try {
+    const access = (await authFacade.getMyCliAccess(controller.signal)).access ?? null
+    if (controller.signal.aborted) return
+    if (access && access.state !== 'LIVE' && access.state !== 'DARPAN_ADMIN') {
+      myAccess.value = access
+      phase.value = 'noaccess'
+      return
+    }
+  } catch {
+    // The access check failed too: fall back to the code message.
+  }
+  if (!controller.signal.aborted) phase.value = 'notfound'
+}
+
 async function answer(choice: 'approved' | 'denied') {
   if (busy.value || !confirmedCode) return
   busy.value = true
@@ -124,17 +152,13 @@ async function answer(choice: 'approved' | 'denied') {
       : await authFacade.denyCliLogin(payload, controller.signal)
     if (controller.signal.aborted) return
     if (!response.ok) {
-      confirmedCode = ''
-      phase.value = 'notfound'
+      await refused()
       return
     }
     outcome.value = choice
     phase.value = 'done'
   } catch {
-    if (!controller.signal.aborted) {
-      confirmedCode = ''
-      phase.value = 'notfound'
-    }
+    if (!controller.signal.aborted) await refused()
   } finally {
     busy.value = false
   }

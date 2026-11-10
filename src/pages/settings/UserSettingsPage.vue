@@ -123,6 +123,7 @@
     </StaticPageSection>
 
     <StaticPageSection title="CLI sessions">
+      <CliAccessRequestCard v-if="myCliAccess" :key="myCliAccess.tenantUserGroupId" :access="myCliAccess" />
       <p v-if="cliSessions.length === 0 && !cliSessionsLoadFailed" class="section-note" data-testid="cli-sessions-empty">No CLI signed in.</p>
       <div v-else-if="cliSessions.length > 0" class="static-page-summary-grid">
         <article
@@ -333,7 +334,8 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { authFacade, settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
-import type { CliSession, TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
+import type { CliSession, MyCliAccess, TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
+import CliAccessRequestCard from '../../components/settings/CliAccessRequestCard.vue'
 import { buildTimezoneOptions, resolveBrowserTimeZone } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -845,6 +847,22 @@ const cliSessionsError = ref<string | null>(null)
 const cliSessionsLoadFailed = ref(false)
 const revokingCliSessionId = ref<string | null>(null)
 const CLI_SESSIONS_LOAD_ERROR = 'Could not load CLI sessions.'
+// DAR-BE-209: the CLI state in the active tenant, with the request when it is not on. Not shown when it cannot be read.
+const myCliAccess = ref<MyCliAccess | null>(null)
+
+async function loadMyCliAccess() {
+  try {
+    const response = await authFacade.getMyCliAccess(pageAbortController.signal)
+    if (pageAbortController.signal.aborted) return
+    myCliAccess.value = response.access ?? null
+  } catch {
+    if (!pageAbortController.signal.aborted) myCliAccess.value = null
+  }
+}
+
+watch(activeTenantUserGroupId, (next, previous) => {
+  if (next && previous && next !== previous) void loadMyCliAccess()
+})
 
 async function loadCliSessions() {
   try {
@@ -887,6 +905,7 @@ onMounted(() => {
   document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handlePasswordWorkflowCancelRequest)
   void loadNotificationDefault()
   void loadCliSessions()
+  void loadMyCliAccess()
 })
 
 onBeforeUnmount(() => {

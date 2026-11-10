@@ -35,6 +35,8 @@ const getUserNotificationDefault = vi.hoisted(() => vi.fn())
 const saveUserNotificationDefault = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
 const listCliSessions = vi.hoisted(() => vi.fn())
+const getMyCliAccess = vi.hoisted(() => vi.fn())
+const requestCliAccess = vi.hoisted(() => vi.fn())
 const revokeCliSession = vi.hoisted(() => vi.fn())
 const saveUserSettings = vi.hoisted(() => vi.fn(async ({ displayName, timeZone }: { displayName?: string; timeZone?: string }) => {
   authState.sessionInfo = {
@@ -81,6 +83,8 @@ vi.mock('../../../lib/api/facade', () => ({
   },
   authFacade: {
     listCliSessions,
+    getMyCliAccess,
+    requestCliAccess,
     revokeCliSession,
   },
 }))
@@ -153,6 +157,8 @@ describe('UserSettingsPage', () => {
     listTenantChatSpaces.mockResolvedValue({ ok: true, messages: [], errors: [], chatSpaces: [] })
     listCliSessions.mockReset()
     listCliSessions.mockResolvedValue({ ok: true, messages: [], errors: [], cliSessions: [] })
+    getMyCliAccess.mockReset().mockResolvedValue({ ok: true, access: null })
+    requestCliAccess.mockReset()
     revokeCliSession.mockReset()
     revokeCliSession.mockResolvedValue({ ok: true, messages: [], errors: [] })
     saveUserNotificationDefault.mockReset()
@@ -739,6 +745,24 @@ describe('UserSettingsPage', () => {
   })
 
   describe('CLI sessions', () => {
+    // DAR-BE-209: the CLI state in the active tenant sits above the sessions, with the request when it is not on.
+    it('shows the CLI access card for the active tenant, with Request access when the CLI is not on', async () => {
+      getMyCliAccess.mockResolvedValue({ ok: true, access: { tenantUserGroupId: 'ACME', tenantLabel: 'Acme', state: 'NOT_GRANTED', lifetimeDays: 7, request: null } })
+      const wrapper = mountPage()
+      await flushPromises()
+      expect(getMyCliAccess).toHaveBeenCalledTimes(1)
+      expect(wrapper.get('[data-testid="cli-access-request"]').text()).toBe('Request access in Acme')
+    })
+
+    it('shows no card when the access cannot be read, and the sessions still list', async () => {
+      getMyCliAccess.mockRejectedValue(new Error('down'))
+      listCliSessions.mockResolvedValue({ ok: true, messages: [], errors: [], cliSessions: sessions })
+      const wrapper = mountPage()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="cli-access-card"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-testid="cli-session-row"]')).toHaveLength(2)
+    })
+
     const sessions = [
       { cliSessionId: 'C1', hostLabel: 'ada-laptop', createdDate: '2026-11-01T10:00:00Z', expiresDate: '2026-11-07T10:00:00Z' },
       { cliSessionId: 'C2', hostLabel: 'build-box', createdDate: '2026-11-02T10:00:00Z', expiresDate: '2026-11-08T10:00:00Z' },
