@@ -253,6 +253,9 @@ describe('AuditReportPage', () => {
 
     expect(w.get('[data-testid="audit-check-invoices-without-etail-id"]').text()).toContain('Queued')
     expect(w.get('[data-testid="audit-check-running-invoices-without-etail-id"]').isVisible()).toBe(false)
+    liveRoute.query = { category: 'health', source: 'checks' }
+    await flushPromises()
+    expect(w.get('[data-testid="audit-check-row-invoices-without-etail-id"]').text()).toContain('queued')
     w.unmount()
   })
 

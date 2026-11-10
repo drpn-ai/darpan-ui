@@ -80,7 +80,7 @@
             <article
               v-for="run in progress.active"
               :key="run.run"
-              class="audit-check audit-check--running"
+              class="audit-check"
               :data-testid="`audit-running-${run.checks[0]}`"
             >
               <div class="audit-detail-head">
@@ -540,7 +540,8 @@ function rowRunning(row: CheckRow): boolean {
   return row.checks.some((check) => runOf(check.id))
 }
 function rowTag(row: CheckRow): string {
-  if (rowRunning(row)) return 'running'
+  const run = row.checks.map((check) => runOf(check.id)).find(Boolean)
+  if (run) return runBadge(run).label.toLowerCase()
   const n = row.checks.length
   if (n > 1 && row.ran > 0 && row.ran < n) return `${row.ran} of ${n} ran`
   return checkStatusBadge(row.status).label.toLowerCase()
@@ -1466,8 +1467,8 @@ function statementText(id: string): string {
   }
 }
 
-/* DAR-UI-085. A play in progress: the house "running" look (dashed, muted, as connection diagnostics), plus one small
-   dot on Run health that breathes so the page reads as live at a glance. */
+/* DAR-UI-085. A play in progress: muted text inside the usual solid 1px lines (dashed means empty in this design system,
+   and a running check is not empty), plus one small dot on Run health that breathes so the page reads as live. */
 .audit-live-dot {
   display: inline-block;
   width: var(--space-1);
@@ -1485,12 +1486,7 @@ function statementText(id: string): string {
 }
 
 .audit-tag--running {
-  border-style: dashed;
   color: var(--text-muted);
-}
-
-.audit-check--running {
-  border-top-style: dashed;
 }
 
 @media (prefers-reduced-motion: reduce) {
