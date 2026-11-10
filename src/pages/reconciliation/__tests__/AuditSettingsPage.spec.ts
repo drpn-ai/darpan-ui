@@ -291,4 +291,17 @@ describe('AuditSettingsPage email after each run', () => {
     expect(w.get('[data-testid="audit-settings-error"]').text()).toBe('Not an email address: cfo@gorjana.con')
     expect(push).not.toHaveBeenCalled()
   })
+
+  it('is read-only for someone who cannot edit it, and Save leaves it out', async () => {
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { ...settings(), runEmail: { ...runEmail, canEdit: false } } } as never)
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(w.get('[data-testid="audit-settings-run-email-active"]').attributes('disabled')).toBeDefined()
+    expect(w.find('[data-testid="audit-settings-run-email"] input[type="text"]').exists()).toBe(false)
+    expect(w.get('[data-testid="audit-settings-also-send-to"]').text()).toBe('ops@gorjana.com')
+    expect(w.get('[data-testid="audit-settings-run-email-readonly"]').text()).toContain('Only tenant admins can change this.')
+    await w.get('[data-testid="audit-settings-name"]').setValue('System health')
+    await save(w)
+    expect(f.saveAuditSettings).toHaveBeenCalledWith({ audit: 'month-close', name: 'System health' })
+  })
 })

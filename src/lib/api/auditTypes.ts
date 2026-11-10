@@ -307,6 +307,8 @@ export interface RunEmailSettings {
   members: number
   /** Of those, how many are Darpan admins; absent on older backends. */
   admins?: number
+  /** False: the viewer may not change it (not a tenant admin); absent on older backends means true. */
+  canEdit?: boolean
   chatSpaceId: string | null
 }
 
@@ -366,7 +368,7 @@ export interface SaveAuditSettingsPayload {
   statements?: Array<{ id: string; text?: string; active?: boolean }>
   schedule?: { active: boolean; time: string; timeZone: string }
   /** Omitted: no change. */
-  runEmail?: Omit<RunEmailSettings, 'members' | 'admins'>
+  runEmail?: Omit<RunEmailSettings, 'members' | 'admins' | 'canEdit'>
 }
 
 export type SaveAuditSettingsResponse = GetAuditSettingsResponse

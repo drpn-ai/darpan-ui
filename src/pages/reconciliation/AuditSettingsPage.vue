@@ -70,11 +70,16 @@
               v-model="runEmailActive"
               label="Email after each run"
               test-id="audit-settings-run-email-active"
-              :disabled="saving"
+              :disabled="saving || !canEditRunEmail"
             />
             <p class="section-note" data-testid="audit-settings-run-email-members">{{ membersLine }}</p>
           </div>
-          <label class="audit-settings-field">
+          <div v-if="!canEditRunEmail" class="audit-settings-field" data-testid="audit-settings-run-email-readonly">
+            <span class="audit-settings-label">Also send to</span>
+            <p v-if="alsoSendTo.length" class="audit-settings-addresses" data-testid="audit-settings-also-send-to">{{ alsoSendTo.join(', ') }}</p>
+            <p class="section-note">Only tenant admins can change this.</p>
+          </div>
+          <label v-else class="audit-settings-field">
             <span class="audit-settings-label">Also send to</span>
             <WorkflowChipTextInput
               ref="alsoSendToInput"
@@ -241,6 +246,8 @@ const timezoneOptions = computed(() => buildTimezoneOptions(scheduleTimeZone.val
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
+// Absent on a backend that does not say: editable, as before.
+const canEditRunEmail = computed(() => original.value?.runEmail?.canEdit !== false)
 const membersLine = computed(() => {
   const members = original.value?.runEmail?.members ?? 0
   const tenant = authStore.sessionInfo?.activeTenantLabel
@@ -366,7 +373,7 @@ function changes(): SaveAuditSettingsPayload | null {
   }
 
   const email = was.runEmail
-  if (email && (runEmailActive.value !== email.active || alsoSendTo.value.join('\n') !== email.alsoSendTo.join('\n'))) {
+  if (email && canEditRunEmail.value && (runEmailActive.value !== email.active || alsoSendTo.value.join('\n') !== email.alsoSendTo.join('\n'))) {
     payload.runEmail = { active: runEmailActive.value, alsoSendTo: [...alsoSendTo.value], chatSpaceId: email.chatSpaceId }
   }
   return Object.keys(payload).length > 1 ? payload : null
@@ -457,6 +464,11 @@ onMounted(() => void load())
   gap: var(--space-3);
   align-items: center;
   min-width: 0;
+}
+
+.audit-settings-addresses {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .audit-settings-field {
