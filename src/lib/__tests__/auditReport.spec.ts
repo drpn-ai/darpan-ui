@@ -129,16 +129,30 @@ describe('auditReport', () => {
     expect(orderNameOf(rows)).toBe('#GOR195470263')
   })
 
-  // DAR-UI-081 (R8 M259806, "Exchange held by open return"). Where it stopped: the return holding it leads.
-  it('lays a held return out as the chain holding it', () => {
+  // DAR-UI-081 (R8 M259806, "Exchange held by open return"). DAR-UI-092 (Aditi: "the order looks like a lifecycle... the
+  // order records are expected to appear"). Aditi 2026-11-10: "the RMA wouldnt come after the exchange". Each record after
+  // the one it is made from: this return, its exchange (HotWax), then NetSuite's RMA, then the exchange's sales order.
+  // The open return holds the first missing record, the RMA, so it sits on that step.
+  it('lays a held return out as the chain holding it, in lifecycle order', () => {
     const rows = recordRows({ OMS: { return: [{ id: 'M259806', internalId: null, status: 'Completed', channel: 'AFTSHIP_RTN_CHANNEL',
       warrantyId: 'FV2MPKXZ', heldBy: { id: 'M192313', status: 'Requested' }, exchange: { id: 'EXC-#GOR196740771-3', netsuiteId: null } }] } })
-    expect(heldChain(rows).map((step) => [step.label, step.sub, step.status, step.cause])).toEqual([
-      ['Return M192313', 'HotWax · same order', 'Requested', true],
-      ['Exchange EXC-#GOR196740771-3', 'HotWax exchange order', 'Not in NetSuite', false],
-      ['Return M259806', 'this finding', 'Waits for the exchange', false],
-      ['NetSuite RMA', 'for M259806', 'None yet', false],
+    const chain = heldChain(rows)
+    expect(chain.map((step) => [step.label, step.sub, step.status, step.present, step.heldBy?.label ?? null])).toEqual([
+      ['Return M259806', 'HotWax · this finding', 'Completed', true, null],
+      ['Exchange EXC-#GOR196740771-3', 'HotWax · from M259806', 'Created', true, null],
+      ['RMA for M259806', 'NetSuite · the return', 'Not created', false, 'Return M192313'],
+      ['Exchange in NetSuite', 'NetSuite · after the RMA', 'Not sent', false, null],
     ])
+    expect(chain[2]?.heldBy).toEqual({ label: 'Return M192313', sub: 'HotWax · open on the same order', status: 'Requested' })
+    // No exchange: the return, then its RMA, held.
+    const plain = heldChain(recordRows({ OMS: { return: [{ id: 'M259806', internalId: null, status: null, heldBy: { id: 'M192313', status: null } }] } }))
+    expect(plain.map((step) => [step.label, step.status, step.heldBy?.status ?? null])).toEqual([
+      ['Return M259806', 'Open', null], ['RMA for M259806', 'Not created', 'Open'],
+    ])
+    // A read that finds the exchange in NetSuite says so as read, even though it should come after the RMA.
+    const synced = recordRows({ OMS: { return: [{ id: 'M259806', internalId: null, status: 'Completed',
+      heldBy: { id: 'M192313', status: 'Requested' }, exchange: { id: 'EXC-#GOR196740771-3', netsuiteId: '88123' } }] } })
+    expect(heldChain(synced).at(-1)).toMatchObject({ label: 'Exchange in NetSuite', sub: 'NetSuite · 88123', status: 'Sent', present: true })
     expect(heldChain(recordRows({ OMS: { return: [{ id: 'M1', internalId: null, status: null }] } }))).toEqual([])
   })
 

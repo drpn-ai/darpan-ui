@@ -520,6 +520,33 @@ describe('AuditReportPage', () => {
   })
 
   // DAR-UI-071. With no cause to explain it, the checks are the only explanation, so the evidence shows.
+  // DAR-UI-092 (Aditi on R2 M253406: "this UI is also not logically ordered"): the record first, then the verdict, then
+  // the held chain in the order its records come to be.
+  it('reads a held return as its record, the verdict, then the chain in lifecycle order', async () => {
+    f.getAuditFinding.mockResolvedValue({ ok: true, finding: { ...findingDocument, finding: { ...findingDocument.finding,
+      headline: 'Exchange held by open return',
+      records: { OMS: { return: [{ id: 'M253406', internalId: null, status: 'Completed', returnDate: '2026-10-09', channel: 'AFTSHIP_RTN_CHANNEL',
+        warrantyId: 'K7Z706YO', heldBy: { id: 'M247105', status: 'Requested' }, exchange: { id: 'EXC-#GOR196940093-2', netsuiteId: null } }] } },
+      fix: { ...findingDocument.finding.fix, owner: 'HotWax Support', where: 'OMS', action: 'Close return M247105 (RETURN_REQUESTED) in HotWax.' } } } } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+
+    const html = w.get('[data-testid="audit-columns"]').html()
+    const at = (id: string) => html.indexOf(`data-testid="${id}"`)
+    const order = ['audit-finding-headline', 'audit-record-detail', 'audit-finding-verdict', 'audit-chain-step', 'audit-history-row'].map(at)
+    expect(order.every((index) => index >= 0)).toBe(true)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+    // Aditi 2026-11-10: the RMA comes before the exchange's sales order; the open return sits on the step it holds.
+    const steps = w.findAll('[data-testid="audit-chain-step"]')
+    expect(steps.map((step) => step.text().split(/\s{2,}|\n/)[0]?.trim())).toEqual([
+      expect.stringContaining('Return M253406'), expect.stringContaining('Exchange EXC-#GOR196940093-2'),
+      expect.stringContaining('RMA for M253406'), expect.stringContaining('Exchange in NetSuite'),
+    ])
+    expect(w.findAll('[data-testid="audit-chain-held"]')).toHaveLength(1)
+    expect(steps[2]?.get('[data-testid="audit-chain-held"]').text()).toContain('Return M247105')
+  })
+
   it('shows the evidence only for a finding no cause explains', async () => {
     f.getAuditFinding.mockResolvedValue({ ok: true, finding: { ...findingDocument,
       finding: { ...findingDocument.finding, diagnosis: { conclusion: null, explanation: null } } } } as never)

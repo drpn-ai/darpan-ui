@@ -242,12 +242,22 @@
                 </span>
               </div>
 
-              <!-- DAR-UI-081. Verdict first: the statement and record, what is wrong, then what it is stuck on and what to do. -->
+              <!-- DAR-UI-081. Verdict first: the statement and record, what is wrong, then what it is stuck on and what to do.
+                   DAR-UI-092: the record's own facts sit between the title and the verdict. -->
               <p v-if="eyebrow" class="micro-label audit-eyebrow" data-testid="audit-finding-eyebrow">{{ eyebrow }}</p>
               <p class="audit-lead" data-testid="audit-finding-headline">{{ lead }}</p>
 
               <dl v-if="money.length" class="audit-facts">
                 <template v-for="item in money" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></template>
+              </dl>
+
+              <!-- DAR-UI-092 (Aditi: "not logically ordered"). The record the finding is about, under its title: then the verdict,
+                   then the records it sits among. -->
+              <dl v-if="details.length" class="audit-facts audit-records">
+                <div v-for="fact in details" :key="fact.key" data-testid="audit-record-detail">
+                  <dt>{{ fact.label }}</dt>
+                  <dd>{{ fact.value }}<span v-if="fact.status" class="audit-muted"> · {{ fact.status }}</span></dd>
+                </div>
               </dl>
 
               <p v-if="whyLine && !findingDoc.finding.fix.action" class="audit-body audit-muted">{{ whyLine }}</p>
@@ -266,13 +276,20 @@
                 </template>
               </div>
 
-              <!-- DAR-UI-081. A return held behind another: where it stopped, the return holding it outlined. -->
+              <!-- DAR-UI-081/092. A return held behind another: each record after the one it is made from, a missing one dashed,
+                   the return holding it outlined on the first missing step. -->
               <ol v-if="chain.length" class="audit-chain" aria-label="Where it stopped">
-                <li v-for="step in chain" :key="step.key" class="audit-chain-step" :class="{ 'audit-chain-step--cause': step.cause }" data-testid="audit-chain-step">
+                <li v-for="step in chain" :key="step.key" class="audit-chain-step" :class="{ 'audit-chain-step--missing': !step.present }" data-testid="audit-chain-step">
                   <span class="audit-chain-mark" aria-hidden="true" />
                   <span class="audit-chain-body">
-                    <span>{{ step.label }}<span v-if="step.sub" class="audit-row-sub audit-block">{{ step.sub }}</span></span>
-                    <span class="audit-row-sub">{{ step.status }}</span>
+                    <span class="audit-chain-line">
+                      <span>{{ step.label }}<span v-if="step.sub" class="audit-row-sub audit-block">{{ step.sub }}</span></span>
+                      <span class="audit-row-sub">{{ step.status }}</span>
+                    </span>
+                    <span v-if="step.heldBy" class="audit-chain-line audit-chain-held" data-testid="audit-chain-held">
+                      <span><span class="audit-row-sub audit-block">Held by</span>{{ step.heldBy.label }}<span class="audit-row-sub audit-block">{{ step.heldBy.sub }}</span></span>
+                      <span class="audit-row-sub">{{ step.heldBy.status }}</span>
+                    </span>
                   </span>
                 </li>
               </ol>
@@ -328,13 +345,6 @@
                   </li>
                 </ul>
               </template>
-
-              <dl v-if="details.length" class="audit-facts audit-records">
-                <div v-for="fact in details" :key="fact.key" data-testid="audit-record-detail">
-                  <dt>{{ fact.label }}</dt>
-                  <dd>{{ fact.value }}<span v-if="fact.status" class="audit-muted"> · {{ fact.status }}</span></dd>
-                </div>
-              </dl>
 
               <!-- DAR-UI-071. A finding its cause explains needs no evidence: the fix and the records already say it. -->
               <details v-if="findingDoc.finding.evidence.checks.length && !findingDoc.finding.diagnosis.conclusion" class="audit-fold" :open="evidenceFailed">
@@ -1272,7 +1282,8 @@ function statementText(id: string): string {
   border-color: var(--border);
 }
 
-/* A return held behind another: one step per record, joined by a rule; the step holding the rest outlined. */
+/* A return held behind another: one step per record, joined by a rule; a missing record dashed, the record holding it
+   outlined inside the first missing step. */
 .audit-chain {
   display: grid;
   margin: 0;
@@ -1302,27 +1313,40 @@ function statementText(id: string): string {
   width: var(--space-1-5);
   height: var(--space-1-5);
   margin-top: var(--space-1);
-  border: 1px dashed var(--text-dim);
+  border: 1px solid var(--text-soft);
   border-radius: var(--radius-pill);
+  background: var(--text-soft);
 }
 
 .audit-chain-body {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
+  display: grid;
+  gap: var(--space-1-5);
   overflow-wrap: anywhere;
 }
 
-.audit-chain-step--cause .audit-chain-body {
+.audit-chain-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.audit-chain-step--missing .audit-chain-mark {
+  border-style: dashed;
+  border-color: var(--text-dim);
+  background: none;
+}
+
+.audit-chain-step--missing .audit-chain-body {
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.audit-chain-held {
   padding: var(--space-1-5) var(--space-2);
   border: 1px solid var(--text-soft);
   border-radius: var(--radius-sm);
   background: var(--surface-3);
-}
-
-.audit-chain-step--cause .audit-chain-mark {
-  border-style: solid;
-  border-color: var(--text-soft);
 }
 
 .audit-block {
@@ -1331,11 +1355,6 @@ function statementText(id: string): string {
 
 .audit-nowrap {
   white-space: nowrap;
-}
-
-.audit-records {
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border-soft);
 }
 
 /* A record's dt and dd sit in the list's grid; the wrapper only groups them for the test and a reader. */

@@ -208,26 +208,35 @@ export interface ChainStep {
   label: string
   sub: string
   status: string
-  /** The step holding the others: the fix acts on it. */
-  cause: boolean
+  /** The record exists; a missing one draws dashed. */
+  present: boolean
+  /** The record holding this step back (the fix acts on it), on the first missing step. */
+  heldBy: { label: string; sub: string; status: string } | null
 }
 
 /**
- * DAR-UI-081. Where a return held behind another stopped (R8 "Exchange held by open return"): the open return holding it,
- * its exchange order, the return itself, then NetSuite, which has none of it yet. Empty for any other finding.
+ * DAR-UI-081. Where a return held behind another stopped (R2 "Exchange held by open return"). Empty for any other finding.
+ * DAR-UI-092 (Aditi: "the order looks like a lifecycle"; 2026-11-10: "the RMA wouldnt come after the exchange"): one
+ * record in one system per step, each after the record it is made from. HotWax makes the return and its exchange order;
+ * NetSuite then takes the return's RMA, and only after it the exchange's sales order. The open return holds the first
+ * missing record, the RMA, so it sits on that step.
  */
 export function heldChain(rows: RecordRow[]): ChainStep[] {
   const row = rows.find((candidate) => candidate.heldBy)
   if (!row?.heldBy) return []
   const steps: ChainStep[] = [
-    { key: 'held-by', label: `Return ${row.heldBy.id}`, sub: `${row.system} · same order`, status: row.heldBy.status || 'Open', cause: true },
+    { key: 'return', label: `Return ${row.id}`, sub: `${row.system} · this finding`, status: row.status || 'Open', present: true, heldBy: null },
   ]
   if (row.exchange) {
-    steps.push({ key: 'exchange', label: `Exchange ${row.exchange.id}`, sub: `${row.system} exchange order`,
-      status: row.exchange.netsuiteId ? 'In NetSuite' : 'Not in NetSuite', cause: false })
+    steps.push({ key: 'exchange', label: `Exchange ${row.exchange.id}`, sub: `${row.system} · from ${row.id}`, status: 'Created', present: true, heldBy: null })
   }
-  steps.push({ key: 'return', label: `Return ${row.id}`, sub: 'this finding', status: row.exchange ? 'Waits for the exchange' : 'Waiting', cause: false })
-  steps.push({ key: 'netsuite', label: 'NetSuite RMA', sub: `for ${row.id}`, status: 'None yet', cause: false })
+  steps.push({ key: 'rma', label: `RMA for ${row.id}`, sub: 'NetSuite · the return', status: 'Not created', present: false,
+    heldBy: { label: `Return ${row.heldBy.id}`, sub: `${row.system} · open on the same order`, status: row.heldBy.status || 'Open' } })
+  if (row.exchange) {
+    const sent = row.exchange.netsuiteId
+    steps.push({ key: 'exchange-netsuite', label: 'Exchange in NetSuite', sub: sent ? `NetSuite · ${sent}` : 'NetSuite · after the RMA',
+      status: sent ? 'Sent' : 'Not sent', present: Boolean(sent), heldBy: null })
+  }
   return steps
 }
 
