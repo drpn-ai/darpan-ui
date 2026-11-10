@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import {
-  buildReconciliationRuleSetDraftState,
   type ReconciliationRuleSetDraftRule,
+  type ReconciliationRuleSetDraftState,
 } from '../../../lib/reconciliationRuleSetDraft'
 
 const getJsonSchema = vi.hoisted(() => vi.fn())
@@ -90,9 +90,9 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 import { ApiCallError } from '../../../lib/api/client'
 import ReconciliationRuleSetManagerPage from '../ReconciliationRuleSetManagerPage.vue'
 
-function createDraftState() {
-  return buildReconciliationRuleSetDraftState(
-    {
+function createDraftState(): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'RS_JSON_ORDER_COMPARE',
       runName: 'JSON Order Compare',
       file1SystemEnumId: 'OMS',
@@ -108,13 +108,13 @@ function createDraftState() {
       file2SchemaFileName: 'test-shopify-orders.schema.json',
       file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
-function createSingleSidedDraftState() {
-  return buildReconciliationRuleSetDraftState(
-    {
+function createSingleSidedDraftState(): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'NS_ORDERS_NO_FULFILLMENT_RS',
       runName: 'Orders that never shipped',
       scopeMode: 'EVALUATE',
@@ -130,13 +130,13 @@ function createSingleSidedDraftState() {
       file2FileTypeEnumId: '',
       file2PrimaryIdExpression: [],
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
-function createSavedRunReopenDraftState(rules: ReconciliationRuleSetDraftRule[] = []) {
-  return buildReconciliationRuleSetDraftState(
-    {
+function createSavedRunReopenDraftState(rules: ReconciliationRuleSetDraftRule[] = []): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'RS_ORDER_SYNC',
       runName: 'Order Sync',
       file1SystemEnumId: 'SHOPIFY',
@@ -151,13 +151,13 @@ function createSavedRunReopenDraftState(rules: ReconciliationRuleSetDraftRule[] 
       file2PrimaryIdExpression: ['$[*].shopify_order_id'],
       rules,
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
-function createApiDraftState() {
-  return buildReconciliationRuleSetDraftState(
-    {
+function createApiDraftState(): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'RS_API_ORDER_SYNC',
       runName: 'API Order Sync',
       file1SystemEnumId: 'OMS',
@@ -191,8 +191,8 @@ function createApiDraftState() {
         },
       ],
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
 describe('ReconciliationRuleSetManagerPage', () => {
@@ -517,8 +517,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
 
   it('shows every composite key field in the Primary ID summary', async () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
-      {
+    draftStoreState.ruleSetDraftState = {
+      draft: {
         savedRunId: 'RS_COMPOSITE_SUMMARY',
         runName: 'Composite Summary',
         file1SystemEnumId: 'SHOPIFY',
@@ -532,8 +532,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
         file2SchemaFileName: 'oms-returns',
         file2PrimaryIdExpression: ['$.returns[*].return_id', '$.returns[*].product_id'],
       },
-      'ruleset-manager',
-    )
+      resumeStepId: 'ruleset-manager',
+    }
     window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
@@ -698,8 +698,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
   // guard on the UI side, not a reproduction of the defect itself -- the UI never mis-derived this
   // value, so no UI code change was needed here.
   it('names the system on the System card and the endpoint on the Schema card', async () => {
-    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
-      {
+    draftStoreState.ruleSetDraftState = {
+      draft: {
         savedRunId: 'RS_RETURNS_PROD',
         runName: 'Returns Prod',
         file1SystemEnumId: 'SHOPIFY_RETURN_REFS',
@@ -731,8 +731,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
           },
         ],
       },
-      'ruleset-manager',
-    )
+      resumeStepId: 'ruleset-manager',
+    }
     window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
@@ -820,14 +820,14 @@ describe('ReconciliationRuleSetManagerPage', () => {
     // The id an operator reuses per environment: one `rails_prod` on the HotWax side, another on
     // the Shopify side. Printing the id names the environment and neither config; matching on id
     // alone would print whichever description happened to come first for both rows.
-    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
-      {
+    draftStoreState.ruleSetDraftState = {
+      draft: {
         ...createApiDraftState().draft,
         file1SourceConfigId: 'rails_prod',
         file2SourceConfigId: 'rails_prod',
       },
-      'ruleset-manager',
-    )
+      resumeStepId: 'ruleset-manager',
+    }
     listAutomationSourceOptions.mockResolvedValue({
       ok: true,
       messages: [],
@@ -1167,8 +1167,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
     permissionState.canRunActiveTenantReconciliation = false
     permissionState.canEditTenantSettings = false
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
-      {
+    draftStoreState.ruleSetDraftState = {
+      draft: {
         savedRunId: '',
         runName: 'Unsaved Draft',
         file1SystemEnumId: 'OMS',
@@ -1184,8 +1184,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
         file2SchemaFileName: 'test-shopify-orders.schema.json',
         file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
       },
-      'ruleset-manager',
-    )
+      resumeStepId: 'ruleset-manager',
+    }
     window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)

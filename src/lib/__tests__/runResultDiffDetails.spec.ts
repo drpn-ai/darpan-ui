@@ -12,7 +12,6 @@ import {
   normalizeServerBucketCounts,
   normalizeServerRuleOption,
   parseDiffData,
-  resolveDiffType,
   stringifyDiffJson,
 } from '../runResultDiffDetails'
 
@@ -44,12 +43,6 @@ describe('runResultDiffDetails', () => {
     expect(isJsonCollapseValue([1])).toBe(true)
     expect(isJsonCollapseValue(null)).toBe(false)
     expect(isJsonCollapseValue('text')).toBe(false)
-  })
-
-  it('resolveDiffType prefers diffType over type and trims values', () => {
-    expect(resolveDiffType({ diffType: ' FIELD_MISMATCH ', type: 'other' })).toBe('FIELD_MISMATCH')
-    expect(resolveDiffType({ type: 'missing_in_OMS' })).toBe('missing_in_OMS')
-    expect(resolveDiffType({})).toBe('')
   })
 
   it('parseDiffData parses JSON strings and passes through everything else', () => {

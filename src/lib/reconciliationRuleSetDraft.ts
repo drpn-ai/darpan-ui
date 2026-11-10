@@ -128,17 +128,6 @@ export interface ReconciliationRuleSetDraftState {
   resumeStepId: ReconciliationRuleSetDraftStepId | null
 }
 
-/**
- * Build a serializable state payload from a rule-set draft.  The result is
- * spread into Vue Router `history.state` so it survives navigation.
- */
-export function buildReconciliationRuleSetDraftState(
-  draft: ReconciliationRuleSetDraft,
-  resumeStepId?: ReconciliationRuleSetDraftStepId | null,
-): ReconciliationRuleSetDraftState {
-  return { draft, resumeStepId: resumeStepId ?? null }
-}
-
 function normalizePreAction(value: unknown): ReconciliationRulePreAction | null {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toUpperCase()

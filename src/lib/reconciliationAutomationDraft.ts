@@ -1,11 +1,7 @@
 import type { SavedRunSummary, SavedRunSystemOption } from './api/types'
 import type { AutomationSourcePayload, SaveAutomationPayload } from './api/facadeTypes'
 import { normalizeExcludeFilters, type SourceExcludeFilter } from './sourceExcludeFilters'
-import { isRecord, removeEmpty } from './utils/objects'
-import { normalizeString } from './utils/strings'
-
-// Draft state management has moved to src/stores/reconciliationDraft.ts.
-// This file keeps types, constants, and pure payload-building utilities.
+import { removeEmpty } from './utils/objects'
 
 export const AUTOMATION_INPUT_MODE_API_RANGE = 'AUT_IN_API_RANGE'
 export const AUTOMATION_INPUT_MODE_SFTP_FILES = 'AUT_IN_SFTP_FILES'
@@ -100,18 +96,6 @@ export interface ReconciliationAutomationDraftState {
   savedRun: SavedRunSummary | null
 }
 
-/**
- * Build a serializable state payload from an automation draft.  The result
- * can be spread into Vue Router `history.state` or saved to sessionStorage.
- */
-export function buildReconciliationAutomationDraftState(
-  draft: ReconciliationAutomationDraft,
-  resumeStepId: ReconciliationAutomationStepId | null,
-  savedRun: SavedRunSummary | null,
-): ReconciliationAutomationDraftState {
-  return { draft, resumeStepId, savedRun }
-}
-
 export function automationWindowNeedsCount(windowTypeEnumId: string | undefined): boolean {
   return COUNTED_WINDOW_TYPES.has(windowTypeEnumId ?? '')
 }
@@ -123,155 +107,6 @@ export function automationWindowUsesCustomRange(windowTypeEnumId: string | undef
 export function buildDefaultAutomationName(savedRunName: string): string {
   const trimmedName = savedRunName.trim()
   return trimmedName ? `${trimmedName} Automation` : 'New Automation'
-}
-
-function normalizeNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return undefined
-}
-
-function normalizeBoolean(value: unknown): boolean | undefined {
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'string') {
-    if (value === 'Y' || value.toLowerCase() === 'true') return true
-    if (value === 'N' || value.toLowerCase() === 'false') return false
-  }
-  return undefined
-}
-
-function normalizeChatSpaceChoice(value: unknown): ReconciliationAutomationChatSpaceChoice | undefined {
-  const normalized = normalizeString(value)
-  return normalized === 'default' || normalized === 'existing' || normalized === 'new' || normalized === 'none'
-    ? normalized
-    : undefined
-}
-
-function readSourceDraft(value: unknown): ReconciliationAutomationSourceDraft {
-  if (!isRecord(value)) return {}
-  return removeEmpty({
-    sourceTypeEnumId: normalizeString(value.sourceTypeEnumId),
-    sftpServerId: normalizeString(value.sftpServerId),
-    nsRestletConfigId: normalizeString(value.nsRestletConfigId),
-    systemMessageRemoteId: normalizeString(value.systemMessageRemoteId),
-    remotePathTemplate: normalizeString(value.remotePathTemplate),
-    fileNamePattern: normalizeString(value.fileNamePattern),
-    apiRequestTemplateJson: normalizeString(value.apiRequestTemplateJson),
-    apiResponsePathExpression: normalizeString(value.apiResponsePathExpression),
-    dateFromParameterName: normalizeString(value.dateFromParameterName),
-    dateToParameterName: normalizeString(value.dateToParameterName),
-    safeMetadataJson: normalizeString(value.safeMetadataJson),
-    optionKey: normalizeString(value.optionKey),
-    omsRestSourceConfigId: normalizeString(value.omsRestSourceConfigId),
-  }) as ReconciliationAutomationSourceDraft
-}
-
-function readSources(value: unknown): Partial<Record<ReconciliationAutomationFileSide, ReconciliationAutomationSourceDraft>> | undefined {
-  if (!isRecord(value)) return undefined
-  const file1 = readSourceDraft(value.FILE_1)
-  const file2 = readSourceDraft(value.FILE_2)
-  return removeEmpty({
-    FILE_1: Object.keys(file1).length ? file1 : undefined,
-    FILE_2: Object.keys(file2).length ? file2 : undefined,
-  }) as Partial<Record<ReconciliationAutomationFileSide, ReconciliationAutomationSourceDraft>>
-}
-
-function readDraft(value: unknown): ReconciliationAutomationDraft | null {
-  if (!isRecord(value)) return null
-  const intent = normalizeString(value.intent)
-  const draft = removeEmpty({
-    automationId: normalizeString(value.automationId),
-    automationName: normalizeString(value.automationName),
-    description: normalizeString(value.description),
-    intent: intent === 'existing-run' || intent === 'new-run' ? intent : undefined,
-    savedRunId: normalizeString(value.savedRunId),
-    savedRunType: normalizeString(value.savedRunType),
-    inputModeEnumId: normalizeString(value.inputModeEnumId),
-    scheduleExpr: normalizeString(value.scheduleExpr),
-    windowTimeZone: normalizeString(value.windowTimeZone),
-    relativeWindowTypeEnumId: normalizeString(value.relativeWindowTypeEnumId),
-    relativeWindowCount: normalizeNumber(value.relativeWindowCount),
-    customWindowStartDate: normalizeString(value.customWindowStartDate),
-    customWindowEndDate: normalizeString(value.customWindowEndDate),
-    maxWindowDays: normalizeNumber(value.maxWindowDays),
-    splitWindowDays: normalizeNumber(value.splitWindowDays),
-    isActive: normalizeBoolean(value.isActive),
-    returnLabel: normalizeString(value.returnLabel),
-    returnPath: normalizeString(value.returnPath),
-    chatSpaceChoice: normalizeChatSpaceChoice(value.chatSpaceChoice),
-    chatSpaceId: normalizeString(value.chatSpaceId),
-    newChatSpaceName: normalizeString(value.newChatSpaceName),
-    newChatSpaceProvider: normalizeString(value.newChatSpaceProvider),
-    newChatSpaceChannelId: normalizeString(value.newChatSpaceChannelId),
-    newChatSpaceUrl: normalizeString(value.newChatSpaceUrl),
-    sources: readSources(value.sources),
-  }) as ReconciliationAutomationDraft
-  return Object.keys(draft).length ? draft : null
-}
-
-function readSavedRunSystemOption(value: unknown): SavedRunSystemOption | null {
-  if (!isRecord(value)) return null
-  const enumId = normalizeString(value.enumId)
-  if (!enumId) return null
-  return removeEmpty({
-    fileSide: normalizeString(value.fileSide),
-    enumId,
-    enumCode: normalizeString(value.enumCode),
-    description: normalizeString(value.description),
-    label: normalizeString(value.label),
-    fileTypeEnumId: normalizeString(value.fileTypeEnumId),
-    fileTypeLabel: normalizeString(value.fileTypeLabel),
-    idFieldExpression: normalizeString(value.idFieldExpression),
-    schemaFileName: normalizeString(value.schemaFileName),
-    sourceTypeEnumId: normalizeString(value.sourceTypeEnumId),
-    sourceTypeLabel: normalizeString(value.sourceTypeLabel),
-    systemMessageRemoteId: normalizeString(value.systemMessageRemoteId),
-    systemMessageRemoteLabel: normalizeString(value.systemMessageRemoteLabel),
-    nsRestletConfigId: normalizeString(value.nsRestletConfigId),
-    nsRestletConfigLabel: normalizeString(value.nsRestletConfigLabel),
-    sourceConfigId: normalizeString(value.sourceConfigId),
-    sourceConfigType: normalizeString(value.sourceConfigType),
-  }) as SavedRunSystemOption
-}
-
-function readSavedRun(value: unknown): SavedRunSummary | null {
-  if (!isRecord(value)) return null
-  const savedRunId = normalizeString(value.savedRunId)
-  const runName = normalizeString(value.runName)
-  if (!savedRunId || !runName) return null
-  const systemOptions = Array.isArray(value.systemOptions)
-    ? value.systemOptions.map(readSavedRunSystemOption).filter((option): option is SavedRunSystemOption => option !== null)
-    : []
-  return removeEmpty({
-    savedRunId,
-    runName,
-    description: normalizeString(value.description),
-    companyUserGroupId: normalizeString(value.companyUserGroupId),
-    companyLabel: normalizeString(value.companyLabel),
-    runType: normalizeString(value.runType),
-    reconciliationMappingId: normalizeString(value.reconciliationMappingId),
-    ruleSetId: normalizeString(value.ruleSetId),
-    compareScopeId: normalizeString(value.compareScopeId),
-    requiresSystemSelection: normalizeBoolean(value.requiresSystemSelection) ?? false,
-    defaultFile1SystemEnumId: normalizeString(value.defaultFile1SystemEnumId),
-    defaultFile2SystemEnumId: normalizeString(value.defaultFile2SystemEnumId),
-    systemOptions,
-  }) as SavedRunSummary
-}
-
-export function readReconciliationAutomationDraftState(stateLike: unknown): ReconciliationAutomationDraftState | null {
-  if (!isRecord(stateLike)) return null
-  const draft = readDraft(stateLike.draft ?? stateLike)
-  if (!draft) return null
-  const resumeStepId = normalizeString(stateLike.resumeStepId)
-  return {
-    draft,
-    resumeStepId: (resumeStepId as ReconciliationAutomationStepId | null) ?? null,
-    savedRun: readSavedRun(stateLike.savedRun),
-  }
 }
 
 function resolveSavedRunSide(savedRun: SavedRunSummary, fileSide: ReconciliationAutomationFileSide): SavedRunSystemOption | null {

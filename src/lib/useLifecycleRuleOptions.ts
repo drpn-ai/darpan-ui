@@ -8,7 +8,6 @@ import { peekAccountMeta, readAccountMeta, readCacheScopeToken, storeAccountMeta
 // settings form. Nothing is read on the spot: once the fields are known every field's values are read in the
 // background, and both are kept as account metadata (readCache meta), which no Darpan write can change.
 export interface LifecycleRuleSource { nsAuthConfigId: string; recordType: string }
-export interface LifecycleRuleDraft { fieldId: string; fieldLabel: string; value: string; valueLabel: string }
 type Scope = 'STAGE' | 'FINDING'
 type RuleValue = { value: string; label: string }
 

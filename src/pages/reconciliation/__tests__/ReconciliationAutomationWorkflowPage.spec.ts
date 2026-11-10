@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
-import {
-  buildReconciliationAutomationDraftState,
-} from '../../../lib/reconciliationAutomationDraft'
 
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const route = vi.hoisted(() => ({
@@ -308,8 +305,8 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
   it('resumes a newly created run at automation setup instead of the final name step', async () => {
     const savedRun = optionsResponse().savedRuns[0]!
-    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
-        {
+    draftStoreState.automationDraftState = {
+      draft: {
           intent: 'new-run',
           savedRunId: savedRun.savedRunId,
           savedRunType: savedRun.runType,
@@ -317,10 +314,9 @@ describe('ReconciliationAutomationWorkflowPage', () => {
           returnLabel: 'Automations',
           returnPath: '/reconciliation/automations',
         },
-        'input-mode',
-        savedRun,
-
-    )
+      resumeStepId: 'input-mode',
+      savedRun: savedRun,
+    }
 
     window.history.replaceState({}, '', '/reconciliation/automation/create')
 
@@ -353,17 +349,17 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
   it('skips the saved-run question when another page already chose the run', async () => {
     const savedRun = optionsResponse().savedRuns[0]!
-    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
-      {
+    draftStoreState.automationDraftState = {
+      draft: {
         intent: 'existing-run',
         savedRunId: savedRun.savedRunId,
         savedRunType: savedRun.runType,
         returnLabel: 'Automations',
         returnPath: '/reconciliation/automations',
       },
-      'input-mode',
-      savedRun,
-    )
+      resumeStepId: 'input-mode',
+      savedRun: savedRun,
+    }
     window.history.replaceState({}, '', '/reconciliation/automation/create')
 
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
@@ -380,8 +376,8 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       ...response,
       systemRemotes: response.systemRemotes.filter((remote) => remote.systemEnumId !== 'SHOPIFY'),
     })
-    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
-        {
+    draftStoreState.automationDraftState = {
+      draft: {
           intent: 'new-run',
           savedRunId: savedRun.savedRunId,
           savedRunType: savedRun.runType,
@@ -389,10 +385,9 @@ describe('ReconciliationAutomationWorkflowPage', () => {
           returnLabel: 'Automations',
           returnPath: '/reconciliation/automations',
         },
-        'input-mode',
-        savedRun,
-
-    )
+      resumeStepId: 'input-mode',
+      savedRun: savedRun,
+    }
 
     window.history.replaceState({}, '', '/reconciliation/automation/create')
 
@@ -413,8 +408,8 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       ...optionsResponse(),
       savedRuns: [savedRun],
     })
-    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
-        {
+    draftStoreState.automationDraftState = {
+      draft: {
           intent: 'new-run',
           savedRunId: savedRun.savedRunId,
           savedRunType: savedRun.runType,
@@ -423,10 +418,9 @@ describe('ReconciliationAutomationWorkflowPage', () => {
           returnLabel: 'Automations',
           returnPath: '/reconciliation/automations',
         },
-        'file1-api',
-        null,
-
-    )
+      resumeStepId: 'file1-api',
+      savedRun: null,
+    }
 
     window.history.replaceState({}, '', '/reconciliation/automation/create')
 

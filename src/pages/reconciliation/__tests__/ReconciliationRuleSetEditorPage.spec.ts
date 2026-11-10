@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import {
-  buildReconciliationRuleSetDraftState,
   type ReconciliationRuleSetDraftRule,
+  type ReconciliationRuleSetDraftState,
 } from '../../../lib/reconciliationRuleSetDraft'
 import { buildRuleSetDraft } from '../../../lib/savedRunEditorRoute'
 import type { SavedRunSummary } from '../../../lib/api/types'
@@ -65,9 +65,9 @@ import ReconciliationRuleSetEditorPage from '../ReconciliationRuleSetEditorPage.
 function createDraftState(
   rules: ReconciliationRuleSetDraftRule[] = [],
   excludeFilters: { file1?: SourceExcludeFilter[], file2?: SourceExcludeFilter[] } = {},
-) {
-  return buildReconciliationRuleSetDraftState(
-    {
+): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'RS_JSON_ORDER_COMPARE',
       runName: 'JSON Order Compare',
       file1SystemEnumId: 'OMS',
@@ -88,8 +88,8 @@ function createDraftState(
       ...(excludeFilters.file1 ? { file1ExcludeFilters: excludeFilters.file1 } : {}),
       ...(excludeFilters.file2 ? { file2ExcludeFilters: excludeFilters.file2 } : {}),
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
 // Mirrors what AutomationFacadeSupport serves: OMS carries the wider board field list AND declares
@@ -198,9 +198,9 @@ function savedRunWithTwoExclusions(): SavedRunSummary {
 function createApiDraftState(
   rules: ReconciliationRuleSetDraftRule[] = [],
   excludeFilters: { file1?: SourceExcludeFilter[], file2?: SourceExcludeFilter[] } = {},
-) {
-  return buildReconciliationRuleSetDraftState(
-    {
+): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'RS_API_ORDER_SYNC',
       runName: 'API Order Sync',
       file1SystemEnumId: 'OMS',
@@ -223,8 +223,8 @@ function createApiDraftState(
       ...(excludeFilters.file1 ? { file1ExcludeFilters: excludeFilters.file1 } : {}),
       ...(excludeFilters.file2 ? { file2ExcludeFilters: excludeFilters.file2 } : {}),
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
 async function chooseAppSelectOption(wrapper: ReturnType<typeof mount>, testId: string, value: string): Promise<void> {
@@ -436,8 +436,8 @@ describe('ReconciliationRuleSetEditorPage', () => {
   // refundOrReturnId -- the join key -- was not offerable at all.
   it('lists the endpoint\'s own board fields, not the parent system\'s', async () => {
     listAutomationSourceOptions.mockResolvedValue(apiSourceOptionsResponse())
-    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
-      {
+    draftStoreState.ruleSetDraftState = {
+      draft: {
         savedRunId: 'RS_RETURNS_PROD',
         runName: 'Returns Prod',
         file1SystemEnumId: 'OMS',
@@ -457,8 +457,8 @@ describe('ReconciliationRuleSetEditorPage', () => {
         file2FileTypeEnumId: '',
         file2PrimaryIdExpression: ['$.records[*].refundOrReturnId'],
       },
-      'ruleset-manager',
-    )
+      resumeStepId: 'ruleset-manager',
+    }
 
     const wrapper = mount(ReconciliationRuleSetEditorPage)
     await flushPromises()
@@ -1405,7 +1405,10 @@ describe('ReconciliationRuleSetEditorPage', () => {
       const savedRun = savedRunWithTwoExclusions()
       const draft = buildRuleSetDraft(savedRun)
       expect(draft).not.toBeNull()
-      draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(draft!, 'ruleset-manager')
+      draftStoreState.ruleSetDraftState = {
+        draft: draft!,
+        resumeStepId: 'ruleset-manager',
+      }
       window.history.replaceState({}, '', '/reconciliation/ruleset-manager/rules')
 
       const wrapper = mount(ReconciliationRuleSetEditorPage)

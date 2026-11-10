@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SavedRunSummary } from '../api/types'
 import {
-  buildReconciliationAutomationDraftState,
   buildSaveAutomationPayload,
-  readReconciliationAutomationDraftState,
   type ReconciliationAutomationDraft,
 } from '../reconciliationAutomationDraft'
 
@@ -66,46 +64,6 @@ function createDraft(overrides: Partial<ReconciliationAutomationDraft> = {}): Re
 }
 
 describe('reconciliationAutomationDraft', () => {
-  it('round-trips the automation draft and handoff saved run through history state', () => {
-    const state = buildReconciliationAutomationDraftState(createDraft(), 'schedule', savedRun)
-
-    expect(readReconciliationAutomationDraftState(state)).toEqual({
-      draft: createDraft(),
-      resumeStepId: 'schedule',
-      savedRun,
-    })
-  })
-
-  it('preserves saved-run API source metadata in automation handoff state', () => {
-    const apiSavedRun: SavedRunSummary = {
-      ...savedRun,
-      systemOptions: [
-        {
-          ...savedRun.systemOptions[0]!,
-          sourceTypeEnumId: 'AUT_SRC_API',
-          sourceTypeLabel: 'API',
-          systemMessageRemoteId: 'OMS_REMOTE',
-          systemMessageRemoteLabel: 'OMS orders',
-          sourceConfigId: 'OMS_REST_SOURCE',
-          sourceConfigType: 'SYSTEM_MESSAGE_REMOTE_OPTION',
-        },
-        {
-          ...savedRun.systemOptions[1]!,
-          sourceTypeEnumId: 'AUT_SRC_API',
-          sourceTypeLabel: 'API',
-          systemMessageRemoteId: 'SHOPIFY_REMOTE',
-          systemMessageRemoteLabel: 'Shopify orders',
-          sourceConfigId: 'SHOPIFY_ORDERS',
-          sourceConfigType: 'SYSTEM_MESSAGE_REMOTE_OPTION',
-        },
-      ],
-    }
-
-    const state = buildReconciliationAutomationDraftState(createDraft(), 'input-mode', apiSavedRun)
-
-    expect(readReconciliationAutomationDraftState(state)?.savedRun?.systemOptions).toEqual(apiSavedRun.systemOptions)
-  })
-
   it('builds a save payload that references the newly created saved run and derives source contract fields from it', () => {
     expect(buildSaveAutomationPayload(createDraft(), savedRun)).toEqual({
       automationName: 'JSON Order Compare Automation',
@@ -204,20 +162,6 @@ describe('reconciliationAutomationDraft', () => {
           apiResponsePathExpression: '$.data.orders',
         },
       ],
-    })
-  })
-
-  it('round-trips chat-space draft fields through history state', () => {
-    const state = buildReconciliationAutomationDraftState(
-      createDraft({ chatSpaceChoice: 'existing', chatSpaceId: 'CS1', newChatSpaceName: 'Ops', newChatSpaceUrl: 'https://chat.googleapis.com/v1/spaces/AAA' }),
-      'chat-space-select',
-      savedRun,
-    )
-
-    expect(readReconciliationAutomationDraftState(state)).toEqual({
-      draft: createDraft({ chatSpaceChoice: 'existing', chatSpaceId: 'CS1', newChatSpaceName: 'Ops', newChatSpaceUrl: 'https://chat.googleapis.com/v1/spaces/AAA' }),
-      resumeStepId: 'chat-space-select',
-      savedRun,
     })
   })
 

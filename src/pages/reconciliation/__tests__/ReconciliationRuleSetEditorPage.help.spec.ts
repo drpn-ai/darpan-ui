@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import {
-  buildReconciliationRuleSetDraftState,
   type ReconciliationRuleSetDraftRule,
+  type ReconciliationRuleSetDraftState,
 } from '../../../lib/reconciliationRuleSetDraft'
 
 const getJsonSchema = vi.hoisted(() => vi.fn())
@@ -53,9 +53,9 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 
 import ReconciliationRuleSetEditorPage from '../ReconciliationRuleSetEditorPage.vue'
 
-function createDraftState(rules: ReconciliationRuleSetDraftRule[] = []) {
-  return buildReconciliationRuleSetDraftState(
-    {
+function createDraftState(rules: ReconciliationRuleSetDraftRule[] = []): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'RS_JSON_ORDER_COMPARE',
       runName: 'JSON Order Compare',
       file1SystemEnumId: 'OMS',
@@ -74,8 +74,8 @@ function createDraftState(rules: ReconciliationRuleSetDraftRule[] = []) {
       file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
       rules,
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
 const RULE_ONE: ReconciliationRuleSetDraftRule = {

@@ -10,7 +10,7 @@
 // the frozen spec does, rather than unit-test either component in isolation.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { buildReconciliationRuleSetDraftState, type ReconciliationRuleSetDraftRule } from '../../../lib/reconciliationRuleSetDraft'
+import { type ReconciliationRuleSetDraftRule, type ReconciliationRuleSetDraftState } from '../../../lib/reconciliationRuleSetDraft'
 import type { SourceExcludeFilter } from '../../../lib/sourceExcludeFilters'
 
 const getJsonSchema = vi.hoisted(() => vi.fn())
@@ -64,9 +64,9 @@ import ReconciliationRuleSetEditorPage from '../ReconciliationRuleSetEditorPage.
 function createDraftState(
   rules: ReconciliationRuleSetDraftRule[] = [],
   excludeFilters: { file1?: SourceExcludeFilter[], file2?: SourceExcludeFilter[] } = {},
-) {
-  return buildReconciliationRuleSetDraftState(
-    {
+): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'RS_JSON_ORDER_COMPARE',
       runName: 'JSON Order Compare',
       file1SystemEnumId: 'OMS',
@@ -87,16 +87,16 @@ function createDraftState(
       ...(excludeFilters.file1 ? { file1ExcludeFilters: excludeFilters.file1 } : {}),
       ...(excludeFilters.file2 ? { file2ExcludeFilters: excludeFilters.file2 } : {}),
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
 // The exclusion mark is only rendered for a source whose connector declares filterParameterName
 // (FINAL-REVIEW IMPORTANT 3), so the exclusion-cancel case needs an API-backed OMS side rather than
 // the JSON-schema draft the rule-cancel case uses.
-function createApiDraftState() {
-  return buildReconciliationRuleSetDraftState(
-    {
+function createApiDraftState(): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       savedRunId: 'RS_API_ORDER_SYNC',
       runName: 'API Order Sync',
       file1SystemEnumId: 'OMS',
@@ -117,8 +117,8 @@ function createApiDraftState() {
       file2PrimaryIdExpression: ['$.records[*].id'],
       rules: [],
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
 function apiSourceOptionsResponse() {

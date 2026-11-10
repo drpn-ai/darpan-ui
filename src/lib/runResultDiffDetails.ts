@@ -120,10 +120,6 @@ export function isJsonCollapseValue(value: unknown): boolean {
   return value !== null && typeof value === 'object'
 }
 
-export function resolveDiffType(record: DiffDetailsRecord): string {
-  return normalizeDisplayText(record.diffType || record.type)
-}
-
 export function parseDiffData(rawData: unknown): unknown {
   if (typeof rawData !== 'string') return rawData
 

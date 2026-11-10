@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { buildReconciliationAutomationDraftState } from '../../../lib/reconciliationAutomationDraft'
-import { buildReconciliationRuleSetDraftState, type ReconciliationRuleSetDraft } from '../../../lib/reconciliationRuleSetDraft'
+import { type ReconciliationRuleSetDraft, type ReconciliationRuleSetDraftState } from '../../../lib/reconciliationRuleSetDraft'
 
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const replace = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
@@ -128,7 +127,10 @@ const apiToApiDraft: ReconciliationRuleSetDraft = {
 // is now always that last entry, this is the fastest way to reach the board in a test.
 async function mountCreateFlow(options: { draft?: ReconciliationRuleSetDraft } = {}): Promise<ReturnType<typeof mount>> {
   if (options.draft) {
-    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(options.draft, 'ruleset-manager')
+    draftStoreState.ruleSetDraftState = {
+      draft: options.draft,
+      resumeStepId: 'ruleset-manager',
+    }
   }
   const wrapper = mount(ReconciliationCreateFlowPage)
   await flushPromises()
@@ -220,9 +222,9 @@ async function advanceToFile1PrimaryIdStep(
   }
 }
 
-function createDraftState() {
-  return buildReconciliationRuleSetDraftState(
-    {
+function createDraftState(): ReconciliationRuleSetDraftState {
+  return {
+    draft: {
       runName: 'JSON Order Compare',
       file1SystemEnumId: 'OMS',
       file1SystemLabel: 'OMS',
@@ -237,8 +239,8 @@ function createDraftState() {
       file2SchemaFileName: 'test-shopify-orders.schema.json',
       file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
     },
-    'ruleset-manager',
-  )
+    resumeStepId: 'ruleset-manager',
+  }
 }
 
 describe('ReconciliationCreateFlowPage', () => {
@@ -1308,10 +1310,10 @@ describe('ReconciliationCreateFlowPage', () => {
     // on exit. Those drafts carry a savedRunId; the wizard's own activeDraft never does. Without the
     // gate, merely clicking into a saved run's settings makes the next "Create new run" open on the
     // rules board wearing that run's answers.
-    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
-      { ...apiToApiDraft, savedRunId: 'RS_EXISTING_RUN' },
-      'ruleset-manager',
-    )
+    draftStoreState.ruleSetDraftState = {
+      draft: { ...apiToApiDraft, savedRunId: 'RS_EXISTING_RUN' },
+      resumeStepId: 'ruleset-manager',
+    }
     window.history.replaceState({}, '', '/reconciliation/create')
 
     const wrapper = mount(ReconciliationCreateFlowPage)
@@ -1325,14 +1327,14 @@ describe('ReconciliationCreateFlowPage', () => {
     // Skipping hydration is not enough on its own: boardDraftExtras() reads the SAME slot for
     // rules and exclusion filters, so a foreign draft merely ignored would still hand them to the
     // run this wizard goes on to create.
-    draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState(
-      {
+    draftStoreState.ruleSetDraftState = {
+      draft: {
         ...apiToApiDraft,
         savedRunId: 'RS_EXISTING_RUN',
         rules: [{ file1FieldPath: 'name', file2FieldPath: 'externalId', operator: '=', sequenceNum: 1 }],
       },
-      'ruleset-manager',
-    )
+      resumeStepId: 'ruleset-manager',
+    }
     window.history.replaceState({}, '', '/reconciliation/create')
 
     mount(ReconciliationCreateFlowPage)
@@ -1360,11 +1362,11 @@ describe('ReconciliationCreateFlowPage', () => {
 
   it('keeps the automation handoff draft alive across the schema-create detour', async () => {
     route.query = { automationFlow: 'new-run' }
-    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
-      { intent: 'new-run' },
-      'input-mode',
-      null,
-    )
+    draftStoreState.automationDraftState = {
+      draft: { intent: 'new-run' },
+      resumeStepId: 'input-mode',
+      savedRun: null,
+    }
 
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()
@@ -1390,11 +1392,11 @@ describe('ReconciliationCreateFlowPage', () => {
 
   it('hands a newly created saved run back to automation setup when launched from automation workflow', async () => {
     draftStoreState.workflowOrigin = { label: 'Automation Setup', path: '/reconciliation/automation/create' }
-    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
-      { intent: 'new-run' },
-      null,
-      null,
-    )
+    draftStoreState.automationDraftState = {
+      draft: { intent: 'new-run' },
+      resumeStepId: null,
+      savedRun: null,
+    }
     window.history.replaceState({}, '', '/reconciliation/create?automationFlow=new-run')
     route.query = { automationFlow: 'new-run' }
 
@@ -1420,11 +1422,11 @@ describe('ReconciliationCreateFlowPage', () => {
 
   it('continues automation setup from the pending option-B handoff when history state is lost', async () => {
     route.query = { automationFlow: 'new-run' }
-    draftStoreState.automationDraftState = buildReconciliationAutomationDraftState(
-      { intent: 'new-run' },
-      'input-mode',
-      null,
-    )
+    draftStoreState.automationDraftState = {
+      draft: { intent: 'new-run' },
+      resumeStepId: 'input-mode',
+      savedRun: null,
+    }
     window.history.replaceState({}, '', '/reconciliation/create?automationFlow=new-run')
 
     const wrapper = mount(ReconciliationCreateFlowPage)
@@ -2619,7 +2621,8 @@ describe('ReconciliationCreateFlowPage', () => {
         ok: true, messages: [], errors: [],
         query: { nsSuiteQlSourceQueryId: 'NS_NEW_QUERY', nsAuthConfigId: 'NS_AUTH', recordType: 'creditmemo', fields: [{ recordFieldName: 'tranId' }, { recordFieldName: 'status' }] },
       })
-      draftStoreState.ruleSetDraftState = buildReconciliationRuleSetDraftState({
+      draftStoreState.ruleSetDraftState = {
+        draft: {
         scopeMode: 'COMPARE',
         runName: 'Credit memos',
         description: 'Kept across the trip',
@@ -2631,7 +2634,9 @@ describe('ReconciliationCreateFlowPage', () => {
         file2SystemEnumId: '',
         file2FileTypeEnumId: 'DftCsv',
         file2PrimaryIdExpression: [],
-      }, 'file1-api-config')
+      },
+        resumeStepId: 'file1-api-config',
+      }
       route.query = { newQuery: 'NS_NEW_QUERY', side: 'file1' }
 
       const wrapper = mount(ReconciliationCreateFlowPage)
