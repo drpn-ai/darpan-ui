@@ -202,6 +202,44 @@ describe('SftpServerWorkflowPage', () => {
     expect(saveSftpServer).toHaveBeenCalledWith(expect.objectContaining({ sftpServerId: 'sftp-primary' }))
   })
 
+  // DAR-BE-082: the server's key is saved on first connection; the edit page shows it and can forget it.
+  async function editServer(server: Record<string, unknown>) {
+    route.params = { sftpServerId: 'sftp-primary' }
+    route.name = 'settings-sftp-edit'
+    route.fullPath = '/settings/sftp/edit/sftp-primary'
+    listSftpServers.mockResolvedValue({
+      ok: true, messages: [], errors: [],
+      servers: [{ sftpServerId: 'sftp-primary', companyUserGroupId: 'KREWE', host: 'sftp.example.com', port: 22, username: 'etl-user', hasPassword: true, hasPrivateKey: false, ...server }],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+    saveSftpServer.mockResolvedValue({ ok: true, messages: ['Saved SFTP server.'], errors: [] })
+    const wrapper = mount(SftpServerWorkflowPage)
+    await flushPromises()
+    return wrapper
+  }
+
+  it('shows the saved server key, and saves without forgetting it unless asked', async () => {
+    const wrapper = await editServer({ hostKeyFingerprint: 'SHA256:rYoGcYjo510rKgfEDgEQauoIa4rWkmPrCTGVak7Xyg8' })
+    expect(wrapper.get('[data-testid="sftp-host-key"]').text()).toContain('SHA256:rYoGcYjo510rKgfEDgEQauoIa4rWkmPrCTGVak7Xyg8')
+    await wrapper.get('[data-testid="save-sftp-server"]').trigger('click')
+    await flushPromises()
+    expect(saveSftpServer.mock.calls[0]![0]).not.toHaveProperty('resetHostKey')
+  })
+
+  it('forgets the saved key when asked, so the next connection saves the new one', async () => {
+    const wrapper = await editServer({ hostKeyFingerprint: 'SHA256:old' })
+    await wrapper.get('[data-testid="sftp-forget-host-key"]').setValue(true)
+    await wrapper.get('[data-testid="save-sftp-server"]').trigger('click')
+    await flushPromises()
+    expect(saveSftpServer).toHaveBeenCalledWith(expect.objectContaining({ sftpServerId: 'sftp-primary', resetHostKey: true }))
+  })
+
+  it('says the key is saved on first connection when none is saved yet', async () => {
+    const wrapper = await editServer({})
+    expect(wrapper.get('[data-testid="sftp-host-key"]').text()).toContain('Saved on first connection')
+    expect(wrapper.find('[data-testid="sftp-forget-host-key"]').exists()).toBe(false)
+  })
+
   it('shows an X cancel action on edit and returns to the SFTP dashboard without saving', async () => {
     route.params = { sftpServerId: 'sftp-primary' }
     route.name = 'settings-sftp-edit'

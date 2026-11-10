@@ -5276,6 +5276,8 @@ export interface components {
                 ruleId?: string;
                 sequenceNum?: number;
                 ruleText?: string;
+                /** @description DAR-BE-210. Optional display name for the run notification; at most 60 characters, no chat markup. */
+                ruleName?: string;
                 ruleLogic?: string;
                 ruleType?: string;
                 expression?: string;
@@ -5349,6 +5351,8 @@ export interface components {
                     ruleId?: string;
                     sequenceNum?: number;
                     ruleText?: string;
+                    /** @description DAR-BE-210. Optional display name for the run notification; at most 60 characters, no chat markup. */
+                    ruleName?: string;
                     ruleLogic?: string;
                     ruleType?: string;
                     expression?: string;
@@ -6660,6 +6664,8 @@ export interface components {
                     ruleId?: string;
                     sequenceNum?: number;
                     ruleText?: string;
+                    /** @description DAR-BE-210. Optional display name for the run notification; at most 60 characters, no chat markup. */
+                    ruleName?: string;
                     ruleLogic?: string;
                     ruleType?: string;
                     expression?: string;
@@ -7836,6 +7842,8 @@ export interface components {
                 ruleId?: string;
                 sequenceNum?: number;
                 ruleText?: string;
+                /** @description DAR-BE-210. Optional display name for the run notification; at most 60 characters, no chat markup. */
+                ruleName?: string;
                 ruleLogic?: string;
                 ruleType?: string;
                 expression?: string;
@@ -7909,6 +7917,8 @@ export interface components {
                     ruleId?: string;
                     sequenceNum?: number;
                     ruleText?: string;
+                    /** @description DAR-BE-210. Optional display name for the run notification; at most 60 characters, no chat markup. */
+                    ruleName?: string;
                     ruleLogic?: string;
                     ruleType?: string;
                     expression?: string;
@@ -8636,6 +8646,10 @@ export interface components {
                 remoteAttributes?: string;
                 hasPassword?: boolean;
                 hasPrivateKey?: boolean;
+                /** @description DAR-BE-082: the server's key saved on first connection (OpenSSH SHA256); empty until then. */
+                hostKeyFingerprint?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                hostKeyPinnedDate?: string | number;
             }[];
         };
         /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.list#SftpServers */
@@ -8868,6 +8882,8 @@ export interface components {
             password?: string;
             privateKey?: string;
             remoteAttributes?: boolean;
+            /** @description DAR-BE-082: forget the saved server key, so the next connection saves the one it sees (after a planned server change). */
+            resetHostKey?: boolean;
         };
         SaveSftpServerResult: {
             ok?: boolean;

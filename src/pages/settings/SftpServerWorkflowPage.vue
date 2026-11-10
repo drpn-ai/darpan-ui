@@ -107,6 +107,15 @@
             placeholder="Paste a private key only when needed"
           />
         </label>
+
+        <div class="wizard-input-shell" data-testid="sftp-host-key">
+          <span class="workflow-context-label">Server key</span>
+          <span class="mono-copy">{{ savedHostKey || 'Saved on first connection' }}</span>
+          <label v-if="savedHostKey" class="sftp-forget-host-key">
+            <input v-model="forgetHostKey" type="checkbox" data-testid="sftp-forget-host-key" />
+            <span>Forget saved key</span>
+          </label>
+        </div>
       </template>
 
       <template v-else>
@@ -248,6 +257,9 @@ function createDefaultSftpForm(): SftpForm {
 }
 
 const form = reactive<SftpForm>(createDefaultSftpForm())
+// DAR-BE-082: the server's key, saved on its first successful connection; later connections must present it.
+const savedHostKey = ref<string | null>(null)
+const forgetHostKey = ref(false)
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -317,6 +329,8 @@ function applyRecord(record: SftpServerRecord): void {
   form.password = ''
   form.privateKey = ''
   form.remoteAttributes = record.remoteAttributes ?? 'Y'
+  savedHostKey.value = record.hostKeyFingerprint ?? null
+  forgetHostKey.value = false
 }
 
 function resetCreateForm(): void {
@@ -390,6 +404,7 @@ async function save(): Promise<void> {
       password: form.password,
       privateKey: form.privateKey,
       remoteAttributes: form.remoteAttributes,
+      ...(isEditing.value && forgetHostKey.value ? { resetHostKey: true } : {}),
     })
     form.password = ''
     form.privateKey = ''

@@ -306,6 +306,9 @@ export interface SftpServerRecord {
   remoteAttributes?: string
   hasPassword: boolean
   hasPrivateKey: boolean
+  /** DAR-BE-082: the server's key, saved on the first successful connection (OpenSSH SHA256 fingerprint). */
+  hostKeyFingerprint?: string | null
+  hostKeyPinnedDate?: string | number | null
 }
 
 export type SaveSftpServerResponse = Schemas['SaveSftpServerResult']

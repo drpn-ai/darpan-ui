@@ -124,6 +124,8 @@ export interface SaveSftpServerPayload {
   password?: string
   privateKey?: string
   remoteAttributes?: string
+  /** DAR-BE-082: forget the saved server key so the next connection saves the one it sees. */
+  resetHostKey?: boolean
 }
 
 export interface ListNsAuthConfigsPayload {
