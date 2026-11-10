@@ -259,13 +259,13 @@ export function defaultSource(report: AuditReport, progress?: AuditProgress | nu
 export interface CheckRow {
   /** The check's id, or the family's shared stem ("shopify-orders-not-in-hotwax"). */
   id: string
-  /** The check's own label; a family has none of its own. */
+  /** The check's own label; for a family, the words its members' labels share ('' when they cannot be compared). */
   label: string
   category: string
   /** The statement the row's first check sits under, where its detail and retry live. */
   statement: string
   checks: AuditStatementCheck[]
-  /** The stores a family covers ("usa", "eu"); empty for a lone check. */
+  /** The stores a family covers, as its labels name them ("US", "EU"; the id suffix without labels); empty for a lone check. */
   variants: string[]
   /** The row's worst: not run, else partial, else ran. */
   status: AuditCheckStatus
@@ -283,6 +283,26 @@ const CHECK_ORDER: Record<AuditCheckStatus, number> = { notRun: 0, partial: 1, r
 function splitCheckId(id: string): [stem: string, suffix: string] {
   const at = id.lastIndexOf('-')
   return at > 0 ? [id.slice(0, at), id.slice(at + 1)] : [id, '']
+}
+
+/**
+ * A family's readable name and each member's: the words every member's label shares, and the words where they differ
+ * ("Rails US Shopify orders HotWax does not have" and "Rails EU ..." give "Rails Shopify orders HotWax does not have",
+ * "US", "EU"). Without labels to compare, the id stem and the id suffixes stand in.
+ */
+function familyNames(stem: string, members: AuditStatementCheck[]): { label: string; variants: string[] } {
+  const words = members.map((member) => (member.label ?? '').trim().split(/\s+/).filter(Boolean))
+  const shortest = Math.min(...words.map((w) => w.length))
+  let head = 0
+  while (head < shortest && words.every((w) => w[head] === words[0]![head])) head++
+  let tail = 0
+  while (tail < shortest - head && words.every((w) => w[w.length - 1 - tail] === words[0]![words[0]!.length - 1 - tail])) tail++
+  const variants = words.map((w) => w.slice(head, w.length - tail).join(' '))
+  if (!shortest || variants.some((variant) => !variant)) {
+    return { label: '', variants: members.map((member) => splitCheckId(member.id)[1]) }
+  }
+  const shared = [...words[0]!.slice(0, head), ...words[0]!.slice(words[0]!.length - tail)].join(' ')
+  return { label: shared || stem, variants }
 }
 
 /**
@@ -317,13 +337,14 @@ export function checkGroups(report: AuditReport): CheckGroup[] {
         const isFamily = family.length > 1 && family.filter((member) => recurs(splitCheckId(member.id)[1])).length > 1
         if (isFamily && family[0] !== check) continue
         const members = isFamily ? family : [check]
+        const names = isFamily ? familyNames(stem, members) : { label: check.label, variants: [] }
         rows.push({
           id: isFamily ? stem : check.id,
-          label: isFamily ? '' : check.label,
+          label: names.label,
           category: categoryId,
           statement: statement.id,
           checks: members,
-          variants: isFamily ? members.map((member) => splitCheckId(member.id)[1]) : [],
+          variants: names.variants,
           status: members.reduce<AuditCheckStatus>((worst, member) =>
             CHECK_ORDER[member.status] < CHECK_ORDER[worst] ? member.status : worst, 'ran'),
           ran: members.filter((member) => member.status === 'ran').length,

@@ -198,7 +198,7 @@ describe('AuditReportPage', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-08T18:00:00Z'))
     try {
-      const check = (id: string) => ({ id, label: `${id} label`, status: 'notRun' as const, reason: null, matchedBy: null, compared: null })
+      const check = (id: string, label = `${id} label`) => ({ id, label, status: 'notRun' as const, reason: null, matchedBy: null, compared: null })
       const doc = report({
         complete: false, summary: 'Not complete: checks a, b and c did not run.', sources: {}, checks: { ran: 0, partial: 0, notRun: 5 },
       })
@@ -206,7 +206,7 @@ describe('AuditReportPage', () => {
       orders.statements.R2!.status = 'notRun'
       orders.statements.R2!.checks = [check('invoices-without-etail-id')]
       orders.statements.R3!.status = 'notRun'
-      orders.statements.R3!.checks = [check('orders-not-in-hotwax-usa'), check('orders-not-in-hotwax-eu')]
+      orders.statements.R3!.checks = [check('orders-not-in-hotwax-usa', 'Rails US orders HotWax does not have'), check('orders-not-in-hotwax-eu', 'Rails EU orders HotWax does not have')]
       doc.categories.returns = { label: 'Returns', counts: counts(), statements: {
         R6: { id: 'R6', text: 'Every refund has a memo.', weight: 'firm', status: 'notRun', reason: null, checks: [check('refunds-without-memo-usa'), check('refunds-without-memo-eu')], counts: counts(), findings: [], findingsOmitted: 0 },
       } }
@@ -222,7 +222,10 @@ describe('AuditReportPage', () => {
       expect(w.text()).not.toContain('did not run.')
       expect(w.findAll('[data-testid^="audit-check-group-"]').map((g) => g.find('h3').text())).toEqual(['Orders', 'Returns'])
       const family = w.get('[data-testid="audit-check-row-orders-not-in-hotwax"]')
-      expect(family.text()).toContain('usa · eu')
+      // Readable: the label the stores share and the stores as the labels name them, not the ids.
+      expect(family.text()).toContain('Rails orders HotWax does not have')
+      expect(family.text()).toContain('US · EU')
+      expect(family.text()).not.toContain('orders-not-in-hotwax')
       expect(family.text()).toContain('not run')
 
       // One retry at the head for every check that did not run, each submitted in turn; the rows carry none.
@@ -282,8 +285,8 @@ describe('AuditReportPage', () => {
       expect(w.get('[data-testid="audit-running-lead"]').text()).toBe('1 of 1 checks')
       const runningCard = w.get('[data-testid="audit-running-invoices-without-etail-id"]')
       expect(runningCard.text()).toContain('Invoices vs Shopify')
-      // The statements it feeds, not raw check codes.
-      expect(runningCard.text()).toContain('R2')
+      // The checks it feeds by their labels, not their codes.
+      expect(runningCard.text()).toContain('Invoices with no Etail id')
       expect(runningCard.text()).not.toContain('invoices-without-etail-id')
 
       // The run ends: the next read finds nothing in flight, the report is read again, and polling stops.

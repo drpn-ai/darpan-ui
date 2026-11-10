@@ -89,7 +89,7 @@
               </div>
               <span v-if="progressLine(run) !== runBadge(run).label" class="audit-row-sub">{{ progressLine(run) }}</span>
               <p v-if="run.healthReason" class="section-note">{{ run.healthReason }}</p>
-              <span class="audit-row-sub">{{ runStatements(run) }}</span>
+              <span v-for="label in runCheckLabels(run)" :key="label" class="audit-row-sub">{{ label }}</span>
             </article>
           </template>
           <template v-else-if="source === SOURCE_CHECKS">
@@ -115,10 +115,10 @@
                 <button
                   type="button"
                   class="audit-check-row-main"
-                  :title="row.label || undefined"
+                  :title="row.id"
                   @click="emit('navigate', { category: row.category, statement: row.statement, finding: undefined, source: undefined })"
                 >
-                  <span>{{ row.id }}</span>
+                  <span>{{ row.label || row.id }}</span>
                   <span v-if="row.variants.length" class="audit-row-sub">{{ row.variants.join(' · ') }}</span>
                 </button>
                 <span
@@ -551,11 +551,11 @@ const runByCheck = computed(() => new Map((props.progress?.active ?? []).flatMap
 function runOf(checkId: string): AuditProgressRun | undefined {
   return runByCheck.value.get(checkId)
 }
-// The statements a run feeds ("R1 · R4"), not its raw check codes.
-const statementByCheck = computed(() => new Map(checkRows.value.flatMap((group) => group.rows)
-  .flatMap((row) => row.checks.map((check) => [check.id, row.statement] as const))))
-function runStatements(run: AuditProgressRun): string {
-  return [...new Set(run.checks.map((code) => statementByCheck.value.get(code) ?? code))].join(' · ')
+// The checks a run feeds, by their labels, not their codes.
+const labelByCheck = computed(() => new Map(checkRows.value.flatMap((group) => group.rows)
+  .flatMap((row) => row.checks.map((check) => [check.id, check.label || check.id] as const))))
+function runCheckLabels(run: AuditProgressRun): string[] {
+  return [...new Set(run.checks.map((code) => labelByCheck.value.get(code) ?? code))]
 }
 function runBadge(run: AuditProgressRun): { label: string; tone: 'neutral' | 'warning' | 'danger' } {
   if (run.state === 'queued') return { label: 'Queued', tone: 'neutral' }
