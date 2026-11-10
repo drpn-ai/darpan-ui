@@ -245,6 +245,17 @@ describe('AuditReportPage', () => {
 
   // DAR-UI-085 (Aditi: "when an audit is running... i cannot see any indication"). Mid-play every check still reads
   // "not run" in the report, so Run health says it is running and where each run is.
+  it('says Queued once on a queued check, in the badge, not again beneath it', async () => {
+    const queued = { run: 'Invoices vs Shopify', checks: ['invoices-without-etail-id'], state: 'queued', attempt: 1 }
+    f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 1, active: [queued] } } as never)
+    const w = mount(AuditReportPage)
+    await flushPromises()
+
+    expect(w.get('[data-testid="audit-check-invoices-without-etail-id"]').text()).toContain('Queued')
+    expect(w.get('[data-testid="audit-check-running-invoices-without-etail-id"]').isVisible()).toBe(false)
+    w.unmount()
+  })
+
   it('shows a play in progress on Run health and in the running check, then reloads the report when it finishes', async () => {
     vi.useFakeTimers()
     try {
@@ -266,7 +277,11 @@ describe('AuditReportPage', () => {
       liveRoute.query = { category: 'health' }
       await flushPromises()
       expect(w.get('[data-testid="audit-running-lead"]').text()).toBe('1 of 1 checks')
-      expect(w.get('[data-testid="audit-running-invoices-without-etail-id"]').text()).toContain('Invoices vs Shopify')
+      const runningCard = w.get('[data-testid="audit-running-invoices-without-etail-id"]')
+      expect(runningCard.text()).toContain('Invoices vs Shopify')
+      // The statements it feeds, not raw check codes.
+      expect(runningCard.text()).toContain('R2')
+      expect(runningCard.text()).not.toContain('invoices-without-etail-id')
 
       // The run ends: the next read finds nothing in flight, the report is read again, and polling stops.
       const reportReads = f.getAuditReport.mock.calls.length

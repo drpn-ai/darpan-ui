@@ -84,12 +84,12 @@
               :data-testid="`audit-running-${run.checks[0]}`"
             >
               <div class="audit-detail-head">
-                <h3 class="micro-label">{{ run.run }}</h3>
+                <h3 class="audit-body">{{ run.run }}</h3>
                 <StatusBadge :label="runBadge(run).label" :tone="runBadge(run).tone" />
               </div>
-              <p class="audit-body">{{ progressLine(run) }}</p>
+              <span v-if="progressLine(run) !== runBadge(run).label" class="audit-row-sub">{{ progressLine(run) }}</span>
               <p v-if="run.healthReason" class="section-note">{{ run.healthReason }}</p>
-              <p class="audit-row-sub">{{ run.checks.join(' · ') }}</p>
+              <span class="audit-row-sub">{{ runStatements(run) }}</span>
             </article>
           </template>
           <template v-else-if="source === SOURCE_CHECKS">
@@ -216,7 +216,7 @@
             </button>
           </template>
           <div v-if="statementDoc && !findings.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
-            {{ narrowed ? 'No match' : statementDoc.status === 'notRun' ? (statementDoc.checks.length ? 'Not run yet' : 'No check yet') : 'Nothing found' }}
+            {{ statementEmpty }}
           </div>
           <InlineValidation v-if="more.error" tone="error" :message="more.error" data-testid="audit-findings-more-error" />
           <div v-if="more.loading && !narrowed" class="audit-empty" data-testid="audit-findings-loading">Loading...</div>
@@ -377,7 +377,14 @@
               </div>
               <p class="audit-body">{{ check.label }}</p>
               <!-- DAR-UI-085. Running now: where it is, in place of this morning's "did not run". -->
-              <p v-if="runOf(check.id)" class="section-note" :data-testid="`audit-check-running-${check.id}`">{{ progressLine(runOf(check.id)!) }}</p>
+              <p
+                v-if="runOf(check.id)"
+                v-show="progressLine(runOf(check.id)!) !== runBadge(runOf(check.id)!).label"
+                class="section-note"
+                :data-testid="`audit-check-running-${check.id}`"
+              >
+                {{ progressLine(runOf(check.id)!) }}
+              </p>
               <p v-else-if="check.reason" class="section-note">{{ check.reason }}</p>
               <!-- DAR-UI-086. A check that did not run this morning runs again from what its run already read. -->
               <button
@@ -543,6 +550,12 @@ const runByCheck = computed(() => new Map((props.progress?.active ?? []).flatMap
 function runOf(checkId: string): AuditProgressRun | undefined {
   return runByCheck.value.get(checkId)
 }
+// The statements a run feeds ("R1 · R4"), not its raw check codes.
+const statementByCheck = computed(() => new Map(checkRows.value.flatMap((group) => group.rows)
+  .flatMap((row) => row.checks.map((check) => [check.id, row.statement] as const))))
+function runStatements(run: AuditProgressRun): string {
+  return [...new Set(run.checks.map((code) => statementByCheck.value.get(code) ?? code))].join(' · ')
+}
 function runBadge(run: AuditProgressRun): { label: string; tone: 'neutral' | 'warning' | 'danger' } {
   if (run.state === 'queued') return { label: 'Queued', tone: 'neutral' }
   if (run.health === 'stuck') return { label: 'Stuck', tone: 'danger' }
@@ -558,6 +571,15 @@ const statements = computed(() => {
     .map((item) => ({ ...item, badge: String(counted.byStatement.get(item.id)) })) : items
 })
 const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statement] ?? null)
+// A statement with no findings: says "Running" while one of its checks is in flight, not "Not run yet".
+const statementEmpty = computed(() => {
+  const doc = statementDoc.value
+  if (!doc) return ''
+  if (props.narrowed) return 'No match'
+  if (doc.checks.some((check) => runOf(check.id))) return 'Running'
+  if (doc.status === 'notRun') return doc.checks.length ? 'Not run yet' : 'No check yet'
+  return 'Nothing found'
+})
 const findings = computed(() => props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
   : statementFindings(statementDoc.value, props.more.findings))
 // DAR-UI-098. The column's rows: every finding under its cause, an order under each of its lines' causes.
@@ -1468,7 +1490,7 @@ function statementText(id: string): string {
 }
 
 .audit-check--running {
-  border-style: dashed;
+  border-top-style: dashed;
 }
 
 @media (prefers-reduced-motion: reduce) {
