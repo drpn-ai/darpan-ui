@@ -24,11 +24,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'every record the run actually looked at, after exclusions. The overlap, not either system’s total — those are always bigger.',
   },
   differenceCount: {
-    // DAR-UI-103. The backend computes this as onlyInFile1 + onlyInFile2 on every run path
-    // (ReconciliationServices: differenceCount = count1 + count2); value mismatches are a separate
-    // ruleDifferenceCount. The old line said the opposite — it taught the number backwards.
+    // DAR-UI-103. reconcile#RuleSetCompareScope (the path every saved run, automation and audit takes)
+    // sets differenceCount = missing either side + one row per rule a matched pair failed + duplicate ids.
+    // The legacy mapping path has no rules, so the same sentence holds with zero rule rows there.
     title: 'Differences',
-    body: 'records one system has and the other does not, both directions added up. Value mismatches are not in it, so zero here does not mean everything lines up.',
+    body: 'records missing on either side, plus one for every rule a matched pair failed, plus duplicate ids. A record failing two rules counts twice — it is not a record count.',
   },
   onlyInFile1Count: {
     title: 'Only in the first source',

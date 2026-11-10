@@ -256,10 +256,9 @@ const columns = [
   { key: 'status', label: 'Status', colStyle: { width: '16%' }, explain: 'runStatus' },
   { key: 'scheduled', label: 'Scheduled', colStyle: { width: '34%' }, explain: 'scheduledDate' },
   { key: 'completed', label: 'Completed', colStyle: { width: '34%' }, explain: 'completedDate' },
-  // "Differences" is the number operators most often read as "everything that is
-  // wrong". It is not: it counts records missing on one side or the other, and value
-  // mismatches are counted separately (ruleDifferenceCount), so a run can show zero here
-  // while both systems disagree on values.
+  // "Differences" is the number operators most often read as a count of bad records. It is
+  // not: reconcile#RuleSetCompareScope sums records missing on either side, one row per rule a
+  // matched pair failed, and duplicate ids — so one record failing two rules counts twice.
   { key: 'counts', label: 'Differences', colStyle: { width: '16%' }, explain: 'differenceCount' },
 ]
 
