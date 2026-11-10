@@ -35,7 +35,7 @@
       <div class="workflow-form-grid workflow-form-grid--two" data-testid="run-source-1-row">
         <template v-if="source1UsesApi">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source1 }} API Config</span>
+            <span v-explain="'connection'" class="workflow-context-label">{{ sourceNames.source1 }} API Config</span>
             <AppSelect
               v-model="source1ApiConfigValue"
               :disabled="!canEditTenantSettings || loading"
@@ -46,7 +46,7 @@
           </label>
 
           <label v-if="!source1UsesSuiteQl" class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source1 }} Endpoint</span>
+            <span v-explain="'endpoint'" class="workflow-context-label">{{ sourceNames.source1 }} Endpoint</span>
             <AppSelect
               v-model="source1ApiEndpointValue"
               :disabled="!canEditTenantSettings || loading || source1ApiEndpointOptions.length === 0"
@@ -57,7 +57,7 @@
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source1 }} Primary ID</span>
+            <span v-explain="'primaryId'" class="workflow-context-label">{{ sourceNames.source1 }} Primary ID</span>
             <WorkflowSelect
               v-model="form.source1.fieldPaths"
               multiple
@@ -71,7 +71,7 @@
 
         <template v-else>
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source1 }} Schema</span>
+            <span v-explain="'schema'" class="workflow-context-label">{{ sourceNames.source1 }} Schema</span>
             <AppSelect
               v-model="form.source1.schemaId"
               :disabled="!canEditTenantSettings || loading"
@@ -82,7 +82,7 @@
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source1 }} Field</span>
+            <span v-explain="'sourceField'" class="workflow-context-label">{{ sourceNames.source1 }} Field</span>
             <WorkflowSelect
               v-model="form.source1.fieldPaths"
               multiple
@@ -98,7 +98,7 @@
       <div v-if="!isSingleSided" class="workflow-form-grid workflow-form-grid--two" data-testid="run-source-2-row">
         <template v-if="source2UsesApi">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source2 }} API Config</span>
+            <span v-explain="'connection'" class="workflow-context-label">{{ sourceNames.source2 }} API Config</span>
             <AppSelect
               v-model="source2ApiConfigValue"
               :disabled="!canEditTenantSettings || loading"
@@ -109,7 +109,7 @@
           </label>
 
           <label v-if="!source2UsesSuiteQl" class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source2 }} Endpoint</span>
+            <span v-explain="'endpoint'" class="workflow-context-label">{{ sourceNames.source2 }} Endpoint</span>
             <AppSelect
               v-model="source2ApiEndpointValue"
               :disabled="!canEditTenantSettings || loading || source2ApiEndpointOptions.length === 0"
@@ -120,7 +120,7 @@
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source2 }} Primary ID</span>
+            <span v-explain="'primaryId'" class="workflow-context-label">{{ sourceNames.source2 }} Primary ID</span>
             <WorkflowSelect
               v-model="form.source2.fieldPaths"
               multiple
@@ -134,7 +134,7 @@
 
         <template v-else>
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source2 }} Schema</span>
+            <span v-explain="'schema'" class="workflow-context-label">{{ sourceNames.source2 }} Schema</span>
             <AppSelect
               v-model="form.source2.schemaId"
               :disabled="!canEditTenantSettings || loading"
@@ -145,7 +145,7 @@
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">{{ sourceNames.source2 }} Field</span>
+            <span v-explain="'sourceField'" class="workflow-context-label">{{ sourceNames.source2 }} Field</span>
             <WorkflowSelect
               v-model="form.source2.fieldPaths"
               multiple

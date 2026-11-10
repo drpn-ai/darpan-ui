@@ -29,7 +29,7 @@
 
       <div class="workflow-form-grid workflow-form-grid--two">
         <label class="wizard-input-shell">
-          <span class="workflow-context-label">Name</span>
+          <span v-explain="'auditCheckName'" class="workflow-context-label">Name</span>
           <input
             :value="form.label"
             name="checkLabel"
@@ -140,11 +140,11 @@
 
       <div :class="['workflow-form-grid', { 'workflow-form-grid--two': !isEvaluate }]">
         <label class="wizard-input-shell">
-          <span class="workflow-context-label">{{ sideName('FILE_1') }} record</span>
+          <span v-explain="'auditCheckRecordType'" class="workflow-context-label">{{ sideName('FILE_1') }} record</span>
           <input v-model="form.file1RecordType" name="file1RecordType" class="wizard-answer-control" type="text" :disabled="busy" />
         </label>
         <label v-if="!isEvaluate" class="wizard-input-shell" data-testid="audit-check-file2">
-          <span class="workflow-context-label">{{ sideName('FILE_2') }} record</span>
+          <span v-explain="'auditCheckRecordType'" class="workflow-context-label">{{ sideName('FILE_2') }} record</span>
           <input v-model="form.file2RecordType" name="file2RecordType" class="wizard-answer-control" type="text" :disabled="busy" />
         </label>
       </div>

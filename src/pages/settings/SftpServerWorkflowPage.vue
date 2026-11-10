@@ -40,7 +40,7 @@
 
         <div class="workflow-form-grid" data-testid="sftp-host-row">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Host</span>
+            <span v-explain="'sftpHost'" class="workflow-context-label">Host</span>
             <input
               name="host"
               v-model="form.host"
@@ -53,7 +53,7 @@
 
         <div class="workflow-form-grid workflow-form-grid--compact" data-testid="sftp-compact-row">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Username</span>
+            <span v-explain="'connectionUsername'" class="workflow-context-label">Username</span>
             <input
               name="username"
               v-model="form.username"
@@ -86,7 +86,7 @@
         </div>
 
         <label class="wizard-input-shell">
-          <span class="workflow-context-label">Password (optional)</span>
+          <span v-explain="'sftpPassword'" class="workflow-context-label">Password (optional)</span>
           <input
             name="password"
             v-model="form.password"

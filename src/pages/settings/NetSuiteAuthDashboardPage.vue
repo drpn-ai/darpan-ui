@@ -39,7 +39,7 @@
             <span>{{ authTypeLabel }}</span>
           </article>
           <article v-if="config.authType === 'BASIC'" class="static-page-summary-card">
-            <span class="static-page-summary-label">Username</span>
+            <span v-explain="'connectionUsername'" class="static-page-summary-label">Username</span>
             <span>{{ config.username }}</span>
           </article>
           <article v-if="config.authType === 'OAUTH2_M2M_JWT'" class="static-page-summary-card">

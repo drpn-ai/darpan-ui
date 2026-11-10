@@ -15,11 +15,11 @@
           <span>{{ userId }}</span>
         </article>
         <article class="static-page-summary-card">
-          <span class="static-page-summary-label">Username</span>
+          <span v-explain="'accountUsername'" class="static-page-summary-label">Username</span>
           <span>{{ username }}</span>
         </article>
         <article class="static-page-summary-card" data-testid="password-card">
-          <span class="static-page-summary-label">Password</span>
+          <span v-explain="'accountPassword'" class="static-page-summary-label">Password</span>
           <span aria-hidden="true">••••••••</span>
           <button class="user-settings-control user-settings-password-trigger" type="button" aria-label="Change password" @click="openPasswordWorkflow">
             Change
@@ -104,7 +104,7 @@
           data-testid="user-notification-default-card"
           @click="openNotificationDefaultWorkflow"
         >
-          <span class="static-page-summary-label">Notifications</span>
+          <span v-explain="'userNotificationDefault'" class="static-page-summary-label">Notifications</span>
           <span>{{ notificationDefaultSummary }}</span>
         </button>
       </div>
@@ -134,11 +134,11 @@
           class="static-page-summary-card"
           data-testid="cli-session-row"
         >
-          <span class="static-page-summary-label">Host</span>
+          <span v-explain="'cliSessionHost'" class="static-page-summary-label">Host</span>
           <span>{{ session.hostLabel }}</span>
           <span class="static-page-summary-label">Signed in</span>
           <span>{{ formatDateTime(session.createdDate) }}</span>
-          <span class="static-page-summary-label">Expires</span>
+          <span v-explain="'cliSessionExpires'" class="static-page-summary-label">Expires</span>
           <span>{{ formatDateTime(session.expiresDate) }}</span>
           <button
             type="button"
@@ -252,7 +252,7 @@
   >
     <section class="popup-workflow-modal workflow-panel">
       <header class="workflow-panel-header">
-        <h2 id="notification-default-workflow-title">Notifications</h2>
+        <h2 v-explain="'userNotificationDefault'" id="notification-default-workflow-title">Notifications</h2>
       </header>
 
       <div class="workflow-step-wrapper">

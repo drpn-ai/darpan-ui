@@ -82,7 +82,7 @@
               />
             </label>
             <label v-if="dateWindowNeedsCount" class="wizard-input-shell">
-              <span class="workflow-context-label">Count</span>
+              <span v-explain="'automationWindowCount'" class="workflow-context-label">Count</span>
               <input
                 v-model.number="relativeWindowCount"
                 name="relativeWindowCount"
@@ -123,7 +123,7 @@
         <template v-else-if="usesSftp">
           <div class="workflow-form-grid workflow-form-grid--two">
             <label class="wizard-input-shell">
-              <span class="workflow-context-label">{{ systemLabelForSide('FILE_1') }} SFTP Server</span>
+              <span v-explain="'automationSftpServer'" class="workflow-context-label">{{ systemLabelForSide('FILE_1') }} SFTP Server</span>
               <WorkflowSelect
                 v-model="editFile1SftpServerId"
                 test-id="automation-edit-file1-sftp-select"
@@ -134,7 +134,7 @@
             </label>
 
             <label class="wizard-input-shell">
-              <span class="workflow-context-label">{{ systemLabelForSide('FILE_1') }} Remote Path</span>
+              <span v-explain="'automationRemotePath'" class="workflow-context-label">{{ systemLabelForSide('FILE_1') }} Remote Path</span>
               <input
                 v-model="editFile1RemotePath"
                 name="file1RemotePathTemplate"
@@ -146,7 +146,7 @@
             </label>
 
             <label class="wizard-input-shell">
-              <span class="workflow-context-label">{{ systemLabelForSide('FILE_2') }} SFTP Server</span>
+              <span v-explain="'automationSftpServer'" class="workflow-context-label">{{ systemLabelForSide('FILE_2') }} SFTP Server</span>
               <WorkflowSelect
                 v-model="editFile2SftpServerId"
                 test-id="automation-edit-file2-sftp-select"
@@ -157,7 +157,7 @@
             </label>
 
             <label class="wizard-input-shell">
-              <span class="workflow-context-label">{{ systemLabelForSide('FILE_2') }} Remote Path</span>
+              <span v-explain="'automationRemotePath'" class="workflow-context-label">{{ systemLabelForSide('FILE_2') }} Remote Path</span>
               <input
                 v-model="editFile2RemotePath"
                 name="file2RemotePathTemplate"
@@ -190,7 +190,7 @@
 
           <div class="automation-edit-chat-space-field">
             <label class="wizard-input-shell">
-              <span class="workflow-context-label">Chat Space</span>
+              <span v-explain="'automationChatSpace'" class="workflow-context-label">Chat Space</span>
               <WorkflowSelect
                 v-model="editChatSpaceValue"
                 test-id="automation-chat-space-select"
@@ -219,7 +219,7 @@
           </label>
 
           <label v-if="schedulePreset === 'hourly'" class="automation-schedule-field">
-            <span class="automation-schedule-label">Minute</span>
+            <span v-explain="'automationScheduleMinute'" class="automation-schedule-label">Minute</span>
             <input
               v-model.number="scheduleMinute"
               class="automation-schedule-control"
@@ -233,7 +233,7 @@
           </label>
 
           <label v-if="schedulePreset === 'weekly'" class="automation-schedule-field">
-            <span class="automation-schedule-label">Day</span>
+            <span v-explain="'automationScheduleWeekday'" class="automation-schedule-label">Day</span>
             <WorkflowSelect
               v-model="scheduleWeekday"
               class="automation-schedule-select"
@@ -245,7 +245,7 @@
           </label>
 
           <label v-if="schedulePreset === 'monthly'" class="automation-schedule-field">
-            <span class="automation-schedule-label">Date</span>
+            <span v-explain="'automationScheduleMonthDay'" class="automation-schedule-label">Date</span>
             <input
               v-model.number="scheduleMonthDay"
               class="automation-schedule-control"
@@ -259,7 +259,7 @@
           </label>
 
           <div v-if="scheduleUsesTime" class="automation-schedule-field">
-            <span class="automation-schedule-label">Time</span>
+            <span v-explain="'automationScheduleTime'" class="automation-schedule-label">Time</span>
             <WorkflowTimeSelect
               v-model="scheduleTime"
               class="automation-schedule-select"
@@ -364,7 +364,7 @@
           </label>
 
           <label v-if="schedulePreset === 'hourly'" class="automation-schedule-field">
-            <span class="automation-schedule-label">Minute</span>
+            <span v-explain="'automationScheduleMinute'" class="automation-schedule-label">Minute</span>
             <input
               v-model.number="scheduleMinute"
               class="automation-schedule-control"
@@ -377,7 +377,7 @@
           </label>
 
           <label v-if="schedulePreset === 'weekly'" class="automation-schedule-field">
-            <span class="automation-schedule-label">Day</span>
+            <span v-explain="'automationScheduleWeekday'" class="automation-schedule-label">Day</span>
             <WorkflowSelect
               v-model="scheduleWeekday"
               class="automation-schedule-select"
@@ -388,7 +388,7 @@
           </label>
 
           <label v-if="schedulePreset === 'monthly'" class="automation-schedule-field">
-            <span class="automation-schedule-label">Date</span>
+            <span v-explain="'automationScheduleMonthDay'" class="automation-schedule-label">Date</span>
             <input
               v-model.number="scheduleMonthDay"
               class="automation-schedule-control"
@@ -401,7 +401,7 @@
           </label>
 
           <div v-if="scheduleUsesTime" class="automation-schedule-field">
-            <span class="automation-schedule-label">Time</span>
+            <span v-explain="'automationScheduleTime'" class="automation-schedule-label">Time</span>
             <WorkflowTimeSelect
               v-model="scheduleTime"
               class="automation-schedule-select"

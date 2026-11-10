@@ -19,7 +19,7 @@
     >
       <div v-if="original" class="audit-settings">
         <label class="wizard-input-shell">
-          <span class="workflow-context-label">Name</span>
+          <span v-explain="'auditName'" class="workflow-context-label">Name</span>
           <input
             v-model="name"
             name="auditName"
@@ -33,7 +33,7 @@
           <span class="workflow-context-label">Schedule</span>
           <div class="audit-settings-schedule">
             <div class="audit-settings-field">
-              <span class="audit-settings-label">Daily</span>
+              <span v-explain="'auditScheduleDaily'" class="audit-settings-label">Daily</span>
               <AppToggleSwitch
                 v-model="scheduleActive"
                 label="Daily schedule"
@@ -42,7 +42,7 @@
               />
             </div>
             <div class="audit-settings-field">
-              <span class="audit-settings-label">Time</span>
+              <span v-explain="'auditScheduleTime'" class="audit-settings-label">Time</span>
               <WorkflowTimeSelect v-model="scheduleTime" test-id="audit-settings-schedule-time" aria-label="Time" :disabled="saving" />
             </div>
             <label class="audit-settings-field">

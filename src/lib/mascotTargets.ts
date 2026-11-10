@@ -167,6 +167,11 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   // the open-until-cleared ledger. The flowchart page points at its own meaning with v-explain.
   'findings': 'auditFindings',
   'grace days': 'auditGrace',
+
+  // Setup forms (DAR-UI-103). Generic words (Username, Password, Host, Expires, Name, Time, Day) are
+  // NOT here: each form points at its own meaning with v-explain, and those entries stay out of the index.
+  'change password': 'accountPassword',
+  'date window': 'automationWindow',
 })
 
 /**
@@ -186,7 +191,8 @@ const LABEL_PATTERNS: readonly (readonly [RegExp, string])[] = Object.freeze([
 function buildIndex(): Record<string, string> {
   const index: Record<string, string> = {}
   for (const [term, entry] of Object.entries(MASCOT_GLOSSARY)) {
-    index[normalizeLabel(entry.title)] = term
+    // A per-place entry stays out of the shared index: its title is a generic word.
+    if (!entry.byDirectiveOnly) index[normalizeLabel(entry.title)] = term
   }
   // Aliases are applied second so an explicit mapping beats a coincidental title match.
   return { ...index, ...LABEL_ALIASES }

@@ -108,6 +108,14 @@ describe('resolveExplainTarget', () => {
     expect(resolveExplainTarget(render('<h2 class="micro-label"><span>Findings</span><span>1,204</span></h2>').querySelector('h2'))?.term).toBe('auditFindings')
   })
 
+  // DAR-UI-103. Username, Password, Host, Expires, Name, Time mean something different on each form;
+  // their entries are reached by v-explain only, so an unmarked use says nothing rather than borrow one.
+  it('keeps a word that means different things on different forms out of the shared index', () => {
+    for (const word of ['Username', 'Password', 'Host', 'Expires', 'Name', 'Time', 'Day']) {
+      expect(resolveExplainTarget(render(`<span class="workflow-context-label">${word}</span>`).querySelector('span')), word).toBeNull()
+    }
+  })
+
   it('strips only a count, so a name with a number in it stays silent', () => {
     // An order number is data; dropping its digits must not leave a word that answers.
     expect(resolveExplainTarget(render('<span class="micro-label">Order 1234</span>').querySelector('span'))).toBeNull()

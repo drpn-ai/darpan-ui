@@ -49,11 +49,11 @@
       <div class="tenant-script-editor" data-testid="script-editor">
         <div class="workflow-form-grid workflow-form-grid--two">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Name</span>
+            <span v-explain="'scriptName'" class="workflow-context-label">Name</span>
             <input v-model="draft.scriptName" class="wizard-answer-control" type="text" data-testid="script-name" :disabled="!canEdit || busy" />
           </label>
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Profile</span>
+            <span v-explain="'scriptProfile'" class="workflow-context-label">Profile</span>
             <AppSelect v-model="draft.scriptProfile" :options="profileOptions" test-id="script-profile" :disabled="!canEdit || busy" />
           </label>
         </div>

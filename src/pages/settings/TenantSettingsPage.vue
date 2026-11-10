@@ -510,7 +510,7 @@
             </label>
 
             <label class="wizard-input-shell">
-              <span class="workflow-context-label">API Key (leave blank to keep existing)</span>
+              <span v-explain="'aiApiKey'" class="workflow-context-label">API Key (leave blank to keep existing)</span>
               <textarea
                 v-model="aiForm.llmApiKey"
                 class="wizard-answer-control workflow-form-textarea workflow-form-textarea--single-row"

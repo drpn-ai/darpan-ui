@@ -4,11 +4,11 @@
 
     <div class="workflow-form-grid workflow-form-grid--two">
       <label v-if="!customCron" class="wizard-input-shell">
-        <span class="workflow-context-label">Every day at ({{ timeZone || 'tenant zone' }})</span>
+        <span v-explain="'scriptSchedule'" class="workflow-context-label">Every day at ({{ timeZone || 'tenant zone' }})</span>
         <input v-model="form.time" class="wizard-answer-control" type="time" data-testid="script-deploy-time" :disabled="!canEdit || busy" />
       </label>
       <label v-else class="wizard-input-shell">
-        <span class="workflow-context-label">Schedule (cron, {{ timeZone || 'tenant zone' }})</span>
+        <span v-explain="'scriptSchedule'" class="workflow-context-label">Schedule (cron, {{ timeZone || 'tenant zone' }})</span>
         <input v-model="form.cron" class="wizard-answer-control" type="text" data-testid="script-deploy-cron" :disabled="!canEdit || busy" />
       </label>
       <label class="wizard-input-shell">

@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { sync as glob } from 'fast-glob'
+import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { describe, expect, it } from 'vitest'
 import { resolveExplainTarget } from '../mascotTargets'
 
@@ -253,33 +255,36 @@ describe('the run result page', () => {
 })
 
 /**
- * DAR-UI-103: every label on a page that shows a result has an answer. The sweep reads each
- * template the way the dock reads the rendered page — a `{{ }}` hole becomes a stand-in
- * number, so "Statements {{ n }}" and "Missing from {{ system }}" are asked about in the shape
- * they really take — and asks resolveExplainTarget about every label element in it. A label
- * marked with v-explain answers through the directive, which wins at runtime.
+ * DAR-UI-103: every label in the app has an answer — first the result surfaces, then (the same day)
+ * every setup form. The sweep reads each template the way the dock reads the rendered page: a
+ * `{{ }}` hole becomes a stand-in, once as a count and once as a name, so "Statements {{ n }}" and
+ * "Missing from {{ system }}" are asked about in the shape they really take. A label marked with
+ * v-explain answers through the directive, which wins at runtime.
  */
-describe('every label on a result surface has an answer', () => {
-  const RESULT_SURFACES = [
-    'pages/HomePage.vue',
-    'pages/reconciliation/ReconciliationRunResultPage.vue',
-    'pages/reconciliation/ReconciliationDiffPage.vue',
-    'pages/reconciliation/ReconciliationRunHistoryPage.vue',
-    'pages/reconciliation/RunFlowchartPage.vue',
-    'pages/reconciliation/AuditReportPage.vue',
-    'pages/reconciliation/ReconciliationAutomationDashboardPage.vue',
-    'pages/settings/TenantConfigHistoryPage.vue',
-    'components/audit/AuditColumns.vue',
-    'components/reconciliation/RunResultConclusionEvidence.vue',
-    'components/reconciliation/LifecycleBoard.vue',
-    'components/settings/ConnectionDiagnosticsPopup.vue',
-  ]
+describe('every label in the app has an answer', () => {
+  const FILES = glob('src/**/*.vue', { ignore: ['**/__tests__/**', '**/.claude/**'] })
 
   /** Labels that are right to say nothing, each with the reason. Silence is a decision, not a gap. */
   const SILENT: Readonly<Record<string, string>> = {
     "let's investigate": 'the home hero is a greeting, not vocabulary',
     'notify me': 'the picker\'s title repeats the button that opened it, and that button already answers',
     'checking...': 'a loading line, gone as soon as the first step lands',
+    'darpan': 'the login page has no mascot dock (design system: MascotDock.prompt.md)',
+    'sign in': 'the login page has no mascot dock, and the Sign In button answers once signed out pages gain one',
+    'user settings': 'page title: it names the page you are on',
+    'account': 'section title over fields that each answer for themselves',
+    'approve cli': 'page title; the Approve button carries the consequence',
+    'scripts': 'page title; the section note says what a script is',
+    'schema library': 'page title; Saved Schemas right below it answers',
+    'netsuite': 'page title naming the system whose connections are listed',
+    'hotwax': 'page title naming the system whose connections are listed',
+    'shopify': 'page title naming the system whose connections are listed',
+    'sftp servers': 'page title over the list',
+    'run editor': 'page title',
+    'no matching results': 'an empty state; the next line suggests words to try',
+    'roadmap & requests': 'placeholder page heading with its own description',
+    'customer_access // linear_portal': 'decorative eyebrow on the placeholder page',
+    'enabled': 'AI Configuration stores it and nothing reads it (DAR-BE-213) — any consequence would be invented',
   }
 
   const LABELS = 'th, dt, legend, h1, h2, h3, h4, h5, h6, .static-page-section-heading, [class*="label"], [class*="eyebrow"]'
@@ -299,9 +304,9 @@ describe('every label on a result surface has an answer', () => {
   it('answers every label they put on screen', () => {
     const unanswered: string[] = []
     let swept = 0
-    for (const relative of RESULT_SURFACES) {
-      const source = readFileSync(`src/${relative}`, 'utf-8').match(/<template>([\s\S]*)<\/template>/)?.[1] ?? ''
-      expect(source, `${relative} has no template — the list is stale`).not.toBe('')
+    for (const file of FILES) {
+      const relative = file.split('src/')[1] as string
+      const source = readFileSync(file, 'utf-8').match(/<template>([\s\S]*)<\/template>/)?.[1] ?? ''
       // The same template twice — holes as a count, holes as a name — so "Statements {{ n }}" and
       // "Missing from {{ system }}" are each asked about in the shape they really take.
       const asCount = document.createElement('div')
@@ -325,7 +330,30 @@ describe('every label on a result surface has an answer', () => {
       asCount.remove()
       asName.remove()
     }
-    expect(swept, 'no labels were swept — the markup rewrite is wrong').toBeGreaterThan(40)
-    expect(unanswered, `result labels with no answer:\n${unanswered.join('\n')}`).toEqual([])
+    expect(FILES.length, 'no components were swept — the glob is wrong').toBeGreaterThan(80)
+    expect(swept, 'no labels were swept — the markup rewrite is wrong').toBeGreaterThan(150)
+    expect(unanswered, `labels with no answer:\n${unanswered.join('\n')}`).toEqual([])
+  })
+
+  /** A directive naming an entry nobody wrote is a hover that silently says nothing. */
+  it('points every v-explain at an entry that exists', () => {
+    const missing: string[] = []
+    let directives = 0
+    for (const file of FILES) {
+      for (const match of readFileSync(file, 'utf-8').matchAll(/v-explain="'([A-Za-z]+)'"/g)) {
+        directives += 1
+        if (!MASCOT_GLOSSARY[match[1] as string]) missing.push(`${file.split('src/')[1]}: ${match[1]}`)
+      }
+    }
+    expect(directives, 'no v-explain was found — the pattern is wrong').toBeGreaterThan(40)
+    expect(missing).toEqual([])
+  })
+
+  /** An entry kept out of the index and named by no directive can never be reached. */
+  it('reaches every directive-only entry from some template', () => {
+    const used = new Set<string>()
+    for (const file of FILES) for (const match of readFileSync(file, 'utf-8').matchAll(/v-explain="'([A-Za-z]+)'"/g)) used.add(match[1] as string)
+    const orphans = Object.entries(MASCOT_GLOSSARY).filter(([key, entry]) => entry.byDirectiveOnly && !used.has(key)).map(([key]) => key)
+    expect(orphans).toEqual([])
   })
 })

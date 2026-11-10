@@ -1,6 +1,6 @@
 <template>
   <article class="static-page-summary-card" data-testid="cli-access-card">
-    <span class="static-page-summary-label">CLI in {{ access.tenantLabel }}</span>
+    <span v-explain="'cliAccess'" class="static-page-summary-label">CLI in {{ access.tenantLabel }}</span>
     <span data-testid="cli-access-state">{{ stateLine }}</span>
 
     <template v-if="canAsk">

@@ -85,7 +85,7 @@
 
         <div v-if="isBasicAuth" class="workflow-form-grid workflow-form-grid--two">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Username (leave blank to keep existing)</span>
+            <span v-explain="'omsUsername'" class="workflow-context-label">Username (leave blank to keep existing)</span>
             <input
               name="username"
               v-model="form.username"
@@ -96,7 +96,7 @@
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Password (leave blank to keep existing)</span>
+            <span v-explain="'connectionPassword'" class="workflow-context-label">Password (leave blank to keep existing)</span>
             <input
               name="password"
               v-model="form.password"
@@ -108,7 +108,7 @@
         </div>
 
         <label v-if="isApiTokenAuth" class="wizard-input-shell">
-          <span class="workflow-context-label">{{ apiTokenLabel }} (leave blank to keep existing)</span>
+          <span v-explain="isApiKeyAuth ? 'omsApiKey' : 'apiToken'" class="workflow-context-label">{{ apiTokenLabel }} (leave blank to keep existing)</span>
           <input
             name="apiToken"
             v-model="form.apiToken"

@@ -196,7 +196,7 @@
       <div v-if="currentCreateStep.id === 'review'" class="workflow-context-block netsuite-query-preview">
         <div class="netsuite-query-preview__bar">
           <label class="netsuite-query-preview__day">
-            <span class="workflow-context-label">Day</span>
+            <span v-explain="'netSuitePreviewDay'" class="workflow-context-label">Day</span>
             <input name="previewDay" v-model="previewDay" type="date" />
           </label>
           <button

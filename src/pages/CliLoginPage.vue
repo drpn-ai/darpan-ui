@@ -22,10 +22,10 @@
           <span data-testid="cli-login-host">Darpan CLI on {{ hostLabel }}</span>
           <span class="section-note">That is the name the CLI gave. Darpan has not checked it.</span>
           <template v-if="startedLabel">
-            <span class="static-page-summary-label">Started</span>
+            <span v-explain="'cliCodeStarted'" class="static-page-summary-label">Started</span>
             <span data-testid="cli-login-started">{{ startedLabel }}</span>
           </template>
-          <span class="static-page-summary-label">Expires</span>
+          <span v-explain="'cliCodeExpires'" class="static-page-summary-label">Expires</span>
           <span data-testid="cli-login-expires">{{ expiresLabel }}</span>
         </article>
         <p class="section-note">Approve only a code you just started in your own terminal.</p>

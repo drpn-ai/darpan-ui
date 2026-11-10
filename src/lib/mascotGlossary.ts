@@ -16,6 +16,12 @@ export interface GlossaryEntry {
   title: string
   /** One sentence. Under thirty words. */
   body: string
+  /**
+   * Reached only through `v-explain`, never by its title. For a word that means different things on
+   * different forms — Username, Password, Host, Expires, Name, Time — a title in the shared index
+   * would answer every unmarked use with this one place's meaning (DAR-UI-103).
+   */
+  byDirectiveOnly?: true
 }
 
 export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.freeze({
@@ -424,6 +430,339 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   configHistory: {
     title: 'Config history',
     body: 'every saved version of this tenant’s setup. Restoring one puts that setup back; runs that already finished keep the results they had.',
+  },
+
+  /* ── Setup forms: connections, settings, scripts, automations, audits (DAR-UI-103) ── */
+  configDescription: {
+    title: 'Description',
+    body: 'the name this setup goes by in lists and pickers. Left blank, people choose between bare IDs.',
+  },
+  connectionUsername: {
+    title: 'Username',
+    body: 'the account Darpan signs in as, for sign-ins that use one. Every call it makes runs under this name, with that account’s access.',
+    byDirectiveOnly: true,
+  },
+  omsUsername: {
+    title: 'Username',
+    body: 'the HotWax account Darpan signs in as for Basic sign-in. It is never shown back, and for now a Basic save needs it typed again.',
+    byDirectiveOnly: true,
+  },
+  connectionPassword: {
+    title: 'Password',
+    body: 'sent with the username as a Basic sign-in on every call. Stored encrypted and never shown back, so an empty box on edit is normal.',
+    byDirectiveOnly: true,
+  },
+  sftpPassword: {
+    title: 'Password',
+    body: 'tried before the private key, and a blank one keeps the saved one. Once a password exists, this form cannot switch the server to key sign-in.',
+    byDirectiveOnly: true,
+  },
+  sftpPrivateKey: {
+    title: 'Private Key',
+    body: 'used only when no password is saved; once one is, this key is never tried. Stored encrypted and never shown back.',
+  },
+  sftpHost: {
+    title: 'Host',
+    body: 'the server’s address. A path after it (host/inbound) becomes the folder runs read, unless the automation names its own.',
+    byDirectiveOnly: true,
+  },
+  sftpPort: {
+    title: 'Port',
+    body: 'the server’s SSH port, 22 when empty. A port written into Host (host:2222) overrides this one.',
+  },
+  apiToken: {
+    title: 'API Token',
+    body: 'sent as a bearer token on every call. Stored encrypted and never shown back. Revoke it at the source and every run using it fails.',
+  },
+  omsApiKey: {
+    title: 'API Key',
+    body: 'sent in HotWax’s api_key header on every call, not as a bearer token. Stored encrypted and never shown back.',
+  },
+  netSuiteClientId: {
+    title: 'Client ID',
+    body: 'the integration’s ID from NetSuite’s M2M setup, sent as the sign-in’s issuer. Swapped with Cert ID, every token request is refused.',
+  },
+  netSuiteCertId: {
+    title: 'Cert ID',
+    body: 'the certificate ID from NetSuite’s M2M mapping, sent as the key ID. Swapped with Client ID, every token request is refused.',
+  },
+  netSuitePrivateKeyPem: {
+    title: 'Private Key PEM',
+    body: 'signs each sign-in request. It must be a PKCS#8 RSA or EC key matching the Cert ID’s certificate. Stored encrypted.',
+  },
+  netSuiteEndpointUrl: {
+    title: 'Endpoint URL',
+    body: 'the exact address every call through this endpoint goes to. GET calls add item, location and dates to it as query values.',
+  },
+  httpMethod: {
+    title: 'HTTP Method',
+    body: 'the verb each call uses. POST and PUT carry the item list in the body; GET fits one item per call, so a bulk lookup on GET fails.',
+  },
+  netSuiteAuthConfig: {
+    title: 'Auth Config',
+    body: 'the saved NetSuite sign-in this endpoint uses. An inactive one will not save here, and one in use here cannot be deleted.',
+  },
+  headersJson: {
+    title: 'Headers JSON',
+    body: 'extra headers added to every call, as one JSON object. Stored as plain text, unlike the sign-in’s secrets, so keep tokens out of it.',
+  },
+  shopifyAccessToken: {
+    title: 'Access Token',
+    body: 'sent with every Shopify call. Stored encrypted and never shown back. A revoked token fails every Shopify run until it is replaced here.',
+  },
+  endpointAccess: {
+    title: 'Available Endpoints',
+    body: 'which calls runs may make through this connection. Untick one and any run needing it stops as not enabled. New ones start ticked.',
+  },
+  aiConfiguration: {
+    title: 'AI Configuration',
+    body: 'one setting for every tenant on this Darpan, not just this one. Only a Darpan admin can save it.',
+  },
+  aiApiKey: {
+    title: 'API Key',
+    body: 'stored encrypted and never shown back, only whether one exists. Blank keeps the current key; this form cannot clear it.',
+    byDirectiveOnly: true,
+  },
+  aiProvider: {
+    title: 'Provider',
+    body: 'which AI company Darpan asks, OpenAI or Gemini. Saving a provider’s settings makes it the active one for the whole instance.',
+  },
+  aiModel: {
+    title: 'Model',
+    body: 'which model this provider is asked for. Left blank, the last saved model stays, or the provider default if none was saved.',
+  },
+  slackBotToken: {
+    title: 'Bot user OAuth token',
+    body: 'the xoxb- token Darpan posts to Slack with. Checked with Slack before saving, then stored encrypted. Anyone holding it can write to that workspace.',
+  },
+  chatProduct: {
+    title: 'Chat product',
+    body: 'which service this space posts through, Google Chat or Slack. It cannot change once saved, so moving a space to the other product means adding a new space.',
+  },
+  chatSpace: {
+    title: 'Chat space',
+    body: 'a named destination: one Google Chat webhook or one Slack channel, set up in tenant settings. Change where it posts there and everything using it follows.',
+  },
+  slackChannel: {
+    title: 'Slack channel',
+    body: 'where this space’s messages land. A private channel needs the Darpan bot invited before it can post there.',
+  },
+  chatSpaceName: {
+    title: 'Space name',
+    body: 'what every picker calls this destination: automations, scripts, your own notification default. Two alike are easy to mix up.',
+  },
+  accountPassword: {
+    title: 'Password',
+    body: 'changing it signs this account out everywhere else, CLI sign-ins included. The session you are in stays.',
+    byDirectiveOnly: true,
+  },
+  accountUsername: {
+    title: 'Username',
+    body: 'what you type to sign in. This page cannot change it.',
+    byDirectiveOnly: true,
+  },
+  displayName: {
+    title: 'Display name',
+    body: 'what the top bar shows beside the tenant name. Left blank, your username shows instead.',
+  },
+  recoveryEmail: {
+    title: 'Recovery email',
+    body: 'where password reset codes go. With none set, Forgot password cannot reach you. Changing it asks for your current password first.',
+  },
+  userId: {
+    title: 'User ID',
+    body: 'how Darpan records you on the runs you start. Unlike your display name it never changes, so quote it to an admin.',
+  },
+  lastLogin: {
+    title: 'Last Login',
+    body: 'the newest successful sign-in to this account, usually this one. A time you do not recognise is worth a password change.',
+  },
+  lastRun: {
+    title: 'Last Run',
+    body: 'the id of the newest run you started in the active tenant. Switch tenant and it changes; runs other people started never show here.',
+  },
+  userNotificationDefault: {
+    title: 'Notifications',
+    body: 'your own chat space, offered as “My default space” when you pick where an automation posts.',
+    byDirectiveOnly: true,
+  },
+  cliSessionHost: {
+    title: 'Host',
+    body: 'the computer name the CLI gave when it signed in. Darpan does not check it, so revoke any you do not recognise.',
+    byDirectiveOnly: true,
+  },
+  cliSessionSignedIn: {
+    title: 'Signed in',
+    body: 'when this terminal was approved. Revoke ends it now; a password change ends every one.',
+  },
+  cliSessionExpires: {
+    title: 'Expires',
+    body: 'after this the terminal has to run darpan login again. Revoke or a password change ends it sooner.',
+    byDirectiveOnly: true,
+  },
+  cliCodeExpires: {
+    title: 'Expires',
+    body: 'this code stops working ten minutes after the terminal asked. Past that, run darpan login again for a fresh one.',
+    byDirectiveOnly: true,
+  },
+  cliCodeStarted: {
+    title: 'Started',
+    body: 'when a terminal asked to sign in as you. If you did not just run darpan login, deny it.',
+    byDirectiveOnly: true,
+  },
+  cliSignInRequest: {
+    title: 'Sign-in request',
+    body: 'a terminal asking to act as you, under a name it chose itself. Approving gives it your permissions until it expires.',
+  },
+  cliAccess: {
+    title: 'CLI access',
+    body: 'whether the Darpan CLI may act for you in this tenant. It is set per tenant, and a Darpan admin turns it on, pauses or ends it.',
+    byDirectiveOnly: true,
+  },
+  scriptName: {
+    title: 'Name',
+    body: 'must be unique in this tenant. A second script with the same name is refused when you save.',
+    byDirectiveOnly: true,
+  },
+  scriptProfile: {
+    title: 'Profile',
+    body: 'how much a script may do: an Expression is one line with no loops and gets 250 ms; a Script allows both and gets 2 s. A body that does not fit is refused on save.',
+    byDirectiveOnly: true,
+  },
+  scriptBody: {
+    title: 'Script',
+    body: 'the JEXL that reads its input and returns the text to post. Return nothing and nothing is sent; pass the time limit and the run stops.',
+  },
+  scriptSchedule: {
+    title: 'Schedule',
+    body: 'when this script runs, read in the tenant’s timezone in brackets, not your own. A teammate in another zone sees a different clock time for the same post.',
+    byDirectiveOnly: true,
+  },
+  scriptPostTo: {
+    title: 'Post to',
+    body: 'the chat space this script’s text goes to. If the space is deleted, switched off or has no webhook, the run reads Not delivered.',
+  },
+  scriptInputRun: {
+    title: 'Reads the newest result of',
+    body: 'the saved run whose latest finished result feeds the script each time. With no finished result yet, nothing is sent.',
+  },
+  automationSftpServer: {
+    title: 'SFTP Server',
+    body: 'the saved server and login this side reads its file from on every run. Change the login there and every automation using it changes too.',
+    byDirectiveOnly: true,
+  },
+  automationRemotePath: {
+    title: 'Remote path',
+    body: 'the folder each run reads: it takes the newest file there, then moves it into an archive subfolder so the next run cannot compare it twice.',
+    byDirectiveOnly: true,
+  },
+  automationName: {
+    title: 'Automation Name',
+    body: 'the name every chat message about this automation’s runs carries. Rename it freely; logs and the CLI go by the automation ID.',
+  },
+  automationChatSpace: {
+    title: 'Chat Space',
+    body: 'where each finished or failed run is posted, with its difference counts. With no notifications, a failed run is seen only by someone who opens it.',
+    byDirectiveOnly: true,
+  },
+  automationWindowCount: {
+    title: 'Count',
+    body: 'how many whole days, weeks or months back each run reaches. It stops at the start of today, this week or this month, so the current one is never read.',
+    byDirectiveOnly: true,
+  },
+  automationCustomEnd: {
+    title: 'End Date',
+    body: 'where a custom window stops. A custom window never moves, so every scheduled run re-reads the same dates and nothing newer is compared.',
+  },
+  automationScheduleMinute: {
+    title: 'Minute',
+    body: 'minutes past every hour this fires. The window is cut by calendar day, so every run within one day asks for the same records.',
+    byDirectiveOnly: true,
+  },
+  automationScheduleWeekday: {
+    title: 'Day',
+    body: 'the weekday this fires, in the timezone beside it. A previous-week window still covers Monday to Sunday, whichever day you pick.',
+    byDirectiveOnly: true,
+  },
+  automationScheduleMonthDay: {
+    title: 'Date',
+    body: 'the day of the month this fires. Pick 29, 30 or 31 and months without that day are skipped, with no run at all.',
+    byDirectiveOnly: true,
+  },
+  automationScheduleTime: {
+    title: 'Time',
+    body: 'when this fires, in the timezone beside it, for the whole tenant. Records are picked by date, so moving the hour does not change what a run reads.',
+    byDirectiveOnly: true,
+  },
+  netSuitePreviewDay: {
+    title: 'Preview day',
+    body: 'the one day this preview pulls. It shapes the preview only, never what the query reads in a run.',
+    byDirectiveOnly: true,
+  },
+  auditName: {
+    title: 'Audit name',
+    body: 'the title the report and the admin live view show for this audit. Its links use the audit code, so renaming breaks no bookmark.',
+    byDirectiveOnly: true,
+  },
+  auditScheduleDaily: {
+    title: 'Daily',
+    body: 'on, every check in this audit runs once a day. Off pauses them all, so no findings are recorded or closed until it is back on.',
+    byDirectiveOnly: true,
+  },
+  auditScheduleTime: {
+    title: 'Audit time',
+    body: 'when every check in this audit starts each day, in the timezone beside it. Saving moves them all here, even checks that ran at other times.',
+    byDirectiveOnly: true,
+  },
+  auditRunEmail: {
+    title: 'Email after each run',
+    body: 'an email to everyone with access to this tenant once each run finishes. Off, findings still record but nobody is told.',
+  },
+  auditRunEmailExtra: {
+    title: 'Also send to',
+    body: 'addresses beyond this tenant’s members that get the same email, such as a client’s inbox. Only tenant admins can change the list.',
+  },
+  auditCheckRecordType: {
+    title: 'Record type',
+    body: 'the type findings file this side’s record under, such as return or creditMemo. Blank reads as record, and it names the record in the default headline.',
+    byDirectiveOnly: true,
+  },
+  auditCheckName: {
+    title: 'Check name',
+    body: 'what this check compares, in a few words. It ends the default headline, and the check ID follows it until you type one.',
+    byDirectiveOnly: true,
+  },
+  auditCheckId: {
+    title: 'Check ID',
+    body: 'this check’s id in the audit report’s JSON, unique in the tenant. It follows the name until you type one; an id already taken is refused.',
+  },
+  auditExpectedCauses: {
+    title: 'Expected causes',
+    body: 'causes that are normal for this run; records they explain count toward no statement. Set on the run, so every check using it changes too.',
+  },
+  auditFixOwner: {
+    title: 'Fix owner',
+    body: 'the team each finding of this check names as its fixer, such as HotWax Support. It is who a reader forwards the finding to.',
+  },
+  auditFixWhere: {
+    title: 'Fix where',
+    body: 'the system each finding says to fix it in: OMS, NetSuite or Shopify. Darpan only points there; it never writes to those systems.',
+  },
+  auditCheckCurrency: {
+    title: 'Currency',
+    body: 'set only when the rule compares money: the first side’s value becomes the expected amount and the second the actual. Blank, they stay plain values.',
+  },
+  auditExpectedSource: {
+    title: 'Expected from',
+    body: 'where the first side’s amount comes from, such as an RMA total. It shows beside the expected figure, so readers know which number is the reference.',
+  },
+  auditActualSource: {
+    title: 'Actual from',
+    body: 'where the second side’s amount comes from, such as a NetSuite credit memo total. It shows beside the actual figure on each money finding.',
+  },
+  auditHeadline: {
+    title: 'Headline',
+    body: 'the one line each finding opens with, filled per record ({recordKey} is its id). Blank uses the record type, id and this check’s name.',
   },
 })
 

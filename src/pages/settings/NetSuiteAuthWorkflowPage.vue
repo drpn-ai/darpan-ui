@@ -60,7 +60,7 @@
 
         <div v-if="isBasicAuth" class="workflow-form-grid workflow-form-grid--two">
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Username</span>
+            <span v-explain="'connectionUsername'" class="workflow-context-label">Username</span>
             <input
               name="username"
               v-model="form.username"
@@ -71,7 +71,7 @@
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Password (leave blank to keep existing)</span>
+            <span v-explain="'connectionPassword'" class="workflow-context-label">Password (leave blank to keep existing)</span>
             <input
               name="password"
               v-model="form.password"
