@@ -32,7 +32,7 @@ vi.mock('../../lib/api/facade', () => ({
 
 import { resolveEffectiveTimeZone, useAuthStore } from '../auth'
 import { getDefaultDisplayTimeZone, setDefaultDisplayTimeZone } from '../../lib/utils/date'
-import { clearAuthToken } from '../../lib/api/client'
+import { ApiCallError, clearAuthToken } from '../../lib/api/client'
 import { useReferenceDataStore } from '../referenceData'
 
 describe('resolveEffectiveTimeZone', () => {
@@ -231,6 +231,19 @@ describe('auth store forced password change', () => {
     expect(authenticated).toBe(false)
     expect(store.passwordChangeReason).toBe('PWDCHG')
     expect(store.error).toBe('Your password must be changed before you can sign in.')
+  })
+
+  it('shows a failed sign-in as its message alone, never the URLs or response body it tried', async () => {
+    loginSessionMock.mockRejectedValue(new ApiCallError(
+      'Darpan stepped out for chai. Try again in a moment.',
+      503,
+      { attemptedUrls: ['http://localhost:5173/rpc/json'], failures: [{ status: 401, raw: '401 Origin not allowed /rpc/json' }] },
+    ))
+
+    const store = useAuthStore()
+    await store.loginWithCredentials('john.doe', 'pass')
+
+    expect(store.error).toBe('Darpan stepped out for chai. Try again in a moment.')
   })
 
   it('leaves the reason unset for an ordinary bad password', async () => {

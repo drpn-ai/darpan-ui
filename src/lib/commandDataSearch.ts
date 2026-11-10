@@ -1,6 +1,7 @@
 import type { GeneratedOutput, SftpServerRecord } from './api/types'
 import type { CommandAction } from './types/ux'
 import { resolveRecordLabel } from './utils/recordLabel'
+import { countLabel } from './utils/strings'
 
 const DEFAULT_RESULT_LIMIT = 6
 
@@ -61,7 +62,7 @@ function resolveOutputLabel(output: GeneratedOutput): string {
 }
 
 function describeGeneratedOutput(output: GeneratedOutput): string {
-  const diffText = typeof output.totalDifferences === 'number' ? `${output.totalDifferences} differences` : 'Saved result'
+  const diffText = typeof output.totalDifferences === 'number' ? countLabel(output.totalDifferences, 'difference') : 'Saved result'
   const systemLabels = [output.file1Label, output.file2Label].map((label) => label?.trim()).filter(Boolean)
 
   if (systemLabels.length === 2) return `${diffText} for ${systemLabels[0]} and ${systemLabels[1]}.`

@@ -44,23 +44,6 @@ export interface UiPermissionPolicy {
 const authBypass = !import.meta.env.PROD
   && (import.meta.env.VITE_DARPAN_AUTH_BYPASS ?? '').toLowerCase() === 'true'
 
-function formatApiError(error: ApiCallError): string {
-  const details = (error.details ?? {}) as {
-    attemptedUrls?: string[]
-    failures?: Array<{ status?: number; raw?: string }>
-  }
-
-  if (Array.isArray(details.attemptedUrls) && details.attemptedUrls.length > 0) {
-    const preview = details.attemptedUrls.slice(0, 3).join(', ')
-    const firstFailure = Array.isArray(details.failures) ? details.failures[0] : undefined
-    const statusHint = firstFailure?.status ? ` First status: ${firstFailure.status}.` : ''
-    const rawHint = firstFailure?.raw ? ` First body: ${firstFailure.raw.slice(0, 120)}.` : ''
-    return `${error.message}. Tried: ${preview}${details.attemptedUrls.length > 3 ? ', ...' : ''}.${statusHint}${rawHint}`
-  }
-
-  return error.message
-}
-
 function normalizeUserId(value: unknown): string | null {
   const normalized = value?.toString()?.trim()
   return normalized ? normalized : null
@@ -241,7 +224,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     _applyAuthState({
       status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-      error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
+      error: err instanceof ApiCallError ? err.message : buildContractViolationError(err),
       sessionInfo: _sessionInfo.value,
     })
   }
@@ -302,7 +285,7 @@ export const useAuthStore = defineStore('auth', () => {
           return false
         }
 
-        const formattedError = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+        const formattedError = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
         _applyAuthState({ status: 'verification-failed', error: formattedError })
         return false
       } finally {
@@ -370,7 +353,7 @@ export const useAuthStore = defineStore('auth', () => {
       clearAuthToken()
       _applyAuthState({
         status: 'unauthenticated',
-        error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
+        error: err instanceof ApiCallError ? err.message : buildContractViolationError(err),
       })
       return false
     }
@@ -402,7 +385,7 @@ export const useAuthStore = defineStore('auth', () => {
       clearApiResponseCache()
       _applyAuthState({
         status: 'unauthenticated',
-        error: err instanceof ApiCallError ? formatApiError(err) : 'Logout failed',
+        error: err instanceof ApiCallError ? err.message : 'Logout failed',
       })
       return false
     }
@@ -450,7 +433,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       _applyAuthState({
         status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-        error: err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err),
+        error: err instanceof ApiCallError ? err.message : buildContractViolationError(err),
         sessionInfo: _sessionInfo.value,
       })
       // The call never reached a verdict. Never render this as access-denied.
@@ -611,7 +594,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (err) {
       // The backend reports a rejected new password as a service error rather than an envelope, so the
       // policy text ("shorter than 8 characters", "was used in last 5 passwords") arrives here.
-      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
       return false
     }
   }
@@ -626,7 +609,7 @@ export const useAuthStore = defineStore('auth', () => {
       _error.value = null
       return { outcome: response.outcome ?? 'sent', emailAddressMasked: response.emailAddressMasked ?? null }
     } catch (err) {
-      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
       return null
     }
   }
@@ -638,7 +621,7 @@ export const useAuthStore = defineStore('auth', () => {
       _error.value = verified ? null : response.errors?.[0] ?? "That code didn't work. Request a new one."
       return verified
     } catch (err) {
-      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
       return false
     }
   }
@@ -656,7 +639,7 @@ export const useAuthStore = defineStore('auth', () => {
       return updated
     } catch (err) {
       // A refused new password arrives as a service error, as in changeExpiredPassword.
-      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
       return false
     }
   }
@@ -680,7 +663,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       return true
     } catch (err) {
-      _error.value = err instanceof ApiCallError ? formatApiError(err) : buildContractViolationError(err)
+      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
       return false
     }
   }

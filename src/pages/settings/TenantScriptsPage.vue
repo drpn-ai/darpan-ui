@@ -182,6 +182,7 @@ import type {
   TenantScript,
 } from '../../lib/api/scriptTypes'
 import type { GeneratedOutput, TenantChatSpace } from '../../lib/api/types'
+import { countLabel } from '../../lib/utils/strings'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -242,7 +243,7 @@ const busy = computed(() => running.value || saving.value)
 const runResultOptions = computed(() =>
   runResults.value.map((out) => ({
     value: out.fileName,
-    label: [out.savedRunName || out.fileName, out.totalDifferences != null ? `${out.totalDifferences} differences` : '']
+    label: [out.savedRunName || out.fileName, out.totalDifferences != null ? countLabel(out.totalDifferences, 'difference') : '']
       .filter(Boolean).join(' · '),
   })))
 const limitLine = computed(() => {
@@ -256,7 +257,7 @@ const runStatus = computed(() => {
   if (!out) return ''
   const summary = out.inputSummary
   const read = summary?.source === 'RUN_RESULT'
-    ? ` · read ${summary.records ?? 0} of ${summary.totalDifferences ?? 0} differences`
+    ? ` · read ${summary.records ?? 0} of ${countLabel(summary.totalDifferences ?? 0, 'difference')}`
     : ''
   return `${out.run.ok ? 'Ran' : 'Stopped'} in ${out.run.elapsedMs} ms · ${out.run.units.toLocaleString()} units${read}`
 })

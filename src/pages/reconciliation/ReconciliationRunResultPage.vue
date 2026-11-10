@@ -623,6 +623,7 @@ import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarge
 import { backIconPath, downloadIconPath, listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
+import { countLabel } from '../../lib/utils/strings'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { useRunResultDifferences } from '../../composables/useRunResultDifferences'
 import { useRunResultDownloads } from '../../composables/useRunResultDownloads'
@@ -1055,7 +1056,7 @@ function stepDurationLabel(step: ReconciliationRunStep): string {
 }
 
 function stepRecordsLabel(step: ReconciliationRunStep): string {
-  return step.recordCount != null ? `${step.recordCount.toLocaleString()} records` : ''
+  return step.recordCount != null ? countLabel(step.recordCount, 'record') : ''
 }
 
 const {

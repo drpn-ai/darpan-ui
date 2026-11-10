@@ -823,27 +823,6 @@ button:disabled {
   justify-content: center;
 }
 
-.user-settings-password-trigger {
-  min-height: 2.2rem;
-  padding: 0 var(--space-2);
-  font-size: var(--type-note-size);
-  white-space: nowrap;
-}
-
-.user-settings-account-action-stack {
-  display: grid;
-  gap: var(--space-2);
-  align-content: start;
-}
-
-.user-settings-account-action-stack .static-page-summary-card {
-  min-width: 0;
-}
-
-.user-settings-account-action-stack .user-settings-password-trigger {
-  justify-self: start;
-}
-
 .user-settings-page--popup-open {
   filter: blur(var(--popup-background-blur));
   opacity: var(--popup-background-opacity);

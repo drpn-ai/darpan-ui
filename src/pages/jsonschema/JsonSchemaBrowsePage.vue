@@ -11,7 +11,6 @@
       <EmptyState
         v-else-if="schemaCards.length === 0"
         title="No schemas saved yet"
-        description="Create your first schema"
       />
 
       <div v-else class="static-page-tile-grid">

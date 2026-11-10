@@ -610,7 +610,7 @@ import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReferenceDataStore } from '../../stores/referenceData'
 import { buildTimezoneOptions } from '../../lib/timezones'
-import { normalizeStringOrEmpty } from '../../lib/utils/strings'
+import { countLabel, normalizeStringOrEmpty } from '../../lib/utils/strings'
 import { useTenantSettingsPopup } from '../../composables/useActivePopup'
 
 type LlmProvider = 'OPENAI' | 'GEMINI'
@@ -784,7 +784,7 @@ const streaksWorkflowSaving = ref(false)
 // lands — so hold a neutral placeholder until there is an answer to report.
 const notificationSummary = computed(() => {
   if (chatSpacesLoading.value) return '—'
-  return chatSpaces.value.length > 0 ? `${chatSpaces.value.length} spaces` : 'Not configured'
+  return chatSpaces.value.length > 0 ? countLabel(chatSpaces.value.length, 'space') : 'Not configured'
 })
 const notificationWorkflowError = ref<string | null>(null)
 const notificationWorkflowSuccess = ref<string | null>(null)

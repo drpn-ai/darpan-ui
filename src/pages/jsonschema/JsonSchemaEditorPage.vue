@@ -21,7 +21,6 @@
         <InlineValidation v-if="error" tone="error" :message="error" />
         <EmptyState
           title="This schema is having a moment"
-          description="Retry loading before refining any fields."
         />
 
         <div class="action-row">
@@ -32,7 +31,6 @@
       <template v-else-if="!hasTarget">
         <EmptyState
           title="No schema selected"
-          description="Open a schema from the library to review and refine its fields."
         />
 
         <RouterLink class="static-page-action-tile static-page-action-tile--inline" :to="{ name: 'schemas-library' }">

@@ -29,7 +29,6 @@
     <template v-else>
       <EmptyState
         title="No run basics defined yet"
-        description="Start in reconciliation setup, then open the rules editor after defining the two sources."
       />
       <RouterLink
         class="static-page-action-tile static-page-action-tile--inline"

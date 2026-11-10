@@ -10,18 +10,20 @@
       </template>
 
       <div class="static-page-summary-grid">
-        <div class="user-settings-account-action-stack">
-          <article class="static-page-summary-card">
-            <span class="static-page-summary-label">User ID</span>
-            <span>{{ userId }}</span>
-          </article>
-          <button class="user-settings-control user-settings-password-trigger" type="button" @click="openPasswordWorkflow">
-            Change password
-          </button>
-        </div>
+        <article class="static-page-summary-card">
+          <span class="static-page-summary-label">User ID</span>
+          <span>{{ userId }}</span>
+        </article>
         <article class="static-page-summary-card">
           <span class="static-page-summary-label">Username</span>
           <span>{{ username }}</span>
+        </article>
+        <article class="static-page-summary-card" data-testid="password-card">
+          <span class="static-page-summary-label">Password</span>
+          <span aria-hidden="true">••••••••</span>
+          <button class="user-settings-control user-settings-password-trigger" type="button" aria-label="Change password" @click="openPasswordWorkflow">
+            Change
+          </button>
         </article>
         <!-- DAR-BE-028: where password reset codes go. Masked: the page never needs the whole address. -->
         <article class="static-page-summary-card" data-testid="recovery-email-card">

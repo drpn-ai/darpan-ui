@@ -166,7 +166,6 @@
       <template v-else>
         <EmptyState
           title="No run basics defined yet"
-          description="Start in reconciliation setup, then open the Ruleset Manager after defining the two sources."
         />
 
         <RouterLink

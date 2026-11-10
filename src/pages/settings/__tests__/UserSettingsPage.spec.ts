@@ -211,18 +211,15 @@ describe('UserSettingsPage', () => {
       'Activity',
       'CLI sessions',
     ])
-    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(9)
+    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(10)
     expect(wrapper.findAll('.static-page-record-tile').map((node) => node.text())).toEqual(['Krewe', 'Gorjana'])
     expect(wrapper.findAll('.static-page-list-tile')).toHaveLength(0)
     expect(wrapper.find('.static-page-section-head .user-settings-password-trigger').exists()).toBe(false)
     expect(wrapper.find('.user-settings-summary-field .static-page-summary-label').text()).toBe('Display name')
-    const accountActionStack = wrapper.get('.user-settings-account-action-stack')
-    expect(accountActionStack.get('.static-page-summary-label').text()).toBe('User ID')
-    expect(accountActionStack.text()).toContain('M100000')
-    const passwordTrigger = accountActionStack.get('.user-settings-password-trigger')
-    expect(passwordTrigger.text()).toBe('Change password')
-    expect(passwordTrigger.find('svg').exists()).toBe(false)
-    expect(passwordTrigger.classes()).not.toContain('static-page-summary-card')
+    // Password changes inside its own card, the same way the recovery email does.
+    const passwordCard = wrapper.get('[data-testid="password-card"]')
+    expect(passwordCard.get('.static-page-summary-label').text()).toBe('Password')
+    expect(passwordCard.get('.user-settings-password-trigger').text()).toBe('Change')
     expect(wrapper.find('.static-page-actions [aria-label="Save user settings"]').exists()).toBe(true)
     expect(wrapper.get('.user-settings-card-grid').classes()).toContain('static-page-summary-grid')
     expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(4)

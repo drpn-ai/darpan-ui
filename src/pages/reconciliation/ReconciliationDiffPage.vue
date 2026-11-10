@@ -6,7 +6,6 @@
       v-else-if="showEmptyState"
       icon="inbox"
       title="No runs available"
-      description="Create a saved reconciliation run first, then come back to execute the diff."
       :action="createRunAction"
     />
 
