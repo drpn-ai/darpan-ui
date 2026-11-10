@@ -69,7 +69,7 @@
       <!-- DAR-UI-065. The counts are the filters: each pill keeps the statements it names. -->
       <div class="audit-toolbar">
         <div class="audit-filters" role="group" aria-label="Show">
-          <!-- DAR-UI-087. Open, pending and all count findings; "not checked" counts statements, so it stands apart. -->
+          <!-- DAR-UI-087. Open and all count findings; "not checked" counts statements, so it stands apart. -->
           <button
             v-for="pill in pills"
             :key="pill.id"
@@ -222,6 +222,8 @@ function queryValue(key: string): string {
 
 const filter = computed<AuditFilter>(() => {
   const value = queryValue('show')
+  // DAR-BE-206. A finding is open or fixed; a link from before still saying ?show=pending opens on open.
+  if (value === 'pending') return 'open'
   return isAuditFilter(value) ? value : 'all'
 })
 // A linked finding (?finding alone, as the CLI hands out) opens under its own category and statement.
@@ -257,9 +259,9 @@ const level = computed(() => {
   return queryValue('category') ? 2 : 1
 })
 
-const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', pending: 'pending', notChecked: 'not checked', all: 'all' }
+const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', notChecked: 'not checked', all: 'all' }
 // DAR-UI-087. The finding pills first, then the statements' one, as the left column words it.
-const PILL_ORDER: AuditFilter[] = ['open', 'pending', 'all', 'notChecked']
+const PILL_ORDER: AuditFilter[] = ['open', 'all', 'notChecked']
 const pills = computed(() => {
   const doc = report.value
   if (!doc) return []
@@ -498,11 +500,10 @@ async function readMore(): Promise<void> {
 }
 
 // DAR-UI-073. The picked pill's state, sent with every findings page, so "more" and the export list what the board counts.
-const pillState = computed<{ state?: 'open' | 'pending' }>(() =>
-  filter.value === 'open' || filter.value === 'pending' ? { state: filter.value } : {})
+const pillState = computed<{ state?: 'open' }>(() => (filter.value === 'open' ? { state: 'open' } : {}))
 
 // DAR-UI-073. The toolbar's filters: ?q (an order or record id), ?cause, ?age (at least N days). The report lists 50
-// findings a statement and no cause, so a filter reads every open and pending finding of the period, once per morning,
+// findings a statement and no cause, so a filter reads every open finding of the period, once per morning,
 // period and pill, and every column counts and lists what the filters leave.
 const AGE_OPTIONS = [
   { value: '', label: 'Any age' },
@@ -654,7 +655,7 @@ watch(auditCode, () => {
 watch([report, selectedStatement, filter], () => {
   more.value = emptyFindingsMore()
   const statement = report.value?.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value]
-  if (findingsLeft(statement, 0, null, filter.value)) void loadMore()
+  if (findingsLeft(statement, 0, null)) void loadMore()
 })
 // DAR-UI-075. An order the report does not list (past its 50: a reload, a link) is found in the statement's orders.
 watch([findingId, report, selectedStatement], async () => {

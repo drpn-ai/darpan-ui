@@ -154,19 +154,7 @@
         <input v-model="form.matchedBy" name="matchedBy" class="wizard-answer-control" type="text" :disabled="busy" />
       </label>
 
-      <div class="workflow-form-grid audit-check-grid--three">
-        <label class="wizard-input-shell">
-          <span class="workflow-context-label">Grace days</span>
-          <input
-            v-model="form.graceDays"
-            name="graceDays"
-            class="wizard-answer-control"
-            type="number"
-            min="0"
-            :max="MAX_GRACE_DAYS"
-            :disabled="busy"
-          />
-        </label>
+      <div class="workflow-form-grid workflow-form-grid--two">
         <label class="wizard-input-shell">
           <span class="workflow-context-label">Fix owner</span>
           <input v-model="form.fixOwner" name="fixOwner" class="wizard-answer-control" type="text" :disabled="busy" />
@@ -315,14 +303,12 @@ interface LinkRow {
 }
 
 const FORM_FIELDS = [
-  'id', 'label', 'savedRunId', 'file1RecordType', 'file2RecordType', 'graceDays', 'matchedBy', 'fixOwner', 'fixWhereEnumId',
+  'id', 'label', 'savedRunId', 'file1RecordType', 'file2RecordType', 'matchedBy', 'fixOwner', 'fixWhereEnumId',
   'expectedSource', 'actualSource', 'amountCurrencyUomId', 'headlineTemplate', 'fixActionTemplate', 'passesWhenTemplate',
 ] as const
-// graceDays is a number input, so v-model may hand it back as a number.
-type CheckForm = Record<Exclude<(typeof FORM_FIELDS)[number], 'graceDays'>, string> & { graceDays: string | number }
+type CheckForm = Record<(typeof FORM_FIELDS)[number], string>
 
 const CODE_MAX_LENGTH = 60
-const MAX_GRACE_DAYS = 60
 const plusIconPath =
   'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'
 
@@ -524,20 +510,18 @@ async function load(): Promise<void> {
   }
 }
 
-function orNull(value: string | number): string | null {
+function orNull(value: string): string | null {
   const trimmed = String(value ?? '').trim()
   return trimmed ? trimmed : null
 }
 
 function draft(): AuditCheckDraft {
-  const graceDays = orNull(form.graceDays)
   return {
     id: form.id.trim(),
     label: form.label.trim(),
     savedRunId: orNull(form.savedRunId),
     file1RecordType: orNull(form.file1RecordType),
     file2RecordType: isEvaluate.value ? null : orNull(form.file2RecordType),
-    graceDays: graceDays === null ? null : Number(graceDays),
     matchedBy: orNull(form.matchedBy),
     fixOwner: orNull(form.fixOwner),
     fixWhereEnumId: orNull(form.fixWhereEnumId),

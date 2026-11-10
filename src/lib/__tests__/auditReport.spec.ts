@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ageLabel, checkStatusBadge, eventLabel, findingStateBadge, heldChain, orderNameOf, periodOptions, recordDetails, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemCards, systemLabel } from '../auditReport'
+import { checkStatusBadge, eventLabel, findingStateBadge, heldChain, orderNameOf, periodOptions, recordDetails, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemCards, systemLabel } from '../auditReport'
 
 // DAR-UI-058. The audit view's words for the report JSON's codes, and rows for its keyed objects.
 describe('auditReport', () => {
@@ -154,11 +154,6 @@ describe('auditReport', () => {
     expect(periodOptions('2026-08', '2026-10-23')).toEqual(['2026-10', '2026-09', '2026-08'])
     expect(periodOptions('2026-06', '2026-10-23')).toEqual(['2026-10', '2026-09', '2026-08', '2026-06'])
     expect(periodOptions('2026-10', '2026-10-23')).toEqual(['2026-10', '2026-09', '2026-08'])
-  })
-
-  it('counts age in days', () => {
-    expect(ageLabel(1)).toBe('1 day')
-    expect(ageLabel(0)).toBe('0 days')
   })
 
   // DAR-UI-066. Short words for the busy finding view.

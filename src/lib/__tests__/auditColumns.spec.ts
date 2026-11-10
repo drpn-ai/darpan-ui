@@ -34,16 +34,16 @@ import {
   statementItems,
 } from '../auditColumns'
 
-function counts(open = 0, pending = 0) {
-  return { open, pending, newToday: 0, fixedToday: 0 }
+function counts(open = 0) {
+  return { open, newToday: 0, fixedToday: 0 }
 }
 
-function statement(id: string, open = 0, pending = 0, status: AuditStatement['status'] = 'ran'): AuditStatement {
-  return { id, text: `${id} text`, weight: 'firm', status, reason: null, checks: [], counts: counts(open, pending), findings: [], findingsOmitted: 0 }
+function statement(id: string, open = 0, status: AuditStatement['status'] = 'ran'): AuditStatement {
+  return { id, text: `${id} text`, weight: 'firm', status, reason: null, checks: [], counts: counts(open), findings: [], findingsOmitted: 0 }
 }
 
-function category(label: string, statements: AuditStatement[], open = 0, pending = 0): AuditCategory {
-  return { label, counts: counts(open, pending), statements: Object.fromEntries(statements.map((s) => [s.id, s])) }
+function category(label: string, statements: AuditStatement[], open = 0): AuditCategory {
+  return { label, counts: counts(open), statements: Object.fromEntries(statements.map((s) => [s.id, s])) }
 }
 
 function report(overrides: Partial<AuditReport['health']> = {}): AuditReport {
@@ -66,10 +66,10 @@ function report(overrides: Partial<AuditReport['health']> = {}): AuditReport {
       notCovered: ['R5'],
       ...overrides,
     },
-    summary: { ...counts(3, 1), oldestOpen: null, byCategory: {} },
+    summary: { ...counts(3), oldestOpen: null, byCategory: {} },
     categories: {
-      orders: category('Orders', [statement('R1', 1), statement('R2', 0, 1), statement('R19')], 1, 1),
-      refunds: category('Refunds and credits', [statement('R4', 2), statement('R5', 0, 0, 'notRun')], 2),
+      orders: category('Orders', [statement('R1', 1), statement('R2'), statement('R19')], 1),
+      refunds: category('Refunds and credits', [statement('R4', 2), statement('R5', 0, 'notRun')], 2),
       exchanges: category('Exchanges and warranty', [statement('R12')]),
     },
   }
@@ -80,56 +80,42 @@ describe('auditColumns', () => {
     const items = categoryItems(report())
     expect(items.map((item) => item.id)).toEqual([HEALTH, 'orders', 'refunds', 'exchanges'])
     expect(items[0]).toMatchObject({ label: 'Run health', sub: 'complete · 1 not covered', attention: false })
-    expect(items[1]).toMatchObject({ sub: '1 open · 1 pending', attention: true, short: 'Orders' })
+    expect(items[1]).toMatchObject({ sub: '1 open', attention: true, short: 'Orders' })
     expect(items[2]).toMatchObject({ sub: '2 open · 1 not checked', short: 'Refunds' })
     expect(items[3]).toMatchObject({ sub: 'nothing found', attention: false })
     // DAR-UI-087. A category nothing checked does not say nothing was found.
     const unchecked = report()
-    unchecked.categories.exchanges = category('Exchanges and warranty', [statement('R12', 0, 0, 'notRun')])
+    unchecked.categories.exchanges = category('Exchanges and warranty', [statement('R12', 0, 'notRun')])
     expect(categoryItems(unchecked)[3]).toMatchObject({ sub: '1 not checked' })
     expect(categoryItems(report({ complete: false, notCovered: [] }))[0]).toMatchObject({ sub: 'not complete', attention: true })
   })
 
-  it('filters a category\'s statements, and badges each by open, else pending, else clean, else a dash', () => {
+  it('filters a category\'s statements, and badges each by open, else clean, else a dash', () => {
     const orders = report().categories.orders
     expect(statementItems(orders, 'all').map((item) => [item.id, item.badge, item.tone])).toEqual([
-      ['R1', '1', 'open'], ['R2', '1', 'pending'], ['R19', '0', 'clean'],
+      ['R1', '1', 'open'], ['R2', '0', 'clean'], ['R19', '0', 'clean'],
     ])
     expect(statementItems(orders, 'open').map((item) => item.id)).toEqual(['R1'])
-    expect(statementItems(orders, 'pending').map((item) => item.id)).toEqual(['R2'])
     expect(statementItems(report().categories.refunds, 'notChecked').map((item) => [item.id, item.badge, item.tone]))
       .toEqual([['R5', '–', 'notChecked']])
   })
 
-  // DAR-UI-073. The pill decides what every column counts and lists: Open open, Pending pending, the rest both.
-  it('counts what the picked pill shows, in every column', () => {
-    expect([countFor(counts(340, 285), 'open'), countFor(counts(340, 285), 'pending'), countFor(counts(340, 285), 'all'),
-      countFor(counts(340, 285), 'notChecked'), countFor(undefined, 'open')]).toEqual([340, 285, 625, 625, 0])
-    expect(categoryItems(report(), 'pending').map((item) => item.count)).toEqual([0, 1, 0, 0])
-    expect(categoryItems(report(), 'all')[1]!.count).toBe(2)
-    const orders = { ...report().categories.orders!, statements: { R1: { ...statement('R1', 340, 285) } } }
-    expect(['open', 'pending', 'all'].map((f) => statementItems(orders, f as 'open')[0]!.badge)).toEqual(['340', '285', '625'])
-    const summary = (id: string, state: 'open' | 'pending') => ({ id, headline: id, state, firstFound: '', ageDays: 0, records: {}, difference: null, next: '' })
-    const doc = { ...statement('R1', 400, 6), findings: [summary('F-1', 'open'), summary('F-2', 'pending')], findingsOmitted: 404 }
-    expect(statementFindings(doc, [], 'open').map((item) => item.id)).toEqual(['F-1'])
-    expect(statementFindings(doc, [summary('F-3', 'pending')], 'pending').map((item) => item.id)).toEqual(['F-2', 'F-3'])
-    expect([findingsLeft(doc, 1, null, 'open'), findingsLeft(doc, 2, null, 'pending'), findingsLeft(doc, 2, null, 'all')]).toEqual([399, 4, 404])
-  })
-
-  // DAR-UI-073. All counts findings too (open + pending), as everything under it does; only unchecked counts statements.
-  it('counts findings on open, pending and all, and statements on unchecked', () => {
-    expect(filterCounts(report())).toEqual({ open: 3, pending: 1, notChecked: 1, all: 4 })
+  // DAR-BE-206. A finding is open or fixed: every column counts the open findings, and a pending pill is gone.
+  it('counts open findings in every column, and offers no pending pill', () => {
+    expect([countFor(counts(340)), countFor(undefined)]).toEqual([340, 0])
+    expect(categoryItems(report()).map((item) => item.count)).toEqual([0, 1, 2, 0])
+    expect(filterCounts(report())).toEqual({ open: 3, notChecked: 1, all: 3 })
+    expect(isAuditFilter('pending')).toBe(false)
   })
 
   it('opens on the category with the most open findings the filter keeps, and its first statement with findings', () => {
     const doc = report()
     expect(defaultCategory(doc, 'all')).toBe('refunds')
-    expect(defaultCategory(doc, 'pending')).toBe('orders')
-    // A morning with nothing open opens where the most is pending.
-    doc.categories.refunds!.counts = counts(0, 0)
-    doc.categories.orders!.counts = counts(0, 1)
-    doc.categories.exchanges!.counts = counts(0, 4)
-    expect(defaultCategory(doc, 'all')).toBe('exchanges')
+    expect(defaultCategory(doc, 'open')).toBe('refunds')
+    // A morning with nothing open opens on the first category.
+    doc.categories.refunds!.counts = counts(0)
+    doc.categories.orders!.counts = counts(0)
+    expect(defaultCategory(doc, 'all')).toBe('orders')
     expect(defaultStatement(doc.categories.orders, 'all')).toBe('R1')
     expect(defaultStatement(doc.categories.exchanges, 'all')).toBe('R12')
     expect(defaultStatement(doc.categories.exchanges, 'open')).toBe('')
@@ -161,15 +147,15 @@ describe('auditColumns', () => {
     }
 
     it('says on Run health that checks are running and how many, and marks it live', () => {
-      const health = categoryItems(report({ complete: false, notCovered: [] }), 'all', progress)[0]
+      const health = categoryItems(report({ complete: false, notCovered: [] }), progress)[0]
       expect(health).toMatchObject({ sub: 'running · 3 of 7 checks', running: true, attention: false })
-      expect(categoryItems(report(), 'all', { checks: 7, activeChecks: 0, active: [] })[0]).toMatchObject({ running: false })
+      expect(categoryItems(report(), { checks: 7, activeChecks: 0, active: [] })[0]).toMatchObject({ running: false })
       expect(categoryItems(report())[0]).toMatchObject({ running: false })
     })
 
     it('a stuck run on Run health is attention, not just running', () => {
       const stuck = { ...progress, active: [{ ...progress.active[0]!, health: 'stuck' as const }] }
-      expect(categoryItems(report(), 'all', stuck)[0]).toMatchObject({ running: true, attention: true })
+      expect(categoryItems(report(), stuck)[0]).toMatchObject({ running: true, attention: true })
     })
 
     it('lists Running now first under Run health and opens on it', () => {
@@ -195,7 +181,7 @@ describe('auditColumns', () => {
   })
 
   it('draws a check\'s compared counts as shares of the largest and says the gap', () => {
-    const check = { id: 'c', label: 'c', status: 'ran' as const, reason: null, matchedBy: null, graceDays: 1, compared: { OMS: 412, NetSuite: 409 } }
+    const check = { id: 'c', label: 'c', status: 'ran' as const, reason: null, matchedBy: null, compared: { OMS: 412, NetSuite: 409 } }
     expect(comparedBars(check)).toEqual([
       { key: 'OMS', system: 'HotWax', count: '412', share: '100%' },
       { key: 'NetSuite', system: 'NetSuite', count: '409', share: '99%' },
@@ -207,19 +193,19 @@ describe('auditColumns', () => {
 
   // DAR-UI-070. The report lists 50 a statement; "N more" pages through the rest.
   it('lists a statement\'s findings past the report\'s 50, without the fixed or a repeat', () => {
-    const summary = (id: string, state: 'open' | 'pending' | 'fixed' = 'open') =>
+    const summary = (id: string, state: 'open' | 'fixed' = 'open') =>
       ({ id, headline: id, state, firstFound: '2026-10-01', ageDays: 1, records: {}, difference: null, next: '' })
-    const doc = { ...statement('R1', 3, 1), findings: [summary('F-1'), summary('F-2', 'fixed'), summary('F-3', 'pending')], findingsOmitted: 2 }
-    expect(statementFindings(doc, [])).toEqual([summary('F-1'), summary('F-3', 'pending')])
+    const doc = { ...statement('R1', 4), findings: [summary('F-1'), summary('F-2', 'fixed'), summary('F-3')], findingsOmitted: 2 }
+    expect(statementFindings(doc, [])).toEqual([summary('F-1'), summary('F-3')])
     expect(statementFindings(doc, [summary('F-1'), summary('F-4'), summary('F-5')]).map((item) => item.id)).toEqual(['F-1', 'F-3', 'F-4', 'F-5'])
     expect(statementFindings(null, [])).toEqual([])
   })
 
   it('says how many findings are left to show, and none once the last page is in', () => {
-    const doc = { ...statement('R1', 400, 6), findingsOmitted: 357 }
-    expect(findingsLeft(doc, 50, null)).toBe(356)
-    expect(findingsLeft(doc, 150, true)).toBe(256)
-    expect(findingsLeft(doc, 406, false)).toBe(0)
+    const doc = { ...statement('R1', 400), findingsOmitted: 350 }
+    expect(findingsLeft(doc, 50, null)).toBe(350)
+    expect(findingsLeft(doc, 150, true)).toBe(250)
+    expect(findingsLeft(doc, 400, false)).toBe(0)
     expect(findingsLeft(doc, 380, false)).toBe(0)
     expect(findingsLeft({ ...doc, findingsOmitted: 0 }, 50, null)).toBe(0)
     expect(findingsLeft(null, 0, null)).toBe(0)
@@ -285,8 +271,8 @@ describe('auditColumns', () => {
   })
 
   it('reads counts and filters in words', () => {
-    expect(countsLine(counts(0, 0))).toBe('nothing found')
-    expect(countsLine(counts(2, 0))).toBe('2 open')
+    expect(countsLine(counts(0))).toBe('nothing found')
+    expect(countsLine(counts(2))).toBe('2 open')
     expect(isAuditFilter('open')).toBe(true)
     expect(isAuditFilter('everything')).toBe(false)
   })
@@ -306,11 +292,11 @@ describe('auditColumns', () => {
   // confusing"): an order sits under ONE heading — its stuck line's cause, else the cause on most of its lines, a tie to the
   // first line — so the headings sum to the findings; its row names only its other causes.
   it('puts an order under one heading, its stuck line\'s cause else its most lines\', and names its other causes on its row', () => {
-    const line = (id: string, cause: string | null, held = false) => ({ id, headline: '', state: 'pending', firstFound: '', ageDays: 0,
+    const line = (id: string, cause: string | null, held = false) => ({ id, headline: '', state: 'open', firstFound: '', ageDays: 0,
       difference: null, next: '', records: {}, cause, held }) as NonNullable<AuditFindingListItem['lines']>[number]
     const order = (id: string, lines: ReturnType<typeof line>[], cause: string | null = null, stuck: string[] = [],
       headline = `Order ${id}: ${lines.length} lines`) =>
-      ({ id, kind: 'order', order: id, headline, state: 'pending', firstFound: '', ageDays: 0, difference: null, next: '', records: {},
+      ({ id, kind: 'order', order: id, headline, state: 'open', firstFound: '', ageDays: 0, difference: null, next: '', records: {},
         statement: 'R1', category: 'orders', cause, stuck, lines }) as AuditFindingListItem
     const shipped = 'Shipped, not billed'
     const mixed = order('M1211771', [line('F-1', shipped), line('F-2', shipped), line('F-3', 'Backordered'), line('F-4', shipped)])
@@ -349,7 +335,7 @@ describe('auditColumns', () => {
   // statement's per-store checks as one row naming the stores, the ones that did not run first.
   it('groups the checks by category, folds a statement\'s per-store checks into one row, and puts not run first', () => {
     const check = (id: string, status: AuditStatementCheck['status'] = 'notRun'): AuditStatementCheck =>
-      ({ id, label: `${id} label`, status, reason: null, matchedBy: null, graceDays: null, compared: null })
+      ({ id, label: `${id} label`, status, reason: null, matchedBy: null, compared: null })
     const withChecks = (id: string, checks: AuditStatementCheck[]) => ({ ...statement(id), checks })
     const doc = report()
     doc.categories = {

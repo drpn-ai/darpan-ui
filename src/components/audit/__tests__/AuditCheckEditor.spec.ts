@@ -67,7 +67,6 @@ const stored: AuditCheckDetail = {
   savedRunId: 'RUN_A',
   file1RecordType: 'Return',
   file2RecordType: 'Credit memo',
-  graceDays: 3,
   matchedBy: 'HC Return Id',
   fixOwner: 'Finance',
   fixWhereEnumId: 'NETSUITE',
@@ -222,7 +221,6 @@ describe('AuditCheckEditor', () => {
     await w.get('input[name="file1RecordType"]').setValue('Return')
     await w.get('input[name="file2RecordType"]').setValue('Credit memo')
     await w.get('input[name="matchedBy"]').setValue('HC Return Id')
-    await w.get('input[name="graceDays"]').setValue('3')
     await w.get('input[name="fixOwner"]').setValue('Finance')
     await pick(w, 'audit-check-fix-where', 'NETSUITE')
     await trigger(w, 'audit-check-money-toggle').trigger('click')
@@ -244,7 +242,6 @@ describe('AuditCheckEditor', () => {
         savedRunId: 'RUN_A',
         file1RecordType: 'Return',
         file2RecordType: 'Credit memo',
-        graceDays: 3,
         matchedBy: 'HC Return Id',
         fixOwner: 'Finance',
         fixWhereEnumId: 'NETSUITE',

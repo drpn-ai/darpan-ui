@@ -2,7 +2,7 @@
 // it and facade.AuditFacadeServices hands it over unchanged: keyed objects, codes not ids. The contract and every
 // key's meaning: darpan-master docs/superpowers/specs/2026-10-21-audit-run-json-contract.md.
 
-export type AuditFindingState = 'open' | 'pending' | 'fixed'
+export type AuditFindingState = 'open' | 'fixed'
 export type AuditCheckStatus = 'ran' | 'partial' | 'notRun'
 export type AuditSourceRead = 'complete' | 'partial' | 'failed'
 
@@ -51,7 +51,6 @@ export type AuditRecords = Record<string, Record<string, AuditRecord[]>>
 
 export interface AuditFindingCounts {
   open: number
-  pending: number
   newToday: number
   fixedToday: number
 }
@@ -84,7 +83,6 @@ export interface AuditStatementCheck {
   status: AuditCheckStatus
   reason: string | null
   matchedBy: string | null
-  graceDays: number | null
   compared: Record<string, number> | null
   /** DAR-UI-063. The days this morning's run read: the period to date, or the days a person played. */
   window?: { from: string; thru: string } | null
@@ -200,7 +198,6 @@ export interface AuditFindingDocument {
       lastChecked: string | null
       ageDays: number
       timesSeen: number
-      pendingUntil: string | null
       closedAt: string | null
       closedBy: { type: string; id: string | null; label: string | null } | null
     }
@@ -249,7 +246,7 @@ export interface GetAuditFindingResponse extends AuditEnvelope {
   finding?: AuditFindingDocument | null
 }
 
-// DAR-UI-075. Every open and pending finding of an audit and period, one per order (get#AuditFindingsByOrder).
+// DAR-UI-075. Every open finding of an audit and period, one per order (get#AuditFindingsByOrder).
 export interface GetAuditFindingsByOrderResponse extends AuditEnvelope {
   findings?: AuditFindingListItem[]
 }

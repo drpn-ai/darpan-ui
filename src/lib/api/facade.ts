@@ -597,7 +597,7 @@ export const auditFacade = {
     return callService<GetAuditFindingResponse>(AUDIT.getAuditFinding, payload, signal)
   },
   getAuditFindingsByOrder(
-    payload: { audit: string; statement?: string; state?: 'open' | 'pending'; period?: string },
+    payload: { audit: string; statement?: string; state?: 'open'; period?: string },
     signal?: AbortSignal,
   ): Promise<GetAuditFindingsByOrderResponse> {
     return callService<GetAuditFindingsByOrderResponse>(AUDIT.getAuditFindingsByOrder, payload, signal)

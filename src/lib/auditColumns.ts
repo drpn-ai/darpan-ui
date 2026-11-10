@@ -23,8 +23,8 @@ export const SOURCE_NOT_COVERED = 'notCovered'
 /** DAR-UI-085. Under Run health while checks are in flight. */
 export const SOURCE_RUNNING = 'running'
 
-export type AuditFilter = 'all' | 'open' | 'pending' | 'notChecked'
-export const AUDIT_FILTERS: AuditFilter[] = ['open', 'pending', 'notChecked', 'all']
+export type AuditFilter = 'all' | 'open' | 'notChecked'
+export const AUDIT_FILTERS: AuditFilter[] = ['open', 'notChecked', 'all']
 
 export function isAuditFilter(value: unknown): value is AuditFilter {
   return typeof value === 'string' && (AUDIT_FILTERS as string[]).includes(value)
@@ -37,7 +37,6 @@ export interface CategoryItem {
   short: string
   sub: string
   open: number
-  pending: number
   /** DAR-UI-073. What the picked pill counts: the rail's number. */
   count: number
   attention: boolean
@@ -49,10 +48,9 @@ export interface StatementItem {
   id: string
   text: string
   open: number
-  pending: number
-  /** What the row's count shows: open, else pending, else 0; a dash when nothing checked it. */
+  /** What the row's count shows: its open findings; a dash when nothing checked it. */
   badge: string
-  tone: 'open' | 'pending' | 'clean' | 'notChecked'
+  tone: 'open' | 'clean' | 'notChecked'
 }
 
 export interface SourceItem {
@@ -75,10 +73,9 @@ function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`
 }
 
-/** "5 open · 2 pending", or "nothing found" when nothing is open or pending (DAR-UI-087: was "holds"). */
+/** "5 open", or "nothing found" when nothing is open (DAR-UI-087: was "holds"). */
 export function countsLine(counts: AuditFindingCounts | null | undefined): string {
-  const parts = [counts?.open ? `${counts.open} open` : '', counts?.pending ? `${counts.pending} pending` : ''].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'nothing found'
+  return counts?.open ? `${counts.open} open` : 'nothing found'
 }
 
 function statementsOf(category: AuditCategory | null | undefined): AuditStatement[] {
@@ -90,17 +87,10 @@ function notCheckedCount(category: AuditCategory | null | undefined): number {
 }
 
 /** Column 1: the run's health first, then the report's categories in the document's order. */
-// DAR-UI-073. The pill decides what every column counts and lists: Open the open findings, Pending the pending, the rest
-// both, so the rail, a statement's badge, the findings heading and the rows listed always agree.
-export function countFor(counts: AuditFindingCounts | null | undefined, filter: AuditFilter): number {
-  const open = counts?.open ?? 0
-  const pending = counts?.pending ?? 0
-  return filter === 'open' ? open : filter === 'pending' ? pending : open + pending
-}
-
-/** The finding states the picked pill lists. */
-export function statesFor(filter: AuditFilter): AuditFindingSummary['state'][] {
-  return filter === 'open' ? ['open'] : filter === 'pending' ? ['pending'] : ['open', 'pending']
+// DAR-UI-073 / DAR-BE-206. Every column counts and lists the open findings, whatever the pill (a finding is open or
+// fixed), so the rail, a statement's badge, the findings heading and the rows listed always agree.
+export function countFor(counts: AuditFindingCounts | null | undefined): number {
+  return counts?.open ?? 0
 }
 
 /** DAR-UI-085. True while any check of the audit is running or queued. */
@@ -112,7 +102,7 @@ function anyUnhealthy(progress: AuditProgress): boolean {
   return progress.active.some((run) => run.health === 'stuck' || run.health === 'slow')
 }
 
-export function categoryItems(report: AuditReport, filter: AuditFilter = 'all', progress?: AuditProgress | null): CategoryItem[] {
+export function categoryItems(report: AuditReport, progress?: AuditProgress | null): CategoryItem[] {
   // DAR-UI-085. While checks are in flight the report still reads them as not run (their ledger rows land when each
   // window ends), so Run health says what is happening instead, and only a slow or stuck run asks for attention.
   const playing = isPlaying(progress)
@@ -127,7 +117,6 @@ export function categoryItems(report: AuditReport, filter: AuditFilter = 'all', 
           report.health.notCovered.length ? `${report.health.notCovered.length} not covered` : '',
         ].filter(Boolean).join(' · '),
     open: 0,
-    pending: 0,
     count: 0,
     attention: playing ? anyUnhealthy(progress) : !report.health.complete,
     running: playing,
@@ -135,15 +124,14 @@ export function categoryItems(report: AuditReport, filter: AuditFilter = 'all', 
   return [health, ...Object.entries(report.categories ?? {}).map(([id, category]) => {
     const unchecked = notCheckedCount(category)
     // DAR-UI-087. Nothing found is said only of a category something checked.
-    const found = unchecked && unchecked === statementsOf(category).length && !countFor(category.counts, 'all') ? '' : countsLine(category.counts)
+    const found = unchecked && unchecked === statementsOf(category).length && !countFor(category.counts) ? '' : countsLine(category.counts)
     return {
       id,
       label: category.label,
       short: category.label.split(' ')[0] ?? category.label,
       sub: [found, unchecked ? `${unchecked} not checked` : ''].filter(Boolean).join(' · '),
       open: category.counts?.open ?? 0,
-      pending: category.counts?.pending ?? 0,
-      count: countFor(category.counts, filter),
+      count: countFor(category.counts),
       attention: (category.counts?.open ?? 0) > 0,
       running: false,
     }
@@ -152,7 +140,6 @@ export function categoryItems(report: AuditReport, filter: AuditFilter = 'all', 
 
 export function keepStatement(statement: AuditStatement, filter: AuditFilter): boolean {
   if (filter === 'open') return (statement.counts?.open ?? 0) > 0
-  if (filter === 'pending') return (statement.counts?.pending ?? 0) > 0
   if (filter === 'notChecked') return statement.status === 'notRun'
   return true
 }
@@ -160,42 +147,36 @@ export function keepStatement(statement: AuditStatement, filter: AuditFilter): b
 /** Column 2: a category's statements that the filter keeps. */
 export function statementItems(category: AuditCategory | null | undefined, filter: AuditFilter): StatementItem[] {
   return statementsOf(category).filter((statement) => keepStatement(statement, filter)).map((statement) => {
-    const open = statement.counts?.open ?? 0
-    const pending = statement.counts?.pending ?? 0
+    const open = countFor(statement.counts)
     const notChecked = statement.status === 'notRun'
     return {
       id: statement.id,
       text: statement.text,
       open,
-      pending,
-      badge: notChecked ? '–' : String(countFor(statement.counts, filter)),
-      tone: notChecked ? 'notChecked' : open ? 'open' : pending ? 'pending' : 'clean',
+      badge: notChecked ? '–' : String(open),
+      tone: notChecked ? 'notChecked' : open ? 'open' : 'clean',
     }
   })
 }
 
-/** The numbers on the filter pills: findings for open and pending, statements for the other two. */
+/** The numbers on the filter pills: findings for open and all, statements for not checked. */
 export function filterCounts(report: AuditReport): Record<AuditFilter, number> {
   const statements = Object.values(report.categories ?? {}).flatMap(statementsOf)
   return {
     open: report.summary.open,
-    pending: report.summary.pending,
     notChecked: statements.filter((statement) => statement.status === 'notRun').length,
-    all: countFor(report.summary, 'all'),
+    all: countFor(report.summary),
   }
 }
 
-/** Where the page opens when the URL names no category: the most open findings, then the most pending, else the first. */
+/** Where the page opens when the URL names no category: the most open findings, else the first. */
 export function defaultCategory(report: AuditReport, filter: AuditFilter): string {
   const entries = Object.entries(report.categories ?? {})
   const kept = entries.filter(([, category]) => statementsOf(category).some((statement) => keepStatement(statement, filter)))
   const pool = kept.length ? kept : entries
-  const weight = (category: AuditCategory) => [category.counts?.open ?? 0, category.counts?.pending ?? 0] as const
   let best = pool[0]
   for (const entry of pool) {
-    const [open, pending] = weight(entry[1])
-    const [bestOpen, bestPending] = best ? weight(best[1]) : [0, 0]
-    if (open > bestOpen || (open === bestOpen && pending > bestPending)) best = entry
+    if (countFor(entry[1].counts) > (best ? countFor(best[1].counts) : 0)) best = entry
   }
   return best?.[0] ?? HEALTH
 }
@@ -203,7 +184,7 @@ export function defaultCategory(report: AuditReport, filter: AuditFilter): strin
 /** The statement a category opens on: the first the filter keeps that has findings, else the first it keeps. */
 export function defaultStatement(category: AuditCategory | null | undefined, filter: AuditFilter): string {
   const items = statementItems(category, filter)
-  return (items.find((item) => item.open || item.pending) ?? items[0])?.id ?? ''
+  return (items.find((item) => item.open) ?? items[0])?.id ?? ''
 }
 
 /** Column 2 under Run health: each system read, then the checks, then the statements nothing checks. */
@@ -369,12 +350,10 @@ export function emptyFindingsMore(): FindingsMore {
 
 // DAR-UI-069. A fixed finding stays in the report for the day's "fixed today" only; the board lists what is still wrong.
 // DAR-UI-070. The report lists 50 a statement; the pages "N more" fetched follow them, each finding once.
-export function statementFindings(statement: AuditStatement | null | undefined, more: AuditFindingSummary[],
-  filter: AuditFilter = 'all'): AuditFindingSummary[] {
-  const states = statesFor(filter)
-  const listed = (statement?.findings ?? []).filter((item) => states.includes(item.state))
+export function statementFindings(statement: AuditStatement | null | undefined, more: AuditFindingSummary[]): AuditFindingSummary[] {
+  const listed = (statement?.findings ?? []).filter((item) => item.state === 'open')
   const seen = new Set(listed.map((item) => item.id))
-  return [...listed, ...more.filter((item) => states.includes(item.state) && !seen.has(item.id))]
+  return [...listed, ...more.filter((item) => item.state === 'open' && !seen.has(item.id))]
 }
 
 // DAR-BE-125. A finding's heading: its cause in the catalog's words (renamed since the finding was written, it still reads
@@ -547,11 +526,10 @@ export function narrowedCounts(items: AuditFindingListItem[]): { byCategory: Map
   return { byCategory, byStatement }
 }
 
-/** How many open and pending findings the board has not shown yet; none once the last page is in. */
-export function findingsLeft(statement: AuditStatement | null | undefined, shown: number, hasNextPage: boolean | null,
-  filter: AuditFilter = 'all'): number {
+/** How many open findings the board has not shown yet; none once the last page is in. */
+export function findingsLeft(statement: AuditStatement | null | undefined, shown: number, hasNextPage: boolean | null): number {
   if (!statement || hasNextPage === false || (hasNextPage === null && !statement.findingsOmitted)) return 0
-  return Math.max(countFor(statement.counts, filter) - shown, 0)
+  return Math.max(countFor(statement.counts) - shown, 0)
 }
 
 export function findStatement(report: AuditReport, id: string): { categoryId: string; statement: AuditStatement } | null {

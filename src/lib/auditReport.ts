@@ -12,7 +12,6 @@ export interface Badge {
 
 const FINDING_STATES: Record<AuditFindingState, Badge> = {
   open: { label: 'Open', tone: 'danger' },
-  pending: { label: 'Pending', tone: 'warning' },
   fixed: { label: 'Fixed', tone: 'success' },
 }
 
@@ -271,12 +270,6 @@ export function recordRows(records: AuditRecords | null | undefined): RecordRow[
     })
   })
   return rows
-}
-
-/** "1 day", "12 days". */
-export function ageLabel(days: number | null | undefined): string {
-  if (days == null) return ''
-  return days === 1 ? '1 day' : `${days} days`
 }
 
 /**

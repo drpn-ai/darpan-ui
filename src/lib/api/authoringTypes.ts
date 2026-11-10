@@ -169,7 +169,6 @@ export interface AuditCheckDraft {
   savedRunId?: string | null
   file1RecordType?: string | null
   file2RecordType?: string | null
-  graceDays?: number | string | null
   matchedBy?: string | null
   fixOwner?: string | null
   /** OMS, NETSUITE or SHOPIFY. */

@@ -403,12 +403,11 @@
               <p v-if="comparedGap(check)" class="section-note" data-testid="audit-compared-gap">{{ comparedGap(check) }}</p>
               <dl class="audit-facts">
                 <template v-if="check.matchedBy"><dt>Matched by</dt><dd>{{ check.matchedBy }}</dd></template>
-                <template v-if="check.graceDays != null"><dt>Grace</dt><dd>{{ check.graceDays === 0 ? 'none' : ageLabel(check.graceDays) }}</dd></template>
                 <template v-if="check.window"><dt>Read</dt><dd>{{ shortRange(check.window.from, check.window.thru) }}</dd></template>
               </dl>
             </article>
             <p class="audit-row-sub" data-testid="audit-statement-counts">
-              {{ statementDoc.counts.open }} open · {{ statementDoc.counts.pending }} pending · {{ statementDoc.counts.newToday }} new · {{ statementDoc.counts.fixedToday }} fixed today
+              {{ statementDoc.counts.open }} open · {{ statementDoc.counts.newToday }} new · {{ statementDoc.counts.fixedToday }} fixed today
             </p>
           </template>
 
@@ -434,7 +433,6 @@ import type {
   AuditReport,
 } from '../../lib/api/auditTypes'
 import {
-  ageLabel,
   checkStatusBadge,
   eventLabel,
   FIX_WHERE_LABELS,
@@ -516,7 +514,7 @@ const rail = computed(() => !isHealth.value && Boolean(props.finding))
 // DAR-UI-073. With the toolbar's filters on, every column counts and lists what they left.
 const narrowedBy = computed(() => (props.narrowed ? narrowedCounts(props.narrowed) : null))
 const categories = computed(() => {
-  const items = categoryItems(props.report, props.filter, props.progress)
+  const items = categoryItems(props.report, props.progress)
   const counted = narrowedBy.value
   if (!counted) return items
   return items.map((item) => item.id === HEALTH ? item : { ...item, count: counted.byCategory.get(item.id) ?? 0,
@@ -561,7 +559,7 @@ const statements = computed(() => {
 })
 const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statement] ?? null)
 const findings = computed(() => props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
-  : statementFindings(statementDoc.value, props.more.findings, props.filter))
+  : statementFindings(statementDoc.value, props.more.findings))
 // DAR-UI-098. The column's rows: every finding under its cause, an order under each of its lines' causes.
 const rows = computed(() => findingRows(findings.value, props.cause))
 // DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
@@ -573,7 +571,7 @@ function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): strin
   return line.cause ?? findingStateBadge(line.state).label
 }
 // What the picked pill counts for the statement (DAR-UI-073), not the 50 the report lists or the pages loaded so far.
-const findingsTotal = computed(() => (statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts, props.filter) : findings.value.length))
+const findingsTotal = computed(() => (statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts) : findings.value.length))
 const records = computed(() => recordRows(props.orderUnit?.records ?? props.findingDoc?.finding.records))
 // DAR-UI-099. The open order's lines with no finding of their own (an item set aside, a NetSuite store-credit line).
 const otherLines = computed(() => otherOrderLines(props.orderUnit))
@@ -1062,7 +1060,7 @@ function statementText(id: string): string {
   color: var(--text-dim);
 }
 
-/* Open = a filled count, pending = a ring, clean = a quiet number, not checked = dashed: the same marks as the canvas. */
+/* Open = a filled count, clean = a quiet number, not checked = dashed: the same marks as the canvas. */
 .audit-count {
   flex: none;
   display: inline-flex;
@@ -1079,11 +1077,6 @@ function statementText(id: string): string {
 .audit-count--open {
   background: var(--accent);
   color: var(--accent-ink);
-}
-
-.audit-count--pending {
-  border-color: var(--warning);
-  color: var(--text-soft);
 }
 
 .audit-count--clean {
