@@ -73,7 +73,7 @@
           </label>
 
           <label class="wizard-input-shell">
-            <span class="workflow-context-label">Active</span>
+            <span v-explain="'connectionActive'" class="workflow-context-label">Active</span>
             <input
               v-model="isActiveChecked"
               name="isActive"

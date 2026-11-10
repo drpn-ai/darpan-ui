@@ -433,6 +433,12 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
 
   /* ── Setup forms: connections, settings, scripts, automations, audits (DAR-UI-103) ── */
+  connectionActive: {
+    // Not activeFlag: that one is an automation's (it runs on its own). A connection never runs; runs read through it.
+    title: 'Active',
+    body: 'whether runs may use this connection. Inactive keeps it saved, but anything reading through it is refused until it is switched back on.',
+    byDirectiveOnly: true,
+  },
   configDescription: {
     title: 'Description',
     body: 'the name this setup goes by in lists and pickers. Left blank, people choose between bare IDs.',

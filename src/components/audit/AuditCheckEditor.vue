@@ -8,7 +8,7 @@
 
     <template v-if="options">
       <label class="wizard-input-shell">
-        <span class="workflow-context-label">Run</span>
+        <span v-explain="'savedRun'" class="workflow-context-label">Run</span>
         <AppSelect
           :model-value="form.savedRunId"
           :options="runOptions"

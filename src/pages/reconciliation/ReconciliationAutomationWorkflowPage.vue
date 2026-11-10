@@ -178,7 +178,7 @@
             class="wizard-input-shell automation-edit-active-field"
             data-testid="automation-edit-active-field"
           >
-            <span class="workflow-context-label">Status</span>
+            <span v-explain="'activeFlag'" class="workflow-context-label">Status</span>
             <WorkflowSelect
               v-model="editActiveStatus"
               test-id="automation-edit-active"
@@ -207,7 +207,7 @@
           data-testid="automation-edit-schedule-fields"
         >
           <label class="automation-schedule-field">
-            <span class="automation-schedule-label">Run</span>
+            <span v-explain="'automationSchedule'" class="automation-schedule-label">Run</span>
             <WorkflowSelect
               v-model="schedulePreset"
               class="automation-schedule-select"
@@ -353,7 +353,7 @@
       <template v-else-if="currentStep.id === 'schedule'">
         <div class="automation-schedule-helper">
           <label class="automation-schedule-field">
-            <span class="automation-schedule-label">Run</span>
+            <span v-explain="'automationSchedule'" class="automation-schedule-label">Run</span>
             <WorkflowSelect
               v-model="schedulePreset"
               class="automation-schedule-select"

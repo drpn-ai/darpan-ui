@@ -335,6 +335,34 @@ describe('every label in the app has an answer', () => {
     expect(unanswered, `labels with no answer:\n${unanswered.join('\n')}`).toEqual([])
   })
 
+  /**
+   * "Answers" is not "answers right". A browser hover found Status on the automation editor reading as a run's
+   * status, Run (the schedule preset) as one execution, and Active on every connection form as an automation's
+   * schedule switch — all through one-word global aliases, all counted as answered by the sweep above. These pin
+   * each such word to the meaning it has on that page.
+   */
+  it('gives a word that means different things on different pages its own meaning there', () => {
+    const PINNED: readonly (readonly [string, string, string, number])[] = [
+      ['pages/reconciliation/ReconciliationAutomationWorkflowPage.vue', 'Status', 'activeFlag', 1],
+      ['pages/reconciliation/ReconciliationAutomationWorkflowPage.vue', 'Run', 'automationSchedule', 2],
+      ['components/audit/AuditCheckEditor.vue', 'Run', 'savedRun', 1],
+      ['pages/reconciliation/AuditSettingsPage.vue', 'Schedule', 'auditScheduleTime', 1],
+      ['pages/settings/NetSuiteAuthDashboardPage.vue', 'Active', 'connectionActive', 1],
+      ['pages/settings/NetSuiteAuthWorkflowPage.vue', 'Active', 'connectionActive', 1],
+      ['pages/settings/NetSuiteEndpointWorkflowPage.vue', 'Active', 'connectionActive', 1],
+      ['pages/settings/OmsRestSourceDashboardPage.vue', 'Active', 'connectionActive', 1],
+      ['pages/settings/OmsRestSourceWorkflowPage.vue', 'Active', 'connectionActive', 1],
+      ['pages/settings/ShopifyAuthDashboardPage.vue', 'Active', 'connectionActive', 1],
+      ['pages/settings/ShopifyAuthWorkflowPage.vue', 'Active', 'connectionActive', 1],
+    ]
+    for (const [file, word, key, count] of PINNED) {
+      const source = readFileSync(`src/${file}`, 'utf-8')
+      const labels = Array.from(source.matchAll(new RegExp(`<[a-z0-9]+[^>]*class="[^"]*label[^"]*"[^>]*>${word}<`, 'g'))).map((m) => m[0])
+      expect(labels.length, `${file}: expected ${count} "${word}" label(s)`).toBe(count)
+      for (const tag of labels) expect(tag, `${file}: "${word}"`).toContain(`v-explain="'${key}'"`)
+    }
+  })
+
   /** A directive naming an entry nobody wrote is a hover that silently says nothing. */
   it('points every v-explain at an entry that exists', () => {
     const missing: string[] = []

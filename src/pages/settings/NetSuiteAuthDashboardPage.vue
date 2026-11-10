@@ -47,7 +47,7 @@
             <span>{{ scopeLabel }}</span>
           </article>
           <article class="static-page-summary-card">
-            <span class="static-page-summary-label">Active</span>
+            <span v-explain="'connectionActive'" class="static-page-summary-label">Active</span>
             <span>{{ activeLabel }}</span>
           </article>
           <article

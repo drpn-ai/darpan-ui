@@ -30,7 +30,7 @@
         </label>
 
         <div class="audit-settings-group">
-          <span class="workflow-context-label">Schedule</span>
+          <span v-explain="'auditScheduleTime'" class="workflow-context-label">Schedule</span>
           <div class="audit-settings-schedule">
             <div class="audit-settings-field">
               <span v-explain="'auditScheduleDaily'" class="audit-settings-label">Daily</span>
