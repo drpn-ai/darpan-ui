@@ -1004,6 +1004,23 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).not.toContain('basic-diff')
   })
 
+  it('lists a named rule by its name with the formula under it, an unnamed one by its formula (DAR-BE-210)', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState([
+      { ruleId: 'R1', file1FieldPath: '$.orders[*].isFulfilled', file2FieldPath: '$[*].isCompleted', operator: '=', sequenceNum: 1, ruleName: 'Fulfillment Sync' },
+      { ruleId: 'R2', file1FieldPath: '$.orders[*].legacyResourceId', file2FieldPath: '$[*].order_name', operator: '=', sequenceNum: 2, ruleName: '' },
+    ])
+    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const named = wrapper.findAll('[data-testid="ruleset-manager-rule-named"]')
+    expect(named).toHaveLength(1)
+    expect(named[0]?.text()).toContain('Fulfillment Sync')
+    expect(named[0]?.get('.ruleset-manager-rule-formula').text()).toBe('isFulfilled = isCompleted')
+    expect(wrapper.get('[data-testid="ruleset-manager-rule-list"]').text()).toContain('legacyResourceId = order_name')
+  })
+
   it('opens the run edit workflow from the Run section without sending rule state', async () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
       draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()

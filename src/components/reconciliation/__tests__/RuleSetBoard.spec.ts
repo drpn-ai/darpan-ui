@@ -349,3 +349,69 @@ describe('RuleSetBoard and the workflow Escape', () => {
     expect(requestCancel().defaultPrevented).toBe(false)
   })
 })
+
+// DAR-BE-210: run notifications show a rule's name instead of its formula. The board rewrites the draft's rules on
+// every change, so a name it does not carry is a name the next save silently drops.
+describe('RuleSetBoard rule names', () => {
+  type DraftRule = { ruleId?: string, ruleName?: string | null }
+  const namedDraft = () => ({
+    runName: 'Order sync',
+    file1SystemEnumId: 'OMS',
+    file1FileTypeEnumId: 'DftCsv',
+    file1PrimaryIdExpression: ['isFulfilled'],
+    file2SystemEnumId: 'NETSUITE',
+    file2FileTypeEnumId: 'DftCsv',
+    file2PrimaryIdExpression: ['isCompleted'],
+    rules: [
+      { ruleId: 'r1', sequenceNum: 1, file1FieldPath: 'isFulfilled', file2FieldPath: 'isCompleted', operator: '=', ruleName: 'Fulfillment Sync' },
+      { ruleId: 'r2', sequenceNum: 2, file1FieldPath: 'status', file2FieldPath: 'state', operator: '=', ruleName: 'Status' },
+      { ruleId: 'r3', sequenceNum: 3, file1FieldPath: 'total', file2FieldPath: 'amount', operator: '=' },
+    ],
+  })
+  const draftRules = () => (draftStoreState.ruleSetDraftState?.draft as { rules: DraftRule[] }).rules
+  const ruleById = (ruleId: string) => draftRules().find((rule) => rule.ruleId === ruleId)
+
+  beforeEach(() => {
+    listAutomationSourceOptions.mockReset()
+    listAutomationSourceOptions.mockResolvedValue({ ok: true, nsRestletConfigs: [], systemRemotes: [] })
+    draftStoreState.pendingExclusion = null
+    draftStoreState.ruleSetDraftState = { resumeStepId: null, draft: namedDraft() }
+  })
+
+  async function editName(wrapper: ReturnType<typeof mount>, ruleId: string, name: string): Promise<void> {
+    await wrapper.get(`[data-testid="ruleset-rule-operator-${ruleId}"]`).trigger('click')
+    await wrapper.get('[data-testid="ruleset-rule-name-input"]').setValue(name)
+    await wrapper.get('[data-testid="ruleset-rule-apply"]').trigger('click')
+    await flushPromises()
+  }
+
+  it('shows the name with the formula as placeholder, and saves an edit without touching other names', async () => {
+    const wrapper = mount(RuleSetBoard, { attachTo: document.body })
+    await flushPromises()
+    await wrapper.get('[data-testid="ruleset-rule-operator-r1"]').trigger('click')
+
+    const input = wrapper.get<HTMLInputElement>('[data-testid="ruleset-rule-name-input"]')
+    expect(input.element.value).toBe('Fulfillment Sync')
+    expect(input.attributes('placeholder')).toBe('isFulfilled = isCompleted')
+    expect(input.attributes('maxlength')).toBe('60')
+
+    await input.setValue('Order Match')
+    await wrapper.get('[data-testid="ruleset-rule-apply"]').trigger('click')
+    await flushPromises()
+
+    expect(ruleById('r1')?.ruleName).toBe('Order Match')
+    expect(ruleById('r2')?.ruleName).toBe('Status')
+    expect(ruleById('r3')).not.toHaveProperty('ruleName')
+  })
+
+  it('records a blanked name as a clear, and leaves a never-named rule unnamed', async () => {
+    const wrapper = mount(RuleSetBoard, { attachTo: document.body })
+    await flushPromises()
+
+    await editName(wrapper, 'r1', '  ')
+    await editName(wrapper, 'r3', '')
+
+    expect(ruleById('r1')?.ruleName).toBe('')
+    expect(ruleById('r3')).not.toHaveProperty('ruleName')
+  })
+})

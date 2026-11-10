@@ -207,6 +207,16 @@
       data-testid="ruleset-rule-popover"
       @keydown.enter.stop.prevent="applyRuleEdit"
     >
+      <label>
+        <span>Name</span>
+        <input
+          v-model="editingName"
+          data-testid="ruleset-rule-name-input"
+          type="text"
+          :maxlength="RULE_NAME_MAX_LENGTH"
+          :placeholder="editingFormula"
+        />
+      </label>
       <section class="ruleset-pre-action-section" aria-labelledby="ruleset-pre-action-title">
         <header class="ruleset-pre-action-header">
           <button
@@ -438,6 +448,7 @@ import {
   type ReconciliationRuleSetDraftRule,
   type ReconciliationRulePreActionEntry,
   reconciliationSystemTitle,
+  RULE_NAME_MAX_LENGTH,
 } from '../../lib/reconciliationRuleSetDraft'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
@@ -464,6 +475,8 @@ interface RuleConnection {
   operator: RuleOperator
   sequenceNum: number
   preActions: ReconciliationRulePreActionEntry[]
+  /** DAR-BE-210. Same undefined / cleared / set meaning as ReconciliationRuleSetDraftRule.ruleName. */
+  ruleName?: string | null
 }
 
 interface EditablePreAction extends ReconciliationRulePreActionEntry {
@@ -567,6 +580,7 @@ const editingRuleId = ref<string | null>(null)
 const editingOperator = ref<RuleOperator>('=')
 const editingPreActions = ref<EditablePreAction[]>([])
 const editingSequence = ref(1)
+const editingName = ref('')
 const editingExclusion = ref<{ side: RuleSide; fieldPath: string } | null>(null)
 const editingExclusionValues = ref<string[]>([])
 const pendingExclusionValue = ref('')
@@ -605,6 +619,10 @@ const editingPreActionFieldOptions = computed<AppSelectOption[]>(() => {
     { value: 'file1', label: `${formatFieldKey(rule.file1FieldPath)} - ${file1Title.value}${sameTitle ? ' (source 1)' : ''}` },
     { value: 'file2', label: `${formatFieldKey(rule.file2FieldPath)} - ${file2Title.value}${sameTitle ? ' (source 2)' : ''}` },
   ]
+})
+const editingFormula = computed(() => {
+  const rule = editingRule.value
+  return rule ? `${formatFieldKey(rule.file1FieldPath)} ${editingOperator.value} ${formatFieldKey(rule.file2FieldPath)}` : ''
 })
 const activeRule = computed(() => editingRule.value ?? orderedRules.value.find((rule) => rule.id === hoveredRuleId.value) ?? null)
 const drawingLinePath = computed(() => {
@@ -887,6 +905,7 @@ function hydrateRules(): void {
     operator: normalizeOperator(rule.operator),
     sequenceNum: rule.sequenceNum,
     preActions: normalizePreActions(rule.preActions),
+    ...(rule.ruleName !== undefined ? { ruleName: rule.ruleName } : {}),
   })))
 }
 
@@ -1466,6 +1485,7 @@ function openRuleEditor(ruleId: string): void {
   editingOperator.value = rule.operator
   editingPreActions.value = rule.preActions.map(toEditablePreAction)
   editingSequence.value = rule.sequenceNum
+  editingName.value = rule.ruleName ?? ''
 }
 
 function closeRuleEditor(): void {
@@ -1498,9 +1518,10 @@ function resequenceRule(
   nextSequence: number,
   nextOperator: RuleOperator,
   nextPreActions: ReconciliationRulePreActionEntry[],
+  nextRuleName: string | null | undefined,
 ): RuleConnection[] {
   const sortedRules = orderedRules.value.map((rule) => (
-    rule.id === ruleId ? { ...rule, operator: nextOperator, preActions: nextPreActions } : { ...rule }
+    rule.id === ruleId ? { ...rule, operator: nextOperator, preActions: nextPreActions, ruleName: nextRuleName } : { ...rule }
   ))
   const targetRule = sortedRules.find((rule) => rule.id === ruleId)
   if (!targetRule) return sortedRules
@@ -1516,11 +1537,15 @@ function applyRuleEdit(): void {
   if (!rule) return
 
   const nextSequence = Number.isFinite(editingSequence.value) ? Math.trunc(editingSequence.value) : rule.sequenceNum
+  // A never-named rule left blank stays never-named; blanking a named one is a clear the save must send.
+  const typedName = editingName.value.trim()
+  const nextRuleName = typedName || (rule.ruleName === undefined ? undefined : '')
   rules.value = resequenceRule(
     rule.id,
     nextSequence,
     normalizeOperator(editingOperator.value),
     normalizePreActions(editingPreActions.value),
+    nextRuleName,
   )
   closeRuleEditor()
 }
@@ -1570,6 +1595,7 @@ function syncRulesToDraft(): void {
     operator: rule.operator,
     sequenceNum: rule.sequenceNum,
     ...(rule.preActions.length ? { preActions: rule.preActions } : {}),
+    ...(rule.ruleName !== undefined ? { ruleName: rule.ruleName } : {}),
   }))
 }
 

@@ -151,7 +151,11 @@
             <ol v-if="visibleRules.length" class="ruleset-manager-rule-list" data-testid="ruleset-manager-rule-list">
               <li v-for="rule in visibleRules" :key="rule.ruleId || `${rule.sequenceNum}-${rule.file1FieldPath}-${rule.file2FieldPath}`">
                 <span class="ruleset-manager-rule-sequence">#{{ rule.sequenceNum }}</span>
-                <span>{{ formatRulePreview(rule) }}</span>
+                <span v-if="rule.ruleName?.trim()" class="ruleset-manager-rule-named" data-testid="ruleset-manager-rule-named">
+                  <span>{{ rule.ruleName.trim() }}</span>
+                  <span class="ruleset-manager-rule-formula">{{ formatRulePreview(rule) }}</span>
+                </span>
+                <span v-else>{{ formatRulePreview(rule) }}</span>
               </li>
             </ol>
             <p v-else class="ruleset-manager-preview-line">{{ comparisonPreview }}</p>
@@ -1040,6 +1044,15 @@ onMounted(() => {
 
 .ruleset-manager-rule-sequence {
   flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.ruleset-manager-rule-named {
+  display: grid;
+  min-width: 0;
+}
+
+.ruleset-manager-rule-formula {
   color: var(--text-muted);
 }
 

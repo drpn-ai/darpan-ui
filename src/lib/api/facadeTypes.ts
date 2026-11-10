@@ -308,6 +308,8 @@ export interface DeleteJsonSchemaPayload {
 export interface RuleSetRulePayload {
   ruleId?: string
   sequenceNum: number
+  /** DAR-BE-210. Plain-text name (up to 60) run notifications show instead of ruleText. null clears it. */
+  ruleName?: string | null
   ruleText: string
   ruleLogic: string
   ruleType: string

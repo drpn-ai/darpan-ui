@@ -529,6 +529,8 @@ export interface SavedRunSystemOption extends MappingSystemOption {
 export interface SavedRunRule {
   ruleId?: string
   sequenceNum?: number
+  /** DAR-BE-210. Absent on older backends. */
+  ruleName?: string | null
   ruleText?: string
   ruleLogic?: string
   ruleType?: string

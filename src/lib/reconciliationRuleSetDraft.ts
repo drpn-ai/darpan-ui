@@ -54,6 +54,11 @@ export interface ReconciliationRuleSetDraftRule {
   operator: string
   sequenceNum: number
   preActions?: ReconciliationRulePreActionEntry[]
+  /**
+   * DAR-BE-210. Undefined = never named (nothing sent); '' or null = cleared (sent as null so the
+   * backend drops the old name); anything else is sent trimmed.
+   */
+  ruleName?: string | null
   ruleText?: string
   ruleLogic?: string
   ruleType?: string
@@ -316,6 +321,7 @@ export function buildRuleSetRulePayloads(draft: ReconciliationRuleSetDraft): Rul
       return {
         ...(rule.ruleId?.trim() ? { ruleId: rule.ruleId.trim() } : {}),
         sequenceNum: rule.sequenceNum,
+        ...ruleNamePayloadField(rule.ruleName),
         ruleText: `${formatFieldKey(rule.file1FieldPath)} ${operator} ${formatFieldKey(rule.file2FieldPath)}`,
         ruleLogic: buildFieldComparisonRuleLogic(draft, rule, operator, preActions, index),
         ruleType: 'FIELD_COMPARISON',
@@ -324,6 +330,13 @@ export function buildRuleSetRulePayloads(draft: ReconciliationRuleSetDraft): Rul
         severity: rule.severity?.trim() || 'WARN',
       }
     })
+}
+
+export const RULE_NAME_MAX_LENGTH = 60
+
+function ruleNamePayloadField(ruleName: string | null | undefined): Pick<RuleSetRulePayload, 'ruleName'> {
+  if (ruleName === undefined) return {}
+  return { ruleName: ruleName?.trim().slice(0, RULE_NAME_MAX_LENGTH) || null }
 }
 
 // Operators whose meaning lives in RuleDiffSupport.matchesOperator. DAR-BE-126: "requires" breaks when the left value

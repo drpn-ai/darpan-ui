@@ -98,6 +98,7 @@ function savedRunRuleToDraftRule(rule: SavedRunRule, index: number): Reconciliat
     preActions: preActions.length
       ? preActions
       : readReconciliationRuleExpressionPreActions(rule.expression),
+    ruleName: rule.ruleName ?? undefined,
     ruleText: rule.ruleText,
     ruleLogic: rule.ruleLogic,
     ruleType: rule.ruleType,

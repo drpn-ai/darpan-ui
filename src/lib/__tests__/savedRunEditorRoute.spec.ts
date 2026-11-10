@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildRuleSetDraft } from '../savedRunEditorRoute'
+import { buildRuleSetRulePayloads } from '../reconciliationRuleSetDraft'
 import type { SavedRunSummary, SavedRunSystemOption } from '../api/types'
 
 function createSystemOption(overrides: Partial<SavedRunSystemOption> = {}): SavedRunSystemOption {
@@ -238,5 +239,26 @@ describe('buildRuleSetDraft', () => {
 
     expect(draft?.file1ExcludeFilters).toBeUndefined()
     expect(draft?.file2ExcludeFilters).toEqual([])
+  })
+
+  // DAR-BE-210: a saved name survives load -> save untouched; an older backend's nameless rule sends no name at all.
+  it('round-trips a rule name from a saved run back onto the save payload', () => {
+    const row = createSavedRun({
+      systemOptions: [
+        createSystemOption({ enumId: 'OMS', fileSide: 'FILE_1', idFieldExpression: 'orderId' }),
+        createSystemOption({ enumId: 'NETSUITE', fileSide: 'FILE_2', idFieldExpression: 'orderId' }),
+      ],
+      rules: [
+        { ruleId: 'R1', sequenceNum: 1, file1FieldPath: 'isFulfilled', file2FieldPath: 'isCompleted', operator: '=', ruleName: 'Fulfillment Sync' },
+        { ruleId: 'R2', sequenceNum: 2, file1FieldPath: 'status', file2FieldPath: 'state', operator: '=' },
+      ],
+    })
+
+    const draft = buildRuleSetDraft(row)
+    if (!draft) throw new Error('Expected a draft')
+    const [named, unnamed] = buildRuleSetRulePayloads(draft)
+
+    expect(named?.ruleName).toBe('Fulfillment Sync')
+    expect(unnamed).not.toHaveProperty('ruleName')
   })
 })

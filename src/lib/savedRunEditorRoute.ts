@@ -121,6 +121,7 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
         operator: rule.operator || '=',
         sequenceNum: rule.sequenceNum ?? index + 1,
         preActions: preActions.length ? preActions : undefined,
+        ruleName: rule.ruleName ?? undefined,
         ruleText: rule.ruleText,
         ruleLogic: rule.ruleLogic,
         ruleType: rule.ruleType,

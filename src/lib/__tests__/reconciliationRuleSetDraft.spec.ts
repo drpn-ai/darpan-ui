@@ -89,6 +89,29 @@ describe('reconciliationRuleSetDraft', () => {
     expect(rule.ruleLogic).toContain(`RuleDiffSupport.violatesOperator(((Map) $m.get("file1")).get("hasPayment"), ((Map) $m.get("file2")).get("hasPayment"), "${operator}")`)
   })
 
+  // DAR-BE-210. Never named sends nothing (older backends see the old payload); blanking a name must
+  // send an explicit clear, or the backend keeps the old one and notifications keep showing it.
+  it('carries ruleName: set is trimmed and capped, cleared is null, absent is omitted', () => {
+    const base = { file1FieldPath: '$.orders[*].isFulfilled', file2FieldPath: '$[*].isCompleted', operator: '=' }
+    const [named, cleared, nulled, absent] = buildRuleSetRulePayloads(createDraft({
+      rules: [
+        { ...base, sequenceNum: 1, ruleName: '  Fulfillment Sync  ' },
+        { ...base, sequenceNum: 2, ruleName: '   ' },
+        { ...base, sequenceNum: 3, ruleName: null },
+        { ...base, sequenceNum: 4 },
+      ],
+    }))
+
+    expect(named?.ruleName).toBe('Fulfillment Sync')
+    expect(named?.ruleText).toBe('isFulfilled = isCompleted')
+    expect(cleared).toHaveProperty('ruleName', null)
+    expect(nulled).toHaveProperty('ruleName', null)
+    expect(absent).not.toHaveProperty('ruleName')
+
+    const [long] = buildRuleSetRulePayloads(createDraft({ rules: [{ ...base, sequenceNum: 1, ruleName: 'x'.repeat(80) }] }))
+    expect(long?.ruleName).toHaveLength(60)
+  })
+
   it('persists API source config ids in create payloads', () => {
     const payload = buildCreateRuleSetRunPayload(createDraft({
       file1SourceTypeEnumId: 'AUT_SRC_API',
