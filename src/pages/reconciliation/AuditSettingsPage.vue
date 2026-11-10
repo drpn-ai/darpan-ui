@@ -244,7 +244,7 @@ function isEmail(value: string): boolean {
 const membersLine = computed(() => {
   const members = original.value?.runEmail?.members ?? 0
   const tenant = authStore.sessionInfo?.activeTenantLabel
-  return `Sent to the ${members} ${members === 1 ? 'member' : 'members'}${tenant ? ` of ${tenant}` : ''}`
+  return `Sent to the ${members} ${members === 1 ? 'person' : 'people'} with access${tenant ? ` to ${tenant}` : ''}`
 })
 
 const abort = new AbortController()

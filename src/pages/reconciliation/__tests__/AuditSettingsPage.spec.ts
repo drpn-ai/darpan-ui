@@ -228,7 +228,7 @@ describe('AuditSettingsPage email after each run', () => {
     const w = mount(AuditSettingsPage)
     await flushPromises()
     expect(w.get('[data-testid="audit-settings-run-email-active"]').attributes('aria-checked')).toBe('true')
-    expect(w.get('[data-testid="audit-settings-run-email-members"]').text()).toBe('Sent to the 4 members of Gorjana')
+    expect(w.get('[data-testid="audit-settings-run-email-members"]').text()).toBe('Sent to the 4 people with access to Gorjana')
     expect(w.findAll('[data-testid="workflow-chip-text-chip"]').map((c) => c.text().replace('×', '').trim())).toEqual(['ops@gorjana.com'])
   })
 

@@ -298,13 +298,15 @@ export interface AuditSchedule {
   checksWithoutRun: number
 }
 
-// DAR-BE-207. The email after each run: to every current member of the tenant (Darpan admins included), plus alsoSendTo.
+// DAR-BE-207. The email after each run: to everyone with access to the tenant (Darpan admins included), plus alsoSendTo.
 export interface RunEmailSettings {
   active: boolean
   /** Addresses beyond the members: group mailboxes, people without an account. */
   alsoSendTo: string[]
-  /** How many members it goes to; read only. */
+  /** How many people with access it goes to, Darpan admins included; read only. */
   members: number
+  /** Of those, how many are Darpan admins; absent on older backends. */
+  admins?: number
   chatSpaceId: string | null
 }
 
@@ -364,7 +366,7 @@ export interface SaveAuditSettingsPayload {
   statements?: Array<{ id: string; text?: string; active?: boolean }>
   schedule?: { active: boolean; time: string; timeZone: string }
   /** Omitted: no change. */
-  runEmail?: Omit<RunEmailSettings, 'members'>
+  runEmail?: Omit<RunEmailSettings, 'members' | 'admins'>
 }
 
 export type SaveAuditSettingsResponse = GetAuditSettingsResponse
