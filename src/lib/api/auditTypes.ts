@@ -298,11 +298,23 @@ export interface AuditSchedule {
   checksWithoutRun: number
 }
 
+// DAR-BE-207. The email after each run: to every current member of the tenant (Darpan admins included), plus alsoSendTo.
+export interface RunEmailSettings {
+  active: boolean
+  /** Addresses beyond the members: group mailboxes, people without an account. */
+  alsoSendTo: string[]
+  /** How many members it goes to; read only. */
+  members: number
+  chatSpaceId: string | null
+}
+
 export interface AuditSettings {
   audit: { id: string; name: string; period: string | null }
   /** The earliest day a play can record today, YYYY-MM-DD. */
   playableFrom?: string | null
   schedule: AuditSchedule
+  /** Absent from a backend before DAR-BE-207; the page then shows no email section. */
+  runEmail?: RunEmailSettings | null
   statements: AuditSettingsStatement[]
 }
 
@@ -351,6 +363,8 @@ export interface SaveAuditSettingsPayload {
   name?: string
   statements?: Array<{ id: string; text?: string; active?: boolean }>
   schedule?: { active: boolean; time: string; timeZone: string }
+  /** Omitted: no change. */
+  runEmail?: Omit<RunEmailSettings, 'members'>
 }
 
 export type SaveAuditSettingsResponse = GetAuditSettingsResponse

@@ -39,16 +39,20 @@ const props = withDefaults(
     placeholder: string
     disabled?: boolean
     testId?: string
+    /** A value it refuses stays typed, and `reject` names it, rather than becoming a chip. */
+    accept?: (value: string) => boolean
   }>(),
   {
     disabled: false,
     testId: '',
+    accept: () => true,
   },
 )
 
 const emit = defineEmits<{
   'update:modelValue': [value: string[]]
   'update:pending': [value: string]
+  reject: [value: string]
 }>()
 
 const pendingValue = ref('')
@@ -59,12 +63,18 @@ const pendingValue = ref('')
 // events and takes no focus, so @blur below never fires either.
 watch(pendingValue, (value) => emit('update:pending', value))
 
-function commitPendingValue(): void {
+// False when typed text was refused and is still in the box, so a parent's save can stop on it.
+function commitPendingValue(): boolean {
   const trimmed = pendingValue.value.trim()
-  if (!trimmed || props.modelValue.includes(trimmed)) return
+  if (!trimmed || props.modelValue.includes(trimmed)) return true
+  if (!props.accept(trimmed)) {
+    emit('reject', trimmed)
+    return false
+  }
 
   emit('update:modelValue', [...props.modelValue, trimmed])
   pendingValue.value = ''
+  return true
 }
 
 function removeChip(value: string): void {

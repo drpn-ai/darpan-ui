@@ -62,6 +62,33 @@
           </p>
         </div>
 
+        <!-- DAR-BE-207: the email after each run, to the tenant's members and any extra addresses. -->
+        <div v-if="original.runEmail" class="audit-settings-group" data-testid="audit-settings-run-email">
+          <span class="workflow-context-label">Email after each run</span>
+          <div class="audit-settings-email">
+            <AppToggleSwitch
+              v-model="runEmailActive"
+              label="Email after each run"
+              test-id="audit-settings-run-email-active"
+              :disabled="saving"
+            />
+            <p class="section-note" data-testid="audit-settings-run-email-members">{{ membersLine }}</p>
+          </div>
+          <label class="audit-settings-field">
+            <span class="audit-settings-label">Also send to</span>
+            <WorkflowChipTextInput
+              ref="alsoSendToInput"
+              v-model="alsoSendTo"
+              placeholder="name@company.com"
+              :accept="isEmail"
+              :disabled="saving"
+              @reject="addressError = `${$event} is not an email address.`"
+              @update:pending="addressError = null"
+            />
+          </label>
+          <InlineValidation v-if="addressError" tone="error" :message="addressError" data-testid="audit-settings-address-error" />
+        </div>
+
         <div class="audit-settings-group">
           <span class="workflow-context-label">Statements</span>
           <div
@@ -174,6 +201,7 @@ import AppSelect from '../../components/ui/AppSelect.vue'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
+import WorkflowChipTextInput from '../../components/workflow/WorkflowChipTextInput.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import { auditFacade } from '../../lib/api/facade'
@@ -181,6 +209,7 @@ import { auditMorningQuery } from '../../lib/auditReport'
 import type { AuditSettings, AuditSettingsCheck, AuditSettingsStatement, SaveAuditSettingsPayload } from '../../lib/api/auditTypes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { buildTimezoneOptions } from '../../lib/timezones'
+import { useAuthStore } from '../../stores/auth'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 
 // DAR-UI-063. The audit page's settings gear: the audit's name, the daily schedule of every check it runs, and each
@@ -189,6 +218,7 @@ import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 const route = useRoute()
 const router = useRouter()
 const draftStore = useReconciliationDraftStore()
+const authStore = useAuthStore()
 const auditCode = computed(() => String(route.params.audit ?? ''))
 
 const original = ref<AuditSettings | null>(null)
@@ -197,11 +227,25 @@ const scheduleActive = ref(false)
 const scheduleTime = ref('')
 const scheduleTimeZone = ref('')
 const statements = ref<AuditSettingsStatement[]>([])
+const runEmailActive = ref(false)
+const alsoSendTo = ref<string[]>([])
+const addressError = ref<string | null>(null)
+const alsoSendToInput = ref<InstanceType<typeof WorkflowChipTextInput> | null>(null)
 const saving = ref(false)
 const opening = ref(false)
 const error = ref<string | null>(null)
 
 const timezoneOptions = computed(() => buildTimezoneOptions(scheduleTimeZone.value))
+
+// DAR-BE-207. A simple shape check; the backend has the last word and names any address it refuses.
+function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+const membersLine = computed(() => {
+  const members = original.value?.runEmail?.members ?? 0
+  const tenant = authStore.sessionInfo?.activeTenantLabel
+  return `Sent to the ${members} ${members === 1 ? 'member' : 'members'}${tenant ? ` of ${tenant}` : ''}`
+})
 
 const abort = new AbortController()
 onBeforeUnmount(() => abort.abort())
@@ -219,6 +263,8 @@ function show(settings: AuditSettings) {
   scheduleActive.value = settings.schedule.active
   scheduleTime.value = settings.schedule.time
   scheduleTimeZone.value = settings.schedule.timeZone
+  runEmailActive.value = settings.runEmail?.active ?? false
+  alsoSendTo.value = [...(settings.runEmail?.alsoSendTo ?? [])]
   statements.value = settings.statements.map((statement) => ({ ...statement, checks: [...statement.checks] }))
 }
 
@@ -318,6 +364,11 @@ function changes(): SaveAuditSettingsPayload | null {
   if (scheduleActive.value !== schedule.active || scheduleTime.value !== schedule.time || scheduleTimeZone.value !== schedule.timeZone) {
     payload.schedule = { active: scheduleActive.value, time: scheduleTime.value, timeZone: scheduleTimeZone.value }
   }
+
+  const email = was.runEmail
+  if (email && (runEmailActive.value !== email.active || alsoSendTo.value.join('\n') !== email.alsoSendTo.join('\n'))) {
+    payload.runEmail = { active: runEmailActive.value, alsoSendTo: [...alsoSendTo.value], chatSpaceId: email.chatSpaceId }
+  }
   return Object.keys(payload).length > 1 ? payload : null
 }
 
@@ -325,6 +376,8 @@ async function save() {
   if (saving.value || !original.value) return
   // A statement still being typed is saved first, not dropped with the form.
   if (addingStatement.value && newText.value.trim() && !(await addStatement())) return
+  // An address still being typed joins the list, not dropped; one that is not an address stops the save.
+  if (alsoSendToInput.value && !alsoSendToInput.value.commitPendingValue()) return
   const payload = changes()
   if (!payload) {
     back()
@@ -333,7 +386,11 @@ async function save() {
   saving.value = true
   error.value = null
   try {
-    await auditFacade.saveAuditSettings(payload)
+    const response = await auditFacade.saveAuditSettings(payload)
+    if (response?.ok === false) {
+      error.value = response.errors?.[0] || 'The audit was not saved.'
+      return
+    }
     await router.push(auditRoute.value)
   } catch (caught) {
     error.value = message(caught)
@@ -392,6 +449,14 @@ onMounted(() => void load())
   grid-template-columns: auto minmax(10rem, 1fr) minmax(10rem, 1.4fr);
   gap: var(--space-3);
   align-items: end;
+}
+
+/* DAR-BE-207: the email's switch with its one line of who it goes to. */
+.audit-settings-email {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
 }
 
 .audit-settings-field {

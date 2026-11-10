@@ -8,6 +8,7 @@ const { push, route } = vi.hoisted(() => ({
 }))
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push }) }))
 vi.mock('../../../lib/api/facade', () => ({ auditFacade: { getAuditSettings: vi.fn(), saveAuditSettings: vi.fn(), addAuditStatement: vi.fn() } }))
+vi.mock('../../../stores/auth', () => ({ useAuthStore: () => ({ sessionInfo: { activeTenantLabel: 'Gorjana' } }) }))
 vi.mock('../../../lib/savedRunEditorRoute', () => ({
   resolveSavedRunEditorTarget: vi.fn(),
   buildSavedRunEditorRoute: vi.fn(() => ({ name: 'settings-runs-edit', params: { reconciliationMappingId: 'S1' } })),
@@ -212,5 +213,82 @@ describe('AuditSettingsPage', () => {
     await save(w)
     expect(f.addAuditStatement).toHaveBeenCalledTimes(1)
     expect(push).toHaveBeenCalledWith(back)
+  })
+})
+
+// DAR-BE-207. The email after each run: on/off and extra addresses, saved with the page.
+describe('AuditSettingsPage email after each run', () => {
+  const runEmail = { active: true, alsoSendTo: ['ops@gorjana.com'], members: 4, chatSpaceId: 'spaces/AAA' }
+  beforeEach(() => {
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { ...settings(), runEmail } } as never)
+  })
+  function address(w: ReturnType<typeof mount>) { return w.get('[data-testid="audit-settings-run-email"] input[type="text"]') }
+
+  it('shows who it goes to and the extra addresses', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(w.get('[data-testid="audit-settings-run-email-active"]').attributes('aria-checked')).toBe('true')
+    expect(w.get('[data-testid="audit-settings-run-email-members"]').text()).toBe('Sent to the 4 members of Gorjana')
+    expect(w.findAll('[data-testid="workflow-chip-text-chip"]').map((c) => c.text().replace('×', '').trim())).toEqual(['ops@gorjana.com'])
+  })
+
+  it('adds an address by Enter and one still typed at Save, keeping the chat space', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    await address(w).setValue('finance@gorjana.com')
+    await address(w).trigger('keydown', { key: 'Enter' })
+    await address(w).setValue('cfo@gorjana.com')
+    await save(w)
+    expect(f.saveAuditSettings).toHaveBeenCalledWith({ audit: 'month-close',
+      runEmail: { active: true, alsoSendTo: ['ops@gorjana.com', 'finance@gorjana.com', 'cfo@gorjana.com'], chatSpaceId: 'spaces/AAA' } })
+  })
+
+  it('adds an address typed and left on blur', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    await address(w).setValue('finance@gorjana.com')
+    await address(w).trigger('blur')
+    expect(w.findAll('[data-testid="workflow-chip-text-chip"]')).toHaveLength(2)
+    expect((address(w).element as HTMLInputElement).value).toBe('')
+  })
+
+  it('refuses a malformed address, keeps it typed, and Save does not write', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    await address(w).setValue('finance@gorjana')
+    await address(w).trigger('keydown', { key: 'Enter' })
+    expect(w.get('[data-testid="audit-settings-address-error"]').text()).toBe('finance@gorjana is not an email address.')
+    expect(w.findAll('[data-testid="workflow-chip-text-chip"]')).toHaveLength(1)
+    expect((address(w).element as HTMLInputElement).value).toBe('finance@gorjana')
+    await save(w)
+    expect(f.saveAuditSettings).not.toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('turning it off sends it off with its addresses', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    await w.get('[data-testid="audit-settings-run-email-active"]').trigger('click')
+    await save(w)
+    expect(f.saveAuditSettings).toHaveBeenCalledWith({ audit: 'month-close',
+      runEmail: { active: false, alsoSendTo: ['ops@gorjana.com'], chatSpaceId: 'spaces/AAA' } })
+  })
+
+  it('leaves runEmail out when it was not touched', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    await w.get('[data-testid="audit-settings-name"]').setValue('System health')
+    await save(w)
+    expect(f.saveAuditSettings).toHaveBeenCalledWith({ audit: 'month-close', name: 'System health' })
+  })
+
+  it('shows the backend refusal naming an address and stays', async () => {
+    f.saveAuditSettings.mockRejectedValue(new Error('Not an email address: cfo@gorjana.con'))
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    await address(w).setValue('cfo@gorjana.con')
+    await save(w)
+    expect(w.get('[data-testid="audit-settings-error"]').text()).toBe('Not an email address: cfo@gorjana.con')
+    expect(push).not.toHaveBeenCalled()
   })
 })
