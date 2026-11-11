@@ -1119,6 +1119,16 @@ describe('RunsSettingsWorkflowPage', () => {
       primaryIdOptions: [{ fieldPath: '$.records[*].externalId', label: 'Shopify order ID' }],
     }
 
+    const returnsRow = {
+      description: 'HotWax returns',
+      label: 'HotWax returns',
+      systemEnumId: 'OMS_RETURNS_GQL',
+      optionKey: 'KREWE_OMS',
+      sourceConfigId: 'KREWE_OMS',
+      sourceConfigType: 'HOTWAX_OMS_GQL_RETURNS',
+      primaryIdOptions: [{ fieldPath: '$.records[*].orderId', label: 'Order ID' }],
+    }
+
     async function mountSalesOrdersRun(file2Extras: Record<string, unknown> = {}) {
       const base = await listAutomationSourceOptions()
       listAutomationSourceOptions.mockResolvedValue({
@@ -1127,10 +1137,11 @@ describe('RunsSettingsWorkflowPage', () => {
           { enumId: 'OMS', label: 'HotWax' },
           { enumId: 'OMS_RECON_ORDERS', label: 'HotWax sales orders', parentEnumId: 'OMS' },
           { enumId: 'OMS_GQL', label: 'HotWax orders and payments', parentEnumId: 'OMS' },
+          { enumId: 'OMS_RETURNS_GQL', label: 'HotWax returns', parentEnumId: 'OMS' },
           { enumId: 'SHOPIFY', label: 'Shopify' },
           { enumId: 'SHOPIFY_RETURN_REFS', label: 'Shopify returns', parentEnumId: 'SHOPIFY' },
         ],
-        systemRemotes: [...base.systemRemotes, salesOrdersRow, paymentsRow],
+        systemRemotes: [...base.systemRemotes, salesOrdersRow, paymentsRow, returnsRow],
       })
       route.params.reconciliationMappingId = 'RS_ORDERS_1'
       draftStoreState.workflowOrigin = { label: 'Run Details', path: '/reconciliation/ruleset-manager' }
@@ -1206,6 +1217,38 @@ describe('RunsSettingsWorkflowPage', () => {
 
       expect(wrapper.get('[data-testid="run-api-endpoint-2"]').text()).toContain('HotWax orders and payments')
       expect(wrapper.text()).not.toContain('needs an API endpoint')
+    })
+
+    // DAR-UI-106: two endpoints of one system are two sources, even through one connection.
+    const omsSide = (n: 1 | 2, systemEnumId: string, sourceConfigType: string, idPath: string) => ({
+      [`file${n}SystemEnumId`]: systemEnumId,
+      [`file${n}SystemLabel`]: 'HotWax',
+      [`file${n}SourceTypeEnumId`]: 'AUT_SRC_API',
+      [`file${n}SystemMessageRemoteId`]: undefined,
+      [`file${n}SourceConfigId`]: 'KREWE_OMS',
+      [`file${n}SourceConfigType`]: sourceConfigType,
+      [`file${n}PrimaryIdExpression`]: [idPath],
+    })
+
+    it('does not refuse orders against returns of one system as the same system', async () => {
+      const wrapper = await mountSalesOrdersRun({
+        ...omsSide(1, 'OMS_GQL', 'HOTWAX_OMS_GQL', '$.records[*].externalId'),
+        ...omsSide(2, 'OMS_RETURNS_GQL', 'HOTWAX_OMS_GQL_RETURNS', '$.records[*].orderId'),
+      })
+
+      expect(wrapper.text()).not.toContain('Both sides use the same system.')
+      expect(wrapper.text()).not.toContain('needs an API endpoint')
+      expect(wrapper.get('[data-testid="save-run-settings"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('refuses the very same endpoint and connection on both sides', async () => {
+      const wrapper = await mountSalesOrdersRun({
+        ...omsSide(1, 'OMS_GQL', 'HOTWAX_OMS_GQL', '$.records[*].externalId'),
+        ...omsSide(2, 'OMS_GQL', 'HOTWAX_OMS_GQL', '$.records[*].externalId'),
+      })
+
+      expect(wrapper.text()).toContain('Both sides use the same system.')
+      expect(wrapper.get('[data-testid="save-run-settings"]').attributes('disabled')).toBeDefined()
     })
 
     it('keeps the family label on a move to a sibling endpoint', async () => {

@@ -1900,6 +1900,89 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(wrapper.get('[data-testid="file1-system-select"]').text()).toBe('HotWax')
     })
 
+    // DAR-UI-106: the family of a stored side comes from the server's rows (an endpoint no client
+    // table names) or the legacy alias list (a run saved under DarSysOms).
+    function omsDraft(file1SystemEnumId: string, file1SystemLabel: string): ReconciliationRuleSetDraft {
+      return {
+        runName: 'Family Resume Test',
+        file1SystemEnumId,
+        file1SystemLabel,
+        file1FileTypeEnumId: 'DftJson',
+        file1JsonSchemaId: 'schema-oms-orders',
+        file1PrimaryIdExpression: ['$.orders[0].order_id'],
+        file2SystemEnumId: 'SHOPIFY',
+        file2SystemLabel: 'SHOPIFY',
+        file2FileTypeEnumId: 'DftJson',
+        file2JsonSchemaId: 'schema-shopify-orders',
+        file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
+      }
+    }
+
+    async function walkBackTo(wrapper: ReturnType<typeof mount>, testId: string): Promise<void> {
+      let guard = 0
+      while (!wrapper.find(`[data-testid="${testId}"]`).exists() && guard < 20) {
+        await wrapper.get('.wizard-back').trigger('click')
+        await flushPromises()
+        guard += 1
+      }
+    }
+
+    it('reopens a side stored on the returns endpoint as HotWax, then Returns', async () => {
+      mockSystemsWithOmsEndpoint()
+      const wrapper = await mountCreateFlow({ draft: omsDraft('OMS_RETURNS_GQL', 'HotWax Returns') })
+
+      await walkBackTo(wrapper, 'file1-endpoint-select')
+      expect(wrapper.get('[data-testid="file1-endpoint-select"]').text()).toContain('HotWax Returns')
+      await walkBackTo(wrapper, 'file1-system-select')
+      expect(wrapper.get('[data-testid="file1-system-select"]').text()).toBe('HotWax')
+    })
+
+    it('reopens a side stored under the legacy DarSysOms id as HotWax', async () => {
+      mockSystemsWithOmsEndpoint()
+      const wrapper = await mountCreateFlow({ draft: omsDraft('DarSysOms', 'HotWax') })
+
+      await walkBackTo(wrapper, 'file1-system-select')
+      expect(wrapper.get('[data-testid="file1-system-select"]').text()).toBe('HotWax')
+    })
+
+    it('lists a connection kept only under an endpoint of the system once', async () => {
+      listAutomationSourceOptions.mockResolvedValueOnce({
+        ok: true,
+        messages: [],
+        errors: [],
+        inputModes: [],
+        sourceTypes: [],
+        relativeWindows: [],
+        fileTypes: FILE_TYPE_OPTIONS,
+        systems: [...SYSTEM_OPTIONS_WITH_OMS_ENDPOINT, { enumId: 'OMS_ORDER_ITEMS_GQL', label: 'HotWax Order Items', parentEnumId: 'OMS' }],
+        savedRuns: [],
+        sftpServers: [],
+        sourceConfigs: [
+          { sourceConfigId: 'items_only', systemEnumId: 'OMS_ORDER_ITEMS_GQL', sourceConfigType: 'HOTWAX_OMS_GQL', label: 'Items Only' },
+          { sourceConfigId: 'shopify_main', systemEnumId: 'SHOPIFY', sourceConfigType: 'SHOPIFY_AUTH', label: 'Shopify Main' },
+        ],
+        nsRestletConfigs: [],
+        systemRemotes: [],
+      })
+      const wrapper = mount(ReconciliationCreateFlowPage)
+      await flushPromises()
+
+      await wrapper.get('input[name="runName"]').setValue('Items Config Test')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
+
+      await wrapper.get('[data-testid="file1-api-config-select"]').trigger('click')
+      const configValues = wrapper
+        .findAll('[data-testid="workflow-select-option"]')
+        .map((option) => option.attributes('data-option-value'))
+      expect(configValues).toEqual(['items_only'])
+    })
+
     // Regression guard for Task 6 (Plan 2 registry-driven options): each enabled endpoint gets its
     // own sourceConfigs row, scoped to its own concrete systemEnumId. Before that change, the config
     // picker only ever offered rows keyed to the parent OMS system, so picking the OMS_RETURNS
