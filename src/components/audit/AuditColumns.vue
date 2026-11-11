@@ -99,7 +99,9 @@
                   :aria-valuenow="barPercent(run)"
                   :aria-label="`${run.run} progress`"
                   data-testid="audit-run-bar"
-                ><span class="audit-run-bar-fill" :style="{ width: `${barPercent(run)}%` }"></span></div>
+                >
+                  <span class="audit-run-bar-fill" :style="{ width: `${barPercent(run)}%` }"></span>
+                </div>
                 <ol class="audit-run-steps">
                   <li
                     v-for="step in progressSteps(run)"
