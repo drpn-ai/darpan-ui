@@ -771,6 +771,9 @@ async function runNow(): Promise<void> {
   runNowInFlight.value = true
   actionError.value = null
   const registrationController = new AbortController()
+  // Leaving the page ends the registration poll too; it would otherwise list executions for all its tries.
+  const stopRegistration = () => registrationController.abort()
+  pageAbortController.signal.addEventListener('abort', stopRegistration, { once: true })
   try {
     // The run executes detached from the request transaction, so its PENDING/RUNNING row is
     // readable within moments of submission while this call is still in flight. Race the two:
@@ -806,6 +809,7 @@ async function runNow(): Promise<void> {
   } catch (runError) {
     actionError.value = runError instanceof ApiCallError ? runError.message : 'The automation tripped at the starting line. Not run.'
   } finally {
+    pageAbortController.signal.removeEventListener('abort', stopRegistration)
     registrationController.abort()
     actionInFlight.value = false
     runNowInFlight.value = false

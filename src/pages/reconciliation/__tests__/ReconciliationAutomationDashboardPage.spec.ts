@@ -513,7 +513,29 @@ describe('ReconciliationAutomationDashboardPage', () => {
       await flushPromises()
 
       expect(wrapper.get('[data-testid="automation-active-toggle"]').attributes('disabled')).toBeDefined()
+      wrapper.unmount()
     })
+  })
+
+  // Leaving the page mid run-now stops the run-registration poll; it used to keep listing executions for
+  // its 12 tries (about 11 s), and in this file it ran on into later tests and broke their call counts.
+  it('stops the run-registration poll when the page unmounts during a run-now', async () => {
+    vi.useFakeTimers()
+    try {
+      runAutomationNow.mockReturnValue(new Promise(() => {}))
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+      await vi.advanceTimersByTimeAsync(1000)
+      const callsAtUnmount = listAutomationExecutions.mock.calls.length
+
+      wrapper.unmount()
+      await vi.advanceTimersByTimeAsync(20000)
+
+      expect(listAutomationExecutions.mock.calls.length).toBe(callsAtUnmount)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('formats timestamps using the app display timezone instead of sessionInfo.timeZone', async () => {
