@@ -59,7 +59,7 @@ describe('MascotDock', () => {
 
     const say = wrapper.get('.mascot-say')
     expect(say.get('.mascot-say-lead').text()).toBe('Differences')
-    expect(say.text()).toContain('don’t line up on a compared field')
+    expect(say.text()).toContain('it is not a record count')
     expect(say.classes()).not.toContain('mascot-say--hint')
   })
 
