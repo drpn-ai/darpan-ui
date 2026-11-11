@@ -11,7 +11,7 @@ import {
   type ReconciliationAutomationFileSide,
   type ReconciliationAutomationSourceDraft,
 } from '../lib/reconciliationAutomationDraft'
-import { darpanSystemIdsMatch } from '../lib/utils/darpanSystems'
+import { darpanSystemOwnsEndpoint } from '../lib/utils/darpanSystems'
 
 export interface ApiSourceSelectOption {
   value: string
@@ -90,14 +90,17 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     return sideOption?.label || sideOption?.description || sideOption?.enumCode || sideOption?.enumId || systemEnumIdForSide(side) || 'source'
   }
 
-  function optionMatchesSystem(optionSystemEnumId: string | undefined, expectedSystemEnumId: string): boolean {
-    return darpanSystemIdsMatch(optionSystemEnumId, expectedSystemEnumId)
+  // DAR-UI-106: a connection serves the side's endpoint, or the system the server says that endpoint belongs to.
+  function optionMatchesSystem(optionSystemEnumId: string | undefined, side: ReconciliationAutomationFileSide): boolean {
+    return darpanSystemOwnsEndpoint(optionSystemEnumId, {
+      enumId: systemEnumIdForSide(side),
+      systemParentEnumId: systemOptionForSide(side)?.systemParentEnumId,
+    })
   }
 
   function apiSourceOptionsForSide(side: ReconciliationAutomationFileSide): ApiSourceSelectOption[] {
-    const expectedSystemEnumId = systemEnumIdForSide(side)
     const nsOptions: ApiSourceSelectOption[] = deps.nsRestletConfigs.value
-      .filter((config) => optionMatchesSystem(config.systemEnumId, expectedSystemEnumId))
+      .filter((config) => optionMatchesSystem(config.systemEnumId, side))
       .map((config) => ({
         value: `ns:${config.nsRestletConfigId}`,
         sourceKind: 'ns',
@@ -107,7 +110,7 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
         label: config.label || config.description || config.nsRestletConfigId,
       }))
     const remoteOptions: ApiSourceSelectOption[] = deps.systemRemotes.value
-      .filter((remote) => optionMatchesSystem(remote.systemEnumId, expectedSystemEnumId))
+      .filter((remote) => optionMatchesSystem(remote.systemEnumId, side))
       .filter((remote) => Boolean(remote.safeMetadataJson))
       .map((remote) => ({
         value: remote.optionKey

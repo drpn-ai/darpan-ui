@@ -96,4 +96,26 @@ describe('useAutomationSourceDraft', () => {
     ]
     expect(source.shouldSkipApiSourceStep('FILE_1')).toBe(true)
   })
+
+  // DAR-UI-106: a side on an endpoint no client table names (a returns endpoint) finds the connections kept under its
+  // system, by the parent the server sends; an exact endpoint match and another system's connections behave as before.
+  it('offers a side the connections of its endpoint\'s system, by the server\'s parent', () => {
+    const { usesApi, systemOptions, remotes, source } = createHarness()
+    usesApi.value = true
+    systemOptions.value = [{ enumId: 'OMS_RETURNS_GQL', systemParentEnumId: 'OMS', fileSide: 'FILE_1' }]
+    remotes.value = [
+      { systemMessageRemoteId: 'R-OMS', systemEnumId: 'OMS', label: 'HotWax prod', safeMetadataJson: '{}' },
+      { systemMessageRemoteId: 'R-EP', systemEnumId: 'OMS_RETURNS_GQL', label: 'HotWax returns', safeMetadataJson: '{}' },
+      { systemMessageRemoteId: 'R-SHOP', systemEnumId: 'SHOPIFY', label: 'Shopify', safeMetadataJson: '{}' },
+    ] as AutomationSystemRemoteOption[]
+    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['HotWax prod', 'HotWax returns'])
+  })
+
+  it('keeps legacy system ids matching their system', () => {
+    const { usesApi, systemOptions, nsConfigs, source } = createHarness()
+    usesApi.value = true
+    systemOptions.value = [{ enumId: 'NETSUITE', fileSide: 'FILE_1' }]
+    nsConfigs.value = [{ nsRestletConfigId: 'cfg-1', systemEnumId: 'DARSYSNETSUITE', label: 'Legacy NS' } as AutomationNsRestletOption]
+    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['Legacy NS'])
+  })
 })

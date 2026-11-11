@@ -72,6 +72,18 @@ export function darpanSystemIdsMatch(left: string | null | undefined, right: str
   return Boolean(canonicalLeft && canonicalRight && canonicalLeft === canonicalRight)
 }
 
+/**
+ * DAR-UI-106. Whether a connection kept under ownerSystemEnumId serves an endpoint: the endpoint itself, or the system the
+ * server says it belongs to (systemParentEnumId), so an endpoint no client table names (a returns endpoint) still finds
+ * the connections of its system. Two endpoints of one system are still told apart by darpanSystemIdsMatch.
+ */
+export function darpanSystemOwnsEndpoint(
+  ownerSystemEnumId: string | null | undefined,
+  endpoint: { enumId?: string | null; systemParentEnumId?: string | null },
+): boolean {
+  return darpanSystemIdsMatch(ownerSystemEnumId, endpoint.enumId) || darpanSystemIdsMatch(ownerSystemEnumId, endpoint.systemParentEnumId)
+}
+
 export function deduplicateDarpanSystemOptions<T extends DarpanSystemOptionInput>(options: T[]): Array<T & { enumId: string }> {
   const preferredBySystemId = new Map<string, PreferredSystemOption<T>>()
 
