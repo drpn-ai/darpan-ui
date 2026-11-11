@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import type { LifecycleBoard, LifecyclePlace } from '../../lib/lifecycleBoard'
+import { isFindingPlace, type LifecycleBoard, type LifecyclePlace } from '../../lib/lifecycleBoard'
 
 // DAR-UI-050. Where records stopped, drawn as the lifecycle's own line (the settings page's spine): a dot per stage
 // with how many reached it, the places a record stopped at listed under the stage where it stopped, the complete
@@ -62,7 +62,7 @@ const countFormat = new Intl.NumberFormat('en-US')
 
 function format(n: number): string { return countFormat.format(n) }
 function openable(place: LifecyclePlace): boolean { return props.canOpen(place) }
-function uncounted(place: LifecyclePlace): boolean { return Boolean(props.notFinding?.includes(place.key)) }
+function uncounted(place: LifecyclePlace): boolean { return !isFindingPlace(place, props.notFinding) }
 </script>
 
 <style scoped>

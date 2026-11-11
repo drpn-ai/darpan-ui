@@ -162,6 +162,7 @@ describe('RunFlowchartSettingsPage', () => {
     const plan = [q('start', null, null, 'Sales orders', null, 'START'), q('s0', 'start', 'YES', 'Fulfillment'),
       q('x0', 's0', 'YES', 'Fulfillment', null, 'EXCUSED'), q('s1', 'x0', 'YES', 'Invoice', 'Shipped, never billed'),
       q('done', 'x0', 'YES', 'Invoice', 'Shipped and billed'), q('x0.not1', 'x0', 'NO', 'Invoice', 'Fulfillment not expected, never billed'),
+      q('x0.done', 'x0', 'NO', 'Invoice', 'Fulfillment not expected, done'),
       q('s0.has1', 's0', 'NO', 'Invoice', 'Billed, never shipped'), q('s0.not1', 's0', 'NO', 'Invoice', 'Never shipped, never billed')]
       .map((x, i) => ({ ...x, runSequence: i + 1 }))
     f.getLifecyclePlan.mockResolvedValue({ questions: plan } as never)
@@ -176,6 +177,11 @@ describe('RunFlowchartSettingsPage', () => {
     // The excused place reads in the exception's words.
     expect(spine).toContain('stops at Store Pickup, never billed')
     expect(spine.indexOf('Never shipped, never billed')).toBeLessThan(spine.indexOf('Invoice'))
+    // DAR-BE-238: excused and then billed anyway: under Fulfillment, never a finding, so no toggle.
+    expect(spine).toContain('goes on to Store Pickup, done')
+    expect(spine.indexOf('Store Pickup, done')).toBeLessThan(spine.indexOf('Invoice'))
+    expect(w.find('[data-testid="lifecycle-settings-not-finding-Fulfillment not expected, done"]').exists()).toBe(true)
+    expect(w.find('[data-testid="lifecycle-settings-finding-Fulfillment not expected, done"]').exists()).toBe(false)
     // Back to the saved order: the saved places, nothing asked.
     f.getLifecyclePlan.mockClear()
     await w.get('[data-testid="lifecycle-settings-up-CustInvc"]').trigger('click')

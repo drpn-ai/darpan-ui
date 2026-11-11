@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultLateAfter, lateAfterOptions, orderedStages, stageOptionLabel, stageReach } from '../lifecycleOptions'
-import { lifecycleBoard } from '../lifecycleBoard'
+import { isFindingPlace, lifecycleBoard } from '../lifecycleBoard'
 import type { FlowchartExecutionRow, FlowchartQuestion, LifecycleStageOption } from '../api/flowchartTypes'
 
 const invoice: LifecycleStageOption = {
@@ -136,6 +136,35 @@ describe('lifecycle board, one question per place', () => {
     expect(checked.complete?.label).toBe('Shipped and billed')
     // Without the exceptions' words, the place keeps its own name.
     expect(lifecycleBoard(excusedTree, rows).stages[1]!.places[1]!.label).toBe('Fulfillment not expected, never billed')
+  })
+
+  // DAR-BE-238: records excused at a stage that then reach every later stage have a place of their own, found beside the
+  // track's last ask. It sits under the stage they were excused at, in the exception's words, and is never a finding.
+  it('files the excused-and-done place under the stage they were excused at, as no finding', () => {
+    const tree = [
+      q('S', { questionRole: 'START', runName: 'Sales orders', runSequence: 1 }),
+      q('F', { parentReconciliationRunId: 'S', parentBranch: 'YES', runName: 'Fulfillment', runSequence: 2 }),
+      q('X', { parentReconciliationRunId: 'F', parentBranch: 'YES', questionRole: 'EXCUSED', runName: 'Fulfillment', runSequence: 3 }),
+      q('I', { parentReconciliationRunId: 'X', parentBranch: 'YES', runName: 'Invoice', noOutcomeLabel: 'Shipped, never billed', runSequence: 4 }),
+      q('D', { parentReconciliationRunId: 'X', parentBranch: 'YES', runName: 'Invoice', noOutcomeLabel: 'Shipped and billed', runSequence: 5 }),
+      q('XN', { parentReconciliationRunId: 'X', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Fulfillment not expected, never billed', runSequence: 6 }),
+      q('XD', { parentReconciliationRunId: 'X', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Fulfillment not expected, done', runSequence: 7 }),
+      q('H', { parentReconciliationRunId: 'F', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Billed, never shipped', runSequence: 8 }),
+      q('N', { parentReconciliationRunId: 'F', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Never shipped, never billed', runSequence: 9 }),
+    ]
+    const rows: FlowchartExecutionRow[] = [
+      { reconciliationRunResultId: 'r1', reconciliationRunId: 'XN', yesCount: 30, noCount: 10 },
+      { reconciliationRunResultId: 'r2', reconciliationRunId: 'XD', yesCount: 10, noCount: 30 },
+    ]
+    const board = lifecycleBoard(tree, rows, { Fulfillment: 'Store Pickup or GFT-CP' })
+    expect(board.stages.map((st) => st.label)).toEqual(['Fulfillment', 'Invoice'])
+    const done = board.stages[0]!.places.find((p) => p.kind === 'excusedDone')
+    expect(done).toMatchObject({ label: 'Store Pickup or GFT-CP, done', key: 'Fulfillment not expected, done', count: 30, branch: 'NO' })
+    expect(board.stages[1]!.places.map((p) => p.label)).toEqual(['Shipped, never billed', 'Store Pickup or GFT-CP, never billed'])
+    // Never a finding, whatever the lifecycle's own list says; the other places still follow the list.
+    expect(isFindingPlace(done!)).toBe(false)
+    expect(isFindingPlace(done!, ['Fulfillment not expected, never billed'])).toBe(false)
+    expect(board.stages[1]!.places.map((p) => isFindingPlace(p, ['Fulfillment not expected, never billed']))).toEqual([true, false])
   })
 })
 

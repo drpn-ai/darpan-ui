@@ -38,7 +38,7 @@
           :class="{ 'lifecycle-outline-place--quiet': !place.finding }"
           :data-testid="place.finding ? 'lifecycle-outline-finding' : 'lifecycle-outline-not-finding'"
         >
-          <span><span class="lifecycle-outline-quiet">{{ place.kind === 'check' ? 'flags' : 'stops at' }}</span> {{ place.label }}</span>
+          <span><span class="lifecycle-outline-quiet">{{ place.kind === 'check' ? 'flags' : place.kind === 'excusedDone' ? 'goes on to' : 'stops at' }}</span> {{ place.label }}</span>
           <StatusBadge v-if="place.finding" label="Finding" tone="warning" />
           <span v-else class="lifecycle-outline-quiet">not a finding</span>
         </div>
@@ -67,7 +67,7 @@ const props = defineProps<{
   exceptions: LifecycleStageException[]
   lateAfterDays: number
   /** Where records stop, by the stage they stop at, and whether each place's records are findings. */
-  places: { stageLabel: string; label: string; finding: boolean; kind?: 'check' }[]
+  places: { stageLabel: string; label: string; finding: boolean; kind?: 'check' | 'excusedDone' }[]
   /** The place a record that reached every stage ends at. */
   complete?: string | null
 }>()

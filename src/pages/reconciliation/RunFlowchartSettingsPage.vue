@@ -195,8 +195,11 @@
                   class="lifecycle-spine-phrase"
                   :data-testid="`lifecycle-settings-place-${place.key}`"
                 >
-                  <span><span class="lifecycle-spine-quiet">stops at</span> {{ place.label }}</span>
+                  <span><span class="lifecycle-spine-quiet">{{ place.kind === 'excusedDone' ? 'goes on to' : 'stops at' }}</span> {{ place.label }}</span>
+                  <!-- DAR-BE-238: records an exception let past this stage that reached every stage after it are never a finding. -->
+                  <span v-if="place.kind === 'excusedDone'" class="lifecycle-spine-quiet" :data-testid="`lifecycle-settings-not-finding-${place.key}`">not a finding</span>
                   <button
+                    v-else
                     type="button"
                     class="lifecycle-spine-finding"
                     :class="{ 'lifecycle-spine-finding--off': keptNotFinding.includes(place.key) }"

@@ -9,8 +9,12 @@ export interface LifecyclePlace {
   label: string
   /** The place's stored name, which stays put when its label is reworded: what "not a finding" is kept by. */
   key: string
-  /** check: a finding a person wrote (records that reached the stage and match), not a place records stop at. */
-  kind?: 'check'
+  /**
+   * check: a finding a person wrote (records that reached the stage and match), not a place records stop at.
+   * excusedDone (DAR-BE-238): records an exception let past this stage that then reached every later stage; drawn under
+   * the stage they were excused at, and never a finding.
+   */
+  kind?: 'check' | 'excusedDone'
   questionId: string
   branch: FlowchartBranch
   count: number | null
@@ -45,6 +49,11 @@ export function notFindingPlacesOf(stored?: string | null): string[] {
   }
 }
 
+/** Whether a place's records are findings: every place is, unless the lifecycle says not, or it is excused-and-done. */
+export function isFindingPlace(place: Pick<LifecyclePlace, 'key' | 'kind'>, notFinding: string[] = []): boolean {
+  return place.kind !== 'excusedDone' && !notFinding.includes(place.key)
+}
+
 /**
  * @param excusedNames what each stage's exceptions excuse, by stage label ("Fulfillment" -> "Store Pickup or GFT-CP"),
  *   so an excused place reads in a person's own words: "Store Pickup or GFT-CP, never billed".
@@ -74,14 +83,19 @@ export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartEx
   const excused: { stageLabel: string; place: LifecyclePlace }[] = []
   const stepOverExcused = (q: FlowchartQuestion) => {
     const name = excusedNames[q.runName ?? '']
-    const track = (e: FlowchartQuestion): void => {
-      if (e.noOutcomeLabel) {
-        const rest = e.noOutcomeLabel.includes(', ') ? e.noOutcomeLabel.slice(e.noOutcomeLabel.indexOf(', ')) : ''
-        excused.push({ stageLabel: e.runName ?? '', place: place(e, 'NO', name ? `${name}${rest}` : e.noOutcomeLabel) })
+    const reword = (label: string) => (name ? `${name}${label.includes(', ') ? label.slice(label.indexOf(', ')) : ''}` : label)
+    // Each step of the track: first the stage they may stop at, then (DAR-BE-238), beside the track's last ask, the
+    // records that reached every later stage anyway.
+    const track = (kids: FlowchartQuestion[]): void => {
+      const [stop, beside] = kids
+      if (!stop) return
+      if (stop.noOutcomeLabel) excused.push({ stageLabel: stop.runName ?? '', place: place(stop, 'NO', reword(stop.noOutcomeLabel)) })
+      if (beside?.noOutcomeLabel) {
+        excused.push({ stageLabel: q.runName ?? '', place: { ...place(beside, 'NO', reword(beside.noOutcomeLabel)), kind: 'excusedDone' } })
       }
-      childrenOf(e.reconciliationRunId, 'YES').forEach(track)
+      track(childrenOf(stop.reconciliationRunId, 'YES'))
     }
-    childrenOf(q.reconciliationRunId, 'NO').forEach(track)
+    track(childrenOf(q.reconciliationRunId, 'NO'))
   }
 
   const startQ = active.find((q) => q.questionRole === 'START') ?? null

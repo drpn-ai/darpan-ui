@@ -192,6 +192,45 @@ describe('RunFlowchartPage', () => {
       expect(w.findAll('[data-testid="lifecycle-place-not-finding"]')).toHaveLength(1)
     })
 
+    // DAR-BE-238 / DAR-UI-107: the records an exception let past fulfillment that were billed anyway show under
+    // Fulfillment, dimmed and marked, and are no finding.
+    it('draws the excused-and-done place under its stage, dimmed, and leaves it out of the findings', async () => {
+      const excusedQuestions = [
+        { reconciliationRunId: 'S', ruleSetId: 'R0', questionRole: 'START', runName: 'Sales orders', runSequence: 1 },
+        { reconciliationRunId: 'A', ruleSetId: 'R1', parentReconciliationRunId: 'S', parentBranch: 'YES', runName: 'Fulfillment', runSequence: 2 },
+        { reconciliationRunId: 'X', ruleSetId: 'R2', parentReconciliationRunId: 'A', parentBranch: 'YES', questionRole: 'EXCUSED', runName: 'Fulfillment', runSequence: 3 },
+        { reconciliationRunId: 'B', ruleSetId: 'R3', parentReconciliationRunId: 'X', parentBranch: 'YES', runName: 'Invoice', noOutcomeLabel: 'Shipped, never billed', runSequence: 4 },
+        { reconciliationRunId: 'D', ruleSetId: 'R4', parentReconciliationRunId: 'X', parentBranch: 'YES', runName: 'Invoice', noOutcomeLabel: 'Shipped and billed', runSequence: 5 },
+        { reconciliationRunId: 'XN', ruleSetId: 'R5', parentReconciliationRunId: 'X', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Fulfillment not expected, never billed', runSequence: 6 },
+        { reconciliationRunId: 'XD', ruleSetId: 'R6', parentReconciliationRunId: 'X', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Fulfillment not expected, done', runSequence: 7 },
+        { reconciliationRunId: 'N', ruleSetId: 'R7', parentReconciliationRunId: 'A', parentBranch: 'NO', runName: 'Invoice', noOutcomeLabel: 'Never shipped, never billed', runSequence: 8 },
+      ]
+      f.getReconciliation.mockResolvedValue({ reconciliation: stagesRun, questions: excusedQuestions,
+        lifecycle: { nsAuthConfigId: 'net_prod', recordType: 'SalesOrd', recordLabel: 'Sales orders' }, rules: [], stages: [], exceptions: [] } as never)
+      routeParams.reconciliationExecutionId = 'E7'
+      f.getReconciliationExecution.mockResolvedValue({ results: [
+        { reconciliationRunResultId: '1', reconciliationRunId: 'S', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 100 },
+        { reconciliationRunResultId: '2', reconciliationRunId: 'A', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 90, noCount: 10 },
+        { reconciliationRunResultId: '3', reconciliationRunId: 'X', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 80, noCount: 10 },
+        { reconciliationRunResultId: '4', reconciliationRunId: 'B', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 77, noCount: 3 },
+        { reconciliationRunResultId: '5', reconciliationRunId: 'D', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 3, noCount: 77 },
+        { reconciliationRunResultId: '6', reconciliationRunId: 'XN', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 8, noCount: 2 },
+        { reconciliationRunResultId: '7', reconciliationRunId: 'XD', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 2, noCount: 8 },
+        { reconciliationRunResultId: '8', reconciliationRunId: 'N', statusEnumId: 'AUT_STAT_SUCCESS', yesCount: 0, noCount: 10 },
+      ] } as never)
+      const w = mount(RunFlowchartPage)
+      await flushPromises()
+      const done = w.get('[data-testid="lifecycle-place-XD-NO"]')
+      expect(done.text()).toContain('Fulfillment not expected, done')
+      expect(done.classes()).toContain('lifecycle-line-place--empty')
+      expect(done.find('[data-testid="lifecycle-place-not-finding"]').exists()).toBe(true)
+      // Under Fulfillment, the stage the exception excused, not under Invoice.
+      const fulfillment = w.findAll('.lifecycle-line-group').find((g) => g.find('[data-testid="lifecycle-stage-A"]').exists())
+      expect(fulfillment?.find('[data-testid="lifecycle-place-XD-NO"]').exists()).toBe(true)
+      // Never shipped, never billed 10 + Shipped, never billed 3 + Fulfillment not expected, never billed 2; done (8) is not one.
+      expect(w.get('[data-testid="flowchart-summary-findings"]').text()).toBe('15')
+    })
+
     // A run's result shows results alone: back, and nothing that changes or starts the run.
     it("a run's result has only back", async () => {
       routeParams.reconciliationExecutionId = 'E7'
