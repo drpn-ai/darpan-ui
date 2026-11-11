@@ -204,6 +204,18 @@
                                         "$ref": "#/components/schemas/ListAgentQueryLogsRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/GetAgentAuditScopeRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/GetAgentConversationRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/GetAgentStatusRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/SendAgentTurnRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/AddAuditStatementRequest"
                                     },
                                     {
@@ -328,6 +340,15 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/RevokeConfigTenantAccessRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/CreateDataSourceDefinitionRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/RetireDataSourceDefinitionRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/ValidateDataSourceDefinitionRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/DeleteHotWaxOmsRestSourceConfigRequest"
@@ -795,6 +816,10 @@
                                         "facade.AgentChangeFacadeServices.reject#AuditChange": "#/components/schemas/RejectAuditChangeRequest",
                                         "facade.AgentChangeFacadeServices.revert#AuditChange": "#/components/schemas/RevertAuditChangeRequest",
                                         "facade.AgentFacadeServices.list#AgentQueryLogs": "#/components/schemas/ListAgentQueryLogsRequest",
+                                        "facade.AgentReadFacadeServices.get#AgentAuditScope": "#/components/schemas/GetAgentAuditScopeRequest",
+                                        "facade.AgentTurnFacadeServices.get#AgentConversation": "#/components/schemas/GetAgentConversationRequest",
+                                        "facade.AgentTurnFacadeServices.get#AgentStatus": "#/components/schemas/GetAgentStatusRequest",
+                                        "facade.AgentTurnFacadeServices.send#AgentTurn": "#/components/schemas/SendAgentTurnRequest",
                                         "facade.AuditFacadeServices.add#AuditStatement": "#/components/schemas/AddAuditStatementRequest",
                                         "facade.AuditFacadeServices.create#Audit": "#/components/schemas/CreateAuditRequest",
                                         "facade.AuditFacadeServices.get#AuditCheckExtracts": "#/components/schemas/GetAuditCheckExtractsRequest",
@@ -837,6 +862,9 @@
                                         "facade.ConfigSharingFacadeServices.grant#ConfigTenantAccess": "#/components/schemas/GrantConfigTenantAccessRequest",
                                         "facade.ConfigSharingFacadeServices.list#ConfigTenantAccess": "#/components/schemas/ListConfigTenantAccessRequest",
                                         "facade.ConfigSharingFacadeServices.revoke#ConfigTenantAccess": "#/components/schemas/RevokeConfigTenantAccessRequest",
+                                        "facade.DataSourceDefinitionFacadeServices.create#DataSourceDefinition": "#/components/schemas/CreateDataSourceDefinitionRequest",
+                                        "facade.DataSourceDefinitionFacadeServices.retire#DataSourceDefinition": "#/components/schemas/RetireDataSourceDefinitionRequest",
+                                        "facade.DataSourceDefinitionFacadeServices.validate#DataSourceDefinition": "#/components/schemas/ValidateDataSourceDefinitionRequest",
                                         "facade.HotWaxOmsFacadeServices.delete#HotWaxOmsRestSourceConfig": "#/components/schemas/DeleteHotWaxOmsRestSourceConfigRequest",
                                         "facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema": "#/components/schemas/GetOmsGraphqlSchemaRequest",
                                         "facade.HotWaxOmsFacadeServices.list#HotWaxOmsRestSourceConfigs": "#/components/schemas/ListHotWaxOmsRestSourceConfigsRequest",
@@ -1168,6 +1196,18 @@
                                             "$ref": "#/components/schemas/ListAgentQueryLogsResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/GetAgentAuditScopeResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/GetAgentConversationResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/GetAgentStatusResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/SendAgentTurnResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/AddAuditStatementResponse"
                                         },
                                         {
@@ -1292,6 +1332,15 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/RevokeConfigTenantAccessResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/CreateDataSourceDefinitionResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/RetireDataSourceDefinitionResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/ValidateDataSourceDefinitionResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/DeleteHotWaxOmsRestSourceConfigResponse"
@@ -7675,6 +7724,405 @@
                     "result"
                 ]
             },
+            "GetAgentAuditScopeParams": {
+                "type": "object",
+                "properties": {
+                    "findingId": {
+                        "type": "string",
+                        "description": "The finding's id, e.g. F-20761."
+                    }
+                },
+                "required": [
+                    "findingId"
+                ],
+                "description": "What the open finding's audit tells the agent (DAR-BE-215): the audit's name and schedule, the finding's own\n            statement and check, and the run that check reads. No other statement of the audit. Another tenant's finding reads as not found."
+            },
+            "GetAgentAuditScopeResult": {
+                "type": "object",
+                "properties": {
+                    "audit": {
+                        "type": "object",
+                        "description": "[name]."
+                    },
+                    "schedule": {
+                        "type": "object",
+                        "description": "[active, time, timeZone]."
+                    },
+                    "statement": {
+                        "type": "object",
+                        "description": "[code, text] of the finding's statement."
+                    },
+                    "check": {
+                        "type": "object",
+                        "description": "[id, label] of the finding's check."
+                    },
+                    "run": {
+                        "type": "object",
+                        "description": "[savedRunId, sides]; empty when the check has no run."
+                    }
+                }
+            },
+            "GetAgentAuditScopeRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AgentReadFacadeServices.get#AgentAuditScope",
+                "x-darpan-method": "facade.AgentReadFacadeServices.get#AgentAuditScope",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AgentReadFacadeServices.get#AgentAuditScope"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetAgentAuditScopeParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetAgentAuditScopeResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AgentReadFacadeServices.get#AgentAuditScope. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetAgentAuditScopeResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "GetAgentConversationParams": {
+                "type": "object",
+                "properties": {
+                    "conversationId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "conversationId"
+                ],
+                "description": "The person's own conversation: its messages (theirs and the agent's replies) and its proposals with their status\n            now. Another person's or another tenant's conversation reads as not found."
+            },
+            "GetAgentConversationResult": {
+                "type": "object",
+                "properties": {
+                    "auditId": {
+                        "type": "string"
+                    },
+                    "findingId": {
+                        "type": "string"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            
+                        },
+                        "description": "{messageId, kind (USER or ASSISTANT), text, question}"
+                    },
+                    "proposals": {
+                        "type": "array",
+                        "items": {
+                            
+                        },
+                        "description": "{proposalId, kind, status, statusMessage, provenanceStatus, blockedIds, backtest}"
+                    }
+                }
+            },
+            "GetAgentConversationRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AgentTurnFacadeServices.get#AgentConversation",
+                "x-darpan-method": "facade.AgentTurnFacadeServices.get#AgentConversation",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AgentTurnFacadeServices.get#AgentConversation"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetAgentConversationParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetAgentConversationResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AgentTurnFacadeServices.get#AgentConversation. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetAgentConversationResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "GetAgentStatusParams": {
+                "type": "object",
+                "properties": {
+                    
+                },
+                "description": "Whether the agent can run for the person now: state (ON, AGENT_OFF, AGENT_UNAVAILABLE or AGENT_REFUSED), grantState\n            (their AI access in this tenant: LIVE, NOT_GRANTED, EXPIRED or PAUSED) and canApprove (true only for someone allowed to\n            save the audit's checks)."
+            },
+            "GetAgentStatusResult": {
+                "type": "object",
+                "properties": {
+                    "state": {
+                        "type": "string"
+                    },
+                    "grantState": {
+                        "type": "string"
+                    },
+                    "canApprove": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "GetAgentStatusRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AgentTurnFacadeServices.get#AgentStatus",
+                "x-darpan-method": "facade.AgentTurnFacadeServices.get#AgentStatus",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AgentTurnFacadeServices.get#AgentStatus"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetAgentStatusParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetAgentStatusResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AgentTurnFacadeServices.get#AgentStatus. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetAgentStatusResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "SendAgentTurnParams": {
+                "type": "object",
+                "properties": {
+                    "conversationId": {
+                        "type": "string",
+                        "description": "Continue this conversation; empty starts one."
+                    },
+                    "auditId": {
+                        "type": "string"
+                    },
+                    "findingId": {
+                        "type": "string",
+                        "description": "The finding the panel is open on."
+                    },
+                    "text": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "auditId",
+                    "text"
+                ],
+                "description": "One message from the person about an audit, optionally with a finding open. The router splits it into\n            items; read questions are grounded and answered; cause and rule comments become one draft change (for a person to\n            approve with apply#AuditChange) or a staff ticket. Keys, secrets, emails and phones are masked before anything is\n            stored or sent. outcome: AGENT_OFF, AGENT_UNAVAILABLE, RATE_LIMITED, OVER_BUDGET, DECLINED, QUESTION, DONE,\n            INCOMPLETE, TENANT_CHANGED or ERROR."
+            },
+            "SendAgentTurnResult": {
+                "type": "object",
+                "properties": {
+                    "conversationId": {
+                        "type": "string"
+                    },
+                    "outcome": {
+                        "type": "string"
+                    },
+                    "reply": {
+                        "type": "string"
+                    },
+                    "proposals": {
+                        "type": "array",
+                        "items": {
+                            
+                        },
+                        "description": "{proposalId, kind, status, statusMessage, provenanceStatus, blockedIds, backtest}"
+                    },
+                    "tickets": {
+                        "type": "array",
+                        "items": {
+                            
+                        },
+                        "description": "{ticketId, category, duplicate}"
+                    },
+                    "question": {
+                        "type": "object",
+                        "description": "{text, options, from} when the agent needs the person's answer."
+                    },
+                    "masked": {
+                        "type": "array",
+                        "items": {
+                            
+                        },
+                        "description": "The kinds of secret or personal data masked in the text (never the values)."
+                    }
+                }
+            },
+            "SendAgentTurnRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AgentTurnFacadeServices.send#AgentTurn",
+                "x-darpan-method": "facade.AgentTurnFacadeServices.send#AgentTurn",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AgentTurnFacadeServices.send#AgentTurn"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/SendAgentTurnParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "SendAgentTurnResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AgentTurnFacadeServices.send#AgentTurn. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/SendAgentTurnResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "AddAuditStatementParams": {
                 "type": "object",
                 "properties": {
@@ -8337,7 +8785,7 @@
                     },
                     "progress": {
                         "type": "object",
-                        "description": "{checks: configured checks, activeChecks, active: [{run,\n                checks: [check codes], state: running | queued, attempt, retryAt, stage, progressPercent, elapsedMs,\n                usualDurationMs, health: healthy | slow | stuck, healthReason}]}"
+                        "description": "{checks: configured checks, activeChecks, active: [{run,\n                checks: [check codes], state: running | queued, attempt, retryAt, stage, progressPercent, elapsedMs,\n                usualDurationMs (a past successful run over a window as long; absent when none), health: healthy | slow |\n                stuck, healthReason, steps: [{stage, status: running | done | failed, records (so far while running),\n                startedDate, completedDate, system (extract steps: the system that side reads)}] in run order\n                (DAR-BE-173)}]}"
                     }
                 }
             },
@@ -12839,6 +13287,315 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/RevokeConfigTenantAccessResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "CreateDataSourceDefinitionParams": {
+                "type": "object",
+                "properties": {
+                    "definitionId": {
+                        "type": "string",
+                        "description": "A new family's name (A-Z, 0-9, _; not ending in _V and a number). Its first row is the name + _V1."
+                    },
+                    "basedOnId": {
+                        "type": "string",
+                        "description": "Any row of an existing family: the save is that family's next version."
+                    },
+                    "definitionName": {
+                        "type": "string",
+                        "description": "A name people read; defaults to the based-on row's."
+                    },
+                    "protocol": {
+                        "type": "string",
+                        "description": "GRAPHQL or REST_JSON; defaults to the based-on row's."
+                    },
+                    "definitionJson": {
+                        "type": "string",
+                        "description": "The definition document."
+                    },
+                    "description": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "definitionJson"
+                ],
+                "description": "Saves a definition as a new DRAFT row: the first of a new family (definitionId), or the next version of an\n            existing one (basedOnId; its row, ACTIVE or not, is left as it is). A document with any problem is refused with them all."
+            },
+            "CreateDataSourceDefinitionResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the row was saved."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Why it was refused: every problem with the document."
+                    },
+                    "dataSourceDefinitionId": {
+                        "type": "string",
+                        "description": "The new row's id."
+                    },
+                    "definitionVersion": {
+                        "type": "integer",
+                        "description": "The new row's version."
+                    }
+                }
+            },
+            "CreateDataSourceDefinitionRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.DataSourceDefinitionFacadeServices.create#DataSourceDefinition",
+                "x-darpan-method": "facade.DataSourceDefinitionFacadeServices.create#DataSourceDefinition",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.DataSourceDefinitionFacadeServices.create#DataSourceDefinition"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/CreateDataSourceDefinitionParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "CreateDataSourceDefinitionResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.DataSourceDefinitionFacadeServices.create#DataSourceDefinition. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/CreateDataSourceDefinitionResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "RetireDataSourceDefinitionParams": {
+                "type": "object",
+                "properties": {
+                    "dataSourceDefinitionId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "dataSourceDefinitionId"
+                ],
+                "description": "Marks a definition RETIRED, kept for history. Refused while a connector still reads it. Retiring a retired row is a no-op."
+            },
+            "RetireDataSourceDefinitionResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the row is retired."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Why it was refused."
+                    }
+                }
+            },
+            "RetireDataSourceDefinitionRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.DataSourceDefinitionFacadeServices.retire#DataSourceDefinition",
+                "x-darpan-method": "facade.DataSourceDefinitionFacadeServices.retire#DataSourceDefinition",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.DataSourceDefinitionFacadeServices.retire#DataSourceDefinition"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/RetireDataSourceDefinitionParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "RetireDataSourceDefinitionResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.DataSourceDefinitionFacadeServices.retire#DataSourceDefinition. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/RetireDataSourceDefinitionResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "ValidateDataSourceDefinitionParams": {
+                "type": "object",
+                "properties": {
+                    "protocol": {
+                        "type": "string",
+                        "description": "GRAPHQL or REST_JSON."
+                    },
+                    "definitionJson": {
+                        "type": "string",
+                        "description": "The definition document."
+                    }
+                },
+                "required": [
+                    "protocol",
+                    "definitionJson"
+                ],
+                "description": "Checks a definition document for a protocol and lists every problem, one each. Saves nothing."
+            },
+            "ValidateDataSourceDefinitionResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "True when the call completed without facade errors."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Why the call was refused."
+                    },
+                    "valid": {
+                        "type": "boolean",
+                        "description": "True when the document has no problem."
+                    },
+                    "problems": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Each problem in words."
+                    }
+                }
+            },
+            "ValidateDataSourceDefinitionRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.DataSourceDefinitionFacadeServices.validate#DataSourceDefinition",
+                "x-darpan-method": "facade.DataSourceDefinitionFacadeServices.validate#DataSourceDefinition",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.DataSourceDefinitionFacadeServices.validate#DataSourceDefinition"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ValidateDataSourceDefinitionParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ValidateDataSourceDefinitionResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.DataSourceDefinitionFacadeServices.validate#DataSourceDefinition. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ValidateDataSourceDefinitionResult"
                     }
                 },
                 "required": [
@@ -31198,6 +31955,10 @@
         "facade.AgentChangeFacadeServices.reject#AuditChange": "RejectAuditChange",
         "facade.AgentChangeFacadeServices.revert#AuditChange": "RevertAuditChange",
         "facade.AgentFacadeServices.list#AgentQueryLogs": "ListAgentQueryLogs",
+        "facade.AgentReadFacadeServices.get#AgentAuditScope": "GetAgentAuditScope",
+        "facade.AgentTurnFacadeServices.get#AgentConversation": "GetAgentConversation",
+        "facade.AgentTurnFacadeServices.get#AgentStatus": "GetAgentStatus",
+        "facade.AgentTurnFacadeServices.send#AgentTurn": "SendAgentTurn",
         "facade.AuditFacadeServices.add#AuditStatement": "AddAuditStatement",
         "facade.AuditFacadeServices.create#Audit": "CreateAudit",
         "facade.AuditFacadeServices.get#AuditCheckExtracts": "GetAuditCheckExtracts",
@@ -31240,6 +32001,9 @@
         "facade.ConfigSharingFacadeServices.grant#ConfigTenantAccess": "GrantConfigTenantAccess",
         "facade.ConfigSharingFacadeServices.list#ConfigTenantAccess": "ListConfigTenantAccess",
         "facade.ConfigSharingFacadeServices.revoke#ConfigTenantAccess": "RevokeConfigTenantAccess",
+        "facade.DataSourceDefinitionFacadeServices.create#DataSourceDefinition": "CreateDataSourceDefinition",
+        "facade.DataSourceDefinitionFacadeServices.retire#DataSourceDefinition": "RetireDataSourceDefinition",
+        "facade.DataSourceDefinitionFacadeServices.validate#DataSourceDefinition": "ValidateDataSourceDefinition",
         "facade.HotWaxOmsFacadeServices.delete#HotWaxOmsRestSourceConfig": "DeleteHotWaxOmsRestSourceConfig",
         "facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema": "GetOmsGraphqlSchema",
         "facade.HotWaxOmsFacadeServices.list#HotWaxOmsRestSourceConfigs": "ListHotWaxOmsRestSourceConfigs",

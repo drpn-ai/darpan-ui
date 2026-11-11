@@ -1,5 +1,15 @@
 import { callService } from './client'
 import type {
+  ApplyAuditChangeResponse,
+  GetAgentConversationResponse,
+  GetAgentStatusResponse,
+  PlanAuditChangeResponse,
+  RejectAuditChangeResponse,
+  RevertAuditChangeResponse,
+  SendAgentTurnPayload,
+  SendAgentTurnResponse,
+} from './agentTypes'
+import type {
   GetAuditFindingResponse,
   GetAuditCheckExtractsResponse,
   GetAuditFindingsByOrderResponse,
@@ -709,6 +719,46 @@ export const scriptFacade = {
   /** send=false (default) previews the message; send=true posts it and records the run. */
   runTenantScriptDeployment(payload: { tenantScriptDeploymentId: string; send?: boolean }, signal?: AbortSignal): Promise<RunTenantScriptDeploymentResponse> {
     return callService<RunTenantScriptDeploymentResponse>(SCRIPT.runTenantScriptDeployment, payload, signal)
+  },
+}
+
+// DAR-BE-159 / DAR-BE-223. The embedded agent's panel (darpan-agent) and the drafted changes it proposes.
+const AGENT = {
+  getAgentStatus: 'facade.AgentTurnFacadeServices.get#AgentStatus',
+  getAgentConversation: 'facade.AgentTurnFacadeServices.get#AgentConversation',
+  sendAgentTurn: 'facade.AgentTurnFacadeServices.send#AgentTurn',
+  planAuditChange: 'facade.AgentChangeFacadeServices.plan#AuditChange',
+  applyAuditChange: 'facade.AgentChangeFacadeServices.apply#AuditChange',
+  rejectAuditChange: 'facade.AgentChangeFacadeServices.reject#AuditChange',
+  revertAuditChange: 'facade.AgentChangeFacadeServices.revert#AuditChange',
+}
+
+export const agentFacade = {
+  /** Whether the panel can offer the box: the tenant switch, the person's AI access, and whether they may approve. */
+  getAgentStatus(payload: Record<string, never> = {}, signal?: AbortSignal): Promise<GetAgentStatusResponse> {
+    return callService<GetAgentStatusResponse>(AGENT.getAgentStatus, payload, signal)
+  },
+  /** The person's own conversation, to reload the panel; another person's reads as not found. */
+  getAgentConversation(payload: { conversationId: string }, signal?: AbortSignal): Promise<GetAgentConversationResponse> {
+    return callService<GetAgentConversationResponse>(AGENT.getAgentConversation, payload, signal)
+  },
+  /** One message. Answers within the request (up to 4 minutes); a write, so it is never retried. */
+  sendAgentTurn(payload: SendAgentTurnPayload, signal?: AbortSignal): Promise<SendAgentTurnResponse> {
+    return callService<SendAgentTurnResponse>(AGENT.sendAgentTurn, payload, signal)
+  },
+  planAuditChange(payload: { proposalId: string }, signal?: AbortSignal): Promise<PlanAuditChangeResponse> {
+    return callService<PlanAuditChangeResponse>(AGENT.planAuditChange, payload, signal)
+  },
+  /** Applies exactly the plan the person saw (planHash); a config version is kept before and after. */
+  applyAuditChange(payload: { proposalId: string; planHash: string }, signal?: AbortSignal): Promise<ApplyAuditChangeResponse> {
+    return callService<ApplyAuditChangeResponse>(AGENT.applyAuditChange, payload, signal)
+  },
+  rejectAuditChange(payload: { proposalId: string; reason?: string }, signal?: AbortSignal): Promise<RejectAuditChangeResponse> {
+    return callService<RejectAuditChangeResponse>(AGENT.rejectAuditChange, payload, signal)
+  },
+  /** Drafts the undo of an applied change as a new, planned proposal; it applies only when approved. */
+  revertAuditChange(payload: { proposalId: string }, signal?: AbortSignal): Promise<RevertAuditChangeResponse> {
+    return callService<RevertAuditChangeResponse>(AGENT.revertAuditChange, payload, signal)
   },
 }
 
