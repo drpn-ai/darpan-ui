@@ -29,6 +29,8 @@ import {
   narrowedCounts,
   orderKey,
   progressLine,
+  progressSteps,
+  elapsedLine,
   statementFindings,
   sourceItems,
   statementItems,
@@ -172,6 +174,36 @@ describe('auditColumns', () => {
       expect(progressLine(progress.active[1]!)).toBe('Queued')
       expect(progressLine({ ...progress.active[1]!, attempt: 2 })).toBe('Queued · retry, attempt 2')
       expect(progressLine({ ...progress.active[0]!, elapsedMs: 125 * 60000 })).toBe('Extracting source 2 · 40% · 2h 5m')
+    })
+
+    // DAR-UI-096: a run's steps (DAR-BE-173 get#AuditProgress), each its own row, in run order.
+    it('turns a run\'s steps into rows: reads named by system with live counts, the rest by stage', () => {
+      const run = { ...progress.active[0]!, steps: [
+        { stage: 'EXTRACT_FILE1', status: 'done', system: 'HotWax', records: 12400, startedDate: '2026-11-01T06:00:00Z', completedDate: '2026-11-01T06:02:05Z' },
+        { stage: 'EXTRACT_FILE2', status: 'running', system: 'NetSuite', records: 3100, startedDate: '2026-11-01T06:00:00Z' },
+        { stage: 'RECHECK', status: 'running', records: null, startedDate: '2026-11-01T06:02:05Z' },
+        { stage: 'COMPARE', status: 'failed', records: 0, startedDate: '2026-11-01T06:03:00Z' },
+      ] }
+      expect(progressSteps(run).map((r) => [r.label, r.status, r.detail])).toEqual([
+        ['Read HotWax', 'done', '12,400 · 2m 05s'],
+        ['Reading NetSuite', 'running', '3,100'],
+        ['Re-checking older findings', 'running', ''],
+        ['Comparing records', 'failed', 'Failed'],
+      ])
+      // Both reads at once, as they run in parallel.
+      const both = { ...run, steps: [{ stage: 'EXTRACT_FILE1', status: 'running', system: 'HotWax', records: 10 },
+        { stage: 'EXTRACT_FILE2', status: 'running', system: 'NetSuite', records: 20 }] }
+      expect(progressSteps(both).map((r) => r.label)).toEqual(['Reading HotWax', 'Reading NetSuite'])
+      // A read without a system says what the stage says; no steps is today's single line.
+      expect(progressSteps({ ...run, steps: [{ stage: 'EXTRACT_FILE1', status: 'running', records: 5 }] })[0]!.label).toBe('Extracting source 1')
+      expect(progressSteps({ ...run, steps: null })).toEqual([])
+      expect(progressSteps({ ...run, steps: [] })).toEqual([])
+    })
+
+    it('says how long a run has been going, with its usual only when one is known', () => {
+      expect(elapsedLine({ ...progress.active[0]!, usualDurationMs: 10 * 60000 })).toBe('4m, usually 10m')
+      expect(elapsedLine({ ...progress.active[0]!, usualDurationMs: null })).toBe('4m')
+      expect(elapsedLine({ ...progress.active[0]!, elapsedMs: null })).toBe('')
     })
   })
 

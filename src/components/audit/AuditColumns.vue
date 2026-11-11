@@ -77,17 +77,44 @@
             <h2 class="micro-label">Running now</h2>
             <p class="audit-lead" data-testid="audit-running-lead">{{ progress.activeChecks }} of {{ progress.checks }} checks</p>
             <p class="section-note">Findings arrive as each check finishes.</p>
+            <!-- DAR-UI-096. Each run on the design-system card: its steps in run order, a bar only with a percent, its
+                 time against its usual only with one. A run that sends no steps keeps its one line. -->
             <article
               v-for="run in progress.active"
               :key="run.run"
-              class="audit-check"
+              class="card audit-run-card"
               :data-testid="`audit-running-${run.checks[0]}`"
             >
               <div class="audit-detail-head">
                 <h3 class="audit-body">{{ run.run }}</h3>
                 <StatusBadge :label="runBadge(run).label" :tone="runBadge(run).tone" />
               </div>
-              <span v-if="progressLine(run) !== runBadge(run).label" class="audit-row-sub">{{ progressLine(run) }}</span>
+              <template v-if="progressSteps(run).length">
+                <div
+                  v-if="run.progressPercent != null"
+                  class="audit-run-bar"
+                  role="progressbar"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  :aria-valuenow="barPercent(run)"
+                  :aria-label="`${run.run} progress`"
+                  data-testid="audit-run-bar"
+                ><span class="audit-run-bar-fill" :style="{ width: `${barPercent(run)}%` }"></span></div>
+                <ol class="audit-run-steps">
+                  <li
+                    v-for="step in progressSteps(run)"
+                    :key="step.key"
+                    class="audit-run-step"
+                    :class="`audit-run-step--${step.status}`"
+                    :data-testid="`audit-run-step-${step.key}`"
+                  >
+                    <span>{{ step.label }}</span>
+                    <span class="audit-run-step-detail">{{ step.detail }}</span>
+                  </li>
+                </ol>
+                <span v-if="elapsedLine(run)" class="audit-row-sub" data-testid="audit-run-elapsed">{{ elapsedLine(run) }}</span>
+              </template>
+              <span v-else-if="progressLine(run) !== runBadge(run).label" class="audit-row-sub">{{ progressLine(run) }}</span>
               <p v-if="run.healthReason" class="section-note">{{ run.healthReason }}</p>
               <span v-for="label in runCheckLabels(run)" :key="label" class="audit-row-sub">{{ label }}</span>
             </article>
@@ -482,6 +509,8 @@ import {
   otherLineWhy,
   otherOrderLines,
   progressLine,
+  progressSteps,
+  elapsedLine,
   sourceItems,
   statementFindings,
   findingRows,
@@ -566,6 +595,10 @@ const labelByCheck = computed(() => new Map(checkRows.value.flatMap((group) => g
   .flatMap((row) => row.checks.map((check) => [check.id, check.label || check.id] as const))))
 function runCheckLabels(run: AuditProgressRun): string[] {
   return [...new Set(run.checks.map((code) => labelByCheck.value.get(code) ?? code))]
+}
+/** DAR-UI-096. The bar's fill, held to 0..100. */
+function barPercent(run: AuditProgressRun): number {
+  return Math.min(100, Math.max(0, Number(run.progressPercent) || 0))
 }
 function runBadge(run: AuditProgressRun): { label: string; tone: 'neutral' | 'warning' | 'danger' } {
   if (run.state === 'queued') return { label: 'Queued', tone: 'neutral' }
@@ -1384,6 +1417,51 @@ function statementText(id: string): string {
   gap: var(--space-1-5);
   padding-top: var(--space-2);
   border-top: 1px solid var(--border-soft);
+}
+
+/* DAR-UI-096. A running run on the design-system card (.card gives the padding, border and radius). */
+.audit-run-card {
+  display: grid;
+  gap: var(--space-1-5);
+  margin-top: var(--space-2);
+}
+
+.audit-run-bar {
+  height: 0.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.audit-run-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.audit-run-steps {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-run-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  font-size: var(--type-meta-size);
+  color: var(--text-soft);
+}
+
+.audit-run-step-detail {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-run-step--failed .audit-run-step-detail {
+  color: var(--danger);
 }
 
 .audit-bars {

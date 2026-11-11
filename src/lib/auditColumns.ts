@@ -12,7 +12,7 @@ import type {
   AuditStatementCheck,
 } from './api/auditTypes'
 import { splitHeadline, systemLabel } from './auditReport'
-import { reconciliationStageLabel } from './reconciliationDisplay'
+import { formatRunStepDuration, reconciliationStageLabel } from './reconciliationDisplay'
 
 // DAR-UI-065. The audit page as drill-down columns: what each column lists and what is picked when the URL does not
 // say. Pure, so the page and its component carry no rules of their own.
@@ -246,6 +246,41 @@ export function progressLine(run: AuditProgressRun): string {
     run.usualDurationMs ? `${minutesText(run.elapsedMs)}, usually ${minutesText(run.usualDurationMs)}` : minutesText(run.elapsedMs)
   return [reconciliationStageLabel(run.stage) || 'Starting', run.progressPercent == null ? '' : `${run.progressPercent}%`, elapsed]
     .filter(Boolean).join(' · ')
+}
+
+/** DAR-UI-096. One step of a running run as the Running now card lists it. */
+export interface ProgressStepRow {
+  key: string
+  label: string
+  /** running, done or failed (any other backend status as it came). */
+  status: string
+  /** A live count while running; count and time when done; "Failed". */
+  detail: string
+}
+
+const STEP_COUNT = new Intl.NumberFormat('en-US')
+
+/**
+ * DAR-UI-096. A run's steps (DAR-BE-173), in the order the run took them: a read named by its system ("Reading NetSuite",
+ * "Read HotWax" once done), any other step by its stage. Empty when the run sends no steps, so the card keeps its one line.
+ */
+export function progressSteps(run: AuditProgressRun): ProgressStepRow[] {
+  return (run.steps ?? []).map((step, i) => {
+    const read = step.stage === 'EXTRACT_FILE1' || step.stage === 'EXTRACT_FILE2'
+    const status = (step.status ?? '').toLowerCase()
+    const label = read && step.system ? `${status === 'running' ? 'Reading' : 'Read'} ${step.system}` : reconciliationStageLabel(step.stage) || step.stage
+    const count = step.records == null ? '' : STEP_COUNT.format(step.records)
+    const detail = status === 'failed' ? 'Failed'
+      : status === 'done' ? [count, formatRunStepDuration(step.startedDate, step.completedDate)].filter(Boolean).join(' · ')
+        : count
+    return { key: `${step.stage}-${i}`, label, status, detail }
+  })
+}
+
+/** DAR-UI-096. How long the run has been going, against its usual only when one is known; empty without a time. */
+export function elapsedLine(run: AuditProgressRun): string {
+  if (run.elapsedMs == null) return ''
+  return run.usualDurationMs ? `${minutesText(run.elapsedMs)}, usually ${minutesText(run.usualDurationMs)}` : minutesText(run.elapsedMs)
 }
 
 /** Health opens on what needs a look: a play in progress, else a read that is not complete, else the checks. */

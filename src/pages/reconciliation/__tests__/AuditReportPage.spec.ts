@@ -306,6 +306,41 @@ describe('AuditReportPage', () => {
     }
   })
 
+  // DAR-UI-096: Running now lists a run's steps in run order on the card, both reads at once while they run in parallel.
+  it('lists a running run\'s steps with their counts, a bar only with a percent, and its usual only with one', async () => {
+    const running = {
+      run: 'Invoices vs Shopify', checks: ['invoices-without-etail-id'], state: 'running', attempt: 1, stage: 'EXTRACT_FILE2',
+      progressPercent: null, elapsedMs: 3 * 60000, usualDurationMs: null, health: 'healthy',
+      steps: [
+        { stage: 'RESOLVE', status: 'done', records: null, startedDate: '2026-11-01T06:00:00Z', completedDate: '2026-11-01T06:00:01Z' },
+        { stage: 'EXTRACT_FILE1', status: 'running', system: 'NetSuite', records: 4200 },
+        { stage: 'EXTRACT_FILE2', status: 'running', system: 'Shopify', records: 1350 },
+      ],
+    }
+    f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 1, active: [running] } } as never)
+    liveRoute.query = { category: 'health' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+
+    const card = w.get('[data-testid="audit-running-invoices-without-etail-id"]')
+    expect(card.classes()).toContain('card')
+    expect(card.findAll('.audit-run-step').map((r) => r.findAll('span').map((x) => x.text()))).toEqual([
+      ['Preparing run', '1s'], ['Reading NetSuite', '4,200'], ['Reading Shopify', '1,350']])
+    expect(card.find('[data-testid="audit-run-bar"]').exists()).toBe(false)
+    expect(card.get('[data-testid="audit-run-elapsed"]').text()).toBe('3m')
+    expect(card.text()).not.toContain('usually')
+
+    f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 1,
+      active: [{ ...running, progressPercent: 40, usualDurationMs: 10 * 60000 }] } } as never)
+    const again = mount(AuditReportPage)
+    await flushPromises()
+    const withBar = again.get('[data-testid="audit-running-invoices-without-etail-id"]')
+    expect(withBar.get('[data-testid="audit-run-bar"]').attributes('aria-valuenow')).toBe('40')
+    expect(withBar.get('[data-testid="audit-run-elapsed"]').text()).toBe('3m, usually 10m')
+    w.unmount()
+    again.unmount()
+  })
+
   // DAR-UI-086 (Aditi: "do the followups"): a check that did not run this morning runs again from what it already read.
   it('offers "Retry from last read" on today\'s check that did not run, submits it for that morning, and watches it', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
