@@ -97,30 +97,63 @@ describe('useAutomationSourceDraft', () => {
     expect(source.shouldSkipApiSourceStep('FILE_1')).toBe(true)
   })
 
-  // DAR-UI-106: a side on an endpoint no client table names (a returns endpoint) finds the connections kept under its
-  // system, by the parent the server sends; an exact endpoint match and another system's connections behave as before.
-  it('offers a side the connections of its endpoint\'s system, by the server\'s parent', () => {
-    const { usesApi, systemOptions, remotes, source } = createHarness()
-    usesApi.value = true
-    systemOptions.value = [{ enumId: 'OMS_RETURNS_GQL', systemParentEnumId: 'OMS', fileSide: 'FILE_1' }]
-    remotes.value = [
-      { systemMessageRemoteId: 'R-OMS', systemEnumId: 'OMS', label: 'HotWax prod', safeMetadataJson: '{}' },
-      { systemMessageRemoteId: 'R-EP', systemEnumId: 'OMS_RETURNS_GQL', label: 'HotWax returns', safeMetadataJson: '{}' },
-      { systemMessageRemoteId: 'R-SHOP', systemEnumId: 'SHOPIFY', label: 'Shopify', safeMetadataJson: '{}' },
-    ] as AutomationSystemRemoteOption[]
-    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['HotWax prod', 'HotWax returns'])
+  // DAR-UI-106: the server sends one remote row per (connection x endpoint), each carrying its endpoint as systemEnumId,
+  // and sibling endpoints of one connection share remoteId and optionKey (so the same select value). A side takes the
+  // rows of its own endpoint only; a sibling's row would store the sibling's extract.
+  const ORDERS_META = '{"extractServiceName":"orders"}'
+  const RETURNS_META = '{"extractServiceName":"returns"}'
+  const omsRemote = (systemEnumId: string, label: string, safeMetadataJson: string) =>
+    ({ systemMessageRemoteId: 'HOTWAX_ORDERS_API', optionKey: 'KREWE', sourceConfigId: 'KREWE', systemEnumId, label, safeMetadataJson }) as AutomationSystemRemoteOption
+
+  function siblingEndpointsHarness(systemOptions: SavedRunSystemOption[] | undefined) {
+    const harness = createHarness()
+    harness.usesApi.value = true
+    harness.systemOptions.value = systemOptions
+    harness.remotes.value = [
+      omsRemote('OMS', 'HotWax', '{"extractServiceName":"rest"}'),
+      omsRemote('OMS_GQL', 'Orders and payments', ORDERS_META),
+      omsRemote('OMS_RETURNS_GQL', 'Returns', RETURNS_META),
+    ]
+    return harness
+  }
+  const omsSides: SavedRunSystemOption[] = [
+    { enumId: 'OMS_GQL', systemParentEnumId: 'OMS', fileSide: 'FILE_1', sourceTypeEnumId: 'AUT_SRC_API', systemMessageRemoteId: 'HOTWAX_ORDERS_API', sourceConfigId: 'KREWE' },
+    { enumId: 'OMS_RETURNS_GQL', systemParentEnumId: 'OMS', fileSide: 'FILE_2', sourceTypeEnumId: 'AUT_SRC_API', systemMessageRemoteId: 'HOTWAX_ORDERS_API', sourceConfigId: 'KREWE' },
+  ]
+
+  it('offers a side only its own endpoint\'s rows, not a sibling\'s or the system\'s', () => {
+    const { source } = siblingEndpointsHarness(omsSides)
+    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['Orders and payments'])
+    expect(source.apiSourceOptionsForSide('FILE_2').map((o) => o.label)).toEqual(['Returns'])
   })
 
-  // Review focus 4: a side the server has sent no parent for (options not loaded) offers only exact matches.
-  it('offers only the side\'s own endpoint connections when the server names no parent', () => {
-    const { usesApi, systemOptions, remotes, source } = createHarness()
+  it('keeps the returns extract on the returns side of an orders-vs-returns run', () => {
+    const { source } = siblingEndpointsHarness(omsSides)
+    source.inferApiSourcesFromSavedRun()
+    expect(source.sourceDrafts.value.FILE_1.safeMetadataJson).toBe(ORDERS_META)
+    expect(source.sourceDrafts.value.FILE_2.safeMetadataJson).toBe(RETURNS_META)
+
+    source.updateApiSource('FILE_2', source.selectedApiSourceValue('FILE_2'))
+    expect(source.sourceDrafts.value.FILE_2.safeMetadataJson).toBe(RETURNS_META)
+  })
+
+  // Review focus 4: options not loaded yet, matching is exact and nothing throws.
+  it('matches exactly while the run\'s system options have not loaded', () => {
+    const { source } = siblingEndpointsHarness(undefined)
+    expect(source.apiSourceOptionsForSide('FILE_1')).toEqual([])
+  })
+
+  // NetSuite configs are kept under the system itself (NETSUITE), and each has its own value, so a side on a
+  // NetSuite endpoint (SuiteQL) finds them by the server's parent.
+  it('offers a NetSuite endpoint side the configs kept under NetSuite', () => {
+    const { usesApi, systemOptions, nsConfigs, source } = createHarness()
     usesApi.value = true
-    systemOptions.value = [{ enumId: 'OMS_RETURNS_GQL', fileSide: 'FILE_1' }]
-    remotes.value = [
-      { systemMessageRemoteId: 'R-OMS', systemEnumId: 'OMS', label: 'HotWax prod', safeMetadataJson: '{}' },
-      { systemMessageRemoteId: 'R-EP', systemEnumId: 'OMS_RETURNS_GQL', label: 'HotWax returns', safeMetadataJson: '{}' },
-    ] as AutomationSystemRemoteOption[]
-    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['HotWax returns'])
+    systemOptions.value = [{ enumId: 'NETSUITE_SUITEQL', systemParentEnumId: 'NETSUITE', fileSide: 'FILE_1' }]
+    nsConfigs.value = [
+      { nsRestletConfigId: 'cfg-ns', systemEnumId: 'NETSUITE', label: 'NetSuite prod' },
+      { nsRestletConfigId: 'cfg-other', systemEnumId: 'SHOPIFY', label: 'Not NetSuite' },
+    ] as AutomationNsRestletOption[]
+    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['NetSuite prod'])
   })
 
   it('keeps legacy system ids matching their system', () => {

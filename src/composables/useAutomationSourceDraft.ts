@@ -11,7 +11,7 @@ import {
   type ReconciliationAutomationFileSide,
   type ReconciliationAutomationSourceDraft,
 } from '../lib/reconciliationAutomationDraft'
-import { darpanSystemsInOneFamily } from '../lib/utils/darpanSystems'
+import { darpanSystemIdsMatch, darpanSystemsInOneFamily } from '../lib/utils/darpanSystems'
 
 export interface ApiSourceSelectOption {
   value: string
@@ -90,14 +90,20 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     return sideOption?.label || sideOption?.description || sideOption?.enumCode || sideOption?.enumId || systemEnumIdForSide(side) || 'source'
   }
 
-  // DAR-UI-106: a connection serves the side when it is kept under the side's system, as the server's rows say.
-  function optionMatchesSystem(optionSystemEnumId: string | undefined, side: ReconciliationAutomationFileSide): boolean {
-    return darpanSystemsInOneFamily(optionSystemEnumId, systemEnumIdForSide(side), deps.selectedSavedRunSystemOptions.value ?? [])
+  // DAR-UI-106: NetSuite configs are kept under the system (NETSUITE), so a side on one of its endpoints (SuiteQL) finds
+  // them by the server's parent. Remote rows are one per (connection x endpoint) and siblings share a select value, so a
+  // side takes only its own endpoint's rows (systemRemoteMatchesSide); a sibling's row would store the sibling's extract.
+  function nsConfigMatchesSide(configSystemEnumId: string | undefined, side: ReconciliationAutomationFileSide): boolean {
+    return darpanSystemsInOneFamily(configSystemEnumId, systemEnumIdForSide(side), deps.selectedSavedRunSystemOptions.value ?? [])
+  }
+
+  function systemRemoteMatchesSide(remoteSystemEnumId: string | undefined, side: ReconciliationAutomationFileSide): boolean {
+    return darpanSystemIdsMatch(remoteSystemEnumId, systemEnumIdForSide(side))
   }
 
   function apiSourceOptionsForSide(side: ReconciliationAutomationFileSide): ApiSourceSelectOption[] {
     const nsOptions: ApiSourceSelectOption[] = deps.nsRestletConfigs.value
-      .filter((config) => optionMatchesSystem(config.systemEnumId, side))
+      .filter((config) => nsConfigMatchesSide(config.systemEnumId, side))
       .map((config) => ({
         value: `ns:${config.nsRestletConfigId}`,
         sourceKind: 'ns',
@@ -107,7 +113,7 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
         label: config.label || config.description || config.nsRestletConfigId,
       }))
     const remoteOptions: ApiSourceSelectOption[] = deps.systemRemotes.value
-      .filter((remote) => optionMatchesSystem(remote.systemEnumId, side))
+      .filter((remote) => systemRemoteMatchesSide(remote.systemEnumId, side))
       .filter((remote) => Boolean(remote.safeMetadataJson))
       .map((remote) => ({
         value: remote.optionKey
