@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   canonicalDarpanSystemEnumId,
@@ -19,6 +21,25 @@ describe('darpanSystems', () => {
     expect(canonicalDarpanSystemEnumId('DarSysOms')).toBe('OMS')
     expect(canonicalDarpanSystemEnumId('DarSysNetSuite')).toBe('NETSUITE')
     expect(canonicalDarpanSystemEnumId('DarSysSapi')).toBe('SAPI')
+  })
+
+  // DAR-UI-106: no hand-kept id table; the legacy list, the top-level ids and the system labels answer instead.
+  it('reads a system id in any case or spacing, and the HotWax name, without an alias table', () => {
+    expect(canonicalDarpanSystemEnumId('shopify')).toBe('SHOPIFY')
+    expect(canonicalDarpanSystemEnumId('Net Suite')).toBe('NETSUITE')
+    expect(canonicalDarpanSystemEnumId('HOTWAX')).toBe('OMS')
+    expect(canonicalDarpanSystemEnumId('HotWax')).toBe('OMS')
+  })
+
+  it('passes endpoint and unknown ids through as they are', () => {
+    expect(canonicalDarpanSystemEnumId('OMS_RETURNS_GQL')).toBe('OMS_RETURNS_GQL')
+    expect(canonicalDarpanSystemEnumId(' ACME_FEED ')).toBe('ACME_FEED')
+    expect(canonicalDarpanSystemEnumId(null)).toBe('')
+  })
+
+  it('keeps no hand-kept system id table', () => {
+    const source = readFileSync(resolve(__dirname, '../utils/darpanSystems.ts'), 'utf-8')
+    expect(source).not.toContain('CANONICAL_SYSTEM_IDS')
   })
 
   it('matches legacy and canonical system IDs', () => {
@@ -150,6 +171,7 @@ describe('system names for result count labels', () => {
     expect(darpanSystemNameFromLabel('SHOPIFY')).toBe('Shopify')
     expect(darpanSystemNameFromLabel('OMS')).toBe('HotWax')
     expect(darpanSystemNameFromLabel('HotWax')).toBe('HotWax')
+    expect(darpanSystemNameFromLabel('HOTWAX')).toBe('HotWax')
   })
 
   it('leaves labels it cannot place untouched', () => {

@@ -31,17 +31,18 @@ export interface DarpanSystemValueOption {
   extractable?: boolean
 }
 
-const CANONICAL_SYSTEM_IDS: Record<string, string> = {
+// DAR-UI-106. The ids older rows still carry, before the systems took their own enum ids. Everything else a system
+// id can be is answered by the top-level ids, the system labels below, or the server's own rows.
+const LEGACY_SYSTEM_IDS: Readonly<Record<string, string>> = {
   DARSYSOMS: 'OMS',
-  HOTWAX: 'OMS',
-  OMS: 'OMS',
   DARSYSSHOPIFY: 'SHOPIFY',
-  SHOPIFY: 'SHOPIFY',
   DARSYSNETSUITE: 'NETSUITE',
-  NETSUITE: 'NETSUITE',
   DARSYSSAPI: 'SAPI',
-  SAPI: 'SAPI',
 }
+
+// The top-level systems only. Endpoint ids (OMS_GQL) are deliberately excluded: an endpoint is what the label
+// collapse further down reads FROM, never an answer it may return.
+const TOP_LEVEL_SYSTEM_ENUM_IDS = ['OMS', 'SHOPIFY', 'NETSUITE', 'SAPI']
 
 const CANONICAL_SYSTEM_LABELS: Record<string, string> = {
   OMS: 'HotWax',
@@ -50,12 +51,21 @@ const CANONICAL_SYSTEM_LABELS: Record<string, string> = {
   SAPI: 'SAPI',
 }
 
+function systemKey(value: string): string {
+  return value.replace(/[\s_-]/g, '').toUpperCase()
+}
+
+// A system id in any case or spacing, a legacy id, or a system's name (HotWax) reads as its top-level id; an
+// endpoint or unknown id passes through as it is (its system comes from the server's rows: darpanSystemFamily).
 export function canonicalDarpanSystemEnumId(systemEnumId: string | null | undefined): string {
   const trimmed = systemEnumId?.trim() ?? ''
   if (!trimmed) return ''
 
-  const lookupKey = trimmed.replace(/[\s_-]/g, '').toUpperCase()
-  return CANONICAL_SYSTEM_IDS[lookupKey] ?? trimmed
+  const lookupKey = systemKey(trimmed)
+  return LEGACY_SYSTEM_IDS[lookupKey]
+    ?? TOP_LEVEL_SYSTEM_ENUM_IDS.find((enumId) => enumId === lookupKey)
+    ?? Object.keys(CANONICAL_SYSTEM_LABELS).find((enumId) => systemKey(CANONICAL_SYSTEM_LABELS[enumId]!) === lookupKey)
+    ?? trimmed
 }
 
 export function darpanSystemDisplayLabel(systemEnumId: string | null | undefined, fallback?: string | null): string {
@@ -225,9 +235,6 @@ export function resolveDarpanSystemParentEnumId<T extends DarpanSystemValueOptio
   return parentEnumId || trimmedSystemEnumId
 }
 
-// The top-level systems only. Endpoint ids (OMS_GQL) are deliberately excluded: an
-// endpoint is what the collapse below reads FROM, never an answer it may return.
-const TOP_LEVEL_SYSTEM_ENUM_IDS = ['OMS', 'SHOPIFY', 'NETSUITE', 'SAPI']
 
 const TOP_LEVEL_SYSTEM_NAMES = TOP_LEVEL_SYSTEM_ENUM_IDS
   .map((enumId) => CANONICAL_SYSTEM_LABELS[enumId])
