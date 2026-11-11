@@ -82,18 +82,6 @@ export function darpanSystemIdsMatch(left: string | null | undefined, right: str
   return Boolean(canonicalLeft && canonicalRight && canonicalLeft === canonicalRight)
 }
 
-/**
- * DAR-UI-106. Whether a connection kept under ownerSystemEnumId serves an endpoint: the endpoint itself, or the system the
- * server says it belongs to (systemParentEnumId), so an endpoint no client table names (a returns endpoint) still finds
- * the connections of its system. Two endpoints of one system are still told apart by darpanSystemIdsMatch.
- */
-export function darpanSystemOwnsEndpoint(
-  ownerSystemEnumId: string | null | undefined,
-  endpoint: { enumId?: string | null; systemParentEnumId?: string | null },
-): boolean {
-  return darpanSystemIdsMatch(ownerSystemEnumId, endpoint.enumId) || darpanSystemIdsMatch(ownerSystemEnumId, endpoint.systemParentEnumId)
-}
-
 export function deduplicateDarpanSystemOptions<T extends DarpanSystemOptionInput>(options: T[]): Array<T & { enumId: string }> {
   const preferredBySystemId = new Map<string, PreferredSystemOption<T>>()
 
@@ -219,22 +207,42 @@ export function excludeApiOnlyEndpointOptions<T extends { value: string }>(optio
   return options.filter((option) => !darpanSystemIsApiOnlyEndpoint(option.value))
 }
 
-// Editing an existing automation/run only has the concrete stored systemEnumId (e.g. OMS_RETURNS_GQL).
-// Resolve which Step 1 answer that belongs to so the wizard can pre-select the right parent.
-// Top-level systems (and anything unrecognized) resolve to themselves — step 2 is then skipped,
-// matching today's behaviour for systems with no endpoints.
-export function resolveDarpanSystemParentEnumId<T extends DarpanSystemValueOption>(
-  systemEnumId: string | null | undefined,
-  allOptions: T[],
-): string {
-  const trimmedSystemEnumId = systemEnumId?.trim() ?? ''
-  if (!trimmedSystemEnumId) return ''
-
-  const match = allOptions.find((option) => darpanSystemIdsMatch(option.value, trimmedSystemEnumId))
-  const parentEnumId = match?.parentEnumId?.trim()
-  return parentEnumId || trimmedSystemEnumId
+// DAR-UI-106. A system row as the server sends it, in either shape: keyed by value (an already-mapped option) or by
+// enumId (a raw row), its system as parentEnumId (list#AutomationSourceOptions) or systemParentEnumId (saved runs).
+export interface DarpanSystemFamilyOption {
+  value?: string
+  enumId?: string
+  parentEnumId?: string
+  systemParentEnumId?: string
 }
 
+/**
+ * DAR-UI-106. The system a stored systemEnumId belongs to, as the server's rows say: an endpoint (OMS_RETURNS_GQL) reads
+ * as its parent (OMS), a system or legacy id as itself (canonical), and an id no row names, or any id while the rows have
+ * not loaded, as itself. Editing an existing run pre-selects its first card from this.
+ */
+export function darpanSystemFamily(systemEnumId: string | null | undefined, options: DarpanSystemFamilyOption[]): string {
+  const trimmed = systemEnumId?.trim() ?? ''
+  if (!trimmed) return ''
+  const row = options.find((option) => darpanSystemIdsMatch(option.value ?? option.enumId, trimmed))
+  const parent = (row?.parentEnumId ?? row?.systemParentEnumId)?.trim()
+  return canonicalDarpanSystemEnumId(parent || trimmed)
+}
+
+/**
+ * DAR-UI-106. Whether two ids belong to one system: a connection kept under OMS serves OMS_RETURNS_GQL, and OMS_GQL and
+ * OMS_RETURNS_GQL are siblings. Where two endpoints must stay apart (schemas, the endpoint picker, "the same source
+ * twice"), compare with darpanSystemIdsMatch instead.
+ */
+export function darpanSystemsInOneFamily(
+  left: string | null | undefined,
+  right: string | null | undefined,
+  options: DarpanSystemFamilyOption[],
+): boolean {
+  const leftFamily = darpanSystemFamily(left, options)
+  const rightFamily = darpanSystemFamily(right, options)
+  return Boolean(leftFamily && rightFamily && leftFamily === rightFamily)
+}
 
 const TOP_LEVEL_SYSTEM_NAMES = TOP_LEVEL_SYSTEM_ENUM_IDS
   .map((enumId) => CANONICAL_SYSTEM_LABELS[enumId])

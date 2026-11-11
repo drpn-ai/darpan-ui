@@ -111,6 +111,18 @@ describe('useAutomationSourceDraft', () => {
     expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['HotWax prod', 'HotWax returns'])
   })
 
+  // Review focus 4: a side the server has sent no parent for (options not loaded) offers only exact matches.
+  it('offers only the side\'s own endpoint connections when the server names no parent', () => {
+    const { usesApi, systemOptions, remotes, source } = createHarness()
+    usesApi.value = true
+    systemOptions.value = [{ enumId: 'OMS_RETURNS_GQL', fileSide: 'FILE_1' }]
+    remotes.value = [
+      { systemMessageRemoteId: 'R-OMS', systemEnumId: 'OMS', label: 'HotWax prod', safeMetadataJson: '{}' },
+      { systemMessageRemoteId: 'R-EP', systemEnumId: 'OMS_RETURNS_GQL', label: 'HotWax returns', safeMetadataJson: '{}' },
+    ] as AutomationSystemRemoteOption[]
+    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['HotWax returns'])
+  })
+
   it('keeps legacy system ids matching their system', () => {
     const { usesApi, systemOptions, nsConfigs, source } = createHarness()
     usesApi.value = true

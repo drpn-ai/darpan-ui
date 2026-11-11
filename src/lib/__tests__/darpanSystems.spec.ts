@@ -12,7 +12,8 @@ import {
   darpanSystemParentOptions,
   deduplicateDarpanSystemOptions,
   excludeApiOnlyEndpointOptions,
-  resolveDarpanSystemParentEnumId,
+  darpanSystemFamily,
+  darpanSystemsInOneFamily,
 } from '../utils/darpanSystems'
 
 describe('darpanSystems', () => {
@@ -141,16 +142,27 @@ describe('darpanSystems', () => {
       .toEqual([{ value: 'NETSUITE', label: 'NetSuite orders' }])
   })
 
-  it('resolves the owning parent for a concrete stored systemEnumId, for edit pre-selection', () => {
-    expect(resolveDarpanSystemParentEnumId('OMS_RETURNS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
-    expect(resolveDarpanSystemParentEnumId('OMS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
-    expect(resolveDarpanSystemParentEnumId('SHOPIFY_RETURN_REFS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('SHOPIFY')
+  it('reads the family of a concrete stored systemEnumId, for edit pre-selection', () => {
+    expect(darpanSystemFamily('OMS_RETURNS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
+    expect(darpanSystemFamily('OMS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
+    expect(darpanSystemFamily('SHOPIFY_RETURN_REFS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('SHOPIFY')
     // Top-level systems (and their own endpoint choice) resolve to themselves.
-    expect(resolveDarpanSystemParentEnumId('OMS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
-    expect(resolveDarpanSystemParentEnumId('SAPI', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('SAPI')
+    expect(darpanSystemFamily('OMS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
+    expect(darpanSystemFamily('SAPI', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('SAPI')
     // Unrecognized/legacy value: resolves to itself so step 2 is skipped rather than crashing.
-    expect(resolveDarpanSystemParentEnumId('UNKNOWN_SYSTEM', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('UNKNOWN_SYSTEM')
-    expect(resolveDarpanSystemParentEnumId('', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('')
+    expect(darpanSystemFamily('UNKNOWN_SYSTEM', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('UNKNOWN_SYSTEM')
+    expect(darpanSystemFamily('', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('')
+  })
+
+  // DAR-UI-106: either option shape the server sends, legacy ids, and nothing loaded yet.
+  it('reads the family from either option shape, and from nothing when options have not loaded', () => {
+    expect(darpanSystemFamily('OMS_RETURNS_GQL', [{ enumId: 'OMS_RETURNS_GQL', systemParentEnumId: 'OMS' }])).toBe('OMS')
+    expect(darpanSystemFamily('DarSysOms', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe('OMS')
+    expect(darpanSystemFamily('OMS_RETURNS_GQL', [])).toBe('OMS_RETURNS_GQL')
+    expect(darpanSystemsInOneFamily('OMS', 'OMS_RETURNS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe(true)
+    expect(darpanSystemsInOneFamily('OMS_GQL', 'OMS_RETURNS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe(true)
+    expect(darpanSystemsInOneFamily('SHOPIFY', 'OMS_RETURNS_GQL', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe(false)
+    expect(darpanSystemsInOneFamily('', 'OMS', SYSTEM_AND_ENDPOINT_OPTIONS)).toBe(false)
   })
 })
 

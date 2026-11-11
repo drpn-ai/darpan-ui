@@ -11,7 +11,7 @@ import {
   type ReconciliationAutomationFileSide,
   type ReconciliationAutomationSourceDraft,
 } from '../lib/reconciliationAutomationDraft'
-import { darpanSystemOwnsEndpoint } from '../lib/utils/darpanSystems'
+import { darpanSystemsInOneFamily } from '../lib/utils/darpanSystems'
 
 export interface ApiSourceSelectOption {
   value: string
@@ -90,12 +90,9 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     return sideOption?.label || sideOption?.description || sideOption?.enumCode || sideOption?.enumId || systemEnumIdForSide(side) || 'source'
   }
 
-  // DAR-UI-106: a connection serves the side's endpoint, or the system the server says that endpoint belongs to.
+  // DAR-UI-106: a connection serves the side when it is kept under the side's system, as the server's rows say.
   function optionMatchesSystem(optionSystemEnumId: string | undefined, side: ReconciliationAutomationFileSide): boolean {
-    return darpanSystemOwnsEndpoint(optionSystemEnumId, {
-      enumId: systemEnumIdForSide(side),
-      systemParentEnumId: systemOptionForSide(side)?.systemParentEnumId,
-    })
+    return darpanSystemsInOneFamily(optionSystemEnumId, systemEnumIdForSide(side), deps.selectedSavedRunSystemOptions.value ?? [])
   }
 
   function apiSourceOptionsForSide(side: ReconciliationAutomationFileSide): ApiSourceSelectOption[] {

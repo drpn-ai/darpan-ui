@@ -193,8 +193,8 @@ import {
   darpanSystemDisplayLabel,
   darpanSystemIdsMatch,
   darpanSystemNamePair,
+  darpanSystemsInOneFamily,
   deduplicateDarpanSystemOptions,
-  resolveDarpanSystemParentEnumId,
   type DarpanSystemValueOption,
 } from '../../lib/utils/darpanSystems'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
@@ -375,10 +375,7 @@ function endpointMatchesSystem(endpointSystemEnumId: string | undefined, selecte
 // DAR-UI-077. Endpoints are grouped under their parent system (OMS_GQL and OMS_RETURNS_GQL under OMS), as in the run
 // builder, so a side can move to a sibling endpoint and not only keep its own.
 function endpointInSystemFamily(endpointSystemEnumId: string | undefined, selectedSystemEnumId: string): boolean {
-  return darpanSystemIdsMatch(
-    resolveDarpanSystemParentEnumId(endpointSystemEnumId, systemOptions.value),
-    resolveDarpanSystemParentEnumId(selectedSystemEnumId, systemOptions.value),
-  )
+  return darpanSystemsInOneFamily(endpointSystemEnumId, selectedSystemEnumId, systemOptions.value)
 }
 
 function sourceConfigMatches(candidate: string | undefined, selected: string): boolean {

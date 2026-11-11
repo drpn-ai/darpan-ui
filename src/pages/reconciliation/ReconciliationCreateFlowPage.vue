@@ -179,12 +179,13 @@ import {
 import {
   canonicalDarpanSystemEnumId,
   darpanSystemEndpointOptions,
+  darpanSystemFamily,
   darpanSystemHasEndpointOptions,
   darpanSystemIdsMatch,
   darpanSystemParentOptions,
-  excludeApiOnlyEndpointOptions,
+  darpanSystemsInOneFamily,
   deduplicateDarpanSystemOptions,
-  resolveDarpanSystemParentEnumId,
+  excludeApiOnlyEndpointOptions,
   type DarpanSystemValueOption,
 } from '../../lib/utils/darpanSystems'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
@@ -1515,10 +1516,7 @@ function apiSourceConfigOptionsForSide(side: SourceSide): WorkflowSelectOption[]
 function sourceConfigBelongsToParentSystem(config: AutomationSourceConfigOption, parentEnumId: string): boolean {
   if (!config.systemEnumId?.trim()) return true
   if (!parentEnumId) return false
-  return darpanSystemIdsMatch(
-    resolveDarpanSystemParentEnumId(config.systemEnumId, allSystemOptions.value),
-    parentEnumId,
-  )
+  return darpanSystemsInOneFamily(config.systemEnumId, parentEnumId, allSystemOptions.value)
 }
 
 function apiSourceOptionsForSide(side: SourceSide): WorkflowSelectOption[] {
@@ -1946,9 +1944,9 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   // A draft published from a card before the endpoint resolved (the config card, on a system with
   // endpoints) has a blank systemEnumId, so the stored first-card answer wins when present.
   file1SystemParentEnumId.value = draftState.draft.file1SystemParentEnumId ||
-    resolveDarpanSystemParentEnumId(file1SystemEnumId.value, allSystemOptions.value)
+    darpanSystemFamily(file1SystemEnumId.value, allSystemOptions.value)
   file2SystemParentEnumId.value = draftState.draft.file2SystemParentEnumId ||
-    resolveDarpanSystemParentEnumId(file2SystemEnumId.value, allSystemOptions.value)
+    darpanSystemFamily(file2SystemEnumId.value, allSystemOptions.value)
   // A draft written before the file branch dropped API-only endpoints can still name one.
   syncFileEndpointSelection('file1')
   syncFileEndpointSelection('file2')
