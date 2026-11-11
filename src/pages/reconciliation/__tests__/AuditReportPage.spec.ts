@@ -968,8 +968,14 @@ describe('AuditReportPage', () => {
       f.verifyAuditFinding.mockResolvedValue({ ok: true, submitted: true } as never)
       const closed = { ...findingDocument, finding: { ...findingDocument.finding,
         status: { ...findingDocument.finding.status, state: 'fixed', lastChecked: '2026-10-24T13:05:00Z', closedAt: '2026-10-24T13:05:00Z' } } }
-      f.getAuditFinding.mockResolvedValueOnce({ ok: true, finding: findingDocument } as never)
-        .mockResolvedValueOnce({ ok: true, finding: closed } as never)
+      // Keyed on the check having started, not on call order: under load the page's own first read can land after
+      // this line, and a once-queue then hands it the "before" document and the first poll the closed one.
+      let pollsSinceCheck = 0
+      f.getAuditFinding.mockImplementation(async () => {
+        if (f.verifyAuditFinding.mock.calls.length === 0) return { ok: true, finding: findingDocument } as never
+        pollsSinceCheck += 1
+        return { ok: true, finding: pollsSinceCheck >= 2 ? closed : findingDocument } as never
+      })
       const reportCalls = f.getAuditReport.mock.calls.length
 
       await w.get('[data-testid="audit-verify-finding"]').trigger('click')
