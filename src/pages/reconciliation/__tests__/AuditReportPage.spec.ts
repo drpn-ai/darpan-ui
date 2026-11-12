@@ -651,6 +651,28 @@ describe('AuditReportPage', () => {
     w.unmount()
   })
 
+  // DAR-BE-250 (Aditi: "earliest step wins"). An order broken at two steps counts at the earliest; the later step's
+  // finding is listed under it, and the later statement says how many of its findings sit under an earlier step.
+  it('lists a later step\'s finding on the same order under the earlier one, and counts it there only', async () => {
+    const doc = report()
+    const r2 = doc.categories.orders!.statements.R2!
+    r2.waiting = 1
+    r2.findings = [{ id: 'M1210830', kind: 'order', order: 'M1210830', headline: 'Order M1210830: line 1 is in HotWax\'s brokering queue',
+      state: 'open', firstFound: '2026-10-02', ageDays: 6, difference: null, next: 'darpan findings show F-1', records: {}, cause: 'In HotWax\'s brokering queue',
+      lines: [{ id: 'F-1', headline: 'Line M1210830/01 is open in NetSuite', state: 'open', firstFound: '2026-10-02', ageDays: 6, difference: null, next: '',
+        cause: 'In HotWax\'s brokering queue', held: false, records: { OMS: { orderItem: [{ id: 'M1210830/01', internalId: null, status: 'Approved' }] } } }],
+      waiting: [{ statement: 'R1', id: 'M1210830', headline: 'Order M1210830: line 2 is completed in HotWax and not billed in NetSuite', cause: 'Held by a backordered line' }] }]
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M1210830' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.findAll('[data-testid="audit-waiting"]').map((row) => row.text())).toEqual([expect.stringMatching(/^R1\s*Held by a backordered line/)])
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    await flushPromises()
+    expect(w.get('[data-testid="audit-statement-counts"]').text()).toBe('2 open · 0 new · 0 fixed today · 1 under an earlier step')
+    w.unmount()
+  })
+
   // DAR-UI-075. An order past the report's 50 (a reload, a link) is found by reading the statement's orders first.
   it('opens an order the report does not list by reading the statement\'s orders', async () => {
     const line = { id: 'F-7', headline: 'Item M77/01 is completed in HotWax and not billed in NetSuite', state: 'open' as const,

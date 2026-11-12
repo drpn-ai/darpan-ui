@@ -125,6 +125,7 @@
         :narrowed="narrowed"
         :cause="findingFilters.cause"
         :order-unit="orderUnit"
+        :waiting="waiting"
         :verifying="verifying"
         :progress="progress"
         :retryable="isTodaysMorning"
@@ -415,6 +416,14 @@ const orderUnit = computed(() => {
   const listed = report.value.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value]?.findings ?? []
   return [...listed, ...more.value.findings, ...(periodFindings.value?.items ?? [])]
     .find((item) => item.kind === 'order' && (item.id === id || Boolean(item.lines?.some((line) => line.id === id)))) ?? null
+})
+// DAR-BE-250. The open finding's row (an order or a lone finding): what later steps report on the same order.
+const waiting = computed(() => {
+  const id = findingId.value
+  if (!id || !report.value) return []
+  const listed = report.value.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value]?.findings ?? []
+  return [...listed, ...more.value.findings, ...(periodFindings.value?.items ?? [])]
+    .find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))?.waiting ?? []
 })
 // A line's finding is F-<n>; anything else names an order, read once the statement's orders are in.
 const isLineId = (id: string) => /^F-\d+$/.test(id)

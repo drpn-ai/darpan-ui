@@ -396,6 +396,18 @@
                   </ul>
                 </template>
 
+                <!-- DAR-BE-250. Earliest step wins: later statements' findings on this order are listed here, not counted there. -->
+                <template v-if="waiting?.length">
+                  <h3 class="micro-label">Also on this order <span class="audit-fold-count">{{ waiting.length }}</span></h3>
+                  <ul class="audit-lines">
+                    <li v-for="item in waiting" :key="`${item.statement}-${item.id}`" class="audit-line audit-line--other" data-testid="audit-waiting">
+                      <span>{{ item.statement }}</span>
+                      <span class="audit-row-sub">{{ item.cause || item.headline }}</span>
+                      <span class="audit-row-sub"></span>
+                    </li>
+                  </ul>
+                </template>
+
                 <!-- DAR-UI-071. A finding its cause explains needs no evidence: the fix and the records already say it. -->
                 <details v-if="findingDoc.finding.evidence.checks.length && !findingDoc.finding.diagnosis.conclusion" class="audit-fold" :open="evidenceFailed">
                   <summary class="micro-label">Evidence <span class="audit-fold-count">{{ evidenceLine }}</span></summary>
@@ -474,7 +486,7 @@
                 </dl>
               </article>
               <p class="audit-row-sub" data-testid="audit-statement-counts">
-                {{ statementDoc.counts.open }} open · {{ statementDoc.counts.newToday }} new · {{ statementDoc.counts.fixedToday }} fixed today
+                {{ statementDoc.counts.open }} open · {{ statementDoc.counts.newToday }} new · {{ statementDoc.counts.fixedToday }} fixed today<template v-if="statementDoc.waiting"> · {{ statementDoc.waiting }} under an earlier step</template>
               </p>
             </template>
 
@@ -499,6 +511,7 @@ import type {
   AuditProgress,
   AuditProgressRun,
   AuditReport,
+  AuditWaitingFinding,
 } from '../../lib/api/auditTypes'
 import {
   checkStatusBadge,
@@ -569,6 +582,8 @@ const props = defineProps<{
   cause?: string
   /** DAR-UI-075. The order open in the detail; findingDoc is then its stuck line's (its fix and history). */
   orderUnit?: AuditFindingSummary | null
+  /** DAR-BE-250. Later steps' findings on the open finding's order (earliest step wins). */
+  waiting?: AuditWaitingFinding[]
   verifying: boolean
   /** DAR-UI-085. What the checks are doing right now; null when nothing was read yet. */
   progress?: AuditProgress | null

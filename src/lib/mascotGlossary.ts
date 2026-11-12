@@ -393,6 +393,10 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Lines',
     body: 'this order’s lines; the outlined one is what holds the order up. Start there — the others are shown for context.',
   },
+  auditAlsoOnThisOrder: {
+    title: 'Also on this order',
+    body: 'later statements that also flag this order. They wait on this one, so they count here once, not again there. Fix this first and they often clear with it.',
+  },
   auditEvidence: {
     title: 'Evidence',
     body: 'the tests run on this one record, passed out of total. The failed ones are why it is a finding; they show only when no cause explains it.',

@@ -107,6 +107,17 @@ export interface AuditFindingSummary {
   /** DAR-UI-099. Every line of the order, in line order: those with a finding (finding, cause, state) and those without, as
    *  the run read them; then lines only another system has with no line of its own (NetSuite's store-credit payment). */
   orderLines?: AuditOrderLine[]
+  /** DAR-BE-250. Earliest step wins: the later steps' findings on the same order, listed here and not counted there.
+   *  Absent when nothing waits. */
+  waiting?: AuditWaitingFinding[]
+}
+
+/** DAR-BE-250. A finding on an order an earlier step already reports: its statement, id, headline and cause. */
+export interface AuditWaitingFinding {
+  statement: string
+  id: string
+  headline: string
+  cause: string | null
 }
 
 /** DAR-UI-099. One line of an order finding's order. */
@@ -147,6 +158,10 @@ export interface AuditStatement {
   counts: AuditFindingCounts
   findings: AuditFindingSummary[]
   findingsOmitted: number
+  /** DAR-BE-250. The statement's place in the order's story (sequenceNum); absent on reports before it. */
+  step?: number | null
+  /** DAR-BE-250. Its findings on orders an earlier step already reports: listed under that finding, not counted here. */
+  waiting?: number
 }
 
 export interface AuditCategory {
