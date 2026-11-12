@@ -959,16 +959,81 @@ describe('AuditReportPage', () => {
   })
 
   // DAR-BE-123. Resolve re-checks the finding in the background and reads it again until its last check moves.
-  // DAR-UI-104: the agent panel is told the audit by code and the finding the page has open.
-  it('gives the agent panel this audit and the open finding, and shows it when the agent is on', async () => {
-    vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: true })
+  // DAR-UI-104/108: the agent is a tab on the board's deepest column, told the audit by code and the finding open.
+  it('has no Agent tab unless the agent is on for the person and their grant is live', async () => {
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    for (const status of [
+      { state: 'AGENT_OFF', grantState: 'LIVE', canApprove: true },
+      { state: 'AGENT_UNAVAILABLE', grantState: 'LIVE', canApprove: true },
+      { state: 'ON', grantState: 'NOT_GRANTED', canApprove: true },
+      { state: 'ON', grantState: 'EXPIRED', canApprove: true },
+    ] as const) {
+      vi.mocked(agentFacade.getAgentStatus).mockResolvedValueOnce(status)
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.find('[data-testid="audit-tab-agent"]').exists(), JSON.stringify(status)).toBe(false)
+      expect(w.findComponent(AuditAgentPanel).exists()).toBe(false)
+      expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
+    }
+    vi.mocked(agentFacade.getAgentStatus).mockRejectedValueOnce(new Error('denied'))
+    const failed = mount(AuditReportPage)
+    await flushPromises()
+    expect(failed.find('[data-testid="audit-tab-agent"]').exists()).toBe(false)
+  })
+
+  it('puts the agent in a tab beside the finding, kept in the URL, with this audit, the open finding and the right to approve', async () => {
+    vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: false })
     liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
     const w = mount(AuditReportPage)
     await flushPromises()
 
+    expect(w.get('[data-testid="audit-tab-detail"]').text()).toBe('Finding')
+    expect(w.get('[data-testid="audit-tab-detail"]').attributes('aria-selected')).toBe('true')
+    expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
     const panel = w.getComponent(AuditAgentPanel)
-    expect(panel.props()).toMatchObject({ auditCode: 'month-close', findingId: 'F-1', tenantId: report().report.tenant.id })
-    expect(w.find('[data-testid="agent-panel"]').exists()).toBe(true)
+    expect(panel.props()).toMatchObject({ auditCode: 'month-close', findingId: 'F-1', tenantId: report().report.tenant.id,
+      auditName: report().report.audit.name, canApprove: false })
+    expect(w.get('[data-testid="audit-agent-slot"]').isVisible()).toBe(false)
+
+    await w.get('[data-testid="audit-tab-agent"]').trigger('click')
+    expect(replace).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-1', tab: 'agent' } })
+
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1', tab: 'agent' }
+    const open = mount(AuditReportPage)
+    await flushPromises()
+    expect(open.get('[data-testid="audit-tab-agent"]').attributes('aria-selected')).toBe('true')
+    expect(open.get('[data-testid="audit-agent-slot"]').isVisible()).toBe(true)
+    expect(open.find('[data-testid="audit-finding-headline"]').exists()).toBe(false)
+    await open.get('[data-testid="audit-tab-detail"]').trigger('click')
+    expect(replace).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-1', tab: undefined } })
+  })
+
+  // DAR-UI-109: a waiting draft is marked on the board before anyone approves it.
+  it('marks what waiting drafts would change: a reworded or switched statement, a new one, findings they close', async () => {
+    vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: true })
+    liveRoute.query = { category: 'orders', statement: 'R2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    await openCauses(w)
+    expect(w.find('[data-testid="audit-statement-draft-R2"]').exists()).toBe(false)
+
+    const statement = (text: string, active = true) => ({ id: 'R2', text, active })
+    w.getComponent(AuditAgentPanel).vm.$emit('preview', [
+      { proposalId: 'P1', kind: 'STATEMENT_EDIT', before: { statements: [statement('Every invoice carries the Etail id.')] },
+        after: { statements: [statement('Every invoice carries the Etail id within a day.', false)] }, backtest: null },
+      { proposalId: 'P2', kind: 'ADD_STATEMENT', before: { statements: [] },
+        after: { statements: [{ id: 'R9', text: 'Every order is invoiced.', active: true }], add: { category: 'orders' } }, backtest: null },
+      { proposalId: 'P3', kind: 'EXPECTED_CAUSES', before: {}, after: {}, backtest: { closed: ['F-1'] } },
+    ])
+    await flushPromises()
+    expect(w.get('[data-testid="audit-statement-draft-R2"]').text()).toBe('reworded, off')
+    expect(w.get('[data-testid="audit-statement-draft-new"]').text()).toContain('Every order is invoiced.')
+    expect(w.get('[data-testid="audit-finding-closing"]').text()).toContain('a draft closes it')
+
+    w.getComponent(AuditAgentPanel).vm.$emit('preview', [])
+    await flushPromises()
+    expect(w.find('[data-testid="audit-statement-draft-R2"]').exists()).toBe(false)
+    expect(w.find('[data-testid="audit-statement-draft-new"]').exists()).toBe(false)
   })
 
   it('resolves a finding: re-checks it, waits for the check, and says it closed', async () => {

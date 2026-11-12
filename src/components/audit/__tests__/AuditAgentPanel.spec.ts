@@ -2,19 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
 import { installLocalStorageStub } from '../../../test/localStorage'
-import type { GetAgentStatusResponse, SendAgentTurnResponse } from '../../../lib/api/agentTypes'
+import type { SendAgentTurnResponse } from '../../../lib/api/agentTypes'
+import type { DraftPreview } from '../../../lib/agentDrafts'
 
-// DAR-UI-104. The agent panel on the audit page: shown only when the agent is on for the person, one conversation per
-// audit (kept by id, reloaded with get#AgentConversation), every reply shown word for word.
+// DAR-UI-104. The agent panel on the audit page: one conversation per audit (kept by id, reloaded with
+// get#AgentConversation), every reply shown word for word. DAR-UI-108: the page decides whether it shows (the Agent tab
+// exists only when the agent is on and the grant live; AuditReportPage.spec) and whether the person may approve.
 
-const getAgentStatus = vi.hoisted(() => vi.fn())
 const getAgentConversation = vi.hoisted(() => vi.fn())
 const sendAgentTurn = vi.hoisted(() => vi.fn())
 const planAuditChange = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../lib/api/facade', () => ({
   agentFacade: {
-    getAgentStatus,
     getAgentConversation,
     sendAgentTurn,
     planAuditChange,
@@ -27,14 +27,12 @@ vi.mock('../../../lib/api/facade', () => ({
 import AuditAgentPanel, { agentConversationKey, clearAgentConversations } from '../AuditAgentPanel.vue'
 import ProposalCard from '../ProposalCard.vue'
 
-const ON: GetAgentStatusResponse = { state: 'ON', grantState: 'LIVE', canApprove: true }
-
 function turn(overrides: Partial<SendAgentTurnResponse> = {}): SendAgentTurnResponse {
   return { conversationId: 'C1', outcome: 'DONE', reply: 'It is open because the return has no credit memo.', proposals: [], tickets: [], question: null, masked: [], ...overrides }
 }
 
 function mountPanel(props: Record<string, unknown> = {}) {
-  return mount(AuditAgentPanel, { props: { auditCode: 'month-close', tenantId: 'TEN_A', findingId: 'F-7', ...props } })
+  return mount(AuditAgentPanel, { props: { auditCode: 'month-close', tenantId: 'TEN_A', findingId: 'F-7', canApprove: true, ...props } })
 }
 
 async function send(wrapper: ReturnType<typeof mountPanel>, text: string) {
@@ -47,26 +45,15 @@ describe('AuditAgentPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     installLocalStorageStub()
-    getAgentStatus.mockResolvedValue(ON)
     planAuditChange.mockResolvedValue({ planHash: 'H1', before: {}, after: {}, backtest: null, status: 'PLANNED', statusMessage: null })
   })
 
-  it('is hidden when the agent is off, unavailable, or the person has no access', async () => {
-    for (const status of [
-      { state: 'AGENT_OFF', grantState: 'LIVE', canApprove: true },
-      { state: 'AGENT_UNAVAILABLE', grantState: 'LIVE', canApprove: true },
-      { state: 'ON', grantState: 'NOT_GRANTED', canApprove: true },
-      { state: 'ON', grantState: 'EXPIRED', canApprove: true },
-    ]) {
-      getAgentStatus.mockResolvedValueOnce(status)
-      const wrapper = mountPanel()
-      await flushPromises()
-      expect(wrapper.find('[data-testid="agent-panel"]').exists(), JSON.stringify(status)).toBe(false)
-    }
-    getAgentStatus.mockRejectedValueOnce(new ApiCallError('denied', 403))
-    const failed = mountPanel()
+  it('says what the next message is about: the open finding, and always the audit', async () => {
+    const wrapper = mountPanel({ auditName: 'Month close' })
     await flushPromises()
-    expect(failed.find('[data-testid="agent-panel"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="agent-about"]').text()).toBe('About F-7 · Month close')
+    await wrapper.setProps({ findingId: '' })
+    expect(wrapper.get('[data-testid="agent-about"]').text()).toBe('About Month close')
   })
 
   it('sends the message with the audit code and the open finding, and keeps the conversation for this audit', async () => {
@@ -181,9 +168,8 @@ describe('AuditAgentPanel', () => {
     // The card planned it on sight; the thread keeps the status it reports.
     expect(cards[0]!.props('proposal').status).toBe('PLANNED')
 
-    getAgentStatus.mockResolvedValueOnce({ ...ON, canApprove: false })
     sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'I drafted an exclusion.', proposals: [draft] }))
-    const viewer = mountPanel()
+    const viewer = mountPanel({ canApprove: false })
     await flushPromises()
     await send(viewer, 'Stop flagging wholesale orders')
     expect(viewer.getComponent(ProposalCard).props('canApprove')).toBe(false)
@@ -224,6 +210,23 @@ describe('AuditAgentPanel', () => {
     const reloaded = mountPanel({ auditCode: 'weekly' })
     await flushPromises()
     expect(reloaded.findAllComponents(ProposalCard)).toHaveLength(1)
+  })
+
+  // DAR-UI-109: the board marks what a waiting draft would change, from the plan its card fetched.
+  it('hands the board the plans of the drafts still waiting, and drops one once it is decided', async () => {
+    const plan = { planHash: 'H1', before: { statements: [] }, after: { statements: [] }, backtest: { closed: ['F-7'] }, status: 'PLANNED', statusMessage: null }
+    planAuditChange.mockResolvedValue(plan)
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'Drafted.', proposals: [{ ...draft, kind: 'EXPECTED_CAUSES' as const }] }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'These are expected')
+
+    const sent = wrapper.emitted('preview') as DraftPreview[][][]
+    expect(sent.at(-1)![0]).toEqual([{ proposalId: 'P1', kind: 'EXPECTED_CAUSES', before: plan.before, after: plan.after, backtest: { closed: ['F-7'] } }])
+
+    wrapper.getComponent(ProposalCard).vm.$emit('changed', { proposalId: 'P1', status: 'REJECTED' })
+    await flushPromises()
+    expect((wrapper.emitted('preview') as DraftPreview[][][]).at(-1)![0]).toEqual([])
   })
 
   it('keeps a conversation per tenant and audit, and a reset forgets them all', () => {

@@ -129,18 +129,29 @@
         :progress="progress"
         :retryable="isTodaysMorning"
         :retrying="retryingChecks"
+        :agent="agentOn"
+        :agent-open="agentOpen"
+        :drafts="drafts"
         @navigate="navigate"
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
         @extract="(check, system) => void exportExtract(check, system)"
         @verify="verifyFinding"
         @retry="retryCheck"
-      />
-      <AuditAgentPanel
-        :key="`${report.report.tenant.id}:${auditCode}`"
-        :audit-code="auditCode"
-        :tenant-id="report.report.tenant.id"
-        :finding-id="findingTarget"
-      />
+        @agent="setAgentTab"
+      >
+        <!-- DAR-UI-108. The agent, in the Agent tab of the board's deepest column. -->
+        <template #agent>
+          <AuditAgentPanel
+            :key="`${report.report.tenant.id}:${auditCode}`"
+            :audit-code="auditCode"
+            :tenant-id="report.report.tenant.id"
+            :finding-id="findingTarget"
+            :audit-name="report.report.audit.name"
+            :can-approve="agentStatus?.canApprove === true"
+            @preview="(next) => (draftPreviews = next)"
+          />
+        </template>
+      </AuditColumns>
     </template>
   </StaticPageFrame>
 </template>
@@ -155,7 +166,9 @@ import AppSelect from '../../components/ui/AppSelect.vue'
 import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
 import AuditColumns from '../../components/audit/AuditColumns.vue'
 import AuditAgentPanel from '../../components/audit/AuditAgentPanel.vue'
-import { auditFacade, reconciliationFacade } from '../../lib/api/facade'
+import { agentFacade, auditFacade, reconciliationFacade } from '../../lib/api/facade'
+import type { GetAgentStatusResponse } from '../../lib/api/agentTypes'
+import { boardDrafts, type DraftPreview } from '../../lib/agentDrafts'
 import { ApiCallError } from '../../lib/api/client'
 import { downloadIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { downloadTextFile } from '../../lib/utils/download'
@@ -640,6 +653,29 @@ function chooseFilter(next: AuditFilter): void {
 function choosePeriod(period: string): void {
   void router.replace({ query: { ...route.query, period, finding: undefined } })
 }
+
+// DAR-UI-108. The Agent tab exists only when the agent is on for the person and their grant is live (send#AgentTurn
+// refuses otherwise anyway); ?tab=agent shows it, kept while the person moves around the board like every other pick.
+const agentStatus = ref<GetAgentStatusResponse | null>(null)
+const agentOn = computed(() => agentStatus.value?.state === 'ON' && agentStatus.value.grantState === 'LIVE')
+const agentOpen = computed(() => agentOn.value && queryValue('tab') === 'agent')
+// DAR-UI-109. What the waiting drafts would change, marked on the board.
+const draftPreviews = ref<DraftPreview[]>([])
+const drafts = computed(() => boardDrafts(draftPreviews.value))
+
+function setAgentTab(open: boolean): void {
+  void router.replace({ query: { ...route.query, tab: open ? 'agent' : undefined } })
+}
+
+async function loadAgentStatus(): Promise<void> {
+  try {
+    agentStatus.value = await agentFacade.getAgentStatus({}, abort.signal)
+  } catch {
+    agentStatus.value = null
+  }
+}
+
+onMounted(() => void loadAgentStatus())
 
 // DAR-UI-063. Arrived from play: the runs were submitted and finish in the background. Said once in the top pill,
 // and consumed, so a reload does not say it again.

@@ -10,11 +10,11 @@
     <dl v-if="plan" class="audit-proposal-change">
       <div data-testid="proposal-before">
         <dt>Before the change</dt>
-        <dd>{{ describe(plan.before) }}</dd>
+        <dd>{{ shown.before }}</dd>
       </div>
       <div data-testid="proposal-after">
         <dt>After the change</dt>
-        <dd>{{ describe(plan.after) }}</dd>
+        <dd>{{ shown.after }}</dd>
       </div>
       <div v-if="backtest" data-testid="proposal-backtest">
         <dt>Backtest</dt>
@@ -41,6 +41,7 @@ import LoadingState from '../ui/LoadingState.vue'
 import { agentFacade } from '../../lib/api/facade'
 import { ApiCallError } from '../../lib/api/client'
 import type { AgentProposal, AuditChangeKind, PlanAuditChangeResponse } from '../../lib/api/agentTypes'
+import { statementChanges } from '../../lib/agentDrafts'
 
 // DAR-UI-105. A change the agent drafted (DAR-BE-159). It changes nothing until a person who may save the audit's checks
 // approves the plan they see; the plan's hash goes with the approval, and a plan the audit has moved past is planned
@@ -56,6 +57,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   changed: [{ proposalId: string; status: string }]
   reverted: [AgentProposal]
+  /** DAR-UI-109. The plan this card shows, so the board can mark what it would change. */
+  planned: [{ proposalId: string; plan: PlanAuditChangeResponse }]
 }>()
 
 const OPEN = new Set(['DRAFT', 'PLANNED', 'STALE'])
@@ -68,6 +71,7 @@ const KIND_LABELS: Record<AuditChangeKind, string> = {
   AUDIT_SETTINGS: 'Audit settings',
   ADD_STATEMENT: 'New statement',
   ADD_CHECK: 'New check',
+  STATEMENT_EDIT: 'Statement change',
 }
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
@@ -100,6 +104,16 @@ const provenance = computed(() => {
   return from ? PROVENANCE_LABELS[from] ?? from : ''
 })
 
+// DAR-UI-109. A statement draft's plan carries every statement of the audit; the card shows only the ones it changes.
+const shown = computed(() => {
+  const current = plan.value
+  if (!current) return { before: '', after: '' }
+  const { before, after } = statementChanges({ kind: props.proposal.kind, before: current.before, after: current.after })
+  if (!after.length) return { before: describe(current.before), after: describe(current.after) }
+  const line = (statement: { id: string; text: string; active: boolean }) => `${statement.id}: ${statement.text}${statement.active ? '' : ' (off)'}`
+  return { before: before.map(line).join('\n') || 'Nothing', after: after.map(line).join('\n') }
+})
+
 function describe(value: Record<string, unknown> | null | undefined): string {
   if (!value || !Object.keys(value).length) return 'Nothing'
   return Object.entries(value)
@@ -122,6 +136,7 @@ async function planAgain(): Promise<void> {
   try {
     const planned = await agentFacade.planAuditChange({ proposalId: props.proposal.proposalId }, abort.signal)
     plan.value = planned
+    emit('planned', { proposalId: props.proposal.proposalId, plan: planned })
     if (planned.status && planned.status !== status.value) setStatus(planned.status)
     if (planned.statusMessage) note.value = planned.statusMessage
   } catch (cause) {

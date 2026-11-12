@@ -1,5 +1,6 @@
 <template>
-  <section v-if="visible" class="card audit-agent" aria-label="Agent" data-testid="agent-panel">
+  <section class="audit-agent" aria-label="Agent" data-testid="agent-panel">
+    <p class="audit-agent-note" data-testid="agent-about">{{ about }}</p>
     <ol v-if="shownMessages.length" class="audit-agent-thread">
       <li
         v-for="message in shownMessages"
@@ -35,8 +36,9 @@
         v-for="proposal in proposals"
         :key="proposal.proposalId"
         :proposal="proposal"
-        :can-approve="status?.canApprove === true"
+        :can-approve="canApprove"
         :highlighted="highlightedId === proposal.proposalId"
+        @planned="onPlanned"
         @changed="onProposalChanged"
         @reverted="(next) => mergeProposals([next])"
       />
@@ -91,21 +93,32 @@ export function clearAgentConversations(): void {
 </script>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import ProposalCard from './ProposalCard.vue'
 import { agentFacade } from '../../lib/api/facade'
 import { ApiCallError } from '../../lib/api/client'
-import type { AgentProposal, AgentQuestion, AgentTurnOutcome, GetAgentStatusResponse } from '../../lib/api/agentTypes'
+import type { AgentProposal, AgentQuestion, AgentTurnOutcome, PlanAuditChangeResponse } from '../../lib/api/agentTypes'
+import type { DraftPreview } from '../../lib/agentDrafts'
 
-// DAR-UI-104. The embedded agent on the audit page (DAR-BE-159). Shown only when the agent is on for the person; every
-// reply, a refusal included, is the server's words.
+// DAR-UI-104. The embedded agent on the audit page (DAR-BE-159); every reply, a refusal included, is the server's words.
+// DAR-UI-108: it lives in the Agent tab of the board's deepest column, which the page shows only when the agent is on
+// for the person and their grant is live. The page also says whether they may approve.
 
 const props = defineProps<{
   auditCode: string
   tenantId: string
   /** The finding open on the page, sent with each message; empty when none is open. */
   findingId: string
+  /** The audit's name, for the line saying what a message is about. */
+  auditName?: string
+  /** True only for someone allowed to save the audit's checks (get#AgentStatus canApprove). */
+  canApprove: boolean
+}>()
+
+const emit = defineEmits<{
+  /** DAR-UI-109. The plans of the drafts waiting for approval, for the board to mark. */
+  preview: [DraftPreview[]]
 }>()
 
 interface PanelMessage {
@@ -116,7 +129,6 @@ interface PanelMessage {
   outcome?: AgentTurnOutcome
 }
 
-const status = ref<GetAgentStatusResponse | null>(null)
 const messages = ref<PanelMessage[]>([])
 const conversationId = ref('')
 const draft = ref('')
@@ -125,6 +137,7 @@ const error = ref('')
 const masked = ref<string[]>([])
 const proposals = ref<AgentProposal[]>([])
 const highlightedId = ref('')
+const plans = ref<Record<string, PlanAuditChangeResponse>>({})
 const approveHint = ref('')
 // DAR-UI-105: typing an approval never applies anything; the card it means is pointed at instead.
 const TYPED_APPROVAL = /^\s*(?:yes[\s,.!]*)?(?:approve|apply|accept|go ahead|do it|ok(?:ay)?|yes)\b/i
@@ -135,7 +148,14 @@ onBeforeUnmount(() => abort.abort())
 
 // A turn that only asks a question has no reply text; the question block shows it.
 const shownMessages = computed(() => messages.value.filter((message) => message.text))
-const visible = computed(() => status.value?.state === 'ON' && status.value.grantState === 'LIVE')
+// What goes with the next message: the open finding, and always the audit.
+const about = computed(() => ['About', [props.findingId, props.auditName || props.auditCode].filter(Boolean).join(' · ')].join(' '))
+const previews = computed<DraftPreview[]>(() => proposals.value.flatMap((proposal) => {
+  const plan = plans.value[proposal.proposalId]
+  if (!plan || !OPEN_STATUSES.has(proposal.status)) return []
+  return [{ proposalId: proposal.proposalId, kind: proposal.kind, before: plan.before, after: plan.after, backtest: plan.backtest ?? proposal.backtest }]
+}))
+watch(previews, (next) => emit('preview', next), { immediate: true })
 const storageKey = computed(() => agentConversationKey(props.tenantId, props.auditCode))
 const openQuestion = computed(() => {
   const last = messages.value[messages.value.length - 1]
@@ -158,6 +178,10 @@ function mergeProposals(next: AgentProposal[] | null | undefined): void {
     else merged.push(proposal)
   }
   proposals.value = merged
+}
+
+function onPlanned(planned: { proposalId: string; plan: PlanAuditChangeResponse }): void {
+  plans.value = { ...plans.value, [planned.proposalId]: planned.plan }
 }
 
 function onProposalChanged(change: { proposalId: string; status: string }): void {
@@ -253,22 +277,24 @@ async function send(text: string, typed = false): Promise<void> {
   }
 }
 
-onMounted(async () => {
-  try {
-    status.value = await agentFacade.getAgentStatus({}, abort.signal)
-  } catch {
-    status.value = null
-    return
-  }
-  if (visible.value) await reload()
-})
+onMounted(() => void reload())
 </script>
 
 <style scoped>
+/* DAR-UI-108. Fills the column; the thread scrolls with the column and the box to write in stays at its foot. */
 .audit-agent {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  min-height: 100%;
+}
+
+.audit-agent > .audit-agent-form {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding-block: var(--space-2) 0;
+  background: var(--surface-2);
 }
 
 .audit-agent-thread {

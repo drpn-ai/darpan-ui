@@ -49,6 +49,21 @@ describe('ProposalCard', () => {
     planAuditChange.mockResolvedValue(PLAN)
   })
 
+  // DAR-UI-109 / DAR-BE-242. A statement draft's plan holds every statement of the audit; the card names only what moves.
+  it('shows only the statement a statement change moves, and hands its plan to the board', async () => {
+    const statements = (r2: string, active: boolean) => [{ id: 'R1', text: 'Every order is invoiced.', active: true, checks: 1, findings: 0 },
+      { id: 'R2', text: r2, active, checks: 1, findings: 4 }]
+    const plan = { ...PLAN, before: { audit: 'month-close', statements: statements('Returns are received.', true) },
+      after: { audit: 'month-close', statements: statements('Returns are received within 5 days.', false) }, backtest: null }
+    planAuditChange.mockResolvedValueOnce(plan)
+    const wrapper = mountCard({ proposal: proposal({ kind: 'STATEMENT_EDIT' }) })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Statement change')
+    expect(wrapper.get('[data-testid="proposal-before"] dd').text()).toBe('R2: Returns are received.')
+    expect(wrapper.get('[data-testid="proposal-after"] dd').text()).toBe('R2: Returns are received within 5 days. (off)')
+    expect(wrapper.emitted('planned')).toEqual([[{ proposalId: 'P1', plan }]])
+  })
+
   it('plans an open proposal and shows before, after, the backtest and where it came from', async () => {
     const wrapper = mountCard({ proposal: proposal({ blockedIds: ['F-99'] }) })
     await flushPromises()

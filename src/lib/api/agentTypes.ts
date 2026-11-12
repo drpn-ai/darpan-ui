@@ -30,6 +30,8 @@ export type AuditChangeKind =
   | 'AUDIT_SETTINGS'
   | 'ADD_STATEMENT'
   | 'ADD_CHECK'
+  /** DAR-BE-242: a statement's wording, its on/off, or both. */
+  | 'STATEMENT_EDIT'
 
 /** A drafted change as the panel lists it; status moves DRAFT -> PLANNED -> APPLIED (or REJECTED, STALE, INVALID, REVERTED). */
 export interface AgentProposal {

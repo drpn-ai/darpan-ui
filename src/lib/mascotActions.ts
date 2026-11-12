@@ -746,6 +746,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
 
   /* ── The audit's agent (DAR-UI-104/105) ─────────────────────────────────────── */
+  agent: {
+    title: 'Agent',
+    body: 'opens the conversation about what is picked on the board: the finding, else the audit. Changes it drafts wait as cards until someone with edit access approves them.',
+  },
   'send to agent': {
     title: 'Send to agent',
     body: 'your words go to the agent with the finding open here. Keys, emails and phones are masked first; a message alone never changes the audit.',
