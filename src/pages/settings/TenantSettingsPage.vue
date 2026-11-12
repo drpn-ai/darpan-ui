@@ -386,7 +386,7 @@
             </p>
           </template>
 
-          <label v-else class="wizard-input-shell">
+          <label v-else-if="currentChatSpaceFormStep.id === 'webhook'" class="wizard-input-shell">
             <span class="workflow-context-label">Webhook URL</span>
             <input
               v-model="chatSpaceForm.webhookUrl"
@@ -629,7 +629,7 @@ interface CreateStep {
   kind: 'select' | 'text' | 'password' | 'number'
 }
 
-type ChatSpaceFormStepId = 'name' | 'provider' | 'webhook' | 'channel'
+type ChatSpaceFormStepId = 'name' | 'provider' | 'webhook' | 'channel' | 'slack-connect'
 
 interface ChatSpaceFormStep {
   id: ChatSpaceFormStepId
@@ -693,9 +693,12 @@ const chatSpaceFormSteps = computed<ChatSpaceFormStep[]>(() => {
   if (!chatSpaceProviderPreset.value && !isChatSpaceEditing.value) {
     steps.push({ id: 'provider', question: 'Which chat product does it post to?' })
   }
-  steps.push(usesSlackChannelPicker.value
-    ? { id: 'channel', question: 'Which Slack channel should it post to?' }
-    : { id: 'webhook', question: 'Paste the incoming webhook URL.' })
+  // DAR-UI-023: Slack posts through a connected workspace (its credential lives on the install, its address is a
+  // channel), so a new Slack space with none connected goes to connecting one. Editing an older webhook-based Slack
+  // space keeps its webhook card: those still deliver; no new ones are made.
+  if (usesSlackChannelPicker.value) steps.push({ id: 'channel', question: 'Which Slack channel should it post to?' })
+  else if (needsSlackWorkspace.value) steps.push({ id: 'slack-connect', question: 'Connect a Slack workspace first.' })
+  else steps.push({ id: 'webhook', question: 'Paste the incoming webhook URL.' })
   return steps
 })
 const chatProviderOptions: Array<{ value: ChatProviderId; label: string }> = [
@@ -962,13 +965,16 @@ const chatSpaceFormQuestion = computed(() => currentChatSpaceFormStep.value.ques
 const isChatSpaceFinalStep = computed(() => (
   currentChatSpaceFormStep.value.id === 'webhook' || currentChatSpaceFormStep.value.id === 'channel'
 ))
+const isSlackConnectStep = computed(() => currentChatSpaceFormStep.value.id === 'slack-connect')
 const chatSpaceFormPrimaryVariant = computed<'default' | 'save'>(() => (
   isChatSpaceFinalStep.value ? 'save' : 'default'
 ))
-const chatSpaceFormPrimaryTestId = computed(() => (
-  isChatSpaceFinalStep.value ? 'save-tenant-chat-space' : 'chat-space-form-next'
-))
+const chatSpaceFormPrimaryTestId = computed(() => {
+  if (isSlackConnectStep.value) return 'chat-space-slack-connect'
+  return isChatSpaceFinalStep.value ? 'save-tenant-chat-space' : 'chat-space-form-next'
+})
 const chatSpaceFormPrimaryLabel = computed(() => {
+  if (isSlackConnectStep.value) return 'Connect Slack'
   if (!isChatSpaceFinalStep.value) return 'Next'
   return chatSpaceFormSaving.value ? 'Saving' : 'Save'
 })
@@ -982,6 +988,9 @@ const chatSpaceFormHasWebhookForSave = computed(() => (
 const connectedSlackInstall = computed<SlackWorkspaceInstall | null>(() => slackInstalls.value[0] ?? null)
 const usesSlackChannelPicker = computed(() => (
   chatSpaceForm.chatProviderEnumId === 'CHAT_PROV_SLACK' && connectedSlackInstall.value !== null
+))
+const needsSlackWorkspace = computed(() => (
+  chatSpaceForm.chatProviderEnumId === 'CHAT_PROV_SLACK' && connectedSlackInstall.value === null && !isChatSpaceEditing.value
 ))
 const slackChannelOptions = computed(() => slackChannels.value.map((channel) => ({
   value: channel.id,
@@ -1012,7 +1021,7 @@ const chatSpaceFormSubmitDisabled = computed(() => {
   if (currentChatSpaceFormStep.value.id === 'name') {
     return normalizeStringOrEmpty(chatSpaceForm.spaceName).length === 0
   }
-  if (currentChatSpaceFormStep.value.id === 'provider') return false
+  if (currentChatSpaceFormStep.value.id === 'provider' || isSlackConnectStep.value) return false
   if (currentChatSpaceFormStep.value.id === 'channel') {
     return normalizeStringOrEmpty(chatSpaceForm.slackChannelId).length === 0
   }
@@ -1416,6 +1425,11 @@ function goBackChatSpaceFormStep(): void {
 
 async function submitChatSpaceFormStep(): Promise<void> {
   if (chatSpaceFormSubmitDisabled.value) return
+  if (isSlackConnectStep.value) {
+    notificationWorkflowError.value = null
+    openSlackMenu()
+    return
+  }
 
   // Advance by position rather than naming the next step: the sequence gained a provider card and
   // a hardcoded "go to index 1" silently turned every later step into the save step.

@@ -889,6 +889,34 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     }, expect.any(AbortSignal))
   })
 
+  // DAR-UI-023: with no Slack workspace connected, Slack is not a webhook paste; the workspace comes first.
+  it('stops at connecting a workspace when Slack is chosen with none connected', async () => {
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+    await chooseExistingRunPurpose(wrapper)
+    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
+    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+
+    await chooseCard(wrapper, 'automation-chat-space-new')
+    await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Slack')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'automation-chat-provider-select', 'CHAT_PROV_SLACK')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Connect a Slack workspace in Tenant settings first.')
+    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeDefined()
+  })
+
   it('creates a new space inline as three separate cards', async () => {
     saveTenantChatSpace.mockResolvedValue({
       ok: true,

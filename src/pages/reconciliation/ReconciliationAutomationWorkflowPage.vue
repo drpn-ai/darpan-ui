@@ -436,6 +436,9 @@
         </label>
       </template>
 
+      <!-- DAR-UI-023: the question is the whole card; there is nothing to answer here. -->
+      <template v-else-if="currentStep.id === 'chat-space-slack-connect'" />
+
       <template v-else-if="currentStep.id === 'chat-space-url'">
         <label class="wizard-input-shell">
           <input
@@ -743,9 +746,11 @@ const chatSpaceSteps = computed<WizardStep[]>(() => {
     chatSpaceStepList.push({ id: 'chat-space-name' }, { id: 'chat-space-provider' })
     // Mirrors the Tenant Settings wizard: with a connected workspace the destination is a channel,
     // not a URL. Asking for a webhook here was unanswerable for a bot-token workspace.
-    chatSpaceStepList.push(usesSlackChannelPicker.value
-      ? { id: 'chat-space-channel' }
-      : { id: 'chat-space-url' })
+    // DAR-UI-023: Slack posts through a connected workspace, which this wizard cannot connect; with none the
+    // card says where to do it instead of asking for a webhook.
+    if (usesSlackChannelPicker.value) chatSpaceStepList.push({ id: 'chat-space-channel' })
+    else if (newChatSpaceProvider.value === 'CHAT_PROV_SLACK') chatSpaceStepList.push({ id: 'chat-space-slack-connect' })
+    else chatSpaceStepList.push({ id: 'chat-space-url' })
   }
   return chatSpaceStepList
 })
@@ -951,6 +956,8 @@ const currentQuestion = computed(() => {
       return 'Which Slack channel should it post to?'
     case 'chat-space-url':
       return `What is the ${newChatSpaceProviderLabel.value} webhook URL for this space?`
+    case 'chat-space-slack-connect':
+      return 'Connect a Slack workspace in Tenant settings first.'
     default:
       return ''
   }
@@ -1207,6 +1214,8 @@ const canProceed = computed(() => {
       return newChatSpaceChannelId.value.length > 0
     case 'chat-space-url':
       return newChatSpaceUrl.value.trim().length > 0
+    case 'chat-space-slack-connect':
+      return false
     default:
       return false
   }

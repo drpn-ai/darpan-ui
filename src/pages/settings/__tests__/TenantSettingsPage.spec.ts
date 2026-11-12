@@ -600,8 +600,9 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.text()).toContain('Saved chat space.')
   })
 
-  it('creates a Slack space and sends the Slack provider with the webhook', async () => {
-    const SLACK_WEBHOOK = 'https://hooks.slack.com/services/T-EXAMPLE/B-EXAMPLE/placeholder-not-a-real-secret'
+  // DAR-UI-023. Slack is not a peer of Google Chat: its address is a channel and its credential lives on the workspace
+  // install, so with no workspace connected the card is "connect one first", never a webhook paste.
+  it('sends Slack with no workspace connected to connecting one, not to a webhook paste', async () => {
     listTenantChatSpaces.mockResolvedValue({ ok: true, chatSpaces: [] })
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
@@ -615,14 +616,14 @@ describe('TenantSettingsPage', () => {
     await wrapper.get('[data-testid="app-select-option"][data-option-value="CHAT_PROV_SLACK"]').trigger('click')
     await flushPromises()
     await wrapper.get('[data-testid="chat-space-form-next"]').trigger('click')
-    await wrapper.get('input[name="webhookUrl"]').setValue(SLACK_WEBHOOK)
-    await wrapper.get('[data-testid="save-tenant-chat-space"]').trigger('click')
+
+    expect(wrapper.text()).toContain('Connect a Slack workspace first.')
+    expect(wrapper.find('input[name="webhookUrl"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="chat-space-slack-connect"]').trigger('click')
     await flushPromises()
 
-    expect(saveTenantChatSpace).toHaveBeenCalledWith(
-      { spaceName: 'Ops Slack', chatProviderEnumId: 'CHAT_PROV_SLACK', webhookUrl: SLACK_WEBHOOK, isActive: true },
-      expect.anything(),
-    )
+    expect(wrapper.find('[data-testid="tenant-slack-menu-connect"]').exists()).toBe(true)
+    expect(saveTenantChatSpace).not.toHaveBeenCalled()
   })
 
   // A space's provider decides which credential it carries and which address shape means anything.

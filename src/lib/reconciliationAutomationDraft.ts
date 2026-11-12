@@ -42,6 +42,7 @@ export type ReconciliationAutomationStepId =
   | 'chat-space-provider'
   | 'chat-space-channel'
   | 'chat-space-url'
+  | 'chat-space-slack-connect'
 
 export interface ReconciliationAutomationSourceDraft {
   sourceTypeEnumId?: string
