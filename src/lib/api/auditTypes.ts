@@ -112,12 +112,16 @@ export interface AuditFindingSummary {
   waiting?: AuditWaitingFinding[]
 }
 
-/** DAR-BE-250. A finding on an order an earlier step already reports: its statement, id, headline and cause. */
+/**
+ * DAR-BE-250. A finding on an order an earlier step already reports: its statement, id, headline and cause. DAR-BE-254:
+ * item names what it is about (the SKU, or the line when the record has none), so the row reads as the thing, not a code.
+ */
 export interface AuditWaitingFinding {
   statement: string
   id: string
   headline: string
   cause: string | null
+  item?: string | null
 }
 
 /** DAR-UI-099. One line of an order finding's order. */

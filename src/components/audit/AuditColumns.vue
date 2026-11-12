@@ -401,9 +401,10 @@
                   <h3 class="micro-label">Also on this order <span class="audit-fold-count">{{ waiting.length }}</span></h3>
                   <ul class="audit-lines">
                     <li v-for="item in waiting" :key="`${item.statement}-${item.id}`" class="audit-line audit-line--other" data-testid="audit-waiting">
-                      <span>{{ item.statement }}</span>
+                      <!-- DAR-BE-254: the item first (Aditi: "it says R4 here.. shouldnt it be the SKU"); the statement after it. -->
+                      <span>{{ item.item || item.statement }}</span>
                       <span class="audit-row-sub">{{ item.cause || item.headline }}</span>
-                      <span class="audit-row-sub"></span>
+                      <span class="audit-row-sub">{{ item.item ? item.statement : '' }}</span>
                     </li>
                   </ul>
                 </template>

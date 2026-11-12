@@ -673,6 +673,27 @@ describe('AuditReportPage', () => {
     w.unmount()
   })
 
+  // DAR-BE-254 (Aditi on RAILS #1028236: "it says R4 here.. shouldnt it be the SKU"): a waiting finding that names its
+  // item leads with it; the statement follows.
+  it('names the item a waiting finding is about, then its statement', async () => {
+    const doc = report()
+    const r2 = doc.categories.orders!.statements.R2!
+    r2.waiting = 1
+    r2.findings = [{ id: 'M1210830', kind: 'order', order: 'M1210830', headline: 'Order M1210830: line 1 is in HotWax\'s brokering queue',
+      state: 'open', firstFound: '2026-10-02', ageDays: 6, difference: null, next: 'darpan findings show F-1', records: {}, cause: 'In HotWax\'s brokering queue',
+      lines: [{ id: 'F-1', headline: 'Line M1210830/01 is open in NetSuite', state: 'open', firstFound: '2026-10-02', ageDays: 6, difference: null, next: '',
+        cause: 'In HotWax\'s brokering queue', held: false, records: { OMS: { orderItem: [{ id: 'M1210830/01', internalId: null, status: 'Approved' }] } } }],
+      waiting: [{ statement: 'R4', id: 'F-142790', headline: 'Order 165068: line 2 is completed in HotWax and not billed in NetSuite',
+        cause: 'Sold in store; NetSuite has no stock at that store', item: '889C-369B-82848284:S' }] }]
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M1210830' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.findAll('[data-testid="audit-waiting"]').map((row) => row.text()))
+      .toEqual([expect.stringMatching(/^889C-369B-82848284:S\s*Sold in store; NetSuite has no stock at that store\s*R4$/)])
+    w.unmount()
+  })
+
   // DAR-UI-075. An order past the report's 50 (a reload, a link) is found by reading the statement's orders first.
   it('opens an order the report does not list by reading the statement\'s orders', async () => {
     const line = { id: 'F-7', headline: 'Item M77/01 is completed in HotWax and not billed in NetSuite', state: 'open' as const,
