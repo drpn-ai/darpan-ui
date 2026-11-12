@@ -41,7 +41,7 @@ describe('RunFlowchartStartPage', () => {
     const labels = w.findAll('.workflow-shortcut-choice-card__label').map((l) => l.text())
     expect(labels[0]).toBe('Previous Day, Aug 16, 2026')
     expect(labels[1]).toBe('Previous Week, Aug 9, 2026 to Aug 16, 2026')
-    expect(labels[2]).toMatch(/^Previous Month, Jul/)
+    expect(labels[2]).toBe('Month to Date, Aug 1, 2026 to Aug 16, 2026')
     expect(labels[3]).toBe('Custom Dates, select start and end dates')
     expect(form(w).props('submitDisabled')).toBe(true)
   })

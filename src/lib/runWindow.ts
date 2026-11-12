@@ -1,11 +1,11 @@
 import type { WorkflowShortcutChoiceOption } from '../components/workflow/WorkflowShortcutChoiceCards.vue'
 import type { CalendarRange, UseCalendarWidget } from '../composables/useCalendarWidget'
-import { addDays, formatMonthLabel } from './utils/date'
+import { addDays } from './utils/date'
 
-// The days a run looks at, asked as a Sync run asks them: Previous Day / Week / Month cards, each naming its
-// dates, and Custom Dates for the calendar. DAR-UI-060 shares it with a lifecycle's start page, which anchors
-// it lateAfterDays back; a Sync run anchors it today.
-export type RunWindowPreset = 'previous-day' | 'previous-week' | 'previous-month' | 'custom'
+// The days a run looks at, asked as a Sync run asks them: Previous Day / Previous Week / Month to Date cards, each
+// naming its dates, and Custom Dates for the calendar. DAR-UI-060 shares it with a lifecycle's start page, which
+// anchors it lateAfterDays back; a Sync run anchors it today.
+export type RunWindowPreset = 'previous-day' | 'previous-week' | 'month-to-date' | 'custom'
 
 export interface RunWindowPresetOption extends WorkflowShortcutChoiceOption {
   value: RunWindowPreset
@@ -16,7 +16,7 @@ export interface RunWindowRange extends CalendarRange {
 }
 
 export function isRunWindowPreset(value: string): value is RunWindowPreset {
-  return ['previous-day', 'previous-week', 'previous-month', 'custom'].includes(value)
+  return ['previous-day', 'previous-week', 'month-to-date', 'custom'].includes(value)
 }
 
 export function presetWindowRange(preset: Exclude<RunWindowPreset, 'custom'>, today: Date): RunWindowRange {
@@ -38,12 +38,16 @@ export function presetWindowRange(preset: Exclude<RunWindowPreset, 'custom'>, to
     }
   }
 
-  const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-  const previousMonthStart = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() - 1, 1)
+  // Month to date: the 1st of yesterday's month through yesterday, so on the 1st it is the whole month just ended
+  // rather than no days at all.
+  const lastDay = addDays(today, -1)
+  const monthStart = new Date(lastDay.getFullYear(), lastDay.getMonth(), 1)
   return {
-    startDate: previousMonthStart,
-    endExclusiveDate: currentMonthStart,
-    summary: formatMonthLabel(previousMonthStart),
+    startDate: monthStart,
+    endExclusiveDate: today,
+    summary: monthStart.getTime() === lastDay.getTime()
+      ? formatWindowDateLabel(lastDay)
+      : formatWindowRangeLabel(monthStart, lastDay),
   }
 }
 
@@ -62,7 +66,7 @@ export function runWindowPresetOptions(today: Date): RunWindowPresetOption[] {
   return [
     { value: 'previous-day', label: `Previous Day, ${presetWindowRange('previous-day', today).summary}`, shortcutKey: 'A' },
     { value: 'previous-week', label: `Previous Week, ${presetWindowRange('previous-week', today).summary}`, shortcutKey: 'B' },
-    { value: 'previous-month', label: `Previous Month, ${presetWindowRange('previous-month', today).summary}`, shortcutKey: 'C' },
+    { value: 'month-to-date', label: `Month to Date, ${presetWindowRange('month-to-date', today).summary}`, shortcutKey: 'C' },
     { value: 'custom', label: 'Custom Dates, select start and end dates', shortcutKey: 'D' },
   ]
 }

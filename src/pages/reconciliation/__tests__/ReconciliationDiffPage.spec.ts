@@ -968,8 +968,8 @@ describe('ReconciliationDiffPage', () => {
     expect(wrapper.get('[data-testid="api-window-preset-previous-week"]').text()).toContain(
       'Previous Week, May 9, 2026 to May 16, 2026',
     )
-    expect(wrapper.get('[data-testid="api-window-preset-previous-month"]').text()).toContain(
-      'Previous Month, April 2026',
+    expect(wrapper.get('[data-testid="api-window-preset-month-to-date"]').text()).toContain(
+      'Month to Date, May 1, 2026 to May 16, 2026',
     )
     expect(wrapper.get('[data-testid="api-window-preset-custom"]').text()).toContain(
       'Custom Dates, select start and end dates',
@@ -1048,7 +1048,7 @@ describe('ReconciliationDiffPage', () => {
     )
   })
 
-  it('uses the previous calendar month for API previous-month presets', async () => {
+  it('runs the month so far, the 1st through yesterday, for the API month-to-date preset', async () => {
     vi.setSystemTime(new Date(2026, 4, 2, 12, 0, 0))
     route.query = {
       savedRunId: 'RS_API_ORDER_SYNC',
@@ -1085,18 +1085,18 @@ describe('ReconciliationDiffPage', () => {
     const wrapper = mount(ReconciliationDiffPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="api-window-preset-previous-month"]').text()).toContain(
-      'Previous Month, April 2026',
+    expect(wrapper.get('[data-testid="api-window-preset-month-to-date"]').text()).toContain(
+      'Month to Date, May 1, 2026',
     )
-    await wrapper.get('[data-testid="api-window-preset-previous-month"]').trigger('click')
+    await wrapper.get('[data-testid="api-window-preset-month-to-date"]').trigger('click')
     await wrapper.get('[data-testid="reconciliation-step-primary"]').trigger('click')
     await flushPromises()
 
     expect(runSavedRunDiff.mock.calls[0]?.[0]).toMatchObject({
-      windowStartDate: expectedWindowPayloadDate(2026, 3, 1),
-      windowEndDate: expectedWindowPayloadDate(2026, 4, 1),
-      windowStartLocalDate: '2026-04-01',
-      windowEndLocalDate: '2026-05-01',
+      windowStartDate: expectedWindowPayloadDate(2026, 4, 1),
+      windowEndDate: expectedWindowPayloadDate(2026, 4, 2),
+      windowStartLocalDate: '2026-05-01',
+      windowEndLocalDate: '2026-05-02',
     })
   })
 

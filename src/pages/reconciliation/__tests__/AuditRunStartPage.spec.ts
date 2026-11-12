@@ -50,14 +50,24 @@ describe('AuditRunStartPage', () => {
   })
 
   // DAR-UI-063. Only days the audit can still record: on Aug 17 a monthly audit plays from Aug 1 unless July is extended,
-  // so Previous Month (July) is not offered and July's days cannot be picked.
+  // so a card reaching into July is not offered and July's days cannot be picked; Month to Date (DAR-UI-112) starts Aug 1.
+  // From Aug 10 the week (Aug 9) and the month to date drop out.
   it('offers only days the audit can still record', async () => {
     f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: '2026-08-01' } } as never)
     const w = mount(AuditRunStartPage)
     await flushPromises()
     expect(f.getAuditSettings).toHaveBeenCalledWith({ audit: 'month-close' })
     const labels = w.findAll('.workflow-shortcut-choice-card__label').map((l) => l.text())
-    expect(labels).toEqual(['Previous Day, Aug 16, 2026', 'Previous Week, Aug 9, 2026 to Aug 16, 2026', 'Custom Dates, select start and end dates'])
+    expect(labels).toEqual(['Previous Day, Aug 16, 2026', 'Previous Week, Aug 9, 2026 to Aug 16, 2026',
+      'Month to Date, Aug 1, 2026 to Aug 16, 2026', 'Custom Dates, select start and end dates'])
+  })
+
+  it('drops a card that starts before the first playable day', async () => {
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: '2026-08-10' } } as never)
+    const w = mount(AuditRunStartPage)
+    await flushPromises()
+    const labels = w.findAll('.workflow-shortcut-choice-card__label').map((l) => l.text())
+    expect(labels).toEqual(['Previous Day, Aug 16, 2026', 'Custom Dates, select start and end dates'])
   })
 
   it('runs every check over the card\'s days, the last day included, and returns to the audit saying it started', async () => {
@@ -90,9 +100,9 @@ describe('AuditRunStartPage', () => {
 
     const m = mount(AuditRunStartPage)
     await flushPromises()
-    await pick(m, 'previous-month')
+    await pick(m, 'month-to-date')
     await submit(m)
-    expect(f.runAudit).toHaveBeenLastCalledWith({ audit: 'month-close', fromDate: '2026-07-01', thruDate: '2026-07-31' })
+    expect(f.runAudit).toHaveBeenLastCalledWith({ audit: 'month-close', fromDate: '2026-08-01', thruDate: '2026-08-16' })
   })
 
   it('Custom Dates runs over the picked days, the last one included, and offers no day after today', async () => {
@@ -112,7 +122,7 @@ describe('AuditRunStartPage', () => {
     f.runAudit.mockRejectedValue(new Error('2026-07 ended on 2026-07-31 and is not extended to 2026-08-17; extend it to run its days.'))
     const w = mount(AuditRunStartPage)
     await flushPromises()
-    await pick(w, 'previous-month')
+    await pick(w, 'month-to-date')
     await submit(w)
     expect(w.text()).toContain('2026-07 ended on 2026-07-31 and is not extended')
     expect(replace).not.toHaveBeenCalled()
