@@ -7,7 +7,10 @@ const { push, route } = vi.hoisted(() => ({
   route: { params: { audit: 'month-close' }, query: { period: '2026-09' } as Record<string, string>, fullPath: '/audits/month-close/settings?period=2026-09' },
 }))
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push }) }))
-vi.mock('../../../lib/api/facade', () => ({ auditFacade: { getAuditSettings: vi.fn(), saveAuditSettings: vi.fn(), addAuditStatement: vi.fn() } }))
+vi.mock('../../../lib/api/facade', () => ({
+  auditFacade: { getAuditSettings: vi.fn(), saveAuditSettings: vi.fn(), addAuditStatement: vi.fn() },
+  settingsFacade: { listTenantChatSpaces: vi.fn() },
+}))
 vi.mock('../../../stores/auth', () => ({ useAuthStore: () => ({ sessionInfo: { activeTenantLabel: 'Gorjana' } }) }))
 vi.mock('../../../lib/savedRunEditorRoute', () => ({
   resolveSavedRunEditorTarget: vi.fn(),
@@ -15,7 +18,7 @@ vi.mock('../../../lib/savedRunEditorRoute', () => ({
   buildRuleSetDraft: vi.fn(() => null),
 }))
 
-import { auditFacade } from '../../../lib/api/facade'
+import { auditFacade, settingsFacade } from '../../../lib/api/facade'
 import { buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../../lib/savedRunEditorRoute'
 import type { AuditSettings } from '../../../lib/api/auditTypes'
 import AuditSettingsPage from '../AuditSettingsPage.vue'
@@ -45,6 +48,12 @@ beforeEach(() => {
   vi.mocked(resolveSavedRunEditorTarget).mockReset()
   f.getAuditSettings.mockResolvedValue({ ok: true, settings: settings() } as never)
   f.saveAuditSettings.mockResolvedValue({ ok: true, settings: settings() } as never)
+  vi.mocked(settingsFacade.listTenantChatSpaces).mockReset()
+  vi.mocked(settingsFacade.listTenantChatSpaces).mockResolvedValue({ ok: true, chatSpaces: [
+    { chatSpaceId: 'spaces/AAA', spaceName: 'Gorjana ops', isActive: 'Y' },
+    { chatSpaceId: 'spaces/BBB', spaceName: 'Gorjana accounting', isActive: 'Y' },
+    { chatSpaceId: 'spaces/OFF', spaceName: 'Old space', isActive: 'N' },
+  ] } as never)
 })
 
 function form(w: ReturnType<typeof mount>) { return w.findComponent({ name: 'WorkflowStepForm' }) }
@@ -300,8 +309,55 @@ describe('AuditSettingsPage email after each run', () => {
     expect(w.find('[data-testid="audit-settings-run-email"] input[type="text"]').exists()).toBe(false)
     expect(w.get('[data-testid="audit-settings-also-send-to"]').text()).toBe('ops@gorjana.com')
     expect(w.get('[data-testid="audit-settings-run-email-readonly"]').text()).toContain('Only tenant admins can change this.')
+    expect(w.get('[data-testid="audit-settings-chat-space-readonly"]').text()).toBe('Gorjana ops')
+    expect(w.find('[data-testid="audit-settings-chat-space"]').exists()).toBe(false)
     await w.get('[data-testid="audit-settings-name"]').setValue('System health')
     await save(w)
     expect(f.saveAuditSettings).toHaveBeenCalledWith({ audit: 'month-close', name: 'System health' })
+  })
+
+  // DAR-UI-111. The chat space that gets the run's summary card.
+  function space(w: ReturnType<typeof mount>) {
+    return w.findAllComponents({ name: 'AppSelect' }).find((c) => c.props('testId') === 'audit-settings-chat-space')!
+  }
+
+  it('lists None and the tenant\'s active spaces, the saved one picked', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(space(w).props('modelValue')).toBe('spaces/AAA')
+    expect(space(w).props('options')).toEqual([
+      { value: '', label: 'None' },
+      { value: 'spaces/AAA', label: 'Gorjana ops' },
+      { value: 'spaces/BBB', label: 'Gorjana accounting' },
+    ])
+  })
+
+  it('saves a new space, and None clears it', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    space(w).vm.$emit('update:modelValue', 'spaces/BBB')
+    await save(w)
+    expect(f.saveAuditSettings).toHaveBeenLastCalledWith({ audit: 'month-close',
+      runEmail: { active: true, alsoSendTo: ['ops@gorjana.com'], chatSpaceId: 'spaces/BBB' } })
+
+    const v = mount(AuditSettingsPage)
+    await flushPromises()
+    space(v).vm.$emit('update:modelValue', '')
+    await save(v)
+    expect(f.saveAuditSettings).toHaveBeenLastCalledWith({ audit: 'month-close',
+      runEmail: { active: true, alsoSendTo: ['ops@gorjana.com'], chatSpaceId: null } })
+  })
+
+  it('keeps a saved space that is off, or a list that did not load, as a choice', async () => {
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { ...settings(), runEmail: { ...runEmail, chatSpaceId: 'spaces/OFF' } } } as never)
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(space(w).props('options')).toContainEqual({ value: 'spaces/OFF', label: 'Old space' })
+
+    vi.mocked(settingsFacade.listTenantChatSpaces).mockRejectedValue(new Error('down'))
+    const v = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(space(v).props('options')).toEqual([{ value: '', label: 'None' }, { value: 'spaces/OFF', label: 'spaces/OFF' }])
+    expect(v.find('[data-testid="audit-settings-error"]').exists()).toBe(false)
   })
 })

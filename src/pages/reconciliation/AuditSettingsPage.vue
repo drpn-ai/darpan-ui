@@ -62,13 +62,14 @@
           </p>
         </div>
 
-        <!-- DAR-BE-207: the email after each run, to the tenant's members and any extra addresses. -->
+        <!-- DAR-BE-207: the update after each run, by email to the tenant's members and any extra addresses, and
+             (DAR-UI-111) a summary card in a chat space. One switch turns both off. -->
         <div v-if="original.runEmail" class="audit-settings-group" data-testid="audit-settings-run-email">
-          <span class="workflow-context-label">Email after each run</span>
+          <span class="workflow-context-label">After each run</span>
           <div class="audit-settings-email">
             <AppToggleSwitch
               v-model="runEmailActive"
-              label="Email after each run"
+              label="After each run"
               test-id="audit-settings-run-email-active"
               :disabled="saving || !canEditRunEmail"
             />
@@ -77,6 +78,8 @@
           <div v-if="!canEditRunEmail" class="audit-settings-field" data-testid="audit-settings-run-email-readonly">
             <span class="audit-settings-label">Also send to</span>
             <p v-if="alsoSendTo.length" class="audit-settings-addresses" data-testid="audit-settings-also-send-to">{{ alsoSendTo.join(', ') }}</p>
+            <span class="audit-settings-label">Chat space</span>
+            <p class="audit-settings-addresses" data-testid="audit-settings-chat-space-readonly">{{ chatSpaceLabel(chatSpaceId) }}</p>
             <p class="section-note">Only tenant admins can change this.</p>
           </div>
           <label v-else class="audit-settings-field">
@@ -92,6 +95,15 @@
             />
           </label>
           <InlineValidation v-if="addressError" tone="error" :message="addressError" data-testid="audit-settings-address-error" />
+          <label v-if="canEditRunEmail" class="audit-settings-field">
+            <span class="audit-settings-label">Chat space</span>
+            <AppSelect
+              v-model="chatSpaceId"
+              test-id="audit-settings-chat-space"
+              :options="chatSpaceOptions"
+              :disabled="saving"
+            />
+          </label>
         </div>
 
         <div class="audit-settings-group">
@@ -209,7 +221,8 @@ import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowChipTextInput from '../../components/workflow/WorkflowChipTextInput.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
-import { auditFacade } from '../../lib/api/facade'
+import { auditFacade, settingsFacade } from '../../lib/api/facade'
+import type { TenantChatSpace } from '../../lib/api/types'
 import { auditMorningQuery } from '../../lib/auditReport'
 import type { AuditSettings, AuditSettingsCheck, AuditSettingsStatement, SaveAuditSettingsPayload } from '../../lib/api/auditTypes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
@@ -236,6 +249,9 @@ const runEmailActive = ref(false)
 const alsoSendTo = ref<string[]>([])
 const addressError = ref<string | null>(null)
 const alsoSendToInput = ref<InstanceType<typeof WorkflowChipTextInput> | null>(null)
+// DAR-UI-111. The space that gets the run's summary card; '' is none.
+const chatSpaceId = ref('')
+const chatSpaces = ref<TenantChatSpace[]>([])
 const saving = ref(false)
 const opening = ref(false)
 const error = ref<string | null>(null)
@@ -252,6 +268,20 @@ const membersLine = computed(() => {
   const members = original.value?.runEmail?.members ?? 0
   const tenant = authStore.sessionInfo?.activeTenantLabel
   return `Sent to the ${members} ${members === 1 ? 'person' : 'people'} with access${tenant ? ` to ${tenant}` : ''}`
+})
+// DAR-UI-111. None and the tenant's active spaces; the saved one stays listed even when it is off or the list did not load.
+function chatSpaceLabel(id: string): string {
+  if (!id) return 'None'
+  return chatSpaces.value.find((space) => space.chatSpaceId === id)?.spaceName || id
+}
+const chatSpaceOptions = computed(() => {
+  const options = [
+    { value: '', label: 'None' },
+    ...chatSpaces.value.filter((space) => space.isActive !== 'N').map((space) => ({ value: space.chatSpaceId, label: space.spaceName })),
+  ]
+  const saved = original.value?.runEmail?.chatSpaceId
+  if (saved && !options.some((option) => option.value === saved)) options.push({ value: saved, label: chatSpaceLabel(saved) })
+  return options
 })
 
 const abort = new AbortController()
@@ -272,6 +302,7 @@ function show(settings: AuditSettings) {
   scheduleTimeZone.value = settings.schedule.timeZone
   runEmailActive.value = settings.runEmail?.active ?? false
   alsoSendTo.value = [...(settings.runEmail?.alsoSendTo ?? [])]
+  chatSpaceId.value = settings.runEmail?.chatSpaceId ?? ''
   statements.value = settings.statements.map((statement) => ({ ...statement, checks: [...statement.checks] }))
 }
 
@@ -343,10 +374,21 @@ async function load() {
     const response = await auditFacade.getAuditSettings({ audit: auditCode.value }, abort.signal)
     if (response.settings) {
       show(response.settings)
+      if (response.settings.runEmail) void loadChatSpaces()
       if (!response.settings.statements.length) await openNewStatement()
     } else error.value = response.errors?.[0] || 'Audit settings filed for an extension.'
   } catch (caught) {
     if (!abort.signal.aborted) error.value = message(caught)
+  }
+}
+
+// DAR-UI-111. Spaces that fail to load leave only None and the saved one (by id); the rest of the page still works.
+async function loadChatSpaces() {
+  try {
+    const response = await settingsFacade.listTenantChatSpaces(abort.signal)
+    chatSpaces.value = response.chatSpaces ?? []
+  } catch {
+    chatSpaces.value = []
   }
 }
 
@@ -373,8 +415,9 @@ function changes(): SaveAuditSettingsPayload | null {
   }
 
   const email = was.runEmail
-  if (email && canEditRunEmail.value && (runEmailActive.value !== email.active || alsoSendTo.value.join('\n') !== email.alsoSendTo.join('\n'))) {
-    payload.runEmail = { active: runEmailActive.value, alsoSendTo: [...alsoSendTo.value], chatSpaceId: email.chatSpaceId }
+  if (email && canEditRunEmail.value && (runEmailActive.value !== email.active || alsoSendTo.value.join('\n') !== email.alsoSendTo.join('\n') ||
+      chatSpaceId.value !== (email.chatSpaceId ?? ''))) {
+    payload.runEmail = { active: runEmailActive.value, alsoSendTo: [...alsoSendTo.value], chatSpaceId: chatSpaceId.value || null }
   }
   return Object.keys(payload).length > 1 ? payload : null
 }

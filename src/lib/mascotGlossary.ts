@@ -721,8 +721,8 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     byDirectiveOnly: true,
   },
   auditRunEmail: {
-    title: 'Email after each run',
-    body: 'an email to everyone with access to this tenant once each run finishes. Off, findings still record but nobody is told.',
+    title: 'After each run',
+    body: 'an email to everyone with access to this tenant, and a card in the chat space if one is picked, once each run finishes. Off, findings still record but nobody is told.',
   },
   auditRunEmailExtra: {
     title: 'Also send to',

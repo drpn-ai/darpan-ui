@@ -732,9 +732,9 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Revert',
     body: 'throws away the edits made here since the last save and puts back what is saved. Nothing saved is touched.',
   },
-  'email after each run': {
-    title: 'Email after each run',
-    body: 'whether everyone with access to this tenant, plus the extra addresses, gets an email when each audit run finishes. It takes effect when the settings are saved.',
+  'after each run': {
+    title: 'After each run',
+    body: 'whether the email to everyone with access, plus the extra addresses, and the chat space’s card go out when each audit run finishes. It takes effect on save.',
   },
   'save script': {
     title: 'Save script',
