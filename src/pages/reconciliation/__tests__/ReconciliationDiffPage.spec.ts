@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { ApiCallError } from '../../../lib/api/client'
 import { installLocalStorageStub } from '../../../test/localStorage'
@@ -260,6 +260,10 @@ describe('ReconciliationDiffPage', () => {
       generatedOutputs: [],
     })
   })
+
+  // Unmount every page after its test: a page left mounted keeps polling for its submitted run on real timers
+  // and answers the next test's getActiveRunResult mock (DAR-UI-110).
+  enableAutoUnmount(afterEach)
 
   afterEach(() => {
     vi.useRealTimers()
