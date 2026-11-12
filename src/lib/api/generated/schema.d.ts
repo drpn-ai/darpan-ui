@@ -2287,7 +2287,10 @@ export interface components {
         SendAgentTurnParams: {
             /** @description Continue this conversation; empty starts one. */
             conversationId?: string;
-            auditId: string;
+            /** @description The audit's row id; or name it by auditCode. Exactly one of the two. */
+            auditId?: string;
+            /** @description The audit's code (the JSON audit id, e.g. month-close), looked up in the active tenant. */
+            auditCode?: string;
             /** @description The finding the panel is open on. */
             findingId?: string;
             text: string;

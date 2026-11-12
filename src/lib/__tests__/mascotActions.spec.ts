@@ -153,6 +153,7 @@ describe('every button in the app has an answer', () => {
     'pages/reconciliation/AuditReportPage.vue': 'a filter pill is named by its live count and its status label; Export report is entered',
     'pages/settings/TenantScriptsPage.vue': 'a saved-script tile is named by the script, which is this tenant\'s data; New script, Run and Delete are entered',
     'pages/reconciliation/ReconciliationAutomationDashboardPage.vue': 'the running/paused toggle is named by activeToggleLabel — Automation is running / Automation is paused, both entered',
+    'components/audit/AuditAgentPanel.vue': 'a question\'s option buttons are named by the agent\'s own options, which are data; Send to agent is entered',
   }
 
   /**

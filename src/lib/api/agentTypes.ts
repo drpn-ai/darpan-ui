@@ -66,7 +66,10 @@ export interface GetAgentStatusResponse {
 export interface SendAgentTurnPayload {
   /** Continue this conversation; leave it out to start one. */
   conversationId?: string
-  auditId: string
+  /** The audit's row id; or name it by auditCode. Exactly one of the two. */
+  auditId?: string
+  /** The audit's code (the report's audit id, e.g. month-close), looked up in the active tenant. */
+  auditCode?: string
   /** The finding the panel is open on. */
   findingId?: string
   text: string

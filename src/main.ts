@@ -13,6 +13,7 @@ import { useReconciliationDraftStore } from './stores/reconciliationDraft'
 import { reportError } from './lib/observability/report'
 import { vExplain } from './directives/vExplain'
 import './style.css'
+import { clearAgentConversations } from './components/audit/AuditAgentPanel.vue'
 
 const RECONCILIATION_DRAFT_SESSION_KEY = 'darpan.reconciliationDraftStore'
 const RECENT_COMMANDS_STORAGE_KEY = 'darpan-ui-recent-commands'
@@ -31,6 +32,7 @@ setApiCacheReset(() => {
   useReferenceDataStore(pinia).reset()
   useRunResultsStore(pinia).reset()
   useReconciliationDraftStore(pinia).resetAll() // setup-style store: explicit reset; clears its sessionStorage too
+  clearAgentConversations() // DAR-UI-104: the agent panel's conversation ids are per user and tenant
   try {
     // resetAll already removes the draft sessionStorage key; clear it again defensively in case
     // the store has not been instantiated yet (no-op if absent).

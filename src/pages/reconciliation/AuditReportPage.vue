@@ -135,6 +135,12 @@
         @verify="verifyFinding"
         @retry="retryCheck"
       />
+      <AuditAgentPanel
+        :key="`${report.report.tenant.id}:${auditCode}`"
+        :audit-code="auditCode"
+        :tenant-id="report.report.tenant.id"
+        :finding-id="findingTarget"
+      />
     </template>
   </StaticPageFrame>
 </template>
@@ -148,6 +154,7 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
 import AuditColumns from '../../components/audit/AuditColumns.vue'
+import AuditAgentPanel from '../../components/audit/AuditAgentPanel.vue'
 import { auditFacade, reconciliationFacade } from '../../lib/api/facade'
 import { ApiCallError } from '../../lib/api/client'
 import { downloadIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'

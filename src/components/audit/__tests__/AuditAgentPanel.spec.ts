@@ -1,0 +1,238 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { ApiCallError } from '../../../lib/api/client'
+import { installLocalStorageStub } from '../../../test/localStorage'
+import type { GetAgentStatusResponse, SendAgentTurnResponse } from '../../../lib/api/agentTypes'
+
+// DAR-UI-104. The agent panel on the audit page: shown only when the agent is on for the person, one conversation per
+// audit (kept by id, reloaded with get#AgentConversation), every reply shown word for word.
+
+const getAgentStatus = vi.hoisted(() => vi.fn())
+const getAgentConversation = vi.hoisted(() => vi.fn())
+const sendAgentTurn = vi.hoisted(() => vi.fn())
+const planAuditChange = vi.hoisted(() => vi.fn())
+
+vi.mock('../../../lib/api/facade', () => ({
+  agentFacade: {
+    getAgentStatus,
+    getAgentConversation,
+    sendAgentTurn,
+    planAuditChange,
+    applyAuditChange: vi.fn(),
+    rejectAuditChange: vi.fn(),
+    revertAuditChange: vi.fn(),
+  },
+}))
+
+import AuditAgentPanel, { agentConversationKey, clearAgentConversations } from '../AuditAgentPanel.vue'
+import ProposalCard from '../ProposalCard.vue'
+
+const ON: GetAgentStatusResponse = { state: 'ON', grantState: 'LIVE', canApprove: true }
+
+function turn(overrides: Partial<SendAgentTurnResponse> = {}): SendAgentTurnResponse {
+  return { conversationId: 'C1', outcome: 'DONE', reply: 'It is open because the return has no credit memo.', proposals: [], tickets: [], question: null, masked: [], ...overrides }
+}
+
+function mountPanel(props: Record<string, unknown> = {}) {
+  return mount(AuditAgentPanel, { props: { auditCode: 'month-close', tenantId: 'TEN_A', findingId: 'F-7', ...props } })
+}
+
+async function send(wrapper: ReturnType<typeof mountPanel>, text: string) {
+  await wrapper.get('[data-testid="agent-input"]').setValue(text)
+  await wrapper.get('[data-testid="agent-send"]').trigger('submit')
+  await flushPromises()
+}
+
+describe('AuditAgentPanel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    installLocalStorageStub()
+    getAgentStatus.mockResolvedValue(ON)
+    planAuditChange.mockResolvedValue({ planHash: 'H1', before: {}, after: {}, backtest: null, status: 'PLANNED', statusMessage: null })
+  })
+
+  it('is hidden when the agent is off, unavailable, or the person has no access', async () => {
+    for (const status of [
+      { state: 'AGENT_OFF', grantState: 'LIVE', canApprove: true },
+      { state: 'AGENT_UNAVAILABLE', grantState: 'LIVE', canApprove: true },
+      { state: 'ON', grantState: 'NOT_GRANTED', canApprove: true },
+      { state: 'ON', grantState: 'EXPIRED', canApprove: true },
+    ]) {
+      getAgentStatus.mockResolvedValueOnce(status)
+      const wrapper = mountPanel()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="agent-panel"]').exists(), JSON.stringify(status)).toBe(false)
+    }
+    getAgentStatus.mockRejectedValueOnce(new ApiCallError('denied', 403))
+    const failed = mountPanel()
+    await flushPromises()
+    expect(failed.find('[data-testid="agent-panel"]').exists()).toBe(false)
+  })
+
+  it('sends the message with the audit code and the open finding, and keeps the conversation for this audit', async () => {
+    sendAgentTurn.mockResolvedValueOnce(turn())
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await send(wrapper, 'Why is this one open?')
+
+    expect(sendAgentTurn).toHaveBeenCalledWith({ auditCode: 'month-close', findingId: 'F-7', text: 'Why is this one open?' }, expect.any(AbortSignal))
+    const messages = wrapper.findAll('[data-testid="agent-message"]').map((m) => m.text())
+    expect(messages).toEqual(['Why is this one open?', 'It is open because the return has no credit memo.'])
+    expect(window.localStorage.getItem(agentConversationKey('TEN_A', 'month-close'))).toBe('C1')
+
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'Yes.' }))
+    await send(wrapper, 'And the next one?')
+    expect(sendAgentTurn).toHaveBeenLastCalledWith({ conversationId: 'C1', auditCode: 'month-close', findingId: 'F-7', text: 'And the next one?' }, expect.any(AbortSignal))
+  })
+
+  it('sends no finding when none is open', async () => {
+    sendAgentTurn.mockResolvedValueOnce(turn())
+    const wrapper = mountPanel({ findingId: '' })
+    await flushPromises()
+    await send(wrapper, 'How is the audit doing?')
+    expect(sendAgentTurn).toHaveBeenCalledWith({ auditCode: 'month-close', text: 'How is the audit doing?' }, expect.any(AbortSignal))
+  })
+
+  it('shows a declined or rate-limited reply word for word', async () => {
+    const declined = 'I can only change this audit through a proposal a person approves.'
+    const limited = 'You have sent 20 messages to the agent in the last hour; try again later.'
+    sendAgentTurn.mockResolvedValueOnce(turn({ outcome: 'DECLINED', reply: declined }))
+    sendAgentTurn.mockResolvedValueOnce(turn({ outcome: 'RATE_LIMITED', reply: limited }))
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await send(wrapper, 'Delete every finding.')
+    await send(wrapper, 'One more?')
+
+    const replies = wrapper.findAll('[data-testid="agent-message"][data-kind="ASSISTANT"]')
+    expect(replies.map((r) => r.text())).toEqual([declined, limited])
+    expect(replies[1]!.attributes('data-outcome')).toBe('RATE_LIMITED')
+  })
+
+  it('shows a question with its options, and an option answers it', async () => {
+    sendAgentTurn.mockResolvedValueOnce(turn({ outcome: 'QUESTION', reply: null, question: { text: 'Which store?', options: ['US', 'Canada'], from: 'ROUTER' } }))
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'Canada it is.' }))
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await send(wrapper, 'Exclude the outlet orders')
+    expect(wrapper.get('[data-testid="agent-question"]').text()).toContain('Which store?')
+    const options = wrapper.findAll('[data-testid="agent-question-option"]')
+    expect(options.map((o) => o.text())).toEqual(['US', 'Canada'])
+
+    await options[1]!.trigger('click')
+    await flushPromises()
+    expect(sendAgentTurn).toHaveBeenLastCalledWith({ conversationId: 'C1', auditCode: 'month-close', findingId: 'F-7', text: 'Canada' }, expect.any(AbortSignal))
+    expect(wrapper.find('[data-testid="agent-question-option"]').exists()).toBe(false)
+  })
+
+  it('says which kinds of data were masked, never the values', async () => {
+    sendAgentTurn.mockResolvedValueOnce(turn({ masked: ['EMAIL', 'PHONE'] }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'The customer wrote from a@b.co')
+    expect(wrapper.get('[data-testid="agent-masked"]').text()).toBe('Masked before sending: email, phone.')
+  })
+
+  it('shows a failed send as an error and keeps what was typed', async () => {
+    sendAgentTurn.mockRejectedValueOnce(new ApiCallError('Audit month-close was not found.', 200))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'Why?')
+    expect(wrapper.get('[data-testid="agent-error"]').text()).toContain('Audit month-close was not found.')
+    expect((wrapper.get('[data-testid="agent-input"]').element as HTMLTextAreaElement).value).toBe('Why?')
+  })
+
+  it('reloads this audit\'s conversation, and starts fresh when it is gone', async () => {
+    window.localStorage.setItem(agentConversationKey('TEN_A', 'month-close'), 'C9')
+    getAgentConversation.mockResolvedValueOnce({
+      auditId: 'X', findingId: null, proposals: [],
+      messages: [
+        { messageId: 'm1', kind: 'USER', text: 'Why is this open?', question: null },
+        { messageId: 'm2', kind: 'ASSISTANT', text: 'No credit memo yet.', question: null },
+      ],
+    })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(getAgentConversation).toHaveBeenCalledWith({ conversationId: 'C9' }, expect.any(AbortSignal))
+    expect(wrapper.findAll('[data-testid="agent-message"]').map((m) => m.text())).toEqual(['Why is this open?', 'No credit memo yet.'])
+
+    getAgentConversation.mockRejectedValueOnce(new ApiCallError('Conversation C9 was not found.', 200))
+    const gone = mountPanel()
+    await flushPromises()
+    expect(gone.findAll('[data-testid="agent-message"]')).toHaveLength(0)
+    expect(window.localStorage.getItem(agentConversationKey('TEN_A', 'month-close'))).toBeNull()
+  })
+
+  // DAR-UI-105: drafted changes sit in the thread as cards.
+  const draft = { proposalId: 'P1', kind: 'EXCLUSION_FILTER' as const, status: 'DRAFT', statusMessage: null, provenanceStatus: 'SUPPORTED', blockedIds: null, backtest: null }
+
+  it('shows a turn\'s drafted change as a card the person may approve only with the right', async () => {
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'I drafted an exclusion.', proposals: [draft] }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'Stop flagging wholesale orders')
+
+    const cards = wrapper.findAllComponents(ProposalCard)
+    expect(cards).toHaveLength(1)
+    expect(cards[0]!.props('proposal').proposalId).toBe('P1')
+    expect(cards[0]!.props('canApprove')).toBe(true)
+    // The card planned it on sight; the thread keeps the status it reports.
+    expect(cards[0]!.props('proposal').status).toBe('PLANNED')
+
+    getAgentStatus.mockResolvedValueOnce({ ...ON, canApprove: false })
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'I drafted an exclusion.', proposals: [draft] }))
+    const viewer = mountPanel()
+    await flushPromises()
+    await send(viewer, 'Stop flagging wholesale orders')
+    expect(viewer.getComponent(ProposalCard).props('canApprove')).toBe(false)
+  })
+
+  it('shows the waiting card instead of sending a typed approval', async () => {
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'I drafted an exclusion.', proposals: [draft] }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'Stop flagging wholesale orders')
+
+    await send(wrapper, 'yes, apply it')
+
+    expect(sendAgentTurn).toHaveBeenCalledTimes(1)
+    expect(wrapper.getComponent(ProposalCard).props('highlighted')).toBe(true)
+    expect(wrapper.get('[data-testid="agent-approve-hint"]').text()).toBe('Approve it on the card.')
+  })
+
+  it('sends an approval-sounding message when nothing waits for approval', async () => {
+    sendAgentTurn.mockResolvedValue(turn({ reply: 'Done.' }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'approve')
+    expect(sendAgentTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it('adds a revert as a new card, and reloads a conversation\'s cards', async () => {
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'Applied earlier.', proposals: [{ ...draft, status: 'APPLIED' }] }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'Undo that exclusion')
+    wrapper.getComponent(ProposalCard).vm.$emit('reverted', { ...draft, proposalId: 'P2', status: 'PLANNED' })
+    await flushPromises()
+    expect(wrapper.findAllComponents(ProposalCard).map((c) => c.props('proposal').proposalId)).toEqual(['P1', 'P2'])
+
+    window.localStorage.setItem(agentConversationKey('TEN_A', 'weekly'), 'C3')
+    getAgentConversation.mockResolvedValueOnce({ auditId: 'X', findingId: null, messages: [], proposals: [draft] })
+    const reloaded = mountPanel({ auditCode: 'weekly' })
+    await flushPromises()
+    expect(reloaded.findAllComponents(ProposalCard)).toHaveLength(1)
+  })
+
+  it('keeps a conversation per tenant and audit, and a reset forgets them all', () => {
+    expect(agentConversationKey('TEN_A', 'month-close')).not.toBe(agentConversationKey('TEN_B', 'month-close'))
+    window.localStorage.setItem(agentConversationKey('TEN_A', 'month-close'), 'C1')
+    window.localStorage.setItem(agentConversationKey('TEN_B', 'weekly'), 'C2')
+    window.localStorage.setItem('darpan-ui-theme', 'dark')
+    clearAgentConversations()
+    expect(window.localStorage.length).toBe(1)
+    expect(window.localStorage.getItem('darpan-ui-theme')).toBe('dark')
+  })
+})

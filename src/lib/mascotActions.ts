@@ -744,6 +744,24 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Save conclusions',
     body: 'replaces this run’s whole conclusion tree, all or nothing — one refusal and nothing is saved. Results get named by it; the records never change.',
   },
+
+  /* ── The audit's agent (DAR-UI-104/105) ─────────────────────────────────────── */
+  'send to agent': {
+    title: 'Send to agent',
+    body: 'your words go to the agent with the finding open here. Keys, emails and phones are masked first; a message alone never changes the audit.',
+  },
+  'approve change': {
+    title: 'Approve change',
+    body: 'applies exactly the plan on this card. If the audit moved since it was planned, nothing is written and the card shows the new plan instead.',
+  },
+  'reject change': {
+    title: 'Reject change',
+    body: 'closes this draft for good; it can never be applied. The audit is untouched, and the agent can still draft a different one.',
+  },
+  'revert change': {
+    title: 'Revert change',
+    body: 'drafts the undo of this applied change as a new card. Nothing goes back until someone approves that card.',
+  },
 })
 
 /**

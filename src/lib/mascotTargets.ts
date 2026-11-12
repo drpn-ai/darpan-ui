@@ -172,6 +172,12 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   // NOT here: each form points at its own meaning with v-explain, and those entries stay out of the index.
   'change password': 'accountPassword',
   'date window': 'automationWindow',
+
+  // The audit's agent (DAR-UI-104/105).
+  'ask the agent': 'agentMessage',
+  'before the change': 'changeBefore',
+  'after the change': 'changeAfter',
+  'backtest': 'changeBacktest',
 })
 
 /**

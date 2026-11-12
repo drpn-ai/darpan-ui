@@ -770,6 +770,24 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Headline',
     body: 'the one line each finding opens with, filled per record ({recordKey} is its id). Blank uses the record type, id and this check’s name.',
   },
+
+  // DAR-UI-104/105. The audit's agent and the changes it drafts.
+  agentMessage: {
+    title: 'Ask the agent',
+    body: 'why a finding is open, or what to change. It answers and can draft a change, but only someone approving a card changes the audit.',
+  },
+  changeBefore: {
+    title: 'Before the change',
+    body: 'the audit as it stands now, read when this plan was made. If it moves before approval, the card plans again.',
+  },
+  changeAfter: {
+    title: 'After the change',
+    body: 'what the audit becomes on approval, checked by a real save that was rolled back — so a plan that would be refused says so here.',
+  },
+  changeBacktest: {
+    title: 'Backtest',
+    body: 'how today’s findings would move under this change: which would close and which would stay. Nothing is applied to get it.',
+  },
 })
 
 /** Null rather than a throw: a missing phrase is a content gap, not a crash. */

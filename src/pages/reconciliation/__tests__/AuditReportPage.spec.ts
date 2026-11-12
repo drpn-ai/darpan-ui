@@ -18,6 +18,7 @@ vi.mock('vue-router', async () => {
 vi.mock('../../../lib/api/facade', () => ({
   auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn(), getAuditProgress: vi.fn(), retryAuditCheck: vi.fn() },
   reconciliationFacade: { getGeneratedOutput: vi.fn() },
+  agentFacade: { getAgentStatus: vi.fn(), getAgentConversation: vi.fn(), sendAgentTurn: vi.fn() },
 }))
 
 vi.mock('../../../lib/utils/download', () => ({ downloadTextFile: vi.fn() }))
@@ -25,9 +26,10 @@ vi.mock('../../../lib/utils/download', () => ({ downloadTextFile: vi.fn() }))
 import { downloadTextFile } from '../../../lib/utils/download'
 import { useRoute } from 'vue-router'
 import { WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
-import { auditFacade, reconciliationFacade } from '../../../lib/api/facade'
+import { agentFacade, auditFacade, reconciliationFacade } from '../../../lib/api/facade'
 import { ApiCallError } from '../../../lib/api/client'
 import AuditReportPage from '../AuditReportPage.vue'
+import AuditAgentPanel from '../../../components/audit/AuditAgentPanel.vue'
 import type { AuditReport } from '../../../lib/api/auditTypes'
 
 const f = vi.mocked(auditFacade)
@@ -113,6 +115,7 @@ beforeEach(() => {
   f.getAuditReport.mockResolvedValue({ ok: true, report: report() } as never)
   f.getAuditFinding.mockResolvedValue({ ok: true, finding: findingDocument } as never)
   f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 0, active: [] } } as never)
+  vi.mocked(agentFacade.getAgentStatus).mockReset().mockResolvedValue({ state: 'AGENT_OFF', grantState: 'NOT_GRANTED', canApprove: false })
 })
 
 // DAR-UI-091. A cause starts folded; open every one to see its findings.
@@ -956,6 +959,18 @@ describe('AuditReportPage', () => {
   })
 
   // DAR-BE-123. Resolve re-checks the finding in the background and reads it again until its last check moves.
+  // DAR-UI-104: the agent panel is told the audit by code and the finding the page has open.
+  it('gives the agent panel this audit and the open finding, and shows it when the agent is on', async () => {
+    vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: true })
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+
+    const panel = w.getComponent(AuditAgentPanel)
+    expect(panel.props()).toMatchObject({ auditCode: 'month-close', findingId: 'F-1', tenantId: report().report.tenant.id })
+    expect(w.find('[data-testid="agent-panel"]').exists()).toBe(true)
+  })
+
   it('resolves a finding: re-checks it, waits for the check, and says it closed', async () => {
     vi.useFakeTimers()
     const heard: string[] = []
