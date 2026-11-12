@@ -781,6 +781,57 @@ describe('ReconciliationDiffPage', () => {
     expect(JSON.parse(window.localStorage.getItem('darpan.pendingReconciliationRuns') ?? '[]')).toHaveLength(1)
   })
 
+  it('submits once when Execute is pressed again while the uploads are still being read', async () => {
+    // A large CSV takes a while to read; until the request goes out the store is not "running" yet.
+    let finishReads: Array<() => void> = []
+    class SlowFileReader {
+      result: string | ArrayBuffer | null = null
+      onload: null | (() => void) = null
+      onerror: null | (() => void) = null
+      readAsText(file: File): void {
+        finishReads.push(() => {
+          this.result = file.name === 'oms-orders.csv' ? 'order_id\n1001\n' : 'order_id\n1002\n'
+          this.onload?.()
+        })
+      }
+    }
+    vi.stubGlobal('FileReader', SlowFileReader as unknown as typeof FileReader)
+    route.query = {
+      savedRunId: 'RS_ORDER_CSV',
+      runName: 'CSV Order Compare',
+      file1SystemLabel: 'OMS',
+      file2SystemLabel: 'SHOPIFY',
+    }
+    runSavedRunDiff.mockReturnValue(new Promise(() => {}))
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+    for (const [testId, name] of [['file1-input', 'oms-orders.csv'], ['file2-input', 'shopify-orders.csv']] as const) {
+      const input = wrapper.get(`[data-testid="${testId}"]`)
+      Object.defineProperty(input.element, 'files', {
+        value: [new File(['order_id\n'], name, { type: 'text/csv' })],
+        configurable: true,
+      })
+      await input.trigger('change')
+      await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
+      await flushPromises()
+    }
+
+    // Execute again before the reads finish, by Enter and by the button.
+    await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
+    await wrapper.get('[data-testid="reconciliation-step-primary"]').trigger('click')
+    expect(wrapper.get('[data-testid="reconciliation-step-primary"]').attributes('disabled')).toBeDefined()
+
+    const reads = finishReads
+    finishReads = []
+    reads.forEach((finish) => finish())
+    await flushPromises()
+
+    expect(reads).toHaveLength(2)
+    expect(runSavedRunDiff).toHaveBeenCalledTimes(1)
+    expect(getActiveRunResult).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps the pending run marker when the submitted request is interrupted after starting', async () => {
     stubFileReader()
     route.query = {

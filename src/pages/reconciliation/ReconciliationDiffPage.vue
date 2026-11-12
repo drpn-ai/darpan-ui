@@ -16,7 +16,7 @@
             class="workflow-step-shell"
             :question="currentQuestion"
             :primary-label="primaryButtonLabel"
-            :submit-disabled="!canContinue || running || loadingMappings"
+            :submit-disabled="!canContinue || running || submittingRun || loadingMappings"
             :show-back="currentStepIndex > 0"
             :allow-select-enter="true"
             :allow-file-enter="isFileStepId(currentStep.id)"
@@ -544,6 +544,7 @@ const clearLatestSavedOutputState = diff.clearLatestSavedOutputState
 const pageAbortController = new AbortController()
 let latestOutputAbortController: AbortController | null = null
 let submitDiffAbortController: AbortController | null = null
+const submittingRun = ref(false)
 
 onBeforeUnmount(() => {
   pageAbortController.abort()
@@ -761,7 +762,15 @@ async function handlePrimaryAction(): Promise<void> {
     return
   }
 
-  await runDiff()
+  // Reading the uploads comes before the request, and the store says "running" only once the request
+  // goes out; a second Enter or click in between would start the run again (DAR-UI-110).
+  if (submittingRun.value) return
+  submittingRun.value = true
+  try {
+    await runDiff()
+  } finally {
+    submittingRun.value = false
+  }
 }
 
 async function runDiff(): Promise<void> {
