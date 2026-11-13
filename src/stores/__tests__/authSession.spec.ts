@@ -372,6 +372,22 @@ describe('auth state', () => {
     expect(useAuthStore().error).toBeNull()
   })
 
+  // DAR-BE-264: change#OwnPassword refuses a wrong current password as a JSON-RPC error. The person stays signed in and
+  // reads the backend's own sentence, not a generic failure.
+  it('a wrong current password keeps the session and says exactly that', async () => {
+    const { ApiCallError } = await import('../../lib/api/client')
+    changeOwnPasswordRpc.mockRejectedValue(new ApiCallError('Current password is incorrect.', 200))
+    const { useAuthStore } = await import('../auth')
+
+    await expect(useAuthStore().changeOwnPassword({
+      currentPassword: 'wrong-password',
+      newPassword: 'new-password-1!',
+      newPasswordVerify: 'new-password-1!',
+    })).resolves.toBe(false)
+    expect(useAuthStore().error).toBe('Current password is incorrect.')
+    expect(useAuthStore().status).not.toBe('unauthenticated')
+  })
+
   it('verifies the current user password through the authenticated auth facade', async () => {
     verifyOwnPasswordRpc.mockResolvedValue({
       ok: true,
