@@ -197,7 +197,7 @@ describe('LoginPage', () => {
     expect(wrapper.find('.login-page > [data-testid="password-change-notice"]').exists()).toBe(true)
   })
 
-  // Backend policy is MoquiDefaultConf <password min-length="8" min-digits="1" min-others="1">.
+  // Backend policy: darpan MoquiConf <password min-length="12"/> (DAR-BE-268) + MoquiDefaultConf min-digits="1" min-others="1".
   // Without these stated up front the only way to discover them was to be rejected by the server.
   it('states the password rules and marks each one live as it is satisfied', async () => {
     const wrapper = await signInIntoPasswordChange()
@@ -209,13 +209,13 @@ describe('LoginPage', () => {
 
     expect(ruleState()).toEqual({ length: 'false', digit: 'false', other: 'false' })
 
-    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdefgh')
+    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdefghijkl')
     expect(ruleState()).toEqual({ length: 'true', digit: 'false', other: 'false' })
 
-    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdefg1')
+    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdefghijk1')
     expect(ruleState()).toEqual({ length: 'true', digit: 'true', other: 'false' })
 
-    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdef1!')
+    await wrapper.get('input[autocomplete="new-password"]').setValue('abcdefghij1!')
     expect(ruleState()).toEqual({ length: 'true', digit: 'true', other: 'true' })
   })
 
@@ -223,7 +223,7 @@ describe('LoginPage', () => {
     const wrapper = await signInIntoPasswordChange()
     const primary = () => wrapper.get('[data-testid="login-password-next"]')
 
-    await wrapper.get('input[autocomplete="new-password"]').setValue('short1!')
+    await wrapper.get('input[autocomplete="new-password"]').setValue('elevenchr1!')
     expect(primary().attributes('disabled')).toBeDefined()
 
     await wrapper.get('input[autocomplete="new-password"]').setValue('longenoughbutnodigit!')
@@ -434,14 +434,14 @@ describe('LoginPage', () => {
     await completeResetStep(wrapper, 'pwr.user')
     await enterCode(wrapper, '123456')
     expect(wrapper.text()).toContain('Enter your new password.')
-    await completeResetStep(wrapper, 'N3w-pass!')
+    await completeResetStep(wrapper, 'N3w-password!')
     expect(wrapper.text()).toContain('Enter it again.')
-    await completeResetStep(wrapper, 'N3w-pass!')
+    await completeResetStep(wrapper, 'N3w-password!')
 
     expect(completePasswordReset).toHaveBeenCalledWith({
-      usernameOrEmail: 'pwr.user', code: '123456', newPassword: 'N3w-pass!', newPasswordVerify: 'N3w-pass!',
+      usernameOrEmail: 'pwr.user', code: '123456', newPassword: 'N3w-password!', newPasswordVerify: 'N3w-password!',
     })
-    expect(loginWithCredentials).toHaveBeenCalledWith('pwr.user', 'N3w-pass!')
+    expect(loginWithCredentials).toHaveBeenCalledWith('pwr.user', 'N3w-password!')
     expect(replace).toHaveBeenCalledWith('/settings')
   })
 
@@ -451,8 +451,8 @@ describe('LoginPage', () => {
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
     await enterCode(wrapper, '123456')
-    await completeResetStep(wrapper, 'N3w-pass!')
-    await completeResetStep(wrapper, 'N3w-pass!')
+    await completeResetStep(wrapper, 'N3w-password!')
+    await completeResetStep(wrapper, 'N3w-password!')
 
     expect(wrapper.text()).toContain('Password was used in last 5 passwords')
     expect(wrapper.text()).toContain('Enter your new password.')
@@ -557,14 +557,14 @@ describe('LoginPage', () => {
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
     await enterCode(wrapper, '123456')
-    await completeResetStep(wrapper, 'N3w-pass!')
-    await completeResetStep(wrapper, 'N3w-pass!')
+    await completeResetStep(wrapper, 'N3w-password!')
+    await completeResetStep(wrapper, 'N3w-password!')
 
     expect(wrapper.text()).toContain('Where should password reset codes go?')
     await wrapper.get('[data-testid="login-recovery-input"]').setValue('me@example.com')
     await wrapper.get('[data-testid="login-recovery-save"]').trigger('click')
     await flushPromises()
-    expect(saveRecoveryEmail).toHaveBeenCalledWith('me@example.com', 'N3w-pass!')
+    expect(saveRecoveryEmail).toHaveBeenCalledWith('me@example.com', 'N3w-password!')
   })
 
   // ---- final review fixes ----
@@ -589,8 +589,8 @@ describe('LoginPage', () => {
     const wrapper = await openReset()
     await completeResetStep(wrapper, 'pwr.user')
     await enterCode(wrapper, '123456')
-    await completeResetStep(wrapper, 'N3w-pass!')
-    await completeResetStep(wrapper, 'N3w-pass!')
+    await completeResetStep(wrapper, 'N3w-password!')
+    await completeResetStep(wrapper, 'N3w-password!')
 
     expect(wrapper.text()).toContain('Enter the code we emailed.')
     expect(wrapper.find('[data-testid="login-reset-resend"]').exists()).toBe(true)

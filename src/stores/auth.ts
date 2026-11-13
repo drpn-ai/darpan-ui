@@ -593,7 +593,7 @@ export const useAuthStore = defineStore('auth', () => {
       return changed
     } catch (err) {
       // The backend reports a rejected new password as a service error rather than an envelope, so the
-      // policy text ("shorter than 8 characters", "was used in last 5 passwords") arrives here.
+      // policy text ("shorter than 12 characters", "was used in last 5 passwords") arrives here.
       _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
       return false
     }

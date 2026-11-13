@@ -356,7 +356,7 @@ describe('password reset and recovery email', () => {
   it('completes a reset and surfaces a refused password', async () => {
     completePasswordResetMock.mockResolvedValueOnce({ ok: true, passwordUpdated: true, messages: [], errors: [] })
     completePasswordResetMock.mockResolvedValueOnce({
-      ok: false, passwordUpdated: false, messages: [], errors: ['Password shorter than 8 characters'],
+      ok: false, passwordUpdated: false, messages: [], errors: ['Password shorter than 12 characters'],
     })
     const store = useAuthStore()
     const payload = { usernameOrEmail: 'pwr.user', code: '123456', newPassword: 'N3w-pass!', newPasswordVerify: 'N3w-pass!' }
@@ -364,7 +364,7 @@ describe('password reset and recovery email', () => {
     expect(await store.completePasswordReset(payload)).toBe(true)
     expect(completePasswordResetMock).toHaveBeenCalledWith(payload)
     expect(await store.completePasswordReset({ ...payload, newPassword: 'a', newPasswordVerify: 'a' })).toBe(false)
-    expect(store.error).toBe('Password shorter than 8 characters')
+    expect(store.error).toBe('Password shorter than 12 characters')
   })
 
   it('reads the recovery email flags from the session', async () => {

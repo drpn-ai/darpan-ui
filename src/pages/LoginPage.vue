@@ -284,11 +284,11 @@ const passwordStepValue = computed({
     }
   },
 })
-// Mirrors the backend policy in MoquiDefaultConf's <user-facade><password ...>:
-// min-length="8" min-digits="1" min-others="1". Kept in one place so the helper text, the live
+// Mirrors the backend policy: darpan's MoquiConf <password min-length="12"/> (DAR-BE-268) over
+// MoquiDefaultConf's min-digits="1" min-others="1". Kept in one place so the helper text, the live
 // checks and the submit gate can never drift apart. history-limit="5" is deliberately not listed:
 // only the server can know a user's previous passwords, so it stays a server-side rejection.
-const PASSWORD_MIN_LENGTH = 8
+const PASSWORD_MIN_LENGTH = 12
 
 const isChoosingNewPassword = computed(() => passwordStep.value.name === 'newPassword')
 
