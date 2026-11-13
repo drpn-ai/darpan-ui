@@ -720,10 +720,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Use a passkey',
     body: 'answers with your fingerprint, face, phone or security key instead of six digits. Closing the browser prompt changes nothing; try again or go back to the code.',
   },
-  'use a passkey instead': {
-    title: 'Use a passkey instead',
-    body: 'makes a passkey your way in, in place of the authenticator app. Either one alone is enough; add the other later in User Settings.',
-  },
   'add a passkey': {
     title: 'Add a passkey',
     body: 'registers this device or a security key. A first passkey turns two-factor on and ends your other sessions and CLI sign-ins.',
@@ -735,10 +731,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   'use the app code': {
     title: 'Use the app code',
     body: 'goes back to the six digits from your authenticator app. Switching uses nothing up; your passkeys stay registered.',
-  },
-  'back to sign in': {
-    title: 'Back to sign in',
-    body: 'drops this two-factor step. Your password starts a new one.',
   },
   'copy': {
     title: 'Copy',

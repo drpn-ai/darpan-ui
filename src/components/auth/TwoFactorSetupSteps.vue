@@ -15,25 +15,14 @@
       <img v-if="setup.qrDataUri" class="two-factor-qr" :src="setup.qrDataUri" alt="QR code for your authenticator app" data-testid="two-factor-qr" />
       <div class="two-factor-key-block">
         <span class="section-note">Can't scan? Key:</span>
-        <span class="two-factor-key" data-testid="two-factor-key">{{ groupedKey }}</span>
+        <span ref="keyText" class="two-factor-key" data-testid="two-factor-key">{{ groupedKey }}</span>
         <div class="action-row">
-          <button type="button" data-testid="two-factor-key-copy" @click="copyKey">Copy</button>
+          <button type="button" data-testid="two-factor-key-copy" @click="copy(setup.secret, keyText)">Copy</button>
           <a class="login-text-link" :href="setup.otpauthUri" data-testid="two-factor-otpauth">Open in app</a>
-          <span v-if="keyNote" class="section-note" role="status">{{ keyNote }}</span>
+          <span class="section-note" role="status" data-testid="two-factor-key-copy-note">{{ note }}</span>
         </div>
       </div>
     </div>
-    <!-- DAR-BE-270: a passkey is the other first factor. -->
-    <button
-      v-if="offerPasskey"
-      type="button"
-      class="login-text-link"
-      data-testid="two-factor-use-passkey"
-      :disabled="passkeyBusy"
-      @click="emit('use-passkey')"
-    >
-      Use a passkey instead
-    </button>
   </WorkflowStepForm>
 
   <WorkflowStepForm
@@ -51,17 +40,7 @@
     <WorkflowCodeInput v-model="code" label="Authenticator code" test-id="two-factor-setup-code" @complete="confirm" />
   </WorkflowStepForm>
 
-  <WorkflowStepForm
-    v-else
-    :class="formClass"
-    question="Save your recovery codes."
-    primary-label="I saved them"
-    :show-enter-hint="false"
-    primary-test-id="two-factor-codes-saved"
-    @submit="emit('done')"
-  >
-    <TwoFactorRecoveryCodes :codes="recoveryCodes" :username="username" />
-  </WorkflowStepForm>
+  <TwoFactorRecoveryCodes v-else :class="formClass" :codes="recoveryCodes" :username="username" @done="emit('done')" />
 
   <InlineValidation v-if="error" tone="error" :message="error" />
 </template>
@@ -72,7 +51,8 @@ import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowCodeInput from '../workflow/WorkflowCodeInput.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
 import TwoFactorRecoveryCodes from './TwoFactorRecoveryCodes.vue'
-import { copyText, groupSecret } from '../../lib/twoFactor'
+import { useCopy } from '../../composables/useCopy'
+import { groupSecret } from '../../lib/twoFactor'
 import { useAuthStore, type TwoFactorSetupStart } from '../../stores/auth'
 
 const props = defineProps<{
@@ -80,9 +60,6 @@ const props = defineProps<{
   username?: string | null
   /** `workflow-form--popup-compact` inside a settings popup. */
   formClass?: string
-  /** DAR-BE-270: offer a passkey instead of the app on the scan step. */
-  offerPasskey?: boolean
-  passkeyBusy?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -94,8 +71,6 @@ const emit = defineEmits<{
   back: []
   /** The sign-in challenge or the pending setup is gone; start over. */
   ended: [message: string]
-  /** "Use a passkey instead". */
-  'use-passkey': []
 }>()
 
 const authStore = useAuthStore()
@@ -103,14 +78,11 @@ const step = ref<'scan' | 'code' | 'codes'>('scan')
 const code = ref('')
 const confirming = ref(false)
 const error = ref<string | null>(null)
-const keyNote = ref<string | null>(null)
 const recoveryCodes = ref<string[]>([])
+const keyText = ref<HTMLElement | null>(null)
+const { note, copy } = useCopy()
 
 const groupedKey = computed(() => groupSecret(props.setup.secret))
-
-async function copyKey(): Promise<void> {
-  keyNote.value = (await copyText(props.setup.secret)) ? 'Copied.' : 'Copy blocked. Type the key.'
-}
 
 function backToScan(): void {
   error.value = null

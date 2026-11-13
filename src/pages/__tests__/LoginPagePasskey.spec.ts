@@ -211,16 +211,18 @@ describe('LoginPage passkeys', () => {
     expect(beginPasskeySignIn).not.toHaveBeenCalled()
   })
 
-  it('a required setup can be a passkey: Continue opens the prompt, the recovery codes show once, then it signs in', async () => {
+  it('a required setup asks app or passkey first; a passkey begins no app setup and signs in after the codes', async () => {
     loginSession.mockResolvedValue(setupChallenge)
-    beginTwoFactorSetup.mockResolvedValue(setupStart)
     finishPasskeyRegistration.mockResolvedValue(signedIn('key-after-passkey', { passkeyId: 'P1', recoveryCodes: CODES, challengeEnded: false }))
     webauthn?.create.mockRejectedValueOnce(notAllowed())
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
-    expect(wrapper.text()).toContain('Scan this with your authenticator app.')
-    await click(wrapper, 'two-factor-use-passkey')
+    expect(wrapper.text()).toContain('Authenticator app or passkey?')
+    await click(wrapper, 'two-factor-enrol-passkey')
+    await click(wrapper, 'two-factor-enrol-next')
+    // No pending app row is made for someone who chose a passkey.
+    expect(beginTwoFactorSetup).not.toHaveBeenCalled()
     expect(beginPasskeyRegistration).toHaveBeenCalledWith({ challengeToken: CHALLENGE })
     expect(wrapper.text()).toContain('Add a passkey.')
 
@@ -228,7 +230,7 @@ describe('LoginPage passkeys', () => {
     await click(wrapper, 'passkey-add-next')
     expect(finishPasskeyRegistration).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Add a passkey.')
-    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('.inline-validation.error').exists()).toBe(false)
 
     await click(wrapper, 'passkey-add-next')
 
@@ -242,14 +244,29 @@ describe('LoginPage passkeys', () => {
     expect(replace).toHaveBeenCalledWith('/')
   })
 
-  it('a refused passkey setup begins again with the same challenge and says why', async () => {
+  it('the app is the default answer, and Back from its scan step returns to the choice', async () => {
     loginSession.mockResolvedValue(setupChallenge)
     beginTwoFactorSetup.mockResolvedValue(setupStart)
+    const wrapper = mount(LoginPage)
+
+    await signIn(wrapper)
+    await click(wrapper, 'two-factor-enrol-next')
+    expect(beginTwoFactorSetup).toHaveBeenCalledWith({ challengeToken: CHALLENGE })
+    expect(wrapper.text()).toContain('Scan this with your authenticator app.')
+
+    await wrapper.get('.wizard-back').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Authenticator app or passkey?')
+  })
+
+  it('a refused passkey setup begins again with the same challenge and says why', async () => {
+    loginSession.mockResolvedValue(setupChallenge)
     finishPasskeyRegistration.mockResolvedValue({ ...refusal(false, 'That passkey is already registered.'), passkeyId: undefined })
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
-    await click(wrapper, 'two-factor-use-passkey')
+    await click(wrapper, 'two-factor-enrol-passkey')
+    await click(wrapper, 'two-factor-enrol-next')
     await click(wrapper, 'passkey-add-next')
 
     expect(wrapper.text()).toContain('That passkey is already registered.')
@@ -267,10 +284,35 @@ describe('LoginPage passkeys', () => {
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
-    await click(wrapper, 'two-factor-use-passkey')
+    await click(wrapper, 'two-factor-enrol-passkey')
+    await click(wrapper, 'two-factor-enrol-next')
 
     expect(wrapper.text()).toContain('Passkeys are not available on this Darpan instance.')
+    expect(wrapper.text()).toContain('Set up an authenticator app.')
+    expect(wrapper.find('[data-testid="two-factor-enrol-passkey"]').exists()).toBe(false)
+    await click(wrapper, 'two-factor-enrol-next')
     expect(wrapper.text()).toContain('Scan this with your authenticator app.')
-    expect(wrapper.find('[data-testid="two-factor-use-passkey"]').exists()).toBe(false)
+  })
+
+  it('in the grace period a passkey is set up with the password just used, then the codes, then on', async () => {
+    loginSession.mockResolvedValue(signedIn('grace-key', {
+      sessionInfo: { userId: 'U1', username: 'ada', twoFactorEnabled: false, twoFactorDueDate: '2026-12-01T12:00:00Z' },
+    }))
+    finishPasskeyRegistration.mockResolvedValue(signedIn('key-after-first-passkey', { passkeyId: 'P1', recoveryCodes: CODES }))
+    const wrapper = mount(LoginPage)
+
+    await signIn(wrapper)
+    expect(wrapper.text()).toContain('Set up two-factor by 1 Dec.')
+    await click(wrapper, 'login-two-factor-due-setup')
+    await click(wrapper, 'two-factor-enrol-passkey')
+    await click(wrapper, 'two-factor-enrol-next')
+    expect(beginPasskeyRegistration).toHaveBeenCalledWith({ currentPassword: 'right-password' })
+
+    await click(wrapper, 'passkey-add-next')
+    // Signed in, a first factor swaps this tab to the key the backend reissued.
+    expect(finishPasskeyRegistration).toHaveBeenCalledWith({ credential: CREATED_JSON })
+    expect(getAuthToken()).toBe('key-after-first-passkey')
+    await click(wrapper, 'two-factor-codes-saved')
+    expect(replace).toHaveBeenCalledWith('/')
   })
 })

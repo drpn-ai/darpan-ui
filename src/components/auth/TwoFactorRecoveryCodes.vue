@@ -1,21 +1,31 @@
 <template>
-  <!-- DAR-BE-264: the ten codes are in this reply only, so Copy and Download sit beside them. When the browser
-       refuses the copy, the codes are selected so the person's own Cmd/Ctrl+C works. -->
-  <div class="stack-md" data-testid="two-factor-recovery-codes">
-    <ol ref="codeList" class="two-factor-codes" aria-label="Recovery codes">
-      <li v-for="code in codes" :key="code" data-testid="two-factor-recovery-code">{{ code }}</li>
-    </ol>
-    <div class="action-row">
-      <button type="button" data-testid="two-factor-codes-copy" @click="copyCodes">Copy</button>
-      <button type="button" data-testid="two-factor-codes-download" @click="downloadCodes">Download</button>
-      <span v-if="copyNote" class="section-note" role="status" data-testid="two-factor-codes-copy-note">{{ copyNote }}</span>
+  <!-- DAR-BE-264: the last step wherever two-factor turns on or new codes are made. The codes are in this reply only,
+       so Copy and Download sit beside them. -->
+  <WorkflowStepForm
+    question="Save your recovery codes."
+    primary-label="I saved them"
+    :show-enter-hint="false"
+    primary-test-id="two-factor-codes-saved"
+    @submit="emit('done')"
+  >
+    <div class="stack-md" data-testid="two-factor-recovery-codes">
+      <ol ref="codeList" class="two-factor-codes" aria-label="Recovery codes">
+        <li v-for="code in codes" :key="code" data-testid="two-factor-recovery-code">{{ code }}</li>
+      </ol>
+      <div class="action-row">
+        <button type="button" data-testid="two-factor-codes-copy" @click="copy(codes.join('\n'), codeList)">Copy</button>
+        <button type="button" data-testid="two-factor-codes-download" @click="downloadCodes">Download</button>
+        <span class="section-note" role="status" data-testid="two-factor-codes-copy-note">{{ note }}</span>
+      </div>
     </div>
-  </div>
+  </WorkflowStepForm>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { copyText, recoveryCodesFileText } from '../../lib/twoFactor'
+import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
+import { useCopy } from '../../composables/useCopy'
+import { recoveryCodesFileText } from '../../lib/twoFactor'
 import { downloadTextFile } from '../../lib/utils/download'
 
 const props = defineProps<{
@@ -23,27 +33,13 @@ const props = defineProps<{
   username?: string | null
 }>()
 
+const emit = defineEmits<{
+  /** "I saved them". */
+  done: []
+}>()
+
 const codeList = ref<HTMLOListElement | null>(null)
-const copyNote = ref<string | null>(null)
-
-async function copyCodes(): Promise<void> {
-  if (await copyText(props.codes.join('\n'))) {
-    copyNote.value = 'Copied.'
-    return
-  }
-  selectCodes()
-  copyNote.value = 'Selected. Press Ctrl+C or ⌘C.'
-}
-
-function selectCodes(): void {
-  const list = codeList.value
-  const selection = typeof window !== 'undefined' ? window.getSelection() : null
-  if (!list || !selection) return
-  const range = document.createRange()
-  range.selectNodeContents(list)
-  selection.removeAllRanges()
-  selection.addRange(range)
-}
+const { note, copy } = useCopy()
 
 function downloadCodes(): void {
   downloadTextFile('darpan-recovery-codes.txt', recoveryCodesFileText(props.codes, props.username))

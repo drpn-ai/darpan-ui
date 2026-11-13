@@ -37,17 +37,13 @@
           @done="emit('close')"
         />
 
-        <WorkflowStepForm
+        <TwoFactorRecoveryCodes
           v-else-if="recoveryCodes"
           class="workflow-form--popup-compact"
-          question="Save your recovery codes."
-          primary-label="I saved them"
-          :show-enter-hint="false"
-          primary-test-id="two-factor-codes-saved"
-          @submit="emit('close')"
-        >
-          <TwoFactorRecoveryCodes :codes="recoveryCodes" :username="username" />
-        </WorkflowStepForm>
+          :codes="recoveryCodes"
+          :username="username"
+          @done="emit('close')"
+        />
 
         <!-- Their only factor is a passkey and this browser cannot use one: there is no proof to ask for here. -->
         <WorkflowStepForm

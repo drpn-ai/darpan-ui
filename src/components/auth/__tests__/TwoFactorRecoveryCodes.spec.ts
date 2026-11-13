@@ -36,6 +36,19 @@ describe('TwoFactorRecoveryCodes', () => {
     expect(wrapper.get('[data-testid="two-factor-codes-copy-note"]').text()).toBe('Copied.')
   })
 
+  it('"Copied." goes after a moment, so a second copy says it again', async () => {
+    vi.useFakeTimers()
+    stubClipboard(vi.fn().mockResolvedValue(undefined))
+    const wrapper = mount(TwoFactorRecoveryCodes, { props: { codes: CODES } })
+
+    await wrapper.get('[data-testid="two-factor-codes-copy"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="two-factor-codes-copy-note"]').text()).toBe('Copied.')
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(wrapper.get('[data-testid="two-factor-codes-copy-note"]').text()).toBe('')
+    vi.useRealTimers()
+  })
+
   it('falls back to a textarea copy when the clipboard refuses', async () => {
     stubClipboard(vi.fn().mockRejectedValue(new Error('NotAllowedError')))
     const execCommand = stubExecCommand(true)

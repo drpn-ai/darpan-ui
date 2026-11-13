@@ -51,13 +51,18 @@
       </form>
 
       <!-- DAR-BE-264: the password was right; the session waits for a code, or for a required first setup. -->
-      <LoginTwoFactorSteps
-        v-else-if="twoFactorMode"
-        :purpose="twoFactorMode"
-        :username="username"
+      <TwoFactorCodeSteps
+        v-else-if="twoFactorMode === 'code'"
         @back="leaveTwoFactorStep"
         @ended="endTwoFactorStep"
         @signed-in="finishTwoFactorSignIn"
+      />
+      <TwoFactorEnrolSteps
+        v-else-if="twoFactorMode === 'setup'"
+        :username="username"
+        @back="leaveTwoFactorStep"
+        @ended="endTwoFactorStep"
+        @done="finishTwoFactorSignIn(null)"
       />
 
       <!-- DAR-BE-264: signed in with a recovery code and few are left. Said once, then on to where they were going. -->
@@ -75,38 +80,24 @@
       <!-- DAR-BE-264 grace: two-factor will be required from a date and is not set up. Asked at every sign-in until
            then (the recovery-email step's pattern). -->
       <template v-else-if="isAskingTwoFactorDue">
-        <PasskeyAddSteps
-          v-if="gracePasskeyOptions"
-          :options="gracePasskeyOptions"
-          :rebegin="beginGracePasskey"
+        <TwoFactorEnrolSteps
+          v-if="isEnrollingInGrace"
+          :proof="{ currentPassword: signInPassword }"
           :username="username"
-          @back="gracePasskeyOptions = null"
-          @refused="restartGraceSetup"
+          @back="isEnrollingInGrace = false"
           @done="leaveSignIn"
-        />
-        <TwoFactorSetupSteps
-          v-else-if="graceSetup"
-          :setup="graceSetup"
-          :username="username"
-          :offer-passkey="gracePasskeyOffered"
-          :passkey-busy="isStartingGraceSetup"
-          @back="graceSetup = null"
-          @ended="restartGraceSetup"
-          @done="leaveSignIn"
-          @use-passkey="startGracePasskey"
         />
         <WorkflowStepForm
           v-else
           :question="twoFactorDueQuestion"
-          :primary-label="isStartingGraceSetup ? 'Starting' : 'Set up'"
-          :submit-disabled="isStartingGraceSetup"
+          primary-label="Set up"
           :show-back="false"
           :show-cancel-action="true"
           cancel-label="Not now"
           cancel-test-id="login-two-factor-due-skip"
           :show-enter-hint="true"
           primary-test-id="login-two-factor-due-setup"
-          @submit="startGraceSetup"
+          @submit="isEnrollingInGrace = true"
           @cancel="leaveSignIn"
         />
       </template>
@@ -244,12 +235,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InlineValidation from '../components/ui/InlineValidation.vue'
 import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
-import LoginTwoFactorSteps from '../components/auth/LoginTwoFactorSteps.vue'
-import TwoFactorSetupSteps from '../components/auth/TwoFactorSetupSteps.vue'
-import PasskeyAddSteps from '../components/auth/PasskeyAddSteps.vue'
+import TwoFactorCodeSteps from '../components/auth/TwoFactorCodeSteps.vue'
+import TwoFactorEnrolSteps from '../components/auth/TwoFactorEnrolSteps.vue'
 import { formatShortDate } from '../lib/utils/date'
-import { passkeysSupported } from '../lib/passkeys'
-import type { TwoFactorChallengePurpose, TwoFactorSetupStart } from '../stores/auth'
+import type { TwoFactorChallengePurpose } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
 import { useAuthStore } from '../stores/auth'
@@ -284,25 +273,21 @@ const passwordForm = ref({
 })
 
 // DAR-BE-028 recovery email. The backend requires the current password to save one (a session token alone
-// must not redirect reset codes); the user has just typed it, so it is held only until this step ends.
+// must not redirect reset codes).
 const isAskingRecoveryEmail = ref(false)
 const isSavingRecoveryEmail = ref(false)
 const recoveryEmail = ref('')
-// The password the person just signed in with, held only until the after-sign-in steps end: the recovery email
-// and a grace-period two-factor setup both need it (a session token alone must not do either).
-const recoveryEmailPassword = ref('')
+// The password the person signed in with, out of the form the moment it is accepted and held only until the
+// after-sign-in steps end: the recovery email and a grace-period two-factor setup both need it (a session token alone
+// must not do either), and with two-factor neither is known to be needed until the code step has signed in.
+const signInPassword = ref('')
 
 // DAR-BE-264. Local, not read live from the store: a required setup clears the store's challenge when it signs in,
 // and the recovery codes it returns still have to be shown.
 const twoFactorMode = ref<TwoFactorChallengePurpose | null>(null)
 const recoveryCodesLeft = ref<number | null>(null)
 const isAskingTwoFactorDue = ref(false)
-const isStartingGraceSetup = ref(false)
-const graceSetup = ref<TwoFactorSetupStart | null>(null)
-// DAR-BE-270: a passkey instead of the app, begun with the password just used.
-const gracePasskeyOptions = ref<string | null>(null)
-const gracePasskeysUnavailable = ref(false)
-const gracePasskeyOffered = computed(() => passkeysSupported() && !gracePasskeysUnavailable.value)
+const isEnrollingInGrace = ref(false)
 // Fewest recovery codes left before the sign-in says so (the backend's own threshold for asking for new ones).
 const LOW_RECOVERY_CODES = 3
 
@@ -453,28 +438,39 @@ async function submit(): Promise<void> {
   loading.value = true
   localError.value = null
   try {
-    const authenticated = await authStore.loginWithCredentials(username.value, password.value)
-    if (!authenticated) {
-      if (authStore.passwordChangeReason) {
-        enterPasswordChangeMode()
-        return
-      }
-      if (authStore.twoFactorChallengePurpose) {
-        twoFactorMode.value = authStore.twoFactorChallengePurpose
-        return
-      }
-      localError.value = authStore.error ?? 'Invalid username or password.'
-      return
-    }
-
-    await finishSignIn(password.value)
+    await signIn(username.value, password.value, 'Invalid username or password.')
   } finally {
     loading.value = false
   }
 }
 
-function enterPasswordChangeMode(): void {
-  acceptedCurrentPassword.value = password.value
+/** Every password sign-in (the form, after a forced change, after a reset) goes through here, so each reaches the
+ *  two-factor step, the forced change and the after-sign-in steps the same way. */
+async function signIn(who: string, typedPassword: string, refusedText: string): Promise<void> {
+  const authenticated = await authStore.loginWithCredentials(who, typedPassword)
+  if (authenticated) {
+    await finishSignIn(typedPassword)
+    return
+  }
+  if (authStore.passwordChangeReason) {
+    enterPasswordChangeMode(typedPassword)
+    return
+  }
+  if (authStore.twoFactorChallengePurpose) {
+    holdSignInPassword(typedPassword)
+    twoFactorMode.value = authStore.twoFactorChallengePurpose
+    return
+  }
+  localError.value = authStore.error ?? refusedText
+}
+
+function holdSignInPassword(typedPassword: string): void {
+  signInPassword.value = typedPassword
+  password.value = ''
+}
+
+function enterPasswordChangeMode(acceptedPassword: string): void {
+  acceptedCurrentPassword.value = acceptedPassword
   // Prefer the backend's own wording so the reason (must change vs. expired) stays server-driven.
   passwordChangeNotice.value = authStore.error ?? FALLBACK_PASSWORD_CHANGE_NOTICE
   passwordForm.value = { newPassword: '', newPasswordVerify: '' }
@@ -534,15 +530,7 @@ async function submitPasswordChange(): Promise<void> {
     // reach somewhere, and the change is the only thing that was standing in the way.
     const nextPassword = passwordForm.value.newPassword
     leavePasswordChangeMode()
-    password.value = nextPassword
-
-    const authenticated = await authStore.loginWithCredentials(username.value, nextPassword)
-    if (!authenticated) {
-      localError.value = authStore.error ?? 'Password changed. Sign in with your new password.'
-      return
-    }
-
-    await finishSignIn(nextPassword)
+    await signIn(username.value, nextPassword, 'Password changed. Sign in with your new password.')
   } finally {
     isSubmittingPasswordChange.value = false
   }
@@ -551,7 +539,7 @@ async function submitPasswordChange(): Promise<void> {
 /** Every successful sign-in ends here, so no path (plain, after a forced change, after a reset, after a code)
  *  skips the recovery-email question or the two-factor grace prompt. */
 async function finishSignIn(passwordJustUsed: string): Promise<void> {
-  recoveryEmailPassword.value = passwordJustUsed
+  holdSignInPassword(passwordJustUsed)
   if (authStore.recoveryEmailMissing) {
     recoveryEmail.value = ''
     isAskingRecoveryEmail.value = true
@@ -566,7 +554,7 @@ async function continueAfterSignIn(): Promise<void> {
   if (authStore.twoFactorDueDate) {
     // Said here, so the shell's pill does not say it again on arrival.
     authStore.noteTwoFactorDueAnnounced()
-    graceSetup.value = null
+    isEnrollingInGrace.value = false
     isAskingTwoFactorDue.value = true
     return
   }
@@ -576,22 +564,23 @@ async function continueAfterSignIn(): Promise<void> {
 async function leaveSignIn(): Promise<void> {
   isAskingRecoveryEmail.value = false
   isAskingTwoFactorDue.value = false
-  graceSetup.value = null
-  gracePasskeyOptions.value = null
-  recoveryEmailPassword.value = ''
+  isEnrollingInGrace.value = false
+  signInPassword.value = ''
   localError.value = null
   await router.replace(resolveInternalRedirectTarget(route.query.redirect))
 }
 
+/** Back to the password form, by choice: the person types the password again. */
 function leaveTwoFactorStep(): void {
   authStore.abandonTwoFactorChallenge()
   twoFactorMode.value = null
+  signInPassword.value = ''
   localError.value = null
 }
 
 function endTwoFactorStep(message: string): void {
   twoFactorMode.value = null
-  password.value = ''
+  signInPassword.value = ''
   localError.value = message
 }
 
@@ -602,55 +591,12 @@ async function finishTwoFactorSignIn(codesLeft: number | null): Promise<void> {
     recoveryCodesLeft.value = codesLeft
     return
   }
-  await finishSignIn(password.value)
+  await finishSignIn(signInPassword.value)
 }
 
 async function acknowledgeRecoveryCodesLeft(): Promise<void> {
   recoveryCodesLeft.value = null
-  await finishSignIn(password.value)
-}
-
-async function startGraceSetup(): Promise<void> {
-  if (isStartingGraceSetup.value) return
-  isStartingGraceSetup.value = true
-  localError.value = null
-  try {
-    const result = await authStore.beginTwoFactorSetup({ currentPassword: recoveryEmailPassword.value })
-    if (result.outcome === 'begun') {
-      graceSetup.value = result.setup
-      return
-    }
-    localError.value = result.message
-  } finally {
-    isStartingGraceSetup.value = false
-  }
-}
-
-function restartGraceSetup(message: string): void {
-  graceSetup.value = null
-  gracePasskeyOptions.value = null
-  localError.value = message
-}
-
-function beginGracePasskey() {
-  return authStore.beginPasskeyRegistration({ currentPassword: recoveryEmailPassword.value })
-}
-
-async function startGracePasskey(): Promise<void> {
-  if (isStartingGraceSetup.value) return
-  isStartingGraceSetup.value = true
-  localError.value = null
-  try {
-    const result = await beginGracePasskey()
-    if (result.outcome === 'begun') {
-      gracePasskeyOptions.value = result.publicKeyOptions
-      return
-    }
-    if (result.outcome === 'refused' && result.reason === 'passkeysUnavailable') gracePasskeysUnavailable.value = true
-    localError.value = result.message
-  } finally {
-    isStartingGraceSetup.value = false
-  }
+  await finishSignIn(signInPassword.value)
 }
 
 async function saveRecoveryEmailAndContinue(): Promise<void> {
@@ -658,7 +604,7 @@ async function saveRecoveryEmailAndContinue(): Promise<void> {
   localError.value = null
   isSavingRecoveryEmail.value = true
   try {
-    const saved = await authStore.saveRecoveryEmail(recoveryEmail.value.trim(), recoveryEmailPassword.value)
+    const saved = await authStore.saveRecoveryEmail(recoveryEmail.value.trim(), signInPassword.value)
     if (!saved) {
       localError.value = authStore.error ?? 'Unable to save the recovery email.'
       return
@@ -797,12 +743,6 @@ async function submitPasswordReset(who: string): Promise<void> {
   const nextPassword = resetForm.value.newPassword
   leaveResetMode()
   username.value = who
-  password.value = nextPassword
-  const authenticated = await authStore.loginWithCredentials(who, nextPassword)
-  if (!authenticated) {
-    localError.value = authStore.error ?? 'Password reset. Sign in with your new password.'
-    return
-  }
-  await finishSignIn(nextPassword)
+  await signIn(who, nextPassword, 'Password reset. Sign in with your new password.')
 }
 </script>

@@ -14,29 +14,19 @@
     @submit="add"
   />
 
-  <WorkflowStepForm
-    v-else
-    :class="formClass"
-    question="Save your recovery codes."
-    primary-label="I saved them"
-    :show-enter-hint="false"
-    primary-test-id="two-factor-codes-saved"
-    @submit="emit('done')"
-  >
-    <TwoFactorRecoveryCodes :codes="recoveryCodes" :username="username" />
-  </WorkflowStepForm>
+  <TwoFactorRecoveryCodes v-else :class="formClass" :codes="recoveryCodes" :username="username" @done="emit('done')" />
 
   <InlineValidation v-if="error" tone="error" :message="error" />
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
 import TwoFactorRecoveryCodes from './TwoFactorRecoveryCodes.vue'
 import { createPasskey } from '../../lib/passkeys'
-import { useAuthStore } from '../../stores/auth'
 import type { PasskeyBeginOutcome } from '../../lib/twoFactor'
+import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps<{
   /** begin#PasskeyRegistration's options. */
@@ -54,7 +44,7 @@ const emit = defineEmits<{
   /** Finished: "I saved them", or straight after an added passkey that was not the first factor. */
   done: []
   back: []
-  /** The sign-in challenge is spent: back to the password. */
+  /** The sign-in challenge is spent, or a signed-in setup has to start again. */
   ended: [message: string]
   /** The registration was refused and its options are used up; without rebegin the caller asks for proof again. */
   refused: [message: string]
@@ -65,6 +55,8 @@ const busy = ref(false)
 const error = ref<string | null>(null)
 const recoveryCodes = ref<string[] | null>(null)
 let current: string | null = props.options
+// Closes the browser's prompt if this step goes away while it is open.
+const prompt = new AbortController()
 
 async function add(): Promise<void> {
   if (busy.value) return
@@ -72,7 +64,7 @@ async function add(): Promise<void> {
   error.value = null
   try {
     if (!current && !(await beginAgain())) return
-    const ceremony = await createPasskey(current as string)
+    const ceremony = await createPasskey(current as string, prompt.signal)
     // A closed prompt is not a refusal: stay here with the same options and say nothing.
     if (ceremony.outcome === 'cancelled') return
     if (ceremony.outcome === 'failed') {
@@ -114,4 +106,6 @@ async function beginAgain(): Promise<boolean> {
   else error.value = again.message
   return false
 }
+
+onBeforeUnmount(() => prompt.abort())
 </script>
