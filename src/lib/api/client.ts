@@ -507,11 +507,23 @@ async function throwAuthRequired(detail: AuthRequiredDetail, details: Record<str
   throw new ApiCallError(detail.message, 401, details)
 }
 
+/** Per-call options for callService. */
+export interface CallServiceOptions {
+  /**
+   * Return a completed `ok: false` reply as the result instead of throwing. For services whose refusal carries
+   * fields the caller acts on (DAR-BE-264: verify#SignInCode, begin/confirm#TwoFactorSetup answer a refused code
+   * with `challengeEnded`). An auth-required refusal still goes through the auth recovery path, and JSON-RPC
+   * errors (missing parameters, transport) still throw.
+   */
+  refusalIsResult?: boolean
+}
+
 async function dispatchService<T>(
   method: string,
   params: object,
   signal?: AbortSignal,
   recoveryExhausted = false,
+  options: CallServiceOptions = {},
 ): Promise<T> {
   const request: JsonRpcRequest = {
     jsonrpc: '2.0',
@@ -622,6 +634,8 @@ async function dispatchService<T>(
         )
       }
 
+      if (options.refusalIsResult) return result
+
       throw new ApiCallError(
         message,
         response.status,
@@ -695,18 +709,28 @@ function isTransientNetworkError(err: unknown): boolean {
 // Moqui gates `authenticate="true"` in ServiceCallSyncImpl BEFORE the service body runs, so a
 // call rejected with "User must be logged in" had no side effects. Replaying it is therefore safe
 // for writes too, which is why this sits outside the reads-only retryRead below.
-async function dispatchWithAuthRecovery<T>(method: string, params: object, signal?: AbortSignal): Promise<T> {
+async function dispatchWithAuthRecovery<T>(
+  method: string,
+  params: object,
+  signal?: AbortSignal,
+  options: CallServiceOptions = {},
+): Promise<T> {
   try {
-    return await dispatchService<T>(method, params, signal)
+    return await dispatchService<T>(method, params, signal, false, options)
   } catch (error) {
     if (!(error instanceof AuthRequiredError) || !error.recovered) throw error
     // Exactly one replay: an error from this call escapes the catch it was thrown in.
-    return dispatchService<T>(method, params, signal, true)
+    return dispatchService<T>(method, params, signal, true, options)
   }
 }
 
-export async function callService<T>(method: string, params: object = {}, signal?: AbortSignal): Promise<T> {
-  const doRequest = () => dispatchWithAuthRecovery<T>(method, params, signal)
+export async function callService<T>(
+  method: string,
+  params: object = {},
+  signal?: AbortSignal,
+  options: CallServiceOptions = {},
+): Promise<T> {
+  const doRequest = () => dispatchWithAuthRecovery<T>(method, params, signal, options)
   if (isIdempotentReadMethod(method)) {
     return retryRead(doRequest, { shouldRetry: isTransientNetworkError }) // reads: retry transient network errors only
   }

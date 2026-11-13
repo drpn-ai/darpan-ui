@@ -36,6 +36,10 @@ const challengeReply = (purpose: 'code' | 'setup') => ({
   ok: true, messages: [], errors: [], authenticated: false, challengeToken: CHALLENGE, challengeExpiresInSeconds: 300,
   ...(purpose === 'code' ? { twoFactorRequired: true } : { twoFactorSetupRequired: true }),
 })
+// As the backend answers since darpan d4d13e26: a completed call carrying challengeEnded.
+const refusal = (challengeEnded = false) => ({
+  ok: false, messages: [], errors: ["That code didn't work."], authenticated: false, challengeEnded,
+})
 const setupStart = {
   ok: true, messages: [], errors: [],
   secret: 'JBSWY3DPEHPK3PXPJBSWY3DP',
@@ -90,7 +94,7 @@ describe('LoginPage two-factor', () => {
 
   it('a wrong code stays on the code step with the one refusal message', async () => {
     loginSession.mockResolvedValue(challengeReply('code'))
-    verifySignInCode.mockRejectedValue(new ApiCallError("That code didn't work.", 500))
+    verifySignInCode.mockResolvedValue(refusal(false))
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
@@ -102,9 +106,9 @@ describe('LoginPage two-factor', () => {
     expect(replace).not.toHaveBeenCalled()
   })
 
-  it('a spent challenge goes back to the password step and clears the password', async () => {
+  it('a refusal with challengeEnded goes back to the password step and clears the password', async () => {
     loginSession.mockResolvedValue(challengeReply('code'))
-    verifySignInCode.mockRejectedValue(new ApiCallError('This sign-in has expired. Enter your password again.', 500))
+    verifySignInCode.mockResolvedValue(refusal(true))
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
@@ -115,32 +119,40 @@ describe('LoginPage two-factor', () => {
     expect((wrapper.get('input[autocomplete="current-password"]').element as HTMLInputElement).value).toBe('')
   })
 
-  it('five wrong codes end the challenge even though the refusals never say challengeEnded', async () => {
+  it('stays on the code step for as many refusals as the backend allows, and leaves when it says challengeEnded', async () => {
     loginSession.mockResolvedValue(challengeReply('code'))
-    verifySignInCode.mockRejectedValue(new ApiCallError("That code didn't work.", 500))
+    verifySignInCode.mockResolvedValue(refusal(false))
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
-    for (let attempt = 0; attempt < 5; attempt += 1) await typeCode(wrapper, 'login-two-factor-code', '000000')
+    for (let attempt = 0; attempt < 4; attempt += 1) await typeCode(wrapper, 'login-two-factor-code', '000000')
+    expect(wrapper.text()).toContain('Enter the code from your app.')
+
+    verifySignInCode.mockResolvedValue(refusal(true))
+    await typeCode(wrapper, 'login-two-factor-code', '000000')
 
     expect(verifySignInCode).toHaveBeenCalledTimes(5)
     expect(wrapper.find('h1').text()).toBe('Sign In')
     expect(wrapper.text()).toContain('This sign-in has expired. Enter your password again.')
   })
 
-  it('ends the code step on screen when the 300 s run out', async () => {
-    vi.useFakeTimers()
+  it('a network failure past the 300 s goes back to the password; one inside them stays', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-13T10:00:00Z'))
     loginSession.mockResolvedValue(challengeReply('code'))
+    verifySignInCode.mockRejectedValue(new ApiCallError('Darpan stepped out for chai. Try again in a moment.'))
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
+    await typeCode(wrapper, 'login-two-factor-code', '123456')
     expect(wrapper.text()).toContain('Enter the code from your app.')
-    await vi.advanceTimersByTimeAsync(300_000)
-    await flushPromises()
+    expect(wrapper.text()).toContain('Darpan stepped out for chai.')
+
+    vi.setSystemTime(new Date('2026-11-13T10:05:01Z'))
+    await typeCode(wrapper, 'login-two-factor-code', '123456')
 
     expect(wrapper.find('h1').text()).toBe('Sign In')
     expect(wrapper.text()).toContain('This sign-in has expired. Enter your password again.')
-    expect(verifySignInCode).not.toHaveBeenCalled()
   })
 
   it('takes a recovery code instead, and says when few are left before going on', async () => {
@@ -206,10 +218,10 @@ describe('LoginPage two-factor', () => {
     expect(replace).toHaveBeenCalledWith('/')
   })
 
-  it('a setup challenge that ran out goes back to the password step', async () => {
+  it('a setup confirm refused with challengeEnded goes back to the password step', async () => {
     loginSession.mockResolvedValue(challengeReply('setup'))
     beginTwoFactorSetup.mockResolvedValue(setupStart)
-    confirmTwoFactorSetup.mockRejectedValue(new ApiCallError('This sign-in has expired. Enter your password again.', 500))
+    confirmTwoFactorSetup.mockResolvedValue(refusal(true))
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)

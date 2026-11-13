@@ -34,7 +34,10 @@ const signedIn = (authToken: string, extra: Record<string, unknown> = {}) => ({
   sessionInfo: { userId: 'U1', username: 'ada', twoFactorEnabled: true },
   ...extra,
 })
-const refusal = () => new ApiCallError("That code didn't work.", 500)
+// As the backend answers since darpan d4d13e26: a completed call, never a JSON-RPC error.
+const refusal = (challengeEnded = false, reason = "That code didn't work.") => ({
+  ok: false, messages: [], errors: [reason], authenticated: false, challengeEnded,
+})
 
 function storageHolds(value: string): boolean {
   const all = [window.sessionStorage, window.localStorage]
@@ -102,50 +105,53 @@ describe('auth store two-factor', () => {
     expect(result).toEqual({ outcome: 'signedIn', recoveryCodesLeft: 2 })
   })
 
-  it('a wrong code keeps the challenge; the fifth ends it (the refusal JSON-RPC error carries no challengeEnded)', async () => {
+  it('a refusal keeps the challenge while challengeEnded is false, however many there are', async () => {
     const { store } = await signInToChallenge('code')
-    verifySignInCode.mockRejectedValue(refusal())
+    verifySignInCode.mockResolvedValue(refusal(false))
 
-    for (let attempt = 1; attempt <= 4; attempt += 1) {
+    for (let attempt = 1; attempt <= 6; attempt += 1) {
       expect(await store.verifySignInCode({ code: '000000' })).toEqual({ outcome: 'refused', message: "That code didn't work." })
-      expect(store.twoFactorChallengePurpose).toBe('code')
     }
-    const fifth = await store.verifySignInCode({ code: '000000' })
-
-    expect(fifth.outcome).toBe('ended')
-    expect(store.twoFactorChallengePurpose).toBeNull()
-  })
-
-  it('a network failure is not counted as a guess', async () => {
-    const { store } = await signInToChallenge('code')
-    verifySignInCode.mockRejectedValue(new ApiCallError('Darpan stepped out for chai. Try again in a moment.'))
-
-    for (let attempt = 1; attempt <= 6; attempt += 1) await store.verifySignInCode({ code: '000000' })
-
     expect(store.twoFactorChallengePurpose).toBe('code')
   })
 
-  it('ends at once on the expired-sign-in refusal, and on a success reply that says challengeEnded', async () => {
+  it('challengeEnded on a refusal ends the challenge at once', async () => {
     const { store } = await signInToChallenge('code')
-    verifySignInCode.mockRejectedValueOnce(new ApiCallError('This sign-in has expired. Enter your password again.', 500))
+    verifySignInCode.mockResolvedValue(refusal(true))
 
-    expect((await store.verifySignInCode({ code: '111111' })).outcome).toBe('ended')
+    const result = await store.verifySignInCode({ code: '000000' })
 
-    await signInToChallenge('code')
-    verifySignInCode.mockResolvedValueOnce({ ok: true, messages: [], errors: [], authenticated: false, challengeEnded: true })
-    expect((await store.verifySignInCode({ code: '111111' })).outcome).toBe('ended')
+    expect(result).toEqual({ outcome: 'ended', message: 'This sign-in has expired. Enter your password again.' })
+    expect(store.twoFactorChallengePurpose).toBeNull()
+    expect(getAuthToken()).toBeNull()
   })
 
-  it('past its 300 s the challenge ends without asking the backend', async () => {
+  it('a failed call (no reply) keeps the challenge inside its 300 s and ends it after', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-11-13T10:00:00Z'))
     const { store } = await signInToChallenge('code')
+    verifySignInCode.mockRejectedValue(new ApiCallError('Darpan stepped out for chai. Try again in a moment.'))
+
+    expect((await store.verifySignInCode({ code: '123456' })).outcome).toBe('refused')
+    expect(store.twoFactorChallengePurpose).toBe('code')
 
     vi.setSystemTime(new Date('2026-11-13T10:05:01Z'))
-    const result = await store.verifySignInCode({ code: '123456' })
+    expect((await store.verifySignInCode({ code: '123456' })).outcome).toBe('ended')
+    expect(store.twoFactorChallengePurpose).toBeNull()
+  })
 
-    expect(result.outcome).toBe('ended')
-    expect(verifySignInCode).not.toHaveBeenCalled()
+  it('setup: begin or confirm refused with challengeEnded ends the setup challenge', async () => {
+    const { store } = await signInToChallenge('setup')
+    beginTwoFactorSetup.mockResolvedValueOnce({ ok: false, messages: [], errors: ['This sign-in has expired. Enter your password again.'], challengeEnded: true })
+    expect((await store.beginTwoFactorSetup()).outcome).toBe('ended')
+
+    await signInToChallenge('setup')
+    confirmTwoFactorSetup.mockResolvedValueOnce(refusal(false))
+    expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'refused', message: "That code didn't work." })
+    expect(store.twoFactorChallengePurpose).toBe('setup')
+    confirmTwoFactorSetup.mockResolvedValueOnce(refusal(true))
+    expect((await store.confirmTwoFactorSetup('000000')).outcome).toBe('ended')
+    expect(store.twoFactorChallengePurpose).toBeNull()
   })
 
   it('a required setup uses the challenge token alone, and confirm signs in with the recovery codes', async () => {
@@ -195,8 +201,8 @@ describe('auth store two-factor', () => {
   it('a signed-in confirm refused keeps the old key; an expired setup says start again', async () => {
     setAuthTokenContract({ authToken: 'old-key', authTokenHeaderName: 'login_key' })
     const store = useAuthStore()
-    confirmTwoFactorSetup.mockRejectedValueOnce(refusal())
-    confirmTwoFactorSetup.mockRejectedValueOnce(new ApiCallError('Setup has expired. Start again.', 500))
+    confirmTwoFactorSetup.mockResolvedValueOnce(refusal(false))
+    confirmTwoFactorSetup.mockResolvedValueOnce(refusal(false, 'Setup has expired. Start again.'))
 
     expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'refused', message: "That code didn't work." })
     expect(getAuthToken()).toBe('old-key')

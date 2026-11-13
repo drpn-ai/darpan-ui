@@ -263,6 +263,9 @@ import type {
   SaveFlowchartRunResponse,
 } from './flowchartTypes'
 
+// A refused two-factor code is answered as a completed call whose fields (challengeEnded) decide the next screen.
+const REFUSAL_IS_RESULT = { refusalIsResult: true } as const
+
 const AUTH = {
   loginSession: 'facade.AuthFacadeServices.login#Session',
   getSessionInfo: 'facade.AuthFacadeServices.get#SessionInfo',
@@ -449,14 +452,15 @@ export const authFacade = {
     return callService<GetCliLoginRequestResponse>(AUTH.getCliLoginRequest, payload, signal)
   },
   // DAR-BE-264 two-factor. verify, begin and confirm are anonymous-all: a sign-in challenge token stands in for a session.
+  // Their refusals are completed calls (ok false, errors, challengeEnded), returned rather than thrown.
   verifySignInCode(payload: VerifySignInCodePayload, signal?: AbortSignal): Promise<VerifySignInCodeResponse> {
-    return callService<VerifySignInCodeResponse>(AUTH.verifySignInCode, payload, signal)
+    return callService<VerifySignInCodeResponse>(AUTH.verifySignInCode, payload, signal, REFUSAL_IS_RESULT)
   },
   beginTwoFactorSetup(payload: BeginTwoFactorSetupPayload, signal?: AbortSignal): Promise<BeginTwoFactorSetupResponse> {
-    return callService<BeginTwoFactorSetupResponse>(AUTH.beginTwoFactorSetup, payload, signal)
+    return callService<BeginTwoFactorSetupResponse>(AUTH.beginTwoFactorSetup, payload, signal, REFUSAL_IS_RESULT)
   },
   confirmTwoFactorSetup(payload: ConfirmTwoFactorSetupPayload, signal?: AbortSignal): Promise<ConfirmTwoFactorSetupResponse> {
-    return callService<ConfirmTwoFactorSetupResponse>(AUTH.confirmTwoFactorSetup, payload, signal)
+    return callService<ConfirmTwoFactorSetupResponse>(AUTH.confirmTwoFactorSetup, payload, signal, REFUSAL_IS_RESULT)
   },
   getTwoFactorStatus(signal?: AbortSignal): Promise<GetTwoFactorStatusResponse> {
     return callService<GetTwoFactorStatusResponse>(AUTH.getTwoFactorStatus, {}, signal)

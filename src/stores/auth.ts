@@ -27,7 +27,7 @@ import type {
 } from '../lib/api/types'
 import { resolveInternalRedirectTarget } from '../lib/navigation'
 import { setDefaultDisplayTimeZone } from '../lib/utils/date'
-import { CHALLENGE_ENDED_TEXT, CHALLENGE_MAX_REFUSALS, CODE_REFUSAL_TEXT, isEndedRefusal } from '../lib/twoFactor'
+import { CHALLENGE_ENDED_TEXT, CODE_REFUSAL_TEXT, isSetupExpired } from '../lib/twoFactor'
 
 export type AuthStatus = 'authenticated' | 'unauthenticated' | 'verification-failed'
 
@@ -52,8 +52,9 @@ export type TwoFactorConfirmOutcome = { outcome: 'confirmed'; recoveryCodes: str
 interface TwoFactorChallenge {
   token: string
   purpose: TwoFactorChallengePurpose
+  /** Local copy of the backend's 300 s. Consulted only when a call fails without a reply (network): every reply
+   *  says whether the challenge is still usable (challengeEnded). */
   expiresAt: number
-  refusals: number
 }
 
 const DEFAULT_CHALLENGE_SECONDS = 300
@@ -198,7 +199,6 @@ export const useAuthStore = defineStore('auth', () => {
   // cookie. A refresh during the code step loses it and goes back to the password, which is the intent.
   let _twoFactorChallenge: TwoFactorChallenge | null = null
   const _twoFactorChallengePurpose = ref<TwoFactorChallengePurpose | null>(null)
-  const _twoFactorChallengeExpiresAt = ref<number | null>(null)
   // The due-date notice is said once per page load: by the sign-in grace step, or by the shell's pill for a tab
   // that arrived signed in.
   const _twoFactorDueAnnounced = ref(false)
@@ -215,7 +215,6 @@ export const useAuthStore = defineStore('auth', () => {
   const recoveryEmailMissing = computed(() => _sessionInfo.value?.recoveryEmailMissing === true)
   const emailAddressMasked = computed(() => _sessionInfo.value?.emailAddressMasked ?? null)
   const twoFactorChallengePurpose = computed(() => _twoFactorChallengePurpose.value)
-  const twoFactorChallengeExpiresAt = computed(() => _twoFactorChallengeExpiresAt.value)
   const twoFactorEnabled = computed(() => _sessionInfo.value?.twoFactorEnabled === true)
   const twoFactorDueDate = computed(() => (twoFactorEnabled.value ? null : _sessionInfo.value?.twoFactorDueDate || null))
   const twoFactorDueAnnounced = computed(() => _twoFactorDueAnnounced.value)
@@ -223,14 +222,10 @@ export const useAuthStore = defineStore('auth', () => {
   function _setTwoFactorChallenge(challenge: TwoFactorChallenge | null): void {
     _twoFactorChallenge = challenge
     _twoFactorChallengePurpose.value = challenge?.purpose ?? null
-    _twoFactorChallengeExpiresAt.value = challenge?.expiresAt ?? null
   }
 
-  /** The live challenge, or null once it has run past its expiry (a wrong clock only shortens it, never extends). */
-  function _liveTwoFactorChallenge(purpose?: TwoFactorChallengePurpose): TwoFactorChallenge | null {
-    const challenge = _twoFactorChallenge
-    if (!challenge || (purpose && challenge.purpose !== purpose)) return null
-    return Date.now() < challenge.expiresAt ? challenge : null
+  function _challengeFor(purpose: TwoFactorChallengePurpose): TwoFactorChallenge | null {
+    return _twoFactorChallenge?.purpose === purpose ? _twoFactorChallenge : null
   }
 
   /** The challenge is spent: drop it and send the person back to the password. */
@@ -240,24 +235,25 @@ export const useAuthStore = defineStore('auth', () => {
     return { outcome: 'ended', message: CHALLENGE_ENDED_TEXT }
   }
 
-  /** A refused code against a challenge. Only the code refusal itself counts toward the backend's five; a network
-   *  failure is not a guess. */
-  function _refuseChallengeCode(challenge: TwoFactorChallenge, message: string | null): TwoFactorRefusal {
+  /** A refusal the backend answered: challengeEnded decides whether the challenge is still usable. */
+  function _refuseChallenge(ended: boolean, message: string | null | undefined): TwoFactorRefusal {
+    if (ended) return _endTwoFactorChallenge()
     const text = message || CODE_REFUSAL_TEXT
-    if (isEndedRefusal(text)) return _endTwoFactorChallenge()
-    if (text === CODE_REFUSAL_TEXT) challenge.refusals += 1
-    if (challenge.refusals >= CHALLENGE_MAX_REFUSALS || Date.now() >= challenge.expiresAt) return _endTwoFactorChallenge()
+    _error.value = text
+    return { outcome: 'refused', message: text }
+  }
+
+  /** A call that threw (network, or a JSON-RPC error such as a missing parameter) carries no challengeEnded. The
+   *  local 300 s copy is the fallback: past it the challenge is surely gone; before it, try again. */
+  function _challengeCallFailed(challenge: TwoFactorChallenge, err: unknown): TwoFactorRefusal {
+    if (Date.now() >= challenge.expiresAt) return _endTwoFactorChallenge()
+    const text = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
     _error.value = text
     return { outcome: 'refused', message: text }
   }
 
   function abandonTwoFactorChallenge(): void {
     _setTwoFactorChallenge(null)
-  }
-
-  /** Called when the challenge's 300 s run out on screen. */
-  function expireTwoFactorChallenge(): TwoFactorRefusal {
-    return _endTwoFactorChallenge()
   }
 
   function noteTwoFactorDueAnnounced(): void {
@@ -425,7 +421,6 @@ export const useAuthStore = defineStore('auth', () => {
           token,
           purpose: response.twoFactorSetupRequired === true ? 'setup' : 'code',
           expiresAt: Date.now() + seconds * 1000,
-          refusals: 0,
         })
         _applyAuthState({ status: 'unauthenticated' })
         return false
@@ -473,20 +468,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** verify#SignInCode: the challenge from login#Session with a code from the app, or a recovery code. */
   async function verifySignInCode(input: { code: string } | { recoveryCode: string }): Promise<TwoFactorVerifyOutcome> {
-    const challenge = _liveTwoFactorChallenge('code')
+    const challenge = _challengeFor('code')
     if (!challenge) return _endTwoFactorChallenge()
 
     try {
+      // A refusal comes back as a reply (ok false, errors, challengeEnded), not as a thrown error.
       const response = await authFacade.verifySignInCode({ challengeToken: challenge.token, ...input })
       if (response.authenticated === true && response.authToken?.toString()?.trim()) {
         _setTwoFactorChallenge(null)
         _applySignInReply(response)
         return { outcome: 'signedIn', recoveryCodesLeft: response.recoveryCodesLeft ?? null }
       }
-      if (response.challengeEnded === true) return _endTwoFactorChallenge()
-      return _refuseChallengeCode(challenge, response.errors?.[0] ?? null)
+      return _refuseChallenge(response.challengeEnded === true, response.errors?.[0])
     } catch (err) {
-      return _refuseChallengeCode(challenge, err instanceof ApiCallError ? err.message : buildContractViolationError(err))
+      return _challengeCallFailed(challenge, err)
     }
   }
 
@@ -495,15 +490,15 @@ export const useAuthStore = defineStore('auth', () => {
    * first setup needs the current password and replacing an app that is on needs a code from it.
    */
   async function beginTwoFactorSetup(proof: { currentPassword?: string; code?: string } = {}): Promise<TwoFactorBeginOutcome> {
-    const viaChallenge = _twoFactorChallenge?.purpose === 'setup'
-    const challenge = viaChallenge ? _liveTwoFactorChallenge('setup') : null
-    if (viaChallenge && !challenge) return _endTwoFactorChallenge()
+    const challenge = _challengeFor('setup')
 
     try {
       const response = await authFacade.beginTwoFactorSetup(challenge ? { challengeToken: challenge.token } : proof)
       const secret = response.secret?.toString()?.trim()
       if (!secret || !response.otpauthUri) {
-        return { outcome: 'refused', message: response.errors?.[0] ?? 'Setup did not start. Try again.' }
+        const message = response.errors?.[0] ?? 'Setup did not start. Try again.'
+        if (challenge) return _refuseChallenge(response.challengeEnded === true, message)
+        return { outcome: 'refused', message }
       }
       _error.value = null
       return {
@@ -511,9 +506,8 @@ export const useAuthStore = defineStore('auth', () => {
         setup: { secret, otpauthUri: response.otpauthUri, qrDataUri: response.qrDataUri?.toString() || null },
       }
     } catch (err) {
-      const message = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
-      if (challenge && isEndedRefusal(message)) return _endTwoFactorChallenge()
-      return { outcome: 'refused', message }
+      if (challenge) return _challengeCallFailed(challenge, err)
+      return { outcome: 'refused', message: err instanceof ApiCallError ? err.message : buildContractViolationError(err) }
     }
   }
 
@@ -522,9 +516,7 @@ export const useAuthStore = defineStore('auth', () => {
    * signed-in tab the old key predates the factor and has stopped working, so this tab swaps to the new one.
    */
   async function confirmTwoFactorSetup(code: string): Promise<TwoFactorConfirmOutcome> {
-    const viaChallenge = _twoFactorChallenge?.purpose === 'setup'
-    const challenge = viaChallenge ? _liveTwoFactorChallenge('setup') : null
-    if (viaChallenge && !challenge) return _endTwoFactorChallenge()
+    const challenge = _challengeFor('setup')
 
     try {
       const response = await authFacade.confirmTwoFactorSetup(challenge ? { code, challengeToken: challenge.token } : { code })
@@ -539,14 +531,14 @@ export const useAuthStore = defineStore('auth', () => {
         }
         return { outcome: 'confirmed', recoveryCodes: response.recoveryCodes ?? [] }
       }
-      if (challenge && response.challengeEnded === true) return _endTwoFactorChallenge()
-      return { outcome: 'refused', message: response.errors?.[0] ?? CODE_REFUSAL_TEXT }
-    } catch (err) {
-      const message = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
-      if (challenge) return _refuseChallengeCode(challenge, message)
-      // Signed in: a setup left past its 15 minutes has to start again.
-      if (isEndedRefusal(message)) return { outcome: 'ended', message }
+      const message = response.errors?.[0] ?? CODE_REFUSAL_TEXT
+      if (challenge) return _refuseChallenge(response.challengeEnded === true, message)
+      // Signed in there is no challenge to end; a setup left past its 15 minutes has to start again.
+      if (isSetupExpired(message)) return { outcome: 'ended', message }
       return { outcome: 'refused', message }
+    } catch (err) {
+      if (challenge) return _challengeCallFailed(challenge, err)
+      return { outcome: 'refused', message: err instanceof ApiCallError ? err.message : buildContractViolationError(err) }
     }
   }
 
@@ -927,13 +919,11 @@ export const useAuthStore = defineStore('auth', () => {
     recoveryEmailMissing,
     emailAddressMasked,
     twoFactorChallengePurpose,
-    twoFactorChallengeExpiresAt,
     twoFactorEnabled,
     twoFactorDueDate,
     twoFactorDueAnnounced,
     noteTwoFactorDueAnnounced,
     abandonTwoFactorChallenge,
-    expireTwoFactorChallenge,
     verifySignInCode,
     beginTwoFactorSetup,
     confirmTwoFactorSetup,

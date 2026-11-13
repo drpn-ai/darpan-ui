@@ -57,6 +57,23 @@ describe('callService', () => {
     expect(requestInit.headers.login_key).toBe('token-123')
   })
 
+  // DAR-BE-264: a refused two-factor code is a completed call whose challengeEnded decides the next screen.
+  it('returns an ok:false reply instead of throwing when the call opts in, and throws without the opt-in', async () => {
+    const refusal = { ok: false, messages: [], errors: ["That code didn't work."], authenticated: false, challengeEnded: true }
+    const reply = () => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: refusal }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => reply()))
+
+    const { callService, ApiCallError } = await import('../client')
+    const method = 'facade.AuthFacadeServices.verify#SignInCode'
+
+    await expect(callService(method, { challengeToken: 't', code: '000000' }, undefined, { refusalIsResult: true }))
+      .resolves.toEqual(refusal)
+    await expect(callService(method, { challengeToken: 't', code: '000000' })).rejects.toBeInstanceOf(ApiCallError)
+  })
+
   it('drops expired auth tokens before sending a request', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

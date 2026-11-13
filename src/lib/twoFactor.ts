@@ -4,25 +4,14 @@
 /** TwoFactorSupport.CODE_REFUSAL: every wrong, reused or locked code reads the same. */
 export const CODE_REFUSAL_TEXT = "That code didn't work."
 
-/** Shown when a sign-in challenge can no longer be used: expired (300 s), used, or 5 wrong codes. */
+/** Shown when a sign-in challenge can no longer be used (challengeEnded): expired (300 s), used, or 5 wrong codes. */
 export const CHALLENGE_ENDED_TEXT = 'This sign-in has expired. Enter your password again.'
 
-/** Wrong codes one challenge takes before the backend ends it (TwoFactorSupport.MAX_CHALLENGE_FAILURES). */
-export const CHALLENGE_MAX_REFUSALS = 5
+/** A signed-in setup (no challenge) left past its 15 minutes: the person starts again. */
+const SETUP_EXPIRED_TEXT = 'Setup has expired. Start again.'
 
-/**
- * Refusals that mean the challenge or the pending setup is gone, so a retry cannot work. The backend also says this
- * with `challengeEnded`, but only in a result envelope: a refusal reaches the browser as a JSON-RPC error, which
- * carries the message alone. So the text, the local refusal count and the local expiry decide.
- */
-const ENDED_TEXTS = [
-  CHALLENGE_ENDED_TEXT,
-  'Setup has expired. Start again.',
-  'This account can no longer sign in.',
-]
-
-export function isEndedRefusal(message: string | null | undefined): boolean {
-  return Boolean(message) && ENDED_TEXTS.some((text) => message?.includes(text))
+export function isSetupExpired(message: string | null | undefined): boolean {
+  return Boolean(message?.includes(SETUP_EXPIRED_TEXT))
 }
 
 /** approve#CliLogin's refusals that a fresh code fixes; anything else is about the CLI request itself. */

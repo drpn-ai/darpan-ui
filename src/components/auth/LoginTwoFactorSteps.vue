@@ -71,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowCodeInput from '../workflow/WorkflowCodeInput.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
@@ -99,31 +99,6 @@ const usingRecoveryCode = ref(false)
 const busy = ref(false)
 const error = ref<string | null>(null)
 const setup = ref<TwoFactorSetupStart | null>(null)
-let expiryTimer: ReturnType<typeof globalThis.setTimeout> | null = null
-
-function clearExpiryTimer(): void {
-  if (expiryTimer === null) return
-  globalThis.clearTimeout(expiryTimer)
-  expiryTimer = null
-}
-
-// The challenge lasts 300 s. Past it the backend refuses anyway; ending it on screen saves a pointless try.
-watch(
-  () => authStore.twoFactorChallengeExpiresAt,
-  (expiresAt) => {
-    clearExpiryTimer()
-    if (expiresAt === null) return
-    expiryTimer = globalThis.setTimeout(() => {
-      expiryTimer = null
-      if (authStore.twoFactorChallengeExpiresAt !== expiresAt) return
-      emit('ended', authStore.expireTwoFactorChallenge().message)
-    }, Math.max(0, expiresAt - Date.now()))
-  },
-  { immediate: true },
-)
-
-onBeforeUnmount(clearExpiryTimer)
-
 onMounted(async () => {
   if (props.purpose !== 'setup') return
   const result = await authStore.beginTwoFactorSetup()

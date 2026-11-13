@@ -136,7 +136,7 @@ export interface VerifySignInCodeResponse extends ApiEnvelope, AuthTokenContract
   sessionInfo?: SessionInfo | null
   /** With a recovery code: how many are left. */
   recoveryCodesLeft?: number
-  /** Never seen over /rpc/json on a refusal (the refusal arrives as a JSON-RPC error); read on success only. */
+  /** On a refusal (ok false): true when the challenge can no longer be used; back to the password. */
   challengeEnded?: boolean
 }
 
