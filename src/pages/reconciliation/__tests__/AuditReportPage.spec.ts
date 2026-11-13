@@ -1117,6 +1117,30 @@ describe('AuditReportPage', () => {
     }
   })
 
+  // DAR-UI-116. Leaving the page mid-Resolve ends the wait: no more reads, nothing said over the next page. (A page
+  // left polling read the next test's finding on a slow CI runner and handed it the closed document early.)
+  it('stops waiting on a resolve once the page is left', async () => {
+    vi.useFakeTimers()
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail.message)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    try {
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      f.verifyAuditFinding.mockResolvedValue({ ok: true, submitted: true } as never)
+      await w.get('[data-testid="audit-verify-finding"]').trigger('click')
+      const reads = f.getAuditFinding.mock.calls.length
+      w.unmount()
+      await vi.advanceTimersByTimeAsync(3000 * 61)
+      expect(f.getAuditFinding.mock.calls.length).toBe(reads)
+      expect(heard).toEqual([])
+    } finally {
+      document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+      vi.useRealTimers()
+    }
+  })
+
   it('says in words why a finding cannot be resolved', async () => {
     liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
     const w = mount(AuditReportPage)

@@ -454,10 +454,15 @@ async function loadFinding(): Promise<void> {
 // finding is read again until its lastChecked moves, then the top pill says whether it closed.
 const VERIFY_POLL_MS = 3000
 const VERIFY_POLL_TRIES = 60
+// DAR-UI-116. Leaving the page ends the wait: a page left mid-Resolve kept reading the finding every 3 s for up to
+// three minutes and could say "Resolved" over whatever page came next.
+let left = false
+onBeforeUnmount(() => { left = true })
 async function verifyFinding(): Promise<void> {
   // An order's finding is its stuck line's (F-n), never the order id in the URL.
   const id = findingTarget.value
   if (!id || verifying.value) return
+  const watching = () => !left && findingTarget.value === id
   const before = finding.value?.finding.status.lastChecked ?? null
   verifying.value = true
   findingError.value = ''
@@ -467,20 +472,21 @@ async function verifyFinding(): Promise<void> {
       findingError.value = 'The finding dodged the check. Try again.'
       return
     }
-    for (let tries = 0; tries < VERIFY_POLL_TRIES && findingTarget.value === id; tries++) {
+    for (let tries = 0; tries < VERIFY_POLL_TRIES && watching(); tries++) {
       await new Promise((resolve) => setTimeout(resolve, VERIFY_POLL_MS))
+      if (!watching()) return
       const response = await auditFacade.getAuditFinding({ findingId: id })
       const doc = response.finding
-      if (findingTarget.value !== id || !doc || doc.finding.status.lastChecked === before) continue
+      if (!watching() || !doc || doc.finding.status.lastChecked === before) continue
       finding.value = doc
       const closed = doc.finding.status.state === 'fixed'
       say(closed ? 'Resolved. The finding is closed.' : 'Still open. The cause above is from this check.')
       if (closed) void loadReport()
       return
     }
-    if (findingTarget.value === id) say('Still checking. Reopen the finding in a minute.')
+    if (watching()) say('Still checking. Reopen the finding in a minute.')
   } catch (error) {
-    if (findingTarget.value === id) findingError.value = error instanceof ApiCallError ? error.message : 'The finding dodged the check. Try again.'
+    if (watching()) findingError.value = error instanceof ApiCallError ? error.message : 'The finding dodged the check. Try again.'
   } finally {
     verifying.value = false
   }
