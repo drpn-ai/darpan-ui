@@ -49,8 +49,8 @@ form-action 'self';
 
 | Target | `connect-src` |
 | --- | --- |
-| `prod` | `'self' https://*.hotwax.io https://api.drpn.ai` |
-| `uat` | `'self' https://*.hotwax.io https://api-uat.drpn.ai` |
+| `prod` | `'self' https://api.drpn.ai` |
+| `uat` | `'self' https://api-uat.drpn.ai` |
 | `sm-darpan` | `'self' https://sm-darpan-maarg.hotwax.io` |
 
 `frame-src https://linear.app` exists for the embedded roadmap page (`/roadmap/reconciliation`,
