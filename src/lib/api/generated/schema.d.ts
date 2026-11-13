@@ -1263,6 +1263,48 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetLiveOperationsResult"];
         };
+        /** @description Counts the rows each table's retention period would delete now, per table and tenant. Deletes nothing. */
+        DryRunRetentionParams: {
+            /** @description One tenant; blank covers every tenant. */
+            tenantUserGroupId?: string;
+            /**
+             * @description Optional preview periods in days by table key (AUDIT_FINDING,
+             *                     RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG), used instead of the configured ones.
+             */
+            periodDays?: Record<string, never>;
+        };
+        DryRunRetentionResult: {
+            /** @description True when the preview ran. */
+            ok?: boolean;
+            /** @description Tenants covered. */
+            tenantCount?: number;
+            /** @description Rows per delete transaction a run would use. */
+            batchSize?: number;
+            /**
+             * @description One entry per table: table, property, periodDays (blank: keep
+             *                     forever), status (KEEP_FOREVER, INVALID_PERIOD, DRY_RUN), cutoff, rows, dependentRows, byTenant.
+             */
+            tables?: string[];
+        };
+        /** @description JSON-RPC request envelope for admin.RetentionAdminServices.dryRun#Retention */
+        DryRunRetentionRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.RetentionAdminServices.dryRun#Retention";
+            params?: components["schemas"]["DryRunRetentionParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.RetentionAdminServices.dryRun#Retention. Check result.ok / result.errors for business failures. */
+        DryRunRetentionResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DryRunRetentionResult"];
+        };
         /**
          * @description Every tenant's scheduled automations on one instance-wide timeline, ordered by the
          *                 moment the scheduler will actually submit them, for deployment and load management.
@@ -1313,6 +1355,96 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["GetScheduleBoardResult"];
+        };
+        /**
+         * @description Each role the two-factor policy covers (ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN, DARPAN_TENANT_ADMIN in
+         *                 any tenant) with its date and who in it is and is not enrolled, plus how many super admins are enrolled (the
+         *                 break-glass rule needs two before super-admin enforcement can be switched on).
+         */
+        GetTwoFactorPoliciesParams: Record<string, never>;
+        GetTwoFactorPoliciesResult: {
+            /** @description One entry per role, in the order above. */
+            policies?: {
+                policy?: {
+                    permissionGroupId?: string;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds. Empty: optional. Future: grace period. */
+                    requiredFromDate?: string | number;
+                    lastChangedByUserId?: string;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    lastChangedDate?: string | number;
+                    enrolledCount?: number;
+                    notEnrolledCount?: number;
+                    enrolled?: {
+                        user?: {
+                            userId?: string;
+                            username?: string;
+                        };
+                    }[];
+                    notEnrolled?: {
+                        user?: {
+                            userId?: string;
+                            username?: string;
+                        };
+                    }[];
+                };
+            }[];
+            /** @description Super admins (ADMIN, DARPAN_SUPER_ADMIN) with two-factor on. */
+            enrolledSuperAdminCount?: number;
+        };
+        /** @description JSON-RPC request envelope for admin.SecurityAdminServices.get#TwoFactorPolicies */
+        GetTwoFactorPoliciesRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.SecurityAdminServices.get#TwoFactorPolicies";
+            params?: components["schemas"]["GetTwoFactorPoliciesParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.SecurityAdminServices.get#TwoFactorPolicies. Check result.ok / result.errors for business failures. */
+        GetTwoFactorPoliciesResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetTwoFactorPoliciesResult"];
+        };
+        /**
+         * @description Require two-factor for a role from a date (today or earlier: now; later: a grace period during which
+         *                 sign-in prompts), or make it optional again (clear). Super admins only. Requiring it for ADMIN or
+         *                 DARPAN_SUPER_ADMIN is refused until at least two super admins have it on. Writes an AdminAuditLog row.
+         */
+        UpdateTwoFactorPolicyParams: {
+            /** @description ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN or DARPAN_TENANT_ADMIN. */
+            permissionGroupId: string;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds. Required from this date. Leave out with clear. */
+            requiredFromDate?: string | number;
+            /** @description True makes the role optional again. */
+            clear?: boolean;
+        };
+        UpdateTwoFactorPolicyResult: {
+            /** @description True when the policy was saved. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.SecurityAdminServices.update#TwoFactorPolicy */
+        UpdateTwoFactorPolicyRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.SecurityAdminServices.update#TwoFactorPolicy";
+            params?: components["schemas"]["UpdateTwoFactorPolicyParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.SecurityAdminServices.update#TwoFactorPolicy. Check result.ok / result.errors for business failures. */
+        UpdateTwoFactorPolicyResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["UpdateTwoFactorPolicyResult"];
         };
         /** @description Create a Darpan tenant: UserGroup (UgtDarpanCompany) + TenantSetting in one transaction. */
         CreateTenantParams: {
@@ -1533,6 +1665,11 @@ export interface components {
         BeginSecretHandoffParams: {
             /** @description The target tenant. */
             tenantUserGroupId: string;
+            /**
+             * @description DAR-BE-264. A current code from the caller's authenticator app; required
+             *                     when they have two-factor on.
+             */
+            twoFactorCode?: string;
         };
         BeginSecretHandoffResult: {
             /** @description Base64 SPKI, for export#ConfigBundle secretsPublicKey. */
@@ -1598,6 +1735,11 @@ export interface components {
              *                     False (the default) sends exactly what it always has.
              */
             includeAutomations?: boolean;
+            /**
+             * @description DAR-BE-264. A current code from the caller's authenticator app; required
+             *                     when they have two-factor on.
+             */
+            twoFactorCode?: string;
         };
         ExportConfigBundleResult: {
             /**
@@ -1726,6 +1868,42 @@ export interface components {
             result: components["schemas"]["ImportConfigBundleResult"];
         };
         /**
+         * @description DAR-ADMIN-011. Make a user a Darpan admin (DARPAN_ADMIN: app settings, the CLI with no grant) or a super
+         *                 admin (DARPAN_SUPER_ADMIN: every tenant, the admin app, AI with no grant, every audit email). Idempotent: a role
+         *                 already in force is left as it is (changed=false, no audit row). Moqui's ADMIN group is never set here.
+         */
+        AddDarpanAdminParams: {
+            /** @description User to promote. */
+            userId: string;
+            /** @description DARPAN_ADMIN (default) or DARPAN_SUPER_ADMIN. */
+            darpanRoleId?: string;
+        };
+        AddDarpanAdminResult: {
+            /** @description True when the user holds the role afterwards. */
+            ok?: boolean;
+            /** @description True when this call started the role; false when it was already in force. */
+            changed?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.add#DarpanAdmin */
+        AddDarpanAdminRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.add#DarpanAdmin";
+            params?: components["schemas"]["AddDarpanAdminParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.add#DarpanAdmin. Check result.ok / result.errors for business failures. */
+        AddDarpanAdminResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["AddDarpanAdminResult"];
+        };
+        /**
          * @description Create a user with a temporary password (change forced at first login) and
          *                 DARPAN_USER group membership. Credentials are shared out-of-band; there is no email invite.
          */
@@ -1820,7 +1998,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["EnableUserAccountResult"];
         };
-        /** @description One user with account state and active tenant memberships, for the admin user detail board. */
+        /** @description One user with account state, Darpan-wide roles and active tenant memberships, for the admin user detail board. */
         GetUserDetailParams: {
             /** @description User to read. */
             userId: string;
@@ -1834,6 +2012,17 @@ export interface components {
                 emailAddress?: string;
                 disabled?: boolean;
                 requirePasswordChange?: boolean;
+                /**
+                 * @description Darpan-wide roles in force: ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN (in that order).
+                 *                         A Darpan admin usually has no tenant memberships: they reach tenants through these groups.
+                 */
+                darpanRoles?: string[];
+                /** @description DAR-BE-264. ON, OFF, or REQUIRED_NOT_SET_UP. */
+                twoFactor?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds. DAR-BE-264. When it was turned on. */
+                twoFactorConfirmedDate?: string | number;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds. DAR-BE-264. When a role of theirs requires it; empty when optional. */
+                twoFactorRequiredFromDate?: string | number;
                 memberships?: {
                     membership?: {
                         tenantUserGroupId?: string;
@@ -1871,6 +2060,8 @@ export interface components {
             pageIndex?: number;
             /** @description Rows per page; defaults to 25. */
             pageSize?: number;
+            /** @description Only users with a Darpan-wide role in force (ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN). */
+            darpanAdminsOnly?: boolean;
         };
         GetUserListResult: {
             /** @description Users on the requested page, sorted by username. */
@@ -1881,6 +2072,10 @@ export interface components {
                     userFullName?: string;
                     emailAddress?: string;
                     disabled?: boolean;
+                    /** @description Darpan-wide roles in force: ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN (in that order). */
+                    darpanRoles?: string[];
+                    /** @description DAR-BE-264. ON, OFF, or REQUIRED_NOT_SET_UP (a role requires it now and it is not on). */
+                    twoFactor?: string;
                 };
             }[];
             /** @description Total matches across all pages. */
@@ -1904,6 +2099,44 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["GetUserListResult"];
+        };
+        /**
+         * @description DAR-ADMIN-011. End a user's Darpan admin role: thruDate the membership (no row deletes, history kept).
+         *                 Omit darpanRoleId to end both DARPAN_ADMIN and DARPAN_SUPER_ADMIN. Ending your own super admin is refused.
+         *                 That also guarantees a super admin is always left: the caller must be one to call this at all.
+         *                 Idempotent: no role in force is changed=false. Moqui's ADMIN group is never ended here.
+         *                 Live CLI keys need no revoke: CliAuthSupport re-checks the role on every call.
+         */
+        RemoveDarpanAdminParams: {
+            /** @description User to demote. */
+            userId: string;
+            /** @description DARPAN_ADMIN or DARPAN_SUPER_ADMIN; both when omitted. */
+            darpanRoleId?: string;
+        };
+        RemoveDarpanAdminResult: {
+            /** @description True when the user no longer holds the role(s). */
+            ok?: boolean;
+            /** @description True when this call ended a role; false when none was in force. */
+            changed?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.remove#DarpanAdmin */
+        RemoveDarpanAdminRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.remove#DarpanAdmin";
+            params?: components["schemas"]["RemoveDarpanAdminParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.remove#DarpanAdmin. Check result.ok / result.errors for business failures. */
+        RemoveDarpanAdminResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RemoveDarpanAdminResult"];
         };
         /**
          * @description Set a temporary password for a user (change forced at next login) and revoke
@@ -1937,6 +2170,43 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["ResetPasswordResult"];
+        };
+        /**
+         * @description DAR-BE-264. End a user's two-factor (lost phone and no recovery code): their authenticator and recovery
+         *                 codes go, every session and CLI key ends, and a user whose role requires it sets up again at the next sign-in.
+         *                 Super admins only, never on one's own account; needs a reason and the acting admin's own current code (so they
+         *                 must have two-factor on). Writes an AdminAuditLog row, a TwoFactorEvent naming the admin, and emails the user.
+         */
+        ResetTwoFactorParams: {
+            /** @description User whose two-factor resets. */
+            userId: string;
+            /** @description Why, for the audit trail ("Two-factor reset: reason"). */
+            reason: string;
+            /** @description A current code from the acting admin's own authenticator app. */
+            adminCode: string;
+        };
+        ResetTwoFactorResult: {
+            /** @description True when reset. */
+            ok?: boolean;
+        };
+        /** @description JSON-RPC request envelope for admin.UserAdminServices.reset#TwoFactor */
+        ResetTwoFactorRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "admin.UserAdminServices.reset#TwoFactor";
+            params?: components["schemas"]["ResetTwoFactorParams"];
+        };
+        /** @description JSON-RPC success envelope for admin.UserAdminServices.reset#TwoFactor. Check result.ok / result.errors for business failures. */
+        ResetTwoFactorResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ResetTwoFactorResult"];
         };
         /** @description Update a user's display name and/or email. */
         UpdateUserAccountParams: {
@@ -2934,6 +3204,58 @@ export interface components {
             result: components["schemas"]["VerifyAuditFindingResult"];
         };
         /**
+         * @description DAR-BE-264. Start setting up an authenticator app: a new secret (any earlier unfinished setup ends),
+         *                 shown once. Either signed in (a first setup needs currentPassword; replacing an app that is on needs a current
+         *                 code from it), or with a setup challengeToken from login#Session (twoFactorSetupRequired). Finish within 15
+         *                 minutes with confirm#TwoFactorSetup.
+         */
+        BeginTwoFactorSetupParams: {
+            /** @description A setup challenge from login#Session; leave out when signed in. */
+            challengeToken?: string;
+            /** @description Signed in, first setup: the account's password (a wrong one counts as a failed login). */
+            currentPassword?: string;
+            /** @description Signed in, replacing an app that is on: a current code from it. */
+            code?: string;
+        };
+        BeginTwoFactorSetupResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description The key, Base32 (show grouped in fours for typing). In this reply only; never returned again. */
+            secret?: string;
+            /**
+             * @description otpauth://totp/Darpan:username?secret=...&issuer=Darpan&digits=6&period=30&algorithm=SHA1
+             *                         (issuer from DARPAN_TOTP_ISSUER, e.g. "Darpan UAT").
+             */
+            otpauthUri?: string;
+            /** @description The otpauthUri as a QR code: an SVG data URI (data:image/svg+xml;base64,...) for an img src. */
+            qrDataUri?: string;
+            /** @description Seconds left to confirm: 900. */
+            expiresInSeconds?: number;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.begin#TwoFactorSetup */
+        BeginTwoFactorSetupRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.begin#TwoFactorSetup";
+            params?: components["schemas"]["BeginTwoFactorSetupParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.begin#TwoFactorSetup. Check result.ok / result.errors for business failures. */
+        BeginTwoFactorSetupResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["BeginTwoFactorSetupResult"];
+        };
+        /**
          * @description Change the password of an account that cannot sign in until it is changed, without a session.
          *                 Requires the account's current password, so it grants nothing to a caller who does not already hold
          *                 valid credentials. Issues no token: darpan-ui calls login#Session afterwards with the new password.
@@ -3039,6 +3361,9 @@ export interface components {
                 canEditActiveTenantData?: boolean;
                 canManageDarpanCore?: boolean;
                 isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
             };
         };
         /** @description JSON-RPC request envelope for facade.AuthFacadeServices.change#OwnPassword */
@@ -3106,6 +3431,170 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["CompletePasswordResetResult"];
+        };
+        /**
+         * @description DAR-BE-264. Turn two-factor on with the first code the new app shows. Every other session and every CLI
+         *                 key of the account ends, and the caller is signed in with a fresh key (authToken): with a setup challengeToken
+         *                 this is the sign-in; from a signed-in tab the old key stops working, so the tab swaps to this one. Returns 10
+         *                 recovery codes, once.
+         */
+        ConfirmTwoFactorSetupParams: {
+            /** @description The 6-digit code the new app shows. */
+            code: string;
+            /** @description The setup challenge from login#Session; leave out when signed in. */
+            challengeToken?: string;
+        };
+        ConfirmTwoFactorSetupResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description True when a session was issued. */
+            authenticated?: boolean;
+            /** @description The login key darpan-ui sends in the `login_key` header (also set as the persistent-login cookie). */
+            authToken?: string;
+            /** @description `LOGIN_KEY`. */
+            authTokenType?: string;
+            /** @description `login_key`. */
+            authTokenHeaderName?: string;
+            /** @description The sign-in's absolute lifetime in seconds, as login#Session. */
+            authTokenExpiresInSeconds?: number;
+            /** @description As login#Session's sessionInfo. */
+            sessionInfo?: {
+                userId?: string;
+                username?: string;
+                displayName?: string;
+                locale?: string;
+                timeZone?: string;
+                userTimeZone?: string;
+                tenantTimeZone?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                lastLoginDate?: string | number;
+                recoveryEmailMissing?: boolean;
+                emailAddressMasked?: string;
+                lastRun?: {
+                    reconciliationRunResultId?: string;
+                    savedRunId?: string;
+                    savedRunType?: string;
+                    reconciliationRunId?: string;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    createdDate?: string | number;
+                };
+                scopeType?: string;
+                customerScopeId?: string;
+                activeTenantUserGroupId?: string;
+                activeTenantLabel?: string;
+                availableTenants?: {
+                    userGroupId?: string;
+                    label?: string;
+                }[];
+                activeTenantPermissionGroupIds?: string[];
+                canViewActiveTenantData?: boolean;
+                canRunActiveTenantReconciliation?: boolean;
+                canEditActiveTenantData?: boolean;
+                canManageDarpanCore?: boolean;
+                isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
+            };
+            /** @description 10 recovery codes, xxxx-xxxx-xxxx-xxxx. In this reply only. */
+            recoveryCodes?: string[];
+            /** @description With a challengeToken: true when it can no longer be used (expired, 5 wrong codes). */
+            challengeEnded?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.confirm#TwoFactorSetup */
+        ConfirmTwoFactorSetupRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.confirm#TwoFactorSetup";
+            params?: components["schemas"]["ConfirmTwoFactorSetupParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.confirm#TwoFactorSetup. Check result.ok / result.errors for business failures. */
+        ConfirmTwoFactorSetupResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["ConfirmTwoFactorSetupResult"];
+        };
+        /**
+         * @description DAR-BE-264. Ten new recovery codes for the signed-in person, replacing every old one. Needs a current
+         *                 authenticator code.
+         */
+        CreateRecoveryCodesParams: {
+            /** @description A current code from the authenticator app. */
+            code: string;
+        };
+        CreateRecoveryCodesResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description 10 recovery codes, xxxx-xxxx-xxxx-xxxx. In this reply only. */
+            recoveryCodes?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.create#RecoveryCodes */
+        CreateRecoveryCodesRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.create#RecoveryCodes";
+            params?: components["schemas"]["CreateRecoveryCodesParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.create#RecoveryCodes. Check result.ok / result.errors for business failures. */
+        CreateRecoveryCodesResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["CreateRecoveryCodesResult"];
+        };
+        /**
+         * @description DAR-BE-264. Turn two-factor off for the signed-in person, with a current code. Refused when a role of
+         *                 theirs requires it. Every other session and CLI key ends; this one carries on.
+         */
+        DisableTwoFactorParams: {
+            /** @description A current code from the authenticator app. */
+            code: string;
+        };
+        DisableTwoFactorResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.disable#TwoFactor */
+        DisableTwoFactorRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.disable#TwoFactor";
+            params?: components["schemas"]["DisableTwoFactorParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.disable#TwoFactor. Check result.ok / result.errors for business failures. */
+        DisableTwoFactorResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DisableTwoFactorResult"];
         };
         /**
          * @description DAR-BE-028. Whether this environment can send password reset email (a SYSTEM EmailServer with
@@ -3181,6 +3670,9 @@ export interface components {
                 canEditActiveTenantData?: boolean;
                 canManageDarpanCore?: boolean;
                 isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
             };
         };
         /** @description JSON-RPC request envelope for facade.AuthFacadeServices.get#SessionInfo */
@@ -3201,6 +3693,47 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["GetSessionInfoResult"];
+        };
+        /** @description DAR-BE-264. The signed-in person's two-factor state, for User Settings. Never the secret. */
+        GetTwoFactorStatusParams: Record<string, never>;
+        GetTwoFactorStatusResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description True when an authenticator app is on. */
+            enabled?: boolean;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds. When it was turned on. */
+            confirmedDate?: string | number;
+            /** @description Unused recovery codes. */
+            recoveryCodesLeft?: number;
+            /** @description True when a role of theirs requires it now (no "Off" action). */
+            required?: boolean;
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds. When it is or becomes required; empty when optional. */
+            requiredFromDate?: string | number;
+            /** @description True after 20 wrong codes in 24 hours, until a password or admin reset. */
+            codesLocked?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.get#TwoFactorStatus */
+        GetTwoFactorStatusRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.get#TwoFactorStatus";
+            params?: components["schemas"]["GetTwoFactorStatusParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.get#TwoFactorStatus. Check result.ok / result.errors for business failures. */
+        GetTwoFactorStatusResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["GetTwoFactorStatusResult"];
         };
         /** @description Create an authenticated session from username/password and return the explicit Moqui login-key token darpan-ui sends on later requests. */
         LoginSessionParams: {
@@ -3232,6 +3765,24 @@ export interface components {
              *                         Absent unless passwordChangeRequired is true.
              */
             passwordChangeReason?: string;
+            /**
+             * @description DAR-BE-264. True when the password was right and the account has two-factor on: no session
+             *                         yet. ok=true, authenticated=false; send challengeToken with a code to verify#SignInCode.
+             */
+            twoFactorRequired?: boolean;
+            /**
+             * @description DAR-BE-264. True when the password was right and two-factor is required for the account's role
+             *                         but not set up: no session yet. ok=true, authenticated=false; challengeToken allows only
+             *                         begin#TwoFactorSetup and confirm#TwoFactorSetup, and confirm signs in.
+             */
+            twoFactorSetupRequired?: boolean;
+            /**
+             * @description DAR-BE-264. With twoFactorRequired or twoFactorSetupRequired: the sign-in challenge. Keep it in
+             *                         page memory only (never storage or a cookie); a refresh goes back to the password step.
+             */
+            challengeToken?: string;
+            /** @description DAR-BE-264. Seconds the challenge lives: 300. */
+            challengeExpiresInSeconds?: number;
             /** @description Explicit login-key token that darpan-ui sends on later requests through the `login_key` header. */
             authToken?: string;
             /** @description Token scheme identifier. Current value: `LOGIN_KEY`. */
@@ -3275,6 +3826,9 @@ export interface components {
                 canEditActiveTenantData?: boolean;
                 canManageDarpanCore?: boolean;
                 isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
             };
         };
         /** @description JSON-RPC request envelope for facade.AuthFacadeServices.login#Session */
@@ -3455,6 +4009,9 @@ export interface components {
                 canEditActiveTenantData?: boolean;
                 canManageDarpanCore?: boolean;
                 isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
             };
         };
         /** @description JSON-RPC request envelope for facade.AuthFacadeServices.save#ActiveTenant */
@@ -3571,6 +4128,9 @@ export interface components {
                 canEditActiveTenantData?: boolean;
                 canManageDarpanCore?: boolean;
                 isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
             };
         };
         /** @description JSON-RPC request envelope for facade.AuthFacadeServices.save#UserSettings */
@@ -3643,6 +4203,9 @@ export interface components {
                 canEditActiveTenantData?: boolean;
                 canManageDarpanCore?: boolean;
                 isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
             };
         };
         /** @description JSON-RPC request envelope for facade.AuthFacadeServices.verify#OwnPassword */
@@ -3702,6 +4265,100 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["VerifyPasswordResetCodeResult"];
+        };
+        /**
+         * @description DAR-BE-264. Finish a sign-in login#Session answered with twoFactorRequired: the challengeToken with a
+         *                 current authenticator code or a recovery code. Success answers as login#Session does (a session and its key).
+         *                 Every refusal is "That code didn't work."; 5 wrong codes end the challenge (challengeEnded), and each wrong code
+         *                 also counts as a failed login. A used recovery code emails the person.
+         */
+        VerifySignInCodeParams: {
+            /** @description From login#Session. */
+            challengeToken: string;
+            /** @description The 6-digit code from the authenticator app; spaces ignored. */
+            code?: string;
+            /** @description Instead of code: a recovery code, xxxx-xxxx-xxxx-xxxx (case, spaces and dashes ignored). Used once. */
+            recoveryCode?: string;
+        };
+        VerifySignInCodeResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description True when a session was issued. */
+            authenticated?: boolean;
+            /** @description The login key darpan-ui sends in the `login_key` header (also set as the persistent-login cookie). */
+            authToken?: string;
+            /** @description `LOGIN_KEY`. */
+            authTokenType?: string;
+            /** @description `login_key`. */
+            authTokenHeaderName?: string;
+            /** @description The sign-in's absolute lifetime in seconds, as login#Session. */
+            authTokenExpiresInSeconds?: number;
+            /** @description As login#Session's sessionInfo. */
+            sessionInfo?: {
+                userId?: string;
+                username?: string;
+                displayName?: string;
+                locale?: string;
+                timeZone?: string;
+                userTimeZone?: string;
+                tenantTimeZone?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                lastLoginDate?: string | number;
+                recoveryEmailMissing?: boolean;
+                emailAddressMasked?: string;
+                lastRun?: {
+                    reconciliationRunResultId?: string;
+                    savedRunId?: string;
+                    savedRunType?: string;
+                    reconciliationRunId?: string;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    createdDate?: string | number;
+                };
+                scopeType?: string;
+                customerScopeId?: string;
+                activeTenantUserGroupId?: string;
+                activeTenantLabel?: string;
+                availableTenants?: {
+                    userGroupId?: string;
+                    label?: string;
+                }[];
+                activeTenantPermissionGroupIds?: string[];
+                canViewActiveTenantData?: boolean;
+                canRunActiveTenantReconciliation?: boolean;
+                canEditActiveTenantData?: boolean;
+                canManageDarpanCore?: boolean;
+                isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
+            };
+            /** @description With a recovery code: how many are left. At 3 or fewer darpan-ui asks for new ones. */
+            recoveryCodesLeft?: number;
+            /** @description True when the challenge can no longer be used (expired, used, 5 wrong codes): go back to the password. */
+            challengeEnded?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.verify#SignInCode */
+        VerifySignInCodeRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.verify#SignInCode";
+            params?: components["schemas"]["VerifySignInCodeParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.verify#SignInCode. Check result.ok / result.errors for business failures. */
+        VerifySignInCodeResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["VerifySignInCodeResult"];
         };
         /** @description The signed-in person's CLI state in the active tenant (LIVE, PAUSED, ENDED, NOT_GRANTED or DARPAN_ADMIN), the grant's end, how long a CLI sign-in lasts there, and their latest request. */
         GetMyCliAccessParams: Record<string, never>;
@@ -3775,6 +4432,11 @@ export interface components {
         ApproveCliLoginParams: {
             /** @description The user code shown by the CLI. */
             userCode: string;
+            /**
+             * @description DAR-BE-264. A current code from the approver's authenticator app; required
+             *                     when they have two-factor on (approval mints a 7-day key, so a hijacked tab must not be enough).
+             */
+            code?: string;
         };
         ApproveCliLoginResult: {
             /** @description True when the sign-in was approved. */
@@ -10381,7 +11043,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateAgentAccessGrantRequest"] | components["schemas"]["GetAgentUsageRequest"] | components["schemas"]["ListAgentAccessGrantsRequest"] | components["schemas"]["PauseAgentAccessGrantRequest"] | components["schemas"]["RevokeAgentAccessGrantRequest"] | components["schemas"]["UnpauseAgentAccessGrantRequest"] | components["schemas"]["UpdateAgentAccessGrantRequest"] | components["schemas"]["ListAllBrainChangeTicketsRequest"] | components["schemas"]["UpdateBrainChangeTicketRequest"] | components["schemas"]["ApproveCliAccessRequestRequest"] | components["schemas"]["CreateCliAccessGrantRequest"] | components["schemas"]["DeclineCliAccessRequestRequest"] | components["schemas"]["ListCliAccessGrantsRequest"] | components["schemas"]["ListCliAccessRequestsRequest"] | components["schemas"]["PauseCliAccessGrantRequest"] | components["schemas"]["RevokeCliAccessGrantRequest"] | components["schemas"]["UnpauseCliAccessGrantRequest"] | components["schemas"]["UpdateCliAccessGrantRequest"] | components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ApplyAuditChangeRequest"] | components["schemas"]["ListBrainChangeTicketsRequest"] | components["schemas"]["PlanAuditChangeRequest"] | components["schemas"]["RejectAuditChangeRequest"] | components["schemas"]["RevertAuditChangeRequest"] | components["schemas"]["ListAgentQueryLogsRequest"] | components["schemas"]["GetAgentAuditScopeRequest"] | components["schemas"]["GetAgentConversationRequest"] | components["schemas"]["GetAgentStatusRequest"] | components["schemas"]["SendAgentTurnRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["GetMyCliAccessRequest"] | components["schemas"]["RequestCliAccessRequest"] | components["schemas"]["ApproveCliLoginRequest"] | components["schemas"]["DenyCliLoginRequest"] | components["schemas"]["GetCliLoginRequestRequest"] | components["schemas"]["ListCliSessionsRequest"] | components["schemas"]["LogoutCliSessionRequest"] | components["schemas"]["PollCliLoginRequest"] | components["schemas"]["RevokeCliSessionRequest"] | components["schemas"]["StartCliLoginRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["CreateDataSourceDefinitionRequest"] | components["schemas"]["RetireDataSourceDefinitionRequest"] | components["schemas"]["ValidateDataSourceDefinitionRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["GetOmsGraphqlSchemaRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["RunOmsGraphqlAgentQueryRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsAgentConnectionsRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["RunNsSuiteQlAgentQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyGraphqlSchemaRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["RunShopifyGraphqlAgentQueryRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["DeleteTenantScriptRequest"] | components["schemas"]["DeleteTenantScriptDeploymentRequest"] | components["schemas"]["ListTenantScriptDeploymentsRequest"] | components["schemas"]["ListTenantScriptsRequest"] | components["schemas"]["RunTenantScriptRequest"] | components["schemas"]["RunTenantScriptDeploymentRequest"] | components["schemas"]["SaveTenantScriptRequest"] | components["schemas"]["SaveTenantScriptDeploymentRequest"];
+                "application/json": components["schemas"]["CreateAgentAccessGrantRequest"] | components["schemas"]["GetAgentUsageRequest"] | components["schemas"]["ListAgentAccessGrantsRequest"] | components["schemas"]["PauseAgentAccessGrantRequest"] | components["schemas"]["RevokeAgentAccessGrantRequest"] | components["schemas"]["UnpauseAgentAccessGrantRequest"] | components["schemas"]["UpdateAgentAccessGrantRequest"] | components["schemas"]["ListAllBrainChangeTicketsRequest"] | components["schemas"]["UpdateBrainChangeTicketRequest"] | components["schemas"]["ApproveCliAccessRequestRequest"] | components["schemas"]["CreateCliAccessGrantRequest"] | components["schemas"]["DeclineCliAccessRequestRequest"] | components["schemas"]["ListCliAccessGrantsRequest"] | components["schemas"]["ListCliAccessRequestsRequest"] | components["schemas"]["PauseCliAccessGrantRequest"] | components["schemas"]["RevokeCliAccessGrantRequest"] | components["schemas"]["UnpauseCliAccessGrantRequest"] | components["schemas"]["UpdateCliAccessGrantRequest"] | components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["DryRunRetentionRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["GetTwoFactorPoliciesRequest"] | components["schemas"]["UpdateTwoFactorPolicyRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["AddDarpanAdminRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["RemoveDarpanAdminRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["ResetTwoFactorRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ApplyAuditChangeRequest"] | components["schemas"]["ListBrainChangeTicketsRequest"] | components["schemas"]["PlanAuditChangeRequest"] | components["schemas"]["RejectAuditChangeRequest"] | components["schemas"]["RevertAuditChangeRequest"] | components["schemas"]["ListAgentQueryLogsRequest"] | components["schemas"]["GetAgentAuditScopeRequest"] | components["schemas"]["GetAgentConversationRequest"] | components["schemas"]["GetAgentStatusRequest"] | components["schemas"]["SendAgentTurnRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["BeginTwoFactorSetupRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["ConfirmTwoFactorSetupRequest"] | components["schemas"]["CreateRecoveryCodesRequest"] | components["schemas"]["DisableTwoFactorRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["GetTwoFactorStatusRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["VerifySignInCodeRequest"] | components["schemas"]["GetMyCliAccessRequest"] | components["schemas"]["RequestCliAccessRequest"] | components["schemas"]["ApproveCliLoginRequest"] | components["schemas"]["DenyCliLoginRequest"] | components["schemas"]["GetCliLoginRequestRequest"] | components["schemas"]["ListCliSessionsRequest"] | components["schemas"]["LogoutCliSessionRequest"] | components["schemas"]["PollCliLoginRequest"] | components["schemas"]["RevokeCliSessionRequest"] | components["schemas"]["StartCliLoginRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["CreateDataSourceDefinitionRequest"] | components["schemas"]["RetireDataSourceDefinitionRequest"] | components["schemas"]["ValidateDataSourceDefinitionRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["GetOmsGraphqlSchemaRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["RunOmsGraphqlAgentQueryRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsAgentConnectionsRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["RunNsSuiteQlAgentQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyGraphqlSchemaRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["RunShopifyGraphqlAgentQueryRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["DeleteTenantScriptRequest"] | components["schemas"]["DeleteTenantScriptDeploymentRequest"] | components["schemas"]["ListTenantScriptDeploymentsRequest"] | components["schemas"]["ListTenantScriptsRequest"] | components["schemas"]["RunTenantScriptRequest"] | components["schemas"]["RunTenantScriptDeploymentRequest"] | components["schemas"]["SaveTenantScriptRequest"] | components["schemas"]["SaveTenantScriptDeploymentRequest"];
             };
         };
         responses: {
@@ -10391,7 +11053,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["CreateAgentAccessGrantResponse"] | components["schemas"]["GetAgentUsageResponse"] | components["schemas"]["ListAgentAccessGrantsResponse"] | components["schemas"]["PauseAgentAccessGrantResponse"] | components["schemas"]["RevokeAgentAccessGrantResponse"] | components["schemas"]["UnpauseAgentAccessGrantResponse"] | components["schemas"]["UpdateAgentAccessGrantResponse"] | components["schemas"]["ListAllBrainChangeTicketsResponse"] | components["schemas"]["UpdateBrainChangeTicketResponse"] | components["schemas"]["ApproveCliAccessRequestResponse"] | components["schemas"]["CreateCliAccessGrantResponse"] | components["schemas"]["DeclineCliAccessRequestResponse"] | components["schemas"]["ListCliAccessGrantsResponse"] | components["schemas"]["ListCliAccessRequestsResponse"] | components["schemas"]["PauseCliAccessGrantResponse"] | components["schemas"]["RevokeCliAccessGrantResponse"] | components["schemas"]["UnpauseCliAccessGrantResponse"] | components["schemas"]["UpdateCliAccessGrantResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ApplyAuditChangeResponse"] | components["schemas"]["ListBrainChangeTicketsResponse"] | components["schemas"]["PlanAuditChangeResponse"] | components["schemas"]["RejectAuditChangeResponse"] | components["schemas"]["RevertAuditChangeResponse"] | components["schemas"]["ListAgentQueryLogsResponse"] | components["schemas"]["GetAgentAuditScopeResponse"] | components["schemas"]["GetAgentConversationResponse"] | components["schemas"]["GetAgentStatusResponse"] | components["schemas"]["SendAgentTurnResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["GetMyCliAccessResponse"] | components["schemas"]["RequestCliAccessResponse"] | components["schemas"]["ApproveCliLoginResponse"] | components["schemas"]["DenyCliLoginResponse"] | components["schemas"]["GetCliLoginRequestResponse"] | components["schemas"]["ListCliSessionsResponse"] | components["schemas"]["LogoutCliSessionResponse"] | components["schemas"]["PollCliLoginResponse"] | components["schemas"]["RevokeCliSessionResponse"] | components["schemas"]["StartCliLoginResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["CreateDataSourceDefinitionResponse"] | components["schemas"]["RetireDataSourceDefinitionResponse"] | components["schemas"]["ValidateDataSourceDefinitionResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["GetOmsGraphqlSchemaResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["RunOmsGraphqlAgentQueryResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsAgentConnectionsResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["RunNsSuiteQlAgentQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyGraphqlSchemaResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["RunShopifyGraphqlAgentQueryResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["DeleteTenantScriptResponse"] | components["schemas"]["DeleteTenantScriptDeploymentResponse"] | components["schemas"]["ListTenantScriptDeploymentsResponse"] | components["schemas"]["ListTenantScriptsResponse"] | components["schemas"]["RunTenantScriptResponse"] | components["schemas"]["RunTenantScriptDeploymentResponse"] | components["schemas"]["SaveTenantScriptResponse"] | components["schemas"]["SaveTenantScriptDeploymentResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["CreateAgentAccessGrantResponse"] | components["schemas"]["GetAgentUsageResponse"] | components["schemas"]["ListAgentAccessGrantsResponse"] | components["schemas"]["PauseAgentAccessGrantResponse"] | components["schemas"]["RevokeAgentAccessGrantResponse"] | components["schemas"]["UnpauseAgentAccessGrantResponse"] | components["schemas"]["UpdateAgentAccessGrantResponse"] | components["schemas"]["ListAllBrainChangeTicketsResponse"] | components["schemas"]["UpdateBrainChangeTicketResponse"] | components["schemas"]["ApproveCliAccessRequestResponse"] | components["schemas"]["CreateCliAccessGrantResponse"] | components["schemas"]["DeclineCliAccessRequestResponse"] | components["schemas"]["ListCliAccessGrantsResponse"] | components["schemas"]["ListCliAccessRequestsResponse"] | components["schemas"]["PauseCliAccessGrantResponse"] | components["schemas"]["RevokeCliAccessGrantResponse"] | components["schemas"]["UnpauseCliAccessGrantResponse"] | components["schemas"]["UpdateCliAccessGrantResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["DryRunRetentionResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["GetTwoFactorPoliciesResponse"] | components["schemas"]["UpdateTwoFactorPolicyResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["AddDarpanAdminResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["RemoveDarpanAdminResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["ResetTwoFactorResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ApplyAuditChangeResponse"] | components["schemas"]["ListBrainChangeTicketsResponse"] | components["schemas"]["PlanAuditChangeResponse"] | components["schemas"]["RejectAuditChangeResponse"] | components["schemas"]["RevertAuditChangeResponse"] | components["schemas"]["ListAgentQueryLogsResponse"] | components["schemas"]["GetAgentAuditScopeResponse"] | components["schemas"]["GetAgentConversationResponse"] | components["schemas"]["GetAgentStatusResponse"] | components["schemas"]["SendAgentTurnResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["BeginTwoFactorSetupResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["ConfirmTwoFactorSetupResponse"] | components["schemas"]["CreateRecoveryCodesResponse"] | components["schemas"]["DisableTwoFactorResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["GetTwoFactorStatusResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["VerifySignInCodeResponse"] | components["schemas"]["GetMyCliAccessResponse"] | components["schemas"]["RequestCliAccessResponse"] | components["schemas"]["ApproveCliLoginResponse"] | components["schemas"]["DenyCliLoginResponse"] | components["schemas"]["GetCliLoginRequestResponse"] | components["schemas"]["ListCliSessionsResponse"] | components["schemas"]["LogoutCliSessionResponse"] | components["schemas"]["PollCliLoginResponse"] | components["schemas"]["RevokeCliSessionResponse"] | components["schemas"]["StartCliLoginResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["CreateDataSourceDefinitionResponse"] | components["schemas"]["RetireDataSourceDefinitionResponse"] | components["schemas"]["ValidateDataSourceDefinitionResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["GetOmsGraphqlSchemaResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["RunOmsGraphqlAgentQueryResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsAgentConnectionsResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["RunNsSuiteQlAgentQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyGraphqlSchemaResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["RunShopifyGraphqlAgentQueryResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["DeleteTenantScriptResponse"] | components["schemas"]["DeleteTenantScriptDeploymentResponse"] | components["schemas"]["ListTenantScriptDeploymentsResponse"] | components["schemas"]["ListTenantScriptsResponse"] | components["schemas"]["RunTenantScriptResponse"] | components["schemas"]["RunTenantScriptDeploymentResponse"] | components["schemas"]["SaveTenantScriptResponse"] | components["schemas"]["SaveTenantScriptDeploymentResponse"];
                 };
             };
         };
