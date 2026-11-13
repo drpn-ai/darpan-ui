@@ -63,9 +63,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  /** The factor is on and this tab holds the new key; the recovery codes are on screen. */
+  /** The factor is on and this tab holds the new key. */
   confirmed: []
-  /** "I saved them". */
+  /** "I saved them", or straight after the confirm when it made no new recovery codes. */
   done: []
   /** Back from the first step. */
   back: []
@@ -97,9 +97,14 @@ async function confirm(): Promise<void> {
   try {
     const result = await authStore.confirmTwoFactorSetup(code.value)
     if (result.outcome === 'confirmed') {
+      emit('confirmed')
+      // Codes come only when this turned two-factor on; an app beside a passkey, or a new app, keeps the old ones.
+      if (result.recoveryCodes.length === 0) {
+        emit('done')
+        return
+      }
       recoveryCodes.value = result.recoveryCodes
       step.value = 'codes'
-      emit('confirmed')
       return
     }
     code.value = ''

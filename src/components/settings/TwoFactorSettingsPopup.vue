@@ -259,14 +259,17 @@ async function act(given: TwoFactorProof): Promise<void> {
   }
   if (props.action === 'remove-passkey') {
     if (!props.passkey) return
-    // The backend refuses a required person's last factor; its reason shows here.
+    // The backend refuses a required person's last factor; its reason shows here. Removing the last one turns
+    // two-factor off: every key ends, this tab's too, and the reply carries the new one.
     const response = await authFacade.deletePasskey({ passkeyId: props.passkey.passkeyId, ...given })
+    authStore.adoptReissuedKey(response)
     emit('changed', response.twoFactorEnabled === false ? 'off' : 'passkey-removed')
     emit('close')
     return
   }
+  // Turning it off ends every key, this tab's too, and answers with the new one; removing only the app reissues none.
   const appOnly = props.action === 'app-off'
-  await authFacade.disableTwoFactor(appOnly ? { ...given, appOnly: true } : given)
+  authStore.adoptReissuedKey(await authFacade.disableTwoFactor(appOnly ? { ...given, appOnly: true } : given))
   emit('changed', appOnly ? 'app-off' : 'off')
   emit('close')
 }

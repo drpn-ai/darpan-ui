@@ -47,6 +47,7 @@ const disableTwoFactor = vi.hoisted(() => vi.fn())
 const beginTwoFactorSetup = vi.hoisted(() => vi.fn())
 const confirmTwoFactorSetup = vi.hoisted(() => vi.fn())
 const applyTwoFactorState = vi.hoisted(() => vi.fn())
+const adoptReissuedKey = vi.hoisted(() => vi.fn())
 const beginPasskeyRegistration = vi.hoisted(() => vi.fn())
 const finishPasskeyRegistration = vi.hoisted(() => vi.fn())
 const beginPasskeyProof = vi.hoisted(() => vi.fn())
@@ -135,6 +136,7 @@ vi.mock('../../../stores/auth', () => ({
     beginTwoFactorSetup,
     confirmTwoFactorSetup,
     applyTwoFactorState,
+    adoptReissuedKey,
     beginPasskeyRegistration,
     finishPasskeyRegistration,
   }),
@@ -203,6 +205,7 @@ describe('UserSettingsPage', () => {
     beginTwoFactorSetup.mockReset()
     confirmTwoFactorSetup.mockReset()
     applyTwoFactorState.mockReset()
+    adoptReissuedKey.mockReset()
     beginPasskeyRegistration.mockReset()
     finishPasskeyRegistration.mockReset()
     beginPasskeyProof.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [], publicKeyOptions: REQUEST_OPTIONS, expiresInSeconds: 300 })
@@ -978,6 +981,15 @@ describe('UserSettingsPage', () => {
 
       expect(beginTwoFactorSetup).toHaveBeenCalledWith({ code: '222333' })
       expect(wrapper.text()).toContain('Scan this with your authenticator app.')
+
+      // A new app keeps the person's recovery codes: confirm returns none, so there is no codes step to save.
+      confirmTwoFactorSetup.mockResolvedValue({ outcome: 'confirmed', recoveryCodes: [] })
+      await wrapper.get('[data-testid="two-factor-scan-next"]').trigger('click')
+      await flushPromises()
+      await typeCode(wrapper, 'two-factor-setup-code', '444555')
+      expect(wrapper.find('[data-testid="two-factor-recovery-code"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="two-factor-message"]').text()).toContain('Authenticator app on.')
     })
 
     it('makes new recovery codes with a current code', async () => {
@@ -1009,7 +1021,9 @@ describe('UserSettingsPage', () => {
 
     it('turns off only on the button (the sixth digit does not act), then updates the session', async () => {
       getTwoFactorStatus.mockResolvedValue(onStatus())
-      disableTwoFactor.mockResolvedValue({ ok: true, messages: [], errors: [] })
+      // Turning it off ends every key, this tab's too: the reply carries the new one.
+      const reissued = { ok: true, messages: [], errors: [], authenticated: true, authToken: 'key-after-off', authTokenHeaderName: 'login_key' }
+      disableTwoFactor.mockResolvedValue(reissued)
       const wrapper = mountPage()
       await flushPromises()
 
@@ -1022,6 +1036,7 @@ describe('UserSettingsPage', () => {
       await flushPromises()
 
       expect(disableTwoFactor).toHaveBeenCalledWith({ code: '666777' })
+      expect(adoptReissuedKey).toHaveBeenCalledWith(reissued)
       expect(applyTwoFactorState).toHaveBeenCalledWith({ enabled: false, dueDate: '2026-12-01T12:00:00Z' })
       expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
       expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('Off. Due 1 Dec')

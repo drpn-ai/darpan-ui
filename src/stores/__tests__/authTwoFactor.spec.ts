@@ -223,6 +223,17 @@ describe('auth store two-factor', () => {
     expect(getAuthToken()).toBe('old-key')
     expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'ended', message: 'Setup has expired. Start again.' })
   })
+  it('turning two-factor off swaps the tab to the key the reply carries; a change that reissues none keeps it', async () => {
+    setAuthTokenContract({ authToken: 'old-key', authTokenHeaderName: 'login_key' })
+    const store = useAuthStore()
+
+    store.adoptReissuedKey({ ok: true, authenticated: true, authToken: 'key-after-off', authTokenHeaderName: 'login_key' } as never)
+    expect(getAuthToken()).toBe('key-after-off')
+    // Removing only the app, or one passkey of several, reissues nothing.
+    store.adoptReissuedKey({ ok: true } as never)
+    expect(getAuthToken()).toBe('key-after-off')
+  })
+
   it('keeps login#Session\'s passkeysAvailable with the challenge, for a forced setup', async () => {
     expect((await signInToChallenge('setup', { passkeysAvailable: true })).store.twoFactorPasskeysAvailable).toBe(true)
     expect((await signInToChallenge('setup')).store.twoFactorPasskeysAvailable).toBe(false)

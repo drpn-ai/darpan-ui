@@ -291,8 +291,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * A reply that signed in. Through a challenge it IS the sign-in: fresh caches and reference data. From a signed-in
-   * tab (a first factor confirmed) the old key predates the factor and has stopped working, so the tab swaps to the
-   * new key; same person, same tenant, so the read cache and reference data stay.
+   * tab (a first factor confirmed, or two-factor turned off) every older key has ended, this tab's too, so the tab swaps
+   * to the new key; same person, same tenant, so the read cache and reference data stay.
    */
   function _adoptSignIn(reply: SignInReply, challenge: TwoFactorChallenge | null): void {
     _setTwoFactorChallenge(null)
@@ -301,7 +301,13 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     setAuthTokenContract(reply)
-    _applyAuthenticatedSession(reply.sessionInfo)
+    if (reply.sessionInfo) _applyAuthenticatedSession(reply.sessionInfo)
+  }
+
+  /** disable#TwoFactor, or delete#Passkey of the last factor, turned two-factor off: every key ended, this tab's too,
+   *  and the reply carries the new one. A change that left two-factor on carries none and changes nothing here. */
+  function adoptReissuedKey(reply: SignInReply): void {
+    if (_holdsSignIn(reply)) _adoptSignIn(reply, null)
   }
 
   function abandonTwoFactorChallenge(): void {
@@ -985,6 +991,7 @@ export const useAuthStore = defineStore('auth', () => {
     beginPasskeyRegistration,
     finishPasskeyRegistration,
     applyTwoFactorState,
+    adoptReissuedKey,
     requestPasswordReset,
     verifyPasswordResetCode,
     completePasswordReset,
