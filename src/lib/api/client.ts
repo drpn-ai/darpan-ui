@@ -332,6 +332,11 @@ export function getAuthToken(): string | null {
   return getActiveAuthTokenState()?.value ?? null
 }
 
+/** The key a call sends now (null in cookie-auth mode, where the HttpOnly cookie is the credential). */
+function currentAuthKey(): string | null {
+  return COOKIE_AUTH ? null : getAuthToken()
+}
+
 // ---- CSRF token (cookie-auth mode) ----
 // Non-secret anti-CSRF token. Kept in memory + sessionStorage (per-tab, cleared on tab close).
 // The actual session credential is the HttpOnly darpan_login_key cookie, which is not JS-readable.
@@ -539,6 +544,16 @@ async function dispatchService<T>(
 
   const parseFailures: Array<{ url: string; status?: number; raw?: string; error?: unknown }> = []
 
+  // The key this call went out with. Confirming a first factor swaps this tab's key and ends the old one at once
+  // (DAR-BE-264/270), so a call already in flight on the old key comes back signed out: that refusal is about the old
+  // key, not the session. Such a call goes again on the current key, and the current key is never cleared for it.
+  let sentKey: string | null = null
+  const refusedSignedOut = (detail: AuthRequiredDetail, details: Record<string, unknown>): Promise<T> => {
+    const key = currentAuthKey()
+    if (key !== null && key !== sentKey) return dispatchService<T>(method, params, signal, recoveryExhausted, options)
+    return throwAuthRequired(detail, details)
+  }
+
   for (const candidateUrl of rpcCandidates) {
     if (signal?.aborted) {
       throw new DOMException('The operation was aborted.', 'AbortError')
@@ -546,6 +561,7 @@ async function dispatchService<T>(
 
     let response: Response
     try {
+      sentKey = currentAuthKey()
       response = await fetch(candidateUrl, {
         method: 'POST',
         headers: buildHeaders(),
@@ -589,7 +605,7 @@ async function dispatchService<T>(
       const message = parsed.error?.message ?? `Request failed with status ${response.status}`
       const authRequired = response.status === 401 || isAuthRequiredMessage(message)
       if (authRequired) {
-        return throwAuthRequired(
+        return refusedSignedOut(
           { message, method, candidateUrl, status: 401, recoveryExhausted },
           withMethodDetails(method, { candidateUrl, data: parsed.error?.data }),
         )
@@ -605,7 +621,7 @@ async function dispatchService<T>(
     if (parsed.error) {
       const authRequired = response.status === 401 || isAuthRequiredMessage(parsed.error.message)
       if (authRequired) {
-        return throwAuthRequired(
+        return refusedSignedOut(
           { message: parsed.error.message, method, candidateUrl, status: 401, recoveryExhausted },
           withMethodDetails(method, { candidateUrl, data: parsed.error.data }),
         )
@@ -628,7 +644,7 @@ async function dispatchService<T>(
       const message = envelope.errors[0] ?? GENERIC_SERVICE_ERROR_MESSAGE
       const authRequired = isAuthRequiredMessage(message)
       if (authRequired) {
-        return throwAuthRequired(
+        return refusedSignedOut(
           { message, method, candidateUrl, status: 401, recoveryExhausted },
           withMethodDetails(method, { candidateUrl, result }),
         )
@@ -661,7 +677,7 @@ async function dispatchService<T>(
   })
 
   if (authLikeFailure) {
-    return throwAuthRequired(
+    return refusedSignedOut(
       {
         message: AUTH_REQUIRED_MESSAGE,
         method,

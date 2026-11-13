@@ -154,6 +154,31 @@ describe('callService', () => {
     expect(window.sessionStorage.getItem('darpan.authToken')).toBeNull()
   })
 
+  // DAR-BE-264/270: confirming a first factor swaps this tab's key and ends the old one at once. A call already in
+  // flight on the old key (the run-results poll, the route guard's session check) comes back signed out; clearing the
+  // stored key then would sign the tab out with the new key in hand.
+  it('a call refused on a key swapped while it was out goes again on the new key and leaves it stored', async () => {
+    const signedOut = { jsonrpc: '2.0', id: 1, result: { ok: false, messages: [], errors: ['Login key not valid'] } }
+    const answered = { jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [], authenticated: true } }
+    const { callService, getAuthToken, setAuthTokenContract } = await import('../client')
+    let replyToOldKey: (response: Response) => void = () => {}
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { replyToOldKey = resolve }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(answered), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    setAuthTokenContract({ authToken: 'old-key', authTokenHeaderName: 'login_key' })
+
+    const call = callService('facade.AuthFacadeServices.get#SessionInfo')
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    setAuthTokenContract({ authToken: 'new-key', authTokenHeaderName: 'login_key' })
+    replyToOldKey(new Response(JSON.stringify(signedOut), { status: 200 }))
+
+    await expect(call).resolves.toMatchObject({ authenticated: true })
+    const headers = fetchMock.mock.calls.map((args) => (args[1] as { headers: Record<string, string> }).headers.login_key)
+    expect(headers).toEqual(['old-key', 'new-key'])
+    expect(getAuthToken()).toBe('new-key')
+  })
+
   it('persists the bearer token to sessionStorage and never localStorage (audit #10)', async () => {
     const { setAuthTokenContract, getAuthToken } = await import('../client')
     setAuthTokenContract({ authToken: 'token-xyz' })
