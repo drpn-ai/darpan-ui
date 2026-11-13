@@ -59,6 +59,7 @@
       />
       <TwoFactorEnrolSteps
         v-else-if="twoFactorMode === 'setup'"
+        :passkeys-available="authStore.twoFactorPasskeysAvailable"
         :username="username"
         @back="leaveTwoFactorStep"
         @ended="endTwoFactorStep"
@@ -81,23 +82,25 @@
            then (the recovery-email step's pattern). -->
       <template v-else-if="isAskingTwoFactorDue">
         <TwoFactorEnrolSteps
-          v-if="isEnrollingInGrace"
+          v-if="gracePasskeysAvailable !== null"
           :proof="{ currentPassword: signInPassword }"
+          :passkeys-available="gracePasskeysAvailable"
           :username="username"
-          @back="isEnrollingInGrace = false"
+          @back="gracePasskeysAvailable = null"
           @done="leaveSignIn"
         />
         <WorkflowStepForm
           v-else
           :question="twoFactorDueQuestion"
-          primary-label="Set up"
+          :primary-label="isStartingGraceSetup ? 'Starting' : 'Set up'"
+          :submit-disabled="isStartingGraceSetup"
           :show-back="false"
           :show-cancel-action="true"
           cancel-label="Not now"
           cancel-test-id="login-two-factor-due-skip"
           :show-enter-hint="true"
           primary-test-id="login-two-factor-due-setup"
-          @submit="isEnrollingInGrace = true"
+          @submit="startGraceSetup"
           @cancel="leaveSignIn"
         />
       </template>
@@ -238,6 +241,7 @@ import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
 import TwoFactorCodeSteps from '../components/auth/TwoFactorCodeSteps.vue'
 import TwoFactorEnrolSteps from '../components/auth/TwoFactorEnrolSteps.vue'
 import { formatShortDate } from '../lib/utils/date'
+import { authFacade } from '../lib/api/facade'
 import type { TwoFactorChallengePurpose } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
@@ -287,7 +291,10 @@ const signInPassword = ref('')
 const twoFactorMode = ref<TwoFactorChallengePurpose | null>(null)
 const recoveryCodesLeft = ref<number | null>(null)
 const isAskingTwoFactorDue = ref(false)
-const isEnrollingInGrace = ref(false)
+// Grace-period setup: whether this instance offers passkeys, read from get#TwoFactorStatus when Set up is chosen (a
+// sign-in without a challenge does not say). Null while the prompt is showing.
+const gracePasskeysAvailable = ref<boolean | null>(null)
+const isStartingGraceSetup = ref(false)
 // Fewest recovery codes left before the sign-in says so (the backend's own threshold for asking for new ones).
 const LOW_RECOVERY_CODES = 3
 
@@ -554,7 +561,7 @@ async function continueAfterSignIn(): Promise<void> {
   if (authStore.twoFactorDueDate) {
     // Said here, so the shell's pill does not say it again on arrival.
     authStore.noteTwoFactorDueAnnounced()
-    isEnrollingInGrace.value = false
+    gracePasskeysAvailable.value = null
     isAskingTwoFactorDue.value = true
     return
   }
@@ -564,7 +571,7 @@ async function continueAfterSignIn(): Promise<void> {
 async function leaveSignIn(): Promise<void> {
   isAskingRecoveryEmail.value = false
   isAskingTwoFactorDue.value = false
-  isEnrollingInGrace.value = false
+  gracePasskeysAvailable.value = null
   signInPassword.value = ''
   localError.value = null
   await router.replace(resolveInternalRedirectTarget(route.query.redirect))
@@ -592,6 +599,19 @@ async function finishTwoFactorSignIn(codesLeft: number | null): Promise<void> {
     return
   }
   await finishSignIn(signInPassword.value)
+}
+
+async function startGraceSetup(): Promise<void> {
+  if (isStartingGraceSetup.value) return
+  isStartingGraceSetup.value = true
+  try {
+    gracePasskeysAvailable.value = (await authFacade.getTwoFactorStatus()).passkeysAvailable === true
+  } catch {
+    // Unread, the app is still offered: it works on every instance.
+    gracePasskeysAvailable.value = false
+  } finally {
+    isStartingGraceSetup.value = false
+  }
 }
 
 async function acknowledgeRecoveryCodesLeft(): Promise<void> {

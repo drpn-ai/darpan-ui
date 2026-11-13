@@ -11,10 +11,11 @@ const verifySignInCode = vi.hoisted(() => vi.fn())
 const beginTwoFactorSetup = vi.hoisted(() => vi.fn())
 const confirmTwoFactorSetup = vi.hoisted(() => vi.fn())
 const getPasswordResetStatus = vi.hoisted(() => vi.fn())
+const getTwoFactorStatus = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ replace }) }))
 vi.mock('../../lib/api/facade', () => ({
-  authFacade: { loginSession, verifySignInCode, beginTwoFactorSetup, confirmTwoFactorSetup, getPasswordResetStatus },
+  authFacade: { loginSession, verifySignInCode, beginTwoFactorSetup, confirmTwoFactorSetup, getPasswordResetStatus, getTwoFactorStatus },
   settingsFacade: {},
   clearApiResponseCache: vi.fn(),
 }))
@@ -70,6 +71,7 @@ describe('LoginPage two-factor', () => {
     clearAuthToken()
     route.query = {}
     getPasswordResetStatus.mockResolvedValue({ available: false })
+    getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: false, passkeysAvailable: false })
   })
 
   it('asks for the app code, submits on the sixth digit, and signs in', async () => {

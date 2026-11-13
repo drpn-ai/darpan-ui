@@ -62,6 +62,8 @@ const FACTORS: { value: Factor; label: string; shortcutKey: string }[] = [
 const props = defineProps<{
   /** The password just used, in the grace period. Absent at a required setup: the sign-in challenge is the proof. */
   proof?: TwoFactorProof
+  /** This instance offers passkeys (login#Session's passkeysAvailable, or get#TwoFactorStatus signed in). */
+  passkeysAvailable: boolean
   username?: string | null
 }>()
 
@@ -79,8 +81,8 @@ const starting = ref(false)
 const error = ref<string | null>(null)
 const setup = ref<TwoFactorSetupStart | null>(null)
 const passkeyOptions = ref<string | null>(null)
-// Offered where this browser can make one, until the instance says it has none (the refusal is the only way to know).
-const passkeysOffered = ref(passkeysSupported())
+// Offered where this instance has passkeys and this browser can make one.
+const passkeysOffered = props.passkeysAvailable && passkeysSupported()
 
 function beginPasskey() {
   return authStore.beginPasskeyRegistration(props.proof)
@@ -106,15 +108,8 @@ async function start(): Promise<void> {
 }
 
 function refused(result: TwoFactorRefusal): void {
-  if (result.outcome === 'ended') {
-    setupEnded(result.message)
-    return
-  }
-  if (result.reason === 'passkeysUnavailable') {
-    passkeysOffered.value = false
-    factor.value = 'app'
-  }
-  error.value = result.message
+  if (result.outcome === 'ended') setupEnded(result.message)
+  else error.value = result.message
 }
 
 /** Through a challenge, back to the password. Signed in (the grace period), a setup left too long starts again here. */
@@ -133,13 +128,13 @@ function backToChoice(): void {
   passkeyOptions.value = null
   error.value = null
   // With nothing to choose, the choice step is only a wait: Back goes past it.
-  if (!passkeysOffered.value) emit('back')
+  if (!passkeysOffered) emit('back')
 }
 
 // The cards draw the A and P badges; the keys are wired here, as every page with choice cards does. Skipped while
 // typing, and Enter outside the form (a letter leaves focus on the page) starts, as the hint says.
 function handleShortcut(event: KeyboardEvent): void {
-  if (setup.value || passkeyOptions.value || !passkeysOffered.value) return
+  if (setup.value || passkeyOptions.value || !passkeysOffered) return
   if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
   const target = event.target
   if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
@@ -157,7 +152,7 @@ function handleShortcut(event: KeyboardEvent): void {
 onMounted(() => {
   window.addEventListener('keydown', handleShortcut)
   // Nothing to choose: begin the app at once.
-  if (!passkeysOffered.value) void start()
+  if (!passkeysOffered) void start()
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', handleShortcut))
 </script>

@@ -212,16 +212,22 @@ describe('auth store two-factor', () => {
     expect(store.twoFactorEnabled).toBe(true)
   })
 
-  it('a signed-in confirm refused keeps the old key; an expired setup says start again', async () => {
+  it('a signed-in confirm refused keeps the old key; SETUP_EXPIRED says start again', async () => {
     setAuthTokenContract({ authToken: 'old-key', authTokenHeaderName: 'login_key' })
     const store = useAuthStore()
     confirmTwoFactorSetup.mockResolvedValueOnce(refusal(false))
-    confirmTwoFactorSetup.mockResolvedValueOnce(refusal(false, 'Setup has expired. Start again.'))
+    // The reason code says so, never the wording.
+    confirmTwoFactorSetup.mockResolvedValueOnce({ ...refusal(false, 'Setup has expired. Start again.'), reason: 'SETUP_EXPIRED' })
 
     expect(await store.confirmTwoFactorSetup('000000')).toMatchObject({ outcome: 'refused', message: "That code didn't work." })
     expect(getAuthToken()).toBe('old-key')
     expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'ended', message: 'Setup has expired. Start again.' })
   })
+  it('keeps login#Session\'s passkeysAvailable with the challenge, for a forced setup', async () => {
+    expect((await signInToChallenge('setup', { passkeysAvailable: true })).store.twoFactorPasskeysAvailable).toBe(true)
+    expect((await signInToChallenge('setup')).store.twoFactorPasskeysAvailable).toBe(false)
+  })
+
   // ─── DAR-BE-270 passkeys ─────────────────────────────────────────────────────
 
   it('keeps what login#Session says the person can answer with, and only the ways this page knows', async () => {

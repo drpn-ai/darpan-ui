@@ -1,7 +1,7 @@
 import { onBeforeUnmount, readonly, ref } from 'vue'
 import { authFacade } from '../lib/api/facade'
 import { getPasskeyAssertion, passkeysSupported, PASSKEY_REFUSAL_TEXT } from '../lib/passkeys'
-import { callFailure, passkeyOptionsOf, refusalOf, type PasskeyBeginOutcome, type TwoFactorRefusal } from '../lib/twoFactor'
+import { callFailure, passkeyOptionsOf, type PasskeyBeginOutcome, type TwoFactorRefusal } from '../lib/twoFactor'
 
 /** How a fresh proof is given: a code from the app, a passkey, or (signing in only) a recovery code. */
 export type ProofMode = 'code' | 'passkey' | 'recovery'
@@ -14,11 +14,10 @@ export type PasskeyProofOutcome =
 /** Options are replaced this long before they expire, so a click never meets dead ones. */
 const REFRESH_MARGIN_MS = 30_000
 
-/** begin#PasskeyProof: options for one signed-in action's fresh proof. */
+/** begin#PasskeyProof: options for one signed-in action's fresh proof. It refuses as a JSON-RPC error. */
 export async function beginPasskeyProof(): Promise<PasskeyBeginOutcome> {
   try {
-    const reply = await authFacade.beginPasskeyProof()
-    return passkeyOptionsOf(reply) ?? refusalOf(reply, PASSKEY_REFUSAL_TEXT)
+    return passkeyOptionsOf(await authFacade.beginPasskeyProof()) ?? { outcome: 'refused', message: PASSKEY_REFUSAL_TEXT }
   } catch (err) {
     return callFailure(err)
   }

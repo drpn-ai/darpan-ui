@@ -16,6 +16,7 @@ const beginPasskeySignIn = vi.hoisted(() => vi.fn())
 const beginPasskeyRegistration = vi.hoisted(() => vi.fn())
 const finishPasskeyRegistration = vi.hoisted(() => vi.fn())
 const getPasswordResetStatus = vi.hoisted(() => vi.fn())
+const getTwoFactorStatus = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ replace }) }))
 vi.mock('../../lib/api/facade', () => ({
@@ -28,6 +29,7 @@ vi.mock('../../lib/api/facade', () => ({
     beginPasskeyRegistration,
     finishPasskeyRegistration,
     getPasswordResetStatus,
+    getTwoFactorStatus,
   },
   settingsFacade: {},
   clearApiResponseCache: vi.fn(),
@@ -60,7 +62,7 @@ const codeChallenge = (methods: string[]) => ({
 })
 const setupChallenge = {
   ok: true, messages: [], errors: [], authenticated: false, challengeToken: CHALLENGE, challengeExpiresInSeconds: 300,
-  twoFactorSetupRequired: true, twoFactorMethods: [],
+  twoFactorSetupRequired: true, twoFactorMethods: [], passkeysAvailable: true,
 }
 const refusal = (challengeEnded: boolean, reason = "That passkey didn't work.") => ({
   ok: false, messages: [], errors: [reason], authenticated: false, challengeEnded,
@@ -92,6 +94,7 @@ describe('LoginPage passkeys', () => {
     clearAuthToken()
     route.query = {}
     getPasswordResetStatus.mockResolvedValue({ available: false })
+    getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: false, passkeysAvailable: true })
     beginPasskeySignIn.mockResolvedValue(begun(REQUEST_OPTIONS))
     beginPasskeyRegistration.mockResolvedValue(begun(CREATION_OPTIONS))
     webauthn = installWebAuthnStub()
@@ -275,22 +278,16 @@ describe('LoginPage passkeys', () => {
     expect(getAuthToken()).toBeNull()
   })
 
-  it('an instance without passkeys says so once and stops offering them', async () => {
-    loginSession.mockResolvedValue(setupChallenge)
+  it('an instance without passkeys (login#Session says so) offers only the app, and begins it at once', async () => {
+    loginSession.mockResolvedValue({ ...setupChallenge, passkeysAvailable: false })
     beginTwoFactorSetup.mockResolvedValue(setupStart)
-    beginPasskeyRegistration.mockResolvedValue({
-      ...refusal(false, 'Passkeys are not available on this Darpan instance.'), publicKeyOptions: undefined,
-    })
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
-    await click(wrapper, 'two-factor-enrol-passkey')
-    await click(wrapper, 'two-factor-enrol-next')
 
-    expect(wrapper.text()).toContain('Passkeys are not available on this Darpan instance.')
-    expect(wrapper.text()).toContain('Set up an authenticator app.')
     expect(wrapper.find('[data-testid="two-factor-enrol-passkey"]').exists()).toBe(false)
-    await click(wrapper, 'two-factor-enrol-next')
+    expect(beginPasskeyRegistration).not.toHaveBeenCalled()
+    expect(beginTwoFactorSetup).toHaveBeenCalledWith({ challengeToken: CHALLENGE })
     expect(wrapper.text()).toContain('Scan this with your authenticator app.')
   })
 
@@ -304,6 +301,8 @@ describe('LoginPage passkeys', () => {
     await signIn(wrapper)
     expect(wrapper.text()).toContain('Set up two-factor by 1 Dec.')
     await click(wrapper, 'login-two-factor-due-setup')
+    // A sign-in without a challenge does not say whether passkeys are offered: the status read does.
+    expect(getTwoFactorStatus).toHaveBeenCalledTimes(1)
     await click(wrapper, 'two-factor-enrol-passkey')
     await click(wrapper, 'two-factor-enrol-next')
     expect(beginPasskeyRegistration).toHaveBeenCalledWith({ currentPassword: 'right-password' })

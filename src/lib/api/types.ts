@@ -128,6 +128,8 @@ export interface LoginSessionResponse extends ApiEnvelope, AuthTokenContract {
   challengeExpiresInSeconds?: number
   /** DAR-BE-270: with twoFactorRequired, what this person can answer with here: "app" and/or "passkey". */
   twoFactorMethods?: string[]
+  /** DAR-BE-270: with a challenge, whether this instance offers passkeys (a forced setup offers one beside the app). */
+  passkeysAvailable?: boolean
 }
 
 // DAR-BE-264. Hand-typed rather than Schemas['VerifySignInCodeResult'] / ['ConfirmTwoFactorSetupResult']: the

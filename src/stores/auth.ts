@@ -69,6 +69,8 @@ interface TwoFactorChallenge {
   token: string
   purpose: TwoFactorChallengePurpose
   methods: TwoFactorMethod[]
+  /** This instance offers passkeys (login#Session's passkeysAvailable), so a forced setup offers one beside the app. */
+  passkeysAvailable: boolean
 }
 
 /** A two-factor reply: refused with an envelope, ending its challenge or not; or signed in with a fresh key. */
@@ -218,6 +220,7 @@ export const useAuthStore = defineStore('auth', () => {
   let _twoFactorChallenge: TwoFactorChallenge | null = null
   const _twoFactorChallengePurpose = ref<TwoFactorChallengePurpose | null>(null)
   const _twoFactorMethods = ref<TwoFactorMethod[]>([])
+  const _twoFactorPasskeysAvailable = ref(false)
   // The due-date notice is said once per page load: by the sign-in grace step, or by the shell's pill for a tab
   // that arrived signed in.
   const _twoFactorDueAnnounced = ref(false)
@@ -235,6 +238,7 @@ export const useAuthStore = defineStore('auth', () => {
   const emailAddressMasked = computed(() => _sessionInfo.value?.emailAddressMasked ?? null)
   const twoFactorChallengePurpose = computed(() => _twoFactorChallengePurpose.value)
   const twoFactorMethods = computed(() => _twoFactorMethods.value)
+  const twoFactorPasskeysAvailable = computed(() => _twoFactorPasskeysAvailable.value)
   const twoFactorEnabled = computed(() => _sessionInfo.value?.twoFactorEnabled === true)
   const twoFactorDueDate = computed(() => (twoFactorEnabled.value ? null : _sessionInfo.value?.twoFactorDueDate || null))
   const twoFactorDueAnnounced = computed(() => _twoFactorDueAnnounced.value)
@@ -243,6 +247,7 @@ export const useAuthStore = defineStore('auth', () => {
     _twoFactorChallenge = challenge
     _twoFactorChallengePurpose.value = challenge?.purpose ?? null
     _twoFactorMethods.value = challenge?.methods ?? []
+    _twoFactorPasskeysAvailable.value = challenge?.passkeysAvailable === true
   }
 
   function _challengeFor(purpose: TwoFactorChallengePurpose): TwoFactorChallenge | null {
@@ -274,8 +279,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (accepted) return accepted
       if (challenge && reply.challengeEnded === true) return _endTwoFactorChallenge()
       const refusal = refusalOf(reply, fallback)
-      if (!challenge && refusal.reason === 'setupExpired') return { outcome: 'ended', message: refusal.message }
-      return refusal
+      return !challenge && reply.reason === 'SETUP_EXPIRED' ? { ...refusal, outcome: 'ended' } : refusal
     } catch (err) {
       return callFailure(err)
     }
@@ -468,6 +472,7 @@ export const useAuthStore = defineStore('auth', () => {
           token,
           purpose,
           methods: methods.filter((method): method is TwoFactorMethod => method === 'app' || method === 'passkey'),
+          passkeysAvailable: response.passkeysAvailable === true,
         })
         _applyAuthState({ status: 'unauthenticated' })
         return false
@@ -967,6 +972,7 @@ export const useAuthStore = defineStore('auth', () => {
     emailAddressMasked,
     twoFactorChallengePurpose,
     twoFactorMethods,
+    twoFactorPasskeysAvailable,
     twoFactorEnabled,
     twoFactorDueDate,
     twoFactorDueAnnounced,

@@ -118,7 +118,7 @@ import CliAccessRequestCard from '../components/settings/CliAccessRequestCard.vu
 import { authFacade } from '../lib/api/facade'
 import type { MyCliAccess } from '../lib/api/types'
 import { formatDateTime } from '../lib/utils/date'
-import { callFailure, refusalReason } from '../lib/twoFactor'
+import { callFailure } from '../lib/twoFactor'
 import { PASSKEY_BROWSER_NEEDED_TEXT, PASSKEYS_UNSUPPORTED_TEXT } from '../lib/passkeys'
 import { beginPasskeyProof, useTwoFactorProof } from '../composables/useTwoFactorProof'
 import { useAuthStore } from '../stores/auth'
@@ -228,27 +228,31 @@ async function lookUp() {
   }
 }
 
-// DAR-BE-209: an approve can fail because the code expired, or because the CLI is not turned on for this person. The
-// refusal text is not matched: approve#CliLogin's own rule (canUseCli: on in any tenant) says which, and a person
-// without the CLI is offered the request for the active tenant. A deny never checks access, so it never comes here.
-async function refused() {
-  confirmedCode = ''
+// approve#CliLogin refuses as a JSON-RPC error with no reason code, so its text is not matched: what the backend still
+// holds says why. DAR-BE-209: the CLI not turned on for this person (canUseCli: on in any tenant) offers the request for
+// the active tenant. DAR-BE-264/270: a request still waiting was refused for its proof (a wrong, reused or missing code
+// or passkey), so it stays on screen with the refusal. Anything else: the request expired or was answered. A deny
+// never checks either, so it never comes here.
+async function approveRefused(message: string): Promise<void> {
   try {
     const access = (await authFacade.getMyCliAccess(controller.signal)).access ?? null
     if (controller.signal.aborted) return
     if (access && access.canUseCli === false) {
+      confirmedCode = ''
       myAccess.value = access
       phase.value = 'noaccess'
       return
     }
+    const request = await authFacade.getCliLoginRequest({ userCode: confirmedCode }, controller.signal)
+    if (controller.signal.aborted) return
+    if (request.ok && request.status === 'PENDING') {
+      proofRefused(message)
+      return
+    }
   } catch {
-    // The access check failed too: fall back to the code message.
+    // The checks failed too: fall back to the code message.
   }
-  if (!controller.signal.aborted) phase.value = 'notfound'
-}
-
-async function failed(choice: 'approved' | 'denied') {
-  if (choice === 'approved') return refused()
+  if (controller.signal.aborted) return
   confirmedCode = ''
   phase.value = 'notfound'
 }
@@ -269,26 +273,24 @@ async function answer(choice: 'approved' | 'denied') {
   codeError.value = null
   try {
     const payload = { userCode: confirmedCode }
-    let response
     if (choice === 'approved') {
-      const proof = await approvalProof()
-      if (!proof || controller.signal.aborted) return
-      response = await authFacade.approveCliLogin({ ...payload, ...proof }, controller.signal)
+      const given = await approvalProof()
+      if (!given || controller.signal.aborted) return
+      await authFacade.approveCliLogin({ ...payload, ...given }, controller.signal)
     } else {
-      response = await authFacade.denyCliLogin(payload, controller.signal)
+      await authFacade.denyCliLogin(payload, controller.signal)
     }
     if (controller.signal.aborted) return
-    // approve#CliLogin answers a refusal as a reply; one a fresh proof fixes keeps the request on screen, anything else
-    // is about the request.
-    if (!response.ok) {
-      if (refusalReason(response) === 'proof') proofRefused(response.errors[0] ?? '')
-      else await failed(choice)
-      return
-    }
     outcome.value = choice
     phase.value = 'done'
-  } catch {
-    if (!controller.signal.aborted) await failed(choice)
+  } catch (err) {
+    if (controller.signal.aborted) return
+    if (choice === 'approved') {
+      await approveRefused(callFailure(err).message)
+      return
+    }
+    confirmedCode = ''
+    phase.value = 'notfound'
   } finally {
     busy.value = false
   }

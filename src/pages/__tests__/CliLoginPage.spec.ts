@@ -23,12 +23,17 @@ import { ApiCallError } from '../../lib/api/client'
 import { ASSERTION_JSON, REQUEST_OPTIONS, installWebAuthnStub, notAllowed, type WebAuthnStub } from '../../test/webauthn'
 
 const access = { tenantUserGroupId: 'ACME', tenantLabel: 'Acme', state: 'NOT_GRANTED', lifetimeDays: 7, canUseCli: false, request: null }
-// approve#CliLogin answers a refusal as a reply (ok false, errors), never as a thrown error.
-const refusal = (error: string) => ({ ok: false, messages: [], errors: [error] })
+// approve#CliLogin refuses as a JSON-RPC error with no reason code: the page reads what the backend still holds.
+const refusal = (error: string) => new ApiCallError(error, 200)
 
 const pending = {
   ok: true, messages: [], errors: [], hostLabel: 'ada-laptop', status: 'PENDING',
   createdDate: '2026-11-03T12:00:00Z', expiresDate: '2026-11-03T12:10:00Z',
+}
+
+/** The request is gone by the time the refusal is looked into (expired, or answered elsewhere). */
+function requestGoneAfterLookup() {
+  getCliLoginRequest.mockResolvedValueOnce(pending).mockResolvedValue({ ...pending, status: 'EXPIRED' })
 }
 
 async function typeCode(wrapper: ReturnType<typeof mount>, value: string) {
@@ -138,8 +143,9 @@ describe('CliLoginPage', () => {
     expect(denyCliLogin).not.toHaveBeenCalled()
   })
 
-  it('a refused approve returns to the not-found answer', async () => {
-    approveCliLogin.mockResolvedValue(refusal('gone'))
+  it('a refused approve returns to the not-found answer once the request is gone', async () => {
+    requestGoneAfterLookup()
+    approveCliLogin.mockRejectedValue(refusal('This sign-in request has expired or was already answered. Run darpan login again.'))
     const wrapper = mount(CliLoginPage)
     await typeCode(wrapper, 'BCDF-GH23')
     await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
@@ -149,7 +155,7 @@ describe('CliLoginPage', () => {
 
   // DAR-BE-209: an approve refused because the CLI is not on for this person offers the request, not "code not found".
   async function approveRefused(wrapper: ReturnType<typeof mount>) {
-    approveCliLogin.mockResolvedValue(refusal('The Darpan CLI is not turned on for this account. A Darpan admin turns it on.'))
+    approveCliLogin.mockRejectedValue(refusal('The Darpan CLI is not turned on for this account. A Darpan admin turns it on.'))
     await typeCode(wrapper, 'BCDF-GH23')
     await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
     await flushPromises()
@@ -165,6 +171,7 @@ describe('CliLoginPage', () => {
   })
 
   it('an expired code still says not found when the person has the CLI', async () => {
+    requestGoneAfterLookup()
     const wrapper = mount(CliLoginPage)
     await approveRefused(wrapper)
     expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(true)
@@ -193,6 +200,7 @@ describe('CliLoginPage', () => {
   // say why an approve failed; and deny never checks access.
   it('an expired code says not found for a person with the CLI on in another tenant', async () => {
     getMyCliAccess.mockResolvedValue({ ok: true, access: { ...access, canUseCli: true } })
+    requestGoneAfterLookup()
     const wrapper = mount(CliLoginPage)
     await approveRefused(wrapper)
     expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(true)
@@ -235,7 +243,7 @@ describe('CliLoginPage', () => {
     })
 
     it('a refused code keeps the request on screen with the refusal, and clears the code', async () => {
-      approveCliLogin.mockResolvedValue(refusal("That code didn't work."))
+      approveCliLogin.mockRejectedValue(refusal("That code didn't work."))
       const wrapper = mount(CliLoginPage)
       await typeCode(wrapper, 'BCDF-GH23')
       await wrapper.get('[data-testid="cli-login-two-factor-code"]').setValue('000000')
@@ -245,7 +253,8 @@ describe('CliLoginPage', () => {
       expect(wrapper.get('[data-testid="cli-login-code-error"]').text()).toBe("That code didn't work.")
       expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(true)
       expect((wrapper.get('[data-testid="cli-login-two-factor-code"]').element as HTMLInputElement).value).toBe('')
-      expect(getMyCliAccess).not.toHaveBeenCalled()
+      // No reason code on approve#CliLogin: the request still waiting is what says the proof was refused.
+      expect(getCliLoginRequest).toHaveBeenCalledTimes(2)
     })
 
     it('Deny needs no code', async () => {
@@ -259,7 +268,7 @@ describe('CliLoginPage', () => {
 
     it('shows the code field when the backend asks for one the session did not know about', async () => {
       authState.twoFactorEnabled = false
-      approveCliLogin.mockResolvedValueOnce(refusal('Enter the code from your authenticator app.'))
+      approveCliLogin.mockRejectedValueOnce(refusal('Enter the code from your authenticator app.'))
       const wrapper = mount(CliLoginPage)
       await typeCode(wrapper, 'BCDF-GH23')
       await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
@@ -330,7 +339,7 @@ describe('CliLoginPage', () => {
 
     it('with the app as well, the code stays first; Use a passkey switches, and a refused passkey stays with the message', async () => {
       getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: true, appEnabled: true, passkeys: [PASSKEY] })
-      approveCliLogin.mockResolvedValue(refusal("That passkey didn't work."))
+      approveCliLogin.mockRejectedValue(refusal("That passkey didn't work."))
       const wrapper = mount(CliLoginPage)
       await typeCode(wrapper, 'BCDF-GH23')
 

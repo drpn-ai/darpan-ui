@@ -275,8 +275,8 @@ import type {
   SaveFlowchartRunResponse,
 } from './flowchartTypes'
 
-// A refused two-factor proof is answered as a completed call whose fields (challengeEnded, the refusal's reason)
-// decide the next screen.
+// A refused sign-in or setup step is answered as a completed call whose fields (challengeEnded, reason) decide the next
+// screen.
 const REFUSAL_IS_RESULT = { refusalIsResult: true } as const
 
 const AUTH = {
@@ -490,13 +490,14 @@ export const authFacade = {
   disableTwoFactor(payload: DisableTwoFactorPayload, signal?: AbortSignal): Promise<DisableTwoFactorResponse> {
     return callService<DisableTwoFactorResponse>(AUTH.disableTwoFactor, payload, signal)
   },
-  // DAR-BE-270 passkeys. The four ceremony steps answer a refusal as a reply (challengeEnded where a sign-in or setup
-  // challenge is in play); rename and delete refuse as errors, like create#RecoveryCodes.
+  // DAR-BE-270 passkeys. The sign-in and registration steps answer a refusal as a reply (reason, and challengeEnded where a
+  // sign-in or setup challenge is in play); begin#PasskeyProof, rename and delete refuse as errors, like
+  // create#RecoveryCodes.
   beginPasskeySignIn(payload: BeginPasskeySignInPayload, signal?: AbortSignal): Promise<BeginPasskeySignInResponse> {
     return callService<BeginPasskeySignInResponse>(AUTH.beginPasskeySignIn, payload, signal, REFUSAL_IS_RESULT)
   },
   beginPasskeyProof(signal?: AbortSignal): Promise<BeginPasskeyProofResponse> {
-    return callService<BeginPasskeyProofResponse>(AUTH.beginPasskeyProof, {}, signal, REFUSAL_IS_RESULT)
+    return callService<BeginPasskeyProofResponse>(AUTH.beginPasskeyProof, {}, signal)
   },
   beginPasskeyRegistration(payload: BeginPasskeyRegistrationPayload, signal?: AbortSignal): Promise<BeginPasskeyRegistrationResponse> {
     return callService<BeginPasskeyRegistrationResponse>(AUTH.beginPasskeyRegistration, payload, signal, REFUSAL_IS_RESULT)
@@ -511,7 +512,7 @@ export const authFacade = {
     return callService<DeletePasskeyResponse>(AUTH.deletePasskey, payload, signal)
   },
   approveCliLogin(payload: ApproveCliLoginPayload, signal?: AbortSignal): Promise<ApproveCliLoginResponse> {
-    return callService<ApproveCliLoginResponse>(AUTH.approveCliLogin, payload, signal, REFUSAL_IS_RESULT)
+    return callService<ApproveCliLoginResponse>(AUTH.approveCliLogin, payload, signal)
   },
   denyCliLogin(payload: CliLoginCodePayload, signal?: AbortSignal): Promise<DenyCliLoginResponse> {
     return callService<DenyCliLoginResponse>(AUTH.denyCliLogin, payload, signal)
