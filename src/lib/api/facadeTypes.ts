@@ -4,6 +4,7 @@
 import type { SourceExcludeFilter } from '../sourceExcludeFilters'
 import type { SharedConfigType } from '../sharedConfig'
 import type { ChatProviderId } from './types'
+import type { Schemas } from './generated'
 import type { SourceExtractOptions } from './authoringTypes'
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
@@ -529,6 +530,16 @@ export interface CancelReconciliationRunPayload {
 export interface CliLoginCodePayload {
   userCode: string
 }
+
+/** approve#CliLogin: `code` is required when the approver has two-factor on (DAR-BE-264). */
+export type ApproveCliLoginPayload = Schemas['ApproveCliLoginParams']
+
+// ─── Two-factor (DAR-BE-264) ───────────────────────────────────────────────────
+
+export type VerifySignInCodePayload = Schemas['VerifySignInCodeParams']
+export type BeginTwoFactorSetupPayload = Schemas['BeginTwoFactorSetupParams']
+export type ConfirmTwoFactorSetupPayload = Schemas['ConfirmTwoFactorSetupParams']
+export type TwoFactorCodePayload = Schemas['CreateRecoveryCodesParams']
 
 export interface RevokeCliSessionPayload {
   cliSessionId: string

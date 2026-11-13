@@ -26,6 +26,8 @@ type TestSessionInfo = {
   canManageDarpanCore?: boolean
   activeTenantPermissionGroupIds?: string[]
   isSuperAdmin: boolean
+  twoFactorEnabled?: boolean
+  twoFactorDueDate?: string | null
 }
 
 const saveActiveTenant = vi.hoisted(() => vi.fn().mockResolvedValue(true))
@@ -39,6 +41,12 @@ const listCliSessions = vi.hoisted(() => vi.fn())
 const getMyCliAccess = vi.hoisted(() => vi.fn())
 const requestCliAccess = vi.hoisted(() => vi.fn())
 const revokeCliSession = vi.hoisted(() => vi.fn())
+const getTwoFactorStatus = vi.hoisted(() => vi.fn())
+const createRecoveryCodes = vi.hoisted(() => vi.fn())
+const disableTwoFactor = vi.hoisted(() => vi.fn())
+const beginTwoFactorSetup = vi.hoisted(() => vi.fn())
+const confirmTwoFactorSetup = vi.hoisted(() => vi.fn())
+const applyTwoFactorState = vi.hoisted(() => vi.fn())
 const saveUserSettings = vi.hoisted(() => vi.fn(async ({ displayName, timeZone }: { displayName?: string; timeZone?: string }) => {
   authState.sessionInfo = {
     ...authState.sessionInfo,
@@ -87,6 +95,9 @@ vi.mock('../../../lib/api/facade', () => ({
     getMyCliAccess,
     requestCliAccess,
     revokeCliSession,
+    getTwoFactorStatus,
+    createRecoveryCodes,
+    disableTwoFactor,
   },
 }))
 
@@ -111,6 +122,11 @@ vi.mock('../../../stores/auth', () => ({
     saveUserSettings,
     changeOwnPassword,
     verifyOwnPassword,
+    get twoFactorEnabled() { return authState.sessionInfo.twoFactorEnabled === true },
+    get twoFactorDueDate() { return authState.sessionInfo.twoFactorDueDate ?? null },
+    beginTwoFactorSetup,
+    confirmTwoFactorSetup,
+    applyTwoFactorState,
   }),
 }))
 
@@ -162,6 +178,12 @@ describe('UserSettingsPage', () => {
     requestCliAccess.mockReset()
     revokeCliSession.mockReset()
     revokeCliSession.mockResolvedValue({ ok: true, messages: [], errors: [] })
+    getTwoFactorStatus.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [], enabled: false, required: false })
+    createRecoveryCodes.mockReset()
+    disableTwoFactor.mockReset()
+    beginTwoFactorSetup.mockReset()
+    confirmTwoFactorSetup.mockReset()
+    applyTwoFactorState.mockReset()
     saveUserNotificationDefault.mockReset()
     saveUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [], userNotificationDefault: undefined })
     authState.error = null
@@ -207,12 +229,13 @@ describe('UserSettingsPage', () => {
     expect(wrapper.text()).not.toContain('Manage account, tenant context, and personal execution settings')
     expect(wrapper.findAll('.static-page-section-heading').map((node) => node.text())).toEqual([
       'Account',
+      'Two-factor',
       'Tenant Context',
       'Preferences',
       'Activity',
       'CLI sessions',
     ])
-    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(10)
+    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(11)
     expect(wrapper.findAll('.static-page-record-tile').map((node) => node.text())).toEqual(['Krewe', 'Gorjana'])
     expect(wrapper.findAll('.static-page-list-tile')).toHaveLength(0)
     expect(wrapper.find('.static-page-section-head .user-settings-password-trigger').exists()).toBe(false)
@@ -223,7 +246,7 @@ describe('UserSettingsPage', () => {
     expect(passwordCard.get('.user-settings-password-trigger').text()).toBe('Change')
     expect(wrapper.find('.static-page-actions [aria-label="Save user settings"]').exists()).toBe(true)
     expect(wrapper.get('.user-settings-card-grid').classes()).toContain('static-page-summary-grid')
-    expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(4)
+    expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(5)
     expect(styleSource).toMatch(/\.static-page-summary-grid\s*\{[^}]*align-items: start;/)
     expect(styleSource).toMatch(/\.user-settings-card-grid\s*\{[^}]*align-items: stretch;/)
     expect(styleSource).toMatch(/\.user-settings-stretch-card\s*\{[^}]*height: 100%;/)
@@ -829,6 +852,154 @@ describe('UserSettingsPage', () => {
       const wrapper = mountPage()
       await flushPromises()
       expect(wrapper.find('[data-testid="cli-sessions-empty"]').exists()).toBe(true)
+    })
+  })
+
+  // DAR-BE-264.
+  describe('two-factor', () => {
+    const CODES = Array.from({ length: 10 }, (_, i) => `abcd-efgh-jkmn-pq${String(i).padStart(2, '0')}`)
+    const onStatus = (extra: Record<string, unknown> = {}) => ({
+      ok: true, messages: [], errors: [], enabled: true, confirmedDate: '2026-11-13T12:00:00Z',
+      recoveryCodesLeft: 4, required: false, codesLocked: false, ...extra,
+    })
+
+    async function typeCode(wrapper: ReturnType<typeof mount>, testId: string, code: string): Promise<void> {
+      const box = wrapper.get(`[data-testid="${testId}-0"]`)
+      ;(box.element as HTMLInputElement).value = code
+      await box.trigger('input')
+      await flushPromises()
+    }
+
+    it('shows on-since, codes left and its actions; no Turn off when a role requires it', async () => {
+      getTwoFactorStatus.mockResolvedValue(onStatus({ required: true, requiredFromDate: '2026-11-01T12:00:00Z' }))
+      const wrapper = mountPage()
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('On since 13 Nov')
+      expect(wrapper.get('[data-testid="two-factor-codes-left"]').text()).toBe('4 left')
+      expect(wrapper.find('[data-testid="two-factor-replace"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="two-factor-new-codes"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="two-factor-off"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="two-factor-setup"]').exists()).toBe(false)
+    })
+
+    it('says when it is due and when codes are locked', async () => {
+      getTwoFactorStatus.mockResolvedValue({ ok: true, messages: [], errors: [], enabled: false, required: false, requiredFromDate: '2026-12-01T12:00:00Z', codesLocked: true })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('Off. Due 1 Dec')
+      expect(wrapper.find('[data-testid="two-factor-locked"]').exists()).toBe(true)
+    })
+
+    it('sets up from a signed-in tab: password first, then scan, code and the recovery codes', async () => {
+      beginTwoFactorSetup.mockResolvedValue({
+        outcome: 'begun',
+        setup: { secret: 'JBSWY3DPEHPK3PXP', otpauthUri: 'otpauth://totp/Darpan:john.doe?secret=JBSWY3DPEHPK3PXP', qrDataUri: 'data:image/svg+xml;base64,PHN2Zy8+' },
+      })
+      confirmTwoFactorSetup.mockResolvedValue({ outcome: 'confirmed', recoveryCodes: CODES })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await wrapper.get('[data-testid="two-factor-setup"]').trigger('click')
+      expect(wrapper.find('.static-page-frame').classes()).toContain('user-settings-page--popup-open')
+      expect(wrapper.text()).toContain('Enter your current password.')
+      await wrapper.get('[data-testid="two-factor-password"]').setValue('current-pass')
+      await wrapper.get('[data-testid="two-factor-proof-next"]').trigger('click')
+      await flushPromises()
+      expect(beginTwoFactorSetup).toHaveBeenCalledWith({ currentPassword: 'current-pass' })
+
+      await wrapper.get('[data-testid="two-factor-scan-next"]').trigger('click')
+      await flushPromises()
+      getTwoFactorStatus.mockResolvedValue(onStatus({ recoveryCodesLeft: 10 }))
+      await typeCode(wrapper, 'two-factor-setup-code', '123456')
+
+      // confirmTwoFactorSetup is the store action that swaps this tab to the new key (covered in authTwoFactor.spec).
+      expect(confirmTwoFactorSetup).toHaveBeenCalledWith('123456')
+      expect(wrapper.findAll('[data-testid="two-factor-recovery-code"]')).toHaveLength(10)
+      expect(getTwoFactorStatus).toHaveBeenCalledTimes(2)
+      expect(listCliSessions).toHaveBeenCalledTimes(2)
+      expect(wrapper.get('[data-testid="two-factor-message"]').text()).toContain('Two-factor on.')
+
+      await wrapper.get('[data-testid="two-factor-codes-saved"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('On since 13 Nov')
+    })
+
+    it('a wrong password stays on the password step', async () => {
+      beginTwoFactorSetup.mockResolvedValue({ outcome: 'refused', message: 'Password incorrect.' })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await wrapper.get('[data-testid="two-factor-setup"]').trigger('click')
+      await wrapper.get('[data-testid="two-factor-password"]').setValue('wrong')
+      await wrapper.get('[data-testid="two-factor-proof-next"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Password incorrect.')
+      expect(wrapper.find('[data-testid="two-factor-password"]').exists()).toBe(true)
+    })
+
+    it('replacing the app begins with a code from the current app', async () => {
+      getTwoFactorStatus.mockResolvedValue(onStatus())
+      beginTwoFactorSetup.mockResolvedValue({ outcome: 'begun', setup: { secret: 'JBSWY3DPEHPK3PXP', otpauthUri: 'otpauth://x', qrDataUri: null } })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await wrapper.get('[data-testid="two-factor-replace"]').trigger('click')
+      expect(wrapper.text()).toContain('Enter the code from your current app.')
+      await typeCode(wrapper, 'two-factor-proof-code', '222333')
+
+      expect(beginTwoFactorSetup).toHaveBeenCalledWith({ code: '222333' })
+      expect(wrapper.text()).toContain('Scan this with your authenticator app.')
+    })
+
+    it('makes new recovery codes with a current code', async () => {
+      getTwoFactorStatus.mockResolvedValue(onStatus())
+      createRecoveryCodes.mockResolvedValue({ ok: true, messages: [], errors: [], recoveryCodes: CODES })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await wrapper.get('[data-testid="two-factor-new-codes"]').trigger('click')
+      await typeCode(wrapper, 'two-factor-proof-code', '444555')
+
+      expect(createRecoveryCodes).toHaveBeenCalledWith({ code: '444555' })
+      expect(wrapper.findAll('[data-testid="two-factor-recovery-code"]')).toHaveLength(10)
+      expect(wrapper.get('[data-testid="two-factor-message"]').text()).toContain('New recovery codes made.')
+    })
+
+    it('a refused code for new recovery codes shows the refusal and stays', async () => {
+      getTwoFactorStatus.mockResolvedValue(onStatus())
+      createRecoveryCodes.mockRejectedValue(new ApiCallError("That code didn't work.", 500))
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await wrapper.get('[data-testid="two-factor-new-codes"]').trigger('click')
+      await typeCode(wrapper, 'two-factor-proof-code', '000000')
+
+      expect(wrapper.text()).toContain("That code didn't work.")
+      expect(wrapper.find('[data-testid="two-factor-recovery-code"]').exists()).toBe(false)
+    })
+
+    it('turns off only on the button (the sixth digit does not act), then updates the session', async () => {
+      getTwoFactorStatus.mockResolvedValue(onStatus())
+      disableTwoFactor.mockResolvedValue({ ok: true, messages: [], errors: [] })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await wrapper.get('[data-testid="two-factor-off"]').trigger('click')
+      await typeCode(wrapper, 'two-factor-proof-code', '666777')
+      expect(disableTwoFactor).not.toHaveBeenCalled()
+
+      getTwoFactorStatus.mockResolvedValue({ ok: true, messages: [], errors: [], enabled: false, required: false, requiredFromDate: '2026-12-01T12:00:00Z' })
+      await wrapper.get('[data-testid="two-factor-proof-next"]').trigger('click')
+      await flushPromises()
+
+      expect(disableTwoFactor).toHaveBeenCalledWith({ code: '666777' })
+      expect(applyTwoFactorState).toHaveBeenCalledWith({ enabled: false, dueDate: '2026-12-01T12:00:00Z' })
+      expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('Off. Due 1 Dec')
     })
   })
 })

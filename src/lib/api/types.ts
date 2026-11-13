@@ -69,6 +69,10 @@ export interface SessionInfo {
   /** DAR-BE-028: no email on file, so password reset cannot reach this account yet. */
   recoveryEmailMissing?: boolean
   emailAddressMasked?: string | null
+  /** DAR-BE-264: an authenticator app is on for this account. */
+  twoFactorEnabled?: boolean
+  /** DAR-BE-264: set only while two-factor is off and a role of theirs has a date; the grace prompt reads it. */
+  twoFactorDueDate?: ApiTimestamp | null
 }
 
 export interface AuthTokenContract {
@@ -115,7 +119,40 @@ export interface LoginSessionResponse extends ApiEnvelope, AuthTokenContract {
   sessionInfo?: SessionInfo | null
   passwordChangeRequired?: boolean
   passwordChangeReason?: PasswordChangeReason
+  /** DAR-BE-264: right password, two-factor on. No session yet; send challengeToken with a code to verify#SignInCode. */
+  twoFactorRequired?: boolean
+  /** DAR-BE-264: right password, two-factor required but not set up. challengeToken allows only begin/confirm setup. */
+  twoFactorSetupRequired?: boolean
+  /** Page memory only: never storage or a cookie. */
+  challengeToken?: string
+  challengeExpiresInSeconds?: number
 }
+
+// DAR-BE-264. Hand-typed rather than Schemas['VerifySignInCodeResult'] / ['ConfirmTwoFactorSetupResult']: the
+// generator types their sessionInfo loosely (userId optional, scopeType a plain string, availableTenants rows with
+// optional ids), and the auth store needs the SessionInfo every other sign-in reply carries.
+export interface VerifySignInCodeResponse extends ApiEnvelope, AuthTokenContract {
+  authenticated?: boolean
+  sessionInfo?: SessionInfo | null
+  /** With a recovery code: how many are left. */
+  recoveryCodesLeft?: number
+  /** Never seen over /rpc/json on a refusal (the refusal arrives as a JSON-RPC error); read on success only. */
+  challengeEnded?: boolean
+}
+
+export interface ConfirmTwoFactorSetupResponse extends ApiEnvelope, AuthTokenContract {
+  authenticated?: boolean
+  sessionInfo?: SessionInfo | null
+  /** 10 codes, xxxx-xxxx-xxxx-xxxx, in this reply only. */
+  recoveryCodes?: string[]
+  challengeEnded?: boolean
+}
+
+// The generated result types are right for these four: flat fields, no sessionInfo.
+export type BeginTwoFactorSetupResponse = Schemas['BeginTwoFactorSetupResult']
+export type GetTwoFactorStatusResponse = Schemas['GetTwoFactorStatusResult']
+export type CreateRecoveryCodesResponse = Schemas['CreateRecoveryCodesResult']
+export type DisableTwoFactorResponse = Schemas['DisableTwoFactorResult']
 
 export interface ChangeExpiredPasswordResponse extends ApiEnvelope {
   passwordUpdated?: boolean

@@ -86,6 +86,7 @@ import {
 } from './lib/uiEvents'
 import { useUserDisplayNamePreference } from './lib/userDisplayName'
 import { resolveStaticPageLabel } from './lib/workflowOrigin'
+import { formatDueDate } from './lib/twoFactor'
 
 import AppErrorBoundary from './components/shell/AppErrorBoundary.vue'
 import OfflineBanner from './components/shell/OfflineBanner.vue'
@@ -570,6 +571,18 @@ function syncWorkflowEscapeOrigin(): void {
   showWorkflowHint(`Esc to go back to ${workflowOrigin.label}`, { durationMs: 2000 })
 }
 
+// DAR-BE-264 grace period: two-factor will be required from a date and is not set up. The sign-in page asks at
+// sign-in; a tab that arrived already signed in (restored session) hears it once here instead.
+function announceTwoFactorDue(): void {
+  if (isShelllessRoute.value || authStore.twoFactorDueAnnounced || !authStore.twoFactorDueDate) return
+  const due = formatDueDate(authStore.twoFactorDueDate)
+  authStore.noteTwoFactorDueAnnounced()
+  showWorkflowHint(
+    due ? `Two-factor due ${due}. Set it up in User Settings.` : 'Set up two-factor in User Settings.',
+    { tone: 'warning', durationMs: 6000 },
+  )
+}
+
 function announceDeepLinkTenantSwitch(): void {
   const tenantLabel = authStore.deepLinkTenantSwitch
   if (!tenantLabel) return
@@ -606,10 +619,16 @@ watch(
     // After, never before: syncWorkflowEscapeOrigin clears the pill on any non-workflow surface, so
     // announcing first would show the tenant notice and wipe it in the same tick. The router guard
     // sets the flag mid-navigation, which lands before this fires on the confirmed route.
+    // One pill at a time: an arrival's tenant notice wins, and the due notice waits for the next route.
+    const tenantNoticePending = Boolean(authStore.deepLinkTenantSwitch)
     announceDeepLinkTenantSwitch()
+    if (!tenantNoticePending) announceTwoFactorDue()
   },
   { immediate: true },
 )
+
+// The first route watch can run before the session is known; say it when the due date arrives with the session.
+watch(() => authStore.twoFactorDueDate, () => announceTwoFactorDue())
 
 watch(
   surfaceMode,

@@ -8,6 +8,7 @@ import { setReadCacheScope } from '../lib/api/readCache'
 import { useReferenceDataStore } from './referenceData'
 import { useRunResultsStore } from './runResults'
 import type {
+  AuthTokenContract,
   ChangeExpiredPasswordResponse,
   CompletePasswordResetResponse,
   SaveRecoveryEmailResponse,
@@ -26,8 +27,36 @@ import type {
 } from '../lib/api/types'
 import { resolveInternalRedirectTarget } from '../lib/navigation'
 import { setDefaultDisplayTimeZone } from '../lib/utils/date'
+import { CHALLENGE_ENDED_TEXT, CHALLENGE_MAX_REFUSALS, CODE_REFUSAL_TEXT, isEndedRefusal } from '../lib/twoFactor'
 
 export type AuthStatus = 'authenticated' | 'unauthenticated' | 'verification-failed'
+
+/** DAR-BE-264: what login#Session asked for after a right password. 'code' = enter a code; 'setup' = set one up first. */
+export type TwoFactorChallengePurpose = 'code' | 'setup'
+
+/** A refusal leaves the challenge usable ('refused') or spends it ('ended': back to the password). */
+export type TwoFactorRefusal = { outcome: 'refused'; message: string } | { outcome: 'ended'; message: string }
+
+export type TwoFactorVerifyOutcome = { outcome: 'signedIn'; recoveryCodesLeft: number | null } | TwoFactorRefusal
+
+export interface TwoFactorSetupStart {
+  secret: string
+  otpauthUri: string
+  qrDataUri: string | null
+}
+
+export type TwoFactorBeginOutcome = { outcome: 'begun'; setup: TwoFactorSetupStart } | TwoFactorRefusal
+
+export type TwoFactorConfirmOutcome = { outcome: 'confirmed'; recoveryCodes: string[] } | TwoFactorRefusal
+
+interface TwoFactorChallenge {
+  token: string
+  purpose: TwoFactorChallengePurpose
+  expiresAt: number
+  refusals: number
+}
+
+const DEFAULT_CHALLENGE_SECONDS = 300
 
 // A tenant switch has three outcomes, not two. 'refused' is the backend's permission verdict;
 // 'failed' means the call never reached one, so callers must not render it as a denial.
@@ -165,6 +194,14 @@ export const useAuthStore = defineStore('auth', () => {
   // call, stampeding the auth endpoint and producing flicker in the UI status. Mirror the
   // _hydrationPromise pattern in referenceData store.
   let _ensureAuthInFlight: Promise<boolean> | null = null
+  // DAR-BE-264. The sign-in challenge lives in this store's memory only: never sessionStorage, localStorage or a
+  // cookie. A refresh during the code step loses it and goes back to the password, which is the intent.
+  let _twoFactorChallenge: TwoFactorChallenge | null = null
+  const _twoFactorChallengePurpose = ref<TwoFactorChallengePurpose | null>(null)
+  const _twoFactorChallengeExpiresAt = ref<number | null>(null)
+  // The due-date notice is said once per page load: by the sign-in grace step, or by the shell's pill for a tab
+  // that arrived signed in.
+  const _twoFactorDueAnnounced = ref(false)
 
   const checked = computed(() => _checked.value)
   const error = computed(() => _error.value)
@@ -177,6 +214,55 @@ export const useAuthStore = defineStore('auth', () => {
   const username = computed(() => _sessionInfo.value?.username ?? _sessionInfo.value?.userId ?? null)
   const recoveryEmailMissing = computed(() => _sessionInfo.value?.recoveryEmailMissing === true)
   const emailAddressMasked = computed(() => _sessionInfo.value?.emailAddressMasked ?? null)
+  const twoFactorChallengePurpose = computed(() => _twoFactorChallengePurpose.value)
+  const twoFactorChallengeExpiresAt = computed(() => _twoFactorChallengeExpiresAt.value)
+  const twoFactorEnabled = computed(() => _sessionInfo.value?.twoFactorEnabled === true)
+  const twoFactorDueDate = computed(() => (twoFactorEnabled.value ? null : _sessionInfo.value?.twoFactorDueDate || null))
+  const twoFactorDueAnnounced = computed(() => _twoFactorDueAnnounced.value)
+
+  function _setTwoFactorChallenge(challenge: TwoFactorChallenge | null): void {
+    _twoFactorChallenge = challenge
+    _twoFactorChallengePurpose.value = challenge?.purpose ?? null
+    _twoFactorChallengeExpiresAt.value = challenge?.expiresAt ?? null
+  }
+
+  /** The live challenge, or null once it has run past its expiry (a wrong clock only shortens it, never extends). */
+  function _liveTwoFactorChallenge(purpose?: TwoFactorChallengePurpose): TwoFactorChallenge | null {
+    const challenge = _twoFactorChallenge
+    if (!challenge || (purpose && challenge.purpose !== purpose)) return null
+    return Date.now() < challenge.expiresAt ? challenge : null
+  }
+
+  /** The challenge is spent: drop it and send the person back to the password. */
+  function _endTwoFactorChallenge(): TwoFactorRefusal {
+    _setTwoFactorChallenge(null)
+    _error.value = CHALLENGE_ENDED_TEXT
+    return { outcome: 'ended', message: CHALLENGE_ENDED_TEXT }
+  }
+
+  /** A refused code against a challenge. Only the code refusal itself counts toward the backend's five; a network
+   *  failure is not a guess. */
+  function _refuseChallengeCode(challenge: TwoFactorChallenge, message: string | null): TwoFactorRefusal {
+    const text = message || CODE_REFUSAL_TEXT
+    if (isEndedRefusal(text)) return _endTwoFactorChallenge()
+    if (text === CODE_REFUSAL_TEXT) challenge.refusals += 1
+    if (challenge.refusals >= CHALLENGE_MAX_REFUSALS || Date.now() >= challenge.expiresAt) return _endTwoFactorChallenge()
+    _error.value = text
+    return { outcome: 'refused', message: text }
+  }
+
+  function abandonTwoFactorChallenge(): void {
+    _setTwoFactorChallenge(null)
+  }
+
+  /** Called when the challenge's 300 s run out on screen. */
+  function expireTwoFactorChallenge(): TwoFactorRefusal {
+    return _endTwoFactorChallenge()
+  }
+
+  function noteTwoFactorDueAnnounced(): void {
+    _twoFactorDueAnnounced.value = true
+  }
 
   function noteDeepLinkTenantSwitch(tenantLabel: string): void {
     _deepLinkTenantSwitch.value = tenantLabel?.toString()?.trim() || null
@@ -323,9 +409,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     _passwordChangeReason.value = null
+    _setTwoFactorChallenge(null)
 
     try {
       const response = await authFacade.loginSession(usernameArg, password)
+      if (response.twoFactorRequired === true || response.twoFactorSetupRequired === true) {
+        // DAR-BE-264: the password was right; the session waits for a code (or for a first setup).
+        const token = response.challengeToken?.toString()?.trim()
+        if (!token) throw new Error('Two-factor login response missing challengeToken')
+        clearAuthToken()
+        const seconds = response.challengeExpiresInSeconds && response.challengeExpiresInSeconds > 0
+          ? response.challengeExpiresInSeconds
+          : DEFAULT_CHALLENGE_SECONDS
+        _setTwoFactorChallenge({
+          token,
+          purpose: response.twoFactorSetupRequired === true ? 'setup' : 'code',
+          expiresAt: Date.now() + seconds * 1000,
+          refusals: 0,
+        })
+        _applyAuthState({ status: 'unauthenticated' })
+        return false
+      }
       if (response.passwordChangeRequired === true) {
         // Credentials were accepted; only the session is withheld. The backend reports this as a completed
         // call with the explanation in `messages`, so _applyAuthResponse's errors-based text does not apply.
@@ -356,6 +460,103 @@ export const useAuthStore = defineStore('auth', () => {
         error: err instanceof ApiCallError ? err.message : buildContractViolationError(err),
       })
       return false
+    }
+  }
+
+  /** Signs a fresh sign-in reply into this tab: its key into sessionStorage (header auth), its session into state. */
+  function _applySignInReply(response: AuthTokenContract & { sessionInfo?: SessionInfo | null }): void {
+    setAuthTokenContract(response)
+    clearApiResponseCache()
+    _applyAuthenticatedSession(response.sessionInfo)
+    _hydrateReferenceData()
+  }
+
+  /** verify#SignInCode: the challenge from login#Session with a code from the app, or a recovery code. */
+  async function verifySignInCode(input: { code: string } | { recoveryCode: string }): Promise<TwoFactorVerifyOutcome> {
+    const challenge = _liveTwoFactorChallenge('code')
+    if (!challenge) return _endTwoFactorChallenge()
+
+    try {
+      const response = await authFacade.verifySignInCode({ challengeToken: challenge.token, ...input })
+      if (response.authenticated === true && response.authToken?.toString()?.trim()) {
+        _setTwoFactorChallenge(null)
+        _applySignInReply(response)
+        return { outcome: 'signedIn', recoveryCodesLeft: response.recoveryCodesLeft ?? null }
+      }
+      if (response.challengeEnded === true) return _endTwoFactorChallenge()
+      return _refuseChallengeCode(challenge, response.errors?.[0] ?? null)
+    } catch (err) {
+      return _refuseChallengeCode(challenge, err instanceof ApiCallError ? err.message : buildContractViolationError(err))
+    }
+  }
+
+  /**
+   * begin#TwoFactorSetup. With a setup challenge (forced setup at sign-in) the token is the whole proof. Signed in, a
+   * first setup needs the current password and replacing an app that is on needs a code from it.
+   */
+  async function beginTwoFactorSetup(proof: { currentPassword?: string; code?: string } = {}): Promise<TwoFactorBeginOutcome> {
+    const viaChallenge = _twoFactorChallenge?.purpose === 'setup'
+    const challenge = viaChallenge ? _liveTwoFactorChallenge('setup') : null
+    if (viaChallenge && !challenge) return _endTwoFactorChallenge()
+
+    try {
+      const response = await authFacade.beginTwoFactorSetup(challenge ? { challengeToken: challenge.token } : proof)
+      const secret = response.secret?.toString()?.trim()
+      if (!secret || !response.otpauthUri) {
+        return { outcome: 'refused', message: response.errors?.[0] ?? 'Setup did not start. Try again.' }
+      }
+      _error.value = null
+      return {
+        outcome: 'begun',
+        setup: { secret, otpauthUri: response.otpauthUri, qrDataUri: response.qrDataUri?.toString() || null },
+      }
+    } catch (err) {
+      const message = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
+      if (challenge && isEndedRefusal(message)) return _endTwoFactorChallenge()
+      return { outcome: 'refused', message }
+    }
+  }
+
+  /**
+   * confirm#TwoFactorSetup. Always answers with a fresh sign-in: through a setup challenge it IS the sign-in; from a
+   * signed-in tab the old key predates the factor and has stopped working, so this tab swaps to the new one.
+   */
+  async function confirmTwoFactorSetup(code: string): Promise<TwoFactorConfirmOutcome> {
+    const viaChallenge = _twoFactorChallenge?.purpose === 'setup'
+    const challenge = viaChallenge ? _liveTwoFactorChallenge('setup') : null
+    if (viaChallenge && !challenge) return _endTwoFactorChallenge()
+
+    try {
+      const response = await authFacade.confirmTwoFactorSetup(challenge ? { code, challengeToken: challenge.token } : { code })
+      if (response.authenticated === true && response.authToken?.toString()?.trim()) {
+        _setTwoFactorChallenge(null)
+        if (challenge) {
+          _applySignInReply(response)
+        } else {
+          // Same person, same tenant: the read cache and reference data stay; only the key and session change.
+          setAuthTokenContract(response)
+          _applyAuthenticatedSession(response.sessionInfo)
+        }
+        return { outcome: 'confirmed', recoveryCodes: response.recoveryCodes ?? [] }
+      }
+      if (challenge && response.challengeEnded === true) return _endTwoFactorChallenge()
+      return { outcome: 'refused', message: response.errors?.[0] ?? CODE_REFUSAL_TEXT }
+    } catch (err) {
+      const message = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
+      if (challenge) return _refuseChallengeCode(challenge, message)
+      // Signed in: a setup left past its 15 minutes has to start again.
+      if (isEndedRefusal(message)) return { outcome: 'ended', message }
+      return { outcome: 'refused', message }
+    }
+  }
+
+  /** After a settings change that did not reissue the session (turning it off), keep the session's view in step. */
+  function applyTwoFactorState(next: { enabled: boolean; dueDate?: SessionInfo['twoFactorDueDate'] }): void {
+    if (!_sessionInfo.value) return
+    _sessionInfo.value = {
+      ..._sessionInfo.value,
+      twoFactorEnabled: next.enabled,
+      twoFactorDueDate: next.enabled ? null : next.dueDate ?? null,
     }
   }
 
@@ -725,6 +926,18 @@ export const useAuthStore = defineStore('auth', () => {
     verifyOwnPassword,
     recoveryEmailMissing,
     emailAddressMasked,
+    twoFactorChallengePurpose,
+    twoFactorChallengeExpiresAt,
+    twoFactorEnabled,
+    twoFactorDueDate,
+    twoFactorDueAnnounced,
+    noteTwoFactorDueAnnounced,
+    abandonTwoFactorChallenge,
+    expireTwoFactorChallenge,
+    verifySignInCode,
+    beginTwoFactorSetup,
+    confirmTwoFactorSetup,
+    applyTwoFactorState,
     requestPasswordReset,
     verifyPasswordResetCode,
     completePasswordReset,

@@ -9,14 +9,21 @@
       tone="warning"
       :message="passwordChangeNotice"
     />
+    <InlineValidation
+      v-else-if="twoFactorMode === 'setup'"
+      class="login-page-banner"
+      data-testid="two-factor-required-notice"
+      tone="warning"
+      message="Your role needs two-factor. Set it up to sign in."
+    />
 
     <section class="login-panel">
       <p class="eyebrow">Darpan</p>
       <!-- No heading in change mode: the step's own question ("Enter your new password.") is the
            instruction, and a title above it only restated that in larger type. -->
-      <h1 v-if="!isChangingPasswordMode && !isResettingMode && !isAskingRecoveryEmail">Sign In</h1>
+      <h1 v-if="isSignInForm">Sign In</h1>
 
-      <form v-if="!isChangingPasswordMode && !isResettingMode && !isAskingRecoveryEmail" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
+      <form v-if="isSignInForm" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
         <!-- The wrapping label already names each field for assistive tech; id/name are here for the
              password managers that still key off them rather than the autocomplete tokens. -->
         <label for="login-username">
@@ -42,6 +49,55 @@
           Forgot password?
         </button>
       </form>
+
+      <!-- DAR-BE-264: the password was right; the session waits for a code, or for a required first setup. -->
+      <LoginTwoFactorSteps
+        v-else-if="twoFactorMode"
+        :purpose="twoFactorMode"
+        :username="username"
+        @back="leaveTwoFactorStep"
+        @ended="endTwoFactorStep"
+        @signed-in="finishTwoFactorSignIn"
+      />
+
+      <!-- DAR-BE-264: signed in with a recovery code and few are left. Said once, then on to where they were going. -->
+      <WorkflowStepForm
+        v-else-if="recoveryCodesLeft !== null"
+        :question="recoveryCodesLeftQuestion"
+        :show-back="false"
+        :show-enter-hint="true"
+        primary-test-id="login-recovery-codes-left-ok"
+        @submit="acknowledgeRecoveryCodesLeft"
+      >
+        <p class="section-note">New ones are in User Settings.</p>
+      </WorkflowStepForm>
+
+      <!-- DAR-BE-264 grace: two-factor will be required from a date and is not set up. Asked at every sign-in until
+           then (the recovery-email step's pattern). -->
+      <template v-else-if="isAskingTwoFactorDue">
+        <TwoFactorSetupSteps
+          v-if="graceSetup"
+          :setup="graceSetup"
+          :username="username"
+          @back="graceSetup = null"
+          @ended="restartGraceSetup"
+          @done="leaveSignIn"
+        />
+        <WorkflowStepForm
+          v-else
+          :question="twoFactorDueQuestion"
+          :primary-label="isStartingGraceSetup ? 'Starting' : 'Set up'"
+          :submit-disabled="isStartingGraceSetup"
+          :show-back="false"
+          :show-cancel-action="true"
+          cancel-label="Not now"
+          cancel-test-id="login-two-factor-due-skip"
+          :show-enter-hint="true"
+          primary-test-id="login-two-factor-due-setup"
+          @submit="startGraceSetup"
+          @cancel="leaveSignIn"
+        />
+      </template>
 
       <!-- DAR-BE-028: signed in, but no email on file, so a forgotten password would be a dead end. Asked at
            every sign-in until one is saved; Not now is never remembered. -->
@@ -176,6 +232,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InlineValidation from '../components/ui/InlineValidation.vue'
 import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
+import LoginTwoFactorSteps from '../components/auth/LoginTwoFactorSteps.vue'
+import TwoFactorSetupSteps from '../components/auth/TwoFactorSetupSteps.vue'
+import { formatDueDate } from '../lib/twoFactor'
+import type { TwoFactorChallengePurpose, TwoFactorSetupStart } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
 import { useAuthStore } from '../stores/auth'
@@ -214,7 +274,19 @@ const passwordForm = ref({
 const isAskingRecoveryEmail = ref(false)
 const isSavingRecoveryEmail = ref(false)
 const recoveryEmail = ref('')
+// The password the person just signed in with, held only until the after-sign-in steps end: the recovery email
+// and a grace-period two-factor setup both need it (a session token alone must not do either).
 const recoveryEmailPassword = ref('')
+
+// DAR-BE-264. Local, not read live from the store: a required setup clears the store's challenge when it signs in,
+// and the recovery codes it returns still have to be shown.
+const twoFactorMode = ref<TwoFactorChallengePurpose | null>(null)
+const recoveryCodesLeft = ref<number | null>(null)
+const isAskingTwoFactorDue = ref(false)
+const isStartingGraceSetup = ref(false)
+const graceSetup = ref<TwoFactorSetupStart | null>(null)
+// Fewest recovery codes left before the sign-in says so (the backend's own threshold for asking for new ones).
+const LOW_RECOVERY_CODES = 3
 
 // The backend's one reply for every code failure (PasswordResetSupport.CODE_FAILURE_MESSAGE).
 const CODE_FAILURE_TEXT = "That code didn't work. Request a new one."
@@ -313,11 +385,29 @@ const isPasswordStepBlocked = computed(() => {
   return false
 })
 
+const isSignInForm = computed(() => (
+  !isChangingPasswordMode.value
+  && !isResettingMode.value
+  && !isAskingRecoveryEmail.value
+  && twoFactorMode.value === null
+  && recoveryCodesLeft.value === null
+  && !isAskingTwoFactorDue.value
+))
+
+const recoveryCodesLeftQuestion = computed(() => (
+  recoveryCodesLeft.value === 1 ? '1 recovery code left.' : `${recoveryCodesLeft.value ?? 0} recovery codes left.`
+))
+
+const twoFactorDueQuestion = computed(() => {
+  const due = formatDueDate(authStore.twoFactorDueDate)
+  return due ? `Set up two-factor by ${due}.` : 'Set up two-factor.'
+})
+
 const errorText = computed(() => {
   if (localError.value) return localError.value
   // In change mode the standing notice already explains why sign-in was refused; only a fresh failure from
-  // the change itself belongs here.
-  if (isChangingPasswordMode.value || isResettingMode.value || isAskingRecoveryEmail.value) return null
+  // the change itself belongs here. The two-factor steps carry their own errors.
+  if (!isSignInForm.value) return null
   if (authStore.status === 'unauthenticated' && authStore.error === INITIAL_UNAUTHENTICATED_MESSAGE) return null
   return authStore.error
 })
@@ -349,6 +439,10 @@ async function submit(): Promise<void> {
     if (!authenticated) {
       if (authStore.passwordChangeReason) {
         enterPasswordChangeMode()
+        return
+      }
+      if (authStore.twoFactorChallengePurpose) {
+        twoFactorMode.value = authStore.twoFactorChallengePurpose
         return
       }
       localError.value = authStore.error ?? 'Invalid username or password.'
@@ -436,23 +530,86 @@ async function submitPasswordChange(): Promise<void> {
   }
 }
 
-/** Every successful sign-in ends here, so no path (plain, after a forced change, after a reset) skips the
- *  recovery-email question. */
+/** Every successful sign-in ends here, so no path (plain, after a forced change, after a reset, after a code)
+ *  skips the recovery-email question or the two-factor grace prompt. */
 async function finishSignIn(passwordJustUsed: string): Promise<void> {
+  recoveryEmailPassword.value = passwordJustUsed
   if (authStore.recoveryEmailMissing) {
     recoveryEmail.value = ''
-    recoveryEmailPassword.value = passwordJustUsed
     isAskingRecoveryEmail.value = true
     return
   }
-  await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+  await continueAfterSignIn()
 }
 
 async function continueAfterSignIn(): Promise<void> {
   isAskingRecoveryEmail.value = false
+  localError.value = null
+  if (authStore.twoFactorDueDate) {
+    // Said here, so the shell's pill does not say it again on arrival.
+    authStore.noteTwoFactorDueAnnounced()
+    graceSetup.value = null
+    isAskingTwoFactorDue.value = true
+    return
+  }
+  await leaveSignIn()
+}
+
+async function leaveSignIn(): Promise<void> {
+  isAskingRecoveryEmail.value = false
+  isAskingTwoFactorDue.value = false
+  graceSetup.value = null
   recoveryEmailPassword.value = ''
   localError.value = null
   await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+}
+
+function leaveTwoFactorStep(): void {
+  authStore.abandonTwoFactorChallenge()
+  twoFactorMode.value = null
+  localError.value = null
+}
+
+function endTwoFactorStep(message: string): void {
+  twoFactorMode.value = null
+  password.value = ''
+  localError.value = message
+}
+
+async function finishTwoFactorSignIn(codesLeft: number | null): Promise<void> {
+  twoFactorMode.value = null
+  localError.value = null
+  if (codesLeft !== null && codesLeft <= LOW_RECOVERY_CODES) {
+    recoveryCodesLeft.value = codesLeft
+    return
+  }
+  await finishSignIn(password.value)
+}
+
+async function acknowledgeRecoveryCodesLeft(): Promise<void> {
+  recoveryCodesLeft.value = null
+  await finishSignIn(password.value)
+}
+
+async function startGraceSetup(): Promise<void> {
+  if (isStartingGraceSetup.value) return
+  isStartingGraceSetup.value = true
+  localError.value = null
+  try {
+    const result = await authStore.beginTwoFactorSetup({ currentPassword: recoveryEmailPassword.value })
+    if (result.outcome === 'begun') {
+      graceSetup.value = result.setup
+      return
+    }
+    localError.value = result.message
+  } finally {
+    isStartingGraceSetup.value = false
+  }
+}
+
+function restartGraceSetup(message: string): void {
+  graceSetup.value = null
+  localError.value = message
 }
 
 async function saveRecoveryEmailAndContinue(): Promise<void> {

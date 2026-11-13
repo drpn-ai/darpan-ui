@@ -1,5 +1,5 @@
 <template>
-  <StaticPageFrame :class="{ 'user-settings-page--popup-open': isPasswordWorkflowOpen || isNotificationDefaultWorkflowOpen || isTimezoneWorkflowOpen || isRecoveryEmailWorkflowOpen }">
+  <StaticPageFrame :class="{ 'user-settings-page--popup-open': isPasswordWorkflowOpen || isNotificationDefaultWorkflowOpen || isTimezoneWorkflowOpen || isRecoveryEmailWorkflowOpen || twoFactorAction !== null }">
     <template #hero>
       <h1>User Settings</h1>
     </template>
@@ -57,6 +57,55 @@
       </div>
 
       <p v-if="passwordMessage" class="section-note">{{ passwordMessage }}</p>
+    </StaticPageSection>
+
+    <!-- DAR-BE-264. Each action asks for proof in its popup: the password for a first setup, a current code for the
+         rest. No Off for someone whose role requires it. -->
+    <StaticPageSection title="Two-factor">
+      <div class="static-page-summary-grid user-settings-card-grid">
+        <article class="static-page-summary-card user-settings-stretch-card" data-testid="two-factor-card">
+          <span v-explain="'twoFactor'" class="static-page-summary-label">Authenticator app</span>
+          <span data-testid="two-factor-state">{{ twoFactorSummary }}</span>
+          <div class="action-row">
+            <button
+              v-if="!twoFactorOn"
+              class="user-settings-control"
+              type="button"
+              data-testid="two-factor-setup"
+              @click="openTwoFactor('setup')"
+            >
+              Set up
+            </button>
+            <template v-else>
+              <button class="user-settings-control" type="button" data-testid="two-factor-replace" @click="openTwoFactor('replace')">
+                New app
+              </button>
+              <button
+                v-if="!twoFactorStatus?.required"
+                class="user-settings-control"
+                type="button"
+                data-testid="two-factor-off"
+                @click="openTwoFactor('off')"
+              >
+                Turn off
+              </button>
+            </template>
+          </div>
+        </article>
+        <article v-if="twoFactorOn && twoFactorStatus" class="static-page-summary-card user-settings-stretch-card" data-testid="two-factor-recovery-card">
+          <span v-explain="'twoFactorRecoveryCodes'" class="static-page-summary-label">Recovery codes</span>
+          <span data-testid="two-factor-codes-left">{{ recoveryCodesLeftLabel }}</span>
+          <div class="action-row">
+            <button class="user-settings-control" type="button" data-testid="two-factor-new-codes" @click="openTwoFactor('codes')">
+              New codes
+            </button>
+          </div>
+        </article>
+      </div>
+      <p v-if="twoFactorStatus?.codesLocked" class="section-note" role="alert" data-testid="two-factor-locked">
+        Codes are locked after too many wrong tries. A password reset unlocks them.
+      </p>
+      <p v-if="twoFactorMessage" class="section-note" role="status" data-testid="two-factor-message">{{ twoFactorMessage }}</p>
     </StaticPageSection>
 
     <StaticPageSection title="Tenant Context">
@@ -201,6 +250,14 @@
     </section>
   </div>
 
+  <TwoFactorSettingsPopup
+    v-if="twoFactorAction"
+    :action="twoFactorAction"
+    :username="username"
+    @changed="handleTwoFactorChanged"
+    @close="twoFactorAction = null"
+  />
+
   <div
     v-if="isRecoveryEmailWorkflowOpen"
     class="popup-workflow-overlay"
@@ -336,8 +393,13 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { authFacade, settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
-import type { CliSession, MyCliAccess, TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
+import type { CliSession, GetTwoFactorStatusResponse, MyCliAccess, TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
 import CliAccessRequestCard from '../../components/settings/CliAccessRequestCard.vue'
+import TwoFactorSettingsPopup, {
+  type TwoFactorSettingsAction,
+  type TwoFactorSettingsChange,
+} from '../../components/settings/TwoFactorSettingsPopup.vue'
+import { formatDueDate } from '../../lib/twoFactor'
 import { buildTimezoneOptions, resolveBrowserTimeZone } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -910,8 +972,62 @@ async function revokeCliSession(cliSessionId: string) {
   }
 }
 
+// ─── Two-factor (DAR-BE-264) ───────────────────────────────────────────────────
+const twoFactorStatus = ref<GetTwoFactorStatusResponse | null>(null)
+const twoFactorAction = ref<TwoFactorSettingsAction | null>(null)
+const twoFactorMessage = ref<string | null>(null)
+
+// The status read is the authority; until it lands (or if it fails) the session's own flag answers.
+const twoFactorOn = computed(() => twoFactorStatus.value?.enabled ?? authStore.twoFactorEnabled)
+const twoFactorSummary = computed(() => {
+  if (twoFactorOn.value) {
+    const since = formatDueDate(twoFactorStatus.value?.confirmedDate)
+    return since ? `On since ${since}` : 'On'
+  }
+  const due = formatDueDate(twoFactorStatus.value?.requiredFromDate ?? authStore.twoFactorDueDate)
+  if (twoFactorStatus.value?.required) return 'Off. Required now'
+  return due ? `Off. Due ${due}` : 'Off'
+})
+const recoveryCodesLeftLabel = computed(() => {
+  const left = twoFactorStatus.value?.recoveryCodesLeft ?? 0
+  return left === 1 ? '1 left' : `${left} left`
+})
+
+async function loadTwoFactorStatus(): Promise<void> {
+  try {
+    const response = await authFacade.getTwoFactorStatus(pageAbortController.signal)
+    if (pageAbortController.signal.aborted) return
+    twoFactorStatus.value = response
+  } catch {
+    if (!pageAbortController.signal.aborted) twoFactorStatus.value = null
+  }
+}
+
+function openTwoFactor(action: TwoFactorSettingsAction): void {
+  twoFactorMessage.value = null
+  twoFactorAction.value = action
+}
+
+const TWO_FACTOR_CHANGE_TEXT: Record<TwoFactorSettingsChange, string> = {
+  on: 'Two-factor on. Other sessions and CLI sign-ins ended.',
+  codes: 'New recovery codes made. The old ones stopped working.',
+  off: 'Two-factor off. Other sessions and CLI sign-ins ended.',
+}
+
+async function handleTwoFactorChanged(change: TwoFactorSettingsChange): Promise<void> {
+  twoFactorMessage.value = TWO_FACTOR_CHANGE_TEXT[change]
+  await loadTwoFactorStatus()
+  // Turning it on swapped this tab's key and session already (confirm#TwoFactorSetup). Turning it off reissues
+  // nothing, so the session's flag and due date are set from the fresh status.
+  if (change === 'off') {
+    authStore.applyTwoFactorState({ enabled: false, dueDate: twoFactorStatus.value?.requiredFromDate ?? null })
+  }
+  if (change !== 'codes') void loadCliSessions()
+}
+
 onMounted(() => {
   document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handlePasswordWorkflowCancelRequest)
+  void loadTwoFactorStatus()
   void loadNotificationDefault()
   void loadCliSessions()
   void loadMyCliAccess()

@@ -29,8 +29,25 @@
           <span data-testid="cli-login-expires">{{ expiresLabel }}</span>
         </article>
         <p class="section-note">Approve only a code you just started in your own terminal.</p>
+        <!-- DAR-BE-264: approving mints a 7-day key, so a two-factor account proves it with a fresh code. A code
+             already used to sign in is refused for 30 s, so the label asks for a current one. -->
+        <label v-if="needsTwoFactorCode" for="cli-login-two-factor">
+          <span>Current code from your app</span>
+          <input
+            id="cli-login-two-factor"
+            v-model="twoFactorCode"
+            name="twoFactorCode"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            spellcheck="false"
+            data-testid="cli-login-two-factor-code"
+          />
+        </label>
+        <p v-if="codeError" class="section-note" role="alert" data-testid="cli-login-code-error">{{ codeError }}</p>
         <div class="cli-login-actions">
-          <button class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy" @click="answer('approved')">
+          <button class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
             Approve
           </button>
           <button class="btn-primary" type="button" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
@@ -66,13 +83,16 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import StaticPageFrame from '../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../components/ui/StaticPageSection.vue'
 import CliAccessRequestCard from '../components/settings/CliAccessRequestCard.vue'
 import { authFacade } from '../lib/api/facade'
 import type { MyCliAccess } from '../lib/api/types'
 import { formatDateTime } from '../lib/utils/date'
+import { ApiCallError } from '../lib/api/client'
+import { isCodeProblem } from '../lib/twoFactor'
+import { useAuthStore } from '../stores/auth'
 
 type Phase = 'enter' | 'ready' | 'done' | 'notfound' | 'noaccess'
 
@@ -88,6 +108,15 @@ const busy = ref(false)
 const myAccess = ref<MyCliAccess | null>(null)
 const controller = new AbortController()
 let confirmedCode = ''
+
+const authStore = useAuthStore()
+const twoFactorCode = ref('')
+const codeError = ref<string | null>(null)
+// The session's flag, or the backend asking for a code (two-factor turned on in another tab since this one loaded).
+const codeDemanded = ref(false)
+const needsTwoFactorCode = computed(() => authStore.twoFactorEnabled || codeDemanded.value)
+const typedTwoFactorCode = computed(() => twoFactorCode.value.replace(/\D/g, ''))
+const approveBlocked = computed(() => needsTwoFactorCode.value && typedTwoFactorCode.value.length !== 6)
 
 onBeforeUnmount(() => controller.abort())
 
@@ -149,23 +178,40 @@ async function failed(choice: 'approved' | 'denied') {
   phase.value = 'notfound'
 }
 
+/** A refused approval a fresh code fixes keeps the request on screen; anything else is about the request. */
+function codeRefused(choice: 'approved' | 'denied', message: string | null | undefined): boolean {
+  if (choice !== 'approved' || !isCodeProblem(message)) return false
+  codeDemanded.value = true
+  codeError.value = message ?? null
+  twoFactorCode.value = ''
+  return true
+}
+
 async function answer(choice: 'approved' | 'denied') {
   if (busy.value || !confirmedCode) return
+  if (choice === 'approved' && approveBlocked.value) return
   busy.value = true
+  codeError.value = null
   try {
     const payload = { userCode: confirmedCode }
     const response = choice === 'approved'
-      ? await authFacade.approveCliLogin(payload, controller.signal)
+      ? await authFacade.approveCliLogin(
+        needsTwoFactorCode.value ? { ...payload, code: typedTwoFactorCode.value } : payload,
+        controller.signal,
+      )
       : await authFacade.denyCliLogin(payload, controller.signal)
     if (controller.signal.aborted) return
     if (!response.ok) {
+      if (codeRefused(choice, response.errors?.[0])) return
       await failed(choice)
       return
     }
     outcome.value = choice
     phase.value = 'done'
-  } catch {
-    if (!controller.signal.aborted) await failed(choice)
+  } catch (err) {
+    if (controller.signal.aborted) return
+    if (codeRefused(choice, err instanceof ApiCallError ? err.message : null)) return
+    await failed(choice)
   } finally {
     busy.value = false
   }

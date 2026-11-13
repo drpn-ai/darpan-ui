@@ -8,7 +8,10 @@ const denyCliLogin = vi.hoisted(() => vi.fn())
 const getMyCliAccess = vi.hoisted(() => vi.fn())
 const requestCliAccess = vi.hoisted(() => vi.fn())
 
+const authState = vi.hoisted(() => ({ twoFactorEnabled: false }))
+
 vi.mock('vue-router', () => ({ useRoute: () => route }))
+vi.mock('../../stores/auth', () => ({ useAuthStore: () => authState }))
 vi.mock('../../lib/api/facade', () => ({
   authFacade: { getCliLoginRequest, approveCliLogin, denyCliLogin, getMyCliAccess, requestCliAccess },
 }))
@@ -33,6 +36,7 @@ async function typeCode(wrapper: ReturnType<typeof mount>, value: string) {
 describe('CliLoginPage', () => {
   beforeEach(() => {
     route.query = {}
+    authState.twoFactorEnabled = false
     getCliLoginRequest.mockReset().mockResolvedValue(pending)
     approveCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
     denyCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
@@ -198,5 +202,76 @@ describe('CliLoginPage', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(true)
     expect(getMyCliAccess).not.toHaveBeenCalled()
+  })
+
+  // DAR-BE-264: approval mints a 7-day key, so a two-factor account adds a current code.
+  describe('two-factor approver', () => {
+    beforeEach(() => {
+      authState.twoFactorEnabled = true
+    })
+
+    it('asks for a current code and holds Approve until it has six digits', async () => {
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+
+      expect(wrapper.text()).toContain('Current code from your app')
+      const approve = wrapper.get('[data-testid="cli-login-approve"]')
+      expect(approve.attributes('disabled')).toBeDefined()
+      await wrapper.get('[data-testid="cli-login-two-factor-code"]').setValue('12345')
+      expect(approve.attributes('disabled')).toBeDefined()
+      await wrapper.get('[data-testid="cli-login-two-factor-code"]').setValue('123456')
+      expect(approve.attributes('disabled')).toBeUndefined()
+
+      await approve.trigger('click')
+      await flushPromises()
+      expect(approveCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23', code: '123456' }, expect.anything())
+      expect(wrapper.find('[data-testid="cli-login-done"]').text()).toContain('CLI approved.')
+    })
+
+    it('a refused code keeps the request on screen with the refusal, and clears the code', async () => {
+      approveCliLogin.mockRejectedValue(new ApiCallError("That code didn't work.", 500))
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+      await wrapper.get('[data-testid="cli-login-two-factor-code"]').setValue('000000')
+      await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="cli-login-code-error"]').text()).toBe("That code didn't work.")
+      expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(true)
+      expect((wrapper.get('[data-testid="cli-login-two-factor-code"]').element as HTMLInputElement).value).toBe('')
+      expect(getMyCliAccess).not.toHaveBeenCalled()
+    })
+
+    it('Deny needs no code', async () => {
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+      await wrapper.get('[data-testid="cli-login-deny"]').trigger('click')
+      await flushPromises()
+
+      expect(denyCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23' }, expect.anything())
+    })
+
+    it('shows the code field when the backend asks for one the session did not know about', async () => {
+      authState.twoFactorEnabled = false
+      approveCliLogin.mockRejectedValueOnce(new ApiCallError('Enter the code from your authenticator app.', 500))
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+      await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="cli-login-code-error"]').text()).toBe('Enter the code from your authenticator app.')
+    })
+
+    it('without two-factor there is no code field and the payload has no code', async () => {
+      authState.twoFactorEnabled = false
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+
+      expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
+      await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
+      await flushPromises()
+      expect(approveCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23' }, expect.anything())
+    })
   })
 })

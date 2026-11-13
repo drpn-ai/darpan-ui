@@ -151,6 +151,12 @@ import type {
   SaveRefinedSchemaResponse,
   SaveSftpServerResponse,
   SessionInfoResponse,
+  VerifySignInCodeResponse,
+  BeginTwoFactorSetupResponse,
+  ConfirmTwoFactorSetupResponse,
+  GetTwoFactorStatusResponse,
+  CreateRecoveryCodesResponse,
+  DisableTwoFactorResponse,
   StoreSourceConfigEndpointAccessResponse,
   ValidateJsonResponse,
 } from './types'
@@ -163,6 +169,11 @@ import type {
   ChangeOwnPasswordPayload,
   ConfigTenantAccessMutationPayload,
   CliLoginCodePayload,
+  ApproveCliLoginPayload,
+  VerifySignInCodePayload,
+  BeginTwoFactorSetupPayload,
+  ConfirmTwoFactorSetupPayload,
+  TwoFactorCodePayload,
   RevokeCliSessionPayload,
   CreateRuleSetRunPayload,
   DeleteAutomationPayload,
@@ -266,6 +277,12 @@ const AUTH = {
   saveRecoveryEmail: 'facade.AuthFacadeServices.save#RecoveryEmail',
   getPasswordResetStatus: 'facade.AuthFacadeServices.get#PasswordResetStatus',
   logoutSession: 'facade.AuthFacadeServices.logout#Session',
+  verifySignInCode: 'facade.AuthFacadeServices.verify#SignInCode',
+  beginTwoFactorSetup: 'facade.AuthFacadeServices.begin#TwoFactorSetup',
+  confirmTwoFactorSetup: 'facade.AuthFacadeServices.confirm#TwoFactorSetup',
+  getTwoFactorStatus: 'facade.AuthFacadeServices.get#TwoFactorStatus',
+  createRecoveryCodes: 'facade.AuthFacadeServices.create#RecoveryCodes',
+  disableTwoFactor: 'facade.AuthFacadeServices.disable#TwoFactor',
   getCliLoginRequest: 'facade.CliAuthFacadeServices.get#CliLoginRequest',
   approveCliLogin: 'facade.CliAuthFacadeServices.approve#CliLogin',
   denyCliLogin: 'facade.CliAuthFacadeServices.deny#CliLogin',
@@ -431,7 +448,26 @@ export const authFacade = {
   getCliLoginRequest(payload: CliLoginCodePayload, signal?: AbortSignal): Promise<GetCliLoginRequestResponse> {
     return callService<GetCliLoginRequestResponse>(AUTH.getCliLoginRequest, payload, signal)
   },
-  approveCliLogin(payload: CliLoginCodePayload, signal?: AbortSignal): Promise<ApproveCliLoginResponse> {
+  // DAR-BE-264 two-factor. verify, begin and confirm are anonymous-all: a sign-in challenge token stands in for a session.
+  verifySignInCode(payload: VerifySignInCodePayload, signal?: AbortSignal): Promise<VerifySignInCodeResponse> {
+    return callService<VerifySignInCodeResponse>(AUTH.verifySignInCode, payload, signal)
+  },
+  beginTwoFactorSetup(payload: BeginTwoFactorSetupPayload, signal?: AbortSignal): Promise<BeginTwoFactorSetupResponse> {
+    return callService<BeginTwoFactorSetupResponse>(AUTH.beginTwoFactorSetup, payload, signal)
+  },
+  confirmTwoFactorSetup(payload: ConfirmTwoFactorSetupPayload, signal?: AbortSignal): Promise<ConfirmTwoFactorSetupResponse> {
+    return callService<ConfirmTwoFactorSetupResponse>(AUTH.confirmTwoFactorSetup, payload, signal)
+  },
+  getTwoFactorStatus(signal?: AbortSignal): Promise<GetTwoFactorStatusResponse> {
+    return callService<GetTwoFactorStatusResponse>(AUTH.getTwoFactorStatus, {}, signal)
+  },
+  createRecoveryCodes(payload: TwoFactorCodePayload, signal?: AbortSignal): Promise<CreateRecoveryCodesResponse> {
+    return callService<CreateRecoveryCodesResponse>(AUTH.createRecoveryCodes, payload, signal)
+  },
+  disableTwoFactor(payload: TwoFactorCodePayload, signal?: AbortSignal): Promise<DisableTwoFactorResponse> {
+    return callService<DisableTwoFactorResponse>(AUTH.disableTwoFactor, payload, signal)
+  },
+  approveCliLogin(payload: ApproveCliLoginPayload, signal?: AbortSignal): Promise<ApproveCliLoginResponse> {
     return callService<ApproveCliLoginResponse>(AUTH.approveCliLogin, payload, signal)
   },
   denyCliLogin(payload: CliLoginCodePayload, signal?: AbortSignal): Promise<DenyCliLoginResponse> {

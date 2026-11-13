@@ -616,6 +616,16 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'when a terminal asked to sign in as you. If you did not just run darpan login, deny it.',
     byDirectiveOnly: true,
   },
+  twoFactor: {
+    title: 'Authenticator app',
+    body: 'a code from your phone after your password, so a leaked password alone cannot sign in. Setting it up or turning it off signs out your other sessions.',
+    byDirectiveOnly: true,
+  },
+  twoFactorRecoveryCodes: {
+    title: 'Recovery codes',
+    body: 'one-time codes for signing in without your phone. Each works once; making new ones retires the old set.',
+    byDirectiveOnly: true,
+  },
   cliSignInRequest: {
     title: 'Sign-in request',
     body: 'a terminal asking to act as you, under a name it chose itself. Approving gives it your permissions until it expires.',
