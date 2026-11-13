@@ -348,6 +348,19 @@ describe('CliLoginPage', () => {
       expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(false)
     })
 
+    it('passkey only, on a browser without passkeys: no code field, and it says what would work', async () => {
+      webauthn?.restore()
+      webauthn = null
+      getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: true, appEnabled: false, passkeys: [PASSKEY] })
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+
+      expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="cli-login-no-proof"]').text()).toContain('This browser cannot use passkeys.')
+      expect(wrapper.get('[data-testid="cli-login-approve"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.get('[data-testid="cli-login-deny"]').attributes('disabled')).toBeUndefined()
+    })
+
     it('without WebAuthn only the code is offered', async () => {
       webauthn?.restore()
       webauthn = null

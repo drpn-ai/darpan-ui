@@ -7,7 +7,14 @@
 /** PasskeySupport.PASSKEY_REFUSAL: every refused assertion reads the same. */
 export const PASSKEY_REFUSAL_TEXT = "That passkey didn't work."
 
-/** The person closed the browser's prompt, or it timed out: not a refusal, so the caller says nothing. */
+/** This browser, on this origin, has no WebAuthn. */
+export const PASSKEYS_UNSUPPORTED_TEXT = 'This browser cannot use passkeys.'
+
+/** Said to someone whose only factor is a passkey, on a browser without WebAuthn, where a fresh proof is needed. */
+export const PASSKEY_BROWSER_NEEDED_TEXT = 'Open Darpan in a browser that can use your passkey.'
+
+/** 'cancelled': the person closed the browser's prompt, it timed out, or the page aborted it. Not a refusal, so the
+ *  caller says nothing. */
 export type PasskeyCeremony = { outcome: 'ok'; json: string } | { outcome: 'cancelled' } | { outcome: 'failed'; message: string }
 
 type JsonDescriptor = { id: string; type: string; transports?: string[] }
@@ -84,26 +91,26 @@ function credentialJson(credential: JsonCapableCredential): string {
 
 // ─── ceremonies ───────────────────────────────────────────────────────────────────────────────────────────────────
 
-function failure(err: unknown): PasskeyCeremony {
+function failure(err: unknown, kind: 'create' | 'get'): PasskeyCeremony {
   const name = err instanceof Error || (typeof DOMException !== 'undefined' && err instanceof DOMException) ? (err as Error).name : ''
   // NotAllowedError covers a closed prompt, a timeout and "no passkey for this site on this device"; AbortError a
   // prompt the page itself cancelled. Neither is the person doing anything wrong.
   if (name === 'NotAllowedError' || name === 'AbortError') return { outcome: 'cancelled' }
-  // excludeCredentials matched: this authenticator already holds one of their passkeys.
-  if (name === 'InvalidStateError') return { outcome: 'failed', message: 'This passkey is already added.' }
+  // Creating only: excludeCredentials matched, so this authenticator already holds one of their passkeys.
+  if (name === 'InvalidStateError' && kind === 'create') return { outcome: 'failed', message: 'This passkey is already added.' }
   // The relying party id does not match this address (a misconfigured instance).
   if (name === 'SecurityError') return { outcome: 'failed', message: "Passkeys don't work on this address." }
   return { outcome: 'failed', message: PASSKEY_REFUSAL_TEXT }
 }
 
-async function ceremony(run: () => Promise<Credential | null>): Promise<PasskeyCeremony> {
-  if (!passkeysSupported()) return { outcome: 'failed', message: 'This browser cannot use passkeys.' }
+async function ceremony(kind: 'create' | 'get', run: () => Promise<Credential | null>): Promise<PasskeyCeremony> {
+  if (!passkeysSupported()) return { outcome: 'failed', message: PASSKEYS_UNSUPPORTED_TEXT }
   try {
     const credential = await run()
     if (!credential) return { outcome: 'cancelled' }
     return { outcome: 'ok', json: credentialJson(credential as JsonCapableCredential) }
   } catch (err) {
-    return failure(err)
+    return failure(err, kind)
   }
 }
 
@@ -116,17 +123,18 @@ function parseOptions(publicKeyOptions: string): JsonOptions | null {
   }
 }
 
-/** navigator.credentials.create over begin#PasskeyRegistration's options; the new credential as JSON text. */
-export function createPasskey(publicKeyOptions: string): Promise<PasskeyCeremony> {
+/** navigator.credentials.create over begin#PasskeyRegistration's options; the new credential as JSON text. `signal`
+ *  closes the prompt when the step that opened it goes away. */
+export function createPasskey(publicKeyOptions: string, signal?: AbortSignal): Promise<PasskeyCeremony> {
   const json = parseOptions(publicKeyOptions)
   if (!json) return Promise.resolve({ outcome: 'failed', message: PASSKEY_REFUSAL_TEXT })
-  return ceremony(() => navigator.credentials.create({ publicKey: creationOptions(json) }))
+  return ceremony('create', () => navigator.credentials.create({ publicKey: creationOptions(json), signal }))
 }
 
 /** navigator.credentials.get over begin#PasskeySignIn's or begin#PasskeyProof's options; the assertion as JSON text. */
-export function getPasskeyAssertion(publicKeyOptions: string): Promise<PasskeyCeremony> {
+export function getPasskeyAssertion(publicKeyOptions: string, signal?: AbortSignal): Promise<PasskeyCeremony> {
   const json = parseOptions(publicKeyOptions)
   if (!json) return Promise.resolve({ outcome: 'failed', message: PASSKEY_REFUSAL_TEXT })
-  return ceremony(() => navigator.credentials.get({ publicKey: requestOptions(json) }))
+  return ceremony('get', () => navigator.credentials.get({ publicKey: requestOptions(json), signal }))
 }
 

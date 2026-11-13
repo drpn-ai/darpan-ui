@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { createPasskey, getPasskeyAssertion, passkeysSupported, PASSKEY_REFUSAL_TEXT } from '../passkeys'
+import { createPasskey, getPasskeyAssertion, passkeysSupported, PASSKEY_REFUSAL_TEXT, PASSKEYS_UNSUPPORTED_TEXT } from '../passkeys'
 import { ASSERTION_JSON, CREATED_JSON, CREATION_OPTIONS, REQUEST_OPTIONS, installWebAuthnStub, notAllowed, type WebAuthnStub } from '../../test/webauthn'
 
 // DAR-BE-270: the browser side of a passkey ceremony. What could bite: an older browser without the L3 JSON methods
@@ -17,7 +17,7 @@ describe('passkeys', () => {
 
   it('is not offered without WebAuthn (an older browser, or an insecure origin)', async () => {
     expect(passkeysSupported()).toBe(false)
-    expect(await getPasskeyAssertion(REQUEST_OPTIONS)).toEqual({ outcome: 'failed', message: 'This browser cannot use passkeys.' })
+    expect(await getPasskeyAssertion(REQUEST_OPTIONS)).toEqual({ outcome: 'failed', message: PASSKEYS_UNSUPPORTED_TEXT })
   })
 
   it('uses the browser\'s own JSON methods when it has them', async () => {
@@ -73,5 +73,17 @@ describe('passkeys', () => {
     stub.create.mockRejectedValueOnce(new TypeError('boom'))
     expect(await createPasskey(CREATION_OPTIONS)).toEqual({ outcome: 'failed', message: PASSKEY_REFUSAL_TEXT })
     expect(await createPasskey('not json')).toEqual({ outcome: 'failed', message: PASSKEY_REFUSAL_TEXT })
+    // Signing in, the same error is no "already added": it is the one refusal.
+    stub.get.mockRejectedValueOnce(new DOMException('bad state', 'InvalidStateError'))
+    expect(await getPasskeyAssertion(REQUEST_OPTIONS)).toEqual({ outcome: 'failed', message: PASSKEY_REFUSAL_TEXT })
+  })
+
+  it('hands the page\'s signal to the browser, so leaving the step closes the prompt', async () => {
+    stub = installWebAuthnStub()
+    const controller = new AbortController()
+    await createPasskey(CREATION_OPTIONS, controller.signal)
+    await getPasskeyAssertion(REQUEST_OPTIONS, controller.signal)
+    expect(stub.create.mock.calls[0]?.[0].signal).toBe(controller.signal)
+    expect(stub.get.mock.calls[0]?.[0].signal).toBe(controller.signal)
   })
 })

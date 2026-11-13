@@ -32,7 +32,7 @@
         <!-- DAR-BE-264: approving mints a 7-day key, so a two-factor account proves it with a fresh code. A code
              already used to sign in is refused for 30 s, so the label asks for a current one. DAR-BE-270: or a passkey,
              whose prompt opens from Approve. -->
-        <label v-if="needsTwoFactorCode && proofChoice === 'code'" for="cli-login-two-factor">
+        <label v-if="needsTwoFactorCode && proof.mode.value === 'code'" for="cli-login-two-factor">
           <span>Current code from your app</span>
           <input
             id="cli-login-two-factor"
@@ -46,23 +46,29 @@
             data-testid="cli-login-two-factor-code"
           />
         </label>
-        <p v-if="needsTwoFactorCode && proofChoice === 'passkey'" class="section-note" data-testid="cli-login-passkey-note">
+        <p v-if="needsTwoFactorCode && proof.mode.value === 'passkey'" class="section-note" data-testid="cli-login-passkey-note">
           Approve opens your passkey prompt.
         </p>
+        <!-- Their only factor is a passkey and this browser cannot use one: never ask them for an app code. -->
+        <p v-if="noProofHere" class="section-note" role="alert" data-testid="cli-login-no-proof">
+          {{ PASSKEYS_UNSUPPORTED_TEXT }} {{ PASSKEY_BROWSER_NEEDED_TEXT }}
+        </p>
         <button
-          v-if="needsTwoFactorCode && proofChoice === 'code' && proofMethods?.passkey"
+          v-if="needsTwoFactorCode && proof.mode.value === 'code' && proof.offers('passkey')"
           type="button"
           class="login-text-link"
           data-testid="cli-login-use-passkey"
+          :disabled="busy"
           @click="useProof('passkey')"
         >
           Use a passkey
         </button>
         <button
-          v-if="needsTwoFactorCode && proofChoice === 'passkey' && proofMethods?.app"
+          v-if="needsTwoFactorCode && proof.mode.value === 'passkey' && proof.offers('code')"
           type="button"
           class="login-text-link"
           data-testid="cli-login-use-app"
+          :disabled="busy"
           @click="useProof('code')"
         >
           Use the app code
@@ -112,9 +118,9 @@ import CliAccessRequestCard from '../components/settings/CliAccessRequestCard.vu
 import { authFacade } from '../lib/api/facade'
 import type { MyCliAccess } from '../lib/api/types'
 import { formatDateTime } from '../lib/utils/date'
-import { refusalReason } from '../lib/twoFactor'
-import { passkeysSupported } from '../lib/passkeys'
-import { usePasskeyProof } from '../composables/usePasskeyProof'
+import { callFailure, refusalReason } from '../lib/twoFactor'
+import { PASSKEY_BROWSER_NEEDED_TEXT, PASSKEYS_UNSUPPORTED_TEXT } from '../lib/passkeys'
+import { beginPasskeyProof, useTwoFactorProof } from '../composables/useTwoFactorProof'
 import { useAuthStore } from '../stores/auth'
 
 type Phase = 'enter' | 'ready' | 'done' | 'notfound' | 'noaccess'
@@ -141,32 +147,32 @@ const needsTwoFactorCode = computed(() => authStore.twoFactorEnabled || codeDema
 const typedTwoFactorCode = computed(() => twoFactorCode.value.replace(/\D/g, ''))
 
 // DAR-BE-270: which proofs this person has (read once two-factor is known to be on) and which one they are using.
-const passkeyProof = usePasskeyProof()
-const proofMethods = ref<{ app: boolean; passkey: boolean } | null>(null)
-const proofChoice = ref<'code' | 'passkey'>('code')
-const approveBlocked = computed(
-  () => needsTwoFactorCode.value && proofChoice.value === 'code' && typedTwoFactorCode.value.length !== 6,
-)
+const proof = useTwoFactorProof({ begin: beginPasskeyProof, onRefused: (refusal) => { codeError.value = refusal.message } })
+const methodsRead = ref(false)
+const noProofHere = computed(() => needsTwoFactorCode.value && methodsRead.value && proof.mode.value === null)
+const approveBlocked = computed(() => {
+  if (!needsTwoFactorCode.value) return false
+  if (proof.mode.value === 'code') return typedTwoFactorCode.value.length !== 6
+  return proof.mode.value !== 'passkey' || proof.preparing.value
+})
 
 async function loadProofMethods(): Promise<void> {
-  if (proofMethods.value) return
+  if (methodsRead.value) return
   try {
     const status = await authFacade.getTwoFactorStatus(controller.signal)
     if (controller.signal.aborted) return
-    const app = status.appEnabled ?? status.enabled ?? true
-    const passkey = (status.passkeys?.length ?? 0) > 0 && passkeysSupported()
-    proofMethods.value = { app, passkey }
-    if (!app && passkey) useProof('passkey')
-  } catch {
-    // Unread: the code input stays, as before passkeys.
+    methodsRead.value = true
+    proof.start({ app: status.appEnabled === true, passkey: (status.passkeys?.length ?? 0) > 0 })
+  } catch (err) {
+    // Without the read there is no knowing which proof to ask for; Approve waits, and a reload reads it again.
+    if (!controller.signal.aborted) codeError.value = callFailure(err).message
   }
 }
 
 function useProof(choice: 'code' | 'passkey'): void {
   codeError.value = null
   twoFactorCode.value = ''
-  proofChoice.value = choice
-  if (choice === 'passkey') passkeyProof.prepare()
+  proof.choose(choice)
 }
 
 watch(
@@ -179,8 +185,8 @@ watch(
 /** The fresh proof approve#CliLogin takes: a code, a passkey assertion, nothing (no two-factor), or null to stop. */
 async function approvalProof(): Promise<{ code?: string; passkeyAssertion?: string } | null> {
   if (!needsTwoFactorCode.value) return {}
-  if (proofChoice.value === 'code') return { code: typedTwoFactorCode.value }
-  const proved = await passkeyProof.prove()
+  if (proof.mode.value === 'code') return { code: typedTwoFactorCode.value }
+  const proved = await proof.prove()
   if (proved.outcome === 'ok') return { passkeyAssertion: proved.passkeyAssertion }
   // A closed prompt is not a refusal: the request stays on screen and nothing is said.
   if (proved.outcome === 'failed') codeError.value = proved.message
@@ -253,7 +259,7 @@ function proofRefused(message: string): void {
   codeError.value = message
   twoFactorCode.value = ''
   // A refused assertion used its options up: fetch the next set now, ahead of the retry's click.
-  if (proofChoice.value === 'passkey') passkeyProof.prepare()
+  if (proof.mode.value === 'passkey') void proof.prepare()
 }
 
 async function answer(choice: 'approved' | 'denied') {

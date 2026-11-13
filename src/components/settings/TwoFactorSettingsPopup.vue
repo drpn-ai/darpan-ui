@@ -49,6 +49,19 @@
           <TwoFactorRecoveryCodes :codes="recoveryCodes" :username="username" />
         </WorkflowStepForm>
 
+        <!-- Their only factor is a passkey and this browser cannot use one: there is no proof to ask for here. -->
+        <WorkflowStepForm
+          v-else-if="!proofKind"
+          class="workflow-form--popup-compact"
+          :question="PASSKEYS_UNSUPPORTED_TEXT"
+          primary-label="OK"
+          :show-enter-hint="true"
+          primary-test-id="two-factor-no-proof-ok"
+          @submit="emit('close')"
+        >
+          <p class="section-note" data-testid="two-factor-no-proof">{{ PASSKEY_BROWSER_NEEDED_TEXT }}</p>
+        </WorkflowStepForm>
+
         <WorkflowStepForm
           v-else
           class="workflow-form--popup-compact"
@@ -80,19 +93,21 @@
             @complete="actsOnSixthDigit ? submitProof() : undefined"
           />
           <button
-            v-if="proofKind === 'code' && passkeyProofOffered"
+            v-if="proofKind === 'code' && proof.offers('passkey')"
             type="button"
             class="login-text-link"
             data-testid="two-factor-proof-use-passkey"
+            :disabled="busy"
             @click="useProof('passkey')"
           >
             Use a passkey
           </button>
           <button
-            v-if="proofKind === 'passkey' && appEnabled"
+            v-if="proofKind === 'passkey' && proof.offers('code')"
             type="button"
             class="login-text-link"
             data-testid="two-factor-proof-use-app"
+            :disabled="busy"
             @click="useProof('code')"
           >
             Use the app code
@@ -113,10 +128,10 @@ import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
 import PasskeyAddSteps from '../auth/PasskeyAddSteps.vue'
 import TwoFactorRecoveryCodes from '../auth/TwoFactorRecoveryCodes.vue'
 import TwoFactorSetupSteps from '../auth/TwoFactorSetupSteps.vue'
-import { usePasskeyProof } from '../../composables/usePasskeyProof'
-import { ApiCallError } from '../../lib/api/client'
+import { beginPasskeyProof, useTwoFactorProof } from '../../composables/useTwoFactorProof'
 import { authFacade } from '../../lib/api/facade'
-import { passkeysSupported } from '../../lib/passkeys'
+import { PASSKEY_BROWSER_NEEDED_TEXT, PASSKEYS_UNSUPPORTED_TEXT } from '../../lib/passkeys'
+import { callFailure } from '../../lib/twoFactor'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import { useAuthStore, type TwoFactorProof, type TwoFactorSetupStart } from '../../stores/auth'
 
@@ -127,9 +142,9 @@ const props = defineProps<{
   action: TwoFactorSettingsAction
   username?: string | null
   /** Two-factor is on (any factor): proof is a code or a passkey, not the password. */
-  twoFactorOn?: boolean
-  appEnabled?: boolean
-  hasPasskeys?: boolean
+  twoFactorOn: boolean
+  appEnabled: boolean
+  hasPasskeys: boolean
   /** remove-passkey: the one being removed. */
   passkey?: { passkeyId: string; name?: string } | null
 }>()
@@ -141,7 +156,6 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
-const passkeyProof = usePasskeyProof()
 const currentPassword = ref('')
 const code = ref('')
 const busy = ref(false)
@@ -150,12 +164,11 @@ const setup = ref<TwoFactorSetupStart | null>(null)
 const passkeyOptions = ref<string | null>(null)
 const recoveryCodes = ref<string[] | null>(null)
 
-const passkeyProofOffered = computed(() => props.hasPasskeys === true && passkeysSupported())
-const proofChoice = ref<'code' | 'passkey'>(props.appEnabled !== false || !passkeyProofOffered.value ? 'code' : 'passkey')
-const proofKind = computed<'password' | 'code' | 'passkey'>(() => {
-  if (!props.twoFactorOn && (props.action === 'setup' || props.action === 'add-passkey')) return 'password'
-  return proofChoice.value
-})
+const proof = useTwoFactorProof({ begin: beginPasskeyProof, onRefused: (refusal) => { error.value = refusal.message } })
+const usesPassword = !props.twoFactorOn && (props.action === 'setup' || props.action === 'add-passkey')
+if (!usesPassword) proof.start({ app: props.appEnabled, passkey: props.hasPasskeys })
+/** The proof asked for; null when none can be given in this browser. */
+const proofKind = computed(() => (usesPassword ? 'password' : proof.mode.value))
 const actsOnSixthDigit = computed(() => props.action !== 'off' && props.action !== 'app-off' && props.action !== 'remove-passkey')
 
 const TITLES: Record<TwoFactorSettingsAction, string> = {
@@ -189,30 +202,21 @@ const primaryLabel = computed(() => {
 const isProofBlocked = computed(() => {
   if (busy.value) return true
   if (proofKind.value === 'password') return currentPassword.value.length === 0
-  if (proofKind.value === 'passkey') return false
+  if (proofKind.value === 'passkey') return proof.preparing.value
   return code.value.length < 6
-})
-
-onMounted(() => {
-  if (proofKind.value === 'passkey') passkeyProof.prepare()
 })
 
 function useProof(choice: 'code' | 'passkey'): void {
   error.value = null
   code.value = ''
-  proofChoice.value = choice
-  if (choice === 'passkey') passkeyProof.prepare()
-}
-
-function messageOf(err: unknown, fallback: string): string {
-  return err instanceof ApiCallError ? err.message : fallback
+  proof.choose(choice)
 }
 
 /** The proof for the action, or null when there is none to send (a closed passkey prompt, or its failure shown). */
 async function collectProof(): Promise<TwoFactorProof | null> {
   if (proofKind.value === 'password') return { currentPassword: currentPassword.value }
   if (proofKind.value === 'code') return { code: code.value }
-  const proved = await passkeyProof.prove()
+  const proved = await proof.prove()
   if (proved.outcome === 'ok') return { passkeyAssertion: proved.passkeyAssertion }
   // A closed prompt is not a refusal: stay here and say nothing.
   if (proved.outcome === 'failed') error.value = proved.message
@@ -224,36 +228,35 @@ async function submitProof(): Promise<void> {
   busy.value = true
   error.value = null
   try {
-    const proof = await collectProof()
-    if (!proof) return
-    await act(proof)
+    const given = await collectProof()
+    if (given) await act(given)
   } catch (err) {
-    error.value = messageOf(err, "That didn't go through. Try again.")
+    error.value = callFailure(err).message
   } finally {
     // The password is held only as long as the step that asked for it.
     currentPassword.value = ''
     code.value = ''
     busy.value = false
-    // The proof was used: fresh options now, so a retry opens the prompt straight from its click.
-    if (error.value && proofKind.value === 'passkey') passkeyProof.prepare()
+    // A refused assertion used its options up: the next set now, so a retry opens the prompt straight from its click.
+    if (error.value && proofKind.value === 'passkey') void proof.prepare()
   }
 }
 
-async function act(proof: TwoFactorProof): Promise<void> {
+async function act(given: TwoFactorProof): Promise<void> {
   if (props.action === 'setup' || props.action === 'replace') {
-    const result = await authStore.beginTwoFactorSetup(proof)
+    const result = await authStore.beginTwoFactorSetup(given)
     if (result.outcome === 'begun') setup.value = result.setup
     else error.value = result.message
     return
   }
   if (props.action === 'add-passkey') {
-    const result = await authStore.beginPasskeyRegistration(proof)
+    const result = await authStore.beginPasskeyRegistration(given)
     if (result.outcome === 'begun') passkeyOptions.value = result.publicKeyOptions
     else error.value = result.message
     return
   }
   if (props.action === 'codes') {
-    const response = await authFacade.createRecoveryCodes(proof)
+    const response = await authFacade.createRecoveryCodes(given)
     recoveryCodes.value = response.recoveryCodes ?? []
     emit('changed', 'codes')
     return
@@ -261,13 +264,13 @@ async function act(proof: TwoFactorProof): Promise<void> {
   if (props.action === 'remove-passkey') {
     if (!props.passkey) return
     // The backend refuses a required person's last factor; its reason shows here.
-    const response = await authFacade.deletePasskey({ passkeyId: props.passkey.passkeyId, ...proof })
+    const response = await authFacade.deletePasskey({ passkeyId: props.passkey.passkeyId, ...given })
     emit('changed', response.twoFactorEnabled === false ? 'off' : 'passkey-removed')
     emit('close')
     return
   }
   const appOnly = props.action === 'app-off'
-  await authFacade.disableTwoFactor(appOnly ? { ...proof, appOnly: true } : proof)
+  await authFacade.disableTwoFactor(appOnly ? { ...given, appOnly: true } : given)
   emit('changed', appOnly ? 'app-off' : 'off')
   emit('close')
 }
@@ -276,7 +279,7 @@ function restart(message: string): void {
   setup.value = null
   passkeyOptions.value = null
   error.value = message
-  if (proofKind.value === 'passkey') passkeyProof.prepare()
+  if (proofKind.value === 'passkey') void proof.prepare()
 }
 
 function handleCancelRequest(event: Event): void {
@@ -284,6 +287,12 @@ function handleCancelRequest(event: Event): void {
   emit('close')
 }
 
+// Focus goes back to the button that opened this.
+const opener = typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null)
+
 onMounted(() => document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest))
-onBeforeUnmount(() => document.removeEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest))
+onBeforeUnmount(() => {
+  document.removeEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest)
+  opener?.focus?.()
+})
 </script>
