@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 // DAR-BE-264: the sign-in page's two-factor steps, driven through the real auth store with only the facade and the
@@ -34,7 +34,7 @@ const signedIn = (authToken: string, extra: Record<string, unknown> = {}) => ({
 })
 const challengeReply = (purpose: 'code' | 'setup') => ({
   ok: true, messages: [], errors: [], authenticated: false, challengeToken: CHALLENGE, challengeExpiresInSeconds: 300,
-  ...(purpose === 'code' ? { twoFactorRequired: true } : { twoFactorSetupRequired: true }),
+  ...(purpose === 'code' ? { twoFactorRequired: true, twoFactorMethods: ['app'] } : { twoFactorSetupRequired: true }),
 })
 // As the backend answers since darpan d4d13e26: a completed call carrying challengeEnded.
 const refusal = (challengeEnded = false) => ({
@@ -70,10 +70,6 @@ describe('LoginPage two-factor', () => {
     clearAuthToken()
     route.query = {}
     getPasswordResetStatus.mockResolvedValue({ available: false })
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   it('asks for the app code, submits on the sixth digit, and signs in', async () => {
@@ -115,7 +111,7 @@ describe('LoginPage two-factor', () => {
     await typeCode(wrapper, 'login-two-factor-code', '000000')
 
     expect(wrapper.find('h1').text()).toBe('Sign In')
-    expect(wrapper.text()).toContain('This sign-in has expired. Enter your password again.')
+    expect(wrapper.text()).toContain('Sign in again.')
     expect((wrapper.get('input[autocomplete="current-password"]').element as HTMLInputElement).value).toBe('')
   })
 
@@ -133,14 +129,13 @@ describe('LoginPage two-factor', () => {
 
     expect(verifySignInCode).toHaveBeenCalledTimes(5)
     expect(wrapper.find('h1').text()).toBe('Sign In')
-    expect(wrapper.text()).toContain('This sign-in has expired. Enter your password again.')
+    expect(wrapper.text()).toContain('Sign in again.')
   })
 
-  it('a network failure past the 300 s goes back to the password; one inside them stays', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2026-11-13T10:00:00Z'))
+  it('a network failure stays on the code step with a message to try again: only the backend ends a challenge', async () => {
     loginSession.mockResolvedValue(challengeReply('code'))
-    verifySignInCode.mockRejectedValue(new ApiCallError('Darpan stepped out for chai. Try again in a moment.'))
+    verifySignInCode.mockRejectedValueOnce(new ApiCallError('Darpan stepped out for chai. Try again in a moment.'))
+    verifySignInCode.mockResolvedValueOnce(signedIn('key-after-retry'))
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
@@ -148,11 +143,8 @@ describe('LoginPage two-factor', () => {
     expect(wrapper.text()).toContain('Enter the code from your app.')
     expect(wrapper.text()).toContain('Darpan stepped out for chai.')
 
-    vi.setSystemTime(new Date('2026-11-13T10:05:01Z'))
     await typeCode(wrapper, 'login-two-factor-code', '123456')
-
-    expect(wrapper.find('h1').text()).toBe('Sign In')
-    expect(wrapper.text()).toContain('This sign-in has expired. Enter your password again.')
+    expect(getAuthToken()).toBe('key-after-retry')
   })
 
   it('takes a recovery code instead, and says when few are left before going on', async () => {
@@ -185,6 +177,21 @@ describe('LoginPage two-factor', () => {
     await flushPromises()
 
     expect(wrapper.find('h1').text()).toBe('Sign In')
+  })
+
+  it('Back after a refused code opens a clean sign-in form: the refusal stayed with the step', async () => {
+    loginSession.mockResolvedValue(challengeReply('code'))
+    verifySignInCode.mockResolvedValue(refusal(false))
+    const wrapper = mount(LoginPage)
+
+    await signIn(wrapper)
+    await typeCode(wrapper, 'login-two-factor-code', '000000')
+    expect(wrapper.text()).toContain("That code didn't work.")
+    await wrapper.get('.wizard-back').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('h1').text()).toBe('Sign In')
+    expect(wrapper.text()).not.toContain("didn't work")
   })
 
   it('walks a required setup: QR and key, the first code, the recovery codes once, then signs in', async () => {
@@ -230,7 +237,7 @@ describe('LoginPage two-factor', () => {
     await typeCode(wrapper, 'two-factor-setup-code', '654321')
 
     expect(wrapper.find('h1').text()).toBe('Sign In')
-    expect(wrapper.text()).toContain('This sign-in has expired. Enter your password again.')
+    expect(wrapper.text()).toContain('Sign in again.')
     expect(getAuthToken()).toBeNull()
   })
 

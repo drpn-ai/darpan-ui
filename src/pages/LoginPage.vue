@@ -248,7 +248,7 @@ import LoginTwoFactorSteps from '../components/auth/LoginTwoFactorSteps.vue'
 import TwoFactorSetupSteps from '../components/auth/TwoFactorSetupSteps.vue'
 import PasskeyAddSteps from '../components/auth/PasskeyAddSteps.vue'
 import { formatShortDate } from '../lib/utils/date'
-import { passkeysSupported, PASSKEYS_UNAVAILABLE_TEXT } from '../lib/passkeys'
+import { passkeysSupported } from '../lib/passkeys'
 import type { TwoFactorChallengePurpose, TwoFactorSetupStart } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
@@ -646,7 +646,7 @@ async function startGracePasskey(): Promise<void> {
       gracePasskeyOptions.value = result.publicKeyOptions
       return
     }
-    if (result.message === PASSKEYS_UNAVAILABLE_TEXT) gracePasskeysUnavailable.value = true
+    if (result.outcome === 'refused' && result.reason === 'passkeysUnavailable') gracePasskeysUnavailable.value = true
     localError.value = result.message
   } finally {
     isStartingGraceSetup.value = false

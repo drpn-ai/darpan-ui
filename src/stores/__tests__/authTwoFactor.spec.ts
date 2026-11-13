@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // DAR-BE-264: the auth store's two-factor paths against the real client token storage (per-tab sessionStorage),
 // with only the facade mocked.
@@ -79,10 +79,6 @@ describe('auth store two-factor', () => {
     clearAuthToken()
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
   it('holds a code challenge in memory only: no session, no token, nothing in storage', async () => {
     const { store, authenticated } = await signInToChallenge('code')
 
@@ -122,7 +118,7 @@ describe('auth store two-factor', () => {
     verifySignInCode.mockResolvedValue(refusal(false))
 
     for (let attempt = 1; attempt <= 6; attempt += 1) {
-      expect(await store.verifySignInCode({ code: '000000' })).toEqual({ outcome: 'refused', message: "That code didn't work." })
+      expect(await store.verifySignInCode({ code: '000000' })).toMatchObject({ outcome: 'refused', message: "That code didn't work." })
     }
     expect(store.twoFactorChallengePurpose).toBe('code')
   })
@@ -133,33 +129,39 @@ describe('auth store two-factor', () => {
 
     const result = await store.verifySignInCode({ code: '000000' })
 
-    expect(result).toEqual({ outcome: 'ended', message: 'This sign-in has expired. Enter your password again.' })
+    expect(result).toEqual({ outcome: 'ended', message: 'Sign in again.' })
     expect(store.twoFactorChallengePurpose).toBeNull()
     expect(getAuthToken()).toBeNull()
   })
 
-  it('a failed call (no reply) keeps the challenge inside its 300 s and ends it after', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-11-13T10:00:00Z'))
+  it('a failed call (no reply) keeps the challenge: nothing says it ended, so the person can try again', async () => {
     const { store } = await signInToChallenge('code')
     verifySignInCode.mockRejectedValue(new ApiCallError('Darpan stepped out for chai. Try again in a moment.'))
 
-    expect((await store.verifySignInCode({ code: '123456' })).outcome).toBe('refused')
+    expect(await store.verifySignInCode({ code: '123456' })).toMatchObject({ outcome: 'refused', message: 'Darpan stepped out for chai. Try again in a moment.' })
     expect(store.twoFactorChallengePurpose).toBe('code')
+  })
 
-    vi.setSystemTime(new Date('2026-11-13T10:05:01Z'))
-    expect((await store.verifySignInCode({ code: '123456' })).outcome).toBe('ended')
-    expect(store.twoFactorChallengePurpose).toBeNull()
+  // The sign-in form shows the store's error. A refusal belongs to the step that showed it: after Back, the fresh form
+  // must not open on "That code didn't work."
+  it('refusals and endings never become the store\'s error', async () => {
+    const { store } = await signInToChallenge('code')
+    verifySignInCode.mockResolvedValueOnce(refusal(false)).mockResolvedValueOnce(refusal(true))
+
+    await store.verifySignInCode({ code: '000000' })
+    expect(store.error).toBeNull()
+    await store.verifySignInCode({ code: '000000' })
+    expect(store.error).toBeNull()
   })
 
   it('setup: begin or confirm refused with challengeEnded ends the setup challenge', async () => {
     const { store } = await signInToChallenge('setup')
-    beginTwoFactorSetup.mockResolvedValueOnce({ ok: false, messages: [], errors: ['This sign-in has expired. Enter your password again.'], challengeEnded: true })
+    beginTwoFactorSetup.mockResolvedValueOnce(refusal(true, 'This sign-in has expired. Enter your password again.'))
     expect((await store.beginTwoFactorSetup()).outcome).toBe('ended')
 
     await signInToChallenge('setup')
     confirmTwoFactorSetup.mockResolvedValueOnce(refusal(false))
-    expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'refused', message: "That code didn't work." })
+    expect(await store.confirmTwoFactorSetup('000000')).toMatchObject({ outcome: 'refused', message: "That code didn't work." })
     expect(store.twoFactorChallengePurpose).toBe('setup')
     confirmTwoFactorSetup.mockResolvedValueOnce(refusal(true))
     expect((await store.confirmTwoFactorSetup('000000')).outcome).toBe('ended')
@@ -216,18 +218,15 @@ describe('auth store two-factor', () => {
     confirmTwoFactorSetup.mockResolvedValueOnce(refusal(false))
     confirmTwoFactorSetup.mockResolvedValueOnce(refusal(false, 'Setup has expired. Start again.'))
 
-    expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'refused', message: "That code didn't work." })
+    expect(await store.confirmTwoFactorSetup('000000')).toMatchObject({ outcome: 'refused', message: "That code didn't work." })
     expect(getAuthToken()).toBe('old-key')
     expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'ended', message: 'Setup has expired. Start again.' })
   })
   // ─── DAR-BE-270 passkeys ─────────────────────────────────────────────────────
 
-  it('keeps what login#Session says the person can answer with; an older backend that says nothing meant the app', async () => {
+  it('keeps what login#Session says the person can answer with, and only the ways this page knows', async () => {
     const { store } = await signInToChallenge('code', { twoFactorMethods: ['passkey', 'sms'] })
     expect(store.twoFactorMethods).toEqual(['passkey'])
-
-    const older = await signInToChallenge('code')
-    expect(older.store.twoFactorMethods).toEqual(['app'])
   })
 
   it('begins a passkey sign-in with the challenge token and verifies the assertion against it', async () => {
@@ -274,7 +273,7 @@ describe('auth store two-factor', () => {
     finishPasskeyRegistration.mockResolvedValueOnce(refusal(false, "That passkey didn't work."))
     finishPasskeyRegistration.mockResolvedValueOnce(refusal(true, "That passkey didn't work."))
 
-    expect(await store.finishPasskeyRegistration('{}')).toEqual({ outcome: 'refused', message: "That passkey didn't work." })
+    expect(await store.finishPasskeyRegistration('{}')).toMatchObject({ outcome: 'refused', message: "That passkey didn't work." })
     expect(store.twoFactorChallengePurpose).toBe('setup')
     expect((await store.finishPasskeyRegistration('{}')).outcome).toBe('ended')
     expect(store.twoFactorChallengePurpose).toBeNull()

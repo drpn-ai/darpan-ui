@@ -275,7 +275,8 @@ import type {
   SaveFlowchartRunResponse,
 } from './flowchartTypes'
 
-// A refused two-factor code is answered as a completed call whose fields (challengeEnded) decide the next screen.
+// A refused two-factor proof is answered as a completed call whose fields (challengeEnded, the refusal's reason)
+// decide the next screen.
 const REFUSAL_IS_RESULT = { refusalIsResult: true } as const
 
 const AUTH = {
@@ -510,7 +511,7 @@ export const authFacade = {
     return callService<DeletePasskeyResponse>(AUTH.deletePasskey, payload, signal)
   },
   approveCliLogin(payload: ApproveCliLoginPayload, signal?: AbortSignal): Promise<ApproveCliLoginResponse> {
-    return callService<ApproveCliLoginResponse>(AUTH.approveCliLogin, payload, signal)
+    return callService<ApproveCliLoginResponse>(AUTH.approveCliLogin, payload, signal, REFUSAL_IS_RESULT)
   },
   denyCliLogin(payload: CliLoginCodePayload, signal?: AbortSignal): Promise<DenyCliLoginResponse> {
     return callService<DenyCliLoginResponse>(AUTH.denyCliLogin, payload, signal)

@@ -35,7 +35,8 @@ import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
 import TwoFactorRecoveryCodes from './TwoFactorRecoveryCodes.vue'
 import { createPasskey } from '../../lib/passkeys'
-import { useAuthStore, type PasskeyBeginOutcome } from '../../stores/auth'
+import { useAuthStore } from '../../stores/auth'
+import type { PasskeyBeginOutcome } from '../../lib/twoFactor'
 
 const props = defineProps<{
   /** begin#PasskeyRegistration's options. */

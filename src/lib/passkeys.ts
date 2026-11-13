@@ -7,9 +7,6 @@
 /** PasskeySupport.PASSKEY_REFUSAL: every refused assertion reads the same. */
 export const PASSKEY_REFUSAL_TEXT = "That passkey didn't work."
 
-/** PasskeySupport.UNAVAILABLE: this instance has no relying party configured (the app still works). */
-export const PASSKEYS_UNAVAILABLE_TEXT = 'Passkeys are not available on this Darpan instance.'
-
 /** The person closed the browser's prompt, or it timed out: not a refusal, so the caller says nothing. */
 export type PasskeyCeremony = { outcome: 'ok'; json: string } | { outcome: 'cancelled' } | { outcome: 'failed'; message: string }
 

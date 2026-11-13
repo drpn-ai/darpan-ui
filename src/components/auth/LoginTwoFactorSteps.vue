@@ -115,10 +115,10 @@ import WorkflowCodeInput from '../workflow/WorkflowCodeInput.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
 import PasskeyAddSteps from './PasskeyAddSteps.vue'
 import TwoFactorSetupSteps from './TwoFactorSetupSteps.vue'
-import { getPasskeyAssertion, passkeysSupported, PASSKEYS_UNAVAILABLE_TEXT } from '../../lib/passkeys'
+import { getPasskeyAssertion, passkeysSupported } from '../../lib/passkeys'
+import type { PasskeyBeginOutcome } from '../../lib/twoFactor'
 import {
   useAuthStore,
-  type PasskeyBeginOutcome,
   type TwoFactorChallengePurpose,
   type TwoFactorSetupStart,
   type TwoFactorVerifyOutcome,
@@ -282,7 +282,7 @@ async function startPasskeySetup(): Promise<void> {
       emit('ended', result.message)
       return
     }
-    if (result.message === PASSKEYS_UNAVAILABLE_TEXT) passkeysUnavailableHere.value = true
+    if (result.outcome === 'refused' && result.reason === 'passkeysUnavailable') passkeysUnavailableHere.value = true
     error.value = result.message
   } finally {
     startingPasskeySetup.value = false

@@ -112,8 +112,7 @@ import CliAccessRequestCard from '../components/settings/CliAccessRequestCard.vu
 import { authFacade } from '../lib/api/facade'
 import type { MyCliAccess } from '../lib/api/types'
 import { formatDateTime } from '../lib/utils/date'
-import { ApiCallError } from '../lib/api/client'
-import { isCodeProblem } from '../lib/twoFactor'
+import { refusalReason } from '../lib/twoFactor'
 import { passkeysSupported } from '../lib/passkeys'
 import { usePasskeyProof } from '../composables/usePasskeyProof'
 import { useAuthStore } from '../stores/auth'
@@ -248,15 +247,13 @@ async function failed(choice: 'approved' | 'denied') {
   phase.value = 'notfound'
 }
 
-/** A refused approval a fresh code fixes keeps the request on screen; anything else is about the request. */
-function codeRefused(choice: 'approved' | 'denied', message: string | null | undefined): boolean {
-  if (choice !== 'approved' || !isCodeProblem(message)) return false
+/** A refused approval a fresh proof fixes keeps the request on screen. */
+function proofRefused(message: string): void {
   codeDemanded.value = true
-  codeError.value = message ?? null
+  codeError.value = message
   twoFactorCode.value = ''
   // A refused assertion used its options up: fetch the next set now, ahead of the retry's click.
   if (proofChoice.value === 'passkey') passkeyProof.prepare()
-  return true
 }
 
 async function answer(choice: 'approved' | 'denied') {
@@ -275,17 +272,17 @@ async function answer(choice: 'approved' | 'denied') {
       response = await authFacade.denyCliLogin(payload, controller.signal)
     }
     if (controller.signal.aborted) return
+    // approve#CliLogin answers a refusal as a reply; one a fresh proof fixes keeps the request on screen, anything else
+    // is about the request.
     if (!response.ok) {
-      if (codeRefused(choice, response.errors?.[0])) return
-      await failed(choice)
+      if (refusalReason(response) === 'proof') proofRefused(response.errors[0] ?? '')
+      else await failed(choice)
       return
     }
     outcome.value = choice
     phase.value = 'done'
-  } catch (err) {
-    if (controller.signal.aborted) return
-    if (codeRefused(choice, err instanceof ApiCallError ? err.message : null)) return
-    await failed(choice)
+  } catch {
+    if (!controller.signal.aborted) await failed(choice)
   } finally {
     busy.value = false
   }

@@ -180,7 +180,7 @@ describe('LoginPage passkeys', () => {
     await click(wrapper, 'login-two-factor-passkey-next')
 
     expect(wrapper.find('h1').text()).toBe('Sign In')
-    expect(wrapper.text()).toContain('This sign-in has expired. Enter your password again.')
+    expect(wrapper.text()).toContain('Sign in again.')
     expect(getAuthToken()).toBeNull()
   })
 
