@@ -91,6 +91,7 @@ import { formatDueDate } from './lib/twoFactor'
 import AppErrorBoundary from './components/shell/AppErrorBoundary.vue'
 import OfflineBanner from './components/shell/OfflineBanner.vue'
 import MascotDock from './components/shell/MascotDock.vue'
+import { routerViewKeyFor } from './lib/routerViewKey'
 
 const CommandPalette = defineAsyncComponent(() => import('./components/shell/CommandPalette.vue').then((module) => module.default))
 
@@ -120,9 +121,7 @@ const workflowEscapeOriginPath = ref<string | null>(null)
 const isShelllessRoute = computed(() => route.name === 'login')
 const surfaceMode = computed<'static' | 'workflow'>(() => (route.meta.surfaceMode === 'workflow' ? 'workflow' : 'static'))
 // DAR-UI-068. A route that reads its query reactively keys on its path, so a query change does not rebuild the page.
-const routerViewKey = computed(
-  () => `${route.meta.queryKeepsPage ? route.path : route.fullPath}::${authStore.sessionInfo?.activeTenantUserGroupId ?? authStore.sessionInfo?.scopeType ?? 'anonymous'}`,
-)
+const routerViewKey = computed(() => routerViewKeyFor(route, authStore.sessionInfo))
 const userDisplayName = computed(() => resolveUserDisplayName(authStore.sessionInfo))
 const activeTenantUserGroupId = computed(() => authStore.sessionInfo?.activeTenantUserGroupId ?? null)
 const slashContext = computed<SlashCommandContext>(() => ({

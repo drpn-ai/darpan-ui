@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
   modelValue: string
@@ -52,6 +52,12 @@ const boxIndexes = computed(() => Array.from({ length: props.length }, (_, index
 
 // The value has no gaps: digits fill from the left, and focus never rests on a box past the first empty one.
 const digits = computed(() => props.modelValue.replace(/\D/g, '').slice(0, props.length).split(''))
+
+// A parent that clears a refused code (two-factor, reset) leaves focus on the box that held the last digit; send it
+// back to the first box so the next code can be typed straight away.
+watch(() => props.modelValue, (next) => {
+  if (next === '' && boxes.some((box) => box !== null && box === document.activeElement)) focusBox(0)
+})
 
 function setBox(element: unknown, index: number): void {
   boxes[index] = element instanceof HTMLInputElement ? element : null

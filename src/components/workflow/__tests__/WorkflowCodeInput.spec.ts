@@ -77,6 +77,32 @@ describe('WorkflowCodeInput', () => {
     wrapper.unmount()
   })
 
+  it('sends focus back to the first box when the parent clears a refused code', async () => {
+    const { wrapper, box } = mountCode('123456')
+    box(5).element.focus()
+    expect(document.activeElement).toBe(box(5).element)
+
+    await wrapper.setProps({ modelValue: '' })
+    await nextTick()
+
+    expect(document.activeElement).toBe(box(0).element)
+    wrapper.unmount()
+  })
+
+  it('leaves focus alone when the value is cleared while focus is elsewhere', async () => {
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    const { wrapper } = mountCode('123456')
+    outside.focus()
+
+    await wrapper.setProps({ modelValue: '' })
+    await nextTick()
+
+    expect(document.activeElement).toBe(outside)
+    wrapper.unmount()
+    outside.remove()
+  })
+
   it('sends focus to the first empty box when a later one is clicked', async () => {
     const { wrapper, box } = mountCode('12')
 
