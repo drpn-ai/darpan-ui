@@ -230,7 +230,7 @@ describe('LoginPage passkeys', () => {
     await click(wrapper, 'passkey-add-next')
     expect(finishPasskeyRegistration).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Add a passkey.')
-    expect(wrapper.find('.inline-validation.error').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain("didn't work")
 
     await click(wrapper, 'passkey-add-next')
 

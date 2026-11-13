@@ -16,7 +16,7 @@
 
   <TwoFactorRecoveryCodes v-else :class="formClass" :codes="recoveryCodes" :username="username" @done="emit('done')" />
 
-  <InlineValidation v-if="error" tone="error" :message="error" />
+  <InlineValidation tone="error" :message="error" />
 </template>
 
 <script setup lang="ts">

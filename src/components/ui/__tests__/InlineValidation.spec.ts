@@ -59,4 +59,16 @@ describe('InlineValidation', () => {
 
     expect(wrapper.text()).toContain('Nothing to reconcile yet.')
   })
+
+  it('with nothing to say stays in the page as a hidden live region, so the text that arrives later is announced', async () => {
+    const wrapper = mount(InlineValidation, { props: { tone: 'error', message: null } })
+    const region = wrapper.get('[role="status"]')
+    expect(region.classes()).toContain('sr-only')
+    expect(region.text()).toBe('')
+
+    await wrapper.setProps({ message: "That code didn't work." })
+    expect(wrapper.get('[role="status"]').element).toBe(region.element)
+    expect(region.classes()).not.toContain('sr-only')
+    expect(region.text()).toBe("That code didn't work.")
+  })
 })

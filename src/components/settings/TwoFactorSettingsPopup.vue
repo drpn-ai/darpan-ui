@@ -110,7 +110,7 @@
           </button>
         </WorkflowStepForm>
 
-        <InlineValidation v-if="error" tone="error" :message="error" />
+        <InlineValidation tone="error" :message="error" />
       </div>
     </section>
   </div>
