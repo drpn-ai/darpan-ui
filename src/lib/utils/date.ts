@@ -109,6 +109,14 @@ export function formatDateTime(value: unknown, options: FormatDateTimeOptions = 
   }).format(parsedDate)
 }
 
+/** "1 Dec" in the app's display time zone: the short date the two-factor screens show. Empty when there is no date. */
+export function formatShortDate(value: unknown): string {
+  if (value === null || value === undefined || value === '') return ''
+  const date = new Date(value as string | number)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: defaultDisplayTimeZone }).format(date)
+}
+
 /**
  * The sentence the mascot says when someone rests on a timestamp: which zone the time is
  * being shown in, and how far that is from UTC. Two people in different zones read

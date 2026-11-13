@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDateTime, formatSavedResultDateTime } from '../utils/date'
+import { formatDateTime, formatSavedResultDateTime, formatShortDate, setDefaultDisplayTimeZone } from '../utils/date'
 
 describe('date utilities', () => {
   it('uses the configured fallback when the value is missing', () => {
@@ -22,5 +22,16 @@ describe('date utilities', () => {
   it('formats timestamps in the requested timezone', () => {
     // The zone is no longer appended — it is asked for by resting on the timestamp.
     expect(formatDateTime('2026-05-02T06:00:00.000Z', { locale: 'en-US', timeZone: 'America/Los_Angeles' })).toBe('May 1, 2026, 11:00 PM')
+  })
+
+  it('a short date is the day in the app\'s display time zone, not the browser\'s', () => {
+    // 03:00 UTC on 1 Dec is still 30 Nov in Los Angeles: a due date read in the wrong zone is a day early.
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    expect(formatShortDate('2026-12-01T03:00:00Z')).toBe('30 Nov')
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    expect(formatShortDate('2026-12-01T03:00:00Z')).toBe('1 Dec')
+    setDefaultDisplayTimeZone(undefined)
+    expect(formatShortDate(null)).toBe('')
+    expect(formatShortDate('not-a-date')).toBe('')
   })
 })

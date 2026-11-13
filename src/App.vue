@@ -86,7 +86,7 @@ import {
 } from './lib/uiEvents'
 import { useUserDisplayNamePreference } from './lib/userDisplayName'
 import { resolveStaticPageLabel } from './lib/workflowOrigin'
-import { formatDueDate } from './lib/twoFactor'
+import { formatShortDate } from './lib/utils/date'
 
 import AppErrorBoundary from './components/shell/AppErrorBoundary.vue'
 import OfflineBanner from './components/shell/OfflineBanner.vue'
@@ -574,7 +574,7 @@ function syncWorkflowEscapeOrigin(): void {
 // sign-in; a tab that arrived already signed in (restored session) hears it once here instead.
 function announceTwoFactorDue(): void {
   if (isShelllessRoute.value || authStore.twoFactorDueAnnounced || !authStore.twoFactorDueDate) return
-  const due = formatDueDate(authStore.twoFactorDueDate)
+  const due = formatShortDate(authStore.twoFactorDueDate)
   authStore.noteTwoFactorDueAnnounced()
   showWorkflowHint(
     due ? `Two-factor due ${due}. Set it up in User Settings.` : 'Set up two-factor in User Settings.',

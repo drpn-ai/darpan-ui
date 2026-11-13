@@ -247,7 +247,7 @@ import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
 import LoginTwoFactorSteps from '../components/auth/LoginTwoFactorSteps.vue'
 import TwoFactorSetupSteps from '../components/auth/TwoFactorSetupSteps.vue'
 import PasskeyAddSteps from '../components/auth/PasskeyAddSteps.vue'
-import { formatDueDate } from '../lib/twoFactor'
+import { formatShortDate } from '../lib/utils/date'
 import { passkeysSupported, PASSKEYS_UNAVAILABLE_TEXT } from '../lib/passkeys'
 import type { TwoFactorChallengePurpose, TwoFactorSetupStart } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
@@ -417,7 +417,7 @@ const recoveryCodesLeftQuestion = computed(() => (
 ))
 
 const twoFactorDueQuestion = computed(() => {
-  const due = formatDueDate(authStore.twoFactorDueDate)
+  const due = formatShortDate(authStore.twoFactorDueDate)
   return due ? `Set up two-factor by ${due}.` : 'Set up two-factor.'
 })
 

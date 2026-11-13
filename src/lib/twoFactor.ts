@@ -32,18 +32,6 @@ export function groupSecret(secret: string | null | undefined): string {
   return (secret ?? '').replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim()
 }
 
-/** "1 Dec": the due date the grace prompt and the pill show. Empty when there is no usable date. */
-export function formatDueDate(value: unknown, timeZone?: string): string {
-  if (value === null || value === undefined || value === '') return ''
-  const date = new Date(value as string | number)
-  if (Number.isNaN(date.getTime())) return ''
-  try {
-    return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }).format(date)
-  } catch {
-    return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(date)
-  }
-}
-
 export function recoveryCodesFileText(codes: readonly string[], username: string | null | undefined): string {
   const who = username ? ` for ${username}` : ''
   return [`Darpan recovery codes${who}. Each works once.`, '', ...codes, ''].join('\n')

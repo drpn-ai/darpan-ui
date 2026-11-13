@@ -125,9 +125,9 @@
             @commit="(name) => renamePasskey(passkey, name)"
           />
           <span v-explain="'twoFactorPasskeyAdded'" class="static-page-summary-label">Added</span>
-          <span data-testid="passkey-added">{{ formatDueDate(passkey.createdDate) }}</span>
+          <span data-testid="passkey-added">{{ formatShortDate(passkey.createdDate) }}</span>
           <span v-explain="'twoFactorPasskeyLastUsed'" class="static-page-summary-label">Last used</span>
-          <span data-testid="passkey-last-used">{{ formatDueDate(passkey.lastUsedDate) || 'Never' }}</span>
+          <span data-testid="passkey-last-used">{{ formatShortDate(passkey.lastUsedDate) || 'Never' }}</span>
           <div class="action-row">
             <button
               class="user-settings-control"
@@ -460,13 +460,12 @@ import TwoFactorSettingsPopup, {
   type TwoFactorSettingsAction,
   type TwoFactorSettingsChange,
 } from '../../components/settings/TwoFactorSettingsPopup.vue'
-import { formatDueDate } from '../../lib/twoFactor'
 import { passkeysSupported } from '../../lib/passkeys'
 import { buildTimezoneOptions, resolveBrowserTimeZone } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../../lib/uiEvents'
-import { formatDateTime } from '../../lib/utils/date'
+import { formatDateTime, formatShortDate } from '../../lib/utils/date'
 
 const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
@@ -1051,11 +1050,11 @@ const canAddPasskey = computed(() => twoFactorStatus.value?.passkeysAvailable ==
 const twoFactorSummary = computed(() => {
   if (appOn.value) {
     // confirmedDate is when two-factor first went on: the app's own date only while it is the only factor.
-    const since = hasPasskeys.value ? '' : formatDueDate(twoFactorStatus.value?.confirmedDate)
+    const since = hasPasskeys.value ? '' : formatShortDate(twoFactorStatus.value?.confirmedDate)
     return since ? `On since ${since}` : 'On'
   }
   if (twoFactorOn.value) return 'Off'
-  const due = formatDueDate(twoFactorStatus.value?.requiredFromDate ?? authStore.twoFactorDueDate)
+  const due = formatShortDate(twoFactorStatus.value?.requiredFromDate ?? authStore.twoFactorDueDate)
   if (twoFactorStatus.value?.required) return 'Off. Required now'
   return due ? `Off. Due ${due}` : 'Off'
 })
