@@ -715,6 +715,44 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'refuses this one request; that terminal gets nothing and has to run darpan login again. CLIs you already approved keep working.',
   },
 
+  /* ── Two-factor (DAR-BE-264) ────────────────────────────────────────────────── */
+  'use a recovery code': {
+    title: 'Use a recovery code',
+    body: 'signs in with one of the codes you saved. That code stops working the moment it is used, so make new ones when few are left.',
+  },
+  'use the app code': {
+    title: 'Use the app code',
+    body: 'goes back to the six digits from your authenticator app. Switching uses nothing up.',
+  },
+  'back to sign in': {
+    title: 'Back to sign in',
+    body: 'drops this two-factor step. Your password starts a new one.',
+  },
+  'copy': {
+    title: 'Copy',
+    body: 'puts it on your clipboard. Darpan never shows it again, so paste it somewhere safe now.',
+  },
+  'download': {
+    title: 'Download',
+    body: 'saves the recovery codes as a text file. Each code signs in as you once, so keep the file like a password.',
+  },
+  'set up': {
+    title: 'Set up',
+    body: 'turns on codes from an authenticator app. Your other sessions and CLI sign-ins end once its first code is confirmed.',
+  },
+  'new app': {
+    title: 'New app',
+    body: 'moves two-factor to another phone or app. The old app\u2019s codes stop working the moment the new one is confirmed.',
+  },
+  'turn off': {
+    title: 'Turn off',
+    body: 'ends two-factor for this account after a current code. Your recovery codes stop working, and your other sessions and CLI sign-ins end.',
+  },
+  'new codes': {
+    title: 'New codes',
+    body: 'makes ten fresh recovery codes. Every code from the old set stops working at once.',
+  },
+
   /* ── Wrapper buttons the sweep could not see until DAR-UI-103 ───────────────── */
   'save refined fields': {
     title: 'Save refined fields',
