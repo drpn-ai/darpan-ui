@@ -59,8 +59,9 @@
       <p v-if="passwordMessage" class="section-note">{{ passwordMessage }}</p>
     </StaticPageSection>
 
-    <!-- DAR-BE-264. Each action asks for proof in its popup: the password for a first setup, a current code for the
-         rest. No Off for someone whose role requires it. -->
+    <!-- DAR-BE-264. Each action asks for proof in its popup: the password while nothing is on, then a current code or
+         (DAR-BE-270) a passkey. No Off for someone whose role requires it; the backend refuses removing their last
+         factor and the popup says so. -->
     <StaticPageSection title="Two-factor">
       <div class="static-page-summary-grid user-settings-card-grid">
         <article class="static-page-summary-card user-settings-stretch-card" data-testid="two-factor-card">
@@ -68,7 +69,7 @@
           <span data-testid="two-factor-state">{{ twoFactorSummary }}</span>
           <div class="action-row">
             <button
-              v-if="!twoFactorOn"
+              v-if="!appOn"
               class="user-settings-control"
               type="button"
               data-testid="two-factor-setup"
@@ -81,15 +82,62 @@
                 New app
               </button>
               <button
-                v-if="!twoFactorStatus?.required"
+                v-if="hasPasskeys || !twoFactorStatus?.required"
                 class="user-settings-control"
                 type="button"
                 data-testid="two-factor-off"
-                @click="openTwoFactor('off')"
+                @click="openTwoFactor(hasPasskeys ? 'app-off' : 'off')"
               >
                 Turn off
               </button>
             </template>
+          </div>
+        </article>
+        <article v-if="passkeysShown" class="static-page-summary-card user-settings-stretch-card" data-testid="passkeys-card">
+          <span v-explain="'twoFactorPasskeys'" class="static-page-summary-label">Passkeys</span>
+          <span data-testid="passkeys-count">{{ passkeys.length === 0 ? 'None' : passkeys.length }}</span>
+          <div v-if="canAddPasskey" class="action-row">
+            <button
+              class="user-settings-control"
+              type="button"
+              aria-label="Add a passkey"
+              data-testid="passkey-add"
+              @click="openTwoFactor('add-passkey')"
+            >
+              Add
+            </button>
+          </div>
+        </article>
+        <article
+          v-for="passkey in passkeys"
+          :key="passkey.passkeyId"
+          class="static-page-summary-card user-settings-stretch-card"
+          data-testid="passkey-row"
+        >
+          <span v-explain="'twoFactorPasskeys'" class="static-page-summary-label">Passkey</span>
+          <StaticEditableTitle
+            :key="`${passkey.passkeyId}-${passkeyNameRevision}`"
+            class="user-settings-passkey-name"
+            tag="h3"
+            :model-value="passkey.name || 'Passkey'"
+            :aria-label="`Rename ${passkey.name || 'passkey'}`"
+            test-id="passkey-name"
+            @commit="(name) => renamePasskey(passkey, name)"
+          />
+          <span v-explain="'twoFactorPasskeyAdded'" class="static-page-summary-label">Added</span>
+          <span data-testid="passkey-added">{{ formatDueDate(passkey.createdDate) }}</span>
+          <span v-explain="'twoFactorPasskeyLastUsed'" class="static-page-summary-label">Last used</span>
+          <span data-testid="passkey-last-used">{{ formatDueDate(passkey.lastUsedDate) || 'Never' }}</span>
+          <div class="action-row">
+            <button
+              class="user-settings-control"
+              type="button"
+              data-testid="passkey-remove"
+              :aria-label="`Remove passkey ${passkey.name || ''}`.trim()"
+              @click="openRemovePasskey(passkey)"
+            >
+              Remove
+            </button>
           </div>
         </article>
         <article v-if="twoFactorOn && twoFactorStatus" class="static-page-summary-card user-settings-stretch-card" data-testid="two-factor-recovery-card">
@@ -105,6 +153,7 @@
       <p v-if="twoFactorStatus?.codesLocked" class="section-note" role="alert" data-testid="two-factor-locked">
         Codes are locked after too many wrong tries. A password reset unlocks them.
       </p>
+      <p v-if="passkeyError" class="section-note" role="alert" data-testid="passkey-error">{{ passkeyError }}</p>
       <p v-if="twoFactorMessage" class="section-note" role="status" data-testid="two-factor-message">{{ twoFactorMessage }}</p>
     </StaticPageSection>
 
@@ -254,6 +303,10 @@
     v-if="twoFactorAction"
     :action="twoFactorAction"
     :username="username"
+    :two-factor-on="twoFactorOn"
+    :app-enabled="appOn"
+    :has-passkeys="hasPasskeys"
+    :passkey="removingPasskey"
     @changed="handleTwoFactorChanged"
     @close="twoFactorAction = null"
   />
@@ -387,19 +440,28 @@ import AppSaveAction from '../../components/ui/AppSaveAction.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { authFacade, settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
-import type { CliSession, GetTwoFactorStatusResponse, MyCliAccess, TenantChatSpace, UserNotificationDefault } from '../../lib/api/types'
+import type {
+  CliSession,
+  GetTwoFactorStatusResponse,
+  MyCliAccess,
+  TenantChatSpace,
+  TwoFactorPasskey,
+  UserNotificationDefault,
+} from '../../lib/api/types'
 import CliAccessRequestCard from '../../components/settings/CliAccessRequestCard.vue'
 import TwoFactorSettingsPopup, {
   type TwoFactorSettingsAction,
   type TwoFactorSettingsChange,
 } from '../../components/settings/TwoFactorSettingsPopup.vue'
 import { formatDueDate } from '../../lib/twoFactor'
+import { passkeysSupported } from '../../lib/passkeys'
 import { buildTimezoneOptions, resolveBrowserTimeZone } from '../../lib/timezones'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -979,11 +1041,20 @@ const twoFactorMessage = ref<string | null>(null)
 
 // The status read is the authority; until it lands (or if it fails) the session's own flag answers.
 const twoFactorOn = computed(() => twoFactorStatus.value?.enabled ?? authStore.twoFactorEnabled)
+// DAR-BE-270. A backend from before passkeys sends no appEnabled: two-factor on then meant the app.
+const appOn = computed(() => twoFactorStatus.value?.appEnabled ?? twoFactorOn.value)
+const passkeys = computed<TwoFactorPasskey[]>(() => twoFactorStatus.value?.passkeys ?? [])
+const hasPasskeys = computed(() => passkeys.value.length > 0)
+const passkeysShown = computed(() => twoFactorStatus.value?.passkeysAvailable === true || hasPasskeys.value)
+// Ten is the backend's cap; this browser must be able to make one.
+const canAddPasskey = computed(() => twoFactorStatus.value?.passkeysAvailable === true && passkeysSupported() && passkeys.value.length < 10)
 const twoFactorSummary = computed(() => {
-  if (twoFactorOn.value) {
-    const since = formatDueDate(twoFactorStatus.value?.confirmedDate)
+  if (appOn.value) {
+    // confirmedDate is when two-factor first went on: the app's own date only while it is the only factor.
+    const since = hasPasskeys.value ? '' : formatDueDate(twoFactorStatus.value?.confirmedDate)
     return since ? `On since ${since}` : 'On'
   }
+  if (twoFactorOn.value) return 'Off'
   const due = formatDueDate(twoFactorStatus.value?.requiredFromDate ?? authStore.twoFactorDueDate)
   if (twoFactorStatus.value?.required) return 'Off. Required now'
   return due ? `Off. Due ${due}` : 'Off'
@@ -1005,13 +1076,49 @@ async function loadTwoFactorStatus(): Promise<void> {
 
 function openTwoFactor(action: TwoFactorSettingsAction): void {
   twoFactorMessage.value = null
+  passkeyError.value = null
+  removingPasskey.value = null
   twoFactorAction.value = action
+}
+
+const removingPasskey = ref<TwoFactorPasskey | null>(null)
+const passkeyError = ref<string | null>(null)
+// Bumped to redraw the names when a rename is refused or left empty (the field shows what was typed until then).
+const passkeyNameRevision = ref(0)
+
+function openRemovePasskey(passkey: TwoFactorPasskey): void {
+  openTwoFactor('remove-passkey')
+  removingPasskey.value = passkey
+}
+
+// rename#Passkey: no proof (a label weakens nothing). Enter or leaving the field saves.
+async function renamePasskey(passkey: TwoFactorPasskey, typed: string): Promise<void> {
+  const name = typed.trim()
+  if (name === (passkey.name ?? '')) return
+  if (!name) {
+    passkeyNameRevision.value += 1
+    return
+  }
+  passkeyError.value = null
+  twoFactorMessage.value = null
+  try {
+    await authFacade.renamePasskey({ passkeyId: passkey.passkeyId, name }, pageAbortController.signal)
+    passkey.name = name
+  } catch (err) {
+    if (pageAbortController.signal.aborted) return
+    passkeyError.value = err instanceof ApiCallError ? err.message : 'Not renamed.'
+    passkeyNameRevision.value += 1
+  }
 }
 
 const TWO_FACTOR_CHANGE_TEXT: Record<TwoFactorSettingsChange, string> = {
   on: 'Two-factor on. Other sessions and CLI sign-ins ended.',
   codes: 'New recovery codes made. The old ones stopped working.',
   off: 'Two-factor off. Other sessions and CLI sign-ins ended.',
+  'app-on': 'Authenticator app on. Other sessions and CLI sign-ins ended.',
+  'app-off': 'Authenticator app removed.',
+  'passkey-added': 'Passkey added.',
+  'passkey-removed': 'Passkey removed.',
 }
 
 async function handleTwoFactorChanged(change: TwoFactorSettingsChange): Promise<void> {
@@ -1022,7 +1129,7 @@ async function handleTwoFactorChanged(change: TwoFactorSettingsChange): Promise<
   if (change === 'off') {
     authStore.applyTwoFactorState({ enabled: false, dueDate: twoFactorStatus.value?.requiredFromDate ?? null })
   }
-  if (change !== 'codes') void loadCliSessions()
+  if (change === 'on' || change === 'app-on' || change === 'off') void loadCliSessions()
 }
 
 onMounted(() => {

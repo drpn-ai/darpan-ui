@@ -30,8 +30,9 @@
         </article>
         <p class="section-note">Approve only a code you just started in your own terminal.</p>
         <!-- DAR-BE-264: approving mints a 7-day key, so a two-factor account proves it with a fresh code. A code
-             already used to sign in is refused for 30 s, so the label asks for a current one. -->
-        <label v-if="needsTwoFactorCode" for="cli-login-two-factor">
+             already used to sign in is refused for 30 s, so the label asks for a current one. DAR-BE-270: or a passkey,
+             whose prompt opens from Approve. -->
+        <label v-if="needsTwoFactorCode && proofChoice === 'code'" for="cli-login-two-factor">
           <span>Current code from your app</span>
           <input
             id="cli-login-two-factor"
@@ -45,6 +46,27 @@
             data-testid="cli-login-two-factor-code"
           />
         </label>
+        <p v-if="needsTwoFactorCode && proofChoice === 'passkey'" class="section-note" data-testid="cli-login-passkey-note">
+          Approve opens your passkey prompt.
+        </p>
+        <button
+          v-if="needsTwoFactorCode && proofChoice === 'code' && proofMethods?.passkey"
+          type="button"
+          class="login-text-link"
+          data-testid="cli-login-use-passkey"
+          @click="useProof('passkey')"
+        >
+          Use a passkey
+        </button>
+        <button
+          v-if="needsTwoFactorCode && proofChoice === 'passkey' && proofMethods?.app"
+          type="button"
+          class="login-text-link"
+          data-testid="cli-login-use-app"
+          @click="useProof('code')"
+        >
+          Use the app code
+        </button>
         <p v-if="codeError" class="section-note" role="alert" data-testid="cli-login-code-error">{{ codeError }}</p>
         <div class="cli-login-actions">
           <button class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
@@ -83,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import StaticPageFrame from '../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../components/ui/StaticPageSection.vue'
 import CliAccessRequestCard from '../components/settings/CliAccessRequestCard.vue'
@@ -92,6 +114,8 @@ import type { MyCliAccess } from '../lib/api/types'
 import { formatDateTime } from '../lib/utils/date'
 import { ApiCallError } from '../lib/api/client'
 import { isCodeProblem } from '../lib/twoFactor'
+import { passkeysSupported } from '../lib/passkeys'
+import { usePasskeyProof } from '../composables/usePasskeyProof'
 import { useAuthStore } from '../stores/auth'
 
 type Phase = 'enter' | 'ready' | 'done' | 'notfound' | 'noaccess'
@@ -116,7 +140,53 @@ const codeError = ref<string | null>(null)
 const codeDemanded = ref(false)
 const needsTwoFactorCode = computed(() => authStore.twoFactorEnabled || codeDemanded.value)
 const typedTwoFactorCode = computed(() => twoFactorCode.value.replace(/\D/g, ''))
-const approveBlocked = computed(() => needsTwoFactorCode.value && typedTwoFactorCode.value.length !== 6)
+
+// DAR-BE-270: which proofs this person has (read once two-factor is known to be on) and which one they are using.
+const passkeyProof = usePasskeyProof()
+const proofMethods = ref<{ app: boolean; passkey: boolean } | null>(null)
+const proofChoice = ref<'code' | 'passkey'>('code')
+const approveBlocked = computed(
+  () => needsTwoFactorCode.value && proofChoice.value === 'code' && typedTwoFactorCode.value.length !== 6,
+)
+
+async function loadProofMethods(): Promise<void> {
+  if (proofMethods.value) return
+  try {
+    const status = await authFacade.getTwoFactorStatus(controller.signal)
+    if (controller.signal.aborted) return
+    const app = status.appEnabled ?? status.enabled ?? true
+    const passkey = (status.passkeys?.length ?? 0) > 0 && passkeysSupported()
+    proofMethods.value = { app, passkey }
+    if (!app && passkey) useProof('passkey')
+  } catch {
+    // Unread: the code input stays, as before passkeys.
+  }
+}
+
+function useProof(choice: 'code' | 'passkey'): void {
+  codeError.value = null
+  twoFactorCode.value = ''
+  proofChoice.value = choice
+  if (choice === 'passkey') passkeyProof.prepare()
+}
+
+watch(
+  () => phase.value === 'ready' && needsTwoFactorCode.value,
+  (ready) => {
+    if (ready) void loadProofMethods()
+  },
+)
+
+/** The fresh proof approve#CliLogin takes: a code, a passkey assertion, nothing (no two-factor), or null to stop. */
+async function approvalProof(): Promise<{ code?: string; passkeyAssertion?: string } | null> {
+  if (!needsTwoFactorCode.value) return {}
+  if (proofChoice.value === 'code') return { code: typedTwoFactorCode.value }
+  const proved = await passkeyProof.prove()
+  if (proved.outcome === 'ok') return { passkeyAssertion: proved.passkeyAssertion }
+  // A closed prompt is not a refusal: the request stays on screen and nothing is said.
+  if (proved.outcome === 'failed') codeError.value = proved.message
+  return null
+}
 
 onBeforeUnmount(() => controller.abort())
 
@@ -184,6 +254,8 @@ function codeRefused(choice: 'approved' | 'denied', message: string | null | und
   codeDemanded.value = true
   codeError.value = message ?? null
   twoFactorCode.value = ''
+  // A refused assertion used its options up: fetch the next set now, ahead of the retry's click.
+  if (proofChoice.value === 'passkey') passkeyProof.prepare()
   return true
 }
 
@@ -194,12 +266,14 @@ async function answer(choice: 'approved' | 'denied') {
   codeError.value = null
   try {
     const payload = { userCode: confirmedCode }
-    const response = choice === 'approved'
-      ? await authFacade.approveCliLogin(
-        needsTwoFactorCode.value ? { ...payload, code: typedTwoFactorCode.value } : payload,
-        controller.signal,
-      )
-      : await authFacade.denyCliLogin(payload, controller.signal)
+    let response
+    if (choice === 'approved') {
+      const proof = await approvalProof()
+      if (!proof || controller.signal.aborted) return
+      response = await authFacade.approveCliLogin({ ...payload, ...proof }, controller.signal)
+    } else {
+      response = await authFacade.denyCliLogin(payload, controller.signal)
+    }
     if (controller.signal.aborted) return
     if (!response.ok) {
       if (codeRefused(choice, response.errors?.[0])) return

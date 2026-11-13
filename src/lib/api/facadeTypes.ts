@@ -531,7 +531,7 @@ export interface CliLoginCodePayload {
   userCode: string
 }
 
-/** approve#CliLogin: `code` is required when the approver has two-factor on (DAR-BE-264). */
+/** approve#CliLogin: a `code` (DAR-BE-264) or a `passkeyAssertion` (DAR-BE-270) when the approver has two-factor on. */
 export type ApproveCliLoginPayload = Schemas['ApproveCliLoginParams']
 
 // ─── Two-factor (DAR-BE-264) ───────────────────────────────────────────────────
@@ -539,7 +539,17 @@ export type ApproveCliLoginPayload = Schemas['ApproveCliLoginParams']
 export type VerifySignInCodePayload = Schemas['VerifySignInCodeParams']
 export type BeginTwoFactorSetupPayload = Schemas['BeginTwoFactorSetupParams']
 export type ConfirmTwoFactorSetupPayload = Schemas['ConfirmTwoFactorSetupParams']
+/** A fresh proof: a current code from the app, or (DAR-BE-270) a passkey assertion over begin#PasskeyProof's options. */
 export type TwoFactorCodePayload = Schemas['CreateRecoveryCodesParams']
+export type DisableTwoFactorPayload = Schemas['DisableTwoFactorParams']
+
+// ─── Passkeys (DAR-BE-270) ─────────────────────────────────────────────────────
+
+export type BeginPasskeySignInPayload = Schemas['BeginPasskeySignInParams']
+export type BeginPasskeyRegistrationPayload = Schemas['BeginPasskeyRegistrationParams']
+export type FinishPasskeyRegistrationPayload = Schemas['FinishPasskeyRegistrationParams']
+export type RenamePasskeyPayload = Schemas['RenamePasskeyParams']
+export type DeletePasskeyPayload = Schemas['DeletePasskeyParams']
 
 export interface RevokeCliSessionPayload {
   cliSessionId: string

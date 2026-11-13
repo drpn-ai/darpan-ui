@@ -1413,12 +1413,17 @@ export interface components {
         /**
          * @description Re-encrypt every stored encrypted field (tenant connector credentials, two-factor secrets) with the
          *                 current key, or with dryRun (the default) only report which key each value is on. Super admins only, with a
-         *                 current code from their own authenticator app. A real run is refused unless an old key different from the
+         *                 current code from their own authenticator app or (DAR-BE-270) a passkey assertion. A real run is refused unless an old key different from the
          *                 current one is configured (entity_ds_crypt_pass_old). Writes an AdminAuditLog row with counts, never values.
          */
         RotateEncryptedFieldsParams: {
-            /** @description A current code from the acting admin's own authenticator app. */
-            adminCode: string;
+            /** @description A current code from the acting admin's own authenticator app (or adminPasskeyAssertion). */
+            adminCode?: string;
+            /**
+             * @description DAR-BE-270. Instead of adminCode: a passkey assertion over
+             *                     facade.AuthFacadeServices.begin#PasskeyProof's options.
+             */
+            adminPasskeyAssertion?: string;
             /**
              * @description True (default): count only, write nothing.
              *                     False: run the sweep.
@@ -1732,9 +1737,14 @@ export interface components {
             tenantUserGroupId: string;
             /**
              * @description DAR-BE-264. A current code from the caller's authenticator app; required
-             *                     when they have two-factor on.
+             *                     when they have two-factor on (or twoFactorPasskeyAssertion).
              */
             twoFactorCode?: string;
+            /**
+             * @description DAR-BE-270. Instead of twoFactorCode: a passkey assertion over
+             *                     facade.AuthFacadeServices.begin#PasskeyProof's options.
+             */
+            twoFactorPasskeyAssertion?: string;
         };
         BeginSecretHandoffResult: {
             /** @description Base64 SPKI, for export#ConfigBundle secretsPublicKey. */
@@ -1802,9 +1812,14 @@ export interface components {
             includeAutomations?: boolean;
             /**
              * @description DAR-BE-264. A current code from the caller's authenticator app; required
-             *                     when they have two-factor on.
+             *                     when they have two-factor on (or twoFactorPasskeyAssertion).
              */
             twoFactorCode?: string;
+            /**
+             * @description DAR-BE-270. Instead of twoFactorCode: a passkey assertion over
+             *                     facade.AuthFacadeServices.begin#PasskeyProof's options.
+             */
+            twoFactorPasskeyAssertion?: string;
         };
         ExportConfigBundleResult: {
             /**
@@ -2088,6 +2103,10 @@ export interface components {
                 twoFactorConfirmedDate?: string | number;
                 /** @description Timestamp — ISO-8601 string or epoch milliseconds. DAR-BE-264. When a role of theirs requires it; empty when optional. */
                 twoFactorRequiredFromDate?: string | number;
+                /** @description DAR-BE-270. True when the authenticator app is on. */
+                twoFactorAppEnabled?: boolean;
+                /** @description DAR-BE-270. Live passkeys. */
+                twoFactorPasskeyCount?: number;
                 memberships?: {
                     membership?: {
                         tenantUserGroupId?: string;
@@ -2237,8 +2256,8 @@ export interface components {
             result: components["schemas"]["ResetPasswordResult"];
         };
         /**
-         * @description DAR-BE-264. End a user's two-factor (lost phone and no recovery code): their authenticator and recovery
-         *                 codes go, every session and CLI key ends, and a user whose role requires it sets up again at the next sign-in.
+         * @description DAR-BE-264. End a user's two-factor (lost phone and no recovery code): their authenticator app, passkeys
+         *                 (DAR-BE-270) and recovery codes go, every session and CLI key ends, and a user whose role requires it sets up again at the next sign-in.
          *                 Super admins only, never on one's own account; needs a reason and the acting admin's own current code (so they
          *                 must have two-factor on). Writes an AdminAuditLog row, a TwoFactorEvent naming the admin, and emails the user.
          */
@@ -2247,8 +2266,13 @@ export interface components {
             userId: string;
             /** @description Why, for the audit trail ("Two-factor reset: reason"). */
             reason: string;
-            /** @description A current code from the acting admin's own authenticator app. */
-            adminCode: string;
+            /** @description A current code from the acting admin's own authenticator app (or adminPasskeyAssertion). */
+            adminCode?: string;
+            /**
+             * @description DAR-BE-270. Instead of adminCode: a passkey assertion over
+             *                     facade.AuthFacadeServices.begin#PasskeyProof's options.
+             */
+            adminPasskeyAssertion?: string;
         };
         ResetTwoFactorResult: {
             /** @description True when reset. */
@@ -3269,6 +3293,139 @@ export interface components {
             result: components["schemas"]["VerifyAuditFindingResult"];
         };
         /**
+         * @description DAR-BE-270. Request options for the signed-in person's passkeys, for one action that asks for a fresh
+         *                 proof (approve#CliLogin, create#RecoveryCodes, disable#TwoFactor, begin#TwoFactorSetup,
+         *                 begin#PasskeyRegistration, delete#Passkey, and the admin app's /transfer export and handoff, two-factor reset and
+         *                 key rotation). The assertion is single-use and lives 5 minutes.
+         */
+        BeginPasskeyProofParams: Record<string, never>;
+        BeginPasskeyProofResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description PublicKeyCredentialRequestOptionsJSON, as begin#PasskeySignIn. */
+            publicKeyOptions?: string;
+            /** @description Seconds the challenge lives: 300. */
+            expiresInSeconds?: number;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.begin#PasskeyProof */
+        BeginPasskeyProofRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.begin#PasskeyProof";
+            params?: components["schemas"]["BeginPasskeyProofParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.begin#PasskeyProof. Check result.ok / result.errors for business failures. */
+        BeginPasskeyProofResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["BeginPasskeyProofResult"];
+        };
+        /**
+         * @description DAR-BE-270. Creation options for a new passkey. Either signed in (no two-factor yet: currentPassword;
+         *                 with two-factor on: a code or a passkey assertion), or with a setup challengeToken from login#Session
+         *                 (twoFactorSetupRequired). Finish within 5 minutes with finish#PasskeyRegistration. Up to 10 passkeys.
+         */
+        BeginPasskeyRegistrationParams: {
+            /** @description A setup challenge from login#Session; leave out when signed in. */
+            challengeToken?: string;
+            /** @description Signed in, no two-factor yet: the account's password (a wrong one counts as a failed login). */
+            currentPassword?: string;
+            /** @description Signed in, two-factor on: a current code from the app. */
+            code?: string;
+            /** @description Signed in, two-factor on: instead of code, a passkey assertion over begin#PasskeyProof's options. */
+            passkeyAssertion?: string;
+        };
+        BeginPasskeyRegistrationResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /**
+             * @description PublicKeyCredentialCreationOptionsJSON: {rp{id, name}, user{id, name, displayName}, challenge,
+             *                         pubKeyCredParams, timeout, excludeCredentials, authenticatorSelection{residentKey: "preferred",
+             *                         userVerification: "required"}, attestation: "none"}.
+             */
+            publicKeyOptions?: string;
+            /** @description Seconds left to finish: 300. */
+            expiresInSeconds?: number;
+            /** @description With a challengeToken: true when it can no longer be used: go back to the password. */
+            challengeEnded?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.begin#PasskeyRegistration */
+        BeginPasskeyRegistrationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.begin#PasskeyRegistration";
+            params?: components["schemas"]["BeginPasskeyRegistrationParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.begin#PasskeyRegistration. Check result.ok / result.errors for business failures. */
+        BeginPasskeyRegistrationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["BeginPasskeyRegistrationResult"];
+        };
+        /**
+         * @description DAR-BE-270. Request options for a sign-in login#Session answered with twoFactorRequired and
+         *                 twoFactorMethods containing "passkey". Each call replaces the previous challenge; send the assertion to
+         *                 verify#SignInCode (passkeyAssertion) with the same challengeToken.
+         */
+        BeginPasskeySignInParams: {
+            /** @description From login#Session. */
+            challengeToken: string;
+        };
+        BeginPasskeySignInResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /**
+             * @description PublicKeyCredentialRequestOptionsJSON: {challenge, rpId, timeout, allowCredentials[{type, id,
+             *                         transports}], userVerification: "required"}.
+             */
+            publicKeyOptions?: string;
+            /** @description True when the challenge can no longer be used: go back to the password. */
+            challengeEnded?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.begin#PasskeySignIn */
+        BeginPasskeySignInRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.begin#PasskeySignIn";
+            params?: components["schemas"]["BeginPasskeySignInParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.begin#PasskeySignIn. Check result.ok / result.errors for business failures. */
+        BeginPasskeySignInResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["BeginPasskeySignInResult"];
+        };
+        /**
          * @description DAR-BE-264. Start setting up an authenticator app: a new secret (any earlier unfinished setup ends),
          *                 shown once. Either signed in (a first setup needs currentPassword; replacing an app that is on needs a current
          *                 code from it), or with a setup challengeToken from login#Session (twoFactorSetupRequired). Finish within 15
@@ -3280,8 +3437,13 @@ export interface components {
             challengeToken?: string;
             /** @description Signed in, first setup: the account's password (a wrong one counts as a failed login). */
             currentPassword?: string;
-            /** @description Signed in, replacing an app that is on: a current code from it. */
+            /** @description Signed in, with two-factor on: a current code from the app. */
             code?: string;
+            /**
+             * @description DAR-BE-270. Signed in, with two-factor on: instead of code, a passkey
+             *                     assertion over begin#PasskeyProof's options.
+             */
+            passkeyAssertion?: string;
         };
         BeginTwoFactorSetupResult: {
             /** @description True when the call completed without facade errors. */
@@ -3595,11 +3757,13 @@ export interface components {
         };
         /**
          * @description DAR-BE-264. Ten new recovery codes for the signed-in person, replacing every old one. Needs a current
-         *                 authenticator code.
+         *                 authenticator code or (DAR-BE-270) a passkey assertion.
          */
         CreateRecoveryCodesParams: {
             /** @description A current code from the authenticator app. */
-            code: string;
+            code?: string;
+            /** @description DAR-BE-270. Instead of code: a passkey assertion over begin#PasskeyProof's options. */
+            passkeyAssertion?: string;
         };
         CreateRecoveryCodesResult: {
             /** @description True when the call completed without facade errors. */
@@ -3631,12 +3795,63 @@ export interface components {
             result: components["schemas"]["CreateRecoveryCodesResult"];
         };
         /**
-         * @description DAR-BE-264. Turn two-factor off for the signed-in person, with a current code. Refused when a role of
-         *                 theirs requires it. Every other session and CLI key ends; this one carries on.
+         * @description DAR-BE-270. Remove one of the signed-in person's passkeys, with a current code or a passkey assertion
+         *                 (it may come from the passkey being removed). Removing the last factor is refused when a role of theirs
+         *                 requires two-factor; for anyone else it turns two-factor off as disable#TwoFactor does.
+         */
+        DeletePasskeyParams: {
+            /** @description From get#TwoFactorStatus passkeys. */
+            passkeyId: string;
+            /** @description A current code from the authenticator app. */
+            code?: string;
+            /** @description Instead of code: a passkey assertion over begin#PasskeyProof's options. */
+            passkeyAssertion?: string;
+        };
+        DeletePasskeyResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description False when this was the last factor. */
+            twoFactorEnabled?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.delete#Passkey */
+        DeletePasskeyRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.delete#Passkey";
+            params?: components["schemas"]["DeletePasskeyParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.delete#Passkey. Check result.ok / result.errors for business failures. */
+        DeletePasskeyResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["DeletePasskeyResult"];
+        };
+        /**
+         * @description DAR-BE-264. Turn two-factor off for the signed-in person (the app and every passkey), with a current code
+         *                 or (DAR-BE-270) a passkey assertion. Refused when a role of theirs requires it. Every other session and CLI key
+         *                 ends; this one carries on. With appOnly and a passkey left: removes just the authenticator app (allowed when
+         *                 required too), sessions unchanged.
          */
         DisableTwoFactorParams: {
             /** @description A current code from the authenticator app. */
-            code: string;
+            code?: string;
+            /** @description DAR-BE-270. Instead of code: a passkey assertion over begin#PasskeyProof's options. */
+            passkeyAssertion?: string;
+            /**
+             * @description DAR-BE-270. Remove only the
+             *                     authenticator app, keeping the passkeys.
+             */
+            appOnly?: boolean;
         };
         DisableTwoFactorResult: {
             /** @description True when the call completed without facade errors. */
@@ -3664,6 +3879,102 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["DisableTwoFactorResult"];
+        };
+        /**
+         * @description DAR-BE-270. Store the new passkey (the browser's credential for begin#PasskeyRegistration's options) and
+         *                 email the person. When it is their first factor two-factor turns on as confirm#TwoFactorSetup does: every other
+         *                 session and CLI key ends, the reply carries a fresh authToken (swap to it; with a setup challenge it is the
+         *                 sign-in) and 10 recovery codes, once. An added passkey changes no session: no authToken.
+         */
+        FinishPasskeyRegistrationParams: {
+            /** @description JSON.stringify(credential.toJSON()) of navigator.credentials.create(). */
+            credential: string;
+            /** @description The person's label, e.g. MacBook Touch ID (60 characters; default Passkey). */
+            name?: string;
+            /** @description The setup challenge from login#Session; leave out when signed in. */
+            challengeToken?: string;
+        };
+        FinishPasskeyRegistrationResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+            /** @description The new passkey's id (for rename#Passkey and delete#Passkey). */
+            passkeyId?: string;
+            /** @description True when a session was issued: the first factor (swap to authToken) or a setup challenge (the sign-in). */
+            authenticated?: boolean;
+            /** @description The login key darpan-ui sends in the `login_key` header (also set as the persistent-login cookie). */
+            authToken?: string;
+            /** @description `LOGIN_KEY`. */
+            authTokenType?: string;
+            /** @description `login_key`. */
+            authTokenHeaderName?: string;
+            /** @description The sign-in's absolute lifetime in seconds, as login#Session. */
+            authTokenExpiresInSeconds?: number;
+            /** @description As login#Session's sessionInfo. */
+            sessionInfo?: {
+                userId?: string;
+                username?: string;
+                displayName?: string;
+                locale?: string;
+                timeZone?: string;
+                userTimeZone?: string;
+                tenantTimeZone?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                lastLoginDate?: string | number;
+                recoveryEmailMissing?: boolean;
+                emailAddressMasked?: string;
+                lastRun?: {
+                    reconciliationRunResultId?: string;
+                    savedRunId?: string;
+                    savedRunType?: string;
+                    reconciliationRunId?: string;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    createdDate?: string | number;
+                };
+                scopeType?: string;
+                customerScopeId?: string;
+                activeTenantUserGroupId?: string;
+                activeTenantLabel?: string;
+                availableTenants?: {
+                    userGroupId?: string;
+                    label?: string;
+                }[];
+                activeTenantPermissionGroupIds?: string[];
+                canViewActiveTenantData?: boolean;
+                canRunActiveTenantReconciliation?: boolean;
+                canEditActiveTenantData?: boolean;
+                canManageDarpanCore?: boolean;
+                isSuperAdmin?: boolean;
+                twoFactorEnabled?: boolean;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                twoFactorDueDate?: string | number;
+            };
+            /** @description First factor only: 10 recovery codes, xxxx-xxxx-xxxx-xxxx. In this reply only. */
+            recoveryCodes?: string[];
+            /** @description With a challengeToken: true when it can no longer be used (expired, 5 refusals). */
+            challengeEnded?: boolean;
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.finish#PasskeyRegistration */
+        FinishPasskeyRegistrationRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.finish#PasskeyRegistration";
+            params?: components["schemas"]["FinishPasskeyRegistrationParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.finish#PasskeyRegistration. Check result.ok / result.errors for business failures. */
+        FinishPasskeyRegistrationResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["FinishPasskeyRegistrationResult"];
         };
         /**
          * @description DAR-BE-028. Whether this environment can send password reset email (a SYSTEM EmailServer with
@@ -3772,9 +4083,9 @@ export interface components {
             messages?: string[];
             /** @description Why it was refused. */
             errors?: string[];
-            /** @description True when an authenticator app is on. */
+            /** @description True when two-factor is on: the authenticator app or a passkey. */
             enabled?: boolean;
-            /** @description Timestamp — ISO-8601 string or epoch milliseconds. When it was turned on. */
+            /** @description Timestamp — ISO-8601 string or epoch milliseconds. When it was first turned on. */
             confirmedDate?: string | number;
             /** @description Unused recovery codes. */
             recoveryCodesLeft?: number;
@@ -3784,6 +4095,27 @@ export interface components {
             requiredFromDate?: string | number;
             /** @description True after 20 wrong codes in 24 hours, until a password or admin reset. */
             codesLocked?: boolean;
+            /** @description DAR-BE-270. True when the authenticator app is on. */
+            appEnabled?: boolean;
+            /**
+             * @description DAR-BE-270. False when this instance has no passkey
+             *                     relying party configured (no add button).
+             */
+            passkeysAvailable?: boolean;
+            /** @description DAR-BE-270. The person's passkeys, oldest first. */
+            passkeys?: {
+                passkey?: {
+                    passkeyId?: string;
+                    name?: string;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    createdDate?: string | number;
+                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
+                    lastUsedDate?: string | number;
+                    transports?: string[];
+                    /** @description A synced passkey (on more than one device). */
+                    backedUp?: boolean;
+                };
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.AuthFacadeServices.get#TwoFactorStatus */
         GetTwoFactorStatusRequest: {
@@ -3852,6 +4184,11 @@ export interface components {
             challengeToken?: string;
             /** @description DAR-BE-264. Seconds the challenge lives: 300. */
             challengeExpiresInSeconds?: number;
+            /**
+             * @description DAR-BE-270. With twoFactorRequired: what this person can answer with here, "app" (a code to
+             *                         verify#SignInCode) and/or "passkey" (begin#PasskeySignIn, then the assertion to verify#SignInCode).
+             */
+            twoFactorMethods?: string[];
             /** @description Explicit login-key token that darpan-ui sends on later requests through the `login_key` header. */
             authToken?: string;
             /** @description Token scheme identifier. Current value: `LOGIN_KEY`. */
@@ -3985,6 +4322,40 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["LogoutSessionResult"];
+        };
+        /** @description DAR-BE-270. Rename one of the signed-in person's passkeys (no fresh proof: a label weakens nothing). */
+        RenamePasskeyParams: {
+            /** @description From get#TwoFactorStatus passkeys. */
+            passkeyId: string;
+            /** @description The new label (60 characters at most). */
+            name: string;
+        };
+        RenamePasskeyResult: {
+            /** @description True when the call completed without facade errors. */
+            ok?: boolean;
+            /** @description Informational messages. */
+            messages?: string[];
+            /** @description Why it was refused. */
+            errors?: string[];
+        };
+        /** @description JSON-RPC request envelope for facade.AuthFacadeServices.rename#Passkey */
+        RenamePasskeyRequest: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id: string | number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            method: "facade.AuthFacadeServices.rename#Passkey";
+            params?: components["schemas"]["RenamePasskeyParams"];
+        };
+        /** @description JSON-RPC success envelope for facade.AuthFacadeServices.rename#Passkey. Check result.ok / result.errors for business failures. */
+        RenamePasskeyResponse: {
+            /** @constant */
+            jsonrpc: "2.0";
+            id?: string | number;
+            result: components["schemas"]["RenamePasskeyResult"];
         };
         /**
          * @description DAR-BE-028. Email a 6-digit password reset code to the account's email on file, and say what
@@ -4337,7 +4708,9 @@ export interface components {
         };
         /**
          * @description DAR-BE-264. Finish a sign-in login#Session answered with twoFactorRequired: the challengeToken with a
-         *                 current authenticator code or a recovery code. Success answers as login#Session does (a session and its key).
+         *                 current authenticator code, a recovery code, or (DAR-BE-270) a passkey assertion over begin#PasskeySignIn's
+         *                 options. Success answers as login#Session does (a session and its key). A refused passkey reads "That passkey
+         *                 didn't work.", counts against the challenge and is not a failed login.
          *                 Every refusal is "That code didn't work."; 5 wrong codes end the challenge (challengeEnded), and each wrong code
          *                 also counts as a failed login. A used recovery code emails the person. A refusal is a completed call with
          *                 ok false and the reason in errors (not a JSON-RPC error), so challengeEnded reaches the caller.
@@ -4349,6 +4722,11 @@ export interface components {
             code?: string;
             /** @description Instead of code: a recovery code, xxxx-xxxx-xxxx-xxxx (case, spaces and dashes ignored). Used once. */
             recoveryCode?: string;
+            /**
+             * @description DAR-BE-270. Instead of code: JSON.stringify(credential.toJSON()) of the
+             *                     navigator.credentials.get() result for begin#PasskeySignIn's publicKeyOptions.
+             */
+            passkeyAssertion?: string;
         };
         VerifySignInCodeResult: {
             /** @description True when the call completed without facade errors. */
@@ -4507,6 +4885,11 @@ export interface components {
              *                     when they have two-factor on (approval mints a 7-day key, so a hijacked tab must not be enough).
              */
             code?: string;
+            /**
+             * @description DAR-BE-270. Instead of code: a passkey assertion over
+             *                     facade.AuthFacadeServices.begin#PasskeyProof's options.
+             */
+            passkeyAssertion?: string;
         };
         ApproveCliLoginResult: {
             /** @description True when the sign-in was approved. */
@@ -11113,7 +11496,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateAgentAccessGrantRequest"] | components["schemas"]["GetAgentUsageRequest"] | components["schemas"]["ListAgentAccessGrantsRequest"] | components["schemas"]["PauseAgentAccessGrantRequest"] | components["schemas"]["RevokeAgentAccessGrantRequest"] | components["schemas"]["UnpauseAgentAccessGrantRequest"] | components["schemas"]["UpdateAgentAccessGrantRequest"] | components["schemas"]["ListAllBrainChangeTicketsRequest"] | components["schemas"]["UpdateBrainChangeTicketRequest"] | components["schemas"]["ApproveCliAccessRequestRequest"] | components["schemas"]["CreateCliAccessGrantRequest"] | components["schemas"]["DeclineCliAccessRequestRequest"] | components["schemas"]["ListCliAccessGrantsRequest"] | components["schemas"]["ListCliAccessRequestsRequest"] | components["schemas"]["PauseCliAccessGrantRequest"] | components["schemas"]["RevokeCliAccessGrantRequest"] | components["schemas"]["UnpauseCliAccessGrantRequest"] | components["schemas"]["UpdateCliAccessGrantRequest"] | components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["DryRunRetentionRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["GetTwoFactorPoliciesRequest"] | components["schemas"]["RotateEncryptedFieldsRequest"] | components["schemas"]["UpdateTwoFactorPolicyRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["AddDarpanAdminRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["RemoveDarpanAdminRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["ResetTwoFactorRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ApplyAuditChangeRequest"] | components["schemas"]["ListBrainChangeTicketsRequest"] | components["schemas"]["PlanAuditChangeRequest"] | components["schemas"]["RejectAuditChangeRequest"] | components["schemas"]["RevertAuditChangeRequest"] | components["schemas"]["ListAgentQueryLogsRequest"] | components["schemas"]["GetAgentAuditScopeRequest"] | components["schemas"]["GetAgentConversationRequest"] | components["schemas"]["GetAgentStatusRequest"] | components["schemas"]["SendAgentTurnRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["BeginTwoFactorSetupRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["ConfirmTwoFactorSetupRequest"] | components["schemas"]["CreateRecoveryCodesRequest"] | components["schemas"]["DisableTwoFactorRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["GetTwoFactorStatusRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["VerifySignInCodeRequest"] | components["schemas"]["GetMyCliAccessRequest"] | components["schemas"]["RequestCliAccessRequest"] | components["schemas"]["ApproveCliLoginRequest"] | components["schemas"]["DenyCliLoginRequest"] | components["schemas"]["GetCliLoginRequestRequest"] | components["schemas"]["ListCliSessionsRequest"] | components["schemas"]["LogoutCliSessionRequest"] | components["schemas"]["PollCliLoginRequest"] | components["schemas"]["RevokeCliSessionRequest"] | components["schemas"]["StartCliLoginRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["CreateDataSourceDefinitionRequest"] | components["schemas"]["RetireDataSourceDefinitionRequest"] | components["schemas"]["ValidateDataSourceDefinitionRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["GetOmsGraphqlSchemaRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["RunOmsGraphqlAgentQueryRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsAgentConnectionsRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["RunNsSuiteQlAgentQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyGraphqlSchemaRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["RunShopifyGraphqlAgentQueryRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["DeleteTenantScriptRequest"] | components["schemas"]["DeleteTenantScriptDeploymentRequest"] | components["schemas"]["ListTenantScriptDeploymentsRequest"] | components["schemas"]["ListTenantScriptsRequest"] | components["schemas"]["RunTenantScriptRequest"] | components["schemas"]["RunTenantScriptDeploymentRequest"] | components["schemas"]["SaveTenantScriptRequest"] | components["schemas"]["SaveTenantScriptDeploymentRequest"];
+                "application/json": components["schemas"]["CreateAgentAccessGrantRequest"] | components["schemas"]["GetAgentUsageRequest"] | components["schemas"]["ListAgentAccessGrantsRequest"] | components["schemas"]["PauseAgentAccessGrantRequest"] | components["schemas"]["RevokeAgentAccessGrantRequest"] | components["schemas"]["UnpauseAgentAccessGrantRequest"] | components["schemas"]["UpdateAgentAccessGrantRequest"] | components["schemas"]["ListAllBrainChangeTicketsRequest"] | components["schemas"]["UpdateBrainChangeTicketRequest"] | components["schemas"]["ApproveCliAccessRequestRequest"] | components["schemas"]["CreateCliAccessGrantRequest"] | components["schemas"]["DeclineCliAccessRequestRequest"] | components["schemas"]["ListCliAccessGrantsRequest"] | components["schemas"]["ListCliAccessRequestsRequest"] | components["schemas"]["PauseCliAccessGrantRequest"] | components["schemas"]["RevokeCliAccessGrantRequest"] | components["schemas"]["UnpauseCliAccessGrantRequest"] | components["schemas"]["UpdateCliAccessGrantRequest"] | components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["DryRunRetentionRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["GetTwoFactorPoliciesRequest"] | components["schemas"]["RotateEncryptedFieldsRequest"] | components["schemas"]["UpdateTwoFactorPolicyRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["AddDarpanAdminRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["RemoveDarpanAdminRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["ResetTwoFactorRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ApplyAuditChangeRequest"] | components["schemas"]["ListBrainChangeTicketsRequest"] | components["schemas"]["PlanAuditChangeRequest"] | components["schemas"]["RejectAuditChangeRequest"] | components["schemas"]["RevertAuditChangeRequest"] | components["schemas"]["ListAgentQueryLogsRequest"] | components["schemas"]["GetAgentAuditScopeRequest"] | components["schemas"]["GetAgentConversationRequest"] | components["schemas"]["GetAgentStatusRequest"] | components["schemas"]["SendAgentTurnRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["BeginPasskeyProofRequest"] | components["schemas"]["BeginPasskeyRegistrationRequest"] | components["schemas"]["BeginPasskeySignInRequest"] | components["schemas"]["BeginTwoFactorSetupRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["ConfirmTwoFactorSetupRequest"] | components["schemas"]["CreateRecoveryCodesRequest"] | components["schemas"]["DeletePasskeyRequest"] | components["schemas"]["DisableTwoFactorRequest"] | components["schemas"]["FinishPasskeyRegistrationRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["GetTwoFactorStatusRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RenamePasskeyRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["VerifySignInCodeRequest"] | components["schemas"]["GetMyCliAccessRequest"] | components["schemas"]["RequestCliAccessRequest"] | components["schemas"]["ApproveCliLoginRequest"] | components["schemas"]["DenyCliLoginRequest"] | components["schemas"]["GetCliLoginRequestRequest"] | components["schemas"]["ListCliSessionsRequest"] | components["schemas"]["LogoutCliSessionRequest"] | components["schemas"]["PollCliLoginRequest"] | components["schemas"]["RevokeCliSessionRequest"] | components["schemas"]["StartCliLoginRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["CreateDataSourceDefinitionRequest"] | components["schemas"]["RetireDataSourceDefinitionRequest"] | components["schemas"]["ValidateDataSourceDefinitionRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["GetOmsGraphqlSchemaRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["RunOmsGraphqlAgentQueryRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsAgentConnectionsRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["RunNsSuiteQlAgentQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyGraphqlSchemaRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["RunShopifyGraphqlAgentQueryRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["DeleteTenantScriptRequest"] | components["schemas"]["DeleteTenantScriptDeploymentRequest"] | components["schemas"]["ListTenantScriptDeploymentsRequest"] | components["schemas"]["ListTenantScriptsRequest"] | components["schemas"]["RunTenantScriptRequest"] | components["schemas"]["RunTenantScriptDeploymentRequest"] | components["schemas"]["SaveTenantScriptRequest"] | components["schemas"]["SaveTenantScriptDeploymentRequest"];
             };
         };
         responses: {
@@ -11123,7 +11506,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["CreateAgentAccessGrantResponse"] | components["schemas"]["GetAgentUsageResponse"] | components["schemas"]["ListAgentAccessGrantsResponse"] | components["schemas"]["PauseAgentAccessGrantResponse"] | components["schemas"]["RevokeAgentAccessGrantResponse"] | components["schemas"]["UnpauseAgentAccessGrantResponse"] | components["schemas"]["UpdateAgentAccessGrantResponse"] | components["schemas"]["ListAllBrainChangeTicketsResponse"] | components["schemas"]["UpdateBrainChangeTicketResponse"] | components["schemas"]["ApproveCliAccessRequestResponse"] | components["schemas"]["CreateCliAccessGrantResponse"] | components["schemas"]["DeclineCliAccessRequestResponse"] | components["schemas"]["ListCliAccessGrantsResponse"] | components["schemas"]["ListCliAccessRequestsResponse"] | components["schemas"]["PauseCliAccessGrantResponse"] | components["schemas"]["RevokeCliAccessGrantResponse"] | components["schemas"]["UnpauseCliAccessGrantResponse"] | components["schemas"]["UpdateCliAccessGrantResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["DryRunRetentionResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["GetTwoFactorPoliciesResponse"] | components["schemas"]["RotateEncryptedFieldsResponse"] | components["schemas"]["UpdateTwoFactorPolicyResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["AddDarpanAdminResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["RemoveDarpanAdminResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["ResetTwoFactorResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ApplyAuditChangeResponse"] | components["schemas"]["ListBrainChangeTicketsResponse"] | components["schemas"]["PlanAuditChangeResponse"] | components["schemas"]["RejectAuditChangeResponse"] | components["schemas"]["RevertAuditChangeResponse"] | components["schemas"]["ListAgentQueryLogsResponse"] | components["schemas"]["GetAgentAuditScopeResponse"] | components["schemas"]["GetAgentConversationResponse"] | components["schemas"]["GetAgentStatusResponse"] | components["schemas"]["SendAgentTurnResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["BeginTwoFactorSetupResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["ConfirmTwoFactorSetupResponse"] | components["schemas"]["CreateRecoveryCodesResponse"] | components["schemas"]["DisableTwoFactorResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["GetTwoFactorStatusResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["VerifySignInCodeResponse"] | components["schemas"]["GetMyCliAccessResponse"] | components["schemas"]["RequestCliAccessResponse"] | components["schemas"]["ApproveCliLoginResponse"] | components["schemas"]["DenyCliLoginResponse"] | components["schemas"]["GetCliLoginRequestResponse"] | components["schemas"]["ListCliSessionsResponse"] | components["schemas"]["LogoutCliSessionResponse"] | components["schemas"]["PollCliLoginResponse"] | components["schemas"]["RevokeCliSessionResponse"] | components["schemas"]["StartCliLoginResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["CreateDataSourceDefinitionResponse"] | components["schemas"]["RetireDataSourceDefinitionResponse"] | components["schemas"]["ValidateDataSourceDefinitionResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["GetOmsGraphqlSchemaResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["RunOmsGraphqlAgentQueryResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsAgentConnectionsResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["RunNsSuiteQlAgentQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyGraphqlSchemaResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["RunShopifyGraphqlAgentQueryResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["DeleteTenantScriptResponse"] | components["schemas"]["DeleteTenantScriptDeploymentResponse"] | components["schemas"]["ListTenantScriptDeploymentsResponse"] | components["schemas"]["ListTenantScriptsResponse"] | components["schemas"]["RunTenantScriptResponse"] | components["schemas"]["RunTenantScriptDeploymentResponse"] | components["schemas"]["SaveTenantScriptResponse"] | components["schemas"]["SaveTenantScriptDeploymentResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["CreateAgentAccessGrantResponse"] | components["schemas"]["GetAgentUsageResponse"] | components["schemas"]["ListAgentAccessGrantsResponse"] | components["schemas"]["PauseAgentAccessGrantResponse"] | components["schemas"]["RevokeAgentAccessGrantResponse"] | components["schemas"]["UnpauseAgentAccessGrantResponse"] | components["schemas"]["UpdateAgentAccessGrantResponse"] | components["schemas"]["ListAllBrainChangeTicketsResponse"] | components["schemas"]["UpdateBrainChangeTicketResponse"] | components["schemas"]["ApproveCliAccessRequestResponse"] | components["schemas"]["CreateCliAccessGrantResponse"] | components["schemas"]["DeclineCliAccessRequestResponse"] | components["schemas"]["ListCliAccessGrantsResponse"] | components["schemas"]["ListCliAccessRequestsResponse"] | components["schemas"]["PauseCliAccessGrantResponse"] | components["schemas"]["RevokeCliAccessGrantResponse"] | components["schemas"]["UnpauseCliAccessGrantResponse"] | components["schemas"]["UpdateCliAccessGrantResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["DryRunRetentionResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["GetTwoFactorPoliciesResponse"] | components["schemas"]["RotateEncryptedFieldsResponse"] | components["schemas"]["UpdateTwoFactorPolicyResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["AddDarpanAdminResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["RemoveDarpanAdminResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["ResetTwoFactorResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ApplyAuditChangeResponse"] | components["schemas"]["ListBrainChangeTicketsResponse"] | components["schemas"]["PlanAuditChangeResponse"] | components["schemas"]["RejectAuditChangeResponse"] | components["schemas"]["RevertAuditChangeResponse"] | components["schemas"]["ListAgentQueryLogsResponse"] | components["schemas"]["GetAgentAuditScopeResponse"] | components["schemas"]["GetAgentConversationResponse"] | components["schemas"]["GetAgentStatusResponse"] | components["schemas"]["SendAgentTurnResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["BeginPasskeyProofResponse"] | components["schemas"]["BeginPasskeyRegistrationResponse"] | components["schemas"]["BeginPasskeySignInResponse"] | components["schemas"]["BeginTwoFactorSetupResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["ConfirmTwoFactorSetupResponse"] | components["schemas"]["CreateRecoveryCodesResponse"] | components["schemas"]["DeletePasskeyResponse"] | components["schemas"]["DisableTwoFactorResponse"] | components["schemas"]["FinishPasskeyRegistrationResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["GetTwoFactorStatusResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RenamePasskeyResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["VerifySignInCodeResponse"] | components["schemas"]["GetMyCliAccessResponse"] | components["schemas"]["RequestCliAccessResponse"] | components["schemas"]["ApproveCliLoginResponse"] | components["schemas"]["DenyCliLoginResponse"] | components["schemas"]["GetCliLoginRequestResponse"] | components["schemas"]["ListCliSessionsResponse"] | components["schemas"]["LogoutCliSessionResponse"] | components["schemas"]["PollCliLoginResponse"] | components["schemas"]["RevokeCliSessionResponse"] | components["schemas"]["StartCliLoginResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["CreateDataSourceDefinitionResponse"] | components["schemas"]["RetireDataSourceDefinitionResponse"] | components["schemas"]["ValidateDataSourceDefinitionResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["GetOmsGraphqlSchemaResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["RunOmsGraphqlAgentQueryResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsAgentConnectionsResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["RunNsSuiteQlAgentQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyGraphqlSchemaResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["RunShopifyGraphqlAgentQueryResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["DeleteTenantScriptResponse"] | components["schemas"]["DeleteTenantScriptDeploymentResponse"] | components["schemas"]["ListTenantScriptDeploymentsResponse"] | components["schemas"]["ListTenantScriptsResponse"] | components["schemas"]["RunTenantScriptResponse"] | components["schemas"]["RunTenantScriptDeploymentResponse"] | components["schemas"]["SaveTenantScriptResponse"] | components["schemas"]["SaveTenantScriptDeploymentResponse"];
                 };
             };
         };

@@ -14,8 +14,14 @@ export function isSetupExpired(message: string | null | undefined): boolean {
   return Boolean(message?.includes(SETUP_EXPIRED_TEXT))
 }
 
-/** approve#CliLogin's refusals that a fresh code fixes; anything else is about the CLI request itself. */
-const CODE_PROBLEM_TEXTS = [CODE_REFUSAL_TEXT, 'Enter the code from your authenticator app.']
+/** approve#CliLogin's refusals that a fresh code or passkey (DAR-BE-270) fixes; anything else is about the CLI request
+ *  itself. */
+const CODE_PROBLEM_TEXTS = [
+  CODE_REFUSAL_TEXT,
+  'Enter the code from your authenticator app.',
+  "That passkey didn't work.",
+  'Confirm with your passkey or a code from your authenticator app.',
+]
 
 export function isCodeProblem(message: string | null | undefined): boolean {
   return Boolean(message) && CODE_PROBLEM_TEXTS.some((text) => message?.includes(text))

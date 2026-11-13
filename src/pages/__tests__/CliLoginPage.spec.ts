@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 const route = vi.hoisted(() => ({ query: {} as Record<string, unknown> }))
@@ -7,17 +7,20 @@ const approveCliLogin = vi.hoisted(() => vi.fn())
 const denyCliLogin = vi.hoisted(() => vi.fn())
 const getMyCliAccess = vi.hoisted(() => vi.fn())
 const requestCliAccess = vi.hoisted(() => vi.fn())
+const getTwoFactorStatus = vi.hoisted(() => vi.fn())
+const beginPasskeyProof = vi.hoisted(() => vi.fn())
 
 const authState = vi.hoisted(() => ({ twoFactorEnabled: false }))
 
 vi.mock('vue-router', () => ({ useRoute: () => route }))
 vi.mock('../../stores/auth', () => ({ useAuthStore: () => authState }))
 vi.mock('../../lib/api/facade', () => ({
-  authFacade: { getCliLoginRequest, approveCliLogin, denyCliLogin, getMyCliAccess, requestCliAccess },
+  authFacade: { getCliLoginRequest, approveCliLogin, denyCliLogin, getMyCliAccess, requestCliAccess, getTwoFactorStatus, beginPasskeyProof },
 }))
 
 import CliLoginPage from '../CliLoginPage.vue'
 import { ApiCallError } from '../../lib/api/client'
+import { ASSERTION_JSON, REQUEST_OPTIONS, installWebAuthnStub, notAllowed, type WebAuthnStub } from '../../test/webauthn'
 
 const access = { tenantUserGroupId: 'ACME', tenantLabel: 'Acme', state: 'NOT_GRANTED', lifetimeDays: 7, canUseCli: false, request: null }
 const refused = new ApiCallError('The Darpan CLI is not turned on for this account. A Darpan admin turns it on.', 400)
@@ -41,6 +44,8 @@ describe('CliLoginPage', () => {
     approveCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
     denyCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
     getMyCliAccess.mockReset().mockResolvedValue({ ok: true, access: { ...access, state: 'LIVE', canUseCli: true } })
+    getTwoFactorStatus.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [], enabled: true, appEnabled: true, passkeys: [] })
+    beginPasskeyProof.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [], publicKeyOptions: REQUEST_OPTIONS, expiresInSeconds: 300 })
     requestCliAccess.mockReset().mockResolvedValue({ ok: true, request: { requestId: 'R1', statusId: 'PENDING', requestedDate: '2026-11-10T09:30:00Z' } })
   })
 
@@ -272,6 +277,86 @@ describe('CliLoginPage', () => {
       await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
       await flushPromises()
       expect(approveCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23' }, expect.anything())
+    })
+  })
+  // DAR-BE-270: a passkey is a fresh proof too; its prompt opens from Approve.
+  describe('passkey approver', () => {
+    const PASSKEY = { passkeyId: 'P1', name: 'MacBook' }
+    let webauthn: WebAuthnStub | null = null
+
+    beforeEach(() => {
+      authState.twoFactorEnabled = true
+      webauthn = installWebAuthnStub()
+    })
+
+    afterEach(() => {
+      webauthn?.restore()
+      webauthn = null
+    })
+
+    it('passkey only: no code field; Approve opens the prompt and sends the assertion', async () => {
+      getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: true, appEnabled: false, passkeys: [PASSKEY] })
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+
+      expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="cli-login-passkey-note"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="cli-login-use-app"]').exists()).toBe(false)
+      expect(beginPasskeyProof).toHaveBeenCalledTimes(1)
+      expect(wrapper.get('[data-testid="cli-login-approve"]').attributes('disabled')).toBeUndefined()
+
+      await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
+      await flushPromises()
+
+      expect(webauthn?.get).toHaveBeenCalledTimes(1)
+      expect(approveCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23', passkeyAssertion: ASSERTION_JSON }, expect.anything())
+      expect(wrapper.get('[data-testid="cli-login-done"]').text()).toContain('CLI approved.')
+    })
+
+    it('a closed prompt sends nothing, says nothing, and keeps the request on screen', async () => {
+      getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: true, appEnabled: false, passkeys: [PASSKEY] })
+      webauthn?.get.mockRejectedValueOnce(notAllowed())
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+
+      await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
+      await flushPromises()
+
+      expect(approveCliLogin).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="cli-login-code-error"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(true)
+    })
+
+    it('with the app as well, the code stays first; Use a passkey switches, and a refused passkey stays with the message', async () => {
+      getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: true, appEnabled: true, passkeys: [PASSKEY] })
+      approveCliLogin.mockRejectedValue(new ApiCallError("That passkey didn't work.", 400))
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+
+      expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(true)
+      await wrapper.get('[data-testid="cli-login-use-passkey"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="cli-login-use-app"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="cli-login-code-error"]').text()).toBe("That passkey didn't work.")
+      expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(false)
+    })
+
+    it('without WebAuthn only the code is offered', async () => {
+      webauthn?.restore()
+      webauthn = null
+      getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: true, appEnabled: true, passkeys: [PASSKEY] })
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+
+      expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="cli-login-use-passkey"]').exists()).toBe(false)
+      expect(beginPasskeyProof).not.toHaveBeenCalled()
     })
   })
 })

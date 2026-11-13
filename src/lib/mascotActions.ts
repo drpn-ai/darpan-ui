@@ -715,14 +715,26 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'refuses this one request; that terminal gets nothing and has to run darpan login again. CLIs you already approved keep working.',
   },
 
-  /* ── Two-factor (DAR-BE-264) ────────────────────────────────────────────────── */
+  /* ── Two-factor (DAR-BE-264) and passkeys (DAR-BE-270) ─────────────────────── */
+  'use a passkey': {
+    title: 'Use a passkey',
+    body: 'answers with your fingerprint, face, phone or security key instead of six digits. Closing the browser prompt changes nothing; try again or go back to the code.',
+  },
+  'use a passkey instead': {
+    title: 'Use a passkey instead',
+    body: 'makes a passkey your way in, in place of the authenticator app. Either one alone is enough; add the other later in User Settings.',
+  },
+  'add a passkey': {
+    title: 'Add a passkey',
+    body: 'registers this device or a security key. A first passkey turns two-factor on and ends your other sessions and CLI sign-ins.',
+  },
   'use a recovery code': {
     title: 'Use a recovery code',
     body: 'signs in with one of the codes you saved. That code stops working the moment it is used, so make new ones when few are left.',
   },
   'use the app code': {
     title: 'Use the app code',
-    body: 'goes back to the six digits from your authenticator app. Switching uses nothing up.',
+    body: 'goes back to the six digits from your authenticator app. Switching uses nothing up; your passkeys stay registered.',
   },
   'back to sign in': {
     title: 'Back to sign in',
@@ -746,7 +758,7 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'turn off': {
     title: 'Turn off',
-    body: 'ends two-factor for this account after a current code. Your recovery codes stop working, and your other sessions and CLI sign-ins end.',
+    body: 'removes the authenticator app. With a passkey left nothing else changes; with none, two-factor goes off and your other sessions and CLI sign-ins end.',
   },
   'new codes': {
     title: 'New codes',
@@ -829,6 +841,11 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^download .+$/, {
     title: 'Download',
     body: 'the source file as the run received it. Useful for checking a record by hand that the run reported as missing.',
+  }],
+  // "Remove passkey <name>": before the general remove, which describes an unsaved form.
+  [/^remove passkey( .+)?$/, {
+    title: 'Remove passkey',
+    body: 'ends it now; it stops signing you in. Your last way in stays while your role requires two-factor.',
   }],
   [/^remove .+$/, {
     title: 'Remove',

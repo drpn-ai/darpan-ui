@@ -1,7 +1,7 @@
 <template>
-  <!-- DAR-BE-264: every two-factor change asks for proof first. A first setup takes the password; replacing the
-       app, new recovery codes and turning it off take a current code. Rendered outside StaticPageFrame, which the
-       page blurs while this is open (the popup contract every User Settings popup follows). -->
+  <!-- DAR-BE-264: every two-factor change asks for proof first. With nothing on yet that is the password; after that a
+       current code from the app or (DAR-BE-270) a passkey. Rendered outside StaticPageFrame, which the page blurs while
+       this is open (the popup contract every User Settings popup follows). -->
   <div
     class="popup-workflow-overlay"
     role="dialog"
@@ -22,7 +22,18 @@
           form-class="workflow-form--popup-compact"
           @back="setup = null"
           @ended="restart"
-          @confirmed="emit('changed', 'on')"
+          @confirmed="emit('changed', twoFactorOn ? 'app-on' : 'on')"
+          @done="emit('close')"
+        />
+
+        <PasskeyAddSteps
+          v-else-if="passkeyOptions"
+          :options="passkeyOptions"
+          :username="username"
+          form-class="workflow-form--popup-compact"
+          @back="passkeyOptions = null"
+          @refused="restart"
+          @added="(firstFactor) => emit('changed', firstFactor ? 'on' : 'passkey-added')"
           @done="emit('close')"
         />
 
@@ -48,7 +59,7 @@
           primary-test-id="two-factor-proof-next"
           @submit="submitProof"
         >
-          <label v-if="action === 'setup'" class="workflow-context-block" aria-label="Current Password">
+          <label v-if="proofKind === 'password'" class="workflow-context-block" aria-label="Current Password">
             <input
               v-model="currentPassword"
               class="wizard-answer-control"
@@ -59,14 +70,33 @@
               required
             />
           </label>
-          <!-- Turning it off waits for the button: the code is the confirmation, so the sixth digit does not act. -->
+          <!-- Turning off and removing wait for the button: the code is the confirmation, so the sixth digit does
+               not act. -->
           <WorkflowCodeInput
-            v-else
+            v-else-if="proofKind === 'code'"
             v-model="code"
             label="Authenticator code"
             test-id="two-factor-proof-code"
-            @complete="action === 'off' ? undefined : submitProof()"
+            @complete="actsOnSixthDigit ? submitProof() : undefined"
           />
+          <button
+            v-if="proofKind === 'code' && passkeyProofOffered"
+            type="button"
+            class="login-text-link"
+            data-testid="two-factor-proof-use-passkey"
+            @click="useProof('passkey')"
+          >
+            Use a passkey
+          </button>
+          <button
+            v-if="proofKind === 'passkey' && appEnabled"
+            type="button"
+            class="login-text-link"
+            data-testid="two-factor-proof-use-app"
+            @click="useProof('code')"
+          >
+            Use the app code
+          </button>
         </WorkflowStepForm>
 
         <InlineValidation v-if="error" tone="error" :message="error" />
@@ -80,19 +110,28 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowCodeInput from '../workflow/WorkflowCodeInput.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
+import PasskeyAddSteps from '../auth/PasskeyAddSteps.vue'
 import TwoFactorRecoveryCodes from '../auth/TwoFactorRecoveryCodes.vue'
 import TwoFactorSetupSteps from '../auth/TwoFactorSetupSteps.vue'
+import { usePasskeyProof } from '../../composables/usePasskeyProof'
 import { ApiCallError } from '../../lib/api/client'
 import { authFacade } from '../../lib/api/facade'
+import { passkeysSupported } from '../../lib/passkeys'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
-import { useAuthStore, type TwoFactorSetupStart } from '../../stores/auth'
+import { useAuthStore, type TwoFactorProof, type TwoFactorSetupStart } from '../../stores/auth'
 
-export type TwoFactorSettingsAction = 'setup' | 'replace' | 'codes' | 'off'
-export type TwoFactorSettingsChange = 'on' | 'codes' | 'off'
+export type TwoFactorSettingsAction = 'setup' | 'replace' | 'codes' | 'off' | 'app-off' | 'add-passkey' | 'remove-passkey'
+export type TwoFactorSettingsChange = 'on' | 'app-on' | 'codes' | 'off' | 'app-off' | 'passkey-added' | 'passkey-removed'
 
 const props = defineProps<{
   action: TwoFactorSettingsAction
   username?: string | null
+  /** Two-factor is on (any factor): proof is a code or a passkey, not the password. */
+  twoFactorOn?: boolean
+  appEnabled?: boolean
+  hasPasskeys?: boolean
+  /** remove-passkey: the one being removed. */
+  passkey?: { passkeyId: string; name?: string } | null
 }>()
 
 const emit = defineEmits<{
@@ -102,40 +141,82 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const passkeyProof = usePasskeyProof()
 const currentPassword = ref('')
 const code = ref('')
 const busy = ref(false)
 const error = ref<string | null>(null)
 const setup = ref<TwoFactorSetupStart | null>(null)
+const passkeyOptions = ref<string | null>(null)
 const recoveryCodes = ref<string[] | null>(null)
 
+const passkeyProofOffered = computed(() => props.hasPasskeys === true && passkeysSupported())
+const proofChoice = ref<'code' | 'passkey'>(props.appEnabled !== false || !passkeyProofOffered.value ? 'code' : 'passkey')
+const proofKind = computed<'password' | 'code' | 'passkey'>(() => {
+  if (!props.twoFactorOn && (props.action === 'setup' || props.action === 'add-passkey')) return 'password'
+  return proofChoice.value
+})
+const actsOnSixthDigit = computed(() => props.action !== 'off' && props.action !== 'app-off' && props.action !== 'remove-passkey')
+
 const TITLES: Record<TwoFactorSettingsAction, string> = {
-  setup: 'Two-factor',
+  setup: 'Authenticator app',
   replace: 'New authenticator app',
   codes: 'Recovery codes',
   off: 'Turn off two-factor',
+  'app-off': 'Remove authenticator app',
+  'add-passkey': 'Add a passkey',
+  'remove-passkey': 'Remove passkey',
 }
-const title = computed(() => TITLES[props.action])
+const title = computed(() => (props.action === 'setup' && !props.twoFactorOn ? 'Two-factor' : TITLES[props.action]))
 
 const proofQuestion = computed(() => {
-  if (props.action === 'setup') return 'Enter your current password.'
+  if (proofKind.value === 'password') return 'Enter your current password.'
+  if (proofKind.value === 'passkey') return 'Confirm with your passkey.'
   if (props.action === 'replace') return 'Enter the code from your current app.'
   return 'Enter the code from your app.'
 })
 
+const DESTRUCTIVE_LABELS: Partial<Record<TwoFactorSettingsAction, string>> = {
+  off: 'Turn off',
+  'app-off': 'Remove',
+  'remove-passkey': 'Remove',
+}
 const primaryLabel = computed(() => {
-  if (busy.value) return 'Checking'
-  return props.action === 'off' ? 'Turn off' : 'OK'
+  if (busy.value) return proofKind.value === 'passkey' ? 'Waiting' : 'Checking'
+  return DESTRUCTIVE_LABELS[props.action] ?? (proofKind.value === 'passkey' ? 'Continue' : 'OK')
 })
 
 const isProofBlocked = computed(() => {
   if (busy.value) return true
-  if (props.action === 'setup') return currentPassword.value.length === 0
+  if (proofKind.value === 'password') return currentPassword.value.length === 0
+  if (proofKind.value === 'passkey') return false
   return code.value.length < 6
 })
 
+onMounted(() => {
+  if (proofKind.value === 'passkey') passkeyProof.prepare()
+})
+
+function useProof(choice: 'code' | 'passkey'): void {
+  error.value = null
+  code.value = ''
+  proofChoice.value = choice
+  if (choice === 'passkey') passkeyProof.prepare()
+}
+
 function messageOf(err: unknown, fallback: string): string {
   return err instanceof ApiCallError ? err.message : fallback
+}
+
+/** The proof for the action, or null when there is none to send (a closed passkey prompt, or its failure shown). */
+async function collectProof(): Promise<TwoFactorProof | null> {
+  if (proofKind.value === 'password') return { currentPassword: currentPassword.value }
+  if (proofKind.value === 'code') return { code: code.value }
+  const proved = await passkeyProof.prove()
+  if (proved.outcome === 'ok') return { passkeyAssertion: proved.passkeyAssertion }
+  // A closed prompt is not a refusal: stay here and say nothing.
+  if (proved.outcome === 'failed') error.value = proved.message
+  return null
 }
 
 async function submitProof(): Promise<void> {
@@ -143,25 +224,9 @@ async function submitProof(): Promise<void> {
   busy.value = true
   error.value = null
   try {
-    if (props.action === 'setup' || props.action === 'replace') {
-      const proof = props.action === 'setup' ? { currentPassword: currentPassword.value } : { code: code.value }
-      const result = await authStore.beginTwoFactorSetup(proof)
-      if (result.outcome === 'begun') {
-        setup.value = result.setup
-      } else {
-        error.value = result.message
-      }
-      return
-    }
-    if (props.action === 'codes') {
-      const response = await authFacade.createRecoveryCodes({ code: code.value })
-      recoveryCodes.value = response.recoveryCodes ?? []
-      emit('changed', 'codes')
-      return
-    }
-    await authFacade.disableTwoFactor({ code: code.value })
-    emit('changed', 'off')
-    emit('close')
+    const proof = await collectProof()
+    if (!proof) return
+    await act(proof)
   } catch (err) {
     error.value = messageOf(err, "That didn't go through. Try again.")
   } finally {
@@ -169,12 +234,49 @@ async function submitProof(): Promise<void> {
     currentPassword.value = ''
     code.value = ''
     busy.value = false
+    // The proof was used: fresh options now, so a retry opens the prompt straight from its click.
+    if (error.value && proofKind.value === 'passkey') passkeyProof.prepare()
   }
+}
+
+async function act(proof: TwoFactorProof): Promise<void> {
+  if (props.action === 'setup' || props.action === 'replace') {
+    const result = await authStore.beginTwoFactorSetup(proof)
+    if (result.outcome === 'begun') setup.value = result.setup
+    else error.value = result.message
+    return
+  }
+  if (props.action === 'add-passkey') {
+    const result = await authStore.beginPasskeyRegistration(proof)
+    if (result.outcome === 'begun') passkeyOptions.value = result.publicKeyOptions
+    else error.value = result.message
+    return
+  }
+  if (props.action === 'codes') {
+    const response = await authFacade.createRecoveryCodes(proof)
+    recoveryCodes.value = response.recoveryCodes ?? []
+    emit('changed', 'codes')
+    return
+  }
+  if (props.action === 'remove-passkey') {
+    if (!props.passkey) return
+    // The backend refuses a required person's last factor; its reason shows here.
+    const response = await authFacade.deletePasskey({ passkeyId: props.passkey.passkeyId, ...proof })
+    emit('changed', response.twoFactorEnabled === false ? 'off' : 'passkey-removed')
+    emit('close')
+    return
+  }
+  const appOnly = props.action === 'app-off'
+  await authFacade.disableTwoFactor(appOnly ? { ...proof, appOnly: true } : proof)
+  emit('changed', appOnly ? 'app-off' : 'off')
+  emit('close')
 }
 
 function restart(message: string): void {
   setup.value = null
+  passkeyOptions.value = null
   error.value = message
+  if (proofKind.value === 'passkey') passkeyProof.prepare()
 }
 
 function handleCancelRequest(event: Event): void {

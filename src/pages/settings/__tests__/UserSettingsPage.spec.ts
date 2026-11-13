@@ -47,6 +47,11 @@ const disableTwoFactor = vi.hoisted(() => vi.fn())
 const beginTwoFactorSetup = vi.hoisted(() => vi.fn())
 const confirmTwoFactorSetup = vi.hoisted(() => vi.fn())
 const applyTwoFactorState = vi.hoisted(() => vi.fn())
+const beginPasskeyRegistration = vi.hoisted(() => vi.fn())
+const finishPasskeyRegistration = vi.hoisted(() => vi.fn())
+const beginPasskeyProof = vi.hoisted(() => vi.fn())
+const renamePasskey = vi.hoisted(() => vi.fn())
+const deletePasskey = vi.hoisted(() => vi.fn())
 const saveUserSettings = vi.hoisted(() => vi.fn(async ({ displayName, timeZone }: { displayName?: string; timeZone?: string }) => {
   authState.sessionInfo = {
     ...authState.sessionInfo,
@@ -98,6 +103,9 @@ vi.mock('../../../lib/api/facade', () => ({
     getTwoFactorStatus,
     createRecoveryCodes,
     disableTwoFactor,
+    beginPasskeyProof,
+    renamePasskey,
+    deletePasskey,
   },
 }))
 
@@ -127,6 +135,8 @@ vi.mock('../../../stores/auth', () => ({
     beginTwoFactorSetup,
     confirmTwoFactorSetup,
     applyTwoFactorState,
+    beginPasskeyRegistration,
+    finishPasskeyRegistration,
   }),
 }))
 
@@ -156,6 +166,15 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 }))
 
 import UserSettingsPage from '../UserSettingsPage.vue'
+import {
+  CREATED_JSON,
+  CREATION_OPTIONS,
+  ASSERTION_JSON,
+  REQUEST_OPTIONS,
+  installWebAuthnStub,
+  notAllowed,
+  type WebAuthnStub,
+} from '../../../test/webauthn'
 
 function mountPage() {
   return mount(UserSettingsPage)
@@ -184,6 +203,11 @@ describe('UserSettingsPage', () => {
     beginTwoFactorSetup.mockReset()
     confirmTwoFactorSetup.mockReset()
     applyTwoFactorState.mockReset()
+    beginPasskeyRegistration.mockReset()
+    finishPasskeyRegistration.mockReset()
+    beginPasskeyProof.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [], publicKeyOptions: REQUEST_OPTIONS, expiresInSeconds: 300 })
+    renamePasskey.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
+    deletePasskey.mockReset()
     saveUserNotificationDefault.mockReset()
     saveUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [], userNotificationDefault: undefined })
     authState.error = null
@@ -1000,6 +1024,217 @@ describe('UserSettingsPage', () => {
       expect(applyTwoFactorState).toHaveBeenCalledWith({ enabled: false, dueDate: '2026-12-01T12:00:00Z' })
       expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
       expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('Off. Due 1 Dec')
+    })
+  })
+  describe('passkeys (DAR-BE-270)', () => {
+    const CODES = Array.from({ length: 10 }, (_, i) => `abcd-efgh-jkmn-pq${String(i).padStart(2, '0')}`)
+    const MAC = { passkeyId: 'P1', name: 'MacBook', createdDate: '2026-11-13T12:00:00Z', lastUsedDate: null, transports: ['internal'], backedUp: true }
+    const KEY = { passkeyId: 'P2', name: 'YubiKey', createdDate: '2026-11-10T12:00:00Z', lastUsedDate: '2026-11-12T12:00:00Z', transports: ['usb'], backedUp: false }
+    const status = (extra: Record<string, unknown> = {}) => ({
+      ok: true, messages: [], errors: [], enabled: true, appEnabled: false, passkeysAvailable: true, passkeys: [MAC],
+      confirmedDate: '2026-11-13T12:00:00Z', recoveryCodesLeft: 10, required: false, codesLocked: false, ...extra,
+    })
+    let webauthn: WebAuthnStub | null = null
+
+    beforeEach(() => {
+      webauthn = installWebAuthnStub()
+    })
+
+    afterEach(() => {
+      webauthn?.restore()
+      webauthn = null
+    })
+
+    async function typeCode(wrapper: ReturnType<typeof mount>, testId: string, code: string): Promise<void> {
+      const box = wrapper.get(`[data-testid="${testId}-0"]`)
+      ;(box.element as HTMLInputElement).value = code
+      await box.trigger('input')
+      await flushPromises()
+    }
+
+    async function click(wrapper: ReturnType<typeof mount>, testId: string): Promise<void> {
+      await wrapper.get(`[data-testid="${testId}"]`).trigger('click')
+      await flushPromises()
+    }
+
+    it('lists each passkey with its name, when it was added and last used; the app reads Off beside them', async () => {
+      getTwoFactorStatus.mockResolvedValue(status({ passkeys: [MAC, KEY] }))
+      const wrapper = mountPage()
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('Off')
+      expect(wrapper.find('[data-testid="two-factor-setup"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="passkeys-count"]').text()).toBe('2')
+      const rows = wrapper.findAll('[data-testid="passkey-row"]')
+      expect(rows.map((row) => row.get('[data-testid="passkey-name"]').text())).toEqual(['MacBook', 'YubiKey'])
+      expect(rows.map((row) => row.get('[data-testid="passkey-added"]').text())).toEqual(['13 Nov', '10 Nov'])
+      expect(rows.map((row) => row.get('[data-testid="passkey-last-used"]').text())).toEqual(['Never', '12 Nov'])
+      expect(wrapper.find('[data-testid="passkey-add"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="two-factor-new-codes"]').exists()).toBe(true)
+    })
+
+    it('adds a first passkey after the password: Continue opens the prompt, then the recovery codes once', async () => {
+      getTwoFactorStatus.mockResolvedValue({ ...status({ passkeys: [] }), enabled: false })
+      beginPasskeyRegistration.mockResolvedValue({ outcome: 'begun', publicKeyOptions: CREATION_OPTIONS })
+      finishPasskeyRegistration.mockResolvedValue({ outcome: 'added', recoveryCodes: CODES })
+      const wrapper = mountPage()
+      await flushPromises()
+      expect(wrapper.get('[data-testid="passkeys-count"]').text()).toBe('None')
+
+      await click(wrapper, 'passkey-add')
+      expect(wrapper.text()).toContain('Enter your current password.')
+      await wrapper.get('[data-testid="two-factor-password"]').setValue('current-pass')
+      await click(wrapper, 'two-factor-proof-next')
+      expect(beginPasskeyRegistration).toHaveBeenCalledWith({ currentPassword: 'current-pass' })
+      expect(wrapper.text()).toContain('Add a passkey.')
+      expect(webauthn?.create).not.toHaveBeenCalled()
+
+      getTwoFactorStatus.mockResolvedValue(status())
+      await click(wrapper, 'passkey-add-next')
+
+      // finishPasskeyRegistration is the store action that swaps this tab to the new key (authTwoFactor.spec).
+      expect(finishPasskeyRegistration).toHaveBeenCalledWith(CREATED_JSON)
+      expect(wrapper.findAll('[data-testid="two-factor-recovery-code"]')).toHaveLength(10)
+      expect(wrapper.get('[data-testid="two-factor-message"]').text()).toContain('Two-factor on.')
+      expect(listCliSessions).toHaveBeenCalledTimes(2)
+
+      await click(wrapper, 'two-factor-codes-saved')
+      expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-testid="passkey-row"]')).toHaveLength(1)
+    })
+
+    it('adds another passkey proved by a passkey; a closed prompt stays on the step and says nothing', async () => {
+      getTwoFactorStatus.mockResolvedValue(status())
+      beginPasskeyRegistration.mockResolvedValue({ outcome: 'begun', publicKeyOptions: CREATION_OPTIONS })
+      finishPasskeyRegistration.mockResolvedValue({ outcome: 'added', recoveryCodes: [] })
+      webauthn?.get.mockRejectedValueOnce(notAllowed())
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await click(wrapper, 'passkey-add')
+      // Passkey only: no code box, and the proof's options are already fetched.
+      expect(wrapper.text()).toContain('Confirm with your passkey.')
+      expect(wrapper.find('[data-testid="two-factor-proof-code-0"]').exists()).toBe(false)
+      expect(beginPasskeyProof).toHaveBeenCalledTimes(1)
+
+      await click(wrapper, 'two-factor-proof-next')
+      expect(beginPasskeyRegistration).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Confirm with your passkey.')
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+      await click(wrapper, 'two-factor-proof-next')
+      expect(beginPasskeyProof).toHaveBeenCalledTimes(1)
+      expect(beginPasskeyRegistration).toHaveBeenCalledWith({ passkeyAssertion: ASSERTION_JSON })
+
+      await click(wrapper, 'passkey-add-next')
+      expect(finishPasskeyRegistration).toHaveBeenCalledWith(CREATED_JSON)
+      expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="two-factor-message"]').text()).toBe('Passkey added.')
+    })
+
+    it('shows the backend\'s refusal to remove a required person\'s last factor, and keeps the passkey', async () => {
+      getTwoFactorStatus.mockResolvedValue(status({ required: true }))
+      deletePasskey.mockRejectedValue(new ApiCallError('Two-factor is required for your role, so your last way to sign in cannot be removed.', 500))
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await click(wrapper, 'passkey-remove')
+      expect(wrapper.text()).toContain('Remove passkey')
+      await click(wrapper, 'two-factor-proof-next')
+
+      expect(deletePasskey).toHaveBeenCalledWith({ passkeyId: 'P1', passkeyAssertion: ASSERTION_JSON })
+      expect(wrapper.text()).toContain('Two-factor is required for your role, so your last way to sign in cannot be removed.')
+      expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(true)
+      expect(applyTwoFactorState).not.toHaveBeenCalled()
+    })
+
+    it('removes a passkey with an app code on the button only; the last factor going turns two-factor off', async () => {
+      getTwoFactorStatus.mockResolvedValue(status({ appEnabled: true, passkeys: [MAC, KEY] }))
+      deletePasskey.mockResolvedValue({ ok: true, messages: [], errors: [], twoFactorEnabled: true })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await wrapper.findAll('[data-testid="passkey-remove"]')[1]?.trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="two-factor-proof-use-passkey"]').exists()).toBe(true)
+      await typeCode(wrapper, 'two-factor-proof-code', '123456')
+      expect(deletePasskey).not.toHaveBeenCalled()
+      await click(wrapper, 'two-factor-proof-next')
+
+      expect(deletePasskey).toHaveBeenCalledWith({ passkeyId: 'P2', code: '123456' })
+      expect(wrapper.get('[data-testid="two-factor-message"]').text()).toBe('Passkey removed.')
+      expect(applyTwoFactorState).not.toHaveBeenCalled()
+
+      getTwoFactorStatus.mockResolvedValue({ ...status({ appEnabled: false, passkeys: [] }), enabled: false })
+      deletePasskey.mockResolvedValue({ ok: true, messages: [], errors: [], twoFactorEnabled: false })
+      await click(wrapper, 'passkey-remove')
+      await typeCode(wrapper, 'two-factor-proof-code', '654321')
+      await click(wrapper, 'two-factor-proof-next')
+      expect(wrapper.get('[data-testid="two-factor-message"]').text()).toContain('Two-factor off.')
+      expect(applyTwoFactorState).toHaveBeenCalledWith({ enabled: false, dueDate: null })
+    })
+
+    it('Turn off removes only the app while a passkey remains, also for a required person', async () => {
+      getTwoFactorStatus.mockResolvedValue(status({ appEnabled: true, required: true }))
+      disableTwoFactor.mockResolvedValue({ ok: true, messages: [], errors: [] })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('On')
+      await click(wrapper, 'two-factor-off')
+      expect(wrapper.text()).toContain('Remove authenticator app')
+      await typeCode(wrapper, 'two-factor-proof-code', '111222')
+      await click(wrapper, 'two-factor-proof-next')
+
+      expect(disableTwoFactor).toHaveBeenCalledWith({ code: '111222', appOnly: true })
+      expect(wrapper.get('[data-testid="two-factor-message"]').text()).toBe('Authenticator app removed.')
+      expect(applyTwoFactorState).not.toHaveBeenCalled()
+    })
+
+    it('renames in place; a refused or empty name goes back to the old one', async () => {
+      getTwoFactorStatus.mockResolvedValue(status())
+      const wrapper = mountPage()
+      await flushPromises()
+
+      const rename = async (typed: string) => {
+        const name = wrapper.get('[data-testid="passkey-name"]')
+        name.element.textContent = typed
+        await name.trigger('input')
+        await name.trigger('keydown', { key: 'Enter' })
+        await flushPromises()
+      }
+
+      await rename('Work laptop')
+      expect(renamePasskey).toHaveBeenCalledWith({ passkeyId: 'P1', name: 'Work laptop' }, expect.anything())
+      expect(wrapper.get('[data-testid="passkey-name"]').text()).toBe('Work laptop')
+
+      renamePasskey.mockRejectedValueOnce(new ApiCallError('A name is required.', 500))
+      await rename('Bad')
+      expect(wrapper.get('[data-testid="passkey-error"]').text()).toBe('A name is required.')
+      expect(wrapper.get('[data-testid="passkey-name"]').text()).toBe('Work laptop')
+
+      await rename('   ')
+      expect(renamePasskey).toHaveBeenCalledTimes(2)
+      expect(wrapper.get('[data-testid="passkey-name"]').text()).toBe('Work laptop')
+    })
+
+    it('without WebAuthn the list stays but Add does not show', async () => {
+      webauthn?.restore()
+      webauthn = null
+      getTwoFactorStatus.mockResolvedValue(status())
+      const wrapper = mountPage()
+      await flushPromises()
+
+      expect(wrapper.findAll('[data-testid="passkey-row"]')).toHaveLength(1)
+      expect(wrapper.find('[data-testid="passkey-add"]').exists()).toBe(false)
+    })
+
+    it('an instance without passkeys shows no passkey card at all', async () => {
+      getTwoFactorStatus.mockResolvedValue(status({ passkeysAvailable: false, passkeys: [], appEnabled: true }))
+      const wrapper = mountPage()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="passkeys-card"]').exists()).toBe(false)
     })
   })
 })

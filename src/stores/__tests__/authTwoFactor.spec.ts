@@ -7,9 +7,20 @@ const loginSession = vi.hoisted(() => vi.fn())
 const verifySignInCode = vi.hoisted(() => vi.fn())
 const beginTwoFactorSetup = vi.hoisted(() => vi.fn())
 const confirmTwoFactorSetup = vi.hoisted(() => vi.fn())
+const beginPasskeySignIn = vi.hoisted(() => vi.fn())
+const beginPasskeyRegistration = vi.hoisted(() => vi.fn())
+const finishPasskeyRegistration = vi.hoisted(() => vi.fn())
 
 vi.mock('../../lib/api/facade', () => ({
-  authFacade: { loginSession, verifySignInCode, beginTwoFactorSetup, confirmTwoFactorSetup },
+  authFacade: {
+    loginSession,
+    verifySignInCode,
+    beginTwoFactorSetup,
+    confirmTwoFactorSetup,
+    beginPasskeySignIn,
+    beginPasskeyRegistration,
+    finishPasskeyRegistration,
+  },
   settingsFacade: {},
   clearApiResponseCache: vi.fn(),
 }))
@@ -45,8 +56,9 @@ function storageHolds(value: string): boolean {
     .some((stored) => stored.includes(value)))
 }
 
-async function signInToChallenge(purpose: 'code' | 'setup' = 'code') {
+async function signInToChallenge(purpose: 'code' | 'setup' = 'code', extra: Record<string, unknown> = {}) {
   loginSession.mockResolvedValue({
+    ...extra,
     ok: true,
     messages: [],
     errors: [],
@@ -207,5 +219,79 @@ describe('auth store two-factor', () => {
     expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'refused', message: "That code didn't work." })
     expect(getAuthToken()).toBe('old-key')
     expect(await store.confirmTwoFactorSetup('000000')).toEqual({ outcome: 'ended', message: 'Setup has expired. Start again.' })
+  })
+  // ─── DAR-BE-270 passkeys ─────────────────────────────────────────────────────
+
+  it('keeps what login#Session says the person can answer with; an older backend that says nothing meant the app', async () => {
+    const { store } = await signInToChallenge('code', { twoFactorMethods: ['passkey', 'sms'] })
+    expect(store.twoFactorMethods).toEqual(['passkey'])
+
+    const older = await signInToChallenge('code')
+    expect(older.store.twoFactorMethods).toEqual(['app'])
+  })
+
+  it('begins a passkey sign-in with the challenge token and verifies the assertion against it', async () => {
+    const { store } = await signInToChallenge('code', { twoFactorMethods: ['passkey'] })
+    beginPasskeySignIn.mockResolvedValue({ ok: true, messages: [], errors: [], publicKeyOptions: '{"challenge":"AQID"}', challengeEnded: false })
+    verifySignInCode.mockResolvedValue(signedIn('passkey-key'))
+
+    expect(await store.beginPasskeySignIn()).toEqual({ outcome: 'begun', publicKeyOptions: '{"challenge":"AQID"}' })
+    expect(beginPasskeySignIn).toHaveBeenCalledWith({ challengeToken: CHALLENGE })
+    const result = await store.verifySignInCode({ passkeyAssertion: '{"id":"cred-1"}' })
+
+    expect(verifySignInCode).toHaveBeenCalledWith({ challengeToken: CHALLENGE, passkeyAssertion: '{"id":"cred-1"}' })
+    expect(result.outcome).toBe('signedIn')
+    expect(getAuthToken()).toBe('passkey-key')
+    expect(storageHolds(CHALLENGE)).toBe(false)
+  })
+
+  it('a passkey begin refused with challengeEnded ends the challenge', async () => {
+    const { store } = await signInToChallenge('code', { twoFactorMethods: ['passkey'] })
+    beginPasskeySignIn.mockResolvedValue({ ...refusal(true, 'This sign-in has expired. Enter your password again.') })
+
+    expect((await store.beginPasskeySignIn()).outcome).toBe('ended')
+    expect(store.twoFactorChallengePurpose).toBeNull()
+  })
+
+  it('a required setup by passkey uses the token alone, and finish signs the tab in with the recovery codes', async () => {
+    const { store } = await signInToChallenge('setup')
+    beginPasskeyRegistration.mockResolvedValue({ ok: true, messages: [], errors: [], publicKeyOptions: '{"challenge":"AQID"}', challengeEnded: false })
+    finishPasskeyRegistration.mockResolvedValue(signedIn('setup-key', { passkeyId: 'P1', recoveryCodes: ['a', 'b'] }))
+
+    expect((await store.beginPasskeyRegistration({ currentPassword: 'ignored' })).outcome).toBe('begun')
+    expect(beginPasskeyRegistration).toHaveBeenCalledWith({ challengeToken: CHALLENGE })
+    const added = await store.finishPasskeyRegistration('{"id":"cred-1"}')
+
+    expect(finishPasskeyRegistration).toHaveBeenCalledWith({ credential: '{"id":"cred-1"}', challengeToken: CHALLENGE })
+    expect(added).toEqual({ outcome: 'added', recoveryCodes: ['a', 'b'] })
+    expect(store.authenticated).toBe(true)
+    expect(getAuthToken()).toBe('setup-key')
+    expect(store.twoFactorChallengePurpose).toBeNull()
+  })
+
+  it('a refused finish through a setup challenge follows challengeEnded', async () => {
+    const { store } = await signInToChallenge('setup')
+    finishPasskeyRegistration.mockResolvedValueOnce(refusal(false, "That passkey didn't work."))
+    finishPasskeyRegistration.mockResolvedValueOnce(refusal(true, "That passkey didn't work."))
+
+    expect(await store.finishPasskeyRegistration('{}')).toEqual({ outcome: 'refused', message: "That passkey didn't work." })
+    expect(store.twoFactorChallengePurpose).toBe('setup')
+    expect((await store.finishPasskeyRegistration('{}')).outcome).toBe('ended')
+    expect(store.twoFactorChallengePurpose).toBeNull()
+  })
+
+  it('signed in, a first passkey swaps the tab to the returned key; another passkey keeps the key it has', async () => {
+    setAuthTokenContract({ authToken: 'old-key', authTokenHeaderName: 'login_key' })
+    const store = useAuthStore()
+    finishPasskeyRegistration.mockResolvedValueOnce(signedIn('first-factor-key', { passkeyId: 'P1', recoveryCodes: ['a'] }))
+    finishPasskeyRegistration.mockResolvedValueOnce({ ok: true, messages: [], errors: [], passkeyId: 'P2', challengeEnded: false })
+
+    expect(await store.finishPasskeyRegistration('{"id":"one"}')).toEqual({ outcome: 'added', recoveryCodes: ['a'] })
+    expect(finishPasskeyRegistration).toHaveBeenCalledWith({ credential: '{"id":"one"}' })
+    expect(getAuthToken()).toBe('first-factor-key')
+    expect(store.twoFactorEnabled).toBe(true)
+
+    expect(await store.finishPasskeyRegistration('{"id":"two"}')).toEqual({ outcome: 'added', recoveryCodes: [] })
+    expect(getAuthToken()).toBe('first-factor-key')
   })
 })

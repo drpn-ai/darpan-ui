@@ -621,6 +621,21 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'a code from your phone after your password, so a leaked password alone cannot sign in. Setting it up or turning it off signs out your other sessions.',
     byDirectiveOnly: true,
   },
+  twoFactorPasskeys: {
+    title: 'Passkeys',
+    body: 'your fingerprint, face, phone or a security key in place of the app code. Nothing to type and nothing to phish: a passkey only answers this site. Click a name to rename it.',
+    byDirectiveOnly: true,
+  },
+  twoFactorPasskeyAdded: {
+    title: 'Added',
+    body: 'when this passkey was registered. One you do not recognise is someone else\'s way in: remove it, then change your password.',
+    byDirectiveOnly: true,
+  },
+  twoFactorPasskeyLastUsed: {
+    title: 'Last used',
+    body: 'the last sign-in or confirmation it answered. Never means it has only been registered.',
+    byDirectiveOnly: true,
+  },
   twoFactorRecoveryCodes: {
     title: 'Recovery codes',
     body: 'one-time codes for signing in without your phone. Each works once; making new ones retires the old set.',

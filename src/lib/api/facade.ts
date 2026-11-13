@@ -157,6 +157,12 @@ import type {
   GetTwoFactorStatusResponse,
   CreateRecoveryCodesResponse,
   DisableTwoFactorResponse,
+  BeginPasskeySignInResponse,
+  BeginPasskeyProofResponse,
+  BeginPasskeyRegistrationResponse,
+  FinishPasskeyRegistrationResponse,
+  RenamePasskeyResponse,
+  DeletePasskeyResponse,
   StoreSourceConfigEndpointAccessResponse,
   ValidateJsonResponse,
 } from './types'
@@ -174,6 +180,12 @@ import type {
   BeginTwoFactorSetupPayload,
   ConfirmTwoFactorSetupPayload,
   TwoFactorCodePayload,
+  DisableTwoFactorPayload,
+  BeginPasskeySignInPayload,
+  BeginPasskeyRegistrationPayload,
+  FinishPasskeyRegistrationPayload,
+  RenamePasskeyPayload,
+  DeletePasskeyPayload,
   RevokeCliSessionPayload,
   CreateRuleSetRunPayload,
   DeleteAutomationPayload,
@@ -286,6 +298,12 @@ const AUTH = {
   getTwoFactorStatus: 'facade.AuthFacadeServices.get#TwoFactorStatus',
   createRecoveryCodes: 'facade.AuthFacadeServices.create#RecoveryCodes',
   disableTwoFactor: 'facade.AuthFacadeServices.disable#TwoFactor',
+  beginPasskeySignIn: 'facade.AuthFacadeServices.begin#PasskeySignIn',
+  beginPasskeyProof: 'facade.AuthFacadeServices.begin#PasskeyProof',
+  beginPasskeyRegistration: 'facade.AuthFacadeServices.begin#PasskeyRegistration',
+  finishPasskeyRegistration: 'facade.AuthFacadeServices.finish#PasskeyRegistration',
+  renamePasskey: 'facade.AuthFacadeServices.rename#Passkey',
+  deletePasskey: 'facade.AuthFacadeServices.delete#Passkey',
   getCliLoginRequest: 'facade.CliAuthFacadeServices.get#CliLoginRequest',
   approveCliLogin: 'facade.CliAuthFacadeServices.approve#CliLogin',
   denyCliLogin: 'facade.CliAuthFacadeServices.deny#CliLogin',
@@ -468,8 +486,28 @@ export const authFacade = {
   createRecoveryCodes(payload: TwoFactorCodePayload, signal?: AbortSignal): Promise<CreateRecoveryCodesResponse> {
     return callService<CreateRecoveryCodesResponse>(AUTH.createRecoveryCodes, payload, signal)
   },
-  disableTwoFactor(payload: TwoFactorCodePayload, signal?: AbortSignal): Promise<DisableTwoFactorResponse> {
+  disableTwoFactor(payload: DisableTwoFactorPayload, signal?: AbortSignal): Promise<DisableTwoFactorResponse> {
     return callService<DisableTwoFactorResponse>(AUTH.disableTwoFactor, payload, signal)
+  },
+  // DAR-BE-270 passkeys. The four ceremony steps answer a refusal as a reply (challengeEnded where a sign-in or setup
+  // challenge is in play); rename and delete refuse as errors, like create#RecoveryCodes.
+  beginPasskeySignIn(payload: BeginPasskeySignInPayload, signal?: AbortSignal): Promise<BeginPasskeySignInResponse> {
+    return callService<BeginPasskeySignInResponse>(AUTH.beginPasskeySignIn, payload, signal, REFUSAL_IS_RESULT)
+  },
+  beginPasskeyProof(signal?: AbortSignal): Promise<BeginPasskeyProofResponse> {
+    return callService<BeginPasskeyProofResponse>(AUTH.beginPasskeyProof, {}, signal, REFUSAL_IS_RESULT)
+  },
+  beginPasskeyRegistration(payload: BeginPasskeyRegistrationPayload, signal?: AbortSignal): Promise<BeginPasskeyRegistrationResponse> {
+    return callService<BeginPasskeyRegistrationResponse>(AUTH.beginPasskeyRegistration, payload, signal, REFUSAL_IS_RESULT)
+  },
+  finishPasskeyRegistration(payload: FinishPasskeyRegistrationPayload, signal?: AbortSignal): Promise<FinishPasskeyRegistrationResponse> {
+    return callService<FinishPasskeyRegistrationResponse>(AUTH.finishPasskeyRegistration, payload, signal, REFUSAL_IS_RESULT)
+  },
+  renamePasskey(payload: RenamePasskeyPayload, signal?: AbortSignal): Promise<RenamePasskeyResponse> {
+    return callService<RenamePasskeyResponse>(AUTH.renamePasskey, payload, signal)
+  },
+  deletePasskey(payload: DeletePasskeyPayload, signal?: AbortSignal): Promise<DeletePasskeyResponse> {
+    return callService<DeletePasskeyResponse>(AUTH.deletePasskey, payload, signal)
   },
   approveCliLogin(payload: ApproveCliLoginPayload, signal?: AbortSignal): Promise<ApproveCliLoginResponse> {
     return callService<ApproveCliLoginResponse>(AUTH.approveCliLogin, payload, signal)

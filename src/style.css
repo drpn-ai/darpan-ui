@@ -841,6 +841,16 @@ button:disabled {
   height: 100%;
 }
 
+/* DAR-BE-270: a passkey's name is renamed in place (StaticEditableTitle), and reads as the card's value, not a heading. */
+.user-settings-passkey-name {
+  margin: 0;
+  min-width: 0;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  overflow-wrap: anywhere;
+}
+
 .user-settings-notification-default-card {
   width: 100%;
   text-align: left;

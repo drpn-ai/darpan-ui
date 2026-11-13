@@ -23,6 +23,17 @@
         </div>
       </div>
     </div>
+    <!-- DAR-BE-270: a passkey is the other first factor. -->
+    <button
+      v-if="offerPasskey"
+      type="button"
+      class="login-text-link"
+      data-testid="two-factor-use-passkey"
+      :disabled="passkeyBusy"
+      @click="emit('use-passkey')"
+    >
+      Use a passkey instead
+    </button>
   </WorkflowStepForm>
 
   <WorkflowStepForm
@@ -69,6 +80,9 @@ const props = defineProps<{
   username?: string | null
   /** `workflow-form--popup-compact` inside a settings popup. */
   formClass?: string
+  /** DAR-BE-270: offer a passkey instead of the app on the scan step. */
+  offerPasskey?: boolean
+  passkeyBusy?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -80,6 +94,8 @@ const emit = defineEmits<{
   back: []
   /** The sign-in challenge or the pending setup is gone; start over. */
   ended: [message: string]
+  /** "Use a passkey instead". */
+  'use-passkey': []
 }>()
 
 const authStore = useAuthStore()

@@ -75,13 +75,25 @@
       <!-- DAR-BE-264 grace: two-factor will be required from a date and is not set up. Asked at every sign-in until
            then (the recovery-email step's pattern). -->
       <template v-else-if="isAskingTwoFactorDue">
+        <PasskeyAddSteps
+          v-if="gracePasskeyOptions"
+          :options="gracePasskeyOptions"
+          :rebegin="beginGracePasskey"
+          :username="username"
+          @back="gracePasskeyOptions = null"
+          @refused="restartGraceSetup"
+          @done="leaveSignIn"
+        />
         <TwoFactorSetupSteps
-          v-if="graceSetup"
+          v-else-if="graceSetup"
           :setup="graceSetup"
           :username="username"
+          :offer-passkey="gracePasskeyOffered"
+          :passkey-busy="isStartingGraceSetup"
           @back="graceSetup = null"
           @ended="restartGraceSetup"
           @done="leaveSignIn"
+          @use-passkey="startGracePasskey"
         />
         <WorkflowStepForm
           v-else
@@ -234,7 +246,9 @@ import InlineValidation from '../components/ui/InlineValidation.vue'
 import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
 import LoginTwoFactorSteps from '../components/auth/LoginTwoFactorSteps.vue'
 import TwoFactorSetupSteps from '../components/auth/TwoFactorSetupSteps.vue'
+import PasskeyAddSteps from '../components/auth/PasskeyAddSteps.vue'
 import { formatDueDate } from '../lib/twoFactor'
+import { passkeysSupported, PASSKEYS_UNAVAILABLE_TEXT } from '../lib/passkeys'
 import type { TwoFactorChallengePurpose, TwoFactorSetupStart } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
@@ -285,6 +299,10 @@ const recoveryCodesLeft = ref<number | null>(null)
 const isAskingTwoFactorDue = ref(false)
 const isStartingGraceSetup = ref(false)
 const graceSetup = ref<TwoFactorSetupStart | null>(null)
+// DAR-BE-270: a passkey instead of the app, begun with the password just used.
+const gracePasskeyOptions = ref<string | null>(null)
+const gracePasskeysUnavailable = ref(false)
+const gracePasskeyOffered = computed(() => passkeysSupported() && !gracePasskeysUnavailable.value)
 // Fewest recovery codes left before the sign-in says so (the backend's own threshold for asking for new ones).
 const LOW_RECOVERY_CODES = 3
 
@@ -559,6 +577,7 @@ async function leaveSignIn(): Promise<void> {
   isAskingRecoveryEmail.value = false
   isAskingTwoFactorDue.value = false
   graceSetup.value = null
+  gracePasskeyOptions.value = null
   recoveryEmailPassword.value = ''
   localError.value = null
   await router.replace(resolveInternalRedirectTarget(route.query.redirect))
@@ -609,7 +628,29 @@ async function startGraceSetup(): Promise<void> {
 
 function restartGraceSetup(message: string): void {
   graceSetup.value = null
+  gracePasskeyOptions.value = null
   localError.value = message
+}
+
+function beginGracePasskey() {
+  return authStore.beginPasskeyRegistration({ currentPassword: recoveryEmailPassword.value })
+}
+
+async function startGracePasskey(): Promise<void> {
+  if (isStartingGraceSetup.value) return
+  isStartingGraceSetup.value = true
+  localError.value = null
+  try {
+    const result = await beginGracePasskey()
+    if (result.outcome === 'begun') {
+      gracePasskeyOptions.value = result.publicKeyOptions
+      return
+    }
+    if (result.message === PASSKEYS_UNAVAILABLE_TEXT) gracePasskeysUnavailable.value = true
+    localError.value = result.message
+  } finally {
+    isStartingGraceSetup.value = false
+  }
 }
 
 async function saveRecoveryEmailAndContinue(): Promise<void> {

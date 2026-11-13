@@ -69,7 +69,7 @@ export interface SessionInfo {
   /** DAR-BE-028: no email on file, so password reset cannot reach this account yet. */
   recoveryEmailMissing?: boolean
   emailAddressMasked?: string | null
-  /** DAR-BE-264: an authenticator app is on for this account. */
+  /** DAR-BE-264: two-factor is on for this account (DAR-BE-270: the app, a passkey, or both). */
   twoFactorEnabled?: boolean
   /** DAR-BE-264: set only while two-factor is off and a role of theirs has a date; the grace prompt reads it. */
   twoFactorDueDate?: ApiTimestamp | null
@@ -126,6 +126,8 @@ export interface LoginSessionResponse extends ApiEnvelope, AuthTokenContract {
   /** Page memory only: never storage or a cookie. */
   challengeToken?: string
   challengeExpiresInSeconds?: number
+  /** DAR-BE-270: with twoFactorRequired, what this person can answer with here: "app" and/or "passkey". */
+  twoFactorMethods?: string[]
 }
 
 // DAR-BE-264. Hand-typed rather than Schemas['VerifySignInCodeResult'] / ['ConfirmTwoFactorSetupResult']: the
@@ -148,11 +150,39 @@ export interface ConfirmTwoFactorSetupResponse extends ApiEnvelope, AuthTokenCon
   challengeEnded?: boolean
 }
 
-// The generated result types are right for these four: flat fields, no sessionInfo.
+// The generated result types are right for these: flat fields, no sessionInfo.
 export type BeginTwoFactorSetupResponse = Schemas['BeginTwoFactorSetupResult']
-export type GetTwoFactorStatusResponse = Schemas['GetTwoFactorStatusResult']
 export type CreateRecoveryCodesResponse = Schemas['CreateRecoveryCodesResult']
 export type DisableTwoFactorResponse = Schemas['DisableTwoFactorResult']
+export type BeginPasskeySignInResponse = Schemas['BeginPasskeySignInResult']
+export type BeginPasskeyProofResponse = Schemas['BeginPasskeyProofResult']
+export type BeginPasskeyRegistrationResponse = Schemas['BeginPasskeyRegistrationResult']
+export type RenamePasskeyResponse = Schemas['RenamePasskeyResult']
+export type DeletePasskeyResponse = Schemas['DeletePasskeyResult']
+
+/** DAR-BE-270: one of the person's passkeys, as get#TwoFactorStatus lists them (oldest first). */
+export interface TwoFactorPasskey {
+  passkeyId: string
+  name?: string
+  createdDate?: ApiTimestamp | null
+  lastUsedDate?: ApiTimestamp | null
+  transports?: string[]
+  /** A synced passkey (on more than one device). */
+  backedUp?: boolean
+}
+
+// Hand-typed passkeys: the generator nests each row under its Moqui list-entry name ({ passkey: {...} }); the reply
+// carries the rows themselves.
+export type GetTwoFactorStatusResponse = Omit<Schemas['GetTwoFactorStatusResult'], 'passkeys'> & { passkeys?: TwoFactorPasskey[] }
+
+/** finish#PasskeyRegistration. The sign-in fields and recoveryCodes come only with a first factor or a setup challenge. */
+export interface FinishPasskeyRegistrationResponse extends ApiEnvelope, AuthTokenContract {
+  passkeyId?: string
+  authenticated?: boolean
+  sessionInfo?: SessionInfo | null
+  recoveryCodes?: string[]
+  challengeEnded?: boolean
+}
 
 export interface ChangeExpiredPasswordResponse extends ApiEnvelope {
   passwordUpdated?: boolean
