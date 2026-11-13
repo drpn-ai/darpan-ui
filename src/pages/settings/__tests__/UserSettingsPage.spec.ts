@@ -259,7 +259,8 @@ describe('UserSettingsPage', () => {
       'Activity',
       'CLI sessions',
     ])
-    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(11)
+    // The two-factor card waits for its status read.
+    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(10)
     expect(wrapper.findAll('.static-page-record-tile').map((node) => node.text())).toEqual(['Krewe', 'Gorjana'])
     expect(wrapper.findAll('.static-page-list-tile')).toHaveLength(0)
     expect(wrapper.find('.static-page-section-head .user-settings-password-trigger').exists()).toBe(false)
@@ -270,7 +271,7 @@ describe('UserSettingsPage', () => {
     expect(passwordCard.get('.user-settings-password-trigger').text()).toBe('Change')
     expect(wrapper.find('.static-page-actions [aria-label="Save user settings"]').exists()).toBe(true)
     expect(wrapper.get('.user-settings-card-grid').classes()).toContain('static-page-summary-grid')
-    expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(5)
+    expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(4)
     expect(styleSource).toMatch(/\.static-page-summary-grid\s*\{[^}]*align-items: start;/)
     expect(styleSource).toMatch(/\.user-settings-card-grid\s*\{[^}]*align-items: stretch;/)
     expect(styleSource).toMatch(/\.user-settings-stretch-card\s*\{[^}]*height: 100%;/)
@@ -883,7 +884,7 @@ describe('UserSettingsPage', () => {
   describe('two-factor', () => {
     const CODES = Array.from({ length: 10 }, (_, i) => `abcd-efgh-jkmn-pq${String(i).padStart(2, '0')}`)
     const onStatus = (extra: Record<string, unknown> = {}) => ({
-      ok: true, messages: [], errors: [], enabled: true, confirmedDate: '2026-11-13T12:00:00Z',
+      ok: true, messages: [], errors: [], enabled: true, appEnabled: true, confirmedDate: '2026-11-13T12:00:00Z',
       recoveryCodesLeft: 4, required: false, codesLocked: false, ...extra,
     })
 
@@ -1227,6 +1228,33 @@ describe('UserSettingsPage', () => {
 
       expect(wrapper.findAll('[data-testid="passkey-row"]')).toHaveLength(1)
       expect(wrapper.find('[data-testid="passkey-add"]').exists()).toBe(false)
+    })
+
+    it('a passkey-only person on a browser without passkeys is told so, never asked for an app code', async () => {
+      webauthn?.restore()
+      webauthn = null
+      getTwoFactorStatus.mockResolvedValue(status())
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await click(wrapper, 'two-factor-new-codes')
+      expect(wrapper.text()).toContain('This browser cannot use passkeys.')
+      expect(wrapper.find('[data-testid="two-factor-proof-code-0"]').exists()).toBe(false)
+      expect(beginPasskeyProof).not.toHaveBeenCalled()
+      await click(wrapper, 'two-factor-no-proof-ok')
+      expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
+    })
+
+    it('offers no two-factor action when the status did not load', async () => {
+      getTwoFactorStatus.mockRejectedValue(new ApiCallError('Darpan stepped out for chai. Try again in a moment.', 503))
+      authState.sessionInfo = { ...authState.sessionInfo, twoFactorEnabled: true }
+      const wrapper = mountPage()
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="two-factor-load-error"]').text()).toBe('Could not load two-factor.')
+      expect(wrapper.find('[data-testid="two-factor-off"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="two-factor-setup"]').exists()).toBe(false)
+      authState.sessionInfo = { ...authState.sessionInfo, twoFactorEnabled: false }
     })
 
     it('an instance without passkeys shows no passkey card at all', async () => {

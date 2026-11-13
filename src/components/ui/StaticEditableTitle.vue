@@ -19,7 +19,8 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 const props = withDefaults(defineProps<{
   modelValue: string
   editable?: boolean
-  tag?: 'h1' | 'h2' | 'h3'
+  /** span: a value renamed in place inside a summary card, not a heading. */
+  tag?: 'h1' | 'h2' | 'h3' | 'span'
   ariaLabel?: string
   testId?: string
   fallback?: string

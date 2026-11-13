@@ -63,7 +63,8 @@
          (DAR-BE-270) a passkey. No Off for someone whose role requires it; the backend refuses removing their last
          factor and the popup says so. -->
     <StaticPageSection title="Two-factor">
-      <div class="static-page-summary-grid user-settings-card-grid">
+      <p v-if="twoFactorLoadError" class="section-note" role="alert" data-testid="two-factor-load-error">{{ twoFactorLoadError }}</p>
+      <div v-if="twoFactorStatus" class="static-page-summary-grid user-settings-card-grid">
         <article class="static-page-summary-card user-settings-stretch-card" data-testid="two-factor-card">
           <span v-explain="'twoFactor'" class="static-page-summary-label">Authenticator app</span>
           <span data-testid="two-factor-state">{{ twoFactorSummary }}</span>
@@ -82,7 +83,7 @@
                 New app
               </button>
               <button
-                v-if="hasPasskeys || !twoFactorStatus?.required"
+                v-if="hasPasskeys || !twoFactorStatus.required"
                 class="user-settings-control"
                 type="button"
                 data-testid="two-factor-off"
@@ -117,8 +118,7 @@
           <span v-explain="'twoFactorPasskeys'" class="static-page-summary-label">Passkey</span>
           <StaticEditableTitle
             :key="`${passkey.passkeyId}-${passkeyNameRevision}`"
-            class="user-settings-passkey-name"
-            tag="h3"
+            tag="span"
             :model-value="passkey.name || 'Passkey'"
             :aria-label="`Rename ${passkey.name || 'passkey'}`"
             test-id="passkey-name"
@@ -140,7 +140,7 @@
             </button>
           </div>
         </article>
-        <article v-if="twoFactorOn && twoFactorStatus" class="static-page-summary-card user-settings-stretch-card" data-testid="two-factor-recovery-card">
+        <article v-if="twoFactorOn" class="static-page-summary-card user-settings-stretch-card" data-testid="two-factor-recovery-card">
           <span v-explain="'twoFactorRecoveryCodes'" class="static-page-summary-label">Recovery codes</span>
           <span data-testid="two-factor-codes-left">{{ recoveryCodesLeftLabel }}</span>
           <div class="action-row">
@@ -1034,14 +1034,14 @@ async function revokeCliSession(cliSessionId: string) {
 }
 
 // ─── Two-factor (DAR-BE-264) ───────────────────────────────────────────────────
+// The cards and their actions show only once the status is read: what to offer depends on it.
 const twoFactorStatus = ref<GetTwoFactorStatusResponse | null>(null)
+const twoFactorLoadError = ref<string | null>(null)
 const twoFactorAction = ref<TwoFactorSettingsAction | null>(null)
 const twoFactorMessage = ref<string | null>(null)
 
-// The status read is the authority; until it lands (or if it fails) the session's own flag answers.
-const twoFactorOn = computed(() => twoFactorStatus.value?.enabled ?? authStore.twoFactorEnabled)
-// DAR-BE-270. A backend from before passkeys sends no appEnabled: two-factor on then meant the app.
-const appOn = computed(() => twoFactorStatus.value?.appEnabled ?? twoFactorOn.value)
+const twoFactorOn = computed(() => twoFactorStatus.value?.enabled === true)
+const appOn = computed(() => twoFactorStatus.value?.appEnabled === true)
 const passkeys = computed<TwoFactorPasskey[]>(() => twoFactorStatus.value?.passkeys ?? [])
 const hasPasskeys = computed(() => passkeys.value.length > 0)
 const passkeysShown = computed(() => twoFactorStatus.value?.passkeysAvailable === true || hasPasskeys.value)
@@ -1054,7 +1054,7 @@ const twoFactorSummary = computed(() => {
     return since ? `On since ${since}` : 'On'
   }
   if (twoFactorOn.value) return 'Off'
-  const due = formatShortDate(twoFactorStatus.value?.requiredFromDate ?? authStore.twoFactorDueDate)
+  const due = formatShortDate(twoFactorStatus.value?.requiredFromDate)
   if (twoFactorStatus.value?.required) return 'Off. Required now'
   return due ? `Off. Due ${due}` : 'Off'
 })
@@ -1068,8 +1068,11 @@ async function loadTwoFactorStatus(): Promise<void> {
     const response = await authFacade.getTwoFactorStatus(pageAbortController.signal)
     if (pageAbortController.signal.aborted) return
     twoFactorStatus.value = response
+    twoFactorLoadError.value = null
   } catch {
-    if (!pageAbortController.signal.aborted) twoFactorStatus.value = null
+    if (pageAbortController.signal.aborted) return
+    twoFactorStatus.value = null
+    twoFactorLoadError.value = 'Could not load two-factor.'
   }
 }
 
