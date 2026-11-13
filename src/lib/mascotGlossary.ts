@@ -405,10 +405,6 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'History',
     body: 'every time this finding was found, reopened or closed, and by whom. One that keeps coming back points at a sync, not a one-off mistake.',
   },
-  auditGrace: {
-    title: 'Grace',
-    body: 'how long a new finding waits as pending before it counts as open, to ride out normal sync lag. Too long, and real problems hide that long too.',
-  },
   auditMatchedBy: {
     title: 'Matched by',
     body: 'the shared id this check joins the two systems on. A record missing that id on one side can only ever read as missing, never as a mismatch.',

@@ -142,21 +142,11 @@ async function mountCreateFlow(options: { draft?: ReconciliationRuleSetDraft } =
 async function advanceToLastStep(wrapper: ReturnType<typeof mount>): Promise<void> {
   await flushPromises()
   while (!wrapper.find('[data-testid="ruleset-editor-board"]').exists()) {
-    if (wrapper.find('[data-testid$="-duplicates-choice-FAIL"]').exists()) {
-      await passDuplicatesCard(wrapper)
-      continue
-    }
     const nextButton = wrapper.find('[data-testid="wizard-next"]')
     if (!nextButton.exists() || nextButton.attributes('disabled') !== undefined) break
     await nextButton.trigger('click')
     await flushPromises()
   }
-}
-
-// DAR-UI-064: the duplicate-key card follows every side's key; take its default (fail the run).
-async function passDuplicatesCard(wrapper: ReturnType<typeof mount>): Promise<void> {
-  await wrapper.get('[data-testid$="-duplicates-choice-FAIL"]').trigger('click')
-  await flushPromises()
 }
 
 async function advanceToFinalPrimaryIdStep(wrapper: ReturnType<typeof mount>): Promise<void> {
@@ -180,7 +170,6 @@ async function advanceToFinalPrimaryIdStep(wrapper: ReturnType<typeof mount>): P
   await chooseWorkflowOption(wrapper, 'file1-field-select', '$.orders[0].order_id')
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-  await passDuplicatesCard(wrapper)
 
   await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -473,7 +462,6 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(wrapper.findAll('textarea')).toHaveLength(0)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
     expect(wrapper.get('[data-testid="create-run-submit"]').text()).toBe('Save run')
   })
 
@@ -502,7 +490,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await advanceToFinalPrimaryIdStep(wrapper)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
     expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(true)
     await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
@@ -566,7 +553,6 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(wrapper.text()).toContain('Which field identifies each record from Orders API?')
     await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].orderId')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
 
     await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -580,7 +566,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
     await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
     await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
@@ -707,7 +692,6 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(wrapper.find('[data-testid="file1-api-select"]').exists()).toBe(false)
     await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].id')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
 
     await chooseWorkflowOption(wrapper, 'file2-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -720,7 +704,6 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(wrapper.find('[data-testid="file2-api-select"]').exists()).toBe(false)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.records[*].externalId')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
     await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
@@ -829,7 +812,6 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(wrapper.text()).toContain('Which field identifies each record from Orders?')
       await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].id')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
 
       await chooseWorkflowOption(wrapper, 'file2-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -843,7 +825,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
       await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
       await flushPromises()
 
@@ -1169,7 +1150,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-field-select', '$.data.orders.edges[0].node.id')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
 
     await chooseWorkflowOption(wrapper, 'file2-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1251,7 +1231,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
     await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
 
     await chooseWorkflowOption(wrapper, 'file2-system-select', 'OMS')
     await flushPromises()
@@ -1406,7 +1385,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await advanceToFinalPrimaryIdStep(wrapper)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
     await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
@@ -1435,7 +1413,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await advanceToFinalPrimaryIdStep(wrapper)
     await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await passDuplicatesCard(wrapper)
     await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
     await flushPromises()
 
@@ -1741,7 +1718,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
 
       await chooseWorkflowOption(wrapper, 'file2-system-select', 'NETSUITE')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1753,7 +1729,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
       await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
       await flushPromises()
 
@@ -1789,7 +1764,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('return_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
 
       await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1802,7 +1776,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
       await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
       await flushPromises()
 
@@ -1838,7 +1811,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
 
       await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1851,7 +1823,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
       await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
       await flushPromises()
 
@@ -2311,7 +2282,6 @@ describe('ReconciliationCreateFlowPage', () => {
         await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].orderId')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-        await passDuplicatesCard(wrapper)
 
         await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -2323,7 +2293,6 @@ describe('ReconciliationCreateFlowPage', () => {
         await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
         await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-        await passDuplicatesCard(wrapper)
         await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
         await flushPromises()
 
@@ -2370,7 +2339,6 @@ describe('ReconciliationCreateFlowPage', () => {
         await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].returnId')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-        await passDuplicatesCard(wrapper)
 
         await chooseWorkflowOption(wrapper, 'file2-system-select', 'SHOPIFY')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -2382,7 +2350,6 @@ describe('ReconciliationCreateFlowPage', () => {
         await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('order_id')
         await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-        await passDuplicatesCard(wrapper)
         await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
         await flushPromises()
 
@@ -2503,7 +2470,7 @@ describe('ReconciliationCreateFlowPage', () => {
     })
   })
 
-  // DAR-UI-064 (S1): a side's duplicate-key handling, its connector's declared extract options, the SuiteQL
+  // DAR-UI-064 (S1): a side's connector's declared extract options, the SuiteQL
   // query entry on the NetSuite config card, and the single-sided (EVALUATE) run.
   describe('run side options', () => {
     const RETURNS_OPTIONS = [
@@ -2585,34 +2552,21 @@ describe('ReconciliationCreateFlowPage', () => {
       return createRuleSetRun.mock.calls.at(-1)?.[0] as Record<string, unknown>
     }
 
-    it('asks what a repeated key means on each side and sends FINDING only where chosen', async () => {
+    it('goes from a side\'s key straight to the next side, and sends no repeated-key choice', async () => {
       mockSideOptions()
-      const wrapper = await startSideFlow('Duplicates')
+      const wrapper = await startSideFlow('No duplicates card')
       await chooseApiConfig(wrapper, 'file1', 'OMS', 'krewe_oms')
       await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].orderId')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      expect(wrapper.text()).toContain('What happens when a key repeats in Orders API?')
-      expect(wrapper.get('[data-testid="file1-duplicates-choice-FAIL"]').classes()).toContain('workflow-shortcut-choice-card--active')
-      await chooseWorkflowChoice(wrapper, 'file1-duplicates-choice-FINDING')
-      await flushPromises()
-      // krewe_oms declares no extract options, so there is no options card.
-      expect(wrapper.find('[data-testid="file1-options"]').exists()).toBe(false)
+      // krewe_oms declares no extract options, so the key is the side's last card.
       expect(wrapper.text()).toContain('Which system provides the second source?')
-
       await answerCsvFile2(wrapper)
-      expect(wrapper.find('[data-testid="file2-duplicates-choice-FAIL"]').exists()).toBe(true)
-      draftStoreState.setRuleSetDraft.mockClear()
-      await passDuplicatesCard(wrapper)
-      // The choice card is the last card before the board, and the board reads only the draft store.
-      expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledTimes(1)
-      expect(draftStoreState.setRuleSetDraft.mock.calls[0]?.[0]).toMatchObject({ file1DuplicateKeyHandling: 'FINDING' })
       await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
       await flushPromises()
 
       const payload = lastCreatePayload()
-      expect(payload.file1DuplicateKeyHandling).toBe('FINDING')
-      expect(payload).not.toHaveProperty('file2DuplicateKeyHandling')
+      expect(Object.keys(payload).filter((key) => key.includes('DuplicateKey'))).toEqual([])
       expect(payload).not.toHaveProperty('file1ExtractOptions')
     })
 
@@ -2622,7 +2576,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await chooseApiConfig(wrapper, 'file1', 'OMS', 'gorjana_gql')
       await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].orderId')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
 
       expect(wrapper.text()).toContain('Which options should Orders API use?')
       expect(wrapper.findAll('[data-testid="file1-options"] input[type="checkbox"]')).toHaveLength(2)
@@ -2630,7 +2583,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
       await answerCsvFile2(wrapper)
-      await passDuplicatesCard(wrapper)
       await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
       await flushPromises()
 
@@ -2643,18 +2595,16 @@ describe('ReconciliationCreateFlowPage', () => {
       await chooseApiConfig(wrapper, 'file1', 'OMS', 'gorjana_gql')
       await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].orderId')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
       await wrapper.get('[data-testid="file1-option-includeReturnsWithoutShopifyRef"]').setValue(true)
 
-      // Back to the config card: options -> duplicates -> key -> config.
-      for (let step = 0; step < 3; step += 1) await wrapper.get('.wizard-back').trigger('click')
+      // Back to the config card: options -> key -> config.
+      for (let step = 0; step < 2; step += 1) await wrapper.get('.wizard-back').trigger('click')
       expect(wrapper.find('[data-testid="file1-api-config-select"]').exists()).toBe(true)
       await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'krewe_oms')
       await chooseWorkflowOption(wrapper, 'file1-api-config-select', 'gorjana_gql')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].orderId')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
 
       const checkbox = wrapper.get('[data-testid="file1-option-includeReturnsWithoutShopifyRef"]').element as HTMLInputElement
       expect(checkbox.checked).toBe(false)
@@ -2736,9 +2686,7 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(getNsSuiteQlQuery).toHaveBeenCalledWith('NS_NEW_QUERY', expect.any(AbortSignal))
       await chooseWorkflowOption(wrapper, 'file1-field-select', '$.records[*].tranId')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      await passDuplicatesCard(wrapper)
       await answerCsvFile2(wrapper)
-      await passDuplicatesCard(wrapper)
       await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
       await flushPromises()
 
@@ -2763,13 +2711,11 @@ describe('ReconciliationCreateFlowPage', () => {
       // The query's fields could not be read (the default mock rejects), so the key is typed.
       await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('tranId')
       await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // The duplicates card is the last card: it saves, and the bar is full.
+      // The key is the last card: it saves, and the bar is full.
       expect(wrapper.get('[data-testid="create-run-submit"]').text()).toBe('Save run')
       expect(Number(wrapper.get('[role="progressbar"]').attributes('aria-valuenow'))).toBe(100)
       expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(false)
-      await chooseWorkflowChoice(wrapper, 'file1-duplicates-choice-FINDING')
       await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
       await flushPromises()
 
@@ -2781,7 +2727,6 @@ describe('ReconciliationCreateFlowPage', () => {
         file1SourceConfigId: 'NS_CREDIT_OPEN',
         file1SourceConfigType: 'NETSUITE_SUITEQL',
         file1PrimaryIdExpression: '$.records[*].tranId',
-        file1DuplicateKeyHandling: 'FINDING',
       }))
       expect(Object.keys(payload).filter((key) => key.startsWith('file2'))).toEqual([])
     })

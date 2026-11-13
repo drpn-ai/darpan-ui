@@ -360,4 +360,49 @@ describe('AuditSettingsPage email after each run', () => {
     expect(space(v).props('options')).toEqual([{ value: '', label: 'None' }, { value: 'spaces/OFF', label: 'spaces/OFF' }])
     expect(v.find('[data-testid="audit-settings-error"]').exists()).toBe(false)
   })
+
+  // DAR-BE-256. The sender drops the card silently when its space cannot be used; the page says so.
+  function problem(w: ReturnType<typeof mount>): string | null {
+    const node = w.find('[data-testid="audit-settings-chat-space-problem"]')
+    return node.exists() ? node.text() : null
+  }
+
+  it.each([
+    ['spaces/OFF', 'This chat space is turned off, so no card is sent.'],
+    ['spaces/GONE', 'This chat space no longer exists, so no card is sent.'],
+    ['spaces/NOHOOK', 'This chat space has no webhook or Slack channel, so no card is sent.'],
+  ])('warns when the saved space %s cannot be posted to', async (chatSpaceId, warning) => {
+    vi.mocked(settingsFacade.listTenantChatSpaces).mockResolvedValue({ ok: true, chatSpaces: [
+      { chatSpaceId: 'spaces/AAA', spaceName: 'Gorjana ops', isActive: 'Y', webhookConfigured: true },
+      { chatSpaceId: 'spaces/OFF', spaceName: 'Old space', isActive: 'N', webhookConfigured: true },
+      { chatSpaceId: 'spaces/NOHOOK', spaceName: 'Half set up', isActive: 'Y', webhookConfigured: false },
+    ] } as never)
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { ...settings(), runEmail: { ...runEmail, chatSpaceId } } } as never)
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(problem(w)).toBe(warning)
+    // Picking a usable space, or None, clears it before saving.
+    space(w).vm.$emit('update:modelValue', 'spaces/AAA')
+    await flushPromises()
+    expect(problem(w)).toBeNull()
+  })
+
+  it('says nothing about a usable space, or when the list did not load', async () => {
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(problem(w)).toBeNull()
+
+    vi.mocked(settingsFacade.listTenantChatSpaces).mockRejectedValue(new Error('down'))
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { ...settings(), runEmail: { ...runEmail, chatSpaceId: 'spaces/GONE' } } } as never)
+    const v = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(problem(v)).toBeNull()
+  })
+
+  it('warns a reader who cannot edit it too', async () => {
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { ...settings(), runEmail: { ...runEmail, chatSpaceId: 'spaces/OFF', canEdit: false } } } as never)
+    const w = mount(AuditSettingsPage)
+    await flushPromises()
+    expect(problem(w)).toBe('This chat space is turned off, so no card is sent.')
+  })
 })

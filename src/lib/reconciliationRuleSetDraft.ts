@@ -24,7 +24,6 @@ export type ReconciliationCreateFlowStepId =
   | 'file1-api-config'
   | 'file1-api'
   | 'file1-primary-id'
-  | 'file1-duplicates'
   | 'file1-options'
   | 'file2-system'
   | 'file2-source'
@@ -34,7 +33,6 @@ export type ReconciliationCreateFlowStepId =
   | 'file2-api-config'
   | 'file2-api'
   | 'file2-primary-id'
-  | 'file2-duplicates'
   | 'file2-options'
   | 'ruleset-rules'
 
@@ -112,9 +110,6 @@ export interface ReconciliationRuleSetDraft {
   file2SchemaLabel?: string
   file2SchemaFileName?: string
   file2PrimaryIdExpression: string[]
-  /** DAR-UI-064. FINDING reports every record under a repeated key; blank fails the run. */
-  file1DuplicateKeyHandling?: string
-  file2DuplicateKeyHandling?: string
   /** DAR-UI-064. The side connector's declared extract options, as chosen. */
   file1ExtractOptions?: SourceExtractOptions
   file2ExtractOptions?: SourceExtractOptions
@@ -210,21 +205,16 @@ export function buildCreateRuleSetRunPayload(draft: ReconciliationRuleSetDraft):
 }
 
 /**
- * DAR-UI-064. A side's duplicate-key handling and extract options. Only FINDING is sent (blank is the
- * backend default, fail the run); an option left false or blank is not sent, and an empty set sends nothing.
+ * DAR-UI-064. A side's extract options. An option left false or blank is not sent, and an empty set sends nothing.
  */
 function sideOptionPayloadFields(side: 'file1' | 'file2', draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
-  const handling = (side === 'file1' ? draft.file1DuplicateKeyHandling : draft.file2DuplicateKeyHandling)?.trim().toUpperCase()
   const options = Object.entries((side === 'file1' ? draft.file1ExtractOptions : draft.file2ExtractOptions) ?? {})
     .flatMap(([name, value]): Array<[string, boolean | string]> => {
       if (value === true) return [[name, true]]
       if (typeof value === 'string' && value.trim()) return [[name, value.trim()]]
       return []
     })
-  return {
-    ...(handling === 'FINDING' ? { [`${side}DuplicateKeyHandling`]: 'FINDING' } : {}),
-    ...(options.length ? { [`${side}ExtractOptions`]: Object.fromEntries(options) } : {}),
-  }
+  return options.length ? { [`${side}ExtractOptions`]: Object.fromEntries(options) } : {}
 }
 
 function buildSideSourceFields(side: 'file1' | 'file2', draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {

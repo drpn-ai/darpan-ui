@@ -213,9 +213,9 @@ const STAGE_MAX_CARDS: Record<(typeof STAGES)[number], number> = {
   // adding a card to a stage without raising its ceiling is silent, because Math.min caps the
   // fraction at 1 — the bar simply stops moving for the last card of the stage instead of failing.
   name: 3,
-  // 8 since DAR-UI-064 added the duplicate-key and extract-option cards after the key.
-  file1: 8,
-  file2: 8,
+  // 7: an API side's system, source, endpoint, config, API, key and extract options.
+  file1: 7,
+  file2: 7,
   rules: 1,
 }
 
@@ -225,9 +225,6 @@ const SOURCE_TYPE_API = 'AUT_SRC_API'
 const SOURCE_MODE_FILE = 'file'
 const SOURCE_MODE_API = 'api'
 const SHORTCUT_KEYS = ['A', 'B', 'C', 'D', 'E', 'F']
-// DAR-UI-064. A side's answer to "a key repeats": blank on the wire fails the run, FINDING reports each record.
-const DUPLICATES_FAIL = 'FAIL'
-const DUPLICATES_FINDING = 'FINDING'
 // A run side over a saved NetSuite SuiteQL query: the config IS the query, and there is no endpoint card after it.
 const SOURCE_CONFIG_TYPE_SUITEQL = 'NETSUITE_SUITEQL'
 const SUITEQL_RECORD_ROOT = '$.records[*].'
@@ -299,8 +296,6 @@ const file2NsRestletConfigId = ref('')
 const file2SystemMessageRemoteId = ref('')
 const scopeMode = ref(readQueryValue('scope').toUpperCase() === SCOPE_EVALUATE ? SCOPE_EVALUATE : SCOPE_COMPARE)
 const isSingleSided = computed(() => scopeMode.value === SCOPE_EVALUATE)
-const file1DuplicateKeyHandling = ref(DUPLICATES_FAIL)
-const file2DuplicateKeyHandling = ref(DUPLICATES_FAIL)
 const file1ExtractOptions = ref<SourceExtractOptions>({})
 const file2ExtractOptions = ref<SourceExtractOptions>({})
 // A SuiteQL query's record field names, by query id: undefined while loading, null when the read failed.
@@ -366,8 +361,6 @@ function sourceArmSteps(side: SourceSide): WizardStep[] {
   }
 
   armSteps.push({ id: `${side}-primary-id` as StepId })
-  // DAR-UI-064. What a repeated key means is a property of the side, so it follows the key.
-  armSteps.push({ id: `${side}-duplicates` as StepId })
   if (armExtractOptions(side).length) armSteps.push({ id: `${side}-options` as StepId })
   return armSteps
 }
@@ -451,11 +444,6 @@ function clearExtractOptions(side: SourceSide): void {
   } else {
     file2ExtractOptions.value = {}
   }
-}
-
-function duplicateKeyHandlingForDraft(side: SourceSide): string | undefined {
-  const value = side === 'file1' ? file1DuplicateKeyHandling.value : file2DuplicateKeyHandling.value
-  return value === DUPLICATES_FINDING ? DUPLICATES_FINDING : undefined
 }
 
 /** The query's fields as key options; a typed bare name gets the records root its extract returns. */
@@ -616,7 +604,6 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file1SchemaLabel: !file1UsesApi.value ? resolveSelectedSchemaLabel(file1JsonSchemaId.value) : undefined,
   file1SchemaFileName: !file1UsesApi.value ? resolveSchemaFileName(file1JsonSchemaId.value) : undefined,
   file1PrimaryIdExpression: primaryIdExpressionForDraft('file1'),
-  file1DuplicateKeyHandling: duplicateKeyHandlingForDraft('file1'),
   file1ExtractOptions: declaredExtractOptionValues('file1'),
   file2SystemEnumId: file2SystemEnumId.value,
   file2SystemLabel: file2SystemLabel.value || undefined,
@@ -634,7 +621,6 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file2SchemaLabel: !file2UsesApi.value ? resolveSelectedSchemaLabel(file2JsonSchemaId.value) : undefined,
   file2SchemaFileName: !file2UsesApi.value ? resolveSchemaFileName(file2JsonSchemaId.value) : undefined,
   file2PrimaryIdExpression: primaryIdExpressionForDraft('file2'),
-  file2DuplicateKeyHandling: duplicateKeyHandlingForDraft('file2'),
   file2ExtractOptions: declaredExtractOptionValues('file2'),
 }))
 
@@ -670,8 +656,6 @@ const currentQuestion = computed(() => {
       return `Which ${sourceSystemLabel('file1')} config should this source use?`
     case 'file1-api':
       return `Which API endpoint should ${sourceSystemLabel('file1')} use?`
-    case 'file1-duplicates':
-      return `What happens when a key repeats in ${apiRecordSourceLabel('file1')}?`
     case 'file1-options':
       return `Which options should ${apiRecordSourceLabel('file1')} use?`
     case 'file2-system':
@@ -700,8 +684,6 @@ const currentQuestion = computed(() => {
       return `Which ${sourceSystemLabel('file2')} config should this source use?`
     case 'file2-api':
       return `Which API endpoint should ${sourceSystemLabel('file2')} use?`
-    case 'file2-duplicates':
-      return `What happens when a key repeats in ${apiRecordSourceLabel('file2')}?`
     case 'file2-options':
       return `Which options should ${apiRecordSourceLabel('file2')} use?`
     case 'ruleset-rules':
@@ -781,10 +763,6 @@ const activeSelectValue = computed({
         return file2SourceConfigId.value
       case 'file2-api':
         return selectedApiSourceValue('file2')
-      case 'file1-duplicates':
-        return file1DuplicateKeyHandling.value
-      case 'file2-duplicates':
-        return file2DuplicateKeyHandling.value
       default:
         return ''
     }
@@ -867,12 +845,6 @@ const activeSelectValue = computed({
         break
       case 'file2-api':
         updateApiSource('file2', value)
-        break
-      case 'file1-duplicates':
-        file1DuplicateKeyHandling.value = value === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
-        break
-      case 'file2-duplicates':
-        file2DuplicateKeyHandling.value = value === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
         break
     }
   },
@@ -1089,8 +1061,7 @@ const showEmptyState = computed(() =>
 
 const isFileTypeChoiceStep = computed(() => currentStep.value.id === 'file1-filetype' || currentStep.value.id === 'file2-filetype')
 const isSourceChoiceStep = computed(() => currentStep.value.id === 'file1-source' || currentStep.value.id === 'file2-source')
-const isDuplicatesChoiceStep = computed(() => currentStep.value.id === 'file1-duplicates' || currentStep.value.id === 'file2-duplicates')
-const isShortcutChoiceStep = computed(() => isSourceChoiceStep.value || isFileTypeChoiceStep.value || isDuplicatesChoiceStep.value)
+const isShortcutChoiceStep = computed(() => isSourceChoiceStep.value || isFileTypeChoiceStep.value)
 const isOptionsStep = computed(() => currentStep.value.id === 'file1-options' || currentStep.value.id === 'file2-options')
 const activeOptionsSide = computed<SourceSide>(() => (currentStep.value.id === 'file2-options' ? 'file2' : 'file1'))
 const activeBooleanExtractOptions = computed(() =>
@@ -1128,29 +1099,18 @@ const activeShortcutChoiceTestPrefix = computed(() => {
       return 'file2-source-choice'
     case 'file2-filetype':
       return 'file2-filetype-choice'
-    case 'file1-duplicates':
-      return 'file1-duplicates-choice'
-    case 'file2-duplicates':
-      return 'file2-duplicates-choice'
     default:
       return 'workflow-choice'
   }
 })
 
 const activeShortcutChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() =>
-  (isSourceChoiceStep.value
-    ? sourceModeOptions.value
-    : (isDuplicatesChoiceStep.value ? duplicateKeyOptions : activeSelectOptions.value)).map((option, index) => ({
+  (isSourceChoiceStep.value ? sourceModeOptions.value : activeSelectOptions.value).map((option, index) => ({
     value: option.value,
     label: option.label,
     shortcutKey: SHORTCUT_KEYS[index] ?? String(index + 1),
   })),
 )
-
-const duplicateKeyOptions: WorkflowSelectOption[] = [
-  { value: DUPLICATES_FAIL, label: 'Fail the run' },
-  { value: DUPLICATES_FINDING, label: 'Report each as a finding' },
-]
 
 const sourceModeOptions = computed<WorkflowSelectOption[]>(() => [
   { value: SOURCE_MODE_FILE, label: 'File upload' },
@@ -1324,8 +1284,6 @@ const canProceed = computed(() => {
       return file2SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
     case 'file2-api':
       return hasApiEndpoint('file2') && !apiSourceSelectionError.value
-    case 'file1-duplicates':
-    case 'file2-duplicates':
     case 'file1-options':
     case 'file2-options':
       return true
@@ -1934,8 +1892,6 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   file2SourceConfigType.value = draftState.draft.file2SourceConfigType ?? ''
   file2NsRestletConfigId.value = draftState.draft.file2NsRestletConfigId ?? ''
   file2SystemMessageRemoteId.value = draftState.draft.file2SystemMessageRemoteId ?? ''
-  file1DuplicateKeyHandling.value = draftState.draft.file1DuplicateKeyHandling === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
-  file2DuplicateKeyHandling.value = draftState.draft.file2DuplicateKeyHandling === DUPLICATES_FINDING ? DUPLICATES_FINDING : DUPLICATES_FAIL
   file1ExtractOptions.value = { ...(draftState.draft.file1ExtractOptions ?? {}) }
   file2ExtractOptions.value = { ...(draftState.draft.file2ExtractOptions ?? {}) }
   // Resolve step 1's answer from the resumed concrete value (e.g. OMS_RETURNS_GQL -> OMS) BEFORE

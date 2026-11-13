@@ -40,7 +40,7 @@ describe('RunFlowchartStartPage', () => {
     expect(w.text()).toContain('Which days should this run look at?')
     const labels = w.findAll('.workflow-shortcut-choice-card__label').map((l) => l.text())
     expect(labels[0]).toBe('Previous Day, Aug 16, 2026')
-    expect(labels[1]).toBe('Previous Week, Aug 9, 2026 to Aug 16, 2026')
+    expect(labels[1]).toBe('Previous Week, Aug 10, 2026 to Aug 16, 2026')
     expect(labels[2]).toBe('Month to Date, Aug 1, 2026 to Aug 16, 2026')
     expect(labels[3]).toBe('Custom Dates, select start and end dates')
     expect(form(w).props('submitDisabled')).toBe(true)
@@ -62,7 +62,7 @@ describe('RunFlowchartStartPage', () => {
     await flushPromises()
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b' }))
     await submit(w)
-    expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ windowStartLocalDate: '2026-08-09', windowEndLocalDate: '2026-08-17' }))
+    expect(f.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ windowStartLocalDate: '2026-08-10', windowEndLocalDate: '2026-08-17' }))
     w.unmount()
   })
 

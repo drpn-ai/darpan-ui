@@ -51,19 +51,19 @@ describe('AuditRunStartPage', () => {
 
   // DAR-UI-063. Only days the audit can still record: on Aug 17 a monthly audit plays from Aug 1 unless July is extended,
   // so a card reaching into July is not offered and July's days cannot be picked; Month to Date (DAR-UI-112) starts Aug 1.
-  // From Aug 10 the week (Aug 9) and the month to date drop out.
+  // From Aug 11 the week (Aug 10) and the month to date drop out.
   it('offers only days the audit can still record', async () => {
     f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: '2026-08-01' } } as never)
     const w = mount(AuditRunStartPage)
     await flushPromises()
     expect(f.getAuditSettings).toHaveBeenCalledWith({ audit: 'month-close' })
     const labels = w.findAll('.workflow-shortcut-choice-card__label').map((l) => l.text())
-    expect(labels).toEqual(['Previous Day, Aug 16, 2026', 'Previous Week, Aug 9, 2026 to Aug 16, 2026',
+    expect(labels).toEqual(['Previous Day, Aug 16, 2026', 'Previous Week, Aug 10, 2026 to Aug 16, 2026',
       'Month to Date, Aug 1, 2026 to Aug 16, 2026', 'Custom Dates, select start and end dates'])
   })
 
   it('drops a card that starts before the first playable day', async () => {
-    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: '2026-08-10' } } as never)
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: '2026-08-11' } } as never)
     const w = mount(AuditRunStartPage)
     await flushPromises()
     const labels = w.findAll('.workflow-shortcut-choice-card__label').map((l) => l.text())
@@ -90,12 +90,12 @@ describe('AuditRunStartPage', () => {
     w.unmount()
   })
 
-  it('a week runs its eight days through yesterday; a month runs to its last day', async () => {
+  it('a week runs its seven days through yesterday; a month runs to its last day', async () => {
     const w = mount(AuditRunStartPage, { attachTo: document.body })
     await flushPromises()
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b' }))
     await submit(w)
-    expect(f.runAudit).toHaveBeenLastCalledWith({ audit: 'month-close', fromDate: '2026-08-09', thruDate: '2026-08-16' })
+    expect(f.runAudit).toHaveBeenLastCalledWith({ audit: 'month-close', fromDate: '2026-08-10', thruDate: '2026-08-16' })
     w.unmount()
 
     const m = mount(AuditRunStartPage)

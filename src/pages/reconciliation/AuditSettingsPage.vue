@@ -80,6 +80,7 @@
             <p v-if="alsoSendTo.length" class="audit-settings-addresses" data-testid="audit-settings-also-send-to">{{ alsoSendTo.join(', ') }}</p>
             <span class="audit-settings-label">Chat space</span>
             <p class="audit-settings-addresses" data-testid="audit-settings-chat-space-readonly">{{ chatSpaceLabel(chatSpaceId) }}</p>
+            <InlineValidation v-if="chatSpaceProblem" tone="warning" :message="chatSpaceProblem" data-testid="audit-settings-chat-space-problem" />
             <p class="section-note">Only tenant admins can change this.</p>
           </div>
           <label v-else class="audit-settings-field">
@@ -104,6 +105,12 @@
               :disabled="saving"
             />
           </label>
+          <InlineValidation
+            v-if="canEditRunEmail && chatSpaceProblem"
+            tone="warning"
+            :message="chatSpaceProblem"
+            data-testid="audit-settings-chat-space-problem"
+          />
         </div>
 
         <div class="audit-settings-group">
@@ -252,6 +259,8 @@ const alsoSendToInput = ref<InstanceType<typeof WorkflowChipTextInput> | null>(n
 // DAR-UI-111. The space that gets the run's summary card; '' is none.
 const chatSpaceId = ref('')
 const chatSpaces = ref<TenantChatSpace[]>([])
+// Only a list that loaded can say a space is gone; a failed load says nothing about it.
+const chatSpacesLoaded = ref(false)
 const saving = ref(false)
 const opening = ref(false)
 const error = ref<string | null>(null)
@@ -282,6 +291,17 @@ const chatSpaceOptions = computed(() => {
   const saved = original.value?.runEmail?.chatSpaceId
   if (saved && !options.some((option) => option.value === saved)) options.push({ value: saved, label: chatSpaceLabel(saved) })
   return options
+})
+
+// DAR-BE-256. The run's sender drops the card without a word when its space is gone (or another tenant's), off, or
+// has nowhere to post, so the page says so. The list is the active tenant's spaces, off ones included.
+const chatSpaceProblem = computed(() => {
+  if (!chatSpaceId.value || !chatSpacesLoaded.value) return ''
+  const space = chatSpaces.value.find((candidate) => candidate.chatSpaceId === chatSpaceId.value)
+  if (!space) return 'This chat space no longer exists, so no card is sent.'
+  if (space.isActive === 'N') return 'This chat space is turned off, so no card is sent.'
+  if (space.webhookConfigured === false) return 'This chat space has no webhook or Slack channel, so no card is sent.'
+  return ''
 })
 
 const abort = new AbortController()
@@ -387,8 +407,10 @@ async function loadChatSpaces() {
   try {
     const response = await settingsFacade.listTenantChatSpaces(abort.signal)
     chatSpaces.value = response.chatSpaces ?? []
+    chatSpacesLoaded.value = response.ok !== false && Array.isArray(response.chatSpaces)
   } catch {
     chatSpaces.value = []
+    chatSpacesLoaded.value = false
   }
 }
 

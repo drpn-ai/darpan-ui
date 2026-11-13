@@ -966,7 +966,7 @@ describe('ReconciliationDiffPage', () => {
     expect(wrapper.findAll('.workflow-shortcut-choice-card')).toHaveLength(4)
     expect(wrapper.get('[data-testid="api-window-preset-previous-day"]').text()).toContain('Previous Day, May 16, 2026')
     expect(wrapper.get('[data-testid="api-window-preset-previous-week"]').text()).toContain(
-      'Previous Week, May 9, 2026 to May 16, 2026',
+      'Previous Week, May 10, 2026 to May 16, 2026',
     )
     expect(wrapper.get('[data-testid="api-window-preset-month-to-date"]').text()).toContain(
       'Month to Date, May 1, 2026 to May 16, 2026',
@@ -989,9 +989,9 @@ describe('ReconciliationDiffPage', () => {
       savedRunId: 'RS_API_ORDER_SYNC',
       file1SystemEnumId: 'OMS',
       file2SystemEnumId: 'SHOPIFY',
-      windowStartDate: expectedWindowPayloadDate(2026, 4, 9),
+      windowStartDate: expectedWindowPayloadDate(2026, 4, 10),
       windowEndDate: expectedWindowPayloadDate(2026, 4, 17),
-      windowStartLocalDate: '2026-05-09',
+      windowStartLocalDate: '2026-05-10',
       windowEndLocalDate: '2026-05-17',
       hasHeader: true,
     })

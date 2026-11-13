@@ -24,6 +24,7 @@ type TestSessionInfo = {
   canRunActiveTenantReconciliation?: boolean
   canEditActiveTenantData: boolean
   canManageDarpanCore?: boolean
+  activeTenantPermissionGroupIds?: string[]
   isSuperAdmin: boolean
 }
 
@@ -385,6 +386,19 @@ describe('UserSettingsPage', () => {
 
     expect(wrapper.text()).not.toContain('Not available')
     expect(wrapper.text()).toContain('Permissions')
+  })
+
+  // DAR-UI-115: the role is named as the admin app names it, by the widest group held in the active tenant.
+  it.each([
+    [['DARPAN_COMPANY_EDITOR'], 'Company editor'],
+    [['DARPAN_COMPANY_VIEW_ONLY'], 'Company view only'],
+    [['DARPAN_COMPANY_VIEW_ONLY', 'DARPAN_TENANT_ADMIN'], 'Tenant admin'],
+    [[], 'No membership'],
+  ])('names the permission groups %j as %s', (groupIds, label) => {
+    authState.sessionInfo = { ...authState.sessionInfo, activeTenantPermissionGroupIds: groupIds }
+    const card = mountPage().findAll('.static-page-summary-card')
+      .find((node) => node.find('.static-page-summary-label').text() === 'Permissions')
+    expect(card?.text()).toBe(`Permissions${label}`)
   })
 
   it('shows the default chat space and changes it via popup', async () => {

@@ -420,12 +420,19 @@ const lastRunLabel = computed(() => {
   if (!lastRun) return ''
   return lastRun.savedRunId || lastRun.reconciliationRunId || lastRun.reconciliationRunResultId || 'Run available'
 })
+// The admin app's names for a tenant role (darpan-admin-ui TenantDetailPage roleOptions), widest first:
+// the summary names the widest role held in the active tenant.
+const TENANT_ROLE_LABELS: ReadonlyArray<readonly [string, string]> = [
+  ['DARPAN_TENANT_ADMIN', 'Tenant admin'],
+  ['DARPAN_COMPANY_EDITOR', 'Company editor'],
+  ['DARPAN_TENANT_USER', 'Tenant user'],
+  ['DARPAN_COMPANY_VIEW_ONLY', 'Company view only'],
+]
 const permissionSummary = computed(() => {
   if (permissionsStore.canManageGlobalSettings) return 'Darpan admin'
   if (sessionInfo.value?.isSuperAdmin === true) return 'Super admin'
-  if (permissionsStore.canEditTenantSettings) return 'Tenant admin'
-  if (permissionsStore.canRunActiveTenantReconciliation) return 'Tenant user'
-  return 'View only membership'
+  const groupIds = sessionInfo.value?.activeTenantPermissionGroupIds ?? []
+  return TENANT_ROLE_LABELS.find(([groupId]) => groupIds.includes(groupId))?.[1] ?? 'No membership'
 })
 const notificationDefaultSummary = computed(() => notificationDefault.value?.spaceName || 'No default space')
 const userTimeZone = computed(() => sessionInfo.value?.userTimeZone?.toString().trim() || '')

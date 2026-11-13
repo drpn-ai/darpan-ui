@@ -28,8 +28,9 @@ export function presetWindowRange(preset: Exclude<RunWindowPreset, 'custom'>, to
       summary: formatWindowDateLabel(previousDay),
     }
   }
+  // Previous week: the seven days ending yesterday.
   if (preset === 'previous-week') {
-    const startDate = addDays(today, -8)
+    const startDate = addDays(today, -7)
     const endDate = addDays(today, -1)
     return {
       startDate,

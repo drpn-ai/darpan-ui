@@ -166,7 +166,6 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   // Explicit, because flowchartFindings carries the same title: on the audit report "Findings" is
   // the open-until-cleared ledger. The flowchart page points at its own meaning with v-explain.
   'findings': 'auditFindings',
-  'grace days': 'auditGrace',
 
   // Setup forms (DAR-UI-103). Generic words (Username, Password, Host, Expires, Name, Time, Day) are
   // NOT here: each form points at its own meaning with v-explain, and those entries stay out of the index.
