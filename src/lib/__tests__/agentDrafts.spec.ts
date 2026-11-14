@@ -28,6 +28,17 @@ describe('boardDrafts', () => {
     expect(drafts.added).toEqual([{ id: 'R2', text: 'Two', category: 'returns' }])
   })
 
+  // DAR-UI-117. Every plan numbers its own new statement R{top+1}; several drafts from one turn read in approval order.
+  it('numbers several new statements in order after the highest code the audit has', () => {
+    const add = (proposalId: string, text: string) => preview({ proposalId, kind: 'ADD_STATEMENT',
+      before: { statements: [statement('R1', 'One'), statement('R4', 'Four')] },
+      after: { statements: [statement('R1', 'One'), statement('R4', 'Four'), statement('R5', text)], add: { text, category: 'orders' } } })
+    const drafts = boardDrafts([add('P1', 'Five'), add('P2', 'Six'), add('P3', 'Seven')])
+    expect(drafts.added.map((statement) => `${statement.id} ${statement.text}`)).toEqual(['R5 Five', 'R6 Six', 'R7 Seven'])
+    expect(boardDrafts([preview({ kind: 'ADD_STATEMENT', before: { statements: [] },
+      after: { statements: [statement('R1', 'First')], add: { text: 'First', category: 'orders' } } })]).added.map((s) => s.id)).toEqual(['R1'])
+  })
+
   it('reads statements only from statement drafts, and collects closed findings once across drafts', () => {
     const drafts = boardDrafts([
       preview({ kind: 'EXPECTED_CAUSES', before: { statements: [] }, after: { statements: [statement('R9', 'Not a statement draft')] },

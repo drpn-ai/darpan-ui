@@ -97,6 +97,16 @@ describe('AuditAgentPanel', () => {
     expect(replies[1]!.attributes('data-outcome')).toBe('RATE_LIMITED')
   })
 
+  // DAR-UI-117. The thread shows plain text, so markdown emphasis in a reply must not show its asterisks.
+  it('shows a reply\'s emphasis as its words, and what the person typed exactly as typed', async () => {
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: '- **Orders:** Every Shopify order is in HotWax.\n- __Refunds:__ a 2*3 note' }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'Keep **this** as typed')
+    const texts = wrapper.findAll('[data-testid="agent-message"]').map((m) => m.text())
+    expect(texts).toEqual(['Keep **this** as typed', '- Orders: Every Shopify order is in HotWax.\n- Refunds: a 2*3 note'])
+  })
+
   it('shows a question with its options, and an option answers it', async () => {
     sendAgentTurn.mockResolvedValueOnce(turn({ outcome: 'QUESTION', reply: null, question: { text: 'Which store?', options: ['US', 'Canada'], from: 'ROUTER' } }))
     sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'Canada it is.' }))
@@ -227,6 +237,19 @@ describe('AuditAgentPanel', () => {
     wrapper.getComponent(ProposalCard).vm.$emit('changed', { proposalId: 'P1', status: 'REJECTED' })
     await flushPromises()
     expect((wrapper.emitted('preview') as DraftPreview[][][]).at(-1)![0]).toEqual([])
+    expect(wrapper.emitted('applied')).toBeUndefined()
+  })
+
+  // DAR-UI-117. An approved change moves the audit; the board must reload or the new statement never shows.
+  it('tells the page when a change is applied, so the board reloads', async () => {
+    planAuditChange.mockResolvedValue({ planHash: 'H1', before: { statements: [] }, after: { statements: [] }, backtest: null, status: 'PLANNED', statusMessage: null })
+    sendAgentTurn.mockResolvedValueOnce(turn({ reply: 'Drafted.', proposals: [{ ...draft, kind: 'ADD_STATEMENT' as const }] }))
+    const wrapper = mountPanel()
+    await flushPromises()
+    await send(wrapper, 'Every order is billed')
+    wrapper.getComponent(ProposalCard).vm.$emit('changed', { proposalId: 'P1', status: 'APPLIED' })
+    await flushPromises()
+    expect(wrapper.emitted('applied')).toHaveLength(1)
   })
 
   it('keeps a conversation per tenant and audit, and a reset forgets them all', () => {

@@ -38,6 +38,7 @@
         :proposal="proposal"
         :can-approve="canApprove"
         :highlighted="highlightedId === proposal.proposalId"
+        :replan-key="appliedCount"
         @planned="onPlanned"
         @changed="onProposalChanged"
         @reverted="(next) => mergeProposals([next])"
@@ -119,6 +120,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** DAR-UI-109. The plans of the drafts waiting for approval, for the board to mark. */
   preview: [DraftPreview[]]
+  /** DAR-UI-117. A change was applied (a revert included): the audit moved, so the board reloads what it shows. */
+  applied: []
 }>()
 
 interface PanelMessage {
@@ -137,6 +140,8 @@ const error = ref('')
 const masked = ref<string[]>([])
 const proposals = ref<AgentProposal[]>([])
 const highlightedId = ref('')
+// DAR-UI-117. How many changes were applied here; each one moves the audit, so the open cards plan again.
+const appliedCount = ref(0)
 const plans = ref<Record<string, PlanAuditChangeResponse>>({})
 const approveHint = ref('')
 // DAR-UI-105: typing an approval never applies anything; the card it means is pointed at instead.
@@ -147,7 +152,9 @@ const abort = new AbortController()
 onBeforeUnmount(() => abort.abort())
 
 // A turn that only asks a question has no reply text; the question block shows it.
-const shownMessages = computed(() => messages.value.filter((message) => message.text))
+// DAR-UI-117. The thread is plain text: a reply's markdown emphasis (**x**, __x__) shows as its words, not its markers.
+const shownMessages = computed(() => messages.value.filter((message) => message.text).map((message) =>
+  message.kind === 'ASSISTANT' ? { ...message, text: message.text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1') } : message))
 // What goes with the next message: the open finding, and always the audit.
 const about = computed(() => ['About', [props.findingId, props.auditName || props.auditCode].filter(Boolean).join(' · ')].join(' '))
 const previews = computed<DraftPreview[]>(() => proposals.value.flatMap((proposal) => {
@@ -187,6 +194,10 @@ function onPlanned(planned: { proposalId: string; plan: PlanAuditChangeResponse 
 function onProposalChanged(change: { proposalId: string; status: string }): void {
   proposals.value = proposals.value.map((proposal) =>
     proposal.proposalId === change.proposalId ? { ...proposal, status: change.status } : proposal)
+  if (change.status === 'APPLIED') {
+    appliedCount.value += 1
+    emit('applied')
+  }
   if (!OPEN_STATUSES.has(change.status) && highlightedId.value === change.proposalId) {
     highlightedId.value = ''
     approveHint.value = ''

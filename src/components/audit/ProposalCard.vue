@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import LoadingState from '../ui/LoadingState.vue'
 import { agentFacade } from '../../lib/api/facade'
@@ -52,6 +52,9 @@ const props = defineProps<{
   canApprove: boolean
   /** The panel points at this card when someone types an approval instead of pressing Approve. */
   highlighted?: boolean
+  /** DAR-UI-117. Bumped by the panel when another card's change was applied: an open card plans again, so its Approve
+   * matches the audit as it now is instead of first answering "the config changed". */
+  replanKey?: number
 }>()
 
 const emit = defineEmits<{
@@ -96,7 +99,11 @@ const abort = new AbortController()
 onBeforeUnmount(() => abort.abort())
 
 const isOpen = computed(() => OPEN.has(status.value))
-const backtest = computed(() => plan.value?.backtest ?? props.proposal.backtest)
+// A backtest that does not apply to this kind of change (a new statement, a schedule) has nothing to show.
+const backtest = computed(() => {
+  const value = plan.value?.backtest ?? props.proposal.backtest
+  return value && value.supported === false && value.reason === 'NOT_APPLICABLE' ? null : value
+})
 const provenance = computed(() => {
   const blocked = props.proposal.blockedIds ?? []
   if (blocked.length) return `Nothing said or read supports ${blocked.join(', ')}.`
@@ -108,11 +115,27 @@ const provenance = computed(() => {
 const shown = computed(() => {
   const current = plan.value
   if (!current) return { before: '', after: '' }
+  // DAR-UI-117. A new check and a schedule read as what they mean, not as the plan's whole state map.
+  if (props.proposal.kind === 'ADD_CHECK') {
+    const add = (current.after?.add ?? {}) as Record<string, unknown>
+    const reads = add.savedRunId && add.savedRunId !== add.label ? ` (reads ${String(add.savedRunId)})` : ''
+    return { before: 'Nothing', after: `${String(add.statementCode ?? '')}: ${String(add.label ?? add.savedRunId ?? '')}${reads}` }
+  }
+  if (props.proposal.kind === 'AUDIT_SETTINGS') return { before: schedule(current.before), after: schedule(current.after) }
   const { before, after } = statementChanges({ kind: props.proposal.kind, before: current.before, after: current.after })
   if (!after.length) return { before: describe(current.before), after: describe(current.after) }
-  const line = (statement: { id: string; text: string; active: boolean }) => `${statement.id}: ${statement.text}${statement.active ? '' : ' (off)'}`
+  // A new statement's code is only known once it is approved (drafts are numbered in approval order), so it shows the sentence alone.
+  const line = (statement: { id: string; text: string; active: boolean }) =>
+    `${props.proposal.kind === 'ADD_STATEMENT' ? '' : `${statement.id}: `}${statement.text}${statement.active ? '' : ' (off)'}`
   return { before: before.map(line).join('\n') || 'Nothing', after: after.map(line).join('\n') }
 })
+
+function schedule(state: Record<string, unknown> | null | undefined): string {
+  const value = state?.schedule as { active?: boolean; time?: string; timeZone?: string } | undefined
+  if (!value) return 'Nothing'
+  if (value.active === false) return value.time ? `Off (${value.time}, ${value.timeZone ?? ''})`.replace(', )', ')') : 'Off'
+  return `Every day at ${value.time ?? '—'}${value.timeZone ? `, ${value.timeZone}` : ''}`
+}
 
 function describe(value: Record<string, unknown> | null | undefined): string {
   if (!value || !Object.keys(value).length) return 'Nothing'
@@ -210,6 +233,10 @@ async function revert(): Promise<void> {
 
 onMounted(() => {
   if (isOpen.value) void planAgain()
+})
+
+watch(() => props.replanKey, () => {
+  if (isOpen.value && !busy.value) void planAgain()
 })
 </script>
 

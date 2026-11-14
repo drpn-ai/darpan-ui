@@ -150,6 +150,7 @@
             :audit-name="report.report.audit.name"
             :can-approve="agentStatus?.canApprove === true"
             @preview="(next) => (draftPreviews = next)"
+            @applied="loadReport({ quiet: true })"
           />
         </template>
       </AuditColumns>

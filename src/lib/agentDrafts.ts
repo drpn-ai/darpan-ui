@@ -92,7 +92,16 @@ export function boardDrafts(previews: readonly DraftPreview[]): BoardDrafts {
       for (const id of closed) if (typeof id === 'string' && !drafts.closing.includes(id)) drafts.closing.push(id)
     }
   }
+  // Each plan numbers its new statement as if it were the only one (every draft reads R{top+1}); the server numbers them
+  // in the order they are approved, so show them in that order after the highest code the audit already has.
+  const top = Math.max(0, ...previews.flatMap((preview) => statementsOf(preview.before)).map((statement) => statementNumber(statement.id)))
+  drafts.added = drafts.added.map((statement, index) => ({ ...statement, id: `R${top + index + 1}` }))
   return drafts
+}
+
+function statementNumber(id: string): number {
+  const match = /^R(\d+)$/.exec(id)
+  return match ? Number(match[1]) : 0
 }
 
 /** The mark a changed statement carries on the board: what the draft does to it. */

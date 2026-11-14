@@ -64,6 +64,50 @@ describe('ProposalCard', () => {
     expect(wrapper.emitted('planned')).toEqual([[{ proposalId: 'P1', plan }]])
   })
 
+  // DAR-UI-117. A new statement's code is known only once approved, and a backtest that cannot apply has nothing to show.
+  it('shows a new statement as its sentence alone, with no backtest when none applies', async () => {
+    const plan = { ...PLAN, before: { audit: 'daily-close', statements: [] },
+      after: { audit: 'daily-close', statements: [{ id: 'R1', text: 'Every exchange Shopify makes is in NetSuite.', active: true, checks: 0, findings: 0 }],
+        add: { text: 'Every exchange Shopify makes is in NetSuite.', category: 'exchangesAndWarranty' } },
+      backtest: { supported: false, reason: 'NOT_APPLICABLE', basisExecutionId: null, closed: [], opened: [], unchanged: 0, limits: [] } }
+    planAuditChange.mockResolvedValueOnce(plan)
+    const wrapper = mountCard({ proposal: proposal({ kind: 'ADD_STATEMENT' }) })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="proposal-after"] dd').text()).toBe('Every exchange Shopify makes is in NetSuite.')
+    expect(wrapper.find('[data-testid="proposal-backtest"]').exists()).toBe(false)
+  })
+
+  // DAR-UI-117. A new check and a schedule say what they mean, never the plan's raw state map.
+  it('shows a new check as its statement and name, and a schedule as when it runs', async () => {
+    planAuditChange.mockResolvedValueOnce({ ...PLAN, before: { audit: 'o2c', checks: [] }, backtest: null,
+      after: { audit: 'o2c', checks: [{ id: 'x', savedRunId: 'RS_1' }], add: { id: 'x', label: 'Shopify vs HotWax payments', savedRunId: 'RS_1', statementCode: 'R2', diffTypes: [] } } })
+    const check = mountCard({ proposal: proposal({ kind: 'ADD_CHECK' }) })
+    await flushPromises()
+    expect(check.get('[data-testid="proposal-after"] dd').text()).toBe('R2: Shopify vs HotWax payments (reads RS_1)')
+    planAuditChange.mockResolvedValueOnce({ ...PLAN, backtest: null,
+      before: { schedule: { active: false, time: '06:00', timeZone: 'America/New_York' }, automations: [] },
+      after: { schedule: { active: true, time: '06:00', timeZone: 'America/New_York' }, automations: [] } })
+    const settings = mountCard({ proposal: proposal({ proposalId: 'P2', kind: 'AUDIT_SETTINGS' }) })
+    await flushPromises()
+    expect(settings.get('[data-testid="proposal-before"] dd').text()).toBe('Off (06:00, America/New_York)')
+    expect(settings.get('[data-testid="proposal-after"] dd').text()).toBe('Every day at 06:00, America/New_York')
+  })
+
+  // DAR-UI-117. Approving one of several drafts moves the audit; the others plan again before anyone presses Approve.
+  it('plans again when another card was applied, only while it is open', async () => {
+    const wrapper = mountCard({ replanKey: 0 })
+    await flushPromises()
+    expect(planAuditChange).toHaveBeenCalledTimes(1)
+    await wrapper.setProps({ replanKey: 1 })
+    await flushPromises()
+    expect(planAuditChange).toHaveBeenCalledTimes(2)
+    const applied = mountCard({ proposal: proposal({ status: 'APPLIED' }), replanKey: 0 })
+    await flushPromises()
+    await applied.setProps({ replanKey: 1 })
+    await flushPromises()
+    expect(planAuditChange).toHaveBeenCalledTimes(2)
+  })
+
   it('plans an open proposal and shows before, after, the backtest and where it came from', async () => {
     const wrapper = mountCard({ proposal: proposal({ blockedIds: ['F-99'] }) })
     await flushPromises()
