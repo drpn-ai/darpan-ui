@@ -694,6 +694,23 @@ describe('AuditReportPage', () => {
     w.unmount()
   })
 
+  // DAR-UI-118 (Dolls Kill DK5153827). The morning's report keeps a line fixed that day beside the order's open one; the
+  // order reads Open, so its detail opens the open line, not the fixed one listed first.
+  it('opens an order\'s open line when a line fixed that morning is listed first', async () => {
+    const doc = report()
+    const line = (id: string, state: 'open' | 'fixed') => ({ id, headline: `Order DK1 is not in NetSuite (${id})`, state,
+      firstFound: '2026-10-02', ageDays: 1, difference: null, next: '', cause: null, held: false, records: {} })
+    doc.categories.orders!.statements.R2!.findings = [{ id: 'DK1', kind: 'order', order: 'DK1', headline: 'Order DK1 is not in NetSuite',
+      state: 'open', firstFound: '2026-10-02', ageDays: 1, difference: null, next: '', records: {}, cause: null, stuck: [],
+      lines: [line('F-3', 'fixed'), line('F-4', 'open')] }]
+    f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'DK1' }
+    mount(AuditReportPage)
+    await flushPromises()
+    expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-4' }, expect.anything())
+    expect(f.getAuditFinding).not.toHaveBeenCalledWith({ findingId: 'F-3' }, expect.anything())
+  })
+
   // DAR-UI-075. An order past the report's 50 (a reload, a link) is found by reading the statement's orders first.
   it('opens an order the report does not list by reading the statement\'s orders', async () => {
     const line = { id: 'F-7', headline: 'Item M77/01 is completed in HotWax and not billed in NetSuite', state: 'open' as const,

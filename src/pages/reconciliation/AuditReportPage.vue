@@ -409,7 +409,7 @@ onBeforeUnmount(() => {
 })
 
 // DAR-UI-075. An order open in the detail: its row in the list (the report's, "more", or the filters' read). Its detail
-// reads the stuck line's finding (else its first line's), whose fix and history are the order's. DAR-UI-081 (Aditi:
+// reads the stuck line's finding (else its first open line's), whose fix and history are the order's. DAR-UI-081 (Aditi:
 // "remove the click and detail page"): a line has no page of its own; its finding id opens its order.
 const orderUnit = computed(() => {
   const id = findingId.value
@@ -431,7 +431,8 @@ const isLineId = (id: string) => /^F-\d+$/.test(id)
 const findingTarget = computed(() => {
   if (!findingId.value || !report.value) return ''
   const unit = orderUnit.value
-  if (unit) return unit.stuck?.[0] ?? unit.lines?.[0]?.id ?? ''
+  // DAR-UI-118: the morning's report keeps lines fixed that day, so an open order opens an open line.
+  if (unit) return unit.stuck?.[0] ?? (unit.lines?.find((line) => line.state === 'open') ?? unit.lines?.[0])?.id ?? ''
   return isLineId(findingId.value) ? findingId.value : ''
 })
 
