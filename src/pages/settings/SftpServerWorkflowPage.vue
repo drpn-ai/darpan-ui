@@ -20,7 +20,7 @@
       :cancel-disabled="loading"
       cancel-test-id="cancel-sftp-server"
       :submit-disabled="submitDisabled"
-      :show-primary-action="canEditTenantSettings"
+      :show-primary-action="canManageConnections"
       :primary-test-id="primaryTestId"
       @submit="handlePrimarySubmit"
       @back="goBack"
@@ -280,7 +280,7 @@ const createSteps: SftpCreateStep[] = [
 ]
 
 const activeServerId = computed(() => String(route.params.sftpServerId ?? '').trim())
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const isEditing = computed(() => activeServerId.value.length > 0)
 const {
   currentCreateStep,
@@ -303,7 +303,7 @@ const {
 })
 const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
 const submitDisabled = computed(() => {
-  if (!canEditTenantSettings.value) return true
+  if (!canManageConnections.value) return true
   if (loading.value) return true
   if (isEditing.value) return false
 
@@ -386,7 +386,7 @@ async function handlePrimarySubmit(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!canEditTenantSettings.value) {
+  if (!canManageConnections.value) {
     error.value = 'You do not have permission to save SFTP servers for the active tenant.'
     return
   }

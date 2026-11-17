@@ -51,6 +51,10 @@ vi.mock('../../../stores/permissions', () => ({
     get canEditTenantSettings() {
       return authState.sessionInfo.canEditActiveTenantData === true || authState.sessionInfo.isSuperAdmin === true
     },
+    get canManageConnections() {
+      const s = authState.sessionInfo as Record<string, unknown>
+      return s.canEditActiveTenantData === true || s.canRunActiveTenantReconciliation === true || s.isSuperAdmin === true
+    },
   }),
 }))
 

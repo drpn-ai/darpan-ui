@@ -18,7 +18,7 @@
       empty-title="No auth configs"
       list-test-id="saved-auth-configs"
       tile-test-id="netsuite-auth-tile"
-      :can-create="canEditTenantSettings"
+      :can-create="canManageConnections"
       :create-route="authCreateRoute"
       create-label="Create Auth Profile"
       create-test-id="netsuite-auth-create-action"
@@ -45,7 +45,7 @@ const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 
 const {
   rows: authRows,

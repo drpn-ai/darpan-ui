@@ -15,7 +15,7 @@
           <div class="static-page-section-header-row">
             <h2 class="static-page-section-heading">Auth</h2>
             <RouterLink
-              v-if="canEditTenantSettings"
+              v-if="canManageConnections"
               :to="editRoute"
               class="app-icon-action static-page-section-edit-action"
               data-testid="oms-auth-edit-action"
@@ -76,7 +76,7 @@
         </RouterLink>
 
         <button
-          v-if="canEditTenantSettings"
+          v-if="canManageConnections"
           type="button"
           class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
           data-testid="diagnose-oms-rest-source"
@@ -98,7 +98,7 @@
         </button>
 
         <button
-          v-if="canEditTenantSettings"
+          v-if="canManageConnections"
           type="button"
           class="app-icon-action app-icon-action--large app-icon-action--danger settings-dashboard-footer-action"
           data-testid="delete-oms-rest-source"
@@ -167,7 +167,7 @@ const error = ref<string | null>(null)
 const deleteError = ref<string | null>(null)
 
 const configId = computed(() => String(route.params.omsRestSourceConfigId ?? '').trim())
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const heroTitle = computed(() => (
   config.value
     ? resolveRecordLabel({ description: config.value.description, fallbackId: config.value.omsRestSourceConfigId })
@@ -238,7 +238,7 @@ async function load(): Promise<void> {
 }
 
 async function deleteConfig(): Promise<void> {
-  if (!config.value || !canEditTenantSettings.value || deletingConfig.value) return
+  if (!config.value || !canManageConnections.value || deletingConfig.value) return
 
   const deleteLabel = resolveRecordLabel({
     description: config.value.description,

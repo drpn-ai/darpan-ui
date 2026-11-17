@@ -18,7 +18,7 @@
       empty-title="No Shopify configs"
       list-test-id="saved-shopify-configs"
       tile-test-id="shopify-auth-tile"
-      :can-create="canEditTenantSettings"
+      :can-create="canManageConnections"
       :create-route="createRoute"
       create-label="Create Shopify Config"
       create-test-id="shopify-create-action"
@@ -46,7 +46,7 @@ const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const {
   rows,
   pageIndex,

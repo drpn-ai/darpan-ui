@@ -44,6 +44,10 @@ const permissionsShape = {
     get canEditTenantSettings() {
       return authState.sessionInfo.canEditActiveTenantData === true || authState.sessionInfo.isSuperAdmin === true
     },
+    get canManageConnections() {
+      const s = authState.sessionInfo as Record<string, unknown>
+      return s.canEditActiveTenantData === true || s.canRunActiveTenantReconciliation === true || s.isSuperAdmin === true
+    },
     get canManageGlobalSettings() {
       return authState.sessionInfo.isSuperAdmin === true
     },
@@ -210,6 +214,27 @@ describe('connections saved-name lists', () => {
 
     expect(wrapper.findAll('[data-testid="netsuite-auth-tile"]')).toHaveLength(1)
     expect(wrapper.find('[data-testid="netsuite-auth-create-action"]').exists()).toBe(false)
+  })
+
+  // DAR-BE-292: connections are the run tier's, so a tenant user (run access, no edit access) adds one.
+  it('offers a tenant user the create action for a NetSuite connection', async () => {
+    authState.sessionInfo = {
+      userId: 'john.doe',
+      isSuperAdmin: false,
+      canEditActiveTenantData: false,
+      canRunActiveTenantReconciliation: true,
+      activeTenantUserGroupId: 'KREWE',
+      availableTenants: [],
+    } as typeof authState.sessionInfo
+    listNsAuthConfigs.mockResolvedValue({
+      ok: true, messages: [], errors: [], authConfigs: [],
+      pagination: { pageIndex: 0, pageSize: 10, totalCount: 0, pageCount: 0 },
+    })
+
+    const wrapper = mount(NetSuiteSettingsPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="netsuite-auth-create-action"]').exists()).toBe(true)
   })
 
   it('filters out auth tiles from other tenants without rendering tenant labels', async () => {

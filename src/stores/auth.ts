@@ -87,6 +87,8 @@ export interface UiPermissionPolicy {
   canViewTenantSettings: boolean
   canRunActiveTenantReconciliation: boolean
   canEditTenantSettings: boolean
+  /** DAR-BE-292: add, edit and delete connections (NetSuite, Shopify, HotWax, SFTP): the run tier, like running. */
+  canManageConnections: boolean
   canManageGlobalSettings: boolean
   canManageConfigSharing: boolean
 }
@@ -182,6 +184,7 @@ export function buildUiPermissionPolicy(sessionInfo: SessionInfo | null | undefi
     canViewTenantSettings: isAuthenticated && (canViewActiveTenantData || isSuperAdmin),
     canRunActiveTenantReconciliation,
     canEditTenantSettings: canEditActiveTenantData || isSuperAdmin,
+    canManageConnections: canRunActiveTenantReconciliation,
     canManageGlobalSettings: canManageDarpanCore,
     canManageConfigSharing: isAuthenticated && (isTenantAdmin || isSuperAdmin),
   }

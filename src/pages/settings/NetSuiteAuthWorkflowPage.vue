@@ -20,7 +20,7 @@
       cancel-test-id="cancel-netsuite-auth"
       :allow-select-enter="isCreateSelectStep"
       :submit-disabled="submitDisabled"
-      :show-primary-action="canEditTenantSettings"
+      :show-primary-action="canManageConnections"
       :primary-test-id="primaryTestId"
       @submit="handlePrimarySubmit"
       @back="goBack"
@@ -445,7 +445,7 @@ const success = ref<string | null>(null)
 const currentStepIndex = ref(0)
 
 const activeAuthConfigId = computed(() => String(route.params.nsAuthConfigId ?? '').trim())
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const isEditing = computed(() => activeAuthConfigId.value.length > 0)
 const selectedScopeValues = ref<string[]>(parseScopeValue(defaultScopeValue))
 const showClientId = ref(false)
@@ -515,7 +515,7 @@ const {
 })
 const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
 const submitDisabled = computed(() => {
-  if (!canEditTenantSettings.value) return true
+  if (!canManageConnections.value) return true
   if (loading.value) return true
   if (isEditing.value) return false
 
@@ -735,7 +735,7 @@ async function initializeForRoute(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!canEditTenantSettings.value) {
+  if (!canManageConnections.value) {
     error.value = 'You do not have permission to save NetSuite auth settings for the active tenant.'
     return
   }

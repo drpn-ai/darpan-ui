@@ -15,7 +15,7 @@
           <div class="static-page-section-header-row">
             <h2 class="static-page-section-heading">Auth</h2>
             <RouterLink
-              v-if="canEditTenantSettings"
+              v-if="canManageConnections"
               :to="editRoute"
               class="app-icon-action static-page-section-edit-action"
               data-testid="netsuite-auth-edit-action"
@@ -74,7 +74,7 @@
         empty-title="No endpoints"
         list-test-id="saved-endpoint-configs"
         tile-test-id="netsuite-endpoint-tile"
-        :can-create="canEditTenantSettings"
+        :can-create="canManageConnections"
         :create-route="endpointCreateRoute"
         create-label="Create Endpoint"
         create-test-id="netsuite-endpoint-create-action"
@@ -101,7 +101,7 @@
 
         <!-- The probe tests OAuth2 profiles only (DAR-BE-114). -->
         <button
-          v-if="canEditTenantSettings && config.authType === 'OAUTH2_M2M_JWT'"
+          v-if="canManageConnections && config.authType === 'OAUTH2_M2M_JWT'"
           type="button"
           class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
           data-testid="diagnose-netsuite-auth"
@@ -123,7 +123,7 @@
         </button>
 
         <button
-          v-if="canEditTenantSettings"
+          v-if="canManageConnections"
           type="button"
           class="app-icon-action app-icon-action--large app-icon-action--danger settings-dashboard-footer-action"
           data-testid="delete-netsuite-auth"
@@ -201,7 +201,7 @@ const error = ref<string | null>(null)
 const deleteError = ref<string | null>(null)
 
 const configId = computed(() => String(route.params.nsAuthConfigId ?? '').trim())
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const heroTitle = computed(() => (
   config.value
     ? resolveRecordLabel({ description: config.value.description, fallbackId: config.value.nsAuthConfigId })
@@ -312,7 +312,7 @@ async function loadEndpoints(): Promise<void> {
 }
 
 async function deleteConfig(): Promise<void> {
-  if (!config.value || !canEditTenantSettings.value || deletingConfig.value) return
+  if (!config.value || !canManageConnections.value || deletingConfig.value) return
   if (!window.confirm(`Delete NetSuite auth profile "${heroTitle.value}"?`)) return
 
   deletingConfig.value = true

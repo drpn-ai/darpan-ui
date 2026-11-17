@@ -18,7 +18,7 @@
       empty-title="No SFTP servers"
       list-test-id="saved-sftp-servers"
       tile-test-id="sftp-server-tile"
-      :can-create="canEditTenantSettings"
+      :can-create="canManageConnections"
       :create-route="createRoute"
       create-label="Create New Server"
       create-test-id="sftp-create-action"
@@ -46,7 +46,7 @@ const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const {
   rows,
   pageIndex,

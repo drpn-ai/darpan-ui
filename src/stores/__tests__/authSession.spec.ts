@@ -454,6 +454,7 @@ describe('auth state', () => {
       canViewTenantSettings: true,
       canRunActiveTenantReconciliation: false,
       canEditTenantSettings: false,
+      canManageConnections: false,
       canManageGlobalSettings: false,
       canManageConfigSharing: false,
     })
@@ -468,6 +469,8 @@ describe('auth state', () => {
       canViewTenantSettings: true,
       canRunActiveTenantReconciliation: true,
       canEditTenantSettings: false,
+      // DAR-BE-292: a tenant user manages connections.
+      canManageConnections: true,
       canManageGlobalSettings: false,
       canManageConfigSharing: false,
     })

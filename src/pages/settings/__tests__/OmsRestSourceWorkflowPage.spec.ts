@@ -47,6 +47,10 @@ const permissionsShape = {
     get canEditTenantSettings() {
       return authState.sessionInfo.canEditActiveTenantData === true || authState.sessionInfo.isSuperAdmin === true
     },
+    get canManageConnections() {
+      const s = authState.sessionInfo as Record<string, unknown>
+      return s.canEditActiveTenantData === true || s.canRunActiveTenantReconciliation === true || s.isSuperAdmin === true
+    },
     get canManageGlobalSettings() {
       return authState.sessionInfo.isSuperAdmin === true
     },

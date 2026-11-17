@@ -283,7 +283,7 @@
                   <span class="audit-col-head-end">
                     <span class="audit-row-sub">{{ sinceLine }}</span>
                     <!-- DAR-BE-123. Re-checks this finding's record now; it closes if the problem is gone. -->
-                    <button v-if="findingDoc.finding.status.state !== 'fixed'" type="button" class="app-icon-action" aria-label="Resolve finding" title="Resolve finding" data-testid="audit-verify-finding" :disabled="verifying" @click="emit('verify')">
+                    <button v-if="canResolve && findingDoc.finding.status.state !== 'fixed'" type="button" class="app-icon-action" aria-label="Resolve finding" title="Resolve finding" data-testid="audit-verify-finding" :disabled="verifying" @click="emit('verify')">
                       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="resolveIconPath" /></svg>
                     </button>
                     <button type="button" class="app-icon-action" aria-label="Export finding" title="Export finding" data-testid="audit-export-finding" @click="emit('export', 'finding')">
@@ -586,6 +586,8 @@ const props = defineProps<{
   /** DAR-BE-250. Later steps' findings on the open finding's order (earliest step wins). */
   waiting?: AuditWaitingFinding[]
   verifying: boolean
+  /** DAR-BE-292. The person may re-check a finding (run access); without it there is no Resolve. */
+  canResolve?: boolean
   /** DAR-UI-085. What the checks are doing right now; null when nothing was read yet. */
   progress?: AuditProgress | null
   /** DAR-UI-086. The morning on show is today's, so a check that did not run can be retried from its last read. */

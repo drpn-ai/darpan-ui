@@ -20,7 +20,7 @@
       cancel-test-id="cancel-netsuite-endpoint"
       :allow-select-enter="isCreateSelectStep"
       :submit-disabled="submitDisabled"
-      :show-primary-action="canEditTenantSettings"
+      :show-primary-action="canManageConnections"
       :primary-test-id="primaryTestId"
       @submit="handlePrimarySubmit"
       @back="goBack"
@@ -284,7 +284,7 @@ const success = ref<string | null>(null)
 const currentStepIndex = ref(0)
 
 const activeEndpointConfigId = computed(() => String(route.params.nsRestletConfigId ?? '').trim())
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const isEditing = computed(() => activeEndpointConfigId.value.length > 0)
 
 const createSteps: EndpointCreateStep[] = [
@@ -319,7 +319,7 @@ const {
 })
 const isCreateSelectStep = computed(() => !isEditing.value && currentCreateStep.value.kind === 'select')
 const submitDisabled = computed(() => {
-  if (!canEditTenantSettings.value) return true
+  if (!canManageConnections.value) return true
   if (loading.value) return true
   if (isEditing.value) return false
 
@@ -427,7 +427,7 @@ async function handlePrimarySubmit(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!canEditTenantSettings.value) {
+  if (!canManageConnections.value) {
     error.value = 'You do not have permission to save NetSuite endpoint settings for the active tenant.'
     return
   }

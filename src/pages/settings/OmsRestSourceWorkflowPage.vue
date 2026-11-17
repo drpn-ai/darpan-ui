@@ -19,7 +19,7 @@
       :cancel-disabled="loading"
       cancel-test-id="cancel-oms-rest-source"
       :submit-disabled="submitDisabled"
-      :show-primary-action="canEditTenantSettings && !isCreateChoiceStep"
+      :show-primary-action="canManageConnections && !isCreateChoiceStep"
       :primary-test-id="primaryTestId"
       @submit="handlePrimarySubmit"
       @back="goBack"
@@ -63,7 +63,7 @@
             <AppSelect
               v-model="form.timeZone"
               :options="timezoneOptions"
-              :disabled="!canEditTenantSettings || loading"
+              :disabled="!canManageConnections || loading"
               searchable
               search-placeholder="Search timezones"
               test-id="oms-timezone-select"
@@ -154,7 +154,7 @@
           <AppSelect
             v-model="form.timeZone"
             :options="timezoneOptions"
-            :disabled="!canEditTenantSettings || loading"
+            :disabled="!canManageConnections || loading"
             placeholder="Select timezone"
             searchable
             search-placeholder="Search timezones"
@@ -313,7 +313,7 @@ const endpointsLoadState = ref<EndpointAccessLoadState>('loading')
 const loadedCanReadOrders = ref(true)
 
 const activeOmsConfigId = computed(() => String(route.params.omsRestSourceConfigId ?? '').trim())
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const isEditing = computed(() => activeOmsConfigId.value.length > 0)
 const isActiveChecked = computed({
   get: () => form.isActive !== 'N',
@@ -379,7 +379,7 @@ const isCreateChoiceStep = computed(() => !isEditing.value && currentCreateStep.
 const selectedTimeZone = computed(() => normalizeTimezoneId(form.timeZone) || 'UTC')
 const timezoneOptions = computed<AppSelectOption[]>(() => buildTimezoneOptions(selectedTimeZone.value))
 const submitDisabled = computed(() => {
-  if (!canEditTenantSettings.value) return true
+  if (!canManageConnections.value) return true
   if (loading.value) return true
   if (isEditing.value) return false
 
@@ -488,7 +488,7 @@ async function load(): Promise<void> {
 }
 
 function advanceFromAuthTypeChoice(value: string): void {
-  if (!canEditTenantSettings.value || currentCreateStep.value.id !== 'authType') return
+  if (!canManageConnections.value || currentCreateStep.value.id !== 'authType') return
 
   form.authType = value
   goNext()
@@ -504,7 +504,7 @@ async function handlePrimarySubmit(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!canEditTenantSettings.value) {
+  if (!canManageConnections.value) {
     error.value = 'You do not have permission to save HotWax settings for the active tenant.'
     return
   }

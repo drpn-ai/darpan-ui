@@ -22,6 +22,9 @@ vi.mock('../../../lib/api/facade', () => ({
 }))
 
 vi.mock('../../../lib/utils/download', () => ({ downloadTextFile: vi.fn() }))
+// DAR-BE-292: play, Retry and Resolve follow run access; a view-only member has none.
+const permissions = vi.hoisted(() => ({ canRunActiveTenantReconciliation: true }))
+vi.mock('../../../stores/permissions', () => ({ usePermissionsStore: () => permissions }))
 
 import { downloadTextFile } from '../../../lib/utils/download'
 import { useRoute } from 'vue-router'
@@ -30,6 +33,7 @@ import { agentFacade, auditFacade, reconciliationFacade } from '../../../lib/api
 import { ApiCallError } from '../../../lib/api/client'
 import AuditReportPage from '../AuditReportPage.vue'
 import AuditAgentPanel from '../../../components/audit/AuditAgentPanel.vue'
+import AuditColumns from '../../../components/audit/AuditColumns.vue'
 import type { AuditReport } from '../../../lib/api/auditTypes'
 
 const f = vi.mocked(auditFacade)
@@ -116,6 +120,7 @@ beforeEach(() => {
   f.getAuditFinding.mockResolvedValue({ ok: true, finding: findingDocument } as never)
   f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 0, active: [] } } as never)
   vi.mocked(agentFacade.getAgentStatus).mockReset().mockResolvedValue({ state: 'AGENT_OFF', grantState: 'NOT_GRANTED', canApprove: false })
+  permissions.canRunActiveTenantReconciliation = true
 })
 
 // DAR-UI-091. A cause starts folded; open every one to see its findings.
@@ -1041,8 +1046,29 @@ describe('AuditReportPage', () => {
     expect(failed.find('[data-testid="audit-tab-agent"]').exists()).toBe(false)
   })
 
-  it('puts the agent in a tab beside the finding, kept in the URL, with this audit, the open finding and the right to approve', async () => {
+  // DAR-BE-292 (Aditi's permissions sheet): only editors and tenant admins talk to the agent, so no one else gets the tab.
+  it('has no Agent tab for someone who cannot approve', async () => {
     vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: false })
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.find('[data-testid="audit-tab-agent"]').exists()).toBe(false)
+  })
+
+  // DAR-BE-292: a view-only member sees the report and the finding, with no play, Resolve or Retry.
+  it('offers no play, Resolve or Retry without run access', async () => {
+    permissions.canRunActiveTenantReconciliation = false
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
+    expect(w.find('[data-testid="audit-run-button"]').exists()).toBe(false)
+    expect(w.find('[data-testid="audit-verify-finding"]').exists()).toBe(false)
+    expect(w.getComponent(AuditColumns).props('retryable')).toBe(false)
+  })
+
+  it('puts the agent in a tab beside the finding, kept in the URL, with this audit, the open finding and the right to approve', async () => {
+    vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: true })
     liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
     const w = mount(AuditReportPage)
     await flushPromises()
@@ -1052,7 +1078,7 @@ describe('AuditReportPage', () => {
     expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
     const panel = w.getComponent(AuditAgentPanel)
     expect(panel.props()).toMatchObject({ auditCode: 'month-close', findingId: 'F-1', tenantId: report().report.tenant.id,
-      auditName: report().report.audit.name, canApprove: false })
+      auditName: report().report.audit.name, canApprove: true })
     expect(w.get('[data-testid="audit-agent-slot"]').isVisible()).toBe(false)
 
     await w.get('[data-testid="audit-tab-agent"]').trigger('click')

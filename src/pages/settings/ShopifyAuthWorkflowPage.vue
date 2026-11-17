@@ -19,7 +19,7 @@
       :cancel-disabled="loading"
       cancel-test-id="cancel-shopify-auth"
       :submit-disabled="submitDisabled"
-      :show-primary-action="canEditTenantSettings"
+      :show-primary-action="canManageConnections"
       :primary-test-id="primaryTestId"
       @submit="handlePrimarySubmit"
       @back="goBack"
@@ -65,7 +65,7 @@
             <AppSelect
               v-model="form.timeZone"
               :options="timezoneOptions"
-              :disabled="!canEditTenantSettings || loading"
+              :disabled="!canManageConnections || loading"
               searchable
               search-placeholder="Search timezones"
               test-id="shopify-timezone-select"
@@ -134,7 +134,7 @@
           <AppSelect
             v-model="form.timeZone"
             :options="timezoneOptions"
-            :disabled="!canEditTenantSettings || loading"
+            :disabled="!canManageConnections || loading"
             placeholder="Select timezone"
             searchable
             search-placeholder="Search timezones"
@@ -239,7 +239,7 @@ const endpointsLoadState = ref<EndpointAccessLoadState>('loading')
 const loadedCanReadOrders = ref(true)
 
 const activeShopifyConfigId = computed(() => String(route.params.shopifyAuthConfigId ?? '').trim())
-const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canManageConnections = computed(() => permissionsStore.canManageConnections)
 const isEditing = computed(() => activeShopifyConfigId.value.length > 0)
 const isActiveChecked = computed({
   get: () => form.isActive !== 'N',
@@ -278,7 +278,7 @@ const {
 const selectedTimeZone = computed(() => normalizeTimezoneId(form.timeZone) || 'UTC')
 const timezoneOptions = computed<AppSelectOption[]>(() => buildTimezoneOptions(selectedTimeZone.value))
 const submitDisabled = computed(() => {
-  if (!canEditTenantSettings.value) return true
+  if (!canManageConnections.value) return true
   if (loading.value) return true
   if (isEditing.value) return false
 
@@ -387,7 +387,7 @@ async function handlePrimarySubmit(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!canEditTenantSettings.value) {
+  if (!canManageConnections.value) {
     error.value = 'You do not have permission to save Shopify settings for the active tenant.'
     return
   }

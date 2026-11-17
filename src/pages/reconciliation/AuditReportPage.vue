@@ -15,6 +15,7 @@
             />
           </div>
           <RouterLink
+            v-if="canRun"
             :to="{ name: 'audit-run-start', params: { audit: auditCode }, query: carriedQuery }"
             class="app-icon-action app-icon-action--large"
             aria-label="Run audit"
@@ -128,8 +129,9 @@
         :waiting="waiting"
         :verifying="verifying"
         :progress="progress"
-        :retryable="isTodaysMorning"
+        :retryable="isTodaysMorning && canRun"
         :retrying="retryingChecks"
+        :can-resolve="canRun"
         :agent="agentOn"
         :agent-open="agentOpen"
         :drafts="drafts"
@@ -169,6 +171,7 @@ import RunTypeBadge from '../../components/ui/RunTypeBadge.vue'
 import AuditColumns from '../../components/audit/AuditColumns.vue'
 import AuditAgentPanel from '../../components/audit/AuditAgentPanel.vue'
 import { agentFacade, auditFacade, reconciliationFacade } from '../../lib/api/facade'
+import { usePermissionsStore } from '../../stores/permissions'
 import type { GetAgentStatusResponse } from '../../lib/api/agentTypes'
 import { boardDrafts, type DraftPreview } from '../../lib/agentDrafts'
 import { ApiCallError } from '../../lib/api/client'
@@ -359,6 +362,9 @@ async function loadProgress(): Promise<void> {
   }
 }
 
+// DAR-BE-292: play, Retry and Resolve are the run tier's (tenant user, editor, tenant admin); view-only sees none of them.
+const permissionsStore = usePermissionsStore()
+const canRun = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 // DAR-UI-086. "Retry from last read" is offered on today's morning only: a retry runs now, so it reports on today.
 const retryingChecks = ref<string[]>([])
 const isTodaysMorning = computed(() => {
@@ -674,7 +680,9 @@ function choosePeriod(period: string): void {
 // DAR-UI-108. The Agent tab exists only when the agent is on for the person and their grant is live (send#AgentTurn
 // refuses otherwise anyway); ?tab=agent shows it, kept while the person moves around the board like every other pick.
 const agentStatus = ref<GetAgentStatusResponse | null>(null)
-const agentOn = computed(() => agentStatus.value?.state === 'ON' && agentStatus.value.grantState === 'LIVE')
+// DAR-BE-292: only editors and tenant admins talk to the agent (canApprove), so nobody else gets the tab.
+const agentOn = computed(() => agentStatus.value?.state === 'ON' && agentStatus.value.grantState === 'LIVE' &&
+  agentStatus.value.canApprove === true)
 const agentOpen = computed(() => agentOn.value && queryValue('tab') === 'agent')
 // DAR-UI-109. What the waiting drafts would change, marked on the board.
 const draftPreviews = ref<DraftPreview[]>([])
