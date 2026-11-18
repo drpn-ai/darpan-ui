@@ -2,323 +2,135 @@
   <StaticPageFrame>
     <template #hero>
       <h1>Scripts</h1>
+      <p class="section-note">Small programs that read a run's results and post a message.</p>
     </template>
 
-    <p class="section-note">JEXL kept as data: reads <code>input</code> and the d: functions, nothing else.</p>
     <LoadingState v-if="loading" noun="scripts" />
-    <InlineValidation v-if="pageError" tone="error" :message="pageError" />
-    <p v-if="statusMessage" class="section-note" role="status" data-testid="scripts-status">{{ statusMessage }}</p>
+    <InlineValidation v-else-if="pageError" tone="error" :message="pageError" />
+    <p v-else-if="scripts.length === 0" class="section-note">No scripts yet.</p>
 
-    <StaticPageSection title="Saved">
-      <div class="static-page-tile-grid static-page-record-grid tenant-settings-list-grid">
-        <button
-          v-if="canEdit"
-          type="button"
-          class="static-page-tile static-page-record-tile static-page-list-tile"
-          data-testid="script-new"
-          @click="startNew"
-        >
-          <span class="tenant-settings-list-row">
-            <span class="tenant-settings-list-main">
-              <span class="static-page-tile-title static-page-list-tile__title">New script</span>
-            </span>
-            <span class="tenant-settings-list-status">Write</span>
+    <ul v-if="rows.length" class="script-rows" data-testid="script-rows">
+      <li v-for="row in rows" :key="row.tenantScriptId" class="script-row" data-testid="script-row">
+        <span class="script-row__main">
+          <span class="script-row__name">{{ row.scriptName }}</span>
+          <span class="script-row__dim"><span v-explain="'scriptProfile'">{{ row.profile }}</span> · reads {{ row.reads }}</span>
+        </span>
+        <span class="script-row__main">
+          <span class="script-row__schedule" data-testid="script-row-schedule">
+            <span class="script-row__dot" :data-state="row.state" aria-hidden="true" />{{ row.schedule }}
           </span>
-        </button>
-        <button
-          v-for="script in scripts"
-          :key="script.tenantScriptId"
-          type="button"
-          class="static-page-tile static-page-record-tile static-page-list-tile"
-          data-testid="script-tile"
-          @click="openScript(script)"
-        >
-          <span class="tenant-settings-list-row">
-            <span class="tenant-settings-list-main">
-              <span class="static-page-tile-title static-page-list-tile__title">{{ script.scriptName }}</span>
-              <span class="static-page-list-tile__meta">{{ profileLabel(script.scriptProfile) }} · {{ sourceLabel(script.inputSource) }}</span>
-            </span>
-            <span class="tenant-settings-list-status">{{ script.isActive ? 'On' : 'Off' }}</span>
-          </span>
-        </button>
-      </div>
-      <p v-if="!loading && !pageError && scripts.length === 0" class="section-note">No scripts yet.</p>
-    </StaticPageSection>
-
-    <StaticPageSection v-if="draft" :title="draft.tenantScriptId ? draft.scriptName || 'Script' : 'New script'">
-      <div class="tenant-script-editor" data-testid="script-editor">
-        <div class="workflow-form-grid workflow-form-grid--two">
-          <label class="wizard-input-shell">
-            <span v-explain="'scriptName'" class="workflow-context-label">Name</span>
-            <input v-model="draft.scriptName" class="wizard-answer-control" type="text" data-testid="script-name" :disabled="!canEdit || busy" />
-          </label>
-          <label class="wizard-input-shell">
-            <span v-explain="'scriptProfile'" class="workflow-context-label">Profile</span>
-            <AppSelect v-model="draft.scriptProfile" :options="profileOptions" test-id="script-profile" :disabled="!canEdit || busy" />
-          </label>
-        </div>
-
-        <label class="wizard-input-shell">
-          <span class="workflow-context-label">Script</span>
-          <textarea
-            v-model="draft.scriptBody"
-            class="wizard-answer-control workflow-form-textarea tenant-script-code"
-            rows="14"
-            spellcheck="false"
-            autocomplete="off"
-            data-testid="script-body"
-            :disabled="!canEdit || busy"
-            @keydown.enter.meta.prevent="runDraft"
-            @keydown.enter.ctrl.prevent="runDraft"
-          />
-        </label>
-        <p class="section-note">{{ limitLine }}</p>
-
-        <div class="workflow-form-grid workflow-form-grid--two">
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Input</span>
-            <AppSelect v-model="draft.inputSource" :options="sourceOptions" test-id="script-input-source" :disabled="!canEdit || busy" />
-          </label>
-          <label v-if="draft.inputSource === 'RUN_RESULT'" class="wizard-input-shell">
-            <span class="workflow-context-label">Run result</span>
-            <AppSelect
-              v-model="runFileName"
-              :options="runResultOptions"
-              placeholder="Select run result"
-              test-id="script-run-result"
-              searchable
-              search-placeholder="Search run results"
-              :disabled="!canEdit || busy"
-            />
-          </label>
-        </div>
-        <label v-if="draft.inputSource === 'SAMPLE'" class="wizard-input-shell">
-          <span class="workflow-context-label">Sample input (JSON)</span>
-          <textarea
-            v-model="draft.sampleInputJson"
-            class="wizard-answer-control workflow-form-textarea tenant-script-code"
-            rows="6"
-            spellcheck="false"
-            data-testid="script-sample"
-            :disabled="!canEdit || busy"
-          />
-        </label>
-
-        <InlineValidation v-if="editorError" tone="error" :message="editorError" />
-
-        <div class="wizard-actions">
-          <button type="button" class="wizard-next" data-testid="script-run" :disabled="!canEdit || busy || !draft.scriptBody.trim()" @click="runDraft">
-            {{ running ? 'Running…' : 'Run' }}
-          </button>
-          <AppSaveAction v-if="canEdit" label="Save script" test-id="script-save" :disabled="busy || !draft.scriptName.trim()" @click="saveDraft" />
+          <span class="script-row__dim" data-testid="script-row-last-run">{{ row.lastRun }}</span>
+        </span>
+        <span class="script-row__actions">
           <button
-            v-if="canEdit && draft.tenantScriptId"
             type="button"
-            class="wizard-back"
-            data-testid="script-delete"
-            :disabled="busy"
-            @click="deleteDraft"
+            :aria-label="`Open script ${row.scriptName}`"
+            data-testid="script-row-open"
+            @click="openScript(row.tenantScriptId)"
           >
-            {{ confirmDelete ? 'Confirm delete' : 'Delete' }}
+            Open <span aria-hidden="true">→</span>
           </button>
-          <AppCancelAction label="Close" test-id="script-close" :disabled="busy" @click="closeEditor" />
-        </div>
+        </span>
+      </li>
+    </ul>
 
-        <div v-if="runOut" class="tenant-script-result" data-testid="script-result">
-          <span class="workflow-context-label">Result</span>
-          <p class="section-note" data-testid="script-result-status">{{ runStatus }}</p>
-          <InlineValidation v-if="runOut.run.error" tone="error" :message="errorLine(runOut.run.error)" />
-          <pre v-else class="tenant-script-output" data-testid="script-output">{{ resultText }}</pre>
-          <template v-if="runOut.run.logs.length">
-            <span class="workflow-context-label">Log</span>
-            <ul class="workflow-list" data-testid="script-logs">
-              <li v-for="(line, index) in runOut.run.logs" :key="index">{{ line }}</li>
-            </ul>
-          </template>
-        </div>
-      </div>
-    </StaticPageSection>
-
-    <StaticPageSection v-if="savedScript" title="Deploy">
-      <ScriptDeploymentPanel
-        :script="savedScript"
-        :chat-spaces="chatSpaces"
-        :saved-run-options="savedRunOptions"
-        :can-edit="canEdit"
-      />
-    </StaticPageSection>
-
-    <StaticPageSection v-if="library.length" title="d: functions">
-      <dl class="tenant-script-library" data-testid="script-library">
-        <template v-for="fn in library" :key="fn.name">
-          <dt><code>d:{{ fn.name }}</code></dt>
-          <dd>{{ fn.help }}</dd>
-        </template>
-      </dl>
-    </StaticPageSection>
+    <RouterLink
+      v-if="canEdit"
+      :to="{ name: 'settings-tenant-script-new' }"
+      class="static-page-action-tile static-page-create-action"
+      data-testid="script-new"
+    >
+      New script
+    </RouterLink>
   </StaticPageFrame>
 </template>
 
 <script setup lang="ts">
-// DAR-BE-164. The active tenant's JEXL scripts: write one, run it against sample JSON or a finished run's differences,
-// save it. Nothing here is a code change; the backend validates every save and runs every script in its sandbox.
-import { computed, onMounted, ref, watch } from 'vue'
-import AppCancelAction from '../../components/ui/AppCancelAction.vue'
-import AppSaveAction from '../../components/ui/AppSaveAction.vue'
-import AppSelect from '../../components/ui/AppSelect.vue'
+// DAR-BE-164 / DAR-UI-124. The active tenant's scripts as one list of rows: what each reads, when it posts and
+// where, and how its last scheduled run went. Each opens its own page (TenantScriptPage).
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
-import StaticPageSection from '../../components/ui/StaticPageSection.vue'
-import ScriptDeploymentPanel from '../../components/settings/ScriptDeploymentPanel.vue'
 import { reconciliationFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
-import type {
-  RunTenantScriptResponse,
-  ScriptError,
-  ScriptInputSource,
-  ScriptLibraryFunction,
-  ScriptProfile,
-  ScriptProfileLimits,
-  TenantScript,
-} from '../../lib/api/scriptTypes'
+import type { TenantScript, TenantScriptDeployment } from '../../lib/api/scriptTypes'
 import type { GeneratedOutput, TenantChatSpace } from '../../lib/api/types'
-import { countLabel } from '../../lib/utils/strings'
+import { isFailedStatus, scheduleState, scheduleWords, statusWords } from '../../lib/scriptDeployment'
+import { formatDateTime } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'
 
-interface Draft {
-  tenantScriptId: string
-  scriptName: string
-  scriptProfile: ScriptProfile
-  inputSource: ScriptInputSource
-  scriptBody: string
-  sampleInputJson: string
-}
-
-const STARTER_BODY = `// input is the sample below. Sum each order's payments by tender.
-var byTender = {:};
-for (var p : input.payments) {
-  byTender[p.tender] = d:dec(byTender[p.tender] ?? 0) + d:dec(p.amount);
-}
-{ 'orderId': input.orderId, 'paid': d:sum(input.payments, 'amount'), 'byTender': byTender }`
-const STARTER_SAMPLE = `{
-  "orderId": "1001",
-  "payments": [
-    { "tender": "CARD", "amount": "40.00" },
-    { "tender": "GIFT_CARD", "amount": "10.00" }
-  ]
-}`
-const RUN_RESULT_STARTER = `// input.differences holds up to 2,000 of the run's differences.
-{ 'total': input.totalDifferences, 'read': size(input.differences) }`
-
-const profileOptions = [
-  { value: 'SCRIPT', label: 'Script (loops, variables)' },
-  { value: 'EXPRESSION', label: 'Expression (one line)' },
-]
-const sourceOptions = [
-  { value: 'SAMPLE', label: 'Sample JSON' },
-  { value: 'RUN_RESULT', label: 'A run result' },
-]
-
+const router = useRouter()
 const permissionsStore = usePermissionsStore()
 const canEdit = computed(() => permissionsStore.canEditTenantSettings)
 
 const scripts = ref<TenantScript[]>([])
-const library = ref<ScriptLibraryFunction[]>([])
-const limits = ref<Partial<Record<ScriptProfile, ScriptProfileLimits>>>({})
-const runResults = ref<GeneratedOutput[]>([])
+const deployments = ref<TenantScriptDeployment[]>([])
 const chatSpaces = ref<TenantChatSpace[]>([])
+const runResults = ref<GeneratedOutput[]>([])
+const timeZone = ref('')
 const loading = ref(false)
 const pageError = ref('')
-const statusMessage = ref('')
 
-const draft = ref<Draft | null>(null)
-const runFileName = ref('')
-const editorError = ref('')
-const running = ref(false)
-const saving = ref(false)
-const confirmDelete = ref(false)
-const runOut = ref<RunTenantScriptResponse | null>(null)
-
-const busy = computed(() => running.value || saving.value)
-const runResultOptions = computed(() =>
-  runResults.value.map((out) => ({
-    value: out.fileName,
-    label: [out.savedRunName || out.fileName, out.totalDifferences != null ? countLabel(out.totalDifferences, 'difference') : '']
-      .filter(Boolean).join(' · '),
-  })))
-const limitLine = computed(() => {
-  const profile = draft.value?.scriptProfile ?? 'SCRIPT'
-  const limit = limits.value[profile]
-  return limit ? `Up to ${limit.unitLimit.toLocaleString()} units and ${limit.timeoutMs.toLocaleString()} ms per run.` : ''
-})
-const resultText = computed(() => JSON.stringify(runOut.value?.run.result ?? null, null, 2))
-const runStatus = computed(() => {
-  const out = runOut.value
-  if (!out) return ''
-  const summary = out.inputSummary
-  const read = summary?.source === 'RUN_RESULT'
-    ? ` · read ${summary.records ?? 0} of ${countLabel(summary.totalDifferences ?? 0, 'difference')}`
-    : ''
-  return `${out.run.ok ? 'Ran' : 'Stopped'} in ${out.run.elapsedMs} ms · ${out.run.units.toLocaleString()} units${read}`
+const savedRunNames = computed(() => {
+  const names = new Map<string, string>()
+  for (const out of runResults.value) {
+    if (out.savedRunId && !names.has(out.savedRunId)) names.set(out.savedRunId, out.savedRunName || out.savedRunId)
+  }
+  return names
 })
 
-function profileLabel(profile: ScriptProfile): string {
-  return profile === 'EXPRESSION' ? 'Expression' : 'Script'
+function spaceName(chatSpaceId: string): string {
+  return chatSpaces.value.find((space) => space.chatSpaceId === chatSpaceId)?.spaceName ?? chatSpaceId
 }
 
-function sourceLabel(source: ScriptInputSource): string {
-  return source === 'RUN_RESULT' ? 'Run result' : 'Sample'
-}
+const rows = computed(() => scripts.value.map((script) => {
+  // One deployment per script on this page; the backend allows more.
+  const deployment = deployments.value.find((item) => item.tenantScriptId === script.tenantScriptId) ?? null
+  const savedRunId = deployment?.inputSavedRunId ?? ''
+  const reads = script.inputSource === 'SAMPLE'
+    ? 'Sample JSON'
+    : (savedRunId && (savedRunNames.value.get(savedRunId) ?? savedRunId)) || 'a saved run'
+  let schedule = 'Not scheduled'
+  if (deployment) {
+    schedule = deployment.isActive
+      ? `${scheduleWords(deployment.scheduleExpr)} → ${spaceName(deployment.chatSpaceId)}`
+      : `Off · posts to ${spaceName(deployment.chatSpaceId)}`
+  }
+  const lastRun = deployment?.lastRunDate
+    ? `Last run ${formatDateTime(deployment.lastRunDate, { timeZone: timeZone.value })} · ${
+      isFailedStatus(deployment.lastRunStatus) ? 'failed' : statusWords(deployment.lastRunStatus).toLowerCase()}`
+    : 'Never run on a schedule'
+  return {
+    tenantScriptId: script.tenantScriptId,
+    scriptName: script.scriptName,
+    profile: script.scriptProfile === 'EXPRESSION' ? 'Expression' : 'Script',
+    reads,
+    schedule,
+    state: scheduleState(deployment),
+    lastRun,
+  }
+}))
 
-function errorLine(error: ScriptError): string {
-  return `${error.line ? `Line ${error.line}: ` : ''}${error.message}`
+function openScript(tenantScriptId: string): void {
+  void router.push({ name: 'settings-tenant-script', params: { tenantScriptId } })
 }
 
 function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
-function resetEditorState(): void {
-  editorError.value = ''
-  runOut.value = null
-  confirmDelete.value = false
-  statusMessage.value = ''
-}
-
-function startNew(): void {
-  resetEditorState()
-  runFileName.value = ''
-  draft.value = { tenantScriptId: '', scriptName: '', scriptProfile: 'SCRIPT', inputSource: 'SAMPLE',
-    scriptBody: STARTER_BODY, sampleInputJson: STARTER_SAMPLE }
-}
-
-function openScript(script: TenantScript): void {
-  resetEditorState()
-  runFileName.value = ''
-  draft.value = {
-    tenantScriptId: script.tenantScriptId,
-    scriptName: script.scriptName,
-    scriptProfile: script.scriptProfile,
-    inputSource: script.inputSource,
-    scriptBody: script.scriptBody,
-    sampleInputJson: script.sampleInputJson ?? '',
-  }
-}
-
-function closeEditor(): void {
-  if (busy.value) return
-  draft.value = null
-  resetEditorState()
-}
-
-async function loadScripts(): Promise<void> {
+async function load(): Promise<void> {
   loading.value = true
   pageError.value = ''
   try {
-    const out = await scriptFacade.listTenantScripts()
-    scripts.value = out.scripts ?? []
-    library.value = out.library ?? []
-    limits.value = out.limits ?? {}
+    const [listed, deployed] = await Promise.all([
+      scriptFacade.listTenantScripts(),
+      scriptFacade.listTenantScriptDeployments(),
+    ])
+    scripts.value = listed.scripts ?? []
+    deployments.value = deployed.deployments ?? []
+    timeZone.value = deployed.timeZone ?? ''
   } catch (error) {
     pageError.value = messageOf(error, 'Could not load the scripts.')
   } finally {
@@ -326,154 +138,112 @@ async function loadScripts(): Promise<void> {
   }
 }
 
-// DAR-BE-167. The Deploy section works on the SAVED script (its saved input source), never an unsaved edit.
-const savedScript = computed(() =>
-  draft.value?.tenantScriptId ? scripts.value.find((script) => script.tenantScriptId === draft.value?.tenantScriptId) ?? null : null)
-// Saved runs that have produced a result, for "reads the newest result of".
-const savedRunOptions = computed(() => {
-  const seen = new Map<string, string>()
-  for (const out of runResults.value) {
-    if (out.savedRunId && !seen.has(out.savedRunId)) seen.set(out.savedRunId, out.savedRunName || out.savedRunId)
-  }
-  return [...seen].map(([value, label]) => ({ value, label }))
-})
-
-async function loadChatSpaces(): Promise<void> {
-  try {
-    chatSpaces.value = (await settingsFacade.listTenantChatSpaces()).chatSpaces ?? []
-  } catch {
-    // Without chat spaces the Deploy section simply has nothing to post to.
-    chatSpaces.value = []
-  }
+// Names only: a row still reads without them, as the space or saved run id.
+async function loadNames(): Promise<void> {
+  const [spaces, outputs] = await Promise.allSettled([
+    settingsFacade.listTenantChatSpaces(),
+    reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 200 }),
+  ])
+  if (spaces.status === 'fulfilled') chatSpaces.value = spaces.value.chatSpaces ?? []
+  if (outputs.status === 'fulfilled') runResults.value = outputs.value.generatedOutputs ?? []
 }
-
-async function loadRunResults(): Promise<void> {
-  try {
-    const out = await reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 200 })
-    runResults.value = (out.generatedOutputs ?? []).filter((item) => item.fileName && item.resultAvailable !== false)
-  } catch {
-    // The run-result picker is optional; sample input still works.
-    runResults.value = []
-  }
-}
-
-async function runDraft(): Promise<void> {
-  const current = draft.value
-  if (!current || busy.value || !canEdit.value || !current.scriptBody.trim()) return
-  if (current.inputSource === 'RUN_RESULT' && !runFileName.value) {
-    editorError.value = 'Choose a run result for the script to read.'
-    return
-  }
-  running.value = true
-  editorError.value = ''
-  try {
-    runOut.value = await scriptFacade.runTenantScript({
-      tenantScriptId: current.tenantScriptId || undefined,
-      scriptBody: current.scriptBody,
-      scriptProfile: current.scriptProfile,
-      inputSource: current.inputSource,
-      inputJson: current.inputSource === 'SAMPLE' ? current.sampleInputJson : undefined,
-      fileName: current.inputSource === 'RUN_RESULT' ? runFileName.value : undefined,
-    })
-  } catch (error) {
-    runOut.value = null
-    editorError.value = messageOf(error, 'Could not run the script.')
-  } finally {
-    running.value = false
-  }
-}
-
-async function saveDraft(): Promise<void> {
-  const current = draft.value
-  if (!current || busy.value || !canEdit.value) return
-  saving.value = true
-  editorError.value = ''
-  try {
-    const out = await scriptFacade.saveTenantScript({
-      tenantScriptId: current.tenantScriptId || undefined,
-      scriptName: current.scriptName.trim(),
-      scriptProfile: current.scriptProfile,
-      inputSource: current.inputSource,
-      scriptBody: current.scriptBody,
-      sampleInputJson: current.sampleInputJson,
-    })
-    current.tenantScriptId = out.script.tenantScriptId
-    statusMessage.value = `Saved ${out.script.scriptName}.`
-    await loadScripts()
-  } catch (error) {
-    editorError.value = messageOf(error, 'Could not save the script.')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function deleteDraft(): Promise<void> {
-  const current = draft.value
-  if (!current?.tenantScriptId || busy.value) return
-  if (!confirmDelete.value) {
-    confirmDelete.value = true
-    return
-  }
-  saving.value = true
-  try {
-    await scriptFacade.deleteTenantScript({ tenantScriptId: current.tenantScriptId })
-    const name = current.scriptName
-    saving.value = false
-    closeEditor()
-    statusMessage.value = `Deleted ${name}.`
-    await loadScripts()
-  } catch (error) {
-    editorError.value = messageOf(error, 'Could not delete the script.')
-  } finally {
-    saving.value = false
-    confirmDelete.value = false
-  }
-}
-
-// An untouched starter follows the input choice, so a new run-result script starts from one that reads differences.
-watch(() => draft.value?.inputSource, (source) => {
-  if (!draft.value) return
-  if (source === 'RUN_RESULT' && draft.value.scriptBody === STARTER_BODY) draft.value.scriptBody = RUN_RESULT_STARTER
-  if (source === 'SAMPLE' && draft.value.scriptBody === RUN_RESULT_STARTER) draft.value.scriptBody = STARTER_BODY
-})
 
 onMounted(() => {
-  void loadScripts()
-  void loadRunResults()
-  void loadChatSpaces()
+  void load()
+  void loadNames()
 })
 </script>
 
 <style scoped>
-.tenant-script-editor,
-.tenant-script-result {
+/* DAR-UI-122's row list (Tenant Settings): one bordered list, every row the same minimum height. */
+.script-rows {
   display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--static-tile-border);
+  border-radius: var(--static-surface-radius);
+  background: var(--static-tile-bg);
+}
+
+.script-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto;
+  align-items: center;
   gap: var(--space-3);
+  min-height: 4rem;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--static-tile-text-size);
 }
 
-.tenant-script-code {
-  white-space: pre;
-  tab-size: 2;
-  overflow-x: auto;
+.script-row + .script-row {
+  border-top: 1px solid var(--static-tile-border);
 }
 
-.tenant-script-output {
-  margin: 0;
-  padding: var(--space-2);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  overflow-x: auto;
-  white-space: pre;
-}
-
-.tenant-script-library {
+.script-row__main {
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-1) var(--space-3);
-  margin: 0;
+  min-width: 0;
 }
 
-.tenant-script-library dd {
-  margin: 0;
+.script-row__name {
+  overflow-wrap: anywhere;
+}
+
+.script-row__dim {
+  color: var(--text-dim);
+  font-size: var(--type-note-size);
+  overflow-wrap: anywhere;
+}
+
+.script-row__schedule {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The state dot: filled on schedule, hollow off, dashed when the last scheduled run failed. */
+.script-row__dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid var(--text-dim);
+  border-radius: var(--radius-pill);
+}
+
+.script-row__dot[data-state='on'] {
+  border-color: var(--text);
+  background: var(--text);
+}
+
+.script-row__dot[data-state='failed'] {
+  border-style: dashed;
+  border-color: var(--text);
+}
+
+.script-row__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.script-row__actions button {
+  min-height: 2.2rem;
+  padding: var(--space-0) var(--space-2);
+  font-size: var(--type-label-size);
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .script-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .script-row > .script-row__main:nth-child(2) {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
 }
 </style>

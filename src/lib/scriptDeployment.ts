@@ -37,3 +37,43 @@ const STATUS_WORDS: Record<ScriptDeploymentStatus, string> = {
 export function statusWords(status: string | null | undefined): string {
   return (status && STATUS_WORDS[status as ScriptDeploymentStatus]) || status || ''
 }
+
+// DAR-UI-124. Outcomes that mean the scheduled run did not post what it should have.
+const FAILED_STATUSES: ReadonlySet<string> = new Set(['SCRIPT_ERROR', 'NO_INPUT', 'NOT_DELIVERED', 'SCRIPT_MISSING'])
+
+export function isFailedStatus(status: string | null | undefined): boolean {
+  return Boolean(status && FAILED_STATUSES.has(status))
+}
+
+/** "07:30" -> "7:30 AM": how a schedule reads back everywhere else in the product. */
+function twelveHourTime(time: string): string {
+  const [hourText, minute] = time.split(':')
+  const hour = Number(hourText)
+  return `${hour % 12 === 0 ? 12 : hour % 12}:${minute} ${hour >= 12 ? 'PM' : 'AM'}`
+}
+
+/** "0 0 7 * * ?" -> "Daily at 7:00 AM"; a cron that is not once a day reads as itself. */
+export function scheduleWords(cron: string | null | undefined): string {
+  const time = timeFromCron(cron)
+  return time ? `Daily at ${twelveHourTime(time)}` : `Cron ${cron ?? ''}`.trim()
+}
+
+/** The state dot on a script's row: on schedule, off, or its last scheduled run failed. */
+export type ScheduleState = 'on' | 'off' | 'failed' | 'none'
+
+export function scheduleState(deployment: { isActive: boolean; lastRunStatus: string | null } | null | undefined): ScheduleState {
+  if (!deployment) return 'none'
+  if (isFailedStatus(deployment.lastRunStatus)) return 'failed'
+  return deployment.isActive ? 'on' : 'off'
+}
+
+/** The newest result file of a saved run, read the way the scheduled run reads it
+ *  (ScriptDeploymentSupport.newestResultFileName): the first finished output in list#GeneratedOutputs order. */
+export function newestResultFileName(
+  outputs: readonly { fileName?: string; savedRunId?: string; resultAvailable?: boolean }[],
+  savedRunId: string,
+): string | null {
+  const newest = outputs.find((out) => out.fileName && out.resultAvailable !== false
+    && (out.savedRunId == null || out.savedRunId === savedRunId))
+  return newest?.fileName ?? null
+}

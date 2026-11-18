@@ -263,6 +263,19 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Scripts' },
   },
   {
+    // DAR-UI-124. One script on a page of its own: what it reads, its schedule, its code and this visit's runs.
+    path: '/settings/tenant/scripts/new',
+    name: 'settings-tenant-script-new',
+    component: () => import('../pages/settings/TenantScriptPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Script' },
+  },
+  {
+    path: '/settings/tenant/scripts/:tenantScriptId',
+    name: 'settings-tenant-script',
+    component: () => import('../pages/settings/TenantScriptPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Script' },
+  },
+  {
     path: '/settings/ai',
     name: 'settings-ai',
     redirect: { name: 'settings-tenant' },
