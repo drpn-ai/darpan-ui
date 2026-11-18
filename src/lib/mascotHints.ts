@@ -21,6 +21,11 @@
  * something, so a page never lectures at a fixed interval.
  */
 export interface Hint {
+  /**
+   * Stable kebab id, unique within its route (`/^[a-z0-9-]{2,40}$/`). The seed key is `<route>.<id>`, so an
+   * admin's edit of a line follows the id, never its position. Never rename one that has shipped.
+   */
+  id: string
   /** The line, as spoken. */
   text: string
   /**
@@ -39,63 +44,63 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
   // RuleSetBoard: @dblclick opens the filter editor, pointerdown/up draws a pairing,
   // and Enter is the keyboard equivalent of the drag.
   'reconciliation-ruleset-editor': Object.freeze([
-    { text: 'Double-click a field to set what this source should leave out when it pulls.', when: control('ruleset-field-list-file1') },
-    { text: 'Drag from a field on one side to a field on the other to pair them.', when: control('ruleset-editor-board') },
-    { text: 'Not every source can filter at the pull — a side that cannot will say so.' },
-    { text: 'Enter on a field, then Enter on its partner, pairs them without the drag.', when: control('ruleset-editor-board') },
+    { id: 'ruleset-field-list-file1', text: 'Double-click a field to set what this source should leave out when it pulls.', when: control('ruleset-field-list-file1') },
+    { id: 'ruleset-editor-board', text: 'Drag from a field on one side to a field on the other to pair them.', when: control('ruleset-editor-board') },
+    { id: 'every-source-can-filter', text: 'Not every source can filter at the pull — a side that cannot will say so.' },
+    { id: 'ruleset-editor-board-2', text: 'Enter on a field, then Enter on its partner, pairs them without the drag.', when: control('ruleset-editor-board') },
   ]),
   'reconciliation-ruleset-manager': Object.freeze([
-    { text: 'Filters or rules change with the pencil beside each — finished runs keep whatever they already compared.', when: control('ruleset-manager-edit-rules') },
-    { text: 'Filters are per source — each side can leave out different records as it pulls.', when: control('ruleset-manager-filters') },
-    { text: 'Open a conclusion row to change its question or conditions; New conclusion adds one after the rest.', when: control('run-conclusions-new') },
-    { text: 'Run this rule set from here; its history is one step further on.', when: control('ruleset-manager-run-ruleset') },
+    { id: 'ruleset-manager-edit-rules', text: 'Filters or rules change with the pencil beside each — finished runs keep whatever they already compared.', when: control('ruleset-manager-edit-rules') },
+    { id: 'ruleset-manager-filters', text: 'Filters are per source — each side can leave out different records as it pulls.', when: control('ruleset-manager-filters') },
+    { id: 'run-conclusions-new', text: 'Open a conclusion row to change its question or conditions; New conclusion adds one after the rest.', when: control('run-conclusions-new') },
+    { id: 'ruleset-manager-run-ruleset', text: 'Run this rule set from here; its history is one step further on.', when: control('ruleset-manager-run-ruleset') },
   ]),
   'reconciliation-automations': Object.freeze([
-    { text: 'Open one to see its schedule, its window, and what it has actually been doing.', when: control('automation-tile') },
-    { text: 'Create Automation builds a new one on top of a saved run.', when: control('automation-create-action') },
+    { id: 'automation-tile', text: 'Open one to see its schedule, its window, and what it has actually been doing.', when: control('automation-tile') },
+    { id: 'automation-create-action', text: 'Create Automation builds a new one on top of a saved run.', when: control('automation-create-action') },
   ]),
   'reconciliation-automation-dashboard': Object.freeze([
-    { text: 'Rest on Schedule or Window — they are the two most easily confused settings here.', when: control('automation-setup-summary') },
+    { id: 'automation-setup-summary', text: 'Rest on Schedule or Window — they are the two most easily confused settings here.', when: control('automation-setup-summary') },
     // Gated on a row rather than the section: with no executions the section is an empty
     // state, and calling that "the record of what happened" explains nothing.
-    { text: 'Previous Runs is the record of what actually happened, newest first.', when: control('automation-execution-row') },
-    { text: 'Run now fires it immediately and leaves the schedule alone.', when: control('automation-run-now-action') },
+    { id: 'automation-execution-row', text: 'Previous Runs is the record of what actually happened, newest first.', when: control('automation-execution-row') },
+    { id: 'automation-run-now-action', text: 'Run now fires it immediately and leaves the schedule alone.', when: control('automation-run-now-action') },
   ]),
   // Two routes, one component. The saved result is the forensic view; the live run is the
   // same page while it is still moving, and almost everything it offers is conditional.
   'reconciliation-run-result': Object.freeze([
-    { text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
+    { id: 'run-result-live-failed', text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
     // The empty message also shows when a filter matches nothing, so it must not be read
     // as "the run found nothing".
-    { text: 'Nothing here yet — a bucket or the search may be filtering it out, not the run.', when: control('diff-details-empty') },
-    { text: 'Click a bucket to narrow the table to just those records.', when: control('diff-bucket-file-1') },
-    { text: 'Rest on any count and I will tell you what it does and does not include.' },
-    { text: 'Differences and missing records are counted separately — a zero in one says nothing about the other.' },
-    { text: 'The source files are the run’s own — download one to check a record it calls missing.', when: control('run-result-source-download') },
-    { text: 'Download gives you the result exactly as the run wrote it.', when: control('run-result-download') },
+    { id: 'diff-details-empty', text: 'Nothing here yet — a bucket or the search may be filtering it out, not the run.', when: control('diff-details-empty') },
+    { id: 'diff-bucket-file-1', text: 'Click a bucket to narrow the table to just those records.', when: control('diff-bucket-file-1') },
+    { id: 'rest-any-count-i', text: 'Rest on any count and I will tell you what it does and does not include.' },
+    { id: 'differences-missing-records-counted', text: 'Differences and missing records are counted separately — a zero in one says nothing about the other.' },
+    { id: 'run-result-source-download', text: 'The source files are the run’s own — download one to check a record it calls missing.', when: control('run-result-source-download') },
+    { id: 'run-result-download', text: 'Download gives you the result exactly as the run wrote it.', when: control('run-result-download') },
   ]),
   'reconciliation-run-live': Object.freeze([
-    { text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
-    { text: 'Notify me pings a chat space when this finishes, so you do not have to wait here.', when: control('run-result-notify-me') },
-    { text: 'Cancel run stops it. Whatever it has done so far is discarded.', when: control('run-result-cancel') },
-    { text: 'Run steps fills in as each stage finishes — it is the live part of this page.', when: control('run-result-step-timeline') },
+    { id: 'run-result-live-failed', text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
+    { id: 'run-result-notify-me', text: 'Notify me pings a chat space when this finishes, so you do not have to wait here.', when: control('run-result-notify-me') },
+    { id: 'run-result-cancel', text: 'Cancel run stops it. Whatever it has done so far is discarded.', when: control('run-result-cancel') },
+    { id: 'run-result-step-timeline', text: 'Run steps fills in as each stage finishes — it is the live part of this page.', when: control('run-result-step-timeline') },
   ]),
   'reconciliation-run-history': Object.freeze([
-    { text: 'A run still going shows its progress here rather than a result.', when: control('run-history-running-tile') },
-    { text: 'A failed run kept its error — open it rather than re-running blind.', when: control('run-history-failed-tile') },
-    { text: 'Runs are a record of what was true when they ran. Re-run rather than editing one.' },
-    { text: 'A burst of failures can bury the run you want — there is more here than the first page.', when: control('run-history-more') },
+    { id: 'run-history-running-tile', text: 'A run still going shows its progress here rather than a result.', when: control('run-history-running-tile') },
+    { id: 'run-history-failed-tile', text: 'A failed run kept its error — open it rather than re-running blind.', when: control('run-history-failed-tile') },
+    { id: 'runs-record-was-true', text: 'Runs are a record of what was true when they ran. Re-run rather than editing one.' },
+    { id: 'run-history-more', text: 'A burst of failures can bury the run you want — there is more here than the first page.', when: control('run-history-more') },
   ]),
   // Schema surfaces. Written from what the components actually render — the editor's
   // controls are all gated on canEditTarget, which is why a read-only view looks broken
   // rather than restricted, and that is the line worth spending.
   'schemas-library': Object.freeze([
-    { text: 'A schema is the shape a run expects its source data to have — open one to see the fields it pins.', when: control('schema-library-tile') },
-    { text: 'Create builds a new schema. Nothing already saved is touched.', when: control('schema-library-create') },
+    { id: 'schema-library-tile', text: 'A schema is the shape a run expects its source data to have — open one to see the fields it pins.', when: control('schema-library-tile') },
+    { id: 'schema-library-create', text: 'Create builds a new schema. Nothing already saved is touched.', when: control('schema-library-create') },
   ]),
   'schemas-editor': Object.freeze([
-    { text: 'Each row is a path into the source document — the placeholder shows the shape it wants.', when: control('schema-editor-add-row') },
-    { text: 'Without permission to edit tenant settings this is a read-only view, not a broken one.' },
+    { id: 'schema-editor-add-row', text: 'Each row is a path into the source document — the placeholder shows the shape it wants.', when: control('schema-editor-add-row') },
+    { id: 'without-permission-edit-tenant', text: 'Without permission to edit tenant settings this is a read-only view, not a broken one.' },
   ]),
   /* ── Settings ──────────────────────────────────────────────────────────────────
      Written from the components, not from the testid names. Three structural facts
@@ -107,95 +112,95 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
      is on screen for exactly the steps before that. */
 
   'settings-oms': Object.freeze([
-    { text: 'Each tile is one HotWax connection — open it to see its endpoints or test it.', when: control('oms-auth-tile') },
-    { text: 'An auth profile is the credentials only. The endpoints that use it live inside it.', when: control('oms-auth-create-action') },
+    { id: 'oms-auth-tile', text: 'Each tile is one HotWax connection — open it to see its endpoints or test it.', when: control('oms-auth-tile') },
+    { id: 'oms-auth-create-action', text: 'An auth profile is the credentials only. The endpoints that use it live inside it.', when: control('oms-auth-create-action') },
   ]),
   'settings-oms-auth': Object.freeze([
-    { text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('oms-endpoint-tile') },
-    { text: 'Diagnostics reads and changes nothing — safe to run whenever you doubt a credential.', when: control('diagnose-oms-rest-source') },
-    { text: 'Delete is the one action here that nothing undoes.', when: control('delete-oms-rest-source') },
+    { id: 'oms-endpoint-tile', text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('oms-endpoint-tile') },
+    { id: 'diagnose-oms-rest-source', text: 'Diagnostics reads and changes nothing — safe to run whenever you doubt a credential.', when: control('diagnose-oms-rest-source') },
+    { id: 'delete-oms-rest-source', text: 'Delete is the one action here that nothing undoes.', when: control('delete-oms-rest-source') },
   ]),
   'settings-oms-create': Object.freeze([
-    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { id: 'wizard-next', text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
   ]),
   'settings-oms-edit': Object.freeze([
-    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-oms-rest-source') },
+    { id: 'save-oms-rest-source', text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-oms-rest-source') },
   ]),
 
   'settings-shopify': Object.freeze([
-    { text: 'Each tile is one Shopify connection — open it to see its endpoints or test it.', when: control('shopify-auth-tile') },
-    { text: 'Nothing saved yet. A config here is what every Shopify run signs in with.', when: control('shopify-empty-create-action') },
+    { id: 'shopify-auth-tile', text: 'Each tile is one Shopify connection — open it to see its endpoints or test it.', when: control('shopify-auth-tile') },
+    { id: 'shopify-empty-create-action', text: 'Nothing saved yet. A config here is what every Shopify run signs in with.', when: control('shopify-empty-create-action') },
   ]),
   'settings-shopify-auth': Object.freeze([
-    { text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('shopify-endpoint-tile') },
-    { text: 'Diagnostics reads and changes nothing — safe to run whenever you doubt a credential.', when: control('diagnose-shopify-auth') },
-    { text: 'Delete is the one action here that nothing undoes.', when: control('delete-shopify-auth') },
+    { id: 'shopify-endpoint-tile', text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('shopify-endpoint-tile') },
+    { id: 'diagnose-shopify-auth', text: 'Diagnostics reads and changes nothing — safe to run whenever you doubt a credential.', when: control('diagnose-shopify-auth') },
+    { id: 'delete-shopify-auth', text: 'Delete is the one action here that nothing undoes.', when: control('delete-shopify-auth') },
   ]),
   'settings-shopify-create': Object.freeze([
-    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { id: 'wizard-next', text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
   ]),
   'settings-shopify-edit': Object.freeze([
-    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-shopify-auth') },
+    { id: 'save-shopify-auth', text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-shopify-auth') },
   ]),
 
   // Endpoints live inside the auth profile they sign in with (DAR-UI-062), so this page lists profiles only.
   'settings-netsuite': Object.freeze([
-    { text: 'Auth is who NetSuite thinks you are. Its endpoints, what you ask it for, live inside it.', when: control('netsuite-auth-tile') },
+    { id: 'netsuite-auth-tile', text: 'Auth is who NetSuite thinks you are. Its endpoints, what you ask it for, live inside it.', when: control('netsuite-auth-tile') },
   ]),
   'settings-netsuite-auth': Object.freeze([
-    { text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('netsuite-endpoint-tile') },
-    { text: 'A new endpoint made here already knows which profile it signs in with.', when: control('netsuite-endpoint-create-action') },
-    { text: 'Diagnostics mints one token and reads one id — safe to run whenever you doubt a credential.', when: control('diagnose-netsuite-auth') },
-    { text: 'Delete refuses while endpoints, checks or saved runs still sign in with this profile.', when: control('delete-netsuite-auth') },
+    { id: 'netsuite-endpoint-tile', text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('netsuite-endpoint-tile') },
+    { id: 'netsuite-endpoint-create-action', text: 'A new endpoint made here already knows which profile it signs in with.', when: control('netsuite-endpoint-create-action') },
+    { id: 'diagnose-netsuite-auth', text: 'Diagnostics mints one token and reads one id — safe to run whenever you doubt a credential.', when: control('diagnose-netsuite-auth') },
+    { id: 'delete-netsuite-auth', text: 'Delete refuses while endpoints, checks or saved runs still sign in with this profile.', when: control('delete-netsuite-auth') },
   ]),
   'settings-netsuite-auth-create': Object.freeze([
-    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
-    { text: 'The eye shows what you pasted, so a stray space is visible before you save it.', when: control('toggle-client-id-visibility') },
+    { id: 'wizard-next', text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { id: 'toggle-client-id-visibility', text: 'The eye shows what you pasted, so a stray space is visible before you save it.', when: control('toggle-client-id-visibility') },
   ]),
   'settings-netsuite-auth-edit': Object.freeze([
-    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-netsuite-auth') },
-    { text: 'The eye shows what you pasted, so a stray space is visible before you save it.', when: control('toggle-client-id-visibility') },
+    { id: 'save-netsuite-auth', text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-netsuite-auth') },
+    { id: 'toggle-client-id-visibility', text: 'The eye shows what you pasted, so a stray space is visible before you save it.', when: control('toggle-client-id-visibility') },
   ]),
   'settings-netsuite-endpoints-create': Object.freeze([
-    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { id: 'wizard-next', text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
   ]),
   'settings-netsuite-endpoints-edit': Object.freeze([
-    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-netsuite-endpoint') },
+    { id: 'save-netsuite-endpoint', text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-netsuite-endpoint') },
   ]),
 
   'settings-sftp': Object.freeze([
-    { text: 'Each server is somewhere a run can pick files up from or drop them off.', when: control('sftp-server-tile') },
-    { text: 'Nothing saved yet — a server here is what a file-based run reads from.', when: control('sftp-empty-create-action') },
+    { id: 'sftp-server-tile', text: 'Each server is somewhere a run can pick files up from or drop them off.', when: control('sftp-server-tile') },
+    { id: 'sftp-empty-create-action', text: 'Nothing saved yet — a server here is what a file-based run reads from.', when: control('sftp-empty-create-action') },
   ]),
   'settings-sftp-create': Object.freeze([
-    { text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { id: 'wizard-next', text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
   ]),
   'settings-sftp-edit': Object.freeze([
-    { text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-sftp-server') },
+    { id: 'save-sftp-server', text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-sftp-server') },
   ]),
 
   // No create action anywhere on this page, and that is the thing worth saying: runs are
   // made in the reconciliation flow and only edited here.
   'settings-runs': Object.freeze([
-    { text: 'Runs are created in the reconciliation flow, not here — this page only edits saved ones.', when: control('run-tile') },
-    { text: 'Editing a saved run changes what it compares next time. Finished results are untouched.', when: control('saved-runs') },
+    { id: 'run-tile', text: 'Runs are created in the reconciliation flow, not here — this page only edits saved ones.', when: control('run-tile') },
+    { id: 'saved-runs', text: 'Editing a saved run changes what it compares next time. Finished results are untouched.', when: control('saved-runs') },
   ]),
   'settings-runs-edit': Object.freeze([
-    { text: 'The two sources are what this run compares — change either and the next run answers differently.', when: control('run-source-1-row') },
+    { id: 'run-source-1-row', text: 'The two sources are what this run compares — change either and the next run answers differently.', when: control('run-source-1-row') },
   ]),
 
   'settings-tenant': Object.freeze([
-    { text: 'This zone is what schedules and windows are read in. Your own preference only changes how times display.', when: control('tenant-module-timezone') },
-    { text: 'Spaces, and what posts to each, are on Notifications now: one grid, one dot per row.', when: control('tenant-module-notifications') },
+    { id: 'tenant-module-timezone', text: 'This zone is what schedules and windows are read in. Your own preference only changes how times display.', when: control('tenant-module-timezone') },
+    { id: 'tenant-module-notifications', text: 'Spaces, and what posts to each, are on Notifications now: one grid, one dot per row.', when: control('tenant-module-notifications') },
   ]),
   'settings-notifications': Object.freeze([
-    { text: 'One dot per row: a thing posts to one space, or nowhere. A click moves it at once, with no Save.', when: control('notifications-grid') },
-    { text: 'Send test posts one short line to that space, so you can see it lands before anything real does.', when: control('notifications-send-test') },
-    { text: 'Add space asks where first: a Slack channel or a Google Chat space, then what moves there.', when: control('notifications-add-space') },
+    { id: 'notifications-grid', text: 'One dot per row: a thing posts to one space, or nowhere. A click moves it at once, with no Save.', when: control('notifications-grid') },
+    { id: 'notifications-send-test', text: 'Send test posts one short line to that space, so you can see it lands before anything real does.', when: control('notifications-send-test') },
+    { id: 'notifications-add-space', text: 'Add space asks where first: a Slack channel or a Google Chat space, then what moves there.', when: control('notifications-add-space') },
   ]),
   'settings-user': Object.freeze([
-    { text: 'Your timezone changes how times read to you here — not when a scheduled automation fires.', when: control('user-timezone-card') },
-    { text: 'This is your own default. It does not change what anyone else is sent.', when: control('user-notification-default-card') },
+    { id: 'user-timezone-card', text: 'Your timezone changes how times read to you here — not when a scheduled automation fires.', when: control('user-timezone-card') },
+    { id: 'user-notification-default-card', text: 'This is your own default. It does not change what anyone else is sent.', when: control('user-notification-default-card') },
   ]),
 
   /* ── Reconciliation and schema wizards ─────────────────────────────────────────
@@ -207,30 +212,30 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
      lands. */
 
   'reconciliation-create': Object.freeze([
-    { text: 'One question per card, and nothing is saved until the last one — leaving now costs you nothing.', when: control('wizard-next') },
-    { text: 'Saving keeps this setup, so running it again is a click rather than a rebuild.', when: control('create-run-submit') },
+    { id: 'wizard-next', text: 'One question per card, and nothing is saved until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { id: 'create-run-submit', text: 'Saving keeps this setup, so running it again is a click rather than a rebuild.', when: control('create-run-submit') },
   ]),
   'reconciliation-diff': Object.freeze([
-    { text: 'This side is a file, so the run compares what you upload — not whatever the system holds now.', when: control('file1-input') },
-    { text: 'The window decides which records are pulled at all. One dated just outside it reads as missing when both systems have it.', when: control('api-window-preset-previous-day') },
-    { text: 'The last result this setup produced — open it rather than re-running to see what it found.', when: control('latest-run-result') },
+    { id: 'file1-input', text: 'This side is a file, so the run compares what you upload — not whatever the system holds now.', when: control('file1-input') },
+    { id: 'api-window-preset-previous-day', text: 'The window decides which records are pulled at all. One dated just outside it reads as missing when both systems have it.', when: control('api-window-preset-previous-day') },
+    { id: 'latest-run-result', text: 'The last result this setup produced — open it rather than re-running to see what it found.', when: control('latest-run-result') },
   ]),
   'reconciliation-automation-create': Object.freeze([
-    { text: 'One question per card, and nothing is scheduled until the last one — leaving now costs you nothing.', when: control('wizard-next') },
-    { text: 'How far back each run reaches. How often it runs is the schedule, and the two are set separately.', when: control('automation-window-select') },
+    { id: 'wizard-next', text: 'One question per card, and nothing is scheduled until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { id: 'automation-window-select', text: 'How far back each run reaches. How often it runs is the schedule, and the two are set separately.', when: control('automation-window-select') },
   ]),
   'reconciliation-automation-edit': Object.freeze([
-    { text: 'Sync replaces this automation’s source setup and filters with the run’s current ones.', when: control('automation-edit-sync') },
-    { text: 'Widening the window makes each run reach further back. It does not make runs happen more often.', when: control('automation-edit-window-fields') },
-    { text: 'This is where this automation’s own notice goes, whichever space the tenant defaults to.', when: control('automation-edit-chat-space-fields') },
+    { id: 'automation-edit-sync', text: 'Sync replaces this automation’s source setup and filters with the run’s current ones.', when: control('automation-edit-sync') },
+    { id: 'automation-edit-window-fields', text: 'Widening the window makes each run reach further back. It does not make runs happen more often.', when: control('automation-edit-window-fields') },
+    { id: 'automation-edit-chat-space-fields', text: 'This is where this automation’s own notice goes, whichever space the tenant defaults to.', when: control('automation-edit-chat-space-fields') },
   ]),
   'schemas-create': Object.freeze([
-    { text: 'One question per card, and nothing is saved until the last one — leaving now costs you nothing.', when: control('wizard-next') },
-    { text: 'What you reviewed here is what every run will expect from this source.', when: control('save-schema') },
+    { id: 'wizard-next', text: 'One question per card, and nothing is saved until the last one — leaving now costs you nothing.', when: control('wizard-next') },
+    { id: 'save-schema', text: 'What you reviewed here is what every run will expect from this source.', when: control('save-schema') },
   ]),
 
   hub: Object.freeze([
-    { text: 'Press ⌘K, or click me, to jump anywhere by name.' },
+    { id: 'press-k-click-me', text: 'Press ⌘K, or click me, to jump anywhere by name.' },
   ]),
 })
 

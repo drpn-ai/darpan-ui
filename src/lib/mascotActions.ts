@@ -853,7 +853,7 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
  * Kept short on purpose: a pattern that fires on something it did not mean is the
  * confident wrong answer the exact registry exists to avoid.
  */
-const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.freeze([
+export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.freeze([
   // "Revoke <host>": the CLI session list names each button by the computer it signed in from.
   // "Request access in <tenant>": the tenant is data, the request is the same everywhere.
   // The tenant is optional for the same reason as retry's count: the coverage sweep reads the template with the hole removed.

@@ -1,9 +1,8 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { MASCOT_HINTS, hintsFor } from '../mascotHints'
+import { routeComponents as realRouteComponents, sourceFor } from '../mascotRouteAnchors'
 
 function render(html: string): HTMLElement {
   const host = document.createElement('div')
@@ -11,6 +10,16 @@ function render(html: string): HTMLElement {
   document.body.appendChild(host)
   return host
 }
+
+describe('hint ids', () => {
+  it('hintIdsAreUniqueAndStable', () => {
+    for (const [route, hints] of Object.entries(MASCOT_HINTS)) {
+      const ids = hints.map((hint) => hint.id)
+      for (const id of ids) expect(id, `${route}: ${id}`).toMatch(/^[a-z0-9-]{2,40}$/)
+      expect(new Set(ids).size, `${route} has a duplicate hint id`).toBe(ids.length)
+    }
+  })
+})
 
 describe('hintsFor', () => {
   it('offers a hint only while the control it names is on the page', () => {
@@ -64,27 +73,7 @@ describe('hintsFor', () => {
  * than reaching a user.
  */
 describe('every hint names a control that exists', () => {
-  const ROUTER = 'src/router/index.ts'
-
-  function routeComponents(): Record<string, string> {
-    const source = readFileSync(ROUTER, 'utf-8')
-    const map: Record<string, string> = {}
-    for (const block of source.split(/\n {2}\{\n/)) {
-      const name = block.match(/name: '([^']+)'/)?.[1]
-      const component = block.match(/component: \(\) => import\('([^']+)'\)/)?.[1]
-      if (name && component) map[name] = resolve(dirname(ROUTER), component)
-    }
-    return map
-  }
-
-  /** The page plus the components it imports directly — a board or a table frame owns
-      plenty of the controls a page's hints talk about. */
-  function sourceFor(entry: string): string {
-    const page = readFileSync(entry, 'utf-8')
-    const imports = Array.from(page.matchAll(/from '([^']+\.vue)'/g))
-      .flatMap((match) => (match[1] ? [resolve(dirname(entry), match[1])] : []))
-    return [page, ...imports.map((path) => readFileSync(path, 'utf-8'))].join('\n')
-  }
+  const routeComponents = () => Object.fromEntries(Object.entries(realRouteComponents()).map(([k, v]) => [k, v.component]))
 
   it('finds every "when" testid in the route it belongs to', () => {
     const components = routeComponents()

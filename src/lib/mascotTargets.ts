@@ -21,7 +21,7 @@ import { describeTimeZone } from './utils/date'
  */
 
 /** Labels carry a colon, stray whitespace and case that the index should not care about. */
-function normalizeLabel(text: string): string {
+export function normalizeLabel(text: string): string {
   // Collapse first, then strip the colon, then trim again — stripping " :" leaves a
   // trailing space that would otherwise miss every entry in the index.
   return text
@@ -56,7 +56,7 @@ function withoutCount(label: string): string {
  * Where the same concept is written differently on screen than in the glossary. Keys are
  * what the product actually displays; the docs' own wording is the value.
  */
-const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+export const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'differences': 'differenceCount',
   'difference count': 'differenceCount',
   'compared': 'comparedCount',
@@ -185,7 +185,7 @@ const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
  * nothing: a pattern that fires on something it did not mean is precisely the confident
  * wrong answer the exact index exists to prevent.
  */
-const LABEL_PATTERNS: readonly (readonly [RegExp, string])[] = Object.freeze([
+export const LABEL_PATTERNS: readonly (readonly [RegExp, string])[] = Object.freeze([
   // The diff buckets read "Missing from HotWax" / "Missing from Shopify" — the system
   // names come from the run. The direction is already visible in the heading, so one
   // direction-neutral answer serves both sides and cannot get the sides backwards.
