@@ -11,7 +11,8 @@ describe('router release scope', () => {
     { name: 'settings-ai-create', path: '/settings/ai/create', redirect: true },
     { name: 'settings-ai-edit', path: '/settings/ai/edit/:llmProvider', redirect: true },
     { name: 'settings-sftp', path: '/settings/sftp', surfaceMode: 'static' },
-    { name: 'settings-notifications', path: '/settings/notifications', redirect: true },
+    { name: 'settings-notifications', path: '/settings/notifications', surfaceMode: 'static', staticPageLabel: 'Notifications' },
+    { name: 'settings', path: '/settings', redirect: true },
     { name: 'connections-notifications', path: '/connections/notifications', redirect: true },
     { name: 'settings-sftp-create', path: '/settings/sftp/create', surfaceMode: 'workflow' },
     { name: 'settings-sftp-edit', path: '/settings/sftp/edit/:sftpServerId', surfaceMode: 'workflow' },
@@ -59,6 +60,17 @@ describe('router release scope', () => {
     if (surfaceMode) expect(route?.meta.surfaceMode).toBe(surfaceMode)
     if (staticPageLabel) expect(route?.meta.staticPageLabel).toBe(staticPageLabel)
     if (redirect) expect(route?.redirect).toBeTruthy()
+  })
+
+  // DAR-UI-123. The Slack OAuth callback returns to /settings?slack=...; it lands on Notifications with its result.
+  it('lands the Slack callback on Notifications and a bare /settings on Tenant Settings', () => {
+    const redirect = router.getRoutes().find((record) => record.name === 'settings')?.redirect as (to: RouteLocationNormalized) => unknown
+    expect(redirect(router.resolve('/settings?slack=connected&team=Acme') as RouteLocationNormalized)).toEqual({
+      name: 'settings-notifications',
+      query: { slack: 'connected', team: 'Acme' },
+    })
+    expect(redirect(router.resolve('/settings') as RouteLocationNormalized)).toEqual({ name: 'settings-tenant' })
+    expect(router.getRoutes().find((record) => record.name === 'connections-notifications')?.redirect).toEqual({ name: 'settings-notifications' })
   })
 
   // DAR-UI-074. The audit board takes the whole screen; its settings and run pages keep the static width.

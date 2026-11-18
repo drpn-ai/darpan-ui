@@ -169,9 +169,6 @@ describe('reconciliationAutomationDraft', () => {
     expect(buildSaveAutomationPayload(createDraft({ chatSpaceChoice: 'existing', chatSpaceId: 'CS1' }), savedRun)).toMatchObject({
       chatSpaceId: 'CS1',
     })
-    expect(buildSaveAutomationPayload(createDraft({ chatSpaceChoice: 'new', chatSpaceId: 'CS9' }), savedRun)).toMatchObject({
-      chatSpaceId: 'CS9',
-    })
   })
 
   it('sends an explicit empty chatSpaceId to clear the link when the choice is none', () => {

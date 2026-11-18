@@ -1,5 +1,11 @@
 <template>
-  <WorkflowPage :progress-percent="progressPercent" aria-label="Automation setup progress" center-stage :edit-surface="isEditMode">
+  <WorkflowPage
+    :class="{ 'static-page-frame--popup-open': addSpaceOpen }"
+    :progress-percent="progressPercent"
+    aria-label="Automation setup progress"
+    center-stage
+    :edit-surface="isEditMode"
+  >
     <InlineValidation v-if="pageError" tone="error" :message="pageError" />
 
     <WorkflowStepForm
@@ -424,37 +430,6 @@
         </div>
       </template>
 
-      <template v-else-if="currentStep.id === 'chat-space-name'">
-        <label class="wizard-input-shell">
-          <input
-            v-model="newChatSpaceName"
-            name="newChatSpaceName"
-            class="wizard-answer-control"
-            data-testid="automation-chat-space-name"
-            placeholder="Ops Alerts"
-          />
-        </label>
-      </template>
-
-      <!-- DAR-UI-023: the question is the whole card; there is nothing to answer here. -->
-      <template v-else-if="currentStep.id === 'chat-space-slack-connect'" />
-
-      <template v-else-if="currentStep.id === 'chat-space-url'">
-        <label class="wizard-input-shell">
-          <input
-            v-model="newChatSpaceUrl"
-            name="newChatSpaceUrl"
-            class="wizard-answer-control"
-            data-testid="automation-chat-space-url"
-            type="text"
-            autocomplete="off"
-            autocapitalize="none"
-            spellcheck="false"
-            :placeholder="chatProviderWebhookPlaceholders[newChatSpaceProvider]"
-          />
-        </label>
-      </template>
-
       <template v-else>
         <label class="wizard-input-shell">
           <input
@@ -467,6 +442,16 @@
       </template>
     </WorkflowStepForm>
   </WorkflowPage>
+
+  <!-- DAR-UI-123. "Set up a new space" is the Notifications page's Add space flow; the space it adds comes back
+       selected. Outside the page, which blurs, as the static pages render their popups. -->
+  <AddChatSpaceFlow
+    v-if="addSpaceOpen"
+    :spaces="tenantChatSpaces"
+    :allow-oauth="false"
+    @added="onChatSpaceAdded"
+    @close="closeAddSpace"
+  />
 </template>
 
 <script setup lang="ts">
@@ -479,7 +464,7 @@ import WorkflowSelect, { type WorkflowSelectOption } from '../../components/work
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
-import { ApiCallError } from '../../lib/api/client'
+import AddChatSpaceFlow from '../../components/settings/AddChatSpaceFlow.vue'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type {
   AutomationNsRestletOption,
@@ -488,10 +473,7 @@ import type {
   AutomationSyncStatus,
   AutomationSftpServerOption,
   AutomationSystemRemoteOption,
-  ChatProviderId,
   EnumOption,
-  SlackChannel,
-  SlackWorkspaceInstall,
   SavedRunSummary,
   TenantChatSpace,
   UserNotificationDefault,
@@ -608,21 +590,7 @@ const returnLabel = ref('')
 const returnPath = ref('')
 const chatSpaceChoice = ref<ReconciliationAutomationChatSpaceChoice>('')
 const chatSpaceId = ref('')
-const newChatSpaceName = ref('')
-const newChatSpaceProvider = ref<ChatProviderId>('CHAT_PROV_GOOGLE')
-const newChatSpaceUrl = ref('')
-const newChatSpaceChannelId = ref('')
-const slackInstalls = ref<SlackWorkspaceInstall[]>([])
-const slackChannels = ref<SlackChannel[]>([])
-const slackChannelsLoading = ref(false)
-const chatProviderOptions: WorkflowSelectOption[] = [
-  { value: 'CHAT_PROV_GOOGLE', label: 'Google Chat' },
-  { value: 'CHAT_PROV_SLACK', label: 'Slack' },
-]
-const chatProviderWebhookPlaceholders: Record<ChatProviderId, string> = {
-  CHAT_PROV_GOOGLE: 'https://chat.googleapis.com/v1/spaces/...',
-  CHAT_PROV_SLACK: 'https://hooks.slack.com/services/T.../B.../...',
-}
+const addSpaceOpen = ref(false)
 const userNotificationDefault = ref<UserNotificationDefault | null>(null)
 const tenantChatSpaces = ref<TenantChatSpace[]>([])
 // Snapshot of the automation's own linked chat space at load time, for the edit-surface
@@ -714,7 +682,7 @@ const chatSpaceSelectOptions = computed<WorkflowSelectOption[]>(() => activeChat
 
 // Edit surface only: one dropdown replaces the wizard's choice-card stack (per live-review
 // feedback -- the card stack read as bulky/redundant on the compact single-page edit form).
-// "Set up a new space" is out of scope here; users add spaces from Tenant Settings.
+// "Set up a new space" is out of scope here; users add spaces from Notifications.
 const editChatSpaceSelectOptions = computed<WorkflowSelectOption[]>(() => {
   const options = chatSpaceSelectOptions.value.slice()
   // The currently-linked space won't be in the active list if it has since gone inactive.
@@ -742,16 +710,6 @@ const editChatSpaceValue = computed({
 const chatSpaceSteps = computed<WizardStep[]>(() => {
   const chatSpaceStepList: WizardStep[] = [{ id: 'chat-space' }]
   if (chatSpaceChoice.value === 'existing') chatSpaceStepList.push({ id: 'chat-space-select' })
-  if (chatSpaceChoice.value === 'new') {
-    chatSpaceStepList.push({ id: 'chat-space-name' }, { id: 'chat-space-provider' })
-    // Mirrors the Tenant Settings wizard: with a connected workspace the destination is a channel,
-    // not a URL. Asking for a webhook here was unanswerable for a bot-token workspace.
-    // DAR-UI-023: Slack posts through a connected workspace, which this wizard cannot connect; with none the
-    // card says where to do it instead of asking for a webhook.
-    if (usesSlackChannelPicker.value) chatSpaceStepList.push({ id: 'chat-space-channel' })
-    else if (newChatSpaceProvider.value === 'CHAT_PROV_SLACK') chatSpaceStepList.push({ id: 'chat-space-slack-connect' })
-    else chatSpaceStepList.push({ id: 'chat-space-url' })
-  }
   return chatSpaceStepList
 })
 
@@ -948,36 +906,12 @@ const currentQuestion = computed(() => {
       return 'Where should Darpan send notifications for this automation?'
     case 'chat-space-select':
       return 'Which chat space should get notified?'
-    case 'chat-space-name':
-      return 'What should the new chat space be called?'
-    case 'chat-space-provider':
-      return 'Which chat product does it post to?'
-    case 'chat-space-channel':
-      return 'Which Slack channel should it post to?'
-    case 'chat-space-url':
-      return `What is the ${newChatSpaceProviderLabel.value} webhook URL for this space?`
-    case 'chat-space-slack-connect':
-      return 'Connect a Slack workspace in Tenant settings first.'
     default:
       return ''
   }
 })
 
-const isSelectStep = computed(() => ['saved-run', 'file1-sftp', 'file2-sftp', 'file1-api', 'file2-api', 'chat-space-select', 'chat-space-provider', 'chat-space-channel'].includes(currentStep.value.id))
-const connectedSlackInstall = computed<SlackWorkspaceInstall | null>(() => slackInstalls.value[0] ?? null)
-const usesSlackChannelPicker = computed(() => (
-  newChatSpaceProvider.value === 'CHAT_PROV_SLACK' && connectedSlackInstall.value !== null
-))
-const slackChannelSelectOptions = computed<WorkflowSelectOption[]>(() => slackChannels.value.map((channel) => ({
-  value: channel.id,
-  label: channel.isPrivate ? `🔒 ${channel.name}` : `#${channel.name}`,
-})))
-const selectedSlackChannel = computed<SlackChannel | null>(() => (
-  slackChannels.value.find((channel) => channel.id === newChatSpaceChannelId.value) ?? null
-))
-const newChatSpaceProviderLabel = computed(() => (
-  chatProviderOptions.find((option) => option.value === newChatSpaceProvider.value)?.label ?? 'chat'
-))
+const isSelectStep = computed(() => ['saved-run', 'file1-sftp', 'file2-sftp', 'file1-api', 'file2-api', 'chat-space-select'].includes(currentStep.value.id))
 
 const activeSelectOptions = computed<WorkflowSelectOption[]>(() => {
   switch (currentStep.value.id) {
@@ -991,10 +925,6 @@ const activeSelectOptions = computed<WorkflowSelectOption[]>(() => {
       return apiSourceOptionsForCurrentStep.value
     case 'chat-space-select':
       return chatSpaceSelectOptions.value
-    case 'chat-space-provider':
-      return chatProviderOptions
-    case 'chat-space-channel':
-      return slackChannelSelectOptions.value
     default:
       return []
   }
@@ -1020,10 +950,6 @@ const activeSelectTestId = computed(() => {
       return 'automation-file2-api-select'
     case 'chat-space-select':
       return 'automation-chat-space-select'
-    case 'chat-space-provider':
-      return 'automation-chat-provider-select'
-    case 'chat-space-channel':
-      return 'automation-slack-channel-select'
     default:
       return 'automation-select'
   }
@@ -1049,10 +975,6 @@ const currentPlaceholder = computed(() => {
       return '/remote/source-2/orders'
     case 'chat-space-select':
       return 'Select chat space...'
-    case 'chat-space-provider':
-      return 'Select chat product...'
-    case 'chat-space-channel':
-      return slackChannelsLoading.value ? 'Loading channels...' : 'Select channel...'
     default:
       return ''
   }
@@ -1073,10 +995,6 @@ const activeSelectValue = computed({
         return selectedApiSourceValue('FILE_2')
       case 'chat-space-select':
         return chatSpaceId.value
-      case 'chat-space-provider':
-        return newChatSpaceProvider.value
-      case 'chat-space-channel':
-        return newChatSpaceChannelId.value
       default:
         return ''
     }
@@ -1101,15 +1019,6 @@ const activeSelectValue = computed({
         break
       case 'chat-space-select':
         chatSpaceId.value = value
-        break
-      case 'chat-space-channel':
-        newChatSpaceChannelId.value = value
-        break
-      case 'chat-space-provider':
-        newChatSpaceProvider.value = value as ChatProviderId
-        // A pasted URL belongs to the product it was copied from; keeping it across a provider
-        // change would send a chat.googleapis.com URL to the Slack validator.
-        newChatSpaceUrl.value = ''
         break
     }
   },
@@ -1206,16 +1115,6 @@ const canProceed = computed(() => {
       return scheduleExpr.value.trim().length > 0
     case 'chat-space-select':
       return chatSpaceId.value.length > 0
-    case 'chat-space-name':
-      return newChatSpaceName.value.trim().length > 0
-    case 'chat-space-provider':
-      return newChatSpaceProvider.value.length > 0
-    case 'chat-space-channel':
-      return newChatSpaceChannelId.value.length > 0
-    case 'chat-space-url':
-      return newChatSpaceUrl.value.trim().length > 0
-    case 'chat-space-slack-connect':
-      return false
     default:
       return false
   }
@@ -1223,13 +1122,6 @@ const canProceed = computed(() => {
 
 const chatSpaceChoiceReady = computed(() => {
   if (chatSpaceChoice.value === 'existing') return Boolean(chatSpaceId.value)
-  if (chatSpaceChoice.value === 'new') {
-    if (!newChatSpaceName.value.trim()) return false
-    // A bot-token destination is complete with a channel; it has no webhook to supply.
-    return usesSlackChannelPicker.value
-      ? Boolean(newChatSpaceChannelId.value)
-      : Boolean(newChatSpaceUrl.value.trim())
-  }
   return true
 })
 
@@ -1273,10 +1165,6 @@ const activeDraft = computed<ReconciliationAutomationDraft>(() => ({
   returnPath: returnPath.value || undefined,
   chatSpaceChoice: chatSpaceChoice.value || undefined,
   chatSpaceId: chatSpaceId.value || undefined,
-  newChatSpaceName: newChatSpaceName.value || undefined,
-  newChatSpaceProvider: newChatSpaceProvider.value,
-  newChatSpaceChannelId: newChatSpaceChannelId.value || undefined,
-  newChatSpaceUrl: newChatSpaceUrl.value || undefined,
   sources: {
     FILE_1: sourceDrafts.value.FILE_1,
     FILE_2: sourceDrafts.value.FILE_2,
@@ -1392,7 +1280,7 @@ function resolveActiveChoiceByKey(key: string): string | null {
 }
 
 function handleChoiceKeydown(event: KeyboardEvent): void {
-  if (!isChoiceStep.value || loadingOptions.value) return
+  if (!isChoiceStep.value || loadingOptions.value || addSpaceOpen.value) return
   if (event.defaultPrevented || event.repeat || event.isComposing) return
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
 
@@ -1405,11 +1293,11 @@ function handleChoiceKeydown(event: KeyboardEvent): void {
 
 function setChatSpaceChoice(value: string): void {
   const choice: ReconciliationAutomationChatSpaceChoice =
-    value === 'default' || value === 'existing' || value === 'new' || value === 'none' ? value : ''
+    value === 'default' || value === 'existing' || value === 'none' ? value : ''
   chatSpaceChoice.value = choice
   if (choice === 'default') {
     chatSpaceId.value = userNotificationDefault.value?.chatSpaceId ?? ''
-  } else if (choice === 'none' || choice === 'new') {
+  } else if (choice === 'none') {
     chatSpaceId.value = ''
   }
 }
@@ -1436,10 +1324,27 @@ async function handleChoice(value: string): Promise<void> {
   }
 
   if (currentStep.value.id === 'chat-space') {
+    if (value === 'new') {
+      addSpaceOpen.value = true
+      return
+    }
     setChatSpaceChoice(value)
     advance()
     return
   }
+}
+
+/** The added space comes back selected, as though it had been picked from the list. */
+function onChatSpaceAdded(space: TenantChatSpace): void {
+  tenantChatSpaces.value = [...tenantChatSpaces.value.filter((existing) => existing.chatSpaceId !== space.chatSpaceId), space]
+  chatSpaceChoice.value = 'existing'
+  chatSpaceId.value = space.chatSpaceId
+}
+
+function closeAddSpace(): void {
+  addSpaceOpen.value = false
+  // Added: past both chat-space cards to the name. Cancelled: still on the chat-space card.
+  if (chatSpaceChoice.value === 'existing' && chatSpaceId.value) moveToStep('automation-name')
 }
 
 async function handlePrimarySubmit(): Promise<void> {
@@ -1497,46 +1402,6 @@ async function saveAutomationSetup(): Promise<void> {
   const submitSignal = submitController.signal
 
   try {
-    // Guarded on !chatSpaceId.value so a retry after a saveAutomation failure below does not
-    // re-create the chat space (duplicate-name rejection) -- the first successful create
-    // already left chatSpaceId set, so a second submit attempt reuses it instead of creating
-    // a second space with the same name.
-    if (chatSpaceChoice.value === 'new' && !chatSpaceId.value) {
-      try {
-        const spaceResponse = await settingsFacade.saveTenantChatSpace({
-          spaceName: newChatSpaceName.value,
-          chatProviderEnumId: newChatSpaceProvider.value,
-          ...(usesSlackChannelPicker.value
-            ? {
-                slackInstallId: connectedSlackInstall.value!.slackInstallId,
-                slackChannelId: newChatSpaceChannelId.value,
-                slackChannelName: selectedSlackChannel.value?.name,
-              }
-            : { webhookUrl: newChatSpaceUrl.value }),
-          isActive: true,
-        }, submitSignal)
-        if (!spaceResponse.chatSpace?.chatSpaceId) {
-          pageError.value = 'The chat space wandered off mid-sentence. Not saved.'
-          return
-        }
-        chatSpaceId.value = spaceResponse.chatSpace.chatSpaceId
-        chatSpaceChoice.value = 'existing'
-        tenantChatSpaces.value = [...tenantChatSpaces.value, spaceResponse.chatSpace]
-        // chatSpaceChoice flipping to 'existing' reshapes chatSpaceSteps (chat-space-name +
-        // chat-space-url collapse into a single chat-space-select step), which shortens the
-        // wizard's steps array out from under currentStepIndex -- re-clamp it so a failed
-        // saveAutomation below leaves the user looking at automation-name (the step they were
-        // actually on), not an out-of-range index that falls back to the first step.
-        settleOnCurrentIndex()
-      } catch (spaceError) {
-        if ((spaceError as { name?: string })?.name === 'AbortError') return
-        // Dedicated catch so a chat-space creation failure (e.g. a duplicate name) isn't
-        // misattributed to the generic automation-save failure message below.
-        pageError.value = spaceError instanceof ApiCallError ? spaceError.message : 'The chat space wandered off mid-sentence. Not saved.'
-        return
-      }
-    }
-
     const response = await reconciliationFacade.saveAutomation(buildSaveAutomationPayload(activeDraft.value, selectedSavedRun.value), submitSignal)
     const origin = draftStore.workflowOrigin
     const savedAutomationId = response.automation?.automationId || activeDraft.value.automationId
@@ -1791,12 +1656,8 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   isActive.value = draft.isActive ?? true
   returnLabel.value = draft.returnLabel ?? ''
   returnPath.value = draft.returnPath ?? ''
-  chatSpaceChoice.value = draft.chatSpaceChoice ?? ''
+  setChatSpaceChoice(draft.chatSpaceChoice ?? '')
   chatSpaceId.value = draft.chatSpaceId ?? ''
-  newChatSpaceName.value = draft.newChatSpaceName ?? ''
-  newChatSpaceProvider.value = (draft.newChatSpaceProvider as ChatProviderId | undefined) ?? 'CHAT_PROV_GOOGLE'
-  newChatSpaceChannelId.value = draft.newChatSpaceChannelId ?? ''
-  newChatSpaceUrl.value = draft.newChatSpaceUrl ?? ''
   sourceDrafts.value = {
     FILE_1: { ...(draft.sources?.FILE_1 ?? {}) },
     FILE_2: { ...(draft.sources?.FILE_2 ?? {}) },
@@ -1805,39 +1666,6 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   applyDeterministicDefaults()
   return draftState.resumeStepId
 }
-
-async function loadSlackInstalls(signal: AbortSignal): Promise<void> {
-  try {
-    const response = await settingsFacade.getSlackInstall(signal)
-    slackInstalls.value = response.installs ?? []
-  } catch {
-    // Deliberately non-fatal and separate from loadChatSpaceOptions: this only decides whether the
-    // inline "new space" flow offers a channel picker or a webhook field. Sharing that call's
-    // Promise.all made a Slack hiccup also erase "My default space", which has nothing to do with it.
-    slackInstalls.value = []
-  }
-}
-
-async function loadSlackChannelOptions(): Promise<void> {
-  const install = connectedSlackInstall.value
-  if (!install || slackChannels.value.length || slackChannelsLoading.value) return
-  slackChannelsLoading.value = true
-  try {
-    const response = await settingsFacade.listSlackChannels(
-      { slackInstallId: install.slackInstallId }, pageAbortController.signal)
-    slackChannels.value = response.channels ?? []
-  } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
-    slackChannels.value = []
-    pageError.value = 'The Slack channels are slacking off.'
-  } finally {
-    slackChannelsLoading.value = false
-  }
-}
-
-watch(currentStep, (step) => {
-  if (step.id === 'chat-space-channel') void loadSlackChannelOptions()
-})
 
 async function loadChatSpaceOptions(signal: AbortSignal): Promise<void> {
   try {
@@ -1849,7 +1677,7 @@ async function loadChatSpaceOptions(signal: AbortSignal): Promise<void> {
     tenantChatSpaces.value = chatSpacesResponse.chatSpaces ?? []
   } catch (loadError) {
     if ((loadError as { name?: string })?.name === 'AbortError') return
-    // Non-critical for the wizard: 'new' and 'none' remain available even without a
+    // Non-critical for the wizard: a new space and 'none' remain available even without a
     // resolved default or registry, so a load failure here does not block automation setup --
     // but it must stay visible (pageError renders in both wizard and edit mode), otherwise
     // "My default space" / "Choose another space" just quietly vanish with no explanation.
@@ -1865,7 +1693,6 @@ async function loadOptions(): Promise<void> {
 
   try {
     const chatSpaceOptionsPromise = loadChatSpaceOptions(pageAbortController.signal)
-    void loadSlackInstalls(pageAbortController.signal)
     const response = await reconciliationFacade.listAutomationSourceOptions(pageAbortController.signal)
     sourceOptions.value = {
       inputModes: response.inputModes ?? [],

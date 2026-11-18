@@ -831,9 +831,34 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS1' }), expect.any(AbortSignal))
   })
 
-  it('asks for a Slack channel instead of a webhook when a workspace is connected', async () => {
-    // The gap this closes: the inline flow asked for a webhook URL even for a bot-token workspace,
-    // which has none — the Tenant Settings wizard offered a picker and this one did not.
+  /** Through the SFTP setup to the chat-space card. */
+  async function walkToChatSpaceStep(wrapper: ReturnType<typeof mount>): Promise<void> {
+    await chooseExistingRunPurpose(wrapper)
+    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
+    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+  }
+
+  /** "Set up a new space" opens the Notifications page's Add space flow over the wizard (DAR-UI-123). */
+  async function addGoogleChatSpace(wrapper: ReturnType<typeof mount>): Promise<void> {
+    await chooseCard(wrapper, 'automation-chat-space-new')
+    await flushPromises()
+    await chooseCard(wrapper, 'add-chat-space-where-google')
+    await wrapper.get('[data-testid="add-chat-space-webhook"]').setValue('https://chat.googleapis.com/v1/spaces/AAA')
+    await wrapper.get('[data-testid="add-chat-space-next"]').trigger('click')
+    await wrapper.get('[data-testid="add-chat-space-name"]').setValue('Ops Alerts')
+    await wrapper.get('[data-testid="add-chat-space-save"]').trigger('click')
+    await flushPromises()
+  }
+
+  it('adds a Slack space through the shared Add space flow and comes back with it selected', async () => {
     getSlackInstall.mockResolvedValue({
       ok: true, slackConfigured: true, oauthAvailable: false,
       installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', isActive: 'Y' }],
@@ -844,80 +869,62 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     })
     saveTenantChatSpace.mockResolvedValue({
       ok: true, messages: [], errors: [],
-      chatSpace: { chatSpaceId: 'CS9', spaceName: 'Ops Slack', isActive: 'Y', inUse: true },
+      chatSpace: { chatSpaceId: 'CS9', spaceName: '#darpan-test', isActive: 'Y', inUse: true },
     })
 
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
-    await chooseExistingRunPurpose(wrapper)
-    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
-    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await walkToChatSpaceStep(wrapper)
 
     await chooseCard(wrapper, 'automation-chat-space-new')
-    await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Slack')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await chooseWorkflowOption(wrapper, 'automation-chat-provider-select', 'CHAT_PROV_SLACK')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await flushPromises()
-
-    // A channel picker, not a webhook field.
-    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="automation-slack-channel-select"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="add-chat-space"]').text()).toContain('Where should it post?')
+    await chooseCard(wrapper, 'add-chat-space-where-slack')
+    await flushPromises()
     expect(listSlackChannels).toHaveBeenCalledWith({ slackInstallId: 'SI1' }, expect.anything())
-
-    await chooseWorkflowOption(wrapper, 'automation-slack-channel-select', 'C1')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
-    await wrapper.get('[data-testid="create-automation"]').trigger('click')
+    await chooseAppSelectOption(wrapper, 'add-chat-space-channel', 'C1')
+    await wrapper.get('[data-testid="add-chat-space-save"]').trigger('click')
     await flushPromises()
 
     expect(saveTenantChatSpace).toHaveBeenCalledWith({
-      spaceName: 'Ops Slack',
+      spaceName: '#darpan-test',
       chatProviderEnumId: 'CHAT_PROV_SLACK',
       slackInstallId: 'SI1',
       slackChannelId: 'C1',
       slackChannelName: 'darpan-test',
       isActive: true,
     }, expect.any(AbortSignal))
+    // No "what should post here" card in the wizard: the automation being built is what posts there.
+    expect(wrapper.get('[data-testid="add-chat-space"]').text()).toContain('#darpan-test is added.')
+    await wrapper.get('[data-testid="add-chat-space-done"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="add-chat-space"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('What should this automation be called?')
+    await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
+    await wrapper.get('[data-testid="create-automation"]').trigger('click')
+    await flushPromises()
+    expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS9' }), expect.any(AbortSignal))
   })
 
-  // DAR-UI-023: with no Slack workspace connected, Slack is not a webhook paste; the workspace comes first.
-  it('stops at connecting a workspace when Slack is chosen with none connected', async () => {
+  // DAR-UI-023: with no Slack workspace connected, Slack is not a webhook paste; the workspace comes first. Inside the
+  // wizard it is a pasted token, never Slack's consent screen, which would leave the wizard and lose its answers.
+  it('connects Slack by token from the wizard, never by leaving for Slack', async () => {
+    getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: true, installs: [] })
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
-    await chooseExistingRunPurpose(wrapper)
-    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
-    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await walkToChatSpaceStep(wrapper)
 
     await chooseCard(wrapper, 'automation-chat-space-new')
-    await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Slack')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await chooseWorkflowOption(wrapper, 'automation-chat-provider-select', 'CHAT_PROV_SLACK')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+    await chooseCard(wrapper, 'add-chat-space-where-slack')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Connect a Slack workspace in Tenant settings first.')
-    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="wizard-next"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="add-chat-space"]').text()).toContain('Paste the bot token.')
+    expect(wrapper.find('[data-testid="add-chat-space-connect-oauth"]').exists()).toBe(false)
   })
 
-  it('creates a new space inline as three separate cards', async () => {
+  it('adds a Google Chat space before the automation is saved, and keeps it on a cancelled flow', async () => {
     saveTenantChatSpace.mockResolvedValue({
       ok: true,
       messages: [],
@@ -927,43 +934,8 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
-
-    await chooseExistingRunPurpose(wrapper)
-    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
-    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    await chooseCard(wrapper, 'automation-chat-space-new')
-    expect(wrapper.find('[data-testid="automation-chat-space-name"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
-    await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Alerts')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    expect(wrapper.find('[data-testid="automation-chat-space-name"]').exists()).toBe(false)
-    // Provider card sits between name and URL — one data point per card.
-    expect(wrapper.find('[data-testid="automation-chat-provider-select"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(false)
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    expect(wrapper.find('[data-testid="automation-chat-space-url"]').exists()).toBe(true)
-    // NOT masked, matching TenantSettingsPage's webhook input since 3746a59. The column stopped
-    // being a secret on 2026-08-14 (encrypt="true" removed, entity description: reads "are no longer
-    // masked either"), so dots hid nothing here while making a URL truncated on paste impossible to
-    // catch by eye -- and this wizard is the one place a fresh webhook is pasted with no stored copy
-    // printed beneath it to check against. Not type="url": native constraint validation would gate
-    // submission ahead of the host pin that is the actual SSRF control.
-    expect(wrapper.get('[data-testid="automation-chat-space-url"]').attributes('type')).not.toBe('password')
-    await wrapper.get('[data-testid="automation-chat-space-url"]').setValue('https://chat.googleapis.com/v1/spaces/AAA')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
-    await wrapper.get('[data-testid="create-automation"]').trigger('click')
-    await flushPromises()
+    await walkToChatSpaceStep(wrapper)
+    await addGoogleChatSpace(wrapper)
 
     expect(saveTenantChatSpace).toHaveBeenCalledWith({
       spaceName: 'Ops Alerts',
@@ -971,83 +943,42 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       webhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA',
       isActive: true,
     }, expect.any(AbortSignal))
-    expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS9' }), expect.any(AbortSignal))
-    const chatSpaceCallOrder = saveTenantChatSpace.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
-    const automationCallOrder = saveAutomation.mock.invocationCallOrder[0] ?? Number.NEGATIVE_INFINITY
-    expect(chatSpaceCallOrder).toBeLessThan(automationCallOrder)
-  })
-
-  async function walkToNewChatSpaceSubmit(wrapper: ReturnType<typeof mount>): Promise<void> {
-    await chooseExistingRunPurpose(wrapper)
-    await chooseCard(wrapper, 'automation-input-mode-choice-AUT_IN_SFTP_FILES')
-    await chooseWorkflowOption(wrapper, 'automation-file1-sftp-select', 'SFTP_OMS')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="file1RemotePathTemplate"]').setValue('/oms/{{date}}')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await chooseWorkflowOption(wrapper, 'automation-file2-sftp-select', 'SFTP_SHOPIFY')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('input[name="file2RemotePathTemplate"]').setValue('/shopify/{{date}}')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-
-    await chooseCard(wrapper, 'automation-chat-space-new')
-    await wrapper.get('[data-testid="automation-chat-space-name"]').setValue('Ops Alerts')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="automation-chat-space-url"]').setValue('https://chat.googleapis.com/v1/spaces/AAA')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    expect(saveAutomation).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="add-chat-space-done"]').trigger('click')
+    await flushPromises()
 
     await wrapper.get('input[name="automationName"]').setValue('Daily order sync')
-  }
-
-  it('does not re-create the chat space on retry after a failed automation save', async () => {
-    saveTenantChatSpace.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      chatSpace: { chatSpaceId: 'CS9', spaceName: 'Ops Alerts', googleChatConfigured: true, isActive: 'Y', inUse: true },
-    })
-    saveAutomation
-      .mockRejectedValueOnce(new Error('network blip'))
-      .mockResolvedValueOnce({
-        ok: true,
-        messages: [],
-        errors: [],
-        automation: { automationId: 'AUT_ORDER_SYNC', automationName: 'Daily order sync' },
-      })
-
-    const wrapper = mount(ReconciliationAutomationWorkflowPage)
-    await flushPromises()
-    await walkToNewChatSpaceSubmit(wrapper)
-
     await wrapper.get('[data-testid="create-automation"]').trigger('click')
     await flushPromises()
 
     expect(saveTenantChatSpace).toHaveBeenCalledTimes(1)
-    expect(saveAutomation).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('The automation setup slipped through our fingers.')
-
-    // Retry: the chat space already exists (chatSpaceId carried over from the first
-    // attempt) -- it must not be re-created a second time with the same name.
-    await wrapper.get('[data-testid="create-automation"]').trigger('click')
-    await flushPromises()
-
-    expect(saveTenantChatSpace).toHaveBeenCalledTimes(1)
-    expect(saveAutomation).toHaveBeenCalledTimes(2)
-    expect(saveAutomation).toHaveBeenLastCalledWith(expect.objectContaining({ chatSpaceId: 'CS9' }), expect.any(AbortSignal))
+    expect(saveAutomation).toHaveBeenCalledWith(expect.objectContaining({ chatSpaceId: 'CS9' }), expect.any(AbortSignal))
   })
 
-  it('surfaces the real chat-space creation error instead of the generic automation-failure message', async () => {
+  it('stays on the chat-space card when the Add space flow is cancelled', async () => {
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+    await walkToChatSpaceStep(wrapper)
+
+    await chooseCard(wrapper, 'automation-chat-space-new')
+    await flushPromises()
+    await wrapper.get('[data-testid="add-chat-space-cancel"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="add-chat-space"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Where should Darpan send notifications for this automation?')
+    expect(saveTenantChatSpace).not.toHaveBeenCalled()
+  })
+
+  it('shows the real chat-space error in the flow and saves no automation', async () => {
     saveTenantChatSpace.mockRejectedValue(new ApiCallError("Chat space name 'Ops Alerts' already exists.", 400))
 
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
-    await walkToNewChatSpaceSubmit(wrapper)
+    await walkToChatSpaceStep(wrapper)
+    await addGoogleChatSpace(wrapper)
 
-    await wrapper.get('[data-testid="create-automation"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain("Chat space name 'Ops Alerts' already exists.")
+    expect(wrapper.get('[data-testid="add-chat-space"]').text()).toContain("Chat space name 'Ops Alerts' already exists.")
     expect(wrapper.text()).not.toContain('The automation setup slipped through our fingers.')
     expect(saveAutomation).not.toHaveBeenCalled()
   })

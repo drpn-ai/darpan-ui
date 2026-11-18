@@ -541,22 +541,38 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Bot user OAuth token',
     body: 'the xoxb- token Darpan posts to Slack with. Checked with Slack before saving, then stored encrypted. Anyone holding it can write to that workspace.',
   },
-  chatProduct: {
-    title: 'Chat product',
-    body: 'which service this space posts through, Google Chat or Slack. It cannot change once saved, so moving a space to the other product means adding a new space.',
-  },
   chatSpace: {
     title: 'Chat space',
-    body: 'a named destination: one Google Chat webhook or one Slack channel, set up in tenant settings. Change where it posts there and everything using it follows.',
+    body: 'a named destination: one Google Chat webhook or one Slack channel, set up on Notifications. Change where it posts there and everything using it follows.',
   },
   slackChannel: {
     title: 'Slack channel',
     body: 'where this space’s messages land. A private channel needs the Darpan bot invited before it can post there.',
   },
-  // DAR-UI-122: the Tenant Settings "Streaks go to" row.
-  tenantStreaksSpace: {
-    title: 'Streaks space',
-    body: 'the chat space this tenant’s streak milestones and badges post to. A switched-off space reads as None, and nothing posts.',
+  // DAR-UI-123: the Notifications page, its grid and its Slack line.
+  notificationRoutes: {
+    title: 'Notifications',
+    body: 'where each thing that posts to chat posts: streaks, each audit update, each automation and each deployed script. One space each, or none.',
+    byDirectiveOnly: true,
+  },
+  notificationSource: {
+    title: 'Posts',
+    body: 'what posts to chat on its own. Notify me on a run and each person’s default space are personal, so they are not here.',
+    byDirectiveOnly: true,
+  },
+  notificationNowhere: {
+    title: 'Nowhere',
+    body: 'posts nothing to chat; the thing still runs. A deployed script has no Nowhere: turn its schedule off on Scripts instead.',
+    byDirectiveOnly: true,
+  },
+  notificationPaused: {
+    title: 'Paused',
+    body: 'off its schedule, or its audit update is off, so nothing posts for now. Where it posts is kept for when it runs again.',
+    byDirectiveOnly: true,
+  },
+  slackWorkspace: {
+    title: 'Slack',
+    body: 'the workspace every Slack space posts through, one per tenant. Disconnect it and those spaces post nothing until one is connected again.',
     byDirectiveOnly: true,
   },
   chatSpaceName: {

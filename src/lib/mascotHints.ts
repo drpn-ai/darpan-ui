@@ -185,7 +185,12 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
 
   'settings-tenant': Object.freeze([
     { text: 'This zone is what schedules and windows are read in. Your own preference only changes how times display.', when: control('tenant-module-timezone') },
-    { text: 'A space set here is the default; an automation can still send its notice somewhere else.', when: control('tenant-module-notifications') },
+    { text: 'Spaces, and what posts to each, are on Notifications now: one grid, one dot per row.', when: control('tenant-module-notifications') },
+  ]),
+  'settings-notifications': Object.freeze([
+    { text: 'One dot per row: a thing posts to one space, or nowhere. A click moves it at once, with no Save.', when: control('notifications-grid') },
+    { text: 'Send test posts one short line to that space, so you can see it lands before anything real does.', when: control('notifications-send-test') },
+    { text: 'Add space asks where first: a Slack channel or a Google Chat space, then what moves there.', when: control('notifications-add-space') },
   ]),
   'settings-user': Object.freeze([
     { text: 'Your timezone changes how times read to you here — not when a scheduled automation fires.', when: control('user-timezone-card') },

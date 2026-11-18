@@ -44,3 +44,7 @@ export const resolveIconPath = 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18ZM8 12.5l2.5 
 
 export const lifecycleIconPath =
   'M10 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM10 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM10 20a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 6v4M8 14v4M10 12h9M16 9l3 3-3 3'
+
+// A plus: add one. Filled on a 20-unit viewBox.
+export const plusIconPath =
+  'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'

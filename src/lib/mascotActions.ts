@@ -590,21 +590,34 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'saves this tenant’s whole audit setup as it stands, so a later edit can be rolled back to exactly this point.',
   },
   // DAR-UI-122: Tenant Settings rows. Pages say Open; popups say Add, Edit or Change.
+  'open notifications': {
+    title: 'Notifications',
+    body: 'opens every space and what posts to each: streaks, audit updates, automations, scripts. A dot moved there takes effect on the click.',
+  },
   'open config history': {
     title: 'Config history',
     body: 'opens the kept versions of this tenant’s audit setup. Restoring one puts the live setup back to that point.',
-  },
-  'change streaks space': {
-    title: 'Change',
-    body: 'moves streak milestones and badges to another active space, or stops them with None. Run notifications keep their own spaces.',
   },
   'change tenant timezone': {
     title: 'Change',
     body: 'how this tenant reads dates and times. Set it before the first automated run, or the team reads timestamps in the wrong zone.',
   },
-  'add chat space': {
-    title: 'Add',
-    body: 'opens where this tenant sends run alerts: a new space, or a Slack connection. A space added here is what Notify me can then pick from.',
+  // DAR-UI-123: the Notifications page.
+  'add space': {
+    title: 'Add space',
+    body: 'a Slack channel or a Google Chat space, then which things move there. Nothing posts to it until something is moved.',
+  },
+  'reconnect slack': {
+    title: 'Reconnect',
+    body: 'authorises Darpan in Slack again, as when it was first connected. Every Slack space keeps its channel.',
+  },
+  'replace slack token': {
+    title: 'Replace token',
+    body: 'swaps in a rotated xoxb- token. Slack checks it before it saves; every Slack space keeps its channel.',
+  },
+  'disconnect slack': {
+    title: 'Disconnect',
+    body: 'drops the workspace now. Its spaces stay on the grid but post nothing until a workspace is connected again.',
   },
   'edit ai provider': {
     title: 'AI provider',
@@ -890,10 +903,19 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
     title: 'Stop showing',
     body: 'takes this field off what each record shows. Records from runs already made keep it.',
   }],
-  // "Edit chat space <name>": each Tenant Settings sub-row names its space (DAR-UI-122).
+  // "Edit chat space <name>": each Notifications column names its space (DAR-UI-123).
   [/^edit chat space( .+)?$/, {
     title: 'Edit',
-    body: 'opens this space to rename it, switch it off, or delete it once no automation posts there. Messages already sent stay.',
+    body: 'renames this space, replaces its webhook, switches it off, or deletes it once nothing uses it. Messages already sent stay.',
+  }],
+  // "Send test to <space>" and "Post <thing> in <space>" / "Post <thing> nowhere": the Notifications grid (DAR-UI-123).
+  [/^send test to( .+)?$/, {
+    title: 'Send test',
+    body: 'posts one short line to this space now, to show it arrives. It carries nothing from your runs.',
+  }],
+  [/^post .+ (in .+|nowhere)$/, {
+    title: 'Where it posts',
+    body: 'moves this one thing there, from its next post. Each row posts to one place, so its old dot clears; other rows stay.',
   }],
   [/^edit rule .+$/, {
     title: 'Edit rule',

@@ -38,11 +38,6 @@ export type ReconciliationAutomationStepId =
   | 'schedule'
   | 'chat-space'
   | 'chat-space-select'
-  | 'chat-space-name'
-  | 'chat-space-provider'
-  | 'chat-space-channel'
-  | 'chat-space-url'
-  | 'chat-space-slack-connect'
 
 export interface ReconciliationAutomationSourceDraft {
   sourceTypeEnumId?: string
@@ -61,7 +56,7 @@ export interface ReconciliationAutomationSourceDraft {
   excludeFilters?: SourceExcludeFilter[]
 }
 
-export type ReconciliationAutomationChatSpaceChoice = '' | 'default' | 'existing' | 'new' | 'none'
+export type ReconciliationAutomationChatSpaceChoice = '' | 'default' | 'existing' | 'none'
 
 export interface ReconciliationAutomationDraft {
   automationId?: string
@@ -84,10 +79,6 @@ export interface ReconciliationAutomationDraft {
   returnPath?: string
   chatSpaceChoice?: ReconciliationAutomationChatSpaceChoice
   chatSpaceId?: string
-  newChatSpaceName?: string
-  newChatSpaceProvider?: string
-  newChatSpaceChannelId?: string
-  newChatSpaceUrl?: string
   sources?: Partial<Record<ReconciliationAutomationFileSide, ReconciliationAutomationSourceDraft>>
 }
 

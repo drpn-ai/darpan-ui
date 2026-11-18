@@ -9,65 +9,22 @@
 
     <StaticPageSection title="Chat" data-testid="tenant-section-chat">
       <ul class="tenant-settings-rows">
+        <!-- DAR-UI-123. The spaces, and what posts to each, are on their own page. -->
         <li class="tenant-settings-row">
-          <span v-explain="'chatSpace'" class="tenant-settings-row__label">Spaces</span>
+          <span v-explain="'notificationRoutes'" class="tenant-settings-row__label">Notifications</span>
           <span class="tenant-settings-row__value">{{ notificationSummary }}</span>
           <span class="tenant-settings-row__actions">
             <button
               type="button"
-              aria-label="Add chat space"
+              aria-label="Open notifications"
               data-testid="tenant-module-notifications"
-              @click="openNotificationWorkflow"
+              @click="router.push({ name: 'settings-notifications' })"
             >
-              Add
-            </button>
-          </span>
-        </li>
-        <li
-          v-for="space in chatSpaces"
-          :key="space.chatSpaceId"
-          class="tenant-settings-row tenant-settings-row--sub"
-          data-testid="tenant-chat-space-row"
-        >
-          <span class="tenant-settings-row__name">{{ space.spaceName }}</span>
-          <span class="tenant-settings-row__value">{{ chatSpaceRowValue(space) }}</span>
-          <span class="tenant-settings-row__actions">
-            <button
-              type="button"
-              :aria-label="`Edit chat space ${space.spaceName}`"
-              data-testid="tenant-chat-space-edit"
-              @click="handleChatSpaceListChoice(space.chatSpaceId)"
-            >
-              Edit
-            </button>
-          </span>
-        </li>
-        <li class="tenant-settings-row">
-          <span v-explain="'tenantStreaksSpace'" class="tenant-settings-row__label">Streaks go to</span>
-          <span class="tenant-settings-row__value">{{ streaksSpaceSummary }}</span>
-          <span class="tenant-settings-row__actions">
-            <button
-              type="button"
-              aria-label="Change streaks space"
-              data-testid="tenant-module-streaks-space"
-              @click="openStreaksSpaceWorkflow"
-            >
-              Change
+              Open <span aria-hidden="true">→</span>
             </button>
           </span>
         </li>
       </ul>
-      <p v-if="notificationWorkflowSuccess" class="section-note" role="status">{{ notificationWorkflowSuccess }}</p>
-      <p v-if="streaksWorkflowSuccess" class="section-note" role="status">{{ streaksWorkflowSuccess }}</p>
-      <!-- Rendered on the PAGE, not only inside the popup. The Slack callback returns the admin here
-           with no popup open, so a failure reported only in the workflow panel would be invisible —
-           a refused authorisation would look exactly like nothing having happened. -->
-      <InlineValidation
-        v-if="notificationWorkflowError && !isPopupOpen"
-        tone="error"
-        :message="notificationWorkflowError"
-        data-testid="tenant-notification-page-error"
-      />
     </StaticPageSection>
 
     <StaticPageSection title="Time" data-testid="tenant-section-time">
@@ -192,225 +149,6 @@
               test-id="tenant-timezone-select"
             />
           </label>
-        </WorkflowStepForm>
-
-        <WorkflowStepForm
-          v-else-if="activePopup?.type === 'streaks-space'"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
-          question="Which chat space gets streaks?"
-          :primary-label="streaksPrimaryLabel"
-          primary-action-variant="save"
-          primary-test-id="save-tenant-streaks-space"
-          :submit-disabled="streaksSaveDisabled"
-          :show-primary-action="canEditTenantSettings"
-          :show-enter-hint="false"
-          show-cancel-action
-          cancel-test-id="tenant-streaks-space-workflow-cancel"
-          @cancel="closePopup"
-          @submit="saveStreaksSpaceSettings"
-        >
-          <InlineValidation v-if="streaksWorkflowError" tone="error" :message="streaksWorkflowError" />
-
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Chat space</span>
-            <AppSelect
-              v-model="streaksForm.streaksChatSpaceId"
-              :options="streaksSpaceOptions"
-              :disabled="!canEditTenantSettings || streaksWorkflowSaving"
-              test-id="tenant-streaks-space-select"
-            />
-          </label>
-        </WorkflowStepForm>
-
-        <WorkflowStepForm
-          v-else-if="activePopup?.type === 'notification-menu'"
-          class="workflow-form--popup-compact"
-          question="Which chat space?"
-          :show-primary-action="false"
-          show-cancel-action
-          cancel-label="Close"
-          cancel-test-id="tenant-notification-workflow-close"
-          @cancel="closePopup"
-        >
-          <InlineValidation v-if="chatSpacesError" tone="error" :message="chatSpacesError" />
-          <InlineValidation
-            v-if="slackLoadError"
-            tone="error"
-            :message="slackLoadError"
-            data-testid="slack-load-error"
-          />
-          <WorkflowShortcutChoiceCards
-            :options="chatSpaceListOptions"
-            test-id-prefix="tenant-chat-space"
-            @choose="handleChatSpaceListChoice"
-          />
-        </WorkflowStepForm>
-
-        <WorkflowStepForm
-          v-else-if="activePopup?.type === 'chat-space-menu'"
-          class="workflow-form--popup-compact"
-          :question="chatSpaceMenuQuestion"
-          :show-primary-action="false"
-          show-back
-          show-cancel-action
-          cancel-label="Close"
-          cancel-test-id="tenant-chat-space-menu-cancel"
-          @back="backToChatSpaceList"
-          @cancel="closePopup"
-        >
-          <InlineValidation v-if="notificationWorkflowError" tone="error" :message="notificationWorkflowError" />
-          <WorkflowShortcutChoiceCards
-            :options="chatSpaceActionOptions"
-            test-id-prefix="tenant-chat-space-menu"
-            @choose="handleChatSpaceMenuChoice"
-          />
-        </WorkflowStepForm>
-
-        <WorkflowStepForm
-          v-else-if="activePopup?.type === 'slack-menu'"
-          class="workflow-form--popup-compact"
-          :question="slackMenuQuestion"
-          :show-primary-action="false"
-          show-back
-          show-cancel-action
-          cancel-label="Close"
-          cancel-test-id="tenant-slack-menu-cancel"
-          @back="backToChatSpaceList"
-          @cancel="closePopup"
-        >
-          <InlineValidation v-if="notificationWorkflowError" tone="error" :message="notificationWorkflowError" />
-          <WorkflowShortcutChoiceCards
-            :options="slackMenuOptions"
-            test-id-prefix="tenant-slack-menu"
-            @choose="handleSlackMenuChoice"
-          />
-        </WorkflowStepForm>
-
-        <WorkflowStepForm
-          v-else-if="activePopup?.type === 'slack-token'"
-          class="workflow-form--popup-compact workflow-form--dense-popup"
-          question="Paste the bot user OAuth token."
-          :primary-label="slackTokenSaving ? 'Checking' : 'Connect'"
-          primary-action-variant="save"
-          primary-test-id="save-slack-bot-token"
-          :submit-disabled="slackTokenSubmitDisabled"
-          :show-primary-action="canEditTenantSettings"
-          :show-enter-hint="false"
-          show-back
-          show-cancel-action
-          cancel-test-id="tenant-slack-token-cancel"
-          @back="openSlackMenu"
-          @cancel="closePopup"
-          @submit="saveSlackToken"
-        >
-          <InlineValidation v-if="notificationWorkflowError" tone="error" :message="notificationWorkflowError" />
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Bot user OAuth token</span>
-            <input
-              v-model="slackTokenInput"
-              class="wizard-answer-control"
-              name="slackBotToken"
-              type="password"
-              autocomplete="off"
-              autocapitalize="none"
-              spellcheck="false"
-              placeholder="xoxb-..."
-              data-testid="slack-bot-token-input"
-              :disabled="!canEditTenantSettings || slackTokenSaving"
-            />
-          </label>
-          <p class="section-note">
-            Slack app → OAuth &amp; Permissions → Bot User OAuth Token. Darpan checks it with Slack
-            before saving.
-          </p>
-        </WorkflowStepForm>
-
-        <WorkflowStepForm
-          v-else-if="activePopup?.type === 'chat-space-form'"
-          class="workflow-form--popup-compact workflow-form--dense-popup"
-          :question="chatSpaceFormQuestion"
-          :primary-label="chatSpaceFormPrimaryLabel"
-          :primary-action-variant="chatSpaceFormPrimaryVariant"
-          :primary-test-id="chatSpaceFormPrimaryTestId"
-          :submit-disabled="chatSpaceFormSubmitDisabled"
-          :show-primary-action="canEditTenantSettings"
-          :show-back="chatSpaceFormStepIndex > 0"
-          :show-enter-hint="false"
-          show-cancel-action
-          cancel-test-id="tenant-chat-space-form-cancel"
-          @back="goBackChatSpaceFormStep"
-          @cancel="closePopup"
-          @submit="submitChatSpaceFormStep"
-        >
-          <InlineValidation v-if="notificationWorkflowError" tone="error" :message="notificationWorkflowError" />
-
-          <label v-if="currentChatSpaceFormStep.id === 'name'" class="wizard-input-shell">
-            <span class="workflow-context-label">Space name</span>
-            <input
-              v-model="chatSpaceForm.spaceName"
-              class="wizard-answer-control"
-              name="chatSpaceName"
-              type="text"
-              autocomplete="off"
-              placeholder="Operations"
-              :disabled="!canEditTenantSettings || chatSpaceFormSaving"
-            />
-          </label>
-
-          <label v-else-if="currentChatSpaceFormStep.id === 'provider'" class="wizard-input-shell">
-            <span class="workflow-context-label">Chat product</span>
-            <AppSelect
-              v-model="chatSpaceForm.chatProviderEnumId"
-              :options="chatProviderOptions"
-              :disabled="!canEditTenantSettings || chatSpaceFormSaving"
-              test-id="tenant-chat-provider-select"
-            />
-          </label>
-
-          <template v-else-if="currentChatSpaceFormStep.id === 'channel'">
-            <label class="wizard-input-shell">
-              <span class="workflow-context-label">Slack channel</span>
-              <AppSelect
-                v-model="chatSpaceForm.slackChannelId"
-                :options="slackChannelOptions"
-                :disabled="!canEditTenantSettings || chatSpaceFormSaving || slackChannelsLoading"
-                searchable
-                search-placeholder="Search channels"
-                test-id="tenant-slack-channel-select"
-              />
-            </label>
-            <p v-if="slackChannelsLoading" class="section-note">Loading channels...</p>
-            <p
-              v-else-if="slackChannelNeedsInvite"
-              class="tenant-notification-current-webhook"
-              data-testid="slack-invite-note"
-            >
-              That channel is private — invite the Darpan app to it, or the first run will fail.
-            </p>
-          </template>
-
-          <label v-else-if="currentChatSpaceFormStep.id === 'webhook'" class="wizard-input-shell">
-            <span class="workflow-context-label">Webhook URL</span>
-            <input
-              v-model="chatSpaceForm.webhookUrl"
-              class="wizard-answer-control"
-              name="webhookUrl"
-              type="text"
-              autocomplete="off"
-              autocapitalize="none"
-              spellcheck="false"
-              :placeholder="chatSpaceWebhookPlaceholder"
-              :disabled="!canEditTenantSettings || chatSpaceFormSaving"
-            />
-          </label>
-
-          <p
-            v-if="currentChatSpaceFormStep.id === 'webhook' && isChatSpaceEditing && activeChatSpace?.webhookConfigured"
-            class="tenant-notification-current-webhook"
-            data-testid="google-chat-webhook-status"
-          >
-            Current webhook: {{ activeChatSpace.webhookUrl || 'Configured' }}
-          </p>
         </WorkflowStepForm>
 
         <WorkflowStepForm
@@ -606,9 +344,7 @@ import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
-import { cachedRead } from '../../lib/api/readCache'
-import type { ChatProviderId, LlmSettings, SlackChannel, SlackWorkspaceInstall, TenantChatSpace, TenantSettings } from '../../lib/api/types'
-import type { SaveTenantChatSpacePayload } from '../../lib/api/facadeTypes'
+import type { LlmSettings, TenantChatSpace, TenantSettings } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReferenceDataStore } from '../../stores/referenceData'
@@ -631,15 +367,6 @@ interface CreateStep {
   title: string
   kind: 'select' | 'text' | 'password' | 'number'
 }
-
-type ChatSpaceFormStepId = 'name' | 'provider' | 'webhook' | 'channel' | 'slack-connect'
-
-interface ChatSpaceFormStep {
-  id: ChatSpaceFormStepId
-  question: string
-}
-
-type ChatSpaceMenuChoice = 'edit' | 'activate' | 'deactivate' | 'delete'
 
 const route = useRoute()
 const router = useRouter()
@@ -680,38 +407,6 @@ const createSteps: CreateStep[] = [
   { id: 'llmTimeoutSeconds', title: 'What timeout should this provider use in seconds?', kind: 'number' },
   { id: 'llmApiKey', title: 'What API key should this provider use?', kind: 'password' },
 ]
-/**
- * The third card depends on how this space will actually deliver. With a connected Slack workspace
- * the admin picks a channel from a list Darpan fetches; otherwise they paste a webhook URL, which is
- * also the fallback for a workspace whose admins do not permit app installation.
- */
-const chatSpaceFormSteps = computed<ChatSpaceFormStep[]>(() => {
-  const steps: ChatSpaceFormStep[] = [{ id: 'name', question: 'Name this chat space.' }]
-  // Omitted entirely rather than shown pre-filled, for two different reasons. Arriving from the
-  // Slack menu already answered this, and a card that only needs Next reads as a mistake. On an
-  // EDIT the question has no valid second answer at all: the provider decides which credential the
-  // space carries and which address shape is valid for it, so changing it is a different
-  // destination wearing the same id. save#TenantChatSpace refuses it, which is the actual guard --
-  // this omission is what stops the form asking a question the service will reject.
-  if (!chatSpaceProviderPreset.value && !isChatSpaceEditing.value) {
-    steps.push({ id: 'provider', question: 'Which chat product does it post to?' })
-  }
-  // DAR-UI-023: Slack posts through a connected workspace (its credential lives on the install, its address is a
-  // channel), so a new Slack space with none connected goes to connecting one. Editing an older webhook-based Slack
-  // space keeps its webhook card: those still deliver; no new ones are made.
-  if (usesSlackChannelPicker.value) steps.push({ id: 'channel', question: 'Which Slack channel should it post to?' })
-  else if (needsSlackWorkspace.value) steps.push({ id: 'slack-connect', question: 'Connect a Slack workspace first.' })
-  else steps.push({ id: 'webhook', question: 'Paste the incoming webhook URL.' })
-  return steps
-})
-const chatProviderOptions: Array<{ value: ChatProviderId; label: string }> = [
-  { value: 'CHAT_PROV_GOOGLE', label: 'Google Chat' },
-  { value: 'CHAT_PROV_SLACK', label: 'Slack' },
-]
-const chatProviderWebhookPlaceholders: Record<ChatProviderId, string> = {
-  CHAT_PROV_GOOGLE: 'https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=...',
-  CHAT_PROV_SLACK: 'https://hooks.slack.com/services/T.../B.../...',
-}
 
 const providers = computed<ProviderProfile[]>(() => {
   if (!canManageGlobalSettings.value) return []
@@ -723,21 +418,6 @@ const aiLoading = computed(() => referenceDataStore.llmProvidersLoading)
 const aiError = computed(() => referenceDataStore.llmProvidersError)
 const aiSuccess = ref<string | null>(null)
 const chatSpaces = ref<TenantChatSpace[]>([])
-const slackInstalls = ref<SlackWorkspaceInstall[]>([])
-const slackConfigured = ref(false)
-const slackChannels = ref<SlackChannel[]>([])
-const slackChannelsLoading = ref(false)
-const slackBotUserId = ref<string | null>(null)
-const slackConnecting = ref(false)
-const slackLoadError = ref<string | null>(null)
-/**
- * True when the create form was opened from the Slack menu, which already establishes the provider.
- * Asking again on the next card is a question the operator has just answered by navigating.
- */
-const chatSpaceProviderPreset = ref(false)
-const slackOauthAvailable = ref(false)
-const slackTokenInput = ref('')
-const slackTokenSaving = ref(false)
 const chatSpacesLoading = ref(false)
 const chatSpacesError = ref<string | null>(null)
 const summaryLoading = computed(() => (
@@ -764,51 +444,22 @@ const tenantTimezoneSummary = computed(() => (
 const timezoneWorkflowError = ref<string | null>(null)
 const timezoneWorkflowSuccess = ref<string | null>(null)
 const timezoneWorkflowSaving = ref(false)
-// Only an active space can be chosen; the service refuses an inactive one and reads a
-// deactivated choice back as unset, so the tile reports a deactivated choice as None too.
-const activeChatSpaces = computed(() => chatSpaces.value.filter((space) => space.isActive !== 'N'))
-const savedStreaksChatSpaceId = computed(() => normalizeStringOrEmpty(tenantSettings.value?.streaksChatSpaceId))
-const streaksSpaceSummary = computed(() => {
-  if (referenceDataStore.tenantSettingsLoading || chatSpacesLoading.value) return '—'
-  const spaceId = savedStreaksChatSpaceId.value
-  if (!spaceId) return 'None'
-  const space = chatSpaces.value.find((candidate) => candidate.chatSpaceId === spaceId)
-  // Unknown to the list (it failed to load): the id is still a true answer, None would not be.
-  if (!space) return spaceId
-  return space.isActive === 'N' ? 'None' : space.spaceName
-})
-const streaksSpaceOptions = computed<AppSelectOption[]>(() => [
-  { value: '', label: 'None' },
-  ...activeChatSpaces.value.map((space) => ({ value: space.chatSpaceId, label: space.spaceName })),
-])
-const streaksWorkflowError = ref<string | null>(null)
-const streaksWorkflowSuccess = ref<string | null>(null)
-const streaksWorkflowSaving = ref(false)
 // An in-flight fetch leaves `chatSpaces` empty, which is indistinguishable from "loaded and
 // genuinely empty" unless the loading flag is consulted here. Asserting "None" during the load
 // window renders a definitive claim that is simply wrong, then flips once the fetch lands — so
 // hold a neutral placeholder until there is an answer to report.
 const notificationSummary = computed(() => {
   if (chatSpacesLoading.value) return '—'
-  return chatSpaces.value.length > 0 ? String(chatSpaces.value.length) : 'None'
+  const count = chatSpaces.value.length
+  if (count === 0) return 'No spaces'
+  return count === 1 ? '1 space' : `${count} spaces`
 })
-const notificationWorkflowError = ref<string | null>(null)
-const notificationWorkflowSuccess = ref<string | null>(null)
-const chatSpaceMenuSaving = ref(false)
 const popup = useTenantSettingsPopup()
 const {
   activePopup,
   isPopupOpen,
   isAiEditing,
-  isChatSpaceEditing,
   openTimezone,
-  openStreaksSpace,
-  openNotificationMenu,
-  openChatSpaceMenu,
-  openSlackMenu,
-  openSlackTokenForm,
-  openChatSpaceCreate,
-  openChatSpaceEdit,
   openAiMenu,
   openAiCreate: openAiCreatePopup,
   openAiEdit: openAiEditPopup,
@@ -829,19 +480,8 @@ const aiForm = reactive({
   llmEnabled: 'Y',
   llmApiKey: '',
 })
-const chatSpaceFormStepIndex = ref(0)
-const chatSpaceFormSaving = ref(false)
-const chatSpaceForm = reactive({
-  spaceName: '',
-  chatProviderEnumId: 'CHAT_PROV_GOOGLE' as ChatProviderId,
-  webhookUrl: '',
-  slackChannelId: '',
-})
 const timezoneForm = reactive({
   timeZone: 'UTC',
-})
-const streaksForm = reactive({
-  streaksChatSpaceId: '',
 })
 
 const canManageGlobalSettings = computed(() => permissionsStore.canManageGlobalSettings)
@@ -866,178 +506,9 @@ const selectedAiProvider = computed(() => {
 })
 const popupTitle = computed(() => {
   if (activePopup.value?.type === 'timezone') return 'Timezone'
-  if (activePopup.value?.type === 'streaks-space') return 'Streaks space'
-  if (
-    activePopup.value?.type === 'notification-menu'
-    || activePopup.value?.type === 'chat-space-menu'
-    || activePopup.value?.type === 'chat-space-form'
-    || activePopup.value?.type === 'slack-menu'
-    || activePopup.value?.type === 'slack-token'
-  ) return 'Notifications'
   if (activePopup.value?.type === 'ai-menu') return 'AI Provider'
   if (activePopup.value?.type === 'ai') return isAiEditing.value ? 'Edit AI Provider' : 'Configure AI Provider'
   return tenantSettingsTitle.value
-})
-const activeChatSpaceId = computed<string | null>(() => {
-  if (activePopup.value?.type === 'chat-space-menu') return activePopup.value.chatSpaceId
-  if (activePopup.value?.type === 'chat-space-form') return activePopup.value.chatSpaceId ?? null
-  return null
-})
-const activeChatSpace = computed<TenantChatSpace | null>(() => (
-  chatSpaces.value.find((space) => space.chatSpaceId === activeChatSpaceId.value) ?? null
-))
-function chatSpaceProduct(space: TenantChatSpace): string {
-  return space.chatProviderLabel || 'Google Chat'
-}
-function chatSpaceStatusLabel(space: TenantChatSpace): string {
-  // The provider is the useful half of this line now that a tenant can have both kinds: two spaces
-  // both reading "Configured" gives no way to tell which one posts where.
-  const delivery = space.deliveryMode === 'SLACK_BOT' ? 'bot' : space.deliveryMode === 'WEBHOOK' ? 'webhook' : ''
-  const provider = [chatSpaceProduct(space), delivery].filter(Boolean).join(' · ')
-  if (!space.webhookConfigured) return `${provider} — not configured`
-  return space.isActive === 'N' ? `${provider} — disabled` : provider
-}
-// "gets streaks" follows streaksSpaceSummary: a deactivated choice reads back as unset, so it is
-// claimed only on an active space.
-function chatSpaceRowValue(space: TenantChatSpace): string {
-  const getsStreaks = space.chatSpaceId === savedStreaksChatSpaceId.value && space.isActive !== 'N'
-  return getsStreaks ? `${chatSpaceProduct(space)} · gets streaks` : chatSpaceProduct(space)
-}
-const chatSpaceListOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
-  const options: Array<{ value: string; label: string; description?: string }> = chatSpaces.value.map((space) => ({
-    value: space.chatSpaceId,
-    label: space.spaceName,
-    description: chatSpaceStatusLabel(space),
-  }))
-  options.push({ value: 'add', label: 'Add a chat space' })
-  options.push(connectedSlackInstall.value
-    ? { value: 'slack', label: `Slack: ${connectedSlackInstall.value.teamName ?? 'connected'}` }
-    : { value: 'slack', label: 'Connect a Slack workspace' })
-
-  return options.map((option, index) => ({
-    ...option,
-    shortcutKey: String.fromCharCode(65 + index),
-  }))
-})
-const slackMenuQuestion = computed(() => (
-  connectedSlackInstall.value
-    ? `${connectedSlackInstall.value.teamName ?? 'This workspace'} is connected. What do you want to do?`
-    : 'Connect a Slack workspace to Darpan?'
-))
-const slackMenuOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
-  const options: Array<{ value: string; label: string; description?: string }> = []
-  if (connectedSlackInstall.value) {
-    // FIRST, because it is the only reason anyone connected a workspace. Without it this menu offers
-    // nothing but workspace maintenance, and the operator who just connected is left with no route
-    // to the thing they came for — a channel that actually receives notifications.
-    options.push({ value: 'add-space', label: 'Add a chat space', description: 'Choose the channel that gets notified' })
-    // The token path is offered here too: re-pasting is how a rotated token gets replaced.
-    if (slackOauthAvailable.value) {
-      options.push({ value: 'reconnect', label: 'Reconnect workspace', description: 'Re-authorise through Slack' })
-    }
-    options.push({ value: 'token', label: 'Replace bot token', description: 'Paste a new xoxb- token' })
-    options.push({ value: 'disconnect', label: 'Disconnect workspace' })
-  } else {
-    if (slackOauthAvailable.value) {
-      options.push({ value: 'connect', label: 'Connect Slack', description: 'Opens Slack to authorise Darpan' })
-    }
-    // Always available: it needs nothing configured on the deployment, and it is the only route for
-    // a workspace whose admins do not permit installing apps.
-    options.push({ value: 'token', label: 'Connect with a bot token', description: 'Paste an xoxb- token from your Slack app' })
-  }
-  return options.map((option, index) => ({ ...option, shortcutKey: String.fromCharCode(65 + index) }))
-})
-const chatSpaceMenuQuestion = computed(() => (
-  activeChatSpace.value ? `What do you want to do with ${activeChatSpace.value.spaceName}?` : 'What do you want to do with this chat space?'
-))
-const chatSpaceActionOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
-  const space = activeChatSpace.value
-  if (!space) return []
-
-  const options: Array<{ value: ChatSpaceMenuChoice; label: string }> = [
-    { value: 'edit', label: 'Edit chat space' },
-  ]
-  options.push(
-    space.isActive === 'N'
-      ? { value: 'activate', label: 'Activate space' }
-      : { value: 'deactivate', label: 'Deactivate space' },
-  )
-  if (!space.inUse) options.push({ value: 'delete', label: 'Delete space' })
-
-  return options.map((option, index) => ({
-    ...option,
-    shortcutKey: String.fromCharCode(65 + index),
-  }))
-})
-const currentChatSpaceFormStep = computed<ChatSpaceFormStep>(() => (
-  chatSpaceFormSteps.value[chatSpaceFormStepIndex.value] ?? chatSpaceFormSteps.value[0]!
-))
-const chatSpaceFormQuestion = computed(() => currentChatSpaceFormStep.value.question)
-// The last card is whichever destination card the provider produced; everything before it advances.
-const isChatSpaceFinalStep = computed(() => (
-  currentChatSpaceFormStep.value.id === 'webhook' || currentChatSpaceFormStep.value.id === 'channel'
-))
-const isSlackConnectStep = computed(() => currentChatSpaceFormStep.value.id === 'slack-connect')
-const chatSpaceFormPrimaryVariant = computed<'default' | 'save'>(() => (
-  isChatSpaceFinalStep.value ? 'save' : 'default'
-))
-const chatSpaceFormPrimaryTestId = computed(() => {
-  if (isSlackConnectStep.value) return 'chat-space-slack-connect'
-  return isChatSpaceFinalStep.value ? 'save-tenant-chat-space' : 'chat-space-form-next'
-})
-const chatSpaceFormPrimaryLabel = computed(() => {
-  if (isSlackConnectStep.value) return 'Connect Slack'
-  if (!isChatSpaceFinalStep.value) return 'Next'
-  return chatSpaceFormSaving.value ? 'Saving' : 'Save'
-})
-const chatSpaceWebhookInput = computed(() => normalizeStringOrEmpty(chatSpaceForm.webhookUrl))
-// An edit may leave the webhook alone, so the stored one counts. The provider can no longer change
-// under it, which is what used to make a stored URL untrustworthy here.
-const chatSpaceFormHasWebhookForSave = computed(() => (
-  chatSpaceWebhookInput.value.length > 0
-  || (isChatSpaceEditing.value && !!activeChatSpace.value?.webhookConfigured)
-))
-const connectedSlackInstall = computed<SlackWorkspaceInstall | null>(() => slackInstalls.value[0] ?? null)
-const usesSlackChannelPicker = computed(() => (
-  chatSpaceForm.chatProviderEnumId === 'CHAT_PROV_SLACK' && connectedSlackInstall.value !== null
-))
-const needsSlackWorkspace = computed(() => (
-  chatSpaceForm.chatProviderEnumId === 'CHAT_PROV_SLACK' && connectedSlackInstall.value === null && !isChatSpaceEditing.value
-))
-const slackChannelOptions = computed(() => slackChannels.value.map((channel) => ({
-  value: channel.id,
-  // The lock marks a private channel; whether the bot is IN it is the thing that decides
-  // whether the first run succeeds, so that warning is shown separately once one is selected.
-  label: channel.isPrivate ? `🔒 ${channel.name}` : `#${channel.name}`,
-})))
-const selectedSlackChannel = computed<SlackChannel | null>(() => (
-  slackChannels.value.find((channel) => channel.id === chatSpaceForm.slackChannelId) ?? null
-))
-const slackChannelNeedsInvite = computed(() => (
-  // chat:write.public already covers public channels the bot never joined, so only a private
-  // channel it is not a member of will actually fail — and it fails at the first run, not here.
-  !!selectedSlackChannel.value && selectedSlackChannel.value.isPrivate && !selectedSlackChannel.value.isMember
-))
-const slackTokenSubmitDisabled = computed(() => (
-  slackTokenSaving.value || !canEditTenantSettings.value
-  || normalizeStringOrEmpty(slackTokenInput.value).length === 0
-))
-// `||` not `??`: a Slack bot space stores an empty webhook, and that must fall through to the
-// example URL rather than blanking the placeholder.
-const chatSpaceWebhookPlaceholder = computed(() => (
-  activeChatSpace.value?.webhookUrl
-  || chatProviderWebhookPlaceholders[chatSpaceForm.chatProviderEnumId]
-))
-const chatSpaceFormSubmitDisabled = computed(() => {
-  if (chatSpaceFormSaving.value || !canEditTenantSettings.value) return true
-  if (currentChatSpaceFormStep.value.id === 'name') {
-    return normalizeStringOrEmpty(chatSpaceForm.spaceName).length === 0
-  }
-  if (currentChatSpaceFormStep.value.id === 'provider' || isSlackConnectStep.value) return false
-  if (currentChatSpaceFormStep.value.id === 'channel') {
-    return normalizeStringOrEmpty(chatSpaceForm.slackChannelId).length === 0
-  }
-  return !chatSpaceFormHasWebhookForSave.value
 })
 const aiProviderWorkflowOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
   const selectedProvider = selectedAiProvider.value
@@ -1119,12 +590,6 @@ const timezoneSaveDisabled = computed(() => (
 const timezonePrimaryLabel = computed(() => (
   timezoneWorkflowSaving.value ? 'Saving timezone' : 'Save Timezone'
 ))
-const streaksSaveDisabled = computed(() => (
-  streaksWorkflowSaving.value || !canEditTenantSettings.value
-))
-const streaksPrimaryLabel = computed(() => (
-  streaksWorkflowSaving.value ? 'Saving streaks space' : 'Save Streaks Space'
-))
 
 function normalizeProvider(rawProvider: unknown): LlmProvider | null {
   const normalized = normalizeStringOrEmpty(rawProvider).toUpperCase()
@@ -1178,18 +643,6 @@ function applyTenantSettings(nextSettings?: TenantSettings | null): void {
   timezoneForm.timeZone = nextTimeZone
 }
 
-function applySavedChatSpace(space?: TenantChatSpace | null): void {
-  if (!space) return
-  const index = chatSpaces.value.findIndex((existing) => existing.chatSpaceId === space.chatSpaceId)
-  if (index === -1) {
-    chatSpaces.value = [...chatSpaces.value, space]
-  } else {
-    const next = [...chatSpaces.value]
-    next[index] = space
-    chatSpaces.value = next
-  }
-}
-
 function openTimezoneWorkflow(): void {
   timezoneWorkflowError.value = null
   timezoneWorkflowSuccess.value = null
@@ -1219,353 +672,6 @@ async function saveTimezoneSettings(): Promise<void> {
     timezoneWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The timezone is stuck in yesterday. Not saved.'
   } finally {
     timezoneWorkflowSaving.value = false
-  }
-}
-
-function openStreaksSpaceWorkflow(): void {
-  streaksWorkflowError.value = null
-  streaksWorkflowSuccess.value = null
-  // Seeded from the saved id unless that space is known to be inactive — a ?workflow= open can
-  // land before the space list does, and seeding None then would clear the choice on Save.
-  const savedId = savedStreaksChatSpaceId.value
-  const savedSpace = chatSpaces.value.find((space) => space.chatSpaceId === savedId)
-  streaksForm.streaksChatSpaceId = savedId && savedSpace?.isActive !== 'N' ? savedId : ''
-  openStreaksSpace()
-}
-
-async function saveStreaksSpaceSettings(): Promise<void> {
-  if (streaksSaveDisabled.value) return
-
-  streaksWorkflowSaving.value = true
-  streaksWorkflowError.value = null
-  streaksWorkflowSuccess.value = null
-  try {
-    // Only the streaks space is sent: an absent timeZone leaves the tenant's zone untouched,
-    // and '' (None) clears the space.
-    const response = await authStore.saveTenantSettings({
-      streaksChatSpaceId: normalizeStringOrEmpty(streaksForm.streaksChatSpaceId),
-    })
-    if (!response?.ok) {
-      streaksWorkflowError.value = response?.errors?.[0] ?? authStore.error ?? 'The streak broke on the way to the save. Not saved.'
-      return
-    }
-
-    applyTenantSettings(response.tenantSettings)
-    streaksWorkflowSuccess.value = response.messages?.[0] ?? 'Saved tenant settings.'
-    closeActivePopup()
-  } catch (saveError) {
-    streaksWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The streak broke on the way to the save. Not saved.'
-  } finally {
-    streaksWorkflowSaving.value = false
-  }
-}
-
-function openNotificationWorkflow(): void {
-  notificationWorkflowError.value = null
-  notificationWorkflowSuccess.value = null
-  openNotificationMenu()
-}
-
-function backToChatSpaceList(): void {
-  notificationWorkflowError.value = null
-  openNotificationMenu()
-}
-
-function resetChatSpaceForm(): void {
-  chatSpaceFormStepIndex.value = 0
-  chatSpaceFormSaving.value = false
-  chatSpaceForm.spaceName = ''
-  chatSpaceForm.chatProviderEnumId = 'CHAT_PROV_GOOGLE'
-  chatSpaceForm.webhookUrl = ''
-  chatSpaceForm.slackChannelId = ''
-  chatSpaceProviderPreset.value = false
-}
-
-function openChatSpaceCreateForm(): void {
-  notificationWorkflowError.value = null
-  resetChatSpaceForm()
-  openChatSpaceCreate()
-}
-
-function openChatSpaceEditForm(): void {
-  const space = activeChatSpace.value
-  if (!space) return
-
-  notificationWorkflowError.value = null
-  resetChatSpaceForm()
-  chatSpaceForm.spaceName = space.spaceName
-  chatSpaceForm.chatProviderEnumId = space.chatProviderEnumId ?? 'CHAT_PROV_GOOGLE'
-  chatSpaceForm.slackChannelId = space.slackChannelId ?? ''
-  openChatSpaceEdit(space.chatSpaceId)
-}
-
-function handleChatSpaceListChoice(value: string): void {
-  if (value === 'add') {
-    openChatSpaceCreateForm()
-    return
-  }
-  if (value === 'slack') {
-    notificationWorkflowError.value = null
-    openSlackMenu()
-    return
-  }
-
-  notificationWorkflowError.value = null
-  openChatSpaceMenu(value)
-}
-
-function handleSlackMenuChoice(value: string): void {
-  if (value === 'add-space') {
-    openChatSpaceCreateForm()
-    // Both set AFTER the open, which resets the form. Arriving from the Slack menu is unambiguous
-    // intent, so the provider is fixed and its card is skipped: name -> channel.
-    chatSpaceForm.chatProviderEnumId = 'CHAT_PROV_SLACK'
-    chatSpaceProviderPreset.value = true
-    return
-  }
-  if (value === 'connect' || value === 'reconnect') {
-    void connectSlack()
-    return
-  }
-  if (value === 'token') {
-    notificationWorkflowError.value = null
-    slackTokenInput.value = ''
-    openSlackTokenForm()
-    return
-  }
-  if (value === 'disconnect') void disconnectSlack()
-}
-
-async function saveSlackToken(): Promise<void> {
-  const token = normalizeStringOrEmpty(slackTokenInput.value)
-  if (!token) return
-  slackTokenSaving.value = true
-  notificationWorkflowError.value = null
-  try {
-    const response = await settingsFacade.saveSlackBotToken({ botAccessToken: token }, pageAbortController.signal)
-    if (!response.ok) {
-      notificationWorkflowError.value = response.errors?.[0] ?? 'Slack rejected that token.'
-      return
-    }
-    // Both messages matter: the second names any missing scope, and a partially scoped token still
-    // connects, so a success-only banner would hide a picker that is about to come back empty.
-    notificationWorkflowSuccess.value = (response.messages ?? []).join(' ') || 'Connected to Slack.'
-    slackTokenInput.value = ''
-    slackChannels.value = []
-    await loadSlackInstall()
-    // Back to the chat-space list, NOT closePopup(). Connecting a workspace creates no destination
-    // on its own — a run still has nowhere to post until a chat space names a channel. Closing the
-    // workflow here ended the flow on a success message that looked like completion, leaving "Add a
-    // chat space" undiscovered one screen away.
-    openNotificationMenu()
-  } catch (saveError) {
-    notificationWorkflowError.value = saveError instanceof ApiCallError
-      ? saveError.message : 'The Slack token slipped through the cracks. Not saved.'
-  } finally {
-    slackTokenSaving.value = false
-  }
-}
-
-function handleChatSpaceMenuChoice(value: string): void {
-  if (value === 'edit') {
-    openChatSpaceEditForm()
-    return
-  }
-
-  if (value === 'activate' || value === 'deactivate') {
-    void toggleChatSpaceActive(value === 'activate')
-    return
-  }
-
-  if (value === 'delete') {
-    void deleteChatSpace()
-  }
-}
-
-async function toggleChatSpaceActive(nextActive: boolean): Promise<void> {
-  const space = activeChatSpace.value
-  if (!space || !canEditTenantSettings.value || chatSpaceMenuSaving.value) return
-
-  chatSpaceMenuSaving.value = true
-  notificationWorkflowError.value = null
-  try {
-    const response = await settingsFacade.saveTenantChatSpace({
-      chatSpaceId: space.chatSpaceId,
-      spaceName: space.spaceName,
-      isActive: nextActive,
-    }, pageAbortController.signal)
-    applySavedChatSpace(response.chatSpace)
-    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Saved chat space.'
-    closePopup()
-  } catch (saveError) {
-    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The chat space did not take the hint. Not updated.'
-  } finally {
-    chatSpaceMenuSaving.value = false
-  }
-}
-
-async function deleteChatSpace(): Promise<void> {
-  const space = activeChatSpace.value
-  if (!space || !canEditTenantSettings.value || chatSpaceMenuSaving.value) return
-
-  chatSpaceMenuSaving.value = true
-  notificationWorkflowError.value = null
-  try {
-    const response = await settingsFacade.deleteTenantChatSpace({ chatSpaceId: space.chatSpaceId }, pageAbortController.signal)
-    chatSpaces.value = chatSpaces.value.filter((existing) => existing.chatSpaceId !== space.chatSpaceId)
-    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Deleted chat space.'
-    closePopup()
-  } catch (deleteError) {
-    notificationWorkflowError.value = deleteError instanceof ApiCallError ? deleteError.message : 'The chat space is still talking. Still here.'
-  } finally {
-    chatSpaceMenuSaving.value = false
-  }
-}
-
-watch(currentChatSpaceFormStep, (step) => {
-  // Fetched when the card opens rather than on page load: conversations.list is rate-limit Tier 2,
-  // and most visits to this page never open the wizard at all.
-  if (step.id === 'channel' && !slackChannels.value.length && !slackChannelsLoading.value) {
-    void loadSlackChannels()
-  }
-})
-
-function goBackChatSpaceFormStep(): void {
-  notificationWorkflowError.value = null
-  chatSpaceFormStepIndex.value = Math.max(chatSpaceFormStepIndex.value - 1, 0)
-}
-
-async function submitChatSpaceFormStep(): Promise<void> {
-  if (chatSpaceFormSubmitDisabled.value) return
-  if (isSlackConnectStep.value) {
-    notificationWorkflowError.value = null
-    openSlackMenu()
-    return
-  }
-
-  // Advance by position rather than naming the next step: the sequence gained a provider card and
-  // a hardcoded "go to index 1" silently turned every later step into the save step.
-  if (!isChatSpaceFinalStep.value) {
-    chatSpaceFormStepIndex.value = Math.min(chatSpaceFormStepIndex.value + 1, chatSpaceFormSteps.value.length - 1)
-    return
-  }
-
-  await saveChatSpaceForm()
-}
-
-async function loadSlackInstall(): Promise<void> {
-  try {
-    await cachedRead(
-      'tenantSettings.slackInstall',
-      () => settingsFacade.getSlackInstall(pageAbortController.signal),
-      (response) => {
-        slackInstalls.value = response.installs ?? []
-        slackConfigured.value = response.slackConfigured ?? false
-        slackOauthAvailable.value = response.oauthAvailable ?? false
-        slackLoadError.value = null
-      },
-    )
-  } catch (loadError) {
-    // A Slack lookup failure must not take the whole settings page down — chat spaces, timezone and
-    // AI settings are all independently useful. But it must not be silent either: an empty install
-    // list makes the channel picker disappear, which is indistinguishable from "no workspace
-    // connected" and sends the operator looking for a step that is actually still there.
-    slackInstalls.value = []
-    slackConfigured.value = false
-    slackOauthAvailable.value = false
-    slackLoadError.value = loadError instanceof ApiCallError
-      ? loadError.message : 'The Slack connection would not pick up.'
-  }
-}
-
-async function loadSlackChannels(): Promise<void> {
-  const install = connectedSlackInstall.value
-  if (!install) return
-  slackChannelsLoading.value = true
-  notificationWorkflowError.value = null
-  try {
-    const response = await settingsFacade.listSlackChannels(
-      { slackInstallId: install.slackInstallId }, pageAbortController.signal)
-    slackChannels.value = response.channels ?? []
-    slackBotUserId.value = response.botUserId ?? null
-  } catch (loadError) {
-    slackChannels.value = []
-    notificationWorkflowError.value = loadError instanceof ApiCallError
-      ? loadError.message : 'The Slack channels are slacking off.'
-  } finally {
-    slackChannelsLoading.value = false
-  }
-}
-
-async function connectSlack(): Promise<void> {
-  slackConnecting.value = true
-  notificationWorkflowError.value = null
-  try {
-    const response = await settingsFacade.beginSlackInstall(pageAbortController.signal)
-    if (!response.authorizeUrl) {
-      notificationWorkflowError.value = response.errors?.[0] ?? 'Slack left us on read. Not connected.'
-      return
-    }
-    // Full-page navigation, not a popup: Slack's consent screen refuses to render in an iframe, and
-    // the callback returns the browser to this app anyway.
-    window.location.assign(response.authorizeUrl)
-  } catch (connectError) {
-    notificationWorkflowError.value = connectError instanceof ApiCallError
-      ? connectError.message : 'Slack left us on read. Not connected.'
-  } finally {
-    slackConnecting.value = false
-  }
-}
-
-async function disconnectSlack(): Promise<void> {
-  const install = connectedSlackInstall.value
-  if (!install) return
-  notificationWorkflowError.value = null
-  try {
-    const response = await settingsFacade.disconnectSlackWorkspace(
-      { slackInstallId: install.slackInstallId }, pageAbortController.signal)
-    if (!response.ok) {
-      notificationWorkflowError.value = response.errors?.[0] ?? 'Slack does not want to break up. Still connected.'
-      return
-    }
-    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Disconnected Slack.'
-    await loadSlackInstall()
-    closePopup()
-  } catch (disconnectError) {
-    notificationWorkflowError.value = disconnectError instanceof ApiCallError
-      ? disconnectError.message : 'Slack does not want to break up. Still connected.'
-  }
-}
-
-async function saveChatSpaceForm(): Promise<void> {
-  if (chatSpaceFormSubmitDisabled.value) return
-
-  chatSpaceFormSaving.value = true
-  notificationWorkflowError.value = null
-  try {
-    const payload: SaveTenantChatSpacePayload = {
-      spaceName: normalizeStringOrEmpty(chatSpaceForm.spaceName),
-      isActive: isChatSpaceEditing.value ? (activeChatSpace.value?.isActive ?? 'Y') !== 'N' : true,
-    }
-    if (isChatSpaceEditing.value && activeChatSpaceId.value) payload.chatSpaceId = activeChatSpaceId.value
-    payload.chatProviderEnumId = chatSpaceForm.chatProviderEnumId
-    if (usesSlackChannelPicker.value) {
-      payload.slackInstallId = connectedSlackInstall.value!.slackInstallId
-      payload.slackChannelId = chatSpaceForm.slackChannelId
-      // Sent for display only; delivery always addresses the id, so a later rename cannot break it.
-      payload.slackChannelName = selectedSlackChannel.value?.name
-    } else if (chatSpaceWebhookInput.value.length > 0) {
-      payload.webhookUrl = chatSpaceWebhookInput.value
-    }
-
-    const response = await settingsFacade.saveTenantChatSpace(payload, pageAbortController.signal)
-    applySavedChatSpace(response.chatSpace)
-    notificationWorkflowSuccess.value = response.messages?.[0] ?? 'Saved chat space.'
-    closePopup()
-  } catch (saveError) {
-    notificationWorkflowError.value = saveError instanceof ApiCallError ? saveError.message : 'The chat space wandered off mid-sentence. Not saved.'
-  } finally {
-    chatSpaceFormSaving.value = false
   }
 }
 
@@ -1670,10 +776,7 @@ function openAiEdit(rawProvider: unknown): void {
 function closePopup(): void {
   closeActivePopup()
   resetAiForm()
-  resetChatSpaceForm()
   timezoneWorkflowError.value = null
-  streaksWorkflowError.value = null
-  notificationWorkflowError.value = null
   if (route.query.workflow) {
     void router.replace('/settings/tenant')
   }
@@ -1755,11 +858,6 @@ function openRouteRequestedWorkflow(): void {
     return
   }
 
-  if (workflow === 'notifications') {
-    openNotificationWorkflow()
-    return
-  }
-
   if (workflow === 'timezone') {
     openTimezoneWorkflow()
   }
@@ -1771,48 +869,11 @@ watch(
   { immediate: true },
 )
 
-/**
- * The Slack callback returns the browser here with a result in the query string — it is the only
- * channel available, since the admin left the app entirely to authorise in Slack. The params are
- * stripped afterwards so a refresh does not replay the banner.
- */
-function consumeSlackReturn(): void {
-  const outcome = normalizeStringOrEmpty(route.query.slack as string | undefined)
-  if (!outcome) return
-  if (outcome === 'connected') {
-    const team = normalizeStringOrEmpty(route.query.team as string | undefined)
-    notificationWorkflowSuccess.value = team
-      ? `Connected to ${team}. Add a chat space to choose which channel gets notified.`
-      : 'Connected to Slack. Add a chat space to choose which channel gets notified.'
-  } else {
-    notificationWorkflowError.value = describeSlackReturnError(
-      normalizeStringOrEmpty(route.query.reason as string | undefined))
-  }
-  const query = { ...route.query }
-  delete query.slack
-  delete query.team
-  delete query.reason
-  void router.replace({ query })
-}
-
-function describeSlackReturnError(reason: string): string {
-  switch (reason) {
-    case 'declined': return 'The Slack authorisation was cancelled, so nothing was connected.'
-    case 'expired': return 'That Slack connection attempt timed out. Start it again.'
-    case 'already_used': return 'That Slack connection link had already been used. Start again.'
-    case 'not_configured': return 'Slack is not configured on this deployment yet.'
-    case 'store_failed': return 'Slack authorised the connection but Darpan could not save it. Try again.'
-    default: return 'Slack could not be connected. Try again.'
-  }
-}
-
 onMounted(() => {
   // Reference data is prefetched at login; ensureLoaded() returns the
   // in-flight promise (or resolves immediately if hydration already finished).
   void referenceDataStore.ensureLoaded()
   void loadChatSpaces()
-  void loadSlackInstall()
-  consumeSlackReturn()
 })
 </script>
 

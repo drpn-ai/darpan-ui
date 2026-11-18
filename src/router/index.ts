@@ -198,7 +198,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: '/connections/notifications',
     name: 'connections-notifications',
-    redirect: { name: 'settings-tenant', query: { workflow: 'notifications' } },
+    redirect: { name: 'settings-notifications' },
   },
   {
     path: '/connections/netsuite/auth',
@@ -234,6 +234,13 @@ export const routes: RouteRecordRaw[] = [
     path: '/connections/runs',
     name: 'connections-runs',
     redirect: { name: 'settings-runs' },
+  },
+  {
+    // DAR-UI-123. The Slack OAuth callback (SlackOAuthSupport.handleCallback) sends the browser to
+    // <app>/settings?slack=connected|error&...; it lands on Notifications, where an Add space flow resumes.
+    path: '/settings',
+    name: 'settings',
+    redirect: (to) => (to.query.slack ? { name: 'settings-notifications', query: to.query } : { name: 'settings-tenant' }),
   },
   {
     path: '/settings/tenant',
@@ -407,9 +414,11 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'SFTP Servers' },
   },
   {
+    // DAR-UI-123. Where each thing that posts to chat posts: the tenant's spaces as a grid, and adding one.
     path: '/settings/notifications',
     name: 'settings-notifications',
-    redirect: { name: 'settings-tenant', query: { workflow: 'notifications' } },
+    component: () => import('../pages/settings/NotificationsPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Notifications' },
   },
   {
     path: '/settings/sftp/create',

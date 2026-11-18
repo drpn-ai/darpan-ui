@@ -238,10 +238,10 @@ const staticCommandActions: CommandAction[] = [
   {
     id: 'navigate-notifications',
     label: 'Configure Notifications',
-    description: 'Configure tenant run-completion webhooks.',
+    description: 'Choose where streaks, audit updates, automations and scripts post, and add chat spaces.',
     group: 'Navigate',
-    to: '/settings/tenant?workflow=notifications',
-    aliases: ['notifications', 'google chat', 'gchat', 'webhook', 'run notification', 'run completion'],
+    to: '/settings/notifications',
+    aliases: ['notifications', 'google chat', 'gchat', 'slack', 'webhook', 'chat space', 'streaks', 'run notification', 'run completion'],
   },
   {
     id: 'navigate-netsuite',
