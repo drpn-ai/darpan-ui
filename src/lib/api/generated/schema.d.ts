@@ -483,7 +483,7 @@ export interface components {
             text: string;
         };
         UpdateAgentTextResult: {
-            text?: Record<string, never>;
+            agentText?: Record<string, never>;
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.update#AgentText */
         UpdateAgentTextRequest: {
