@@ -134,6 +134,16 @@ function bundleAnswers(label: string): boolean {
   return lookupBundledLabel(label) !== null || lookupBundledAction(label) !== null
 }
 
+/**
+ * The aliases a data row may keep. One alias the bundle already answers (or one that breaks the alias rules) is dropped
+ * on its own: it never costs the row its words, its hidden flag or its other aliases.
+ */
+function usableAliases(aliases: readonly string[] | undefined): string[] {
+  if (!aliases?.length) return []
+  const kept = aliasesOk(aliases) ? aliases : aliases.filter((alias, index) => aliasesOk([alias]) && aliases.indexOf(alias) === index)
+  return kept.filter((alias) => !bundleAnswers(alias)).slice(0, MAX_ALIASES)
+}
+
 /** The bundled entry a SEED row's key names, or null for a key no bundle has (a stale or foreign row). */
 function bundledEntry(kind: AppContentKind, key: string): { title?: string; body: string } | null {
   if (kind === 'MASCOT_GLOSSARY') return MASCOT_GLOSSARY[key] ?? null
@@ -158,8 +168,7 @@ function applySeed(entry: AppContentEdit, next: ContentState): void {
   const body = entry.body || bundled.body
   const edited = Boolean(entry.title || entry.body)
   if (edited && !wordsOk(entry.kind, 'SEED', title, body, bundled.title, bundled.body)) return
-  const aliases = entry.aliases ?? []
-  if (aliases.length && (hint || !aliasesOk(aliases) || aliases.some(bundleAnswers))) return
+  const aliases = hint ? [] : usableAliases(entry.aliases)
   if (!edited && !entry.hidden && !aliases.length) return
   next.edits.set(`${entry.kind}/${entry.key}`, {
     ...(entry.title ? { title: entry.title } : {}), ...(entry.body ? { body: entry.body } : {}), ...(entry.hidden ? { hidden: true } : {}),
@@ -189,10 +198,10 @@ function applyAdmin(entry: AppContentEdit, next: ContentState): void {
     next.hints.set(route, [...(next.hints.get(route) ?? []), { text: body, sequence, ...(when ? { when } : {}) }])
     return
   }
-  const aliases = entry.aliases ?? []
+  const aliases = usableAliases(entry.aliases)
   const pattern = entry.matchPattern ?? ''
+  if (pattern && !patternOk(pattern)) return
   if (!aliases.length && !pattern) return
-  if (!aliasesOk(aliases) || aliases.some(bundleAnswers) || (pattern && !patternOk(pattern))) return
   const words = { title: entry.title as string, body }
   if (entry.kind === 'MASCOT_GLOSSARY') {
     next.adminGlossary.set(entry.key, words)

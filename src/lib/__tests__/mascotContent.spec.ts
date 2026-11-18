@@ -95,10 +95,28 @@ describe('mascot content as data', () => {
     const host = render('<dt class="micro-label">Differences</dt><dt class="micro-label">Brand new label</dt>')
     const [first, second] = Array.from(host.querySelectorAll('dt'))
     expect(resolveExplainTarget(first!)?.term).toBe('differenceCount')
-    // the row that shadows a bundled label is dropped whole
-    expect(resolveExplainTarget(second!)).toBeNull()
+    // only the shadowed alias is dropped; the row's other alias still answers
+    expect(resolveExplainTarget(second!)?.term).toBe('admin:shadow')
     expect(lookupAction('download results.csv')?.title).toBe('Download')
     expect(lookupAction('stop run')?.title).toBe('Stop run')
+  })
+
+  it('aShadowedAliasDropsOnlyItself', () => {
+    applyAppContent([
+      glossaryEdit({ hidden: true, aliases: ['differences'] }),
+      { kind: 'MASCOT_ACTION', key: 'stop run', source: 'SEED', body: 'ends the run and keeps nothing.', aliases: ['download results.csv', 'halt it'] },
+      adminTerm({ key: 'admin:regex', aliases: ['missing from netsuite', 'ledger pulse'] }),
+    ])
+    // the hidden edit survives the alias the bundle already answers
+    expect(lookupGlossary('differenceCount')).toBeNull()
+    // the body edit survives, the shadowed alias does not, the free one answers
+    expect(lookupAction('stop run')?.body).toBe('ends the run and keeps nothing.')
+    expect(lookupAction('halt it')?.body).toBe('ends the run and keeps nothing.')
+    expect(lookupAction('download results.csv')?.title).toBe('Download')
+    const host = render('<dt class="micro-label">Missing from NetSuite</dt><dt class="micro-label">Ledger pulse</dt>')
+    const [regex, free] = Array.from(host.querySelectorAll('dt'))
+    expect(resolveExplainTarget(regex!)?.term).toBe('missingInSource')
+    expect(resolveExplainTarget(free!)?.term).toBe('admin:regex')
   })
 
   it('ignoresARowThatBreaksTheRules', () => {

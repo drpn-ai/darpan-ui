@@ -4,8 +4,8 @@ import { ACTION_PATTERNS, MASCOT_ACTIONS } from '../mascotActions'
 import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { MASCOT_HINTS } from '../mascotHints'
 import { anchorsIn, routeAnchors } from '../mascotRouteAnchors'
-import { LABEL_ALIASES, normalizeLabel } from '../mascotTargets'
-import { actionPatternKey, assertMatchLabelsFit, hintKey, mascotSeedMark, mascotSeedRows, mascotSeedXml, xmlAttr, type SeedRow } from '../mascotSeed'
+import { LABEL_ALIASES, LABEL_PATTERNS, normalizeLabel } from '../mascotTargets'
+import { actionPatternKey, assertMatchLabelsFit, assertMatchRegexFit, hintKey, mascotSeedMark, mascotSeedRows, mascotSeedXml, xmlAttr, type SeedRow } from '../mascotSeed'
 
 const rows = mascotSeedRows()
 const ofKind = (kind: string) => rows.filter((row) => row.contentKind === kind)
@@ -62,6 +62,61 @@ describe('mascot seed rows', () => {
   })
 })
 
+/** One sample label per bundled regex source. The darpan backend test (AppContentRulesTests) holds the same table and runs it through java.util.regex. */
+const REGEX_SAMPLES: Record<string, string> = {
+  '^missing (from|in) .+$': 'missing from netsuite',
+  '^request access in( .+)?$': 'request access in shopify',
+  '^revoke .+$': 'revoke token abc',
+  '^download .+$': 'download results.csv',
+  '^remove passkey( .+)?$': 'remove passkey laptop',
+  '^remove .+$': 'remove ledger row',
+  '^move .+ (up|down)$': 'move rule 3 up',
+  '^change (rule|exception) .+$': 'change rule 4',
+  '^.+ is a finding$': 'orders is a finding',
+  '^check statement .+$': 'check statement 2',
+  '^open rules for .+$': 'open rules for shopify',
+  '^stop showing .+$': 'stop showing tips',
+  '^edit chat space( .+)?$': 'edit chat space ops',
+  '^send test to( .+)?$': 'send test to ops',
+  '^post .+ (in .+|nowhere)$': 'post digest nowhere',
+  '^edit rule .+$': 'edit rule 7',
+  '^notifying — .+$': 'notifying — ops',
+  '^retry (\\d+ )?not run$': 'retry 3 not run',
+  '^open script .+$': 'open script reader',
+  '^reads: .+$': 'reads: orders',
+  '^schedule: .+$': 'schedule: daily',
+  '^posts to: .+$': 'posts to: ops',
+  '^export .+ extract$': 'export orders extract',
+  '^(expand|collapse) .+ (object|array)$': 'expand items array',
+  '^open statement .+$': 'open statement 4',
+  '^audit schedule: .+$': 'audit schedule: daily',
+  '^after each run: .+$': 'after each run: email',
+  '^audit posts to: .+$': 'audit posts to: ops',
+  '^open conclusion .+$': 'open conclusion 2',
+  '^restore version .+$': 'restore version 3',
+}
+
+describe('bundled regex matchers in the seed', () => {
+  const regexRows = rows.filter((row) => row.matchRegex.length > 0)
+
+  it('every bundled pattern is emitted, each with a sample, and the sample matches in JS', () => {
+    const sources = regexRows.flatMap((row) => row.matchRegex).sort()
+    expect(sources).toEqual([...ACTION_PATTERNS.map(([re]) => re.source), ...LABEL_PATTERNS.map(([re]) => re.source)].sort())
+    expect(Object.keys(REGEX_SAMPLES).sort(), 'add a sample here and in AppContentRulesTests for a new pattern').toEqual(sources)
+    for (const [source, sample] of Object.entries(REGEX_SAMPLES)) expect(new RegExp(source).test(sample), source).toBe(true)
+  })
+
+  it('stays inside the column and uses only the syntax Java and JS share', () => {
+    expect(() => assertMatchRegexFit(rows)).not.toThrow()
+    for (const row of regexRows) for (const source of row.matchRegex) expect(source, source).not.toMatch(/\(\?|\\[pPkbB]|\n/)
+  })
+
+  it('refuses a matchRegex over the column', () => {
+    const row: SeedRow = { contentKind: 'MASCOT_ACTION', contentKey: 'k', defaultTitle: 'T', defaultBody: 'b', matchLabels: [], matchRegex: ['a'.repeat(256)], whereShown: 'x' }
+    expect(() => assertMatchRegexFit([row])).toThrow(/matchRegex.*255/)
+  })
+})
+
 describe('routeAnchors', () => {
   it('routeAnchorsReadsRealComponents', () => {
     const anchors = routeAnchors()
@@ -97,6 +152,29 @@ describe('mascotSeedXml', () => {
     expect(mascotSeedMark()).toBe(mark)
   })
 
+  it('writes every seed-owned column, an absent value as "", so a dropped value is cleared by the next load', () => {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml')
+    const entries = Array.from(doc.getElementsByTagName('darpan.content.AppContentEntry'))
+    for (const column of ['defaultTitle', 'defaultBody', 'matchLabels', 'matchRegex', 'routeName', 'conditionKind', 'anchorTestId', 'defaultSequence', 'whereShown']) {
+      expect(entries.every((entry) => entry.hasAttribute(column)), column).toBe(true)
+    }
+    const hint = entries.find((entry) => entry.getAttribute('contentKind') === 'MASCOT_HINT' && !entry.getAttribute('anchorTestId'))!
+    expect(hint.getAttribute('conditionKind')).toBe('ALWAYS')
+    const glossary = entries.find((entry) => entry.getAttribute('contentKey') === 'differenceCount')!
+    expect(glossary.getAttribute('routeName')).toBe('')
+    expect(glossary.getAttribute('defaultSequence')).toBe('')
+  })
+
+  it('stamps routes and anchors with the mark, so a release that drops one retires it', () => {
+    const mark = mascotSeedMark()
+    const doc = new DOMParser().parseFromString(xml, 'application/xml')
+    for (const tag of ['darpan.content.AppRoute', 'darpan.content.AppRouteAnchor']) {
+      const found = Array.from(doc.getElementsByTagName(tag))
+      expect(found.length, tag).toBeGreaterThan(0)
+      expect(found.every((node) => node.getAttribute('seedMark') === mark), tag).toBe(true)
+    }
+  })
+
   it('writes the seed file when MASCOT_SEED_OUT is set', () => {
     const out = process.env['MASCOT_SEED_OUT']
     if (out) writeFileSync(out, xml)
@@ -123,7 +201,7 @@ describe('generator guards', () => {
   })
 
   it('refusesMatchLabelsOverTheColumn', () => {
-    const row = (labels: string[]): SeedRow => ({ contentKind: 'MASCOT_GLOSSARY', contentKey: 'longTerm', defaultTitle: 'T', defaultBody: 'b', matchLabels: labels, whereShown: 'x' })
+    const row = (labels: string[]): SeedRow => ({ contentKind: 'MASCOT_GLOSSARY', contentKey: 'longTerm', defaultTitle: 'T', defaultBody: 'b', matchLabels: labels, matchRegex: [], whereShown: 'x' })
     expect(() => assertMatchLabelsFit([row(['a'.repeat(255)])])).not.toThrow()
     expect(() => assertMatchLabelsFit([row(['a'.repeat(200), 'b'.repeat(100)])])).toThrow(/longTerm.*matchLabels.*255/)
   })

@@ -17,6 +17,8 @@
     "lint:css": "stylelint \"src/**/*.{css,vue}\" --max-warnings=0",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
+    "mascot:seed": "MASCOT_SEED_OUT=../darpan-backend/runtime/component/darpan/data/AppContentSeedData.xml vitest run src/lib/__tests__/mascotSeed.spec.ts",
+    "mascot:seed:check": "MASCOT_SEED_REQUIRE=1 vitest run src/lib/__tests__/mascotSeedFresh.spec.ts",
     "check": "npm run lint && npm run lint:css && npm run type-check && npm run test",
     "sync-contract": "cp ../darpan-backend/runtime/component/darpan/docs/api-contract/methods.txt src/lib/api/contract/methods.txt && cp ../darpan-backend/runtime/component/darpan/docs/api-contract/openapi.json src/lib/api/contract/openapi.json && echo 'contract methods + openapi refreshed (rerun npm run generate-api-types)'",
     "generate-api-types": "openapi-typescript src/lib/api/contract/openapi.json -o src/lib/api/generated/schema.d.ts"

@@ -1,4 +1,4 @@
-import { lookupAction } from './mascotActions'
+import { isHiddenAction, lookupAction } from './mascotActions'
 import { adminGlossaryEntry, editFor } from './mascotContentState'
 
 /**
@@ -935,4 +935,11 @@ export function lookupGlossary(term: string | null | undefined): GlossaryEntry |
     return { ...bundled, title: edit.title ?? bundled.title, body: edit.body ?? bundled.body }
   }
   return adminGlossaryEntry(term) ?? lookupAction(term)
+}
+
+/** True when an admin hid the bundled term (or control) behind this name: it is silent, not "stumped". */
+export function isHiddenTerm(term: string | null | undefined): boolean {
+  if (!term) return false
+  if (MASCOT_GLOSSARY[term]) return editFor('MASCOT_GLOSSARY', term)?.hidden === true
+  return isHiddenAction(term)
 }

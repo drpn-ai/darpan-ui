@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useMascotStore, type MascotWarning } from '../mascot'
+import { applyAppContent, resetMascotContentForTests } from '../../lib/mascotContent'
 
 function warning(id: string, overrides: Partial<MascotWarning> = {}): MascotWarning {
   return { id, title: `Title ${id}`, prompt: `Prompt ${id}`, body: `Body ${id}`, actions: [], ...overrides }
@@ -158,5 +159,27 @@ describe('mascot store — warnings', () => {
     await mascot.warnings[0]?.actions[0]?.run()
 
     expect(run).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('mascot store — hidden terms', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => resetMascotContentForTests())
+
+  it('a hidden glossary term is silent, not stumped', () => {
+    applyAppContent([{ kind: 'MASCOT_GLOSSARY', key: 'differenceCount', source: 'SEED', hidden: true }])
+    const mascot = useMascotStore()
+    mascot.explain('differenceCount')
+    expect(mascot.mode).toBe('idle')
+    expect(mascot.isStumped).toBe(false)
+  })
+
+  it('a hidden control is silent too, and an unknown term is still stumped', () => {
+    applyAppContent([{ kind: 'MASCOT_ACTION', key: 'stop run', source: 'SEED', hidden: true }])
+    const mascot = useMascotStore()
+    mascot.explain('stop run')
+    expect(mascot.mode).toBe('idle')
+    mascot.explain('nobodyTaughtMeThis')
+    expect(mascot.isStumped).toBe(true)
   })
 })

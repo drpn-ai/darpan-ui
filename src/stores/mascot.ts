@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { lookupGlossary, type GlossaryEntry } from '../lib/mascotGlossary'
+import { isHiddenTerm, lookupGlossary, type GlossaryEntry } from '../lib/mascotGlossary'
 
 /**
  * What the mascot is currently doing. There are deliberately only three modes: a
@@ -180,6 +180,11 @@ export const useMascotStore = defineStore('mascot', () => {
   }
 
   function explain(nextTerm: string, nextDetail?: string | null): void {
+    // An admin hid this term: it stays silent (no bubble, no "drawing a blank"), and any earlier answer goes.
+    if (isHiddenTerm(nextTerm)) {
+      clear()
+      return
+    }
     listening.value = false
     releasing.value = false
     // An answer always wins over an offer.

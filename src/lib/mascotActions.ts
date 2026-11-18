@@ -1013,3 +1013,11 @@ export function lookupAction(name: string | null | undefined): ActionEntry | nul
   for (const [pattern, entry] of ACTION_PATTERNS) if (pattern.test(name)) return edited(`pattern:${pattern.source}`, entry)
   return dataAction(name)
 }
+
+/** True when an admin hid the bundled control entry that answers this name: a hidden control is silent, not "stumped". */
+export function isHiddenAction(name: string | null | undefined): boolean {
+  if (!name) return false
+  if (MASCOT_ACTIONS[name]) return editFor('MASCOT_ACTION', name)?.hidden === true
+  for (const [pattern] of ACTION_PATTERNS) if (pattern.test(name)) return editFor('MASCOT_ACTION', `pattern:${pattern.source}`)?.hidden === true
+  return false
+}

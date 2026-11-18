@@ -4,8 +4,9 @@
  * without ever touching an admin's edit. Run through `mascotSeed.spec.ts` with MASCOT_SEED_OUT set.
  * NEVER imported by app code (it reads source files through node fs).
  *
- * The XML sets only `default*`, `matchLabels`, the hint binding and `whereShown`. The edit columns
- * (title, body, aliases, hidden) are never written, so reloading the seed cannot undo an edit.
+ * The XML sets only `default*`, `matchLabels`, `matchRegex`, the hint binding and `whereShown`, and always sets every one
+ * of them (empty as ""), so a later release that drops a value clears it. The edit columns (title, body, aliases,
+ * hidden) are never written, so reloading the seed cannot undo an edit.
  */
 import { createHash } from 'node:crypto'
 import { MASCOT_ACTIONS, ACTION_PATTERNS } from './mascotActions'
@@ -23,6 +24,8 @@ export interface SeedRow {
   defaultTitle: string | null
   defaultBody: string
   matchLabels: string[]
+  /** The bundled regex sources this row answers (release code, never admin-editable); the server tests an alias against them. */
+  matchRegex: string[]
   routeName?: string
   anchorTestId?: string
   defaultSequence?: number
@@ -47,7 +50,7 @@ function glossaryRows(): SeedRow[] {
       ...(patterns.length ? [`and labels matching ${patterns.join(', ')} (in code)`] : []),
     ].join(' ')
     return {
-      contentKind: 'MASCOT_GLOSSARY' as const, contentKey: term, defaultTitle: entry.title, defaultBody: entry.body, matchLabels, whereShown: where,
+      contentKind: 'MASCOT_GLOSSARY' as const, contentKey: term, defaultTitle: entry.title, defaultBody: entry.body, matchLabels, matchRegex: patternTerms.get(term) ?? [], whereShown: where,
     }
   })
 }
@@ -55,11 +58,11 @@ function glossaryRows(): SeedRow[] {
 function actionRows(): SeedRow[] {
   const named = Object.entries(MASCOT_ACTIONS).map(([name, entry]) => ({
     contentKind: 'MASCOT_ACTION' as const, contentKey: name, defaultTitle: entry.title, defaultBody: entry.body,
-    matchLabels: [name], whereShown: `answers controls named ${name}`,
+    matchLabels: [name], matchRegex: [] as string[], whereShown: `answers controls named ${name}`,
   }))
   const patterned = ACTION_PATTERNS.map(([re, entry]) => ({
     contentKind: 'MASCOT_ACTION' as const, contentKey: actionPatternKey(re), defaultTitle: entry.title, defaultBody: entry.body,
-    matchLabels: [] as string[], whereShown: `answers controls whose name matches /${re.source}/ (in code)`,
+    matchLabels: [] as string[], matchRegex: [re.source], whereShown: `answers controls whose name matches /${re.source}/ (in code)`,
   }))
   return [...named, ...patterned]
 }
@@ -71,7 +74,7 @@ function hintRows(): SeedRow[] {
       const anchor = hint.when?.match(ANCHOR_SELECTOR)?.[1]
       const when = anchor ? `when ${anchor} is on the page` : 'always'
       return {
-        contentKind: 'MASCOT_HINT' as const, contentKey: hintKey(route, hint), defaultTitle: null, defaultBody: hint.text, matchLabels: [] as string[],
+        contentKind: 'MASCOT_HINT' as const, contentKey: hintKey(route, hint), defaultTitle: null, defaultBody: hint.text, matchLabels: [] as string[], matchRegex: [] as string[],
         routeName: route, ...(anchor ? { anchorTestId: anchor } : {}), defaultSequence: (index + 1) * 10,
         whereShown: `${paths[route]?.path ?? route} · ${when} · position ${index + 1} of ${hints.length}`,
       }
@@ -90,6 +93,14 @@ export function xmlAttr(value: string): string {
     .replace(/\t/g, '&#9;').replace(/\r\n|\n/g, '&#10;').replace(/\r/g, '&#13;')
 }
 
+/** `matchRegex` is a text-medium column of 255 characters, one source per line; the bundled patterns are release code, so fail the generation, not the load. */
+export function assertMatchRegexFit(rows: readonly SeedRow[]): void {
+  for (const row of rows) {
+    const length = row.matchRegex.join('\n').length
+    if (length > 255) throw new Error(`Seed row ${row.contentKind} ${row.contentKey}: matchRegex is ${length} characters, over the 255 the column holds.`)
+  }
+}
+
 /** `matchLabels` is a text-medium column of 255 characters; a longer join would fail the load, so fail the generation. */
 export function assertMatchLabelsFit(rows: readonly SeedRow[]): void {
   for (const row of rows) {
@@ -98,8 +109,9 @@ export function assertMatchLabelsFit(rows: readonly SeedRow[]): void {
   }
 }
 
+/** Every pair is written, an absent value as "" (a load treats "" as null), so a value a release drops is cleared in the database. */
 function attrs(pairs: [string, string | number | undefined][]): string {
-  return pairs.filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}="${xmlAttr(String(v))}"`).join(' ')
+  return pairs.map(([k, v]) => `${k}="${xmlAttr(v === undefined ? '' : String(v))}"`).join(' ')
 }
 
 /**
@@ -120,22 +132,23 @@ export function mascotSeedXml(): string {
     '<!-- No copyright or license for configuration file, details here are not considered a creative work. -->',
     '<entity-facade-xml type="darpan-seed">',
     '    <!-- DAR-BE-313 — GENERATED by darpan-ui/src/lib/mascotSeed.ts (MASCOT_SEED_OUT=… npx vitest run src/lib/__tests__/mascotSeed.spec.ts); do not edit by hand.',
-    '         Sets only the default* columns, matchLabels, the hint binding, whereShown and seedMark, so a release never overwrites an admin edit (title, body, aliases, hidden). -->',
+    '         Sets only the default* columns, matchLabels, matchRegex, the hint binding, whereShown and seedMark (always all of them, empty as ""), so a release never overwrites an admin edit (title, body, aliases, hidden). -->',
   ]
   lines.push(`    <darpan.content.AppContentSeed ${attrs([['seedId', 'CURRENT'], ['seedMark', seedMark]])}/>`)
   const seedRows = mascotSeedRows()
   assertMatchLabelsFit(seedRows)
+  assertMatchRegexFit(seedRows)
   for (const row of seedRows) {
     lines.push(`    <darpan.content.AppContentEntry ${attrs([
       ['contentKind', row.contentKind], ['contentKey', row.contentKey], ['source', 'SEED'], ['seedMark', seedMark],
-      ['defaultTitle', row.defaultTitle ?? undefined], ['defaultBody', row.defaultBody], ['matchLabels', row.matchLabels.join('|')],
+      ['defaultTitle', row.defaultTitle ?? undefined], ['defaultBody', row.defaultBody], ['matchLabels', row.matchLabels.join('|')], ['matchRegex', row.matchRegex.join('\n')],
       ['routeName', row.routeName], ['conditionKind', row.routeName ? (row.anchorTestId ? 'ANCHOR_PRESENT' : 'ALWAYS') : undefined],
       ['anchorTestId', row.anchorTestId], ['defaultSequence', row.defaultSequence], ['whereShown', row.whereShown],
     ])}/>`)
   }
-  for (const [name, { path }] of routes) lines.push(`    <darpan.content.AppRoute ${attrs([['routeName', name], ['routePath', path]])}/>`)
+  for (const [name, { path }] of routes) lines.push(`    <darpan.content.AppRoute ${attrs([['routeName', name], ['routePath', path], ['seedMark', seedMark]])}/>`)
   for (const [name, { anchors }] of routes) {
-    for (const anchor of anchors) lines.push(`    <darpan.content.AppRouteAnchor ${attrs([['routeName', name], ['anchorTestId', anchor]])}/>`)
+    for (const anchor of anchors) lines.push(`    <darpan.content.AppRouteAnchor ${attrs([['routeName', name], ['anchorTestId', anchor], ['seedMark', seedMark]])}/>`)
   }
   lines.push('</entity-facade-xml>', '')
   return lines.join('\n')
