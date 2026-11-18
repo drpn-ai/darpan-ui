@@ -114,7 +114,8 @@ describe('StaticEditableTitle', () => {
     wrapper.unmount()
   })
 
-  it('focus() puts the caret in the title for a Rename button beside it', () => {
+  // An in-place edit is a caret in the text, nothing more: Rename must not select the name.
+  it('focus() puts the caret at the end of the title, selecting nothing', () => {
     const wrapper = mount(StaticEditableTitle, {
       attachTo: document.body,
       props: { modelValue: 'Aditi', tag: 'span', testId: 'editable-title' },
@@ -122,7 +123,13 @@ describe('StaticEditableTitle', () => {
 
     ;(wrapper.vm as unknown as { focus: () => void }).focus()
 
-    expect(document.activeElement).toBe(wrapper.get('[data-testid="editable-title"]').element)
+    const titleElement = wrapper.get('[data-testid="editable-title"]').element
+    expect(document.activeElement).toBe(titleElement)
+    const selection = window.getSelection()!
+    expect(selection.isCollapsed).toBe(true)
+    expect(selection.toString()).toBe('')
+    expect(selection.focusNode && titleElement.contains(selection.focusNode)).toBe(true)
+    expect(selection.focusOffset).toBe(selection.focusNode?.nodeType === Node.TEXT_NODE ? 'Aditi'.length : selection.focusNode!.childNodes.length)
     wrapper.unmount()
   })
 })

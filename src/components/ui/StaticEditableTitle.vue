@@ -89,7 +89,8 @@ function handleEscapeCancel(event: KeyboardEvent): void {
   }
 }
 
-/** Puts the caret in the title with its text selected, as a Rename button beside it asks for. */
+/** Puts the caret at the end of the title for a Rename button beside it. Nothing is selected: an in-place edit is
+ *  just a caret in the text (DAR-UI-121, Aditi 2026-11-18). */
 function focus(): void {
   const element = titleElement.value
   if (!element || !props.editable) return
@@ -98,6 +99,7 @@ function focus(): void {
   if (!selection) return
   const range = document.createRange()
   range.selectNodeContents(element)
+  range.collapse(false)
   selection.removeAllRanges()
   selection.addRange(range)
 }
