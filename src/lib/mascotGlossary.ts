@@ -431,6 +431,27 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Config history',
     body: 'every saved version of this tenant’s setup. Restoring one puts that setup back; runs that already finished keep the results they had.',
   },
+  // DAR-UI-125: the Config history facts strip (the newest version).
+  configVersionCurrent: {
+    title: 'Current',
+    body: 'the version this tenant runs on now. A new one is kept a minute after an audit, check, run or connection changes.',
+    byDirectiveOnly: true,
+  },
+  configVersionKept: {
+    title: 'Kept',
+    body: 'when this version was kept, and what kept it: a save, by hand, a restore, the agent or an import.',
+    byDirectiveOnly: true,
+  },
+  configVersionBy: {
+    title: 'By',
+    body: 'the person whose change kept this version. Darpan when no person is on record.',
+    byDirectiveOnly: true,
+  },
+  configVersionHolds: {
+    title: 'Holds',
+    body: 'what this version holds, counted by kind. Each earlier row says how those counts moved from the version before it.',
+    byDirectiveOnly: true,
+  },
 
   /* ── Setup forms: connections, settings, scripts, automations, audits (DAR-UI-103) ── */
   connectionActive: {
@@ -680,16 +701,32 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   scriptSchedule: {
     title: 'Schedule',
-    body: 'when this script runs, read in the tenant’s timezone in brackets, not your own. A teammate in another zone sees a different clock time for the same post.',
+    body: 'when this script runs by itself, read in the tenant’s timezone, not your own. A teammate in another zone sees a different clock time for the same post.',
     byDirectiveOnly: true,
   },
   scriptPostTo: {
-    title: 'Post to',
+    title: 'Posts to',
     body: 'the chat space this script’s text goes to. If the space is deleted, switched off or has no webhook, the run reads Not delivered.',
   },
   scriptInputRun: {
-    title: 'Reads the newest result of',
-    body: 'the saved run whose latest finished result feeds the script each time. With no finished result yet, nothing is sent.',
+    title: 'Reads',
+    body: 'what Run and the schedule both feed the script: a saved run’s newest finished result, or the sample JSON. With no finished result yet, nothing is sent.',
+  },
+  // DAR-UI-124: the script page.
+  scriptSample: {
+    title: 'Sample JSON',
+    body: 'the input a script reads when it reads a sample: `input` is this JSON. Kept with the script, so the schedule reads it too.',
+    byDirectiveOnly: true,
+  },
+  scriptLastRun: {
+    title: 'Last run',
+    body: 'how the last scheduled run went, in the tenant’s zone. Runs from this page are not counted; they never post.',
+    byDirectiveOnly: true,
+  },
+  scriptRuns: {
+    title: 'Runs',
+    body: 'this visit’s runs, newest first, the last three kept, then the last scheduled run. Leaving the page clears this visit’s runs.',
+    byDirectiveOnly: true,
   },
   automationSftpServer: {
     title: 'SFTP Server',

@@ -472,18 +472,14 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'downloads this day’s whole audit as JSON: every statement, check and finding. The page shows a slice of it.',
   },
 
-  /* ── Script deployments (DAR-BE-167) ────────────────────────────────────────── */
+  /* ── Scripts (DAR-BE-164, DAR-BE-167, DAR-UI-124) ───────────────────────────── */
   'preview message': {
     title: 'Preview message',
-    body: 'runs the saved deployment against the newest result and shows the text it would post. Nothing reaches the chat space, and unsaved edits are left out.',
+    body: 'runs the saved script and schedule against the newest result and shows the text it would post. Nothing reaches the chat space, and unsaved edits are left out.',
   },
   'send now': {
     title: 'Send now',
-    body: 'asks once before it posts. The second press sends the script’s text to the chat space a single time; the daily schedule is unchanged.',
-  },
-  'delete deployment': {
-    title: 'Delete deployment',
-    body: 'asks once before it goes. Deleting stops this script’s scheduled posts; the script itself stays saved and can be deployed again.',
+    body: 'posts this text to the chat space once, now. The schedule is unchanged, and there is no unsend.',
   },
   'confirm delete': {
     title: 'Confirm delete',
@@ -491,23 +487,31 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'new script': {
     title: 'New script',
-    body: 'opens an empty editor. Nothing is saved and nothing runs until you press Save script or Run.',
+    body: 'a fresh script on its own page, starting from a sample. Nothing is kept until you press Save.',
   },
   run: {
     title: 'Run',
-    body: 'runs the script as written, unsaved edits included, on the chosen input and shows what it returns. Nothing is saved or posted.',
+    body: 'runs the code as written, unsaved edits included, on what the schedule reads, and adds the result under Runs. Nothing is saved or posted.',
   },
   'running…': {
     title: 'Running',
-    body: 'the script is already running on that input. Its output shows below when it returns.',
-  },
-  delete: {
-    title: 'Delete',
-    body: 'asks once before it goes; the second press removes this saved script.',
+    body: 'it is already going. The page shows what came back when it finishes; pressing again does nothing.',
   },
   'open scripts': {
     title: 'Scripts',
-    body: 'opens this tenant’s saved scripts: write one, try it on a sample or a run’s result, and deploy it to post on a schedule.',
+    body: 'this tenant’s scripts: each reads a run’s newest result or a sample, and can post what it returns to a chat space on a schedule.',
+  },
+  'on schedule': {
+    title: 'On schedule',
+    body: 'whether the script runs by itself at its time and posts. It is kept with Save; with no schedule set up it stays off.',
+  },
+  'back to scripts': {
+    title: 'Back to Scripts',
+    body: 'the list of this tenant’s scripts. Unsaved edits here are dropped on the way out.',
+  },
+  'delete script': {
+    title: 'Delete script',
+    body: 'asks first. A deleted script stops posting and leaves the Notifications grid; there is no undo.',
   },
 
   /* ── Connections and settings ───────────────────────────────────────────────── */
@@ -698,6 +702,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Back to Shopify Settings',
     body: 'the list of Shopify connections. Nothing on this page is saved on the way out.',
   },
+  'back to tenant settings': {
+    title: 'Back to Tenant Settings',
+    body: 'chat, time, audit and AI settings for this tenant. Nothing on this page is saved or discarded on the way.',
+  },
   'back to run editor': {
     title: 'Back to Run Editor',
     body: 'the list of saved runs on this tenant. Nothing here is saved on the way out, and the run it was showing is not discarded either.',
@@ -798,14 +806,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Save refined fields',
     body: 'replaces this schema’s field list for the whole tenant. Source files are checked against it from the next run; finished runs are not re-checked.',
   },
-  'run on schedule': {
-    title: 'Run on schedule',
-    body: 'whether this script runs by itself at its time. Flipping it changes nothing until the deployment is saved; Preview and Send now work either way.',
-  },
-  'save deployment': {
-    title: 'Save deployment',
-    body: 'keeps the time, chat space and input. While it is on schedule, the script runs at that time and posts what it returns there with nobody pressing anything.',
-  },
   'revert': {
     title: 'Revert',
     body: 'throws away the edits made here since the last save and puts back what is saved. Nothing saved is touched.',
@@ -816,7 +816,7 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'save script': {
     title: 'Save script',
-    body: 'checks it and keeps it for the whole tenant. A deployment runs the saved version from its next scheduled time; an unsaved edit never runs on schedule.',
+    body: 'checks the code and keeps it, with what it reads and its schedule, for the whole tenant. The schedule runs the saved version; an unsaved edit never runs on schedule.',
   },
   'save conclusions': {
     title: 'Save conclusions',
@@ -930,9 +930,22 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
     title: 'Retry not run',
     body: 'goes again for each check that did not run, one after another, from what its last read already fetched. Checks that ran are left alone.',
   }],
-  [/^confirm send to .+$/, {
-    title: 'Confirm send',
-    body: 'posts the message to that chat space now, once. There is no unsend, so preview it first if you have not read the text.',
+  // DAR-UI-124: each Scripts row names its script ("Open script <name>"); the script page's facts name their value.
+  [/^open script .+$/, {
+    title: 'Open',
+    body: 'this script’s own page: what it reads, its schedule, its code and its runs.',
+  }],
+  [/^reads: .+$/, {
+    title: 'Reads',
+    body: 'picks what Run and the schedule both feed the script: a saved run’s newest finished result, or the sample JSON.',
+  }],
+  [/^schedule: .+$/, {
+    title: 'Schedule',
+    body: 'sets the time it runs each day, in the tenant’s zone, and the space it posts to. Kept with Save.',
+  }],
+  [/^posts to: .+$/, {
+    title: 'Posts to',
+    body: 'picks the chat space its text goes to, with the time it runs. Kept with Save.',
   }],
   [/^export .+ extract$/, {
     title: 'Export extract',
@@ -941,6 +954,11 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^(expand|collapse) .+ (object|array)$/, {
     title: 'Expand',
     body: 'opens this branch of the record. It is the value the run actually compared, not a re-formatting of it.',
+  }],
+  // DAR-UI-125: each earlier row on Config history is named "Restore version <n>".
+  [/^restore version .+$/, {
+    title: 'Restore',
+    body: 'shows what putting this version back would change, before anything does. Your config now is kept as a version first.',
   }],
 ] as const)
 
