@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countsSummary, restoreChangesNothing, restoreSections, versionMeta } from '../configHistory'
+import { countsDelta, countsSummary, groupVersionsByDay, restoreChangesNothing, restoreSections, sourceLabel, versionTime } from '../configHistory'
 import type { ConfigRestorePlan, ConfigVersion } from '../api/configTypes'
 
 const version = (over: Partial<ConfigVersion> = {}): ConfigVersion => ({
@@ -28,10 +28,42 @@ const plan = (over: Partial<ConfigRestorePlan> = {}): ConfigRestorePlan => ({
 })
 
 describe('configHistory', () => {
-  it('says when, who and what wrote a version', () => {
-    expect(versionMeta(version(), 'America/Los_Angeles')).toBe('Oct 29, 2026, 9:47 PM · Aditi Patel · Saved')
-    expect(versionMeta(version({ changeSource: 'MANUAL', createdByName: null }), 'UTC')).toBe('Oct 30, 2026, 4:47 AM · Darpan · Kept by hand')
-    expect(versionMeta(version({ changeSource: 'RESTORE' }), 'UTC')).toContain('· Restore')
+  it('names what kept a version', () => {
+    expect(sourceLabel(version())).toBe('Saved')
+    expect(sourceLabel(version({ changeSource: 'MANUAL' }))).toBe('Kept by hand')
+    expect(sourceLabel(version({ changeSource: 'RESTORE' }))).toBe('Restore')
+    expect(sourceLabel(version({ changeSource: 'SOMETHING_NEW' }))).toBe('SOMETHING_NEW')
+  })
+
+  it('says what changed against the version before, counts only', () => {
+    const before = version({ seq: 2, counts: { audits: 1, statements: 3, checks: 1 } })
+    expect(countsDelta(version({ counts: { audits: 1, statements: 2, checks: 3 } }), before)).toBe('\u22121 statement · +2 checks')
+    expect(countsDelta(version({ counts: { audits: 2, statements: 3, checks: 1, runs: 1 } }), before)).toBe('+1 audit · +1 run')
+    expect(countsDelta(version({ counts: { audits: 1, statements: 3, checks: 1, conclusionCodes: 4 } }), before))
+      .toBe('Settings changed, counts the same')
+    expect(countsDelta(version({ seq: 1 }), null)).toBe('First version')
+    // The one before is older than the list the page loaded: say nothing rather than "First version".
+    expect(countsDelta(version({ seq: 9 }), undefined)).toBe('')
+  })
+
+  it('groups versions by day in the display time zone: Today, Yesterday, then dates', () => {
+    const now = new Date('2026-11-18T10:00:00Z') // 02:00 on the 18th in Los Angeles
+    const groups = groupVersionsByDay([
+      version({ id: 'a', createdDate: '2026-11-18T09:30:00Z' }), // 01:30 on the 18th, LA
+      version({ id: 'b', createdDate: '2026-11-18T07:30:00Z' }), // 23:30 on the 17th, LA: yesterday there, today in UTC
+      version({ id: 'c', createdDate: Date.parse('2026-11-12T20:00:00Z') }),
+      version({ id: 'd', createdDate: '2025-12-30T20:00:00Z' }),
+    ], 'America/Los_Angeles', now)
+    expect(groups.map((g) => [g.label, g.versions.map((v) => v.id)])).toEqual([
+      ['Today', ['a']], ['Yesterday', ['b']], ['12 Nov', ['c']], ['30 Dec 2025', ['d']],
+    ])
+    expect(groupVersionsByDay([version({ id: 'a', createdDate: '2026-11-18T09:30:00Z' }), version({ id: 'b', createdDate: '2026-11-18T07:30:00Z' })], 'UTC', now)
+      .map((g) => g.label)).toEqual(['Today'])
+  })
+
+  it('gives the time of day in the display time zone', () => {
+    expect(versionTime('2026-10-30T04:47:00Z', 'America/Los_Angeles')).toBe('9:47 PM')
+    expect(versionTime(null, 'UTC')).toBe('-')
   })
 
   it('counts what a version holds, skipping what it has none of', () => {

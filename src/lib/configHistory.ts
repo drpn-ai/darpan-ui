@@ -1,6 +1,6 @@
 // DAR-BE-160. Plain words for a tenant's config versions and a restore plan (TenantConfigHistoryPage).
 
-import { formatDateTime } from './utils/date'
+import { addDays, displayCalendarDayOf, formatDateInputValue, getDefaultDisplayTimeZone } from './utils/date'
 import type { ConfigRestorePlan, ConfigVersion, ConfigVersionCounts } from './api/configTypes'
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -48,11 +48,70 @@ export interface RestoreSection {
   items: string[]
 }
 
-export function versionMeta(version: ConfigVersion, timeZone?: string): string {
-  const when = formatDateTime(version.createdDate, { timeZone })
-  const who = version.createdByName || 'Darpan'
-  const what = SOURCE_LABEL[version.changeSource] ?? version.changeSource
-  return `${when} · ${who} · ${what}`
+/** The words for what kept a version: Saved, Kept by hand, Restore, Agent, Imported. */
+export function sourceLabel(version: ConfigVersion): string {
+  return SOURCE_LABEL[version.changeSource] ?? version.changeSource
+}
+
+/**
+ * What changed against the version before, from the counts alone, in Holds order: "−1 statement · +2 checks" (U+2212).
+ * No previous version: "First version" for seq 1; empty when the one before is older than the page loaded.
+ */
+export function countsDelta(version: ConfigVersion, previous: ConfigVersion | null | undefined): string {
+  if (!previous) return version.seq <= 1 ? 'First version' : ''
+  const parts = COUNTED
+    .map(({ key, one, many }) => ({ d: Number(version.counts?.[key] ?? 0) - Number(previous.counts?.[key] ?? 0), one, many }))
+    .filter(({ d }) => d !== 0)
+    .map(({ d, one, many }) => `${d > 0 ? '+' : '\u2212'}${Math.abs(d)} ${Math.abs(d) === 1 ? one : many}`)
+  return parts.length ? parts.join(' · ') : 'Settings changed, counts the same'
+}
+
+export interface VersionDayGroup {
+  key: string
+  label: string
+  versions: ConfigVersion[]
+}
+
+/** Earlier versions under one heading per day in the display time zone: Today, Yesterday, else "12 Nov". */
+export function groupVersionsByDay(versions: readonly ConfigVersion[], timeZone?: string, now: Date = new Date()): VersionDayGroup[] {
+  const zone = timeZone?.trim() || getDefaultDisplayTimeZone()
+  const today = displayCalendarDayOf(now, zone)
+  const todayKey = formatDateInputValue(today)
+  const yesterdayKey = formatDateInputValue(addDays(today, -1))
+  const groups: VersionDayGroup[] = []
+  for (const version of versions) {
+    const at = instantOf(version.createdDate)
+    const day = at ? displayCalendarDayOf(at, zone) : null
+    const key = day ? formatDateInputValue(day) : ''
+    let group = groups[groups.length - 1]
+    if (!group || group.key !== key) {
+      const label = !day ? 'Undated'
+        : key === todayKey ? 'Today'
+          : key === yesterdayKey ? 'Yesterday'
+            : new Intl.DateTimeFormat('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: day.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+            }).format(day)
+      group = { key, label, versions: [] }
+      groups.push(group)
+    }
+    group.versions.push(version)
+  }
+  return groups
+}
+
+/** The time of day a version was kept, in the display time zone; its day heading carries the date. */
+export function versionTime(value: ConfigVersion['createdDate'], timeZone?: string): string {
+  const at = instantOf(value)
+  if (!at) return '-'
+  return new Intl.DateTimeFormat(undefined, { timeStyle: 'short', timeZone: timeZone?.trim() || getDefaultDisplayTimeZone() }).format(at)
+}
+
+function instantOf(value: ConfigVersion['createdDate']): Date | null {
+  if (value === null || value === undefined || value === '') return null
+  const at = new Date(value)
+  return Number.isNaN(at.getTime()) ? null : at
 }
 
 export function countsSummary(counts: Partial<ConfigVersionCounts> | null | undefined): string {
