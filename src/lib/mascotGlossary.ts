@@ -581,17 +581,9 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Recovery email',
     body: 'where password reset codes go. With none set, Forgot password cannot reach you. Changing it asks for your current password first.',
   },
-  userId: {
-    title: 'User ID',
-    body: 'how Darpan records you on the runs you start. Unlike your display name it never changes, so quote it to an admin.',
-  },
   lastLogin: {
-    title: 'Last Login',
+    title: 'Last sign-in',
     body: 'the newest successful sign-in to this account, usually this one. A time you do not recognise is worth a password change.',
-  },
-  lastRun: {
-    title: 'Last Run',
-    body: 'the id of the newest run you started in the active tenant. Switch tenant and it changes; runs other people started never show here.',
   },
   userNotificationDefault: {
     title: 'Notifications',
