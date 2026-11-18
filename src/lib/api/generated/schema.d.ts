@@ -1404,7 +1404,7 @@ export interface components {
         };
         /**
          * @description Each role the two-factor policy covers (ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN, DARPAN_TENANT_ADMIN in
-         *                 any tenant) with its date and who in it is and is not enrolled, plus how many super admins are enrolled (the
+         *                 any tenant, and EVERYONE: any person with a Darpan role or a tenant membership) with its date and who in it is and is not enrolled, plus how many super admins are enrolled (the
          *                 break-glass rule needs two before super-admin enforcement can be switched on).
          */
         GetTwoFactorPoliciesParams: Record<string, never>;
@@ -1533,7 +1533,7 @@ export interface components {
          *                 DARPAN_SUPER_ADMIN is refused until at least two super admins have it on. Writes an AdminAuditLog row.
          */
         UpdateTwoFactorPolicyParams: {
-            /** @description ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN or DARPAN_TENANT_ADMIN. */
+            /** @description ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN, DARPAN_TENANT_ADMIN or EVERYONE (every person with a Darpan role or a tenant membership). */
             permissionGroupId: string;
             /** @description Timestamp — ISO-8601 string or epoch milliseconds. Required from this date. Leave out with clear. */
             requiredFromDate?: string | number;
