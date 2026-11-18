@@ -47,6 +47,8 @@ export type TwoFactorChallengePurpose = 'code' | 'setup'
 /** DAR-BE-270: what a 'code' challenge can be answered with here (login#Session's twoFactorMethods). */
 export type TwoFactorMethod = 'app' | 'passkey'
 
+export type PasskeyFirstBeginOutcome = { outcome: 'begun'; publicKeyOptions: string; challengeToken: string } | TwoFactorRefusal
+export type PasskeyFirstFinishOutcome = { outcome: 'signedIn' } | (TwoFactorRefusal & { reason?: string })
 export type TwoFactorVerifyOutcome = { outcome: 'signedIn'; recoveryCodesLeft: number | null } | TwoFactorRefusal
 
 export interface TwoFactorSetupStart {
@@ -571,6 +573,36 @@ export const useAuthStore = defineStore('auth', () => {
     return _twoFactorCall(challenge, () => authFacade.beginPasskeySignIn({ challengeToken: challenge.token }), passkeyOptionsOf, PASSKEY_REFUSAL_TEXT)
   }
 
+  /** DAR-BE-301 begin#PasskeyFirstSignIn: options for signing in with a passkey alone. No challenge yet: the reply
+   *  carries its own token, held by the caller until finish. */
+  async function beginPasskeyFirstSignIn(usernameTyped: string): Promise<PasskeyFirstBeginOutcome> {
+    try {
+      const reply = await authFacade.beginPasskeyFirstSignIn(usernameTyped.trim() ? { username: usernameTyped.trim() } : {})
+      const begun = passkeyOptionsOf(reply)
+      const challengeToken = reply.challengeToken?.toString()?.trim()
+      if (begun && begun.outcome === 'begun' && challengeToken) return { ...begun, challengeToken }
+      return refusalOf(reply, PASSKEY_REFUSAL_TEXT)
+    } catch (err) {
+      return callFailure(err)
+    }
+  }
+
+  /** DAR-BE-301 finish#PasskeyFirstSignIn: the assertion over those options. A success is a sign-in as
+   *  verify#SignInCode's. Any refusal has used the token up. */
+  async function finishPasskeyFirstSignIn(challengeToken: string, passkeyAssertion: string): Promise<PasskeyFirstFinishOutcome> {
+    try {
+      const reply = await authFacade.finishPasskeyFirstSignIn({ challengeToken, passkeyAssertion })
+      if (_holdsSignIn(reply)) {
+        _setTwoFactorChallenge(null)
+        _applySignInReply(reply)
+        return { outcome: 'signedIn' }
+      }
+      return { ...refusalOf(reply, PASSKEY_REFUSAL_TEXT), reason: reply.reason ?? undefined }
+    } catch (err) {
+      return callFailure(err)
+    }
+  }
+
   /**
    * begin#PasskeyRegistration: creation options for a new passkey. With a setup challenge (forced setup at sign-in) the
    * token is the whole proof; signed in, the same proof begin#TwoFactorSetup takes.
@@ -991,6 +1023,8 @@ export const useAuthStore = defineStore('auth', () => {
     beginTwoFactorSetup,
     confirmTwoFactorSetup,
     beginPasskeySignIn,
+    beginPasskeyFirstSignIn,
+    finishPasskeyFirstSignIn,
     beginPasskeyRegistration,
     finishPasskeyRegistration,
     applyTwoFactorState,

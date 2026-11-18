@@ -17,6 +17,8 @@ const beginPasskeyRegistration = vi.hoisted(() => vi.fn())
 const finishPasskeyRegistration = vi.hoisted(() => vi.fn())
 const getPasswordResetStatus = vi.hoisted(() => vi.fn())
 const getTwoFactorStatus = vi.hoisted(() => vi.fn())
+const beginPasskeyFirstSignIn = vi.hoisted(() => vi.fn())
+const finishPasskeyFirstSignIn = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ replace }) }))
 vi.mock('../../lib/api/facade', () => ({
@@ -30,6 +32,8 @@ vi.mock('../../lib/api/facade', () => ({
     finishPasskeyRegistration,
     getPasswordResetStatus,
     getTwoFactorStatus,
+    beginPasskeyFirstSignIn,
+    finishPasskeyFirstSignIn,
   },
   settingsFacade: {},
   clearApiResponseCache: vi.fn(),
@@ -313,5 +317,84 @@ describe('LoginPage passkeys', () => {
     expect(getAuthToken()).toBe('key-after-first-passkey')
     await click(wrapper, 'two-factor-codes-saved')
     expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  describe('sign in with a passkey alone (DAR-BE-301)', () => {
+    const first = { ok: true, messages: [], errors: [], challengeToken: 'first-token', publicKeyOptions: REQUEST_OPTIONS, expiresInSeconds: 300 }
+    const refused = (reason: string, message: string) => ({ ok: false, messages: [], errors: [message], reason, authenticated: false })
+
+    beforeEach(() => {
+      beginPasskeyFirstSignIn.mockResolvedValue(first)
+    })
+
+    it('offers the button only where the browser has WebAuthn', () => {
+      expect(mount(LoginPage).find('[data-testid="login-passkey-sign-in"]').exists()).toBe(true)
+      webauthn?.restore()
+      webauthn = null
+      expect(mount(LoginPage).find('[data-testid="login-passkey-sign-in"]').exists()).toBe(false)
+    })
+
+    it('with nothing typed: no username, no password, then the same sign-in a code gives', async () => {
+      finishPasskeyFirstSignIn.mockResolvedValue(signedIn('key-first'))
+      const wrapper = mount(LoginPage)
+      await click(wrapper, 'login-passkey-sign-in')
+
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({})
+      expect(webauthn?.parseRequestOptionsFromJSON).toHaveBeenCalledTimes(1)
+      expect(finishPasskeyFirstSignIn).toHaveBeenCalledWith({ challengeToken: 'first-token', passkeyAssertion: ASSERTION_JSON })
+      expect(loginSession).not.toHaveBeenCalled()
+      expect(getAuthToken()).toBe('key-first')
+      expect(replace).toHaveBeenCalledWith('/')
+    })
+
+    it('passes the username when one is typed', async () => {
+      finishPasskeyFirstSignIn.mockResolvedValue(signedIn('key-first'))
+      const wrapper = mount(LoginPage)
+      await wrapper.get('input[autocomplete="username"]').setValue('ada')
+      await click(wrapper, 'login-passkey-sign-in')
+
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({ username: 'ada' })
+    })
+
+    it('a closed prompt says it was cancelled and sends nothing', async () => {
+      webauthn?.get.mockRejectedValueOnce(notAllowed())
+      const wrapper = mount(LoginPage)
+      await click(wrapper, 'login-passkey-sign-in')
+
+      expect(wrapper.text()).toContain('Passkey sign-in was cancelled.')
+      expect(finishPasskeyFirstSignIn).not.toHaveBeenCalled()
+      expect(wrapper.find('input[autocomplete="current-password"]').exists()).toBe(true)
+    })
+
+    it('a refusal shows the backend message and leaves the password form usable', async () => {
+      finishPasskeyFirstSignIn.mockResolvedValue(refused('PASSKEY_REFUSED', 'That passkey did not sign you in.'))
+      const wrapper = mount(LoginPage)
+      await click(wrapper, 'login-passkey-sign-in')
+
+      expect(wrapper.text()).toContain('That passkey did not sign you in.')
+      expect(getAuthToken()).toBeNull()
+      loginSession.mockResolvedValue(signedIn('key-pw'))
+      await signIn(wrapper)
+      expect(getAuthToken()).toBe('key-pw')
+    })
+
+    it('a password change required shows its message and focuses the password field', async () => {
+      finishPasskeyFirstSignIn.mockResolvedValue(refused('PASSWORD_CHANGE_REQUIRED', 'Sign in with your password once to set a new one.'))
+      const wrapper = mount(LoginPage, { attachTo: document.body })
+      await click(wrapper, 'login-passkey-sign-in')
+
+      expect(wrapper.text()).toContain('Sign in with your password once to set a new one.')
+      expect(document.activeElement).toBe(wrapper.get('input[autocomplete="current-password"]').element)
+      wrapper.unmount()
+    })
+
+    it('a refused begin shows its message and opens no prompt', async () => {
+      beginPasskeyFirstSignIn.mockResolvedValue(refused('TOO_MANY_ATTEMPTS', 'Too many tries. Wait a minute.'))
+      const wrapper = mount(LoginPage)
+      await click(wrapper, 'login-passkey-sign-in')
+
+      expect(wrapper.text()).toContain('Too many tries. Wait a minute.')
+      expect(webauthn?.get).not.toHaveBeenCalled()
+    })
   })
 })

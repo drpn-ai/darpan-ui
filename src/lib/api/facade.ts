@@ -159,6 +159,8 @@ import type {
   DisableTwoFactorResponse,
   BeginPasskeySignInResponse,
   BeginPasskeyProofResponse,
+  BeginPasskeyFirstSignInResponse,
+  FinishPasskeyFirstSignInResponse,
   BeginPasskeyRegistrationResponse,
   FinishPasskeyRegistrationResponse,
   RenamePasskeyResponse,
@@ -183,6 +185,8 @@ import type {
   DisableTwoFactorPayload,
   BeginPasskeySignInPayload,
   BeginPasskeyRegistrationPayload,
+  BeginPasskeyFirstSignInPayload,
+  FinishPasskeyFirstSignInPayload,
   FinishPasskeyRegistrationPayload,
   RenamePasskeyPayload,
   DeletePasskeyPayload,
@@ -301,6 +305,8 @@ const AUTH = {
   disableTwoFactor: 'facade.AuthFacadeServices.disable#TwoFactor',
   beginPasskeySignIn: 'facade.AuthFacadeServices.begin#PasskeySignIn',
   beginPasskeyProof: 'facade.AuthFacadeServices.begin#PasskeyProof',
+  beginPasskeyFirstSignIn: 'facade.AuthFacadeServices.begin#PasskeyFirstSignIn',
+  finishPasskeyFirstSignIn: 'facade.AuthFacadeServices.finish#PasskeyFirstSignIn',
   beginPasskeyRegistration: 'facade.AuthFacadeServices.begin#PasskeyRegistration',
   finishPasskeyRegistration: 'facade.AuthFacadeServices.finish#PasskeyRegistration',
   renamePasskey: 'facade.AuthFacadeServices.rename#Passkey',
@@ -495,6 +501,12 @@ export const authFacade = {
   // create#RecoveryCodes.
   beginPasskeySignIn(payload: BeginPasskeySignInPayload, signal?: AbortSignal): Promise<BeginPasskeySignInResponse> {
     return callService<BeginPasskeySignInResponse>(AUTH.beginPasskeySignIn, payload, signal, REFUSAL_IS_RESULT)
+  },
+  beginPasskeyFirstSignIn(payload: BeginPasskeyFirstSignInPayload, signal?: AbortSignal): Promise<BeginPasskeyFirstSignInResponse> {
+    return callService<BeginPasskeyFirstSignInResponse>(AUTH.beginPasskeyFirstSignIn, payload, signal, REFUSAL_IS_RESULT)
+  },
+  finishPasskeyFirstSignIn(payload: FinishPasskeyFirstSignInPayload, signal?: AbortSignal): Promise<FinishPasskeyFirstSignInResponse> {
+    return callService<FinishPasskeyFirstSignInResponse>(AUTH.finishPasskeyFirstSignIn, payload, signal, REFUSAL_IS_RESULT)
   },
   beginPasskeyProof(signal?: AbortSignal): Promise<BeginPasskeyProofResponse> {
     return callService<BeginPasskeyProofResponse>(AUTH.beginPasskeyProof, {}, signal)

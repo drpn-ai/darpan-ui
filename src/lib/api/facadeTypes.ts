@@ -546,6 +546,8 @@ export type DisableTwoFactorPayload = Schemas['DisableTwoFactorParams']
 // ─── Passkeys (DAR-BE-270) ─────────────────────────────────────────────────────
 
 export type BeginPasskeySignInPayload = Schemas['BeginPasskeySignInParams']
+export type BeginPasskeyFirstSignInPayload = Schemas['BeginPasskeyFirstSignInParams']
+export type FinishPasskeyFirstSignInPayload = Schemas['FinishPasskeyFirstSignInParams']
 export type BeginPasskeyRegistrationPayload = Schemas['BeginPasskeyRegistrationParams']
 export type FinishPasskeyRegistrationPayload = Schemas['FinishPasskeyRegistrationParams']
 export type RenamePasskeyPayload = Schemas['RenamePasskeyParams']

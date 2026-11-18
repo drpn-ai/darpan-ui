@@ -144,6 +144,13 @@ export interface VerifySignInCodeResponse extends ApiEnvelope, AuthTokenContract
   challengeEnded?: boolean
 }
 
+/** DAR-BE-301: finish#PasskeyFirstSignIn answers a success as verify#SignInCode does; a refusal carries `reason`. */
+export interface FinishPasskeyFirstSignInResponse extends ApiEnvelope, AuthTokenContract {
+  authenticated?: boolean
+  sessionInfo?: SessionInfo | null
+  reason?: string
+}
+
 export interface ConfirmTwoFactorSetupResponse extends ApiEnvelope, AuthTokenContract {
   authenticated?: boolean
   sessionInfo?: SessionInfo | null
@@ -157,6 +164,7 @@ export type BeginTwoFactorSetupResponse = Schemas['BeginTwoFactorSetupResult']
 export type CreateRecoveryCodesResponse = Schemas['CreateRecoveryCodesResult']
 export type DisableTwoFactorResponse = Schemas['DisableTwoFactorResult']
 export type BeginPasskeySignInResponse = Schemas['BeginPasskeySignInResult']
+export type BeginPasskeyFirstSignInResponse = Schemas['BeginPasskeyFirstSignInResult']
 export type BeginPasskeyProofResponse = Schemas['BeginPasskeyProofResult']
 export type BeginPasskeyRegistrationResponse = Schemas['BeginPasskeyRegistrationResult']
 export type RenamePasskeyResponse = Schemas['RenamePasskeyResult']

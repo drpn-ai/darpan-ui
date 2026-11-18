@@ -39,6 +39,17 @@
         <div class="action-row">
           <button type="submit" :disabled="loading">Sign In</button>
         </div>
+        <!-- DAR-BE-301: the passkey alone is the whole sign-in, so neither field is required for it. -->
+        <button
+          v-if="passkeysOffered"
+          type="button"
+          class="login-text-link"
+          data-testid="login-passkey-sign-in"
+          :disabled="loading"
+          @click="signInWithPasskey"
+        >
+          Sign in with a passkey
+        </button>
         <button
           v-if="passwordResetAvailable"
           type="button"
@@ -234,7 +245,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InlineValidation from '../components/ui/InlineValidation.vue'
 import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
@@ -246,6 +257,7 @@ import type { TwoFactorChallengePurpose } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
 import { useAuthStore } from '../stores/auth'
+import { getPasskeyAssertion, passkeysSupported } from '../lib/passkeys'
 import { requestSubmitOnEnter } from '../lib/keyboard'
 import { resolveInternalRedirectTarget } from '../lib/navigation'
 
@@ -440,6 +452,49 @@ onMounted(async () => {
   passwordResetAvailable.value = await authStore.getPasswordResetAvailable()
 })
 watch(() => route.query.redirect, cleanupLoginSelfRedirect)
+
+// DAR-BE-301. Read once: a browser does not gain WebAuthn while the page is open.
+const passkeysOffered = passkeysSupported()
+const PASSKEY_CANCELLED_TEXT = 'Passkey sign-in was cancelled.'
+
+/** Sign in with a passkey alone. The username, when typed, narrows the prompt to that account's passkeys (a security key
+ *  needs it); the password is never read. */
+async function signInWithPasskey(): Promise<void> {
+  if (loading.value) return
+  loading.value = true
+  localError.value = null
+  try {
+    const begun = await authStore.beginPasskeyFirstSignIn(username.value)
+    if (begun.outcome !== 'begun') {
+      localError.value = begun.message
+      return
+    }
+    const asserted = await getPasskeyAssertion(begun.publicKeyOptions)
+    if (asserted.outcome === 'cancelled') {
+      localError.value = PASSKEY_CANCELLED_TEXT
+      return
+    }
+    if (asserted.outcome === 'failed') {
+      localError.value = asserted.message
+      return
+    }
+    const finished = await authStore.finishPasskeyFirstSignIn(begun.challengeToken, asserted.json)
+    if (finished.outcome === 'signedIn') {
+      // No password was typed, so the steps that need one (a recovery email) are not asked here.
+      await leaveSignIn()
+      return
+    }
+    localError.value = finished.message
+    if (finished.reason === 'PASSWORD_CHANGE_REQUIRED') await focusPasswordField()
+  } finally {
+    loading.value = false
+  }
+}
+
+async function focusPasswordField(): Promise<void> {
+  await nextTick()
+  document.getElementById('login-password')?.focus()
+}
 
 async function submit(): Promise<void> {
   loading.value = true
