@@ -37,7 +37,7 @@
             @click="selectRuleFilter(option.key)"
           >
             <span class="run-result-rule-selector__option-label">{{ option.label }}</span>
-            <span class="run-result-rule-selector__option-detail">{{ option.detail }}</span>
+            <span v-if="option.detail" class="run-result-rule-selector__option-detail">{{ option.detail }}</span>
             <span class="run-result-rule-selector__option-count">{{ option.count }}</span>
           </button>
         </div>

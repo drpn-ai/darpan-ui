@@ -1391,6 +1391,34 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.find('[data-rule-filter-key="order_id_match"]').exists()).toBe(false)
   })
 
+  // DAR-BE-299: a named rule's option is its name alone (label = name, detail = ''); an unnamed one keeps its formula.
+  it('shows a named rule by its name with no formula line', async () => {
+    const simulate = simulateDifferences({
+      metadata: defaultDiffDetails.metadata,
+      differences: [
+        { diffType: 'FIELD_MISMATCH', primaryId: '1002', field: 'OMS order id = Shopify order id', ruleId: 'ORDER_ID_MATCH' },
+        { diffType: 'FIELD_MISMATCH', primaryId: '1004', field: 'Payment total = Shopify total', ruleId: 'PAYMENT_TOTAL_MATCH' },
+      ],
+    })
+    getGeneratedOutputDifferences.mockImplementation(async (payload: DifferencesQuery) => {
+      const response = await simulate(payload)
+      return {
+        ...response,
+        ruleOptions: response.ruleOptions?.map((option) =>
+          option.key === 'order_id_match' ? { ...option, label: 'Order Sync', detail: '' } : option),
+      }
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    const named = wrapper.get('[data-rule-filter-key="order_id_match"]')
+    expect(named.get('.run-result-rule-selector__option-label').text()).toBe('Order Sync')
+    expect(named.find('.run-result-rule-selector__option-detail').exists()).toBe(false)
+    const unnamed = wrapper.get('[data-rule-filter-key="payment_total_match"]')
+    expect(unnamed.get('.run-result-rule-selector__option-detail').text()).toBe('Payment total = Shopify total')
+  })
+
   it('shows an inline error when the saved result cannot be loaded', async () => {
     getGeneratedOutputDifferences.mockReset()
     getGeneratedOutputDifferences.mockRejectedValue(new ApiCallError('This saved result got saved somewhere we cannot reach.', 503))
