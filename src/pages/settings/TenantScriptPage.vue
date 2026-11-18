@@ -1,74 +1,30 @@
 <template>
   <StaticPageFrame :class="{ 'static-page-frame--popup-open': activePopup !== null }">
     <template #hero>
-      <div class="script-title-line">
-        <StaticEditableTitle
-          v-if="draft"
-          v-explain="'scriptName'"
-          class="script-title-line__name"
-          :model-value="draft.scriptName"
-          :editable="canEdit"
-          aria-label="Script name"
-          test-id="script-name"
-          @update:model-value="renameDraft"
-        />
-        <h1 v-else>Script</h1>
-        <span v-if="dirty" class="script-title-line__mark" data-testid="script-edited">• edited</span>
-        <AppToggleSwitch
-          class="script-title-line__toggle"
-          :model-value="schedule?.isActive ?? false"
-          label="On schedule"
-          test-id="script-on-schedule"
-          :disabled="!schedule || !canEdit || busy"
-          @update:model-value="setOnSchedule"
-        />
-      </div>
+      <StaticRecordTitle
+        v-if="draft"
+        :model-value="draft.scriptName"
+        :editable="canEdit"
+        aria-label="Script name"
+        test-id="script-name"
+        explain="scriptName"
+        toggle-label="On schedule"
+        :on="schedule?.isActive ?? false"
+        toggle-test-id="script-on-schedule"
+        :toggle-disabled="!schedule || !canEdit || busy"
+        @update:model-value="renameDraft"
+        @update:on="setOnSchedule"
+      >
+        <span v-if="dirty" class="script-edited-mark" data-testid="script-edited">• edited</span>
+      </StaticRecordTitle>
+      <h1 v-else>Script</h1>
     </template>
 
     <LoadingState v-if="loading" noun="script" />
     <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="script-page-error" />
 
     <template v-if="draft">
-      <div class="script-facts" data-testid="script-facts">
-        <button
-          type="button"
-          class="script-fact"
-          :aria-label="`Reads: ${readsText}`"
-          :disabled="!canEdit || busy"
-          data-testid="script-fact-reads"
-          @click="openReads"
-        >
-          <span v-explain="'scriptInputRun'" class="static-page-summary-label">Reads</span>
-          <span class="script-fact__value">{{ readsText }}</span>
-          <span v-if="readsSubText" class="script-fact__sub">{{ readsSubText }}</span>
-        </button>
-        <button
-          type="button"
-          class="script-fact"
-          :aria-label="`Schedule: ${scheduleText}`"
-          :disabled="!canEdit || busy"
-          data-testid="script-fact-schedule"
-          @click="openSchedule"
-        >
-          <span v-explain="'scriptSchedule'" class="static-page-summary-label">Schedule</span>
-          <span class="script-fact__value">{{ scheduleText }}</span>
-        </button>
-        <button
-          type="button"
-          class="script-fact"
-          :aria-label="`Posts to: ${postsToText}`"
-          :disabled="!canEdit || busy"
-          data-testid="script-fact-posts-to"
-          @click="openSchedule"
-        >
-          <span v-explain="'scriptPostTo'" class="static-page-summary-label">Posts to</span>
-          <span class="script-fact__value">{{ postsToText }}</span>
-        </button>
-        <div class="script-fact" data-testid="script-fact-last-run">
-          <span v-explain="'scriptLastRun'" class="static-page-summary-label">Last run</span>
-          <span class="script-fact__value">{{ lastRunText }}</span>
-        </div>
-      </div>
+      <StaticFactStrip :facts="facts" test-id="script-facts" @open="openFact" />
 
       <div class="script-bench">
         <section class="script-column">
@@ -369,8 +325,9 @@ import AppSelect from '../../components/ui/AppSelect.vue'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
-import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
+import StaticFactStrip, { type StaticFact } from '../../components/ui/StaticFactStrip.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
+import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import { reconciliationFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
@@ -521,6 +478,23 @@ const lastRunText = computed(() => {
   const when = formatDateTime(current.lastRunDate, { timeZone: timeZone.value })
   return lastRunFailed.value ? `Failed · ${when}` : `${when} · ${statusWords(current.lastRunStatus).toLowerCase()}`
 })
+
+// The header strip (DAR-UI-126): the three that change open their popup; Last run only reads.
+const facts = computed<StaticFact[]>(() => {
+  const changeable = { interactive: canEdit.value, disabled: busy.value }
+  return [
+    { key: 'reads', label: 'Reads', value: readsText.value, sub: readsSubText.value, explain: 'scriptInputRun',
+      testId: 'script-fact-reads', ...changeable },
+    { key: 'schedule', label: 'Schedule', value: scheduleText.value, explain: 'scriptSchedule', testId: 'script-fact-schedule', ...changeable },
+    { key: 'postsTo', label: 'Posts to', value: postsToText.value, explain: 'scriptPostTo', testId: 'script-fact-posts-to', ...changeable },
+    { key: 'lastRun', label: 'Last run', value: lastRunText.value, explain: 'scriptLastRun', testId: 'script-fact-last-run' },
+  ]
+})
+
+function openFact(key: string): void {
+  if (key === 'reads') openReads()
+  else openSchedule()
+}
 
 const lineCount = computed(() => Math.max((draft.value?.scriptBody ?? '').split('\n').length, 12))
 const errorLine = computed(() => runs.value[0]?.run.error?.line ?? null)
@@ -856,79 +830,8 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.script-title-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  min-width: 0;
-}
-
-.script-title-line__name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.script-title-line__mark {
+.script-edited-mark {
   color: var(--text-muted);
-  font-size: var(--type-note-size);
-}
-
-.script-title-line__toggle {
-  margin-left: auto;
-}
-
-/* Four equal cells; the three that change are the buttons, tinted on hover. */
-.script-facts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--static-tile-border);
-  border-radius: var(--static-surface-radius);
-  background: var(--static-tile-bg);
-  overflow: hidden;
-}
-
-.script-fact {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  align-content: start;
-  gap: var(--space-00);
-  min-width: 0;
-  min-height: 4.6rem;
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  font-size: var(--static-tile-text-size);
-}
-
-.script-fact + .script-fact {
-  border-left: 1px solid var(--static-tile-border);
-}
-
-button.script-fact:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--static-tile-bg) 88%, var(--accent));
-}
-
-button.script-fact:focus-visible {
-  outline-offset: -2px;
-}
-
-/* A viewer reads the facts; they are not greyed out, only inert. */
-button.script-fact:disabled {
-  opacity: 1;
-  cursor: default;
-}
-
-.script-fact__value {
-  overflow-wrap: anywhere;
-}
-
-.script-fact__sub {
-  color: var(--text-dim);
   font-size: var(--type-note-size);
 }
 
@@ -1131,22 +1034,6 @@ button.script-fact:disabled {
 }
 
 @media (max-width: 860px) {
-  .script-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .script-fact + .script-fact {
-    border-left: 0;
-  }
-
-  .script-fact:nth-child(even) {
-    border-left: 1px solid var(--static-tile-border);
-  }
-
-  .script-fact:nth-child(n + 3) {
-    border-top: 1px solid var(--static-tile-border);
-  }
-
   .script-bench {
     grid-template-columns: minmax(0, 1fr);
   }

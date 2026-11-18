@@ -77,9 +77,9 @@ describe('TenantConfigHistoryPage', () => {
   it('states the newest version as a read-only strip, never as a row', async () => {
     const wrapper = await mountPage()
     const strip = wrapper.find('[data-testid="config-current"]')
-    const facts = strip.findAll('.config-history-fact').map((f) => {
-      const lines = f.findAll('dd > span').map((line) => line.text())
-      return [f.find('dt').text(), lines.length ? lines.join(' / ') : f.find('dd').text()]
+    const facts = strip.findAll('.static-fact').map((f) => {
+      const lines = f.findAll('.static-fact__value, .static-fact__sub').map((line) => line.text())
+      return [f.find('.static-page-summary-label').text(), lines.join(' / ')]
     })
     expect(facts).toEqual([
       ['Current', 'Version 4'],

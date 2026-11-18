@@ -399,9 +399,10 @@ describe('TenantScriptPage', () => {
     permissions.canEditTenantSettings = false
     const wrapper = await mountPage()
     expect(wrapper.find('[data-testid="script-name"]').attributes('contenteditable')).toBe('false')
+    // A viewer's facts are plain text (DAR-UI-126), not buttons, so nothing opens.
     for (const fact of ['script-fact-reads', 'script-fact-schedule', 'script-fact-posts-to']) {
       await wrapper.find(`[data-testid="${fact}"]`).trigger('click')
-      expect(wrapper.find(`[data-testid="${fact}"]`).attributes('disabled')).toBeDefined()
+      expect(wrapper.find(`[data-testid="${fact}"]`).element.tagName).toBe('DIV')
     }
     expect(wrapper.find('.popup-workflow-modal').exists()).toBe(false)
     expect(wrapper.find('[data-testid="script-on-schedule"]').attributes('disabled')).toBeDefined()

@@ -135,6 +135,7 @@ describe('every button in the app has an answer', () => {
     'components/ui/AppToggleSwitch.vue': 'label prop; the automation running/paused pair is entered',
     'components/ui/JsonCollapseNode.vue': 'toggleLabel builds "Expand <name> object" — the expand/collapse pattern answers it',
     'components/ui/AppSelect.vue': 'the trigger shows the selected value and each option IS a value, not vocabulary',
+    'components/ui/StaticRecordTitle.vue': 'toggleLabel prop; each caller\'s toggle-label is swept with the wrappers below',
     'components/ui/EmptyState.vue': 'the caller supplies action.label; the caller is where the entry belongs',
     'components/ui/ErrorState.vue': 'the caller supplies action.label; the caller is where the entry belongs',
     'components/shell/CommandPalette.vue': 'rows are named by the command list, and are navigation rather than an action on data',
@@ -267,6 +268,13 @@ describe('every button in the app has an answer', () => {
     expect(lookupAction('retry not running')).toBeNull()
   })
 
+  // DAR-UI-126. A StaticFactStrip cell is named in script ("Label: value"), out of the template sweep's reach.
+  it('answers the settings-page facts by the names their pages give them', () => {
+    expect(lookupAction('reads: sales orders')?.title).toBe('Reads')
+    expect(lookupAction('schedule: daily at 7:00 am')?.title).toBe('Schedule')
+    expect(lookupAction('posts to: #ops-daily')?.title).toBe('Posts to')
+  })
+
   it('resolves every button name written in a template', () => {
     const files = glob('src/**/*.vue', { ignore: ['**/__tests__/**', '**/.claude/**'] })
     expect(files.length, 'no components were swept — the glob is wrong').toBeGreaterThan(30)
@@ -312,7 +320,9 @@ describe('every button in the app has an answer', () => {
     return answered
   }
 
-  const WRAPPERS: Readonly<Record<string, string | null>> = { AppSaveAction: 'Save', AppCancelAction: 'Cancel', AppToggleSwitch: null }
+  const WRAPPERS: Readonly<Record<string, string | null>> = { AppSaveAction: 'Save', AppCancelAction: 'Cancel', AppToggleSwitch: null, StaticRecordTitle: null }
+  /** The prop each wrapper names its button by: the settings-page title (DAR-UI-126) names its switch by toggle-label. */
+  const NAME_PROP: Readonly<Record<string, string>> = { StaticRecordTitle: 'toggle-label' }
 
   function wrapperTags(source: string): { component: string, tag: string }[] {
     const found: { component: string, tag: string }[] = []
@@ -345,8 +355,9 @@ describe('every button in the app has an answer', () => {
       const source = readFileSync(file, 'utf-8').match(/<template>([\s\S]*)<\/template>/)?.[1] ?? ''
       for (const { component, tag } of wrapperTags(source)) {
         swept += 1
-        const literal = tag.match(/(?<![\w:-])label="([^"]*)"/)?.[1]
-        const bound = tag.match(/(?<![\w-]):label="([^"]*)"/)?.[1]
+        const prop = NAME_PROP[component] ?? 'label'
+        const literal = tag.match(new RegExp(`(?<![\\w:-])${prop}="([^"]*)"`))?.[1]
+        const bound = tag.match(new RegExp(`(?<![\\w-]):${prop}="([^"]*)"`))?.[1]
         let names: string[]
         if (literal !== undefined) names = [literal]
         else if (bound !== undefined) {
@@ -355,7 +366,8 @@ describe('every button in the app has an answer', () => {
           // A label bound to a script computed has no literal here; the caller must document it.
           if (names.length === 0 && !COMPUTED_NAMES[relative]) unanswered.push(`${relative}: <${component}> whose label is computed and undocumented`)
         } else names = WRAPPERS[component] ? [WRAPPERS[component] as string] : []
-        if (names.length === 0 && literal === undefined && bound === undefined) unanswered.push(`${relative}: <${component}> with no label`)
+        // A title with no switch has nothing to name.
+        if (names.length === 0 && literal === undefined && bound === undefined && !NAME_PROP[component]) unanswered.push(`${relative}: <${component}> with no label`)
         for (const name of names) {
           if (!lookupAction(normalize(name)) || !answersAtRuntime(name)) unanswered.push(`${relative}: <${component}> "${name}"`)
         }

@@ -10,27 +10,7 @@
     <p v-if="!loading && !pageError && versions.length === 0" class="section-note">No versions yet.</p>
 
     <!-- The newest version: what this tenant runs on now. Read-only; only older versions restore. -->
-    <dl v-if="current" class="config-history-facts" data-testid="config-current">
-      <div class="config-history-fact">
-        <dt v-explain="'configVersionCurrent'" class="static-page-summary-label">Current</dt>
-        <dd>Version {{ current.seq }}</dd>
-      </div>
-      <div class="config-history-fact">
-        <dt v-explain="'configVersionKept'" class="static-page-summary-label">Kept</dt>
-        <dd>
-          <span>{{ formatDateTime(current.createdDate) }}</span>
-          <span class="config-history-dim">{{ sourceLabel(current) }}</span>
-        </dd>
-      </div>
-      <div class="config-history-fact">
-        <dt v-explain="'configVersionBy'" class="static-page-summary-label">By</dt>
-        <dd>{{ whoOf(current) }}</dd>
-      </div>
-      <div class="config-history-fact">
-        <dt v-explain="'configVersionHolds'" class="static-page-summary-label">Holds</dt>
-        <dd>{{ countsSummary(current.counts) }}</dd>
-      </div>
-    </dl>
+    <StaticFactStrip v-if="current" :facts="currentFacts" test-id="config-current" />
 
     <StaticPageSection v-if="earlier.length" class="config-history-days">
       <template v-for="group in dayGroups" :key="group.key">
@@ -157,6 +137,7 @@ import { RouterLink } from 'vue-router'
 import AppListPager from '../../components/ui/AppListPager.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
+import StaticFactStrip, { type StaticFact } from '../../components/ui/StaticFactStrip.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
@@ -189,6 +170,16 @@ const restoreError = ref('')
 const isPopupOpen = computed(() => restoreTarget.value !== null)
 const current = computed(() => versions.value[0] ?? null)
 const earlier = computed(() => versions.value.slice(1))
+const currentFacts = computed<StaticFact[]>(() => {
+  const version = current.value
+  if (!version) return []
+  return [
+    { key: 'current', label: 'Current', value: `Version ${version.seq}`, explain: 'configVersionCurrent' },
+    { key: 'kept', label: 'Kept', value: formatDateTime(version.createdDate), sub: sourceLabel(version), explain: 'configVersionKept' },
+    { key: 'by', label: 'By', value: whoOf(version), explain: 'configVersionBy' },
+    { key: 'holds', label: 'Holds', value: countsSummary(version.counts), explain: 'configVersionHolds' },
+  ]
+})
 const { pageIndex, pageCount, pagedItems, goToPage } = useListPagination(earlier, { pageSize: PAGE_SIZE })
 const dayGroups = computed(() => groupVersionsByDay(pagedItems.value))
 // Against the version before it in the whole list, not the page: the last row on a page still has one.
@@ -297,7 +288,6 @@ onMounted(loadVersions)
 }
 
 /* The Tenant Settings row pattern (DAR-UI-122): one bordered list, every row the same minimum height. */
-.config-history-facts,
 .config-history-rows {
   margin: 0;
   padding: 0;
@@ -305,30 +295,6 @@ onMounted(loadVersions)
   border-radius: var(--static-surface-radius);
   background: var(--static-tile-bg);
   font-size: var(--static-tile-text-size);
-}
-
-/* The current version: four equal cells, a small label over each value. */
-.config-history-facts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.config-history-fact {
-  display: grid;
-  align-content: start;
-  gap: var(--space-1);
-  min-width: 0;
-  padding: var(--space-2) var(--space-3);
-}
-
-.config-history-fact + .config-history-fact {
-  border-left: 1px solid var(--static-tile-border);
-}
-
-.config-history-fact dd {
-  display: grid;
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 
 .config-history-day {
@@ -390,18 +356,6 @@ button.config-history-row:focus-visible {
 }
 
 @media (max-width: 768px) {
-  .config-history-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .config-history-fact:nth-child(3) {
-    border-left: 0;
-  }
-
-  .config-history-fact:nth-child(n + 3) {
-    border-top: 1px solid var(--static-tile-border);
-  }
-
   .config-history-row {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-1);

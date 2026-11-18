@@ -363,12 +363,18 @@ describe('every label in the app has an answer', () => {
     }
   })
 
+  /**
+   * A glossary key as a template names it: the directive itself, or the explain prop of a component that puts the
+   * directive on its own element (StaticRecordTitle's explain="…", a StaticFactStrip fact's explain: '…', DAR-UI-126).
+   */
+  const EXPLAIN_KEY = /(?:v-explain="'|(?<![\w-])explain="|(?<![\w-])explain: ')([A-Za-z]+)['"]/g
+
   /** A directive naming an entry nobody wrote is a hover that silently says nothing. */
   it('points every v-explain at an entry that exists', () => {
     const missing: string[] = []
     let directives = 0
     for (const file of FILES) {
-      for (const match of readFileSync(file, 'utf-8').matchAll(/v-explain="'([A-Za-z]+)'"/g)) {
+      for (const match of readFileSync(file, 'utf-8').matchAll(EXPLAIN_KEY)) {
         directives += 1
         if (!MASCOT_GLOSSARY[match[1] as string]) missing.push(`${file.split('src/')[1]}: ${match[1]}`)
       }
@@ -380,7 +386,7 @@ describe('every label in the app has an answer', () => {
   /** An entry kept out of the index and named by no directive can never be reached. */
   it('reaches every directive-only entry from some template', () => {
     const used = new Set<string>()
-    for (const file of FILES) for (const match of readFileSync(file, 'utf-8').matchAll(/v-explain="'([A-Za-z]+)'"/g)) used.add(match[1] as string)
+    for (const file of FILES) for (const match of readFileSync(file, 'utf-8').matchAll(EXPLAIN_KEY)) used.add(match[1] as string)
     const orphans = Object.entries(MASCOT_GLOSSARY).filter(([key, entry]) => entry.byDirectiveOnly && !used.has(key)).map(([key]) => key)
     expect(orphans).toEqual([])
   })
