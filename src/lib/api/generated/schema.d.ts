@@ -319,7 +319,7 @@ export interface components {
         };
         /**
          * @description Makes a new ADMIN entry with the key `admin:` + slug. Every rule runs; any problem (or dryRun) saves nothing.
-         *                 whereShown previews where the mascot will say it. Writes an AdminAuditLog row.
+         *                 whereShown previews where the mascot will say it. The caller reads `problems` and `saved`: non-empty problems means nothing was saved, and dryRun never saves. Markup characters are refused by the rules in `problems`, not as a service error. Writes an AdminAuditLog row.
          */
         CreateAppContentEntryParams: {
             kind: string;
@@ -489,7 +489,7 @@ export interface components {
          * @description Edits an entry; a parameter left out is unchanged. A SEED entry takes only title, body, aliases and hidden (a
          *                 title or body equal to its default is stored as none); the binding (matchPattern, route, condition, anchor, sequence)
          *                 is for ADMIN entries. Every rule runs; any problem (or dryRun) saves nothing. Writes an AdminAuditLog row naming each
-         *                 changed field, old -> new; nothing changed writes none.
+         *                 changed field, old -> new; nothing changed writes none. The caller reads `problems` and `saved`: non-empty problems means nothing was saved, and dryRun never saves. Markup characters are refused by the rules in `problems`, not as a service error.
          */
         UpdateAppContentEntryParams: {
             kind: string;
@@ -3555,7 +3555,7 @@ export interface components {
         };
         /**
          * @description The mascot entries an admin has edited, hidden or created: every SEED row with a title, body, alias or
-         *                 hidden edit, and every ADMIN row. Fields that are not set are omitted. version is the latest lastChangedDate.
+         *                 hidden edit, and every ADMIN row. Fields that are not set are omitted. version is a stable hash of the entries returned, so it changes on every create, edit, reset, delete or seed retirement that changes what is served (null when nothing is served).
          */
         GetAppContentParams: Record<string, never>;
         GetAppContentResult: {
