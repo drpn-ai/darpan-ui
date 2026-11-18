@@ -1529,8 +1529,8 @@ export interface components {
         /**
          * @description Require two-factor for a role from a date (today or earlier: now; later: a grace period during which
          *                 sign-in prompts), or make it optional again (clear). Super admins only, with a current code from their own
-         *                 authenticator app or a passkey assertion (so they must have two-factor on). Requiring it for ADMIN or
-         *                 DARPAN_SUPER_ADMIN is refused until at least two super admins have it on. Writes an AdminAuditLog row.
+         *                 authenticator app or a passkey assertion (so they must have two-factor on). Requiring it for ADMIN,
+         *                 DARPAN_SUPER_ADMIN or EVERYONE needs the acting super admin to keep a second way back in (two factors, or unused recovery codes). Writes an AdminAuditLog row.
          */
         UpdateTwoFactorPolicyParams: {
             /** @description ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN, DARPAN_TENANT_ADMIN or EVERYONE (every person with a Darpan role or a tenant membership). */
