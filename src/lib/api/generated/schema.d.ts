@@ -5161,6 +5161,8 @@ export interface components {
             errors?: string[];
             /** @description The computer the CLI says it runs on. */
             hostLabel?: string;
+            /** @description DAR-BE-295. TENANT or ADMIN (darpan-admin: a super admin approves it). */
+            scope?: string;
             /** @description PENDING (waiting for approval), APPROVED, DENIED, or EXPIRED (expired or unknown code). */
             status?: string;
             /** @description Timestamp — ISO-8601 string or epoch milliseconds. When the request expires. */
@@ -5343,6 +5345,11 @@ export interface components {
         StartCliLoginParams: {
             /** @description The computer the CLI runs on (its hostname), shown to the person before they approve. */
             hostLabel: string;
+            /**
+             * @description DAR-BE-295. TENANT (the default) or ADMIN: the darpan-admin CLI, which may call admin.* for 12 hours
+             *                         and which only a super admin may approve.
+             */
+            scope?: string;
         };
         StartCliLoginResult: {
             /** @description True when the call completed without facade errors. */
