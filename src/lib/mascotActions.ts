@@ -505,7 +505,7 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Delete',
     body: 'asks once before it goes; the second press removes this saved script.',
   },
-  scripts: {
+  'open scripts': {
     title: 'Scripts',
     body: 'opens this tenant’s saved scripts: write one, try it on a sample or a run’s result, and deploy it to post on a schedule.',
   },
@@ -589,23 +589,24 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Keep a version now',
     body: 'saves this tenant’s whole audit setup as it stands, so a later edit can be rolled back to exactly this point.',
   },
-  'config history': {
+  // DAR-UI-122: Tenant Settings rows. Pages say Open; popups say Add, Edit or Change.
+  'open config history': {
     title: 'Config history',
     body: 'opens the kept versions of this tenant’s audit setup. Restoring one puts the live setup back to that point.',
   },
-  'streaks space': {
-    title: 'Streaks space',
-    body: 'picks the chat space this tenant’s streak milestones and badges post to. It moves streaks only; run notifications keep their own spaces.',
+  'change streaks space': {
+    title: 'Change',
+    body: 'moves streak milestones and badges to another active space, or stops them with None. Run notifications keep their own spaces.',
   },
-  timezone: {
-    title: 'Timezone',
+  'change tenant timezone': {
+    title: 'Change',
     body: 'how this tenant reads dates and times. Set it before the first automated run, or the team reads timestamps in the wrong zone.',
   },
-  notifications: {
-    title: 'Notifications',
-    body: 'where this tenant sends run alerts. A chat space added here is what Notify me can then pick from.',
+  'add chat space': {
+    title: 'Add',
+    body: 'opens where this tenant sends run alerts: a new space, or a Slack connection. A space added here is what Notify me can then pick from.',
   },
-  'no ai provider selected': {
+  'edit ai provider': {
     title: 'AI provider',
     body: 'which model answers Ask Darpan for this tenant. Nothing else on the product depends on it.',
   },
@@ -888,6 +889,11 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^stop showing .+$/, {
     title: 'Stop showing',
     body: 'takes this field off what each record shows. Records from runs already made keep it.',
+  }],
+  // "Edit chat space <name>": each Tenant Settings sub-row names its space (DAR-UI-122).
+  [/^edit chat space( .+)?$/, {
+    title: 'Edit',
+    body: 'opens this space to rename it, switch it off, or delete it once no automation posts there. Messages already sent stay.',
   }],
   [/^edit rule .+$/, {
     title: 'Edit rule',

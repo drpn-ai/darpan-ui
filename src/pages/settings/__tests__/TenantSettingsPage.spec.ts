@@ -116,6 +116,12 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 
 import TenantSettingsPage from '../TenantSettingsPage.vue'
 
+/** The value column of the row that holds this action button. */
+function rowValue(wrapper: ReturnType<typeof mount>, testId: string): string {
+  const row = wrapper.get(`[data-testid="${testId}"]`).element.closest('.tenant-settings-row')
+  return row?.querySelector('.tenant-settings-row__value')?.textContent?.trim() ?? ''
+}
+
 describe('TenantSettingsPage', () => {
   beforeEach(() => {
     route.fullPath = '/settings/tenant'
@@ -288,15 +294,14 @@ describe('TenantSettingsPage', () => {
   it('does not claim notifications are unconfigured while chat spaces are still loading', async () => {
     // An unresolved chat-space fetch leaves `chatSpaces` empty, which is indistinguishable from
     // "loaded and genuinely empty" unless the summary consults the loading flag. It used to render
-    // a definitive "Not configured" and then flip to "2 spaces" once the fetch landed.
+    // a definitive "None" and then flip to "2" once the fetch landed.
     let releaseChatSpaces: (value: unknown) => void = () => {}
     listTenantChatSpaces.mockReturnValue(new Promise((resolve) => { releaseChatSpaces = resolve }))
 
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    const summaryWhileLoading = wrapper.get('[data-testid="tenant-module-notifications"]').text()
-    expect(summaryWhileLoading).not.toContain('Not configured')
+    expect(rowValue(wrapper, 'tenant-module-notifications')).toBe('—')
 
     releaseChatSpaces({
       ok: true,
@@ -309,10 +314,10 @@ describe('TenantSettingsPage', () => {
     })
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="tenant-module-notifications"]').text()).toContain('2 spaces')
+    expect(rowValue(wrapper, 'tenant-module-notifications')).toBe('2')
   })
 
-  it('renders one tenant settings surface with AI moved into the page', async () => {
+  it('renders one tenant settings surface as groups of rows, with no tiles left', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
@@ -320,17 +325,14 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.find('h1').text()).toBe('Krewe Settings')
     expect(wrapper.text()).not.toContain('Active Tenant')
     expect(wrapper.find('.tenant-settings-summary-grid').exists()).toBe(false)
-    expect(wrapper.text()).toContain('AI Configuration')
-    expect(wrapper.text()).toContain('Gemini')
+    expect(wrapper.find('.static-page-list-tile').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('AI Configuration')
+    expect(wrapper.text()).not.toContain('Localization')
+    expect(wrapper.text()).not.toContain('Operations')
+    expect(rowValue(wrapper, 'tenant-module-notifications')).toBe('2')
+    expect(rowValue(wrapper, 'tenant-module-timezone')).toBe('America/Los_Angeles')
+    expect(rowValue(wrapper, 'tenant-ai-provider-tile')).toBe('Gemini · gemini-2.5-flash · Primary · Enabled · Key stored')
     expect(wrapper.text()).not.toContain('OpenAI')
-    expect(wrapper.get('[data-testid="tenant-ai-providers"]').classes()).toContain('tenant-settings-list-grid')
-    expect(wrapper.findAll('[data-testid="tenant-ai-provider-tile"]')).toHaveLength(1)
-    expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').classes()).toContain('static-page-list-tile')
-    expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').text()).toContain('Primary · Enabled · Key stored')
-    expect(wrapper.text()).toContain('Localization')
-    expect(wrapper.text()).toContain('Timezone')
-    expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toContain('America/Los_Angeles')
-    expect(wrapper.text()).toContain('Operations')
     expect(wrapper.text()).not.toContain('Connections')
     expect(wrapper.find('[data-testid="tenant-module-sftp"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tenant-module-netsuite"]').exists()).toBe(false)
@@ -338,9 +340,6 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.find('[data-testid="tenant-module-oms"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tenant-module-runs"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Run Editor')
-    expect(wrapper.text()).toContain('Notifications')
-    expect(wrapper.get('[data-testid="tenant-module-notifications"]').text()).toContain('2 spaces')
-    expect(wrapper.find('.static-page-module-grid').exists()).toBe(false)
     expect(getLlmSettings).toHaveBeenNthCalledWith(1, { llmProvider: 'OPENAI' }, expect.any(AbortSignal))
     expect(getLlmSettings).toHaveBeenNthCalledWith(2, { llmProvider: 'GEMINI' }, expect.any(AbortSignal))
     expect(getTenantSettings).toHaveBeenCalledTimes(1)
@@ -353,14 +352,101 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.html()).not.toContain('/settings/ai')
   })
 
-  it('opens the config history from its Operations tile', async () => {
+  it('orders the groups Chat, Time, Audit, AI, each one list of rows', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    const tile = wrapper.get('[data-testid="tenant-module-config-history"]')
-    expect(tile.text()).toContain('Config history')
-    await tile.trigger('click')
+    const sections = wrapper.findAll('.static-page-section')
+    expect(sections.map((section) => section.attributes('data-testid'))).toEqual([
+      'tenant-section-chat', 'tenant-section-time', 'tenant-section-audit', 'tenant-section-ai',
+    ])
+    expect(sections.map((section) => section.get('h2').text())).toEqual(['Chat', 'Time', 'Audit', 'AI'])
+    for (const section of sections) expect(section.findAll('.tenant-settings-rows')).toHaveLength(1)
+    expect(wrapper.findAll('.tenant-settings-row__label').map((label) => label.text())).toEqual([
+      'Spaces', 'Streaks go to', 'Timezone', 'Config history', 'Scripts', 'Provider',
+    ])
+  })
+
+  it('names popups with a verb and pages with Open', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="tenant-module-notifications"]').text()).toBe('Add')
+    expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toBe('Change')
+    expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toBe('Change')
+    expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').text()).toBe('Edit')
+    expect(wrapper.get('[data-testid="tenant-module-config-history"]').text()).toBe('Open →')
+    expect(wrapper.get('[data-testid="tenant-module-scripts"]').text()).toBe('Open →')
+    expect(rowValue(wrapper, 'tenant-module-config-history')).toBe('Versions and restores')
+    expect(rowValue(wrapper, 'tenant-module-scripts')).toBe('JEXL used by checks')
+  })
+
+  it('lists one sub-row per chat space and marks only the saved streaks space', async () => {
+    getTenantSettings.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      tenantSettings: { companyUserGroupId: 'KREWE', companyLabel: 'Krewe', timeZone: 'America/Los_Angeles', streaksChatSpaceId: 'CS2' },
+    })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="tenant-chat-space-row"]')
+    expect(rows).toHaveLength(2)
+    expect(rows.map((row) => row.get('.tenant-settings-row__name').text())).toEqual(['Ops', 'Finance'])
+    expect(rows.map((row) => row.get('.tenant-settings-row__value').text())).toEqual(['Google Chat', 'Google Chat · gets streaks'])
+    expect(wrapper.findAll('[data-testid="tenant-chat-space-edit"]').map((button) => button.text())).toEqual(['Edit', 'Edit'])
+  })
+
+  it('opens a space\'s own menu straight from its Edit', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    await wrapper.findAll('[data-testid="tenant-chat-space-edit"]')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('What do you want to do with Finance?')
+    expect(wrapper.find('[data-testid="tenant-chat-space-menu-edit"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tenant-chat-space-menu-delete"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tenant-chat-space-add"]').exists()).toBe(false)
+  })
+
+  it('opens the chat space popup from Add, offering a new space and Slack', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-module-notifications"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Which chat space?')
+    expect(wrapper.find('[data-testid="tenant-chat-space-add"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tenant-chat-space-slack"]').exists()).toBe(true)
+  })
+
+  it('opens the streaks and timezone popups from their Change', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-module-streaks-space"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Which chat space gets streaks?')
+    await wrapper.get('[data-testid="tenant-streaks-space-workflow-cancel"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-module-timezone"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Set the tenant timezone.')
+  })
+
+  it('opens the config history and scripts pages from their rows', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tenant-module-config-history"]').trigger('click')
     expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-config-history' })
+    await wrapper.get('[data-testid="tenant-module-scripts"]').trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-scripts' })
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('edits tenant timezone from the Tenant Settings popup', async () => {
@@ -381,7 +467,7 @@ describe('TenantSettingsPage', () => {
     expect(saveTenantSettings).toHaveBeenCalledWith({ timeZone: 'Europe/London' })
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Saved tenant settings.')
-    expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toContain('Europe/London')
+    expect(rowValue(wrapper, 'tenant-module-timezone')).toContain('Europe/London')
   })
 
   describe('streaks space', () => {
@@ -402,15 +488,15 @@ describe('TenantSettingsPage', () => {
     it('shows None when unset', async () => {
       const wrapper = mount(TenantSettingsPage)
       await flushPromises()
-      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('None')
+      expect(rowValue(wrapper, 'tenant-module-streaks-space')).toContain('None')
     })
 
     it('shows the space name when set', async () => {
       getTenantSettings.mockResolvedValue(tenantSettingsWith('CS2'))
       const wrapper = mount(TenantSettingsPage)
       await flushPromises()
-      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('Finance')
-      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).not.toContain('None')
+      expect(rowValue(wrapper, 'tenant-module-streaks-space')).toContain('Finance')
+      expect(rowValue(wrapper, 'tenant-module-streaks-space')).not.toContain('None')
     })
 
     it('saves the chosen space alone, without the timezone', async () => {
@@ -431,8 +517,8 @@ describe('TenantSettingsPage', () => {
       expect(saveTenantSettings).toHaveBeenCalledWith({ streaksChatSpaceId: 'CS1' })
       expect(saveTenantSettings.mock.calls[0]![0]).not.toHaveProperty('timeZone')
       expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('Ops')
-      expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toContain('America/Los_Angeles')
+      expect(rowValue(wrapper, 'tenant-module-streaks-space')).toContain('Ops')
+      expect(rowValue(wrapper, 'tenant-module-timezone')).toContain('America/Los_Angeles')
     })
 
     it('clears the space when None is chosen', async () => {
@@ -451,7 +537,7 @@ describe('TenantSettingsPage', () => {
       await flushPromises()
 
       expect(saveTenantSettings).toHaveBeenCalledWith({ streaksChatSpaceId: '' })
-      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('None')
+      expect(rowValue(wrapper, 'tenant-module-streaks-space')).toContain('None')
     })
 
     it('does not offer inactive spaces', async () => {
@@ -487,7 +573,7 @@ describe('TenantSettingsPage', () => {
       const wrapper = mount(TenantSettingsPage)
       await flushPromises()
 
-      expect(wrapper.get('[data-testid="tenant-module-streaks-space"]').text()).toContain('Ops')
+      expect(rowValue(wrapper, 'tenant-module-streaks-space')).toContain('Ops')
       await wrapper.get('[data-testid="tenant-module-streaks-space"]').trigger('click')
       await flushPromises()
 
@@ -1077,7 +1163,7 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.get('[role="dialog"]').text()).toContain('Ops')
   })
 
-  it('keeps AI settings visible but locked for super-admins without Darpan-admin access', async () => {
+  it('leaves the AI group out for super-admins without Darpan-admin access', async () => {
     authState.sessionInfo = {
       userId: 'super-admin',
       activeTenantUserGroupId: 'KREWE',
@@ -1093,8 +1179,10 @@ describe('TenantSettingsPage', () => {
     await flushPromises()
 
     expect(getLlmSettings).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Darpan admin only')
-    expect(wrapper.find('[data-testid="tenant-ai-create-action"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tenant-section-ai"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tenant-ai-provider-tile"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Darpan admin only')
+    expect(wrapper.findAll('.static-page-section h2').map((heading) => heading.text())).toEqual(['Chat', 'Time', 'Audit'])
   })
 
   it('shows the last visit\'s Slack connection at once on a revisit, before the network answers (DAR-UI-051)', async () => {

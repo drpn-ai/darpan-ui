@@ -145,7 +145,6 @@ describe('every button in the app has an answer', () => {
     'components/workflow/WorkflowShortcutChoiceCards.vue': 'a choice card is named by the choice, which is data',
     'pages/reconciliation/ReconciliationRunResultPage.vue': 'the rule-selector option is a rule name and the diff bucket is answered through its own label span',
     'pages/reconciliation/ReconciliationDiffPage.vue': 'a calendar cell is a date',
-    'pages/settings/TenantSettingsPage.vue': 'the AI tile is named by the selected provider',
     'components/reconciliation/RunFlowchartBoard.vue': 'a question box and an openable finding are named by their question and finding, which are data; the + buttons are entered',
     'components/audit/AuditColumns.vue': 'the drill-down rows, breadcrumb steps and cause-group toggles are named by the audit\'s own categories, statements, checks, findings and causes; its icon actions and retries are entered',
     'components/workflow/WorkflowDateRangeCalendar.vue': 'the start and end fields and each day cell are named by a date; the month arrows are entered',
@@ -265,6 +264,7 @@ describe('every button in the app has an answer', () => {
     expect(lookupAction('retry 3 not run')?.title).toBe('Retry not run')
     expect(lookupAction('revoke aditis-macbook.local')?.title).toBe('Revoke')
     expect(lookupAction('export shopify extract')?.title).toBe('Export extract')
+    expect(lookupAction('edit chat space ops')?.title).toBe('Edit')
     expect(lookupAction('retry not running')).toBeNull()
   })
 

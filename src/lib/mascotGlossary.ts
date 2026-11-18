@@ -553,6 +553,12 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Slack channel',
     body: 'where this space’s messages land. A private channel needs the Darpan bot invited before it can post there.',
   },
+  // DAR-UI-122: the Tenant Settings "Streaks go to" row.
+  tenantStreaksSpace: {
+    title: 'Streaks space',
+    body: 'the chat space this tenant’s streak milestones and badges post to. A switched-off space reads as None, and nothing posts.',
+    byDirectiveOnly: true,
+  },
   chatSpaceName: {
     title: 'Space name',
     body: 'what every picker calls this destination: automations, scripts, your own notification default. Two alike are easy to mix up.',

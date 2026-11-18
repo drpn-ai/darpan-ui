@@ -7,134 +7,58 @@
     <LoadingState v-if="summaryLoading" noun="tenant settings" />
     <InlineValidation v-if="summaryError" tone="error" :message="summaryError" />
 
-    <StaticPageSection>
-      <template #header>
-        <div class="static-page-section-header-row">
-          <h2 class="static-page-section-heading">AI Configuration</h2>
-        </div>
-      </template>
-
-      <p v-if="!canManageGlobalSettings" class="section-note">Darpan admin only</p>
-      <p v-else-if="aiLoading" class="section-note">Loading AI provider settings...</p>
-      <InlineValidation v-else-if="aiError" tone="error" :message="aiError" />
-
-      <div
-        v-else-if="selectedAiProvider"
-        class="static-page-tile-grid static-page-record-grid tenant-settings-list-grid"
-        data-testid="tenant-ai-providers"
-      >
-        <button
-          type="button"
-          class="static-page-tile static-page-record-tile static-page-list-tile"
-          data-testid="tenant-ai-provider-tile"
-          @click="openAiProviderWorkflow"
+    <StaticPageSection title="Chat" data-testid="tenant-section-chat">
+      <ul class="tenant-settings-rows">
+        <li class="tenant-settings-row">
+          <span v-explain="'chatSpace'" class="tenant-settings-row__label">Spaces</span>
+          <span class="tenant-settings-row__value">{{ notificationSummary }}</span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              aria-label="Add chat space"
+              data-testid="tenant-module-notifications"
+              @click="openNotificationWorkflow"
+            >
+              Add
+            </button>
+          </span>
+        </li>
+        <li
+          v-for="space in chatSpaces"
+          :key="space.chatSpaceId"
+          class="tenant-settings-row tenant-settings-row--sub"
+          data-testid="tenant-chat-space-row"
         >
-          <span class="tenant-settings-list-row">
-            <span class="tenant-settings-list-main">
-              <span class="static-page-tile-title static-page-list-tile__title">{{ selectedAiProvider.label }}</span>
-              <span class="static-page-list-tile__meta">{{ selectedAiProvider.llmModel || 'Model not set' }}</span>
-            </span>
-            <span class="tenant-settings-list-status">{{ providerSummary(selectedAiProvider) }}</span>
+          <span class="tenant-settings-row__name">{{ space.spaceName }}</span>
+          <span class="tenant-settings-row__value">{{ chatSpaceRowValue(space) }}</span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              :aria-label="`Edit chat space ${space.spaceName}`"
+              data-testid="tenant-chat-space-edit"
+              @click="handleChatSpaceListChoice(space.chatSpaceId)"
+            >
+              Edit
+            </button>
           </span>
-        </button>
-      </div>
-      <button
-        v-else
-        type="button"
-        class="static-page-tile static-page-record-tile static-page-list-tile"
-        data-testid="tenant-ai-provider-tile"
-        @click="openAiProviderWorkflow"
-      >
-        <span class="tenant-settings-list-row">
-          <span class="tenant-settings-list-main">
-            <span class="static-page-tile-title static-page-list-tile__title">No AI provider selected</span>
-            <span class="static-page-list-tile__meta">Configure a provider for this tenant.</span>
+        </li>
+        <li class="tenant-settings-row">
+          <span v-explain="'tenantStreaksSpace'" class="tenant-settings-row__label">Streaks go to</span>
+          <span class="tenant-settings-row__value">{{ streaksSpaceSummary }}</span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              aria-label="Change streaks space"
+              data-testid="tenant-module-streaks-space"
+              @click="openStreaksSpaceWorkflow"
+            >
+              Change
+            </button>
           </span>
-          <span class="tenant-settings-list-status">Not configured</span>
-        </span>
-      </button>
-
-      <p v-if="aiSuccess" class="section-note" role="status">{{ aiSuccess }}</p>
-    </StaticPageSection>
-
-    <StaticPageSection title="Localization">
-      <div class="static-page-tile-grid static-page-record-grid tenant-settings-list-grid">
-        <button
-          type="button"
-          class="static-page-tile static-page-record-tile static-page-list-tile"
-          data-testid="tenant-module-timezone"
-          @click="openTimezoneWorkflow"
-        >
-          <span class="tenant-settings-list-row">
-            <span class="tenant-settings-list-main">
-              <span class="static-page-tile-title static-page-list-tile__title">Timezone</span>
-            </span>
-            <span class="tenant-settings-list-status">{{ tenantTimezoneSummary }}</span>
-          </span>
-        </button>
-        <button
-          type="button"
-          class="static-page-tile static-page-record-tile static-page-list-tile"
-          data-testid="tenant-module-streaks-space"
-          @click="openStreaksSpaceWorkflow"
-        >
-          <span class="tenant-settings-list-row">
-            <span class="tenant-settings-list-main">
-              <span class="static-page-tile-title static-page-list-tile__title">Streaks space</span>
-            </span>
-            <span class="tenant-settings-list-status">{{ streaksSpaceSummary }}</span>
-          </span>
-        </button>
-      </div>
-      <p v-if="timezoneWorkflowSuccess" class="section-note" role="status">{{ timezoneWorkflowSuccess }}</p>
-      <p v-if="streaksWorkflowSuccess" class="section-note" role="status">{{ streaksWorkflowSuccess }}</p>
-    </StaticPageSection>
-
-    <StaticPageSection title="Operations">
-      <div class="static-page-tile-grid static-page-record-grid tenant-settings-list-grid">
-        <button
-          type="button"
-          class="static-page-tile static-page-record-tile static-page-list-tile"
-          data-testid="tenant-module-notifications"
-          @click="openNotificationWorkflow"
-        >
-          <span class="tenant-settings-list-row">
-            <span class="tenant-settings-list-main">
-              <span class="static-page-tile-title static-page-list-tile__title">Notifications</span>
-            </span>
-            <span class="tenant-settings-list-status">{{ notificationSummary }}</span>
-          </span>
-        </button>
-        <!-- DAR-BE-160. Versions of this tenant's audit config, and restoring one. -->
-        <button
-          type="button"
-          class="static-page-tile static-page-record-tile static-page-list-tile"
-          data-testid="tenant-module-config-history"
-          @click="router.push({ name: 'settings-tenant-config-history' })"
-        >
-          <span class="tenant-settings-list-row">
-            <span class="tenant-settings-list-main">
-              <span class="static-page-tile-title static-page-list-tile__title">Config history</span>
-            </span>
-            <span class="tenant-settings-list-status">Versions</span>
-          </span>
-        </button>
-        <!-- DAR-BE-164. This tenant's JEXL scripts. -->
-        <button
-          type="button"
-          class="static-page-tile static-page-record-tile static-page-list-tile"
-          data-testid="tenant-module-scripts"
-          @click="router.push({ name: 'settings-tenant-scripts' })"
-        >
-          <span class="tenant-settings-list-row">
-            <span class="tenant-settings-list-main">
-              <span class="static-page-tile-title static-page-list-tile__title">Scripts</span>
-            </span>
-            <span class="tenant-settings-list-status">JEXL</span>
-          </span>
-        </button>
-      </div>
+        </li>
+      </ul>
       <p v-if="notificationWorkflowSuccess" class="section-note" role="status">{{ notificationWorkflowSuccess }}</p>
+      <p v-if="streaksWorkflowSuccess" class="section-note" role="status">{{ streaksWorkflowSuccess }}</p>
       <!-- Rendered on the PAGE, not only inside the popup. The Slack callback returns the admin here
            with no popup open, so a failure reported only in the workflow panel would be invisible —
            a refused authorisation would look exactly like nothing having happened. -->
@@ -144,6 +68,85 @@
         :message="notificationWorkflowError"
         data-testid="tenant-notification-page-error"
       />
+    </StaticPageSection>
+
+    <StaticPageSection title="Time" data-testid="tenant-section-time">
+      <ul class="tenant-settings-rows">
+        <li class="tenant-settings-row">
+          <span class="tenant-settings-row__label">Timezone</span>
+          <span class="tenant-settings-row__value">{{ tenantTimezoneSummary }}</span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              aria-label="Change tenant timezone"
+              data-testid="tenant-module-timezone"
+              @click="openTimezoneWorkflow"
+            >
+              Change
+            </button>
+          </span>
+        </li>
+      </ul>
+      <p v-if="timezoneWorkflowSuccess" class="section-note" role="status">{{ timezoneWorkflowSuccess }}</p>
+    </StaticPageSection>
+
+    <StaticPageSection title="Audit" data-testid="tenant-section-audit">
+      <ul class="tenant-settings-rows">
+        <!-- DAR-BE-160. Versions of this tenant's audit config, and restoring one. -->
+        <li class="tenant-settings-row">
+          <span class="tenant-settings-row__label">Config history</span>
+          <span class="tenant-settings-row__value tenant-settings-row__dim">Versions and restores</span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              aria-label="Open config history"
+              data-testid="tenant-module-config-history"
+              @click="router.push({ name: 'settings-tenant-config-history' })"
+            >
+              Open <span aria-hidden="true">→</span>
+            </button>
+          </span>
+        </li>
+        <!-- DAR-BE-164. This tenant's JEXL scripts. -->
+        <li class="tenant-settings-row">
+          <span class="tenant-settings-row__label">Scripts</span>
+          <span class="tenant-settings-row__value tenant-settings-row__dim">JEXL used by checks</span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              aria-label="Open scripts"
+              data-testid="tenant-module-scripts"
+              @click="router.push({ name: 'settings-tenant-scripts' })"
+            >
+              Open <span aria-hidden="true">→</span>
+            </button>
+          </span>
+        </li>
+      </ul>
+    </StaticPageSection>
+
+    <StaticPageSection v-if="canManageGlobalSettings" title="AI" data-testid="tenant-section-ai">
+      <p v-if="aiLoading" class="section-note">Loading AI provider settings...</p>
+      <InlineValidation v-else-if="aiError" tone="error" :message="aiError" />
+      <ul v-else-if="selectedAiProvider" class="tenant-settings-rows" data-testid="tenant-ai-providers">
+        <li class="tenant-settings-row">
+          <span class="tenant-settings-row__label">Provider</span>
+          <span class="tenant-settings-row__value">
+            {{ selectedAiProvider.label }}<span class="tenant-settings-row__dim"> · {{ selectedAiProvider.llmModel || 'Model not set' }} · {{ providerSummary(selectedAiProvider) }}</span>
+          </span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              aria-label="Edit AI provider"
+              data-testid="tenant-ai-provider-tile"
+              @click="openAiProviderWorkflow"
+            >
+              Edit
+            </button>
+          </span>
+        </li>
+      </ul>
+      <p v-if="aiSuccess" class="section-note" role="status">{{ aiSuccess }}</p>
     </StaticPageSection>
   </StaticPageFrame>
 
@@ -610,7 +613,7 @@ import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReferenceDataStore } from '../../stores/referenceData'
 import { buildTimezoneOptions } from '../../lib/timezones'
-import { countLabel, normalizeStringOrEmpty } from '../../lib/utils/strings'
+import { normalizeStringOrEmpty } from '../../lib/utils/strings'
 import { useTenantSettingsPopup } from '../../composables/useActivePopup'
 
 type LlmProvider = 'OPENAI' | 'GEMINI'
@@ -782,12 +785,12 @@ const streaksWorkflowError = ref<string | null>(null)
 const streaksWorkflowSuccess = ref<string | null>(null)
 const streaksWorkflowSaving = ref(false)
 // An in-flight fetch leaves `chatSpaces` empty, which is indistinguishable from "loaded and
-// genuinely empty" unless the loading flag is consulted here. Asserting "Not configured" during
-// the load window renders a definitive claim that is simply wrong, then flips once the fetch
-// lands — so hold a neutral placeholder until there is an answer to report.
+// genuinely empty" unless the loading flag is consulted here. Asserting "None" during the load
+// window renders a definitive claim that is simply wrong, then flips once the fetch lands — so
+// hold a neutral placeholder until there is an answer to report.
 const notificationSummary = computed(() => {
   if (chatSpacesLoading.value) return '—'
-  return chatSpaces.value.length > 0 ? countLabel(chatSpaces.value.length, 'space') : 'Not configured'
+  return chatSpaces.value.length > 0 ? String(chatSpaces.value.length) : 'None'
 })
 const notificationWorkflowError = ref<string | null>(null)
 const notificationWorkflowSuccess = ref<string | null>(null)
@@ -883,13 +886,22 @@ const activeChatSpaceId = computed<string | null>(() => {
 const activeChatSpace = computed<TenantChatSpace | null>(() => (
   chatSpaces.value.find((space) => space.chatSpaceId === activeChatSpaceId.value) ?? null
 ))
+function chatSpaceProduct(space: TenantChatSpace): string {
+  return space.chatProviderLabel || 'Google Chat'
+}
 function chatSpaceStatusLabel(space: TenantChatSpace): string {
   // The provider is the useful half of this line now that a tenant can have both kinds: two spaces
   // both reading "Configured" gives no way to tell which one posts where.
   const delivery = space.deliveryMode === 'SLACK_BOT' ? 'bot' : space.deliveryMode === 'WEBHOOK' ? 'webhook' : ''
-  const provider = [space.chatProviderLabel || 'Google Chat', delivery].filter(Boolean).join(' · ')
+  const provider = [chatSpaceProduct(space), delivery].filter(Boolean).join(' · ')
   if (!space.webhookConfigured) return `${provider} — not configured`
   return space.isActive === 'N' ? `${provider} — disabled` : provider
+}
+// "gets streaks" follows streaksSpaceSummary: a deactivated choice reads back as unset, so it is
+// claimed only on an active space.
+function chatSpaceRowValue(space: TenantChatSpace): string {
+  const getsStreaks = space.chatSpaceId === savedStreaksChatSpaceId.value && space.isActive !== 'N'
+  return getsStreaks ? `${chatSpaceProduct(space)} · gets streaks` : chatSpaceProduct(space)
 }
 const chatSpaceListOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
   const options: Array<{ value: string; label: string; description?: string }> = chatSpaces.value.map((space) => ({
@@ -1803,3 +1815,84 @@ onMounted(() => {
   consumeSlackReturn()
 })
 </script>
+
+<style scoped>
+/* One bordered list per group: label | value | actions, every row the same minimum height. */
+.tenant-settings-rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--static-tile-border);
+  border-radius: var(--static-surface-radius);
+  background: var(--static-tile-bg);
+}
+
+.tenant-settings-row {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--static-tile-text-size);
+}
+
+.tenant-settings-row + .tenant-settings-row {
+  border-top: 1px solid var(--static-tile-border);
+}
+
+.tenant-settings-row__label,
+.tenant-settings-row__name,
+.tenant-settings-row__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A chat space sits under Spaces. Its name is this tenant's data, so it is not a *label* class
+   the mascot would look up in the glossary. */
+.tenant-settings-row--sub .tenant-settings-row__name {
+  padding-left: var(--space-3);
+}
+
+.tenant-settings-row__dim {
+  color: var(--text-dim);
+}
+
+.tenant-settings-row__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.tenant-settings-row__actions button {
+  min-height: 2.2rem;
+  padding: var(--space-0) var(--space-2);
+  font-size: var(--type-label-size);
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .tenant-settings-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'label label'
+      'value actions';
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .tenant-settings-row__label,
+  .tenant-settings-row__name {
+    grid-area: label;
+  }
+
+  .tenant-settings-row__value {
+    grid-area: value;
+  }
+
+  .tenant-settings-row__actions {
+    grid-area: actions;
+  }
+}
+</style>
