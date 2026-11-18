@@ -140,6 +140,9 @@ import type {
   SaveTenantSettingsResponse,
   SaveUserNotificationDefaultResponse,
   SaveUserSettingsResponse,
+  GetNotificationRoutesResponse,
+  SetNotificationRouteResponse,
+  SendChatSpaceTestResponse,
   SaveShopifyAuthConfigResponse,
   TestSourceConnectionResponse,
   SubscribeRunNotificationResponse,
@@ -247,6 +250,8 @@ import type {
   SaveTenantSettingsPayload,
   SaveUserNotificationDefaultPayload,
   SaveUserSettingsPayload,
+  SetNotificationRoutePayload,
+  SendChatSpaceTestPayload,
   StoreSourceConfigEndpointAccessPayload,
   SubscribeRunNotificationPayload,
   UnsubscribeRunNotificationPayload,
@@ -336,6 +341,9 @@ const SETTINGS = {
   disconnectSlackWorkspace: 'facade.SlackFacadeServices.disconnect#SlackWorkspace',
   getUserNotificationDefault: 'facade.SettingsFacadeServices.get#UserNotificationDefault',
   saveUserNotificationDefault: 'facade.SettingsFacadeServices.save#UserNotificationDefault',
+  getNotificationRoutes: 'facade.SettingsFacadeServices.get#NotificationRoutes',
+  setNotificationRoute: 'facade.SettingsFacadeServices.set#NotificationRoute',
+  sendChatSpaceTest: 'facade.SettingsFacadeServices.send#ChatSpaceTest',
   listSftpServers: 'facade.SettingsFacadeServices.list#SftpServers',
   saveSftpServer: 'facade.SettingsFacadeServices.save#SftpServer',
   listNsAuthConfigs: 'facade.SettingsFacadeServices.list#NsAuthConfigs',
@@ -590,6 +598,16 @@ export const settingsFacade = {
   },
   saveUserNotificationDefault(payload: SaveUserNotificationDefaultPayload, signal?: AbortSignal): Promise<SaveUserNotificationDefaultResponse> {
     return callService<SaveUserNotificationDefaultResponse>(SETTINGS.saveUserNotificationDefault, payload, signal)
+  },
+  /** DAR-UI-123. The notifications grid: the tenant's spaces and where each thing that posts to chat posts. */
+  getNotificationRoutes(signal?: AbortSignal): Promise<GetNotificationRoutesResponse> {
+    return callService<GetNotificationRoutesResponse>(SETTINGS.getNotificationRoutes, {}, signal)
+  },
+  setNotificationRoute(payload: SetNotificationRoutePayload, signal?: AbortSignal): Promise<SetNotificationRouteResponse> {
+    return callService<SetNotificationRouteResponse>(SETTINGS.setNotificationRoute, payload, signal)
+  },
+  sendChatSpaceTest(payload: SendChatSpaceTestPayload, signal?: AbortSignal): Promise<SendChatSpaceTestResponse> {
+    return callService<SendChatSpaceTestResponse>(SETTINGS.sendChatSpaceTest, payload, signal)
   },
   listSftpServers(payload: ListSftpServersPayload, signal?: AbortSignal): Promise<ListSftpServersResponse> {
     return callService<ListSftpServersResponse>(SETTINGS.listSftpServers, payload, signal)

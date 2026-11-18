@@ -372,6 +372,51 @@ export interface SaveUserNotificationDefaultResponse extends ApiEnvelope {
   userNotificationDefault?: UserNotificationDefault
 }
 
+/** DAR-UI-123. The things that post to chat on the notifications grid. */
+export type NotificationSourceType = 'STREAKS' | 'AUDIT_UPDATE' | 'AUTOMATION' | 'SCRIPT'
+
+/** A chat space as get#NotificationRoutes lists it: a TenantChatSpace without its webhook URL. */
+export type NotificationRouteSpace = Pick<
+  TenantChatSpace,
+  | 'chatSpaceId'
+  | 'spaceName'
+  | 'chatProviderEnumId'
+  | 'chatProviderLabel'
+  | 'slackChannelName'
+  | 'deliveryMode'
+  | 'webhookConfigured'
+  | 'isActive'
+>
+
+/** One row of the notifications grid: one thing that posts to chat and the one space it posts to. */
+export interface NotificationRoute {
+  sourceType: NotificationSourceType
+  /** null for STREAKS; the audit's code (AUDIT_UPDATE); the automationId; the tenantScriptDeploymentId (SCRIPT). */
+  sourceId: string | null
+  /** "Streaks", "<audit name> update", the automation's name, or the script's name. */
+  label: string
+  /** "Daily HH:mm" (daily automation or script), "After each run" (audit update), else null. */
+  when: string | null
+  /** Off its schedule, or the audit's run update is off. Always false for STREAKS. */
+  paused: boolean
+  /** The space it posts to as stored (it may since be switched off); null posts nowhere. */
+  chatSpaceId: string | null
+}
+
+export interface GetNotificationRoutesResponse extends ApiEnvelope {
+  /** The tenant's spaces by name, switched-off ones too. */
+  spaces?: NotificationRouteSpace[]
+  /** Streaks, then each audit update, each automation (paused too, not archived), each deployed script. */
+  routes?: NotificationRoute[]
+}
+
+export interface SetNotificationRouteResponse extends ApiEnvelope {
+  /** The route as saved; absent when refused. */
+  route?: NotificationRoute
+}
+
+export type SendChatSpaceTestResponse = ApiEnvelope
+
 export interface SftpServerRecord {
   sftpServerId: string
   description?: string

@@ -3,7 +3,7 @@
 
 import type { SourceExcludeFilter } from '../sourceExcludeFilters'
 import type { SharedConfigType } from '../sharedConfig'
-import type { ChatProviderId } from './types'
+import type { ChatProviderId, NotificationSourceType } from './types'
 import type { Schemas } from './generated'
 import type { SourceExtractOptions } from './authoringTypes'
 
@@ -109,6 +109,21 @@ export interface DeleteTenantChatSpacePayload {
 
 export interface SaveUserNotificationDefaultPayload {
   chatSpaceId?: string
+}
+
+/**
+ * DAR-UI-123. Moves one source to a space. A blank chatSpaceId posts nowhere (refused for SCRIPT); an AUDIT_UPDATE move
+ * needs a tenant admin.
+ */
+export interface SetNotificationRoutePayload {
+  sourceType: NotificationSourceType
+  /** Omit for STREAKS; the audit's code, the automationId or the tenantScriptDeploymentId otherwise. */
+  sourceId?: string | null
+  chatSpaceId?: string | null
+}
+
+export interface SendChatSpaceTestPayload {
+  chatSpaceId: string
 }
 
 export interface ListSftpServersPayload {
