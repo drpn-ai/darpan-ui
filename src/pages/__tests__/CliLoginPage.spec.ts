@@ -80,6 +80,46 @@ describe('CliLoginPage', () => {
     expect(wrapper.find('[data-testid="cli-login-expires"]').exists()).toBe(true)
   })
 
+  it('names an ADMIN sign-in and warns before the approve control', async () => {
+    getCliLoginRequest.mockResolvedValue({ ...pending, scope: 'ADMIN' })
+    const wrapper = mount(CliLoginPage)
+    await typeCode(wrapper, 'BCDF-GH23')
+    expect(wrapper.get('[data-testid="cli-login-host"]').text()).toBe('darpan-admin on ada-laptop')
+    const warning = wrapper.get('[data-testid="cli-login-admin-warning"]')
+    expect(warning.text()).toBe("This sign-in can use the admin app's powers for 12 hours.")
+    const html = wrapper.html()
+    expect(html.indexOf('cli-login-admin-warning')).toBeLessThan(html.indexOf('cli-login-approve'))
+    expect(wrapper.get('[data-testid="cli-login-approve"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it.each([['TENANT'], [undefined]])('a %s sign-in reads as the Darpan CLI with no admin line', async (scope) => {
+    getCliLoginRequest.mockResolvedValue({ ...pending, scope })
+    const wrapper = mount(CliLoginPage)
+    await typeCode(wrapper, 'BCDF-GH23')
+    expect(wrapper.get('[data-testid="cli-login-host"]').text()).toBe('Darpan CLI on ada-laptop')
+    expect(wrapper.find('[data-testid="cli-login-admin-warning"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(true)
+  })
+
+  it('an unrecognised scope says so and offers no approve control', async () => {
+    getCliLoginRequest.mockResolvedValue({ ...pending, scope: 'ROOT' })
+    const wrapper = mount(CliLoginPage)
+    await typeCode(wrapper, 'BCDF-GH23')
+    expect(wrapper.get('[data-testid="cli-login-unknown-scope"]').text())
+      .toBe('This sign-in asks for access Darpan does not recognise. Do not approve it.')
+    expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(false)
+  })
+
+  it.each([['?code=ABCD-EFGH', ''], ['', '#ABCD-EFGH']])('never reads a code from the route (%s%s)', async (search, hash) => {
+    window.history.replaceState(null, '', `/cli-login${search}${hash}`)
+    route.query = search ? { code: 'ABCD-EFGH' } : {}
+    const wrapper = mount(CliLoginPage)
+    await flushPromises()
+    expect((wrapper.get('[data-testid="cli-login-code"]').element as HTMLInputElement).value).toBe('')
+    expect(getCliLoginRequest).not.toHaveBeenCalled()
+    window.history.replaceState(null, '', '/')
+  })
+
   it('omits the start line when the backend gives no start time', async () => {
     getCliLoginRequest.mockResolvedValue({ ...pending, createdDate: undefined })
     const wrapper = mount(CliLoginPage)

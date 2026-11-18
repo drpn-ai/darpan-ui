@@ -116,7 +116,7 @@ const permissionsShape = {
       authState.sessionInfo.canEditActiveTenantData === true ||
       authState.sessionInfo.isSuperAdmin === true,
     canEditTenantSettings: authState.sessionInfo.canEditActiveTenantData === true,
-    canManageGlobalSettings: authState.sessionInfo.canManageDarpanCore === true,
+    get canManageGlobalSettings() { return authState.sessionInfo.canManageDarpanCore === true },
 }
 
 vi.mock('../../../stores/auth', () => ({
@@ -447,6 +447,17 @@ describe('UserSettingsPage', () => {
     [[], 'No membership'],
   ])('names the permission groups %j as %s', (groupIds, label) => {
     authState.sessionInfo = { ...authState.sessionInfo, activeTenantPermissionGroupIds: groupIds }
+    const card = mountPage().findAll('.static-page-summary-card')
+      .find((node) => node.find('.static-page-summary-label').text() === 'Permissions')
+    expect(card?.text()).toBe(`Permissions${label}`)
+  })
+
+  // DAR-BE-295/296: a super admin also holds canManageDarpanCore, so the widest role is named first.
+  it.each([
+    [{ isSuperAdmin: true, canManageDarpanCore: true }, 'Super admin'],
+    [{ isSuperAdmin: false, canManageDarpanCore: true }, 'Darpan admin'],
+  ])('names the platform role %j as %s', (flags, label) => {
+    authState.sessionInfo = { ...authState.sessionInfo, ...flags }
     const card = mountPage().findAll('.static-page-summary-card')
       .find((node) => node.find('.static-page-summary-label').text() === 'Permissions')
     expect(card?.text()).toBe(`Permissions${label}`)

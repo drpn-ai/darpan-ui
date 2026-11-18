@@ -19,7 +19,7 @@
       <template v-else-if="phase === 'ready'">
         <article class="static-page-summary-card">
           <span class="static-page-summary-label">Sign-in request</span>
-          <span data-testid="cli-login-host">Darpan CLI on {{ hostLabel }}</span>
+          <span data-testid="cli-login-host">{{ scope === 'ADMIN' ? 'darpan-admin' : 'Darpan CLI' }} on {{ hostLabel }}</span>
           <span class="section-note">That is the name the CLI gave. Darpan has not checked it.</span>
           <template v-if="startedLabel">
             <span v-explain="'cliCodeStarted'" class="static-page-summary-label">Started</span>
@@ -28,60 +28,66 @@
           <span v-explain="'cliCodeExpires'" class="static-page-summary-label">Expires</span>
           <span data-testid="cli-login-expires">{{ expiresLabel }}</span>
         </article>
+        <p v-if="scope === 'ADMIN'" class="section-note" role="alert" data-testid="cli-login-admin-warning">This sign-in can use the admin app's powers for 12 hours.</p>
         <p class="section-note">Approve only a code you just started in your own terminal.</p>
-        <!-- DAR-BE-264: approving mints a 7-day key, so a two-factor account proves it with a fresh code. A code
+        <p v-if="!scopeKnown" class="section-note" role="alert" data-testid="cli-login-unknown-scope">
+          This sign-in asks for access Darpan does not recognise. Do not approve it.
+        </p>
+        <template v-if="scopeKnown">
+          <!-- DAR-BE-264: approving mints a 7-day key, so a two-factor account proves it with a fresh code. A code
              already used to sign in is refused for 30 s, so the label asks for a current one. DAR-BE-270: or a passkey,
              whose prompt opens from Approve. -->
-        <label v-if="needsTwoFactorCode && proof.mode.value === 'code'" for="cli-login-two-factor">
-          <span>Current code from your app</span>
-          <input
-            id="cli-login-two-factor"
-            v-model="twoFactorCode"
-            name="twoFactorCode"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            maxlength="6"
-            spellcheck="false"
-            data-testid="cli-login-two-factor-code"
-          />
-        </label>
-        <p v-if="needsTwoFactorCode && proof.mode.value === 'passkey'" class="section-note" data-testid="cli-login-passkey-note">
-          Approve opens your passkey prompt.
-        </p>
-        <!-- Their only factor is a passkey and this browser cannot use one: never ask them for an app code. -->
-        <p v-if="noProofHere" class="section-note" role="alert" data-testid="cli-login-no-proof">
-          {{ PASSKEYS_UNSUPPORTED_TEXT }} {{ PASSKEY_BROWSER_NEEDED_TEXT }}
-        </p>
-        <button
-          v-if="needsTwoFactorCode && proof.mode.value === 'code' && proof.offers('passkey')"
-          type="button"
-          class="login-text-link"
-          data-testid="cli-login-use-passkey"
-          :disabled="busy"
-          @click="useProof('passkey')"
-        >
-          Use a passkey
-        </button>
-        <button
-          v-if="needsTwoFactorCode && proof.mode.value === 'passkey' && proof.offers('code')"
-          type="button"
-          class="login-text-link"
-          data-testid="cli-login-use-app"
-          :disabled="busy"
-          @click="useProof('code')"
-        >
-          Use the app code
-        </button>
-        <p v-if="codeError" class="section-note" role="alert" data-testid="cli-login-code-error">{{ codeError }}</p>
-        <div class="cli-login-actions">
-          <button class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
-            Approve
+          <label v-if="needsTwoFactorCode && proof.mode.value === 'code'" for="cli-login-two-factor">
+            <span>Current code from your app</span>
+            <input
+              id="cli-login-two-factor"
+              v-model="twoFactorCode"
+              name="twoFactorCode"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              spellcheck="false"
+              data-testid="cli-login-two-factor-code"
+            />
+          </label>
+          <p v-if="needsTwoFactorCode && proof.mode.value === 'passkey'" class="section-note" data-testid="cli-login-passkey-note">
+            Approve opens your passkey prompt.
+          </p>
+          <!-- Their only factor is a passkey and this browser cannot use one: never ask them for an app code. -->
+          <p v-if="noProofHere" class="section-note" role="alert" data-testid="cli-login-no-proof">
+            {{ PASSKEYS_UNSUPPORTED_TEXT }} {{ PASSKEY_BROWSER_NEEDED_TEXT }}
+          </p>
+          <button
+            v-if="needsTwoFactorCode && proof.mode.value === 'code' && proof.offers('passkey')"
+            type="button"
+            class="login-text-link"
+            data-testid="cli-login-use-passkey"
+            :disabled="busy"
+            @click="useProof('passkey')"
+          >
+            Use a passkey
           </button>
-          <button class="btn-primary" type="button" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
-            Deny
+          <button
+            v-if="needsTwoFactorCode && proof.mode.value === 'passkey' && proof.offers('code')"
+            type="button"
+            class="login-text-link"
+            data-testid="cli-login-use-app"
+            :disabled="busy"
+            @click="useProof('code')"
+          >
+            Use the app code
           </button>
-        </div>
+          <p v-if="codeError" class="section-note" role="alert" data-testid="cli-login-code-error">{{ codeError }}</p>
+          <div class="cli-login-actions">
+            <button class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
+              Approve
+            </button>
+            <button class="btn-primary" type="button" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
+              Deny
+            </button>
+          </div>
+        </template>
       </template>
 
       <form v-else class="stack-md" @submit.prevent="lookUp">
@@ -130,6 +136,9 @@ type Phase = 'enter' | 'ready' | 'done' | 'notfound' | 'noaccess'
 const phase = ref<Phase>('enter')
 const typedCode = ref('')
 const hostLabel = ref('')
+// TENANT or ADMIN; a missing scope (older backend) is TENANT. Anything else is shown as unrecognised, with no approve.
+const scope = ref('TENANT')
+const scopeKnown = computed(() => scope.value === 'TENANT' || scope.value === 'ADMIN')
 const startedLabel = ref('')
 const expiresLabel = ref('')
 const outcome = ref<'approved' | 'denied'>('approved')
@@ -217,6 +226,7 @@ async function lookUp() {
       return
     }
     confirmedCode = userCode
+    scope.value = response.scope ?? 'TENANT'
     hostLabel.value = response.hostLabel ?? 'an unknown computer'
     startedLabel.value = response.createdDate ? formatDateTime(response.createdDate) : ''
     expiresLabel.value = formatDateTime(response.expiresDate)

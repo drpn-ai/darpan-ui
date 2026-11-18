@@ -1248,6 +1248,8 @@ export interface GetCliLoginRequestResponse extends ApiEnvelope {
   status?: 'PENDING' | 'APPROVED' | 'DENIED' | 'EXPIRED'
   expiresDate?: ApiTimestamp
   createdDate?: ApiTimestamp
+  /** DAR-BE-295: TENANT (default) or ADMIN (the darpan-admin CLI); a string so an unknown value is shown, not trusted. */
+  scope?: string
 }
 
 export type ApproveCliLoginResponse = ApiEnvelope

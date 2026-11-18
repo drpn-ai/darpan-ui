@@ -552,8 +552,9 @@ const TENANT_ROLE_LABELS: ReadonlyArray<readonly [string, string]> = [
   ['DARPAN_COMPANY_VIEW_ONLY', 'Company view only'],
 ]
 const permissionSummary = computed(() => {
-  if (permissionsStore.canManageGlobalSettings) return 'Darpan admin'
+  // A super admin also holds canManageDarpanCore, so the widest role is named first.
   if (sessionInfo.value?.isSuperAdmin === true) return 'Super admin'
+  if (permissionsStore.canManageGlobalSettings) return 'Darpan admin'
   const groupIds = sessionInfo.value?.activeTenantPermissionGroupIds ?? []
   return TENANT_ROLE_LABELS.find(([groupId]) => groupIds.includes(groupId))?.[1] ?? 'No membership'
 })
