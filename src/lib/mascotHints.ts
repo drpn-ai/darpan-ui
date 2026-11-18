@@ -1,3 +1,5 @@
+import { dataHints, editFor } from './mascotContentState'
+
 /**
  * What the mascot offers when someone has been on a page a while without doing anything.
  *
@@ -250,7 +252,12 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
  */
 export function hintsFor(routeName: string | null | undefined, root: ParentNode): readonly string[] {
   if (!routeName) return []
-  const hints = MASCOT_HINTS[routeName]
-  if (!hints) return []
-  return hints.filter((hint) => !hint.when || root.querySelector(hint.when) !== null).map((hint) => hint.text)
+  const bundled = (MASCOT_HINTS[routeName] ?? []).flatMap((hint, index) => {
+    const edit = editFor('MASCOT_HINT', `${routeName}.${hint.id}`)
+    if (edit?.hidden) return []
+    return [{ text: edit?.body ?? hint.text, when: hint.when, sequence: (index + 1) * 10 }]
+  })
+  // Data hints join by sequence (a bundled hint's is its position times ten); a tie keeps the bundled one first.
+  const merged = [...bundled, ...dataHints(routeName)].sort((a, b) => a.sequence - b.sequence)
+  return merged.filter((hint) => !hint.when || root.querySelector(hint.when) !== null).map((hint) => hint.text)
 }

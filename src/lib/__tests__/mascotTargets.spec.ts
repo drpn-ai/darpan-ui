@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { applyAppContent, resetMascotContentForTests } from '../mascotContent'
 import { lookupGlossary } from '../mascotGlossary'
 import { resolveExplainTarget } from '../mascotTargets'
 import { formatDateTime } from '../utils/date'
@@ -154,5 +155,26 @@ describe('resolveExplainTarget', () => {
     const host = render('<p>Some prose about differences.</p>')
 
     expect(resolveExplainTarget(host.querySelector('p'))).toBeNull()
+  })
+})
+
+describe('resolveExplainTarget with data entries behind the bundle', () => {
+  afterEach(() => {
+    resetMascotContentForTests()
+    document.body.innerHTML = ''
+  })
+
+  it('answers a bundled label from the bundle even when data claims the same words', () => {
+    applyAppContent([{ kind: 'MASCOT_GLOSSARY', key: 'admin:mine', source: 'ADMIN', title: 'Mine', body: 'is mine.', aliases: ['schedule'] }])
+    const host = render('<dt class="micro-label">Schedule</dt>')
+
+    expect(resolveExplainTarget(host.querySelector('dt'))?.term).toBe('automationSchedule')
+  })
+
+  it('reaches a data term through a counted heading like a bundled one', () => {
+    applyAppContent([{ kind: 'MASCOT_GLOSSARY', key: 'admin:ledger', source: 'ADMIN', title: 'Ledger', body: 'the books side of a run.', aliases: ['ledger lines'] }])
+    const host = render('<h2 class="static-page-section-heading">Ledger lines 12</h2>')
+
+    expect(resolveExplainTarget(host.querySelector('h2'))?.term).toBe('admin:ledger')
   })
 })

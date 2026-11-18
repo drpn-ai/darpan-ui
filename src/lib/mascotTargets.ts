@@ -1,5 +1,6 @@
 import { MASCOT_GLOSSARY } from './mascotGlossary'
 import { lookupAction } from './mascotActions'
+import { dataLabel, editFor } from './mascotContentState'
 import { describeTimeZone } from './utils/date'
 
 /**
@@ -205,11 +206,22 @@ function buildIndex(): Record<string, string> {
 
 const LABEL_INDEX = buildIndex()
 
-function lookupLabel(text: string): string | null {
+/** The bundle alone: the index, then the bundled patterns. What a data entry may never shadow. */
+export function lookupBundledLabel(text: string): string | null {
   const exact = LABEL_INDEX[text]
   if (exact) return exact
   for (const [pattern, term] of LABEL_PATTERNS) if (pattern.test(text)) return term
   return null
+}
+
+/**
+ * Bundled index, bundled patterns, then data aliases and wildcards (DAR-BE-313). A term an admin hid resolves to
+ * nothing, so it is silent rather than stumped.
+ */
+function lookupLabel(text: string): string | null {
+  const term = lookupBundledLabel(text) ?? dataLabel(text)
+  if (!term) return null
+  return editFor('MASCOT_GLOSSARY', term)?.hidden ? null : term
 }
 
 /**

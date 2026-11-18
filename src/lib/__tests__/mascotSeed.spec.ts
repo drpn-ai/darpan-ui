@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { ACTION_PATTERNS, MASCOT_ACTIONS } from '../mascotActions'
 import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { MASCOT_HINTS } from '../mascotHints'
-import { routeAnchors } from '../mascotRouteAnchors'
+import { anchorsIn, routeAnchors } from '../mascotRouteAnchors'
 import { LABEL_ALIASES, normalizeLabel } from '../mascotTargets'
-import { actionPatternKey, hintKey, mascotSeedMark, mascotSeedRows, mascotSeedXml } from '../mascotSeed'
+import { actionPatternKey, assertMatchLabelsFit, hintKey, mascotSeedMark, mascotSeedRows, mascotSeedXml, xmlAttr, type SeedRow } from '../mascotSeed'
 
 const rows = mascotSeedRows()
 const ofKind = (kind: string) => rows.filter((row) => row.contentKind === kind)
@@ -101,5 +101,30 @@ describe('mascotSeedXml', () => {
     const out = process.env['MASCOT_SEED_OUT']
     if (out) writeFileSync(out, xml)
     expect(true).toBe(true)
+  })
+})
+
+describe('anchor sweep', () => {
+  it('readsOnlyTestIdForms', () => {
+    const source = [
+      '<button data-testid="real-one" class="foo-bar">',
+      "<Wizard :primary-test-id=\"ok ? 'wizard-next' : 'wizard-done'\" />",
+      "const spec = { backTestId: ok ? 'wizard-back' : 'wizard-prev', title: 'not-an-anchor' }",
+      "const label = 'some-label' // mentions a test id in passing",
+      "<p :title=\"'also-not'\" data-test-id-doc>see test-id notes 'nor-this'</p>",
+    ].join('\n')
+    expect(anchorsIn(source)).toEqual(['real-one', 'wizard-back', 'wizard-done', 'wizard-next', 'wizard-prev'])
+  })
+})
+
+describe('generator guards', () => {
+  it('escapesTabAndLoneCarriageReturn', () => {
+    expect(xmlAttr('a\tb\rc\r\nd\ne&"<>')).toBe('a&#9;b&#13;c&#10;d&#10;e&amp;&quot;&lt;&gt;')
+  })
+
+  it('refusesMatchLabelsOverTheColumn', () => {
+    const row = (labels: string[]): SeedRow => ({ contentKind: 'MASCOT_GLOSSARY', contentKey: 'longTerm', defaultTitle: 'T', defaultBody: 'b', matchLabels: labels, whereShown: 'x' })
+    expect(() => assertMatchLabelsFit([row(['a'.repeat(255)])])).not.toThrow()
+    expect(() => assertMatchLabelsFit([row(['a'.repeat(200), 'b'.repeat(100)])])).toThrow(/longTerm.*matchLabels.*255/)
   })
 })

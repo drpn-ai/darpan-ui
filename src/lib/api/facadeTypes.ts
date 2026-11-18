@@ -571,3 +571,8 @@ export type DeletePasskeyPayload = Schemas['DeletePasskeyParams']
 export interface RevokeCliSessionPayload {
   cliSessionId: string
 }
+
+// ─── Mascot content (DAR-BE-313) ─────────────────────────────────────────────
+
+/** The mascot entries an admin edited, hid or created; `version` is null when none are served. */
+export type GetAppContentResponse = Schemas['GetAppContentResult']

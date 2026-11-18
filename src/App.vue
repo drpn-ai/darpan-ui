@@ -69,6 +69,8 @@ import { useReconciliationDraftStore } from './stores/reconciliationDraft'
 import { setAuthRequiredHandler, type AuthRequiredDetail } from './lib/api/client'
 import { handleAuthExpiry } from './lib/api/sessionExpiry'
 import { shouldAbortWorkflowOnEscape } from './lib/keyboard'
+import { contentFacade } from './lib/api/facade'
+import { loadMascotContent } from './lib/mascotContent'
 import { useTheme } from './composables/useTheme'
 import { useCommandPalette } from './composables/useCommandPalette'
 import {
@@ -608,6 +610,15 @@ function announceDeepLinkTenantSwitch(): void {
   // the reader is seeing for the first time.
   showWorkflowHint(tenantSwitchNotice(tenantLabel), { durationMs: 6000 })
 }
+
+// DAR-BE-313: the mascot's edited and admin-made words, once per tab. A failed read leaves the bundle as it is.
+watch(
+  () => authStore.authenticated,
+  (authenticated) => {
+    if (authenticated) void loadMascotContent(() => contentFacade.getAppContent())
+  },
+  { immediate: true },
+)
 
 watch(activeTenantUserGroupId, () => {
   commandPalette.clearCommandData()

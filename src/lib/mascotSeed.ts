@@ -13,8 +13,9 @@ import { MASCOT_GLOSSARY } from './mascotGlossary'
 import { MASCOT_HINTS } from './mascotHints'
 import { LABEL_ALIASES, LABEL_PATTERNS, normalizeLabel } from './mascotTargets'
 import { routeAnchors } from './mascotRouteAnchors'
+import { actionPatternKey, hintKey, type AppContentKind } from './mascotContent'
 
-export type AppContentKind = 'MASCOT_GLOSSARY' | 'MASCOT_ACTION' | 'MASCOT_HINT'
+export { actionPatternKey, hintKey, type AppContentKind }
 
 export interface SeedRow {
   contentKind: AppContentKind
@@ -26,14 +27,6 @@ export interface SeedRow {
   anchorTestId?: string
   defaultSequence?: number
   whereShown: string
-}
-
-export function hintKey(route: string, hint: { id: string }): string {
-  return `${route}.${hint.id}`
-}
-
-export function actionPatternKey(re: RegExp): string {
-  return `pattern:${re.source}`
 }
 
 const ANCHOR_SELECTOR = /^\[data-testid="([^"]+)"\]$/
@@ -91,12 +84,22 @@ export function mascotSeedRows(): SeedRow[] {
     .sort((a, b) => a.contentKind.localeCompare(b.contentKind) || a.contentKey.localeCompare(b.contentKey))
 }
 
-function esc(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\r?\n/g, '&#10;')
+/** An XML attribute value. Tab, CR and LF are escaped as references, or a parser normalises them to a space. */
+export function xmlAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/\t/g, '&#9;').replace(/\r\n|\n/g, '&#10;').replace(/\r/g, '&#13;')
+}
+
+/** `matchLabels` is a text-medium column of 255 characters; a longer join would fail the load, so fail the generation. */
+export function assertMatchLabelsFit(rows: readonly SeedRow[]): void {
+  for (const row of rows) {
+    const length = row.matchLabels.join('|').length
+    if (length > 255) throw new Error(`Seed row ${row.contentKind} ${row.contentKey}: matchLabels is ${length} characters, over the 255 the column holds. Shorten or drop an alias.`)
+  }
 }
 
 function attrs(pairs: [string, string | number | undefined][]): string {
-  return pairs.filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}="${esc(String(v))}"`).join(' ')
+  return pairs.filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}="${xmlAttr(String(v))}"`).join(' ')
 }
 
 /**
@@ -120,7 +123,9 @@ export function mascotSeedXml(): string {
     '         Sets only the default* columns, matchLabels, the hint binding, whereShown and seedMark, so a release never overwrites an admin edit (title, body, aliases, hidden). -->',
   ]
   lines.push(`    <darpan.content.AppContentSeed ${attrs([['seedId', 'CURRENT'], ['seedMark', seedMark]])}/>`)
-  for (const row of mascotSeedRows()) {
+  const seedRows = mascotSeedRows()
+  assertMatchLabelsFit(seedRows)
+  for (const row of seedRows) {
     lines.push(`    <darpan.content.AppContentEntry ${attrs([
       ['contentKind', row.contentKind], ['contentKey', row.contentKey], ['source', 'SEED'], ['seedMark', seedMark],
       ['defaultTitle', row.defaultTitle ?? undefined], ['defaultBody', row.defaultBody], ['matchLabels', row.matchLabels.join('|')],

@@ -256,6 +256,7 @@ import type {
   SubscribeRunNotificationPayload,
   UnsubscribeRunNotificationPayload,
   CancelReconciliationRunPayload,
+  GetAppContentResponse,
   ValidateJsonTextPayload,
   VerifyOwnPasswordPayload,
 } from './facadeTypes'
@@ -829,6 +830,18 @@ export const scriptFacade = {
   /** send=false (default) previews the message; send=true posts it and records the run. */
   runTenantScriptDeployment(payload: { tenantScriptDeploymentId: string; send?: boolean }, signal?: AbortSignal): Promise<RunTenantScriptDeploymentResponse> {
     return callService<RunTenantScriptDeploymentResponse>(SCRIPT.runTenantScriptDeployment, payload, signal)
+  },
+}
+
+// DAR-BE-313. The mascot's words an admin edited or added, read once per tab behind the bundled ones.
+const CONTENT = {
+  getAppContent: 'facade.AppContentFacadeServices.get#AppContent',
+}
+
+export const contentFacade = {
+  /** Global product copy, no tenant: answers any signed-in user. The app keeps its bundle if this fails. */
+  getAppContent(signal?: AbortSignal): Promise<GetAppContentResponse> {
+    return callService<GetAppContentResponse>(CONTENT.getAppContent, {}, signal)
   },
 }
 

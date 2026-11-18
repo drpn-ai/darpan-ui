@@ -1,4 +1,5 @@
 import { lookupAction } from './mascotActions'
+import { adminGlossaryEntry, editFor } from './mascotContentState'
 
 /**
  * What the mascot is allowed to explain.
@@ -925,5 +926,13 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
  */
 export function lookupGlossary(term: string | null | undefined): GlossaryEntry | null {
   if (!term) return null
-  return MASCOT_GLOSSARY[term] ?? lookupAction(term)
+  const bundled = MASCOT_GLOSSARY[term]
+  if (bundled) {
+    // An admin's edit replaces the words, never what is recognised; hiding makes the term unknown (silent).
+    const edit = editFor('MASCOT_GLOSSARY', term)
+    if (!edit) return bundled
+    if (edit.hidden) return null
+    return { ...bundled, title: edit.title ?? bundled.title, body: edit.body ?? bundled.body }
+  }
+  return adminGlossaryEntry(term) ?? lookupAction(term)
 }

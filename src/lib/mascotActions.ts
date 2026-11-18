@@ -18,6 +18,8 @@
  * so the registry needs no ids of its own and a renamed button fails the coverage test in
  * mascotActions.spec.ts rather than going quietly dead.
  */
+import { dataAction, editFor } from './mascotContentState'
+
 export interface ActionEntry {
   /** The control's own name, as the bubble leads with it. */
   title: string
@@ -983,10 +985,31 @@ export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Obje
   }],
 ] as const)
 
-export function lookupAction(name: string | null | undefined): ActionEntry | null {
+/** The registries only: no data, no edits. What the bundle itself answers, which is what a data entry may never shadow. */
+export function lookupBundledAction(name: string | null | undefined): ActionEntry | null {
   if (!name) return null
   const direct = MASCOT_ACTIONS[name]
   if (direct) return direct
   for (const [pattern, entry] of ACTION_PATTERNS) if (pattern.test(name)) return entry
   return null
+}
+
+/** An admin's edit of a bundled entry replaces its words; hiding it makes the control unknown (silent, not stumped). */
+function edited(key: string, entry: ActionEntry): ActionEntry | null {
+  const edit = editFor('MASCOT_ACTION', key)
+  if (!edit) return entry
+  if (edit.hidden) return null
+  return { title: edit.title ?? entry.title, body: edit.body ?? entry.body }
+}
+
+/**
+ * Bundled direct name, then the bundled patterns, then data names, then data wildcards (DAR-BE-313), so data can
+ * only answer a control the bundle does not. Edits and hiding apply to the bundled entry that answered.
+ */
+export function lookupAction(name: string | null | undefined): ActionEntry | null {
+  if (!name) return null
+  const direct = MASCOT_ACTIONS[name]
+  if (direct) return edited(name, direct)
+  for (const [pattern, entry] of ACTION_PATTERNS) if (pattern.test(name)) return edited(`pattern:${pattern.source}`, entry)
+  return dataAction(name)
 }

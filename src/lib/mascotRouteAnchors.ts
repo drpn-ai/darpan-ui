@@ -6,8 +6,8 @@
  * has no browser to ask. NEVER imported by app code; it uses node fs and exists for Vitest only.
  *
  * An anchor is a static `data-testid="…"` in the route's page or in a `.vue` / `use*.ts` file the
- * page imports directly, plus a kebab literal on a line that sets a test id by prop or
- * composable (`:primary-test-id="… : 'wizard-next'"`), because that is how the wizards bind theirs.
+ * page imports directly, plus a kebab literal where a test id is set by prop or composable
+ * (`:primary-test-id="… : 'wizard-next'"`, `primaryTestId: … 'wizard-next'`), because that is how the wizards bind theirs.
  */
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -41,12 +41,13 @@ export function sourceFor(entry: string): string {
   return [page, ...texts].join('\n')
 }
 
-function anchorsIn(source: string): string[] {
+export function anchorsIn(source: string): string[] {
   const found = new Set<string>()
   for (const m of source.matchAll(/(?<![:\w-])(?:data-testid|[a-z-]*test-id)="([^"{}$]+)"/g)) if (m[1]) found.add(m[1])
-  for (const line of source.split('\n')) {
-    if (!/test-?id/i.test(line)) continue
-    for (const m of line.matchAll(/'([a-z0-9]+(?:-[a-z0-9]+)+)'/g)) if (m[1]) found.add(m[1])
+  // A kebab literal only where a test id is being set: `fooTestId: cond ? 'a-b' : 'c-d'`, `const fooTestId = cond ? 'a-b' : 'c-d'`, or a bound `:foo-test-id="…"` / `:data-testid="…"`.
+  // Any other quoted word on a line that merely mentions a test id is not an anchor.
+  for (const m of source.matchAll(/[A-Za-z]*[Tt]estId\s*[:=]([^,}\n]*)|:(?:data-testid|[a-z-]*test-id)\s*=\s*"([^"]*)"/g)) {
+    for (const literal of (m[1] ?? m[2] ?? '').matchAll(/'([a-z0-9]+(?:-[a-z0-9]+)+)'/g)) if (literal[1]) found.add(literal[1])
   }
   return [...found].sort()
 }
