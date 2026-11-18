@@ -131,7 +131,7 @@ describe('every button in the app has an answer', () => {
    */
   const COMPUTED_NAMES: Readonly<Record<string, string>> = {
     'components/ui/AppCancelAction.vue': "label prop, default 'Cancel' — the entry answers it",
-    'components/ui/AppSaveAction.vue': "label prop, default 'Save'; callers pass Save rule / Save exclusion / Save user settings",
+    'components/ui/AppSaveAction.vue': "label prop, default 'Save'; callers pass Save rule / Save exclusion",
     'components/ui/AppToggleSwitch.vue': 'label prop; the automation running/paused pair is entered',
     'components/ui/JsonCollapseNode.vue': 'toggleLabel builds "Expand <name> object" — the expand/collapse pattern answers it',
     'components/ui/AppSelect.vue': 'the trigger shows the selected value and each option IS a value, not vocabulary',
@@ -145,7 +145,6 @@ describe('every button in the app has an answer', () => {
     'components/workflow/WorkflowShortcutChoiceCards.vue': 'a choice card is named by the choice, which is data',
     'pages/reconciliation/ReconciliationRunResultPage.vue': 'the rule-selector option is a rule name and the diff bucket is answered through its own label span',
     'pages/reconciliation/ReconciliationDiffPage.vue': 'a calendar cell is a date',
-    'pages/settings/UserSettingsPage.vue': 'a tenant tile is named by the tenant',
     'pages/settings/TenantSettingsPage.vue': 'the AI tile is named by the selected provider',
     'components/reconciliation/RunFlowchartBoard.vue': 'a question box and an openable finding are named by their question and finding, which are data; the + buttons are entered',
     'components/audit/AuditColumns.vue': 'the drill-down rows, breadcrumb steps and cause-group toggles are named by the audit\'s own categories, statements, checks, findings and causes; its icon actions and retries are entered',

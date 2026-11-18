@@ -543,6 +543,27 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Change password',
     body: 'sets a new one for this account. Other sessions stay signed in until they expire on their own.',
   },
+  // DAR-UI-121: User Settings, profile first.
+  'rename display name': {
+    title: 'Rename',
+    body: 'puts the caret in your name. Enter or clicking away saves it, Esc keeps the old one; your username and sign-in stay as they are.',
+  },
+  'switch tenant': {
+    title: 'Switch',
+    body: 'opens Ask Darpan already at /switch-tenant. A company picked there moves every open tab with it; no data in either company changes.',
+  },
+  'change timezone': {
+    title: 'Change',
+    body: 'picks the zone times show in, for you alone. Cleared, it falls back to the tenant\u2019s zone, then this browser\u2019s; stored times never move.',
+  },
+  'change notifications': {
+    title: 'Change',
+    body: 'picks the chat space your own notifications go to. The tenant\u2019s spaces and everyone else\u2019s choice stay as they are.',
+  },
+  'manage passkeys': {
+    title: 'Manage',
+    body: 'lists your passkeys to rename or remove. A name needs no proof; removing one asks for a current code or passkey first.',
+  },
   // DAR-UI-120: the sign-in page's passkey links.
   'use a passkey or security key': {
     title: 'Use a passkey or security key',
@@ -609,14 +630,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   'save filter': {
     title: 'Save filter',
     body: 'the source changes what it fetches from the next run. Finished runs keep whatever they compared.',
-  },
-  'save user settings': {
-    title: 'Save user settings',
-    body: 'writes your own preferences — zone, notifications — and touches nothing the rest of the tenant sees.',
-  },
-  'saving user settings': {
-    title: 'Saving user settings',
-    body: 'the write is in flight. Nothing else on the page is affected while it lands.',
   },
   'automation is running': {
     title: 'Automation is running',

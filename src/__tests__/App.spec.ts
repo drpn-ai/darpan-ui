@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { useMascotStore } from '../stores/mascot'
 import { installLocalStorageStub } from '../test/localStorage'
-import { DISMISS_INLINE_MENUS_EVENT, WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../lib/uiEvents'
+import { COMMAND_PALETTE_OPEN_REQUEST_EVENT, DISMISS_INLINE_MENUS_EVENT, WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../lib/uiEvents'
 
 const ensureAuthenticated = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const logoutSession = vi.hoisted(() => vi.fn().mockResolvedValue(true))
@@ -131,6 +131,10 @@ vi.mock('../components/shell/CommandPalette.vue', () => ({
         default: () => [],
       },
       dataSearchLoading: Boolean,
+      initialQuery: {
+        type: String,
+        default: '',
+      },
     },
     template: `
       <div data-testid="command-palette-stub">
@@ -363,6 +367,18 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
       ],
       activeTenantUserGroupId: 'GORJANA',
     })
+  })
+
+  // DAR-UI-121: User Settings' Switch asks for the same palette the bow opens, already at /switch-tenant.
+  it('opens Ask Darpan at the query a page asks for', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'CommandPalette' }).exists()).toBe(false)
+
+    document.dispatchEvent(new CustomEvent(COMMAND_PALETTE_OPEN_REQUEST_EVENT, { detail: { initialQuery: '/switch-tenant ' } }))
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'CommandPalette' }).props('initialQuery')).toBe('/switch-tenant ')
   })
 
   it('switches the active company when /switch-tenant runs, and says so', async () => {

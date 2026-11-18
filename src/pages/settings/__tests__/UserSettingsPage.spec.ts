@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
-import { WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
+import { COMMAND_PALETTE_OPEN_REQUEST_EVENT, WORKFLOW_CANCEL_REQUEST_EVENT, WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
 
 type TestSessionInfo = {
   userId: string
@@ -254,72 +254,128 @@ describe('UserSettingsPage', () => {
     expect(wrapper.find('.static-page-hero h1').text()).toBe('User Settings')
     expect(wrapper.find('.static-page-hero .static-page-section-description').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Manage account, tenant context, and personal execution settings')
+    // DAR-UI-121 profile first: the badge leads, untitled, then the three titled groups.
     expect(wrapper.findAll('.static-page-section-heading').map((node) => node.text())).toEqual([
-      'Account',
-      'Two-factor',
-      'Tenant Context',
       'Preferences',
-      'Activity',
+      'Sign-in',
       'CLI sessions',
     ])
-    // The two-factor card waits for its status read.
-    expect(wrapper.findAll('.static-page-summary-card')).toHaveLength(10)
-    expect(wrapper.findAll('.static-page-record-tile').map((node) => node.text())).toEqual(['Krewe', 'Gorjana'])
-    expect(wrapper.findAll('.static-page-list-tile')).toHaveLength(0)
+    const firstSection = wrapper.findAll('.static-page-section')[0]!
+    expect(firstSection.find('[data-testid="user-badge"]').exists()).toBe(true)
     expect(wrapper.find('.static-page-section-head .user-settings-password-trigger').exists()).toBe(false)
-    expect(wrapper.find('.user-settings-summary-field .static-page-summary-label').text()).toBe('Display name')
-    // Password changes inside its own card, the same way the recovery email does.
     const passwordCard = wrapper.get('[data-testid="password-card"]')
     expect(passwordCard.get('.static-page-summary-label').text()).toBe('Password')
     expect(passwordCard.get('.user-settings-password-trigger').text()).toBe('Change')
-    expect(wrapper.find('.static-page-actions [aria-label="Save user settings"]').exists()).toBe(true)
     expect(wrapper.get('.user-settings-card-grid').classes()).toContain('static-page-summary-grid')
-    expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(4)
+    // Before the two-factor status reads: Timezone, Notifications, then Password, Recovery email, Last sign-in.
+    expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(5)
     expect(styleSource).toMatch(/\.static-page-summary-grid\s*\{[^}]*align-items: start;/)
-    expect(styleSource).toMatch(/\.user-settings-card-grid\s*\{[^}]*align-items: stretch;/)
+    expect(styleSource).toMatch(/\.user-settings-card-grid\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*align-items: stretch;/)
     expect(styleSource).toMatch(/\.user-settings-stretch-card\s*\{[^}]*height: 100%;/)
-    expect(wrapper.text()).toContain('ORDER_SYNC')
+    expect(styleSource).toMatch(/@media \(max-width: 768px\) \{\s*\.user-settings-card-grid\s*\{\s*grid-template-columns: minmax\(0, 1fr\);/)
     expect(wrapper.get('[data-testid="user-notification-default-card"]').text()).toContain('No default space')
   })
 
-  it('saves a display name preference from the shared page action', async () => {
+  it('drops the footer Save, the User ID, Last Run and the tenant tiles', () => {
     const wrapper = mountPage()
-    const input = wrapper.get('input[name="displayName"]')
 
-    expect((input.element as HTMLInputElement).value).toBe('john.doe')
+    expect(wrapper.find('.static-page-actions').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Save user settings"]').exists()).toBe(false)
+    expect(wrapper.find('input[name="displayName"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('User ID')
+    expect(wrapper.text()).not.toContain('M100000')
+    expect(wrapper.text()).not.toContain('Last Run')
+    expect(wrapper.text()).not.toContain('ORDER_SYNC')
+    expect(wrapper.find('.static-page-record-tile').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Tenant Context')
+  })
 
-    await input.setValue('Aditi')
-    await wrapper.get('.static-page-actions [aria-label="Save user settings"]').trigger('click')
+  it('leads with a badge: the initial, the name, and the role in the active tenant', () => {
+    authState.sessionInfo = { ...authState.sessionInfo, displayName: 'aditi Patel', activeTenantPermissionGroupIds: ['DARPAN_COMPANY_EDITOR'] }
+    const wrapper = mountPage()
+    const badge = wrapper.get('[data-testid="user-badge"]')
+
+    expect(badge.get('.user-settings-badge-initial').text()).toBe('A')
+    expect(badge.get('[data-testid="user-display-name"]').text()).toBe('aditi Patel')
+    expect(badge.get('[data-testid="user-badge-meta"]').text()).toBe('john.doe · Company editor in Krewe')
+    expect(badge.find('[data-testid="user-settings-no-tenant"]').exists()).toBe(false)
+  })
+
+  it('renames the display name in place through the same save call', async () => {
+    const wrapper = mountPage()
+    const name = wrapper.get('[data-testid="user-display-name"]')
+
+    name.element.textContent = 'Aditi'
+    await name.trigger('input')
+    await name.trigger('keydown', { key: 'Enter' })
     await flushPromises()
 
+    expect(saveUserSettings).toHaveBeenCalledTimes(1)
     expect(saveUserSettings).toHaveBeenCalledWith({ displayName: 'Aditi' })
   })
 
-  it('autosaves display name edits after one second without additional input', async () => {
-    vi.useFakeTimers()
-    const wrapper = mountPage()
-    const input = wrapper.get('input[name="displayName"]')
+  it('Rename puts the caret in the name; Esc keeps the old one and saves nothing', async () => {
+    const wrapper = mount(UserSettingsPage, { attachTo: document.body })
+    const name = wrapper.get('[data-testid="user-display-name"]')
 
-    await input.setValue('Aditi')
+    await wrapper.get('[data-testid="user-rename"]').trigger('click')
+    expect(document.activeElement).toBe(name.element)
 
-    expect(saveUserSettings).not.toHaveBeenCalled()
-
-    vi.advanceTimersByTime(999)
-    expect(saveUserSettings).not.toHaveBeenCalled()
-
-    vi.advanceTimersByTime(1)
+    name.element.textContent = 'Typo'
+    await name.trigger('input')
+    await name.trigger('keydown', { key: 'Escape' })
     await flushPromises()
 
-    expect(saveUserSettings).toHaveBeenCalledWith({ displayName: 'Aditi' })
+    expect(name.text()).toBe('john.doe')
+    expect(saveUserSettings).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
-  it('switches tenant through the existing active tenant contract', async () => {
+  it('an empty name saves nothing, and a refused one goes back and says why', async () => {
+    const wrapper = mountPage()
+    const rename = async (typed: string) => {
+      const name = wrapper.get('[data-testid="user-display-name"]')
+      name.element.textContent = typed
+      await name.trigger('input')
+      await name.trigger('keydown', { key: 'Enter' })
+      await flushPromises()
+    }
+
+    await rename('   ')
+    expect(saveUserSettings).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="user-display-name"]').text()).toBe('john.doe')
+
+    saveUserSettings.mockImplementationOnce(async () => {
+      authState.error = 'Display name is too long.'
+      return false
+    })
+    await rename('Aditi')
+    expect(wrapper.get('[data-testid="user-display-name-error"]').text()).toBe('Display name is too long.')
+    expect(wrapper.get('[data-testid="user-display-name"]').text()).toBe('john.doe')
+  })
+
+  it('Switch opens Ask Darpan already at /switch-tenant (the bow\'s picker, not a second one)', async () => {
+    const requests: CustomEvent[] = []
+    const capture = (event: Event) => requests.push(event as CustomEvent)
+    document.addEventListener(COMMAND_PALETTE_OPEN_REQUEST_EVENT, capture)
+    try {
+      const wrapper = mountPage()
+      await wrapper.get('[data-testid="user-switch-tenant"]').trigger('click')
+
+      expect(requests).toHaveLength(1)
+      expect(requests[0]?.detail).toEqual({ initialQuery: '/switch-tenant ' })
+      expect(saveActiveTenant).not.toHaveBeenCalled()
+    } finally {
+      document.removeEventListener(COMMAND_PALETTE_OPEN_REQUEST_EVENT, capture)
+    }
+  })
+
+  it('hides Switch with only one tenant to switch to', () => {
+    authState.sessionInfo = { ...authState.sessionInfo, availableTenants: [{ userGroupId: 'KREWE', label: 'Krewe' }] }
     const wrapper = mountPage()
 
-    await wrapper.findAll('.static-page-record-tile')[1]?.trigger('click')
-    await flushPromises()
-
-    expect(saveActiveTenant).toHaveBeenCalledWith('GORJANA')
+    expect(wrapper.find('[data-testid="user-switch-tenant"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="user-rename"]').exists()).toBe(true)
   })
 
   it('explains a missing company membership instead of showing an empty tenant section', () => {
@@ -334,10 +390,12 @@ describe('UserSettingsPage', () => {
 
     const wrapper = mountPage()
 
-    expect(wrapper.findAll('.static-page-record-tile')).toHaveLength(0)
-    const notice = wrapper.get('[data-testid="user-settings-no-tenant"]')
+    const badge = wrapper.get('[data-testid="user-badge"]')
+    expect(badge.get('[data-testid="user-badge-meta"]').text()).toBe('john.doe · No membership')
+    const notice = badge.get('[data-testid="user-settings-no-tenant"]')
     expect(notice.text()).toContain('not a member of any company')
     expect(notice.text()).toContain('Ask a Darpan admin')
+    expect(wrapper.find('[data-testid="user-switch-tenant"]').exists()).toBe(false)
   })
 
   it('points an admin at the group they can fix it in themselves', () => {
@@ -426,17 +484,16 @@ describe('UserSettingsPage', () => {
     expect(wrapper.get('.static-page-frame').classes()).not.toContain('user-settings-page--popup-open')
   })
 
-  it('does not render missing activity placeholders', () => {
-    authState.sessionInfo = {
-      ...authState.sessionInfo,
-      lastLoginDate: undefined,
-      lastRun: null,
-    }
+  it('shows Last sign-in read-only, and no placeholder when there is none', () => {
+    const signedIn = mountPage().get('[data-testid="last-sign-in-card"]')
+    expect(signedIn.get('.static-page-summary-label').text()).toBe('Last sign-in')
+    expect(signedIn.find('button').exists()).toBe(false)
 
+    authState.sessionInfo = { ...authState.sessionInfo, lastLoginDate: undefined }
     const wrapper = mountPage()
 
+    expect(wrapper.find('[data-testid="last-sign-in-card"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Not available')
-    expect(wrapper.text()).toContain('Permissions')
   })
 
   // DAR-UI-115: the role is named as the admin app names it, by the widest group held in the active tenant.
@@ -447,9 +504,7 @@ describe('UserSettingsPage', () => {
     [[], 'No membership'],
   ])('names the permission groups %j as %s', (groupIds, label) => {
     authState.sessionInfo = { ...authState.sessionInfo, activeTenantPermissionGroupIds: groupIds }
-    const card = mountPage().findAll('.static-page-summary-card')
-      .find((node) => node.find('.static-page-summary-label').text() === 'Permissions')
-    expect(card?.text()).toBe(`Permissions${label}`)
+    expect(mountPage().get('[data-testid="user-badge-meta"]').text()).toBe(`john.doe · ${label} in Krewe`)
   })
 
   // DAR-BE-295/296: a super admin also holds canManageDarpanCore, so the widest role is named first.
@@ -458,9 +513,7 @@ describe('UserSettingsPage', () => {
     [{ isSuperAdmin: false, canManageDarpanCore: true }, 'Darpan admin'],
   ])('names the platform role %j as %s', (flags, label) => {
     authState.sessionInfo = { ...authState.sessionInfo, ...flags }
-    const card = mountPage().findAll('.static-page-summary-card')
-      .find((node) => node.find('.static-page-summary-label').text() === 'Permissions')
-    expect(card?.text()).toBe(`Permissions${label}`)
+    expect(mountPage().get('[data-testid="user-badge-meta"]').text()).toBe(`john.doe · ${label} in Krewe`)
   })
 
   it('shows the default chat space and changes it via popup', async () => {
@@ -490,7 +543,7 @@ describe('UserSettingsPage', () => {
 
     expect(wrapper.get('[data-testid="user-notification-default-card"]').text()).toContain('Ops')
 
-    await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-notification-default-change"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="dialog"]').text()).toContain('Which chat space')
@@ -520,7 +573,7 @@ describe('UserSettingsPage', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-notification-default-change"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[data-testid="user-chat-space-choice-CS1"]').exists()).toBe(true)
@@ -554,7 +607,7 @@ describe('UserSettingsPage', () => {
 
     expect(wrapper.get('[data-testid="user-notification-default-card"]').text()).toContain('Ops')
 
-    await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-notification-default-change"]').trigger('click')
     await flushPromises()
     await wrapper.get('[data-testid="user-chat-space-choice-clear"]').trigger('click')
     await flushPromises()
@@ -580,7 +633,7 @@ describe('UserSettingsPage', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-notification-default-change"]').trigger('click')
     await flushPromises()
     await wrapper.get('[data-testid="user-chat-space-choice-CS1"]').trigger('click')
     await flushPromises()
@@ -596,7 +649,7 @@ describe('UserSettingsPage', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-notification-default-change"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
 
@@ -612,7 +665,7 @@ describe('UserSettingsPage', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-notification-default-change"]').trigger('click')
     await flushPromises()
 
     await wrapper.get('[role="dialog"]').trigger('click')
@@ -635,7 +688,7 @@ describe('UserSettingsPage', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    await wrapper.get('[data-testid="user-notification-default-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-notification-default-change"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="dialog"]').text()).toContain('The chat spaces drifted into outer space.')
@@ -655,7 +708,7 @@ describe('UserSettingsPage', () => {
   it('offers the same tenant-and-code label as the option that clears the preference', async () => {
     const wrapper = mountPage()
 
-    await wrapper.get('[data-testid="user-timezone-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-timezone-change"]').trigger('click')
     await wrapper.get('[data-testid="user-timezone-select"]').trigger('click')
 
     expect(wrapper.get('[data-testid="app-select-option"][data-option-value=""]').text())
@@ -675,7 +728,7 @@ describe('UserSettingsPage', () => {
   it('saves a preferred timezone via the popup picker', async () => {
     const wrapper = mountPage()
 
-    await wrapper.get('[data-testid="user-timezone-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-timezone-change"]').trigger('click')
     await wrapper.get('[data-testid="user-timezone-select"]').trigger('click')
     await wrapper.get('[data-testid="app-select-search"]').setValue('America/New_York')
     await wrapper.get('[data-testid="app-select-option"][data-option-value="America/New_York"]').trigger('click')
@@ -690,7 +743,7 @@ describe('UserSettingsPage', () => {
     authState.sessionInfo = { ...authState.sessionInfo, userTimeZone: 'America/New_York' }
     const wrapper = mountPage()
 
-    await wrapper.get('[data-testid="user-timezone-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-timezone-change"]').trigger('click')
     expect(wrapper.get('[data-testid="user-timezone-select"]').text()).toContain('America/New_York')
     await wrapper.get('[data-testid="user-timezone-select"]').trigger('click')
     await wrapper.get('[data-testid="app-select-option"][data-option-value=""]').trigger('click')
@@ -710,7 +763,7 @@ describe('UserSettingsPage', () => {
     })
     const wrapper = mountPage()
 
-    await wrapper.get('[data-testid="user-timezone-card"]').trigger('click')
+    await wrapper.get('[data-testid="user-timezone-change"]').trigger('click')
     await wrapper.get('[data-testid="save-user-timezone"]').trigger('click')
     await flushPromises()
 
@@ -718,14 +771,14 @@ describe('UserSettingsPage', () => {
     expect(wrapper.find('[data-testid="user-timezone-select"]').exists()).toBe(true)
   })
   it('keeps Preferences to things the user can change, and reports the rest elsewhere', async () => {
-    // "Preference" on this page means settable. Last Login, Last Run and Permissions are facts the
-    // system reports back, so filing them under Preferences made the heading untrue.
+    // "Preference" on this page means settable. Last sign-in and the role are facts the system reports
+    // back, so filing them under Preferences would make the heading untrue.
     const wrapper = mountPage()
     await flushPromises()
 
     const sectionFor = (heading: string) => {
       const section = wrapper.findAll('.static-page-section')
-        .find((node) => node.find('.static-page-section-heading').text() === heading)
+        .find((node) => node.find('.static-page-section-heading').exists() && node.get('.static-page-section-heading').text() === heading)
       expect(section, `no section titled ${heading}`).toBeTruthy()
       return section!
     }
@@ -733,15 +786,14 @@ describe('UserSettingsPage', () => {
     const preferences = sectionFor('Preferences')
     expect(preferences.findAll('.static-page-summary-label').map((n) => n.text()))
       .toEqual(['Timezone', 'Notifications'])
-    // Every card in Preferences opens something; none is inert.
-    expect(preferences.findAll('button.static-page-summary-card')).toHaveLength(2)
-    expect(preferences.text()).not.toContain('Last Login')
-    expect(preferences.text()).not.toContain('Permissions')
+    // Two equal cards, each with its own action; none is inert, and neither spans the row.
+    expect(preferences.findAll('.user-settings-row-card')).toHaveLength(2)
+    expect(preferences.findAll('.user-settings-card-actions button').map((n) => n.attributes('aria-label')))
+      .toEqual(['Change timezone', 'Change notifications'])
+    expect(preferences.find('.static-page-summary-card--full').exists()).toBe(false)
+    expect(preferences.text()).not.toContain('Last sign-in')
 
-    expect(sectionFor('Activity').findAll('.static-page-summary-label').map((n) => n.text()))
-      .toEqual(['Last Login', 'Last Run'])
-    // Permissions is an access fact, so it sits with User ID and Username.
-    expect(sectionFor('Account').text()).toContain('Permissions')
+    expect(sectionFor('Sign-in').text()).toContain('Last sign-in')
   })
 
   it('shows the last visit\'s default chat space at once on a revisit, before the network answers (DAR-UI-051)', async () => {
@@ -1092,7 +1144,13 @@ describe('UserSettingsPage', () => {
       expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('Off')
       expect(wrapper.find('[data-testid="two-factor-setup"]').exists()).toBe(true)
       expect(wrapper.get('[data-testid="passkeys-count"]').text()).toBe('2')
-      const rows = wrapper.findAll('[data-testid="passkey-row"]')
+      // DAR-UI-121: the passkeys themselves live in Manage, a popup over the blurred page.
+      expect(wrapper.find('[data-testid="passkey-row"]').exists()).toBe(false)
+      await click(wrapper, 'passkeys-manage')
+      const popup = wrapper.get('[data-testid="passkeys-manage-popup"]')
+      expect(wrapper.get('.static-page-frame').classes()).toContain('user-settings-page--popup-open')
+      expect(wrapper.find('.static-page-frame [data-testid="passkeys-manage-popup"]').exists()).toBe(false)
+      const rows = popup.findAll('[data-testid="passkey-row"]')
       expect(rows.map((row) => row.get('[data-testid="passkey-name"]').text())).toEqual(['MacBook', 'YubiKey'])
       expect(rows.map((row) => row.get('[data-testid="passkey-added"]').text())).toEqual(['13 Nov', '10 Nov'])
       expect(rows.map((row) => row.get('[data-testid="passkey-last-used"]').text())).toEqual(['Never', '12 Nov'])
@@ -1107,6 +1165,8 @@ describe('UserSettingsPage', () => {
       const wrapper = mountPage()
       await flushPromises()
       expect(wrapper.get('[data-testid="passkeys-count"]').text()).toBe('None')
+      // Nothing to manage yet.
+      expect(wrapper.find('[data-testid="passkeys-manage"]').exists()).toBe(false)
 
       await click(wrapper, 'passkey-add')
       expect(wrapper.text()).toContain('Enter your current password.')
@@ -1127,7 +1187,7 @@ describe('UserSettingsPage', () => {
 
       await click(wrapper, 'two-factor-codes-saved')
       expect(wrapper.find('[data-testid="two-factor-workflow"]').exists()).toBe(false)
-      expect(wrapper.findAll('[data-testid="passkey-row"]')).toHaveLength(1)
+      expect(wrapper.get('[data-testid="passkeys-count"]').text()).toBe('1')
     })
 
     it('adds another passkey proved by a passkey; a closed prompt stays on the step and says nothing', async () => {
@@ -1165,6 +1225,7 @@ describe('UserSettingsPage', () => {
       const wrapper = mountPage()
       await flushPromises()
 
+      await click(wrapper, 'passkeys-manage')
       await click(wrapper, 'passkey-remove')
       expect(wrapper.text()).toContain('Remove passkey')
       await click(wrapper, 'two-factor-proof-next')
@@ -1181,8 +1242,10 @@ describe('UserSettingsPage', () => {
       const wrapper = mountPage()
       await flushPromises()
 
+      await click(wrapper, 'passkeys-manage')
       await wrapper.findAll('[data-testid="passkey-remove"]')[1]?.trigger('click')
       await flushPromises()
+      expect(wrapper.find('[data-testid="passkeys-manage-popup"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="two-factor-proof-use-passkey"]').exists()).toBe(true)
       await typeCode(wrapper, 'two-factor-proof-code', '123456')
       expect(deletePasskey).not.toHaveBeenCalled()
@@ -1194,6 +1257,7 @@ describe('UserSettingsPage', () => {
 
       getTwoFactorStatus.mockResolvedValue({ ...status({ appEnabled: false, passkeys: [] }), enabled: false })
       deletePasskey.mockResolvedValue({ ok: true, messages: [], errors: [], twoFactorEnabled: false })
+      await click(wrapper, 'passkeys-manage')
       await click(wrapper, 'passkey-remove')
       await typeCode(wrapper, 'two-factor-proof-code', '654321')
       await click(wrapper, 'two-factor-proof-next')
@@ -1222,6 +1286,7 @@ describe('UserSettingsPage', () => {
       getTwoFactorStatus.mockResolvedValue(status())
       const wrapper = mountPage()
       await flushPromises()
+      await click(wrapper, 'passkeys-manage')
 
       const rename = async (typed: string) => {
         const name = wrapper.get('[data-testid="passkey-name"]')
@@ -1252,8 +1317,9 @@ describe('UserSettingsPage', () => {
       const wrapper = mountPage()
       await flushPromises()
 
-      expect(wrapper.findAll('[data-testid="passkey-row"]')).toHaveLength(1)
       expect(wrapper.find('[data-testid="passkey-add"]').exists()).toBe(false)
+      await click(wrapper, 'passkeys-manage')
+      expect(wrapper.findAll('[data-testid="passkey-row"]')).toHaveLength(1)
     })
 
     it('a passkey-only person on a browser without passkeys is told so, never asked for an app code', async () => {
@@ -1290,5 +1356,88 @@ describe('UserSettingsPage', () => {
 
       expect(wrapper.find('[data-testid="passkeys-card"]').exists()).toBe(false)
     })
+
+    it('Manage closes by its Close button, by Esc and by a click outside', async () => {
+      getTwoFactorStatus.mockResolvedValue(status())
+      const wrapper = mountPage()
+      await flushPromises()
+
+      await click(wrapper, 'passkeys-manage')
+      await click(wrapper, 'passkeys-manage-close')
+      expect(wrapper.find('[data-testid="passkeys-manage-popup"]').exists()).toBe(false)
+      expect(wrapper.get('.static-page-frame').classes()).not.toContain('user-settings-page--popup-open')
+
+      await click(wrapper, 'passkeys-manage')
+      const cancelRequest = new Event(WORKFLOW_CANCEL_REQUEST_EVENT, { cancelable: true })
+      document.dispatchEvent(cancelRequest)
+      await flushPromises()
+      expect(cancelRequest.defaultPrevented).toBe(true)
+      expect(wrapper.find('[data-testid="passkeys-manage-popup"]').exists()).toBe(false)
+
+      await click(wrapper, 'passkeys-manage')
+      await click(wrapper, 'passkeys-manage-popup')
+      expect(wrapper.find('[data-testid="passkeys-manage-popup"]').exists()).toBe(false)
+    })
+
+    it('a refused rename says so inside Manage, where the person is looking', async () => {
+      getTwoFactorStatus.mockResolvedValue(status())
+      renamePasskey.mockRejectedValueOnce(new ApiCallError('A name is required.', 500))
+      const wrapper = mountPage()
+      await flushPromises()
+      await click(wrapper, 'passkeys-manage')
+
+      const name = wrapper.get('[data-testid="passkey-name"]')
+      name.element.textContent = 'Bad'
+      await name.trigger('input')
+      await name.trigger('keydown', { key: 'Enter' })
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="passkeys-manage-popup"] [data-testid="passkey-error"]').text()).toBe('A name is required.')
+      expect(wrapper.findAll('[data-testid="passkey-error"]')).toHaveLength(1)
+    })
+
+    // DAR-UI-121 even pairs: two to a row, and an odd last card spans the row instead of standing alone.
+    const fullWidth = (wrapper: ReturnType<typeof mount>) => wrapper
+      .findAll('.static-page-summary-card--full')
+      .map((card) => card.attributes('data-testid'))
+
+    it('orders Sign-in as Passkeys, Password, Authenticator app, Recovery codes, Recovery email, Last sign-in', async () => {
+      getTwoFactorStatus.mockResolvedValue(status({ appEnabled: true }))
+      const wrapper = mountPage()
+      await flushPromises()
+
+      const signIn = wrapper.findAll('.static-page-section')
+        .find((node) => node.find('.static-page-section-heading').exists() && node.get('.static-page-section-heading').text() === 'Sign-in')!
+      expect(signIn.findAll('.user-settings-row-card').map((card) => card.attributes('data-testid'))).toEqual([
+        'passkeys-card', 'password-card', 'two-factor-card', 'two-factor-recovery-card', 'recovery-email-card', 'last-sign-in-card',
+      ])
+      // Six: three even rows.
+      expect(fullWidth(wrapper)).toEqual([])
+    })
+
+    it('spans the odd last Sign-in card across both columns', async () => {
+      // Two-factor off, so no Recovery codes: Passkeys, Password, App, Email, Last sign-in.
+      getTwoFactorStatus.mockResolvedValue({ ...status({ passkeys: [] }), enabled: false })
+      const wrapper = mountPage()
+      await flushPromises()
+
+      expect(fullWidth(wrapper)).toEqual(['last-sign-in-card'])
+
+      authState.sessionInfo = { ...authState.sessionInfo, lastLoginDate: undefined }
+      const even = mountPage()
+      await flushPromises()
+      expect(fullWidth(even)).toEqual([])
+    })
+  })
+
+  it('spans an odd last CLI session across both columns', async () => {
+    const session = (id: string) => ({ cliSessionId: id, hostLabel: `${id}-host`, createdDate: '2026-11-01T10:00:00Z', expiresDate: '2026-11-07T10:00:00Z' })
+    listCliSessions.mockResolvedValue({ ok: true, messages: [], errors: [], cliSessions: [session('C1'), session('C2'), session('C3')] })
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="cli-session-row"]')
+    expect(rows.map((row) => row.classes().includes('static-page-summary-card--full'))).toEqual([false, false, true])
+    expect(rows[0]!.get('.user-settings-meta').text()).toMatch(/^Signed in .+ · Expires .+$/)
   })
 })

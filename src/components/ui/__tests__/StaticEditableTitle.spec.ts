@@ -89,4 +89,40 @@ describe('StaticEditableTitle', () => {
     await title.trigger('blur')
     wrapper.unmount()
   })
+  // DAR-UI-121: Esc leaves an edit without committing, and stops there so the shell does not act on it.
+  it('puts the text back on Esc, commits nothing and keeps the key from the shell', async () => {
+    const wrapper = mount(StaticEditableTitle, {
+      attachTo: document.body,
+      props: { modelValue: 'Orders schema', testId: 'editable-title' },
+    })
+
+    const title = wrapper.get('[data-testid="editable-title"]')
+    const titleElement = title.element as HTMLElement
+    titleElement.focus()
+    titleElement.textContent = 'Orders schema revised'
+    await title.trigger('input')
+
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    titleElement.dispatchEvent(escape)
+    await wrapper.vm.$nextTick()
+
+    expect(escape.defaultPrevented).toBe(true)
+    expect(titleElement.textContent).toBe('Orders schema')
+    expect(wrapper.emitted('commit')).toBeUndefined()
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['Orders schema'])
+    expect(document.activeElement).not.toBe(titleElement)
+    wrapper.unmount()
+  })
+
+  it('focus() puts the caret in the title for a Rename button beside it', () => {
+    const wrapper = mount(StaticEditableTitle, {
+      attachTo: document.body,
+      props: { modelValue: 'Aditi', tag: 'span', testId: 'editable-title' },
+    })
+
+    ;(wrapper.vm as unknown as { focus: () => void }).focus()
+
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="editable-title"]').element)
+    wrapper.unmount()
+  })
 })

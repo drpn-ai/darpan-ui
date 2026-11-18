@@ -795,22 +795,6 @@ button:disabled {
   fill: currentColor;
 }
 
-.user-settings-summary-field {
-  width: 100%;
-  cursor: text;
-}
-
-.user-settings-summary-input {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: inherit;
-  line-height: inherit;
-}
-
 .user-settings-control {
   min-height: 2.35rem;
   border: 1px solid var(--border);
@@ -834,6 +818,7 @@ button:disabled {
 }
 
 .user-settings-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
 }
 
@@ -841,10 +826,75 @@ button:disabled {
   height: 100%;
 }
 
-.user-settings-notification-default-card {
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
+/* DAR-UI-121 even pairs: label and value on the left, the action on the right, centred, so every card in a
+   row carries its button in the same place. An odd last card spans the row via .static-page-summary-card--full. */
+.user-settings-row-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+}
+
+.user-settings-card-main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.user-settings-card-main > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.user-settings-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.user-settings-meta {
+  color: var(--text-soft);
+  font-size: var(--type-meta-size);
+}
+
+.user-settings-badge {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+}
+
+.user-settings-badge-initial {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--surface-section-title-size);
+}
+
+.user-settings-badge-name {
+  font-size: var(--surface-section-title-size);
+}
+
+.user-settings-passkey-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+@media (max-width: 768px) {
+  .user-settings-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .user-settings-badge {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .user-settings-badge > .user-settings-card-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
 }
 
 .tenant-settings-list-grid {

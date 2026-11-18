@@ -81,9 +81,11 @@ import {
 } from './lib/slashCommands'
 import type { CommandAction } from './lib/types/ux'
 import {
+  COMMAND_PALETTE_OPEN_REQUEST_EVENT,
   DISMISS_INLINE_MENUS_EVENT,
   WORKFLOW_CANCEL_REQUEST_EVENT,
   WORKFLOW_HINT_REQUEST_EVENT,
+  type CommandPaletteOpenRequestDetail,
   type WorkflowHintRequestDetail,
   type WorkflowHintTone,
 } from './lib/uiEvents'
@@ -348,6 +350,12 @@ function openCommandPalette(initialQuery = ''): void {
   document.dispatchEvent(new Event(DISMISS_INLINE_MENUS_EVENT))
   paletteInitialQuery.value = initialQuery
   commandPalette.open()
+}
+
+/** DAR-UI-121. The same open as the bow's, asked for by a page (User Settings' Switch) that cannot reach the shell. */
+function handleCommandPaletteOpenRequest(event: Event): void {
+  if (isShelllessRoute.value) return
+  openCommandPalette((event as CustomEvent<CommandPaletteOpenRequestDetail>).detail?.initialQuery ?? '')
 }
 
 function closeCommandPalette(): void {
@@ -662,6 +670,7 @@ onMounted(() => {
   window.addEventListener('storage', handleAuthStorageEvent)
   setAuthRequiredHandler((detail) => handleAuthRequired(detail))
   document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, handleWorkflowHintRequest)
+  document.addEventListener(COMMAND_PALETTE_OPEN_REQUEST_EVENT, handleCommandPaletteOpenRequest)
   syncBodySurfaceMode(surfaceMode.value)
   if (!isShelllessRoute.value) {
     void authStore.ensureAuthenticated()
@@ -674,6 +683,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('storage', handleAuthStorageEvent)
   setAuthRequiredHandler(null)
   document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, handleWorkflowHintRequest)
+  document.removeEventListener(COMMAND_PALETTE_OPEN_REQUEST_EVENT, handleCommandPaletteOpenRequest)
   if (typeof document !== 'undefined') {
     document.body.classList.remove('surface-mode-static', 'surface-mode-workflow')
   }
