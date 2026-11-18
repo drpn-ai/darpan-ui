@@ -44,6 +44,7 @@ vi.mock('../../stores/runResults', () => ({ useRunResultsStore: () => ({ hydrate
 import LoginPage from '../LoginPage.vue'
 import { clearAuthToken, getAuthToken } from '../../lib/api/client'
 import { installLocalStorageStub } from '../../test/localStorage'
+import { hasRememberedPasskey, rememberPasskey } from '../../lib/passkeyHint'
 import {
   ASSERTION_JSON,
   CREATED_JSON,
@@ -77,16 +78,49 @@ const setupStart = {
   qrDataUri: null, expiresInSeconds: 900,
 }
 
-async function signIn(wrapper: ReturnType<typeof mount>): Promise<void> {
-  await wrapper.get('input[autocomplete="username"]').setValue('ada')
-  await wrapper.get('input[autocomplete="current-password"]').setValue('right-password')
-  await wrapper.get('form').trigger('submit.prevent')
-  await flushPromises()
+/** The remembered-passkey hint is a SHA-256 through crypto.subtle, which settles a few turns after a promise flush. */
+async function settle(): Promise<void> {
+  for (let turn = 0; turn < 5; turn += 1) {
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  }
 }
+
+/** DAR-UI-120: the username step and its Next. */
+async function enterUsername(wrapper: ReturnType<typeof mount>, user = 'ada'): Promise<void> {
+  await wrapper.get('#login-username').setValue(user)
+  await wrapper.get('[data-testid="login-username-next"]').trigger('click')
+  await settle()
+}
+
+async function signIn(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await enterUsername(wrapper)
+  await wrapper.get('#login-password').setValue('right-password')
+  await wrapper.get('[data-testid="login-current-password-next"]').trigger('click')
+  await settle()
+}
+
+/** A browser that offers passkeys in the username autofill: the conditional request waits until the page aborts it,
+ *  unless `pick` says the person chose a passkey there. A modal request answers as the stub does. */
+function withAutofill(stub: WebAuthnStub, pick = false): AbortSignal[] {
+  const signals: AbortSignal[] = []
+  const modal = stub.get.getMockImplementation()
+  stub.get.mockImplementation((options: CredentialRequestOptions) => {
+    if (options.mediation !== 'conditional') return modal?.(options)
+    if (options.signal) signals.push(options.signal)
+    if (pick) return modal?.(options)
+    return new Promise((_, reject) => {
+      options.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')))
+    })
+  })
+  return signals
+}
+
+const modalCalls = (stub: WebAuthnStub | null) => (stub?.get.mock.calls ?? []).filter(([options]) => options.mediation !== 'conditional')
 
 async function click(wrapper: ReturnType<typeof mount>, testId: string): Promise<void> {
   await wrapper.get(`[data-testid="${testId}"]`).trigger('click')
-  await flushPromises()
+  await settle()
 }
 
 describe('LoginPage passkeys', () => {
@@ -128,6 +162,23 @@ describe('LoginPage passkeys', () => {
     expect(verifySignInCode).toHaveBeenCalledWith({ challengeToken: CHALLENGE, passkeyAssertion: ASSERTION_JSON })
     expect(getAuthToken()).toBe('key-1')
     expect(replace).toHaveBeenCalledWith('/')
+    // DAR-UI-120: that passkey can be the whole sign-in next time.
+    expect(await hasRememberedPasskey('ada')).toBe(true)
+  })
+
+  it('an app code as the second step remembers no passkey', async () => {
+    loginSession.mockResolvedValue(codeChallenge(['app', 'passkey']))
+    verifySignInCode.mockResolvedValue(signedIn('key-app'))
+    const wrapper = mount(LoginPage)
+
+    await signIn(wrapper)
+    const box = wrapper.get('[data-testid="login-two-factor-code-0"]')
+    ;(box.element as HTMLInputElement).value = '123456'
+    await box.trigger('input')
+    await flushPromises()
+
+    expect(getAuthToken()).toBe('key-app')
+    expect(await hasRememberedPasskey('ada')).toBe(false)
   })
 
   it('passkey only: opens the prompt at once; a closed prompt stays put, says nothing, and Continue reuses the options', async () => {
@@ -319,7 +370,7 @@ describe('LoginPage passkeys', () => {
     expect(replace).toHaveBeenCalledWith('/')
   })
 
-  describe('sign in with a passkey alone (DAR-BE-301)', () => {
+  describe('username first, then a passkey or the password (DAR-UI-120)', () => {
     const first = { ok: true, messages: [], errors: [], challengeToken: 'first-token', publicKeyOptions: REQUEST_OPTIONS, expiresInSeconds: 300 }
     const refused = (reason: string, message: string) => ({ ok: false, messages: [], errors: [message], reason, authenticated: false })
 
@@ -327,74 +378,235 @@ describe('LoginPage passkeys', () => {
       beginPasskeyFirstSignIn.mockResolvedValue(first)
     })
 
-    it('offers the button only where the browser has WebAuthn', () => {
-      expect(mount(LoginPage).find('[data-testid="login-passkey-sign-in"]').exists()).toBe(true)
-      webauthn?.restore()
-      webauthn = null
-      expect(mount(LoginPage).find('[data-testid="login-passkey-sign-in"]').exists()).toBe(false)
+    afterEach(() => {
+      vi.useRealTimers()
     })
 
-    it('with nothing typed: no username, no password, then the same sign-in a code gives', async () => {
+    it('a username this browser has not seen sign in with a passkey goes to the password; no prompt, no server check', async () => {
+      const wrapper = mount(LoginPage)
+      await enterUsername(wrapper)
+
+      expect(wrapper.text()).toContain('Password for ada?')
+      expect(beginPasskeyFirstSignIn).not.toHaveBeenCalled()
+      expect(webauthn?.get).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="login-use-passkey"]').exists()).toBe(true)
+    })
+
+    it('a remembered username opens the passkey prompt at Next and signs in with no password and no code', async () => {
+      await rememberPasskey('ada')
       finishPasskeyFirstSignIn.mockResolvedValue(signedIn('key-first'))
       const wrapper = mount(LoginPage)
-      await click(wrapper, 'login-passkey-sign-in')
+      await enterUsername(wrapper, 'Ada')
 
-      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({})
-      expect(webauthn?.parseRequestOptionsFromJSON).toHaveBeenCalledTimes(1)
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({ username: 'Ada' })
+      expect(modalCalls(webauthn)).toHaveLength(1)
+      expect(webauthn?.get.mock.calls[0]?.[0]).not.toHaveProperty('mediation')
       expect(finishPasskeyFirstSignIn).toHaveBeenCalledWith({ challengeToken: 'first-token', passkeyAssertion: ASSERTION_JSON })
       expect(loginSession).not.toHaveBeenCalled()
+      expect(verifySignInCode).not.toHaveBeenCalled()
       expect(getAuthToken()).toBe('key-first')
       expect(replace).toHaveBeenCalledWith('/')
     })
 
-    it('passes the username when one is typed', async () => {
-      finishPasskeyFirstSignIn.mockResolvedValue(signedIn('key-first'))
+    it('a closed prompt says so and stays; Try again opens it again; Use password instead goes to the password', async () => {
+      await rememberPasskey('ada')
+      webauthn?.get.mockRejectedValueOnce(notAllowed()).mockRejectedValueOnce(notAllowed())
+      loginSession.mockResolvedValue(signedIn('key-pw'))
       const wrapper = mount(LoginPage)
-      await wrapper.get('input[autocomplete="username"]').setValue('ada')
-      await click(wrapper, 'login-passkey-sign-in')
+      await enterUsername(wrapper)
 
-      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({ username: 'ada' })
-    })
-
-    it('a closed prompt says it was cancelled and sends nothing', async () => {
-      webauthn?.get.mockRejectedValueOnce(notAllowed())
-      const wrapper = mount(LoginPage)
-      await click(wrapper, 'login-passkey-sign-in')
-
+      expect(wrapper.text()).toContain('Use your passkey.')
+      expect(wrapper.get('[data-testid="login-passkey-username"]').text()).toBe('ada')
       expect(wrapper.text()).toContain('Passkey sign-in was cancelled.')
       expect(finishPasskeyFirstSignIn).not.toHaveBeenCalled()
-      expect(wrapper.find('input[autocomplete="current-password"]').exists()).toBe(true)
-    })
 
-    it('a refusal shows the backend message and leaves the password form usable', async () => {
-      finishPasskeyFirstSignIn.mockResolvedValue(refused('PASSKEY_REFUSED', 'That passkey did not sign you in.'))
-      const wrapper = mount(LoginPage)
-      await click(wrapper, 'login-passkey-sign-in')
+      await click(wrapper, 'login-passkey-try-again')
+      expect(modalCalls(webauthn)).toHaveLength(2)
+      expect(wrapper.text()).toContain('Use your passkey.')
 
-      expect(wrapper.text()).toContain('That passkey did not sign you in.')
-      expect(getAuthToken()).toBeNull()
-      loginSession.mockResolvedValue(signedIn('key-pw'))
-      await signIn(wrapper)
+      await click(wrapper, 'login-use-password')
+      expect(wrapper.text()).toContain('Password for ada?')
+      expect(wrapper.text()).not.toContain('cancelled')
+      await wrapper.get('#login-password').setValue('right-password')
+      await click(wrapper, 'login-current-password-next')
       expect(getAuthToken()).toBe('key-pw')
+      // A cancel is not a refusal: the hint stays.
+      expect(await hasRememberedPasskey('ada')).toBe(true)
     })
 
-    it('a password change required shows its message and focuses the password field', async () => {
+    it('Back from the passkey step returns to the username with the name kept', async () => {
+      await rememberPasskey('ada')
+      webauthn?.get.mockRejectedValueOnce(notAllowed())
+      const wrapper = mount(LoginPage)
+      await enterUsername(wrapper)
+
+      await wrapper.get('.wizard-back').trigger('click')
+      await settle()
+
+      expect(wrapper.text()).toContain('Username?')
+      expect(wrapper.text()).not.toContain('cancelled')
+      expect((wrapper.get('#login-username').element as HTMLInputElement).value).toBe('ada')
+    })
+
+    it('a refused passkey shows the message and forgets the hint, so the next Next asks for the password', async () => {
+      await rememberPasskey('ada')
+      finishPasskeyFirstSignIn.mockResolvedValue(refused('PASSKEY_REFUSED', "That passkey didn't work."))
+      const wrapper = mount(LoginPage)
+      await enterUsername(wrapper)
+
+      expect(wrapper.text()).toContain("That passkey didn't work.")
+      expect(wrapper.text()).toContain('Use your passkey.')
+      expect(getAuthToken()).toBeNull()
+      expect(await hasRememberedPasskey('ada')).toBe(false)
+
+      await wrapper.get('.wizard-back').trigger('click')
+      await settle()
+      await enterUsername(wrapper)
+      expect(wrapper.text()).toContain('Password for ada?')
+    })
+
+    it('a password change required goes to the password step with its message, focused', async () => {
+      await rememberPasskey('ada')
       finishPasskeyFirstSignIn.mockResolvedValue(refused('PASSWORD_CHANGE_REQUIRED', 'Sign in with your password once to set a new one.'))
       const wrapper = mount(LoginPage, { attachTo: document.body })
-      await click(wrapper, 'login-passkey-sign-in')
+      await enterUsername(wrapper)
 
       expect(wrapper.text()).toContain('Sign in with your password once to set a new one.')
-      expect(document.activeElement).toBe(wrapper.get('input[autocomplete="current-password"]').element)
+      expect(wrapper.text()).toContain('Password for ada?')
+      expect(document.activeElement).toBe(wrapper.get('#login-password').element)
+      // Not a refused passkey: it still opens first next time.
+      expect(await hasRememberedPasskey('ada')).toBe(true)
       wrapper.unmount()
     })
 
     it('a refused begin shows its message and opens no prompt', async () => {
+      await rememberPasskey('ada')
       beginPasskeyFirstSignIn.mockResolvedValue(refused('TOO_MANY_ATTEMPTS', 'Too many tries. Wait a minute.'))
       const wrapper = mount(LoginPage)
-      await click(wrapper, 'login-passkey-sign-in')
+      await enterUsername(wrapper)
 
       expect(wrapper.text()).toContain('Too many tries. Wait a minute.')
       expect(webauthn?.get).not.toHaveBeenCalled()
+    })
+
+    it('the password step\'s link runs the prompt for that username, and remembers it once signed in', async () => {
+      finishPasskeyFirstSignIn.mockResolvedValue(signedIn('key-link'))
+      const wrapper = mount(LoginPage)
+      await enterUsername(wrapper)
+      await click(wrapper, 'login-use-passkey')
+
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({ username: 'ada' })
+      expect(modalCalls(webauthn)).toHaveLength(1)
+      expect(loginSession).not.toHaveBeenCalled()
+      expect(getAuthToken()).toBe('key-link')
+      expect(await hasRememberedPasskey('ada')).toBe(true)
+    })
+
+    it('autofill: a passkey picked in the username field signs in, and the account\'s name is remembered', async () => {
+      webauthn?.restore()
+      webauthn = installWebAuthnStub({ conditional: true })
+      withAutofill(webauthn, true)
+      finishPasskeyFirstSignIn.mockResolvedValue(signedIn('key-autofill'))
+      mount(LoginPage)
+      await settle()
+
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({})
+      expect(webauthn.get.mock.calls[0]?.[0]).toMatchObject({ mediation: 'conditional' })
+      expect(finishPasskeyFirstSignIn).toHaveBeenCalledWith({ challengeToken: 'first-token', passkeyAssertion: ASSERTION_JSON })
+      expect(getAuthToken()).toBe('key-autofill')
+      expect(replace).toHaveBeenCalledWith('/')
+      expect(await hasRememberedPasskey('ada')).toBe(true)
+    })
+
+    it('autofill waits while the username step shows, and Next aborts it', async () => {
+      webauthn?.restore()
+      webauthn = installWebAuthnStub({ conditional: true })
+      const signals = withAutofill(webauthn)
+      const wrapper = mount(LoginPage)
+      await settle()
+      expect(signals).toHaveLength(1)
+      expect(signals[0]?.aborted).toBe(false)
+
+      await enterUsername(wrapper)
+
+      expect(signals[0]?.aborted).toBe(true)
+      expect(wrapper.text()).toContain('Password for ada?')
+      expect(finishPasskeyFirstSignIn).not.toHaveBeenCalled()
+      expect(wrapper.text()).not.toContain('cancelled')
+    })
+
+    it('autofill is aborted before the modal prompt opens, and comes back with the username step', async () => {
+      await rememberPasskey('ada')
+      webauthn?.restore()
+      webauthn = installWebAuthnStub({ conditional: true })
+      const signals = withAutofill(webauthn)
+      const wrapper = mount(LoginPage)
+      await settle()
+      expect(signals).toHaveLength(1)
+
+      // Browsers take one WebAuthn request at a time: the waiting autofill must be gone when the prompt is asked for.
+      let autofillAbortedFirst = false
+      const autofillOrModal = webauthn.get.getMockImplementation()
+      webauthn.get.mockImplementation(async (options: CredentialRequestOptions) => {
+        if (options.mediation === 'conditional') return autofillOrModal?.(options)
+        autofillAbortedFirst = signals[0]?.aborted === true
+        throw notAllowed()
+      })
+
+      await enterUsername(wrapper)
+      expect(autofillAbortedFirst).toBe(true)
+      expect(wrapper.text()).toContain('Use your passkey.')
+
+      await wrapper.get('.wizard-back').trigger('click')
+      await settle()
+      expect(signals).toHaveLength(2)
+      expect(signals[1]?.aborted).toBe(false)
+      wrapper.unmount()
+      expect(signals[1]?.aborted).toBe(true)
+    })
+
+    it('autofill begins a fresh challenge before the old one expires', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      webauthn?.restore()
+      webauthn = installWebAuthnStub({ conditional: true })
+      const signals = withAutofill(webauthn)
+      mount(LoginPage)
+      await flushPromises()
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(270_000)
+      await flushPromises()
+
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledTimes(2)
+      expect(signals[0]?.aborted).toBe(true)
+      expect(signals[1]?.aborted).toBe(false)
+    })
+
+    it('autofill that cannot begin says nothing and leaves the steps working', async () => {
+      webauthn?.restore()
+      webauthn = installWebAuthnStub({ conditional: true })
+      beginPasskeyFirstSignIn.mockResolvedValue(refused('TOO_MANY_ATTEMPTS', 'Too many tries. Wait a minute.'))
+      const wrapper = mount(LoginPage)
+      await settle()
+
+      expect(webauthn.get).not.toHaveBeenCalled()
+      expect(wrapper.text()).not.toContain('Too many tries.')
+      await enterUsername(wrapper)
+      expect(wrapper.text()).toContain('Password for ada?')
+    })
+
+    it('without WebAuthn: username then password, with no autofill and no passkey control even for a remembered name', async () => {
+      await rememberPasskey('ada')
+      webauthn?.restore()
+      webauthn = null
+      const wrapper = mount(LoginPage)
+      await settle()
+      await enterUsername(wrapper)
+
+      expect(beginPasskeyFirstSignIn).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Password for ada?')
+      expect(wrapper.find('[data-testid="login-use-passkey"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="login-passkey-try-again"]').exists()).toBe(false)
     })
   })
 })

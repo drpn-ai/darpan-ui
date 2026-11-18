@@ -543,6 +543,15 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Change password',
     body: 'sets a new one for this account. Other sessions stay signed in until they expire on their own.',
   },
+  // DAR-UI-120: the sign-in page's passkey links.
+  'use a passkey or security key': {
+    title: 'Use a passkey or security key',
+    body: 'opens the browser prompt for this username: this device, your phone or a key you plug in. Your password is not sent.',
+  },
+  'use password instead': {
+    title: 'Use password instead',
+    body: 'asks for your password this time. Your passkey stays registered, and Next offers it first again next time.',
+  },
   'forgot password?': {
     title: 'Forgot password?',
     body: 'asks who you are, then emails a one-time code to the address on your account. With no email on file there is nowhere to send it.',

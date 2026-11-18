@@ -88,8 +88,8 @@ import type { TwoFactorRefusal } from '../../lib/twoFactor'
 import { useAuthStore, type TwoFactorVerifyOutcome } from '../../stores/auth'
 
 const emit = defineEmits<{
-  /** Signed in. recoveryCodesLeft is set only after a recovery code. */
-  'signed-in': [recoveryCodesLeft: number | null]
+  /** Signed in. recoveryCodesLeft is set only after a recovery code; byPasskey (DAR-UI-120) when a passkey answered. */
+  'signed-in': [recoveryCodesLeft: number | null, byPasskey: boolean]
   /** Back to the password step by choice. */
   back: []
   /** The challenge is spent (expired, used, 5 wrong answers): back to the password with this message. */
@@ -128,7 +128,7 @@ function leave(): void {
 }
 
 function settle(result: TwoFactorVerifyOutcome | TwoFactorRefusal): void {
-  if (result.outcome === 'signedIn') emit('signed-in', result.recoveryCodesLeft)
+  if (result.outcome === 'signedIn') emit('signed-in', result.recoveryCodesLeft, proof.mode.value === 'passkey')
   else if (result.outcome === 'ended') emit('ended', result.message)
   else error.value = result.message
 }

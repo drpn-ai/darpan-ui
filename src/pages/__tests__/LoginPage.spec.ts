@@ -69,6 +69,20 @@ vi.mock('../../stores/auth', () => ({
 
 import LoginPage from '../LoginPage.vue'
 
+/** DAR-UI-120: the username step, Next, then the password step and its Next. */
+async function enterUsername(wrapper: ReturnType<typeof mount>, user: string): Promise<void> {
+  await wrapper.get('#login-username').setValue(user)
+  await wrapper.get('[data-testid="login-username-next"]').trigger('click')
+  await flushPromises()
+}
+
+async function signInWith(wrapper: ReturnType<typeof mount>, user: string, pass: string): Promise<void> {
+  await enterUsername(wrapper, user)
+  await wrapper.get('#login-password').setValue(pass)
+  await wrapper.get('[data-testid="login-current-password-next"]').trigger('click')
+  await flushPromises()
+}
+
 /** Drive the change-password panel: fill the current step and press its primary action. */
 async function completePasswordStep(wrapper: ReturnType<typeof mount>, value: string): Promise<void> {
   await wrapper.get('input[autocomplete="new-password"]').setValue(value)
@@ -108,10 +122,7 @@ describe('LoginPage', () => {
     authState.error = 'Your password must be changed before you can sign in.'
 
     const wrapper = mount(LoginPage)
-    await wrapper.get('input[autocomplete="username"]').setValue('avnindra.sharma')
-    await wrapper.get('input[autocomplete="current-password"]').setValue('temp-pass')
-    await wrapper.get('form').trigger('submit.prevent')
-    await flushPromises()
+    await signInWith(wrapper, 'avnindra.sharma', 'temp-pass')
     return wrapper
   }
 
@@ -123,18 +134,79 @@ describe('LoginPage', () => {
     expect(wrapper.text()).not.toContain('No active authenticated session detected.')
   })
 
-  it('submits on Enter from the credential form', async () => {
+  it('asks the username, then the password for it, each step advancing on Enter', async () => {
     const wrapper = mount(LoginPage)
 
     expect(wrapper.text()).not.toContain('Sign in to access Darpan. Backend screens are admin-only.')
+    expect(wrapper.text()).toContain('Username?')
+    expect(wrapper.find('#login-password').exists()).toBe(false)
 
-    await wrapper.get('input[autocomplete="username"]').setValue('john.doe')
-    await wrapper.get('input[autocomplete="current-password"]').setValue('moqui')
-    await wrapper.get('input[autocomplete="current-password"]').trigger('keydown.enter')
+    await wrapper.get('#login-username').setValue(' john.doe ')
+    await wrapper.get('#login-username').trigger('keydown.enter')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Password for john.doe?')
+    expect(loginWithCredentials).not.toHaveBeenCalled()
+
+    await wrapper.get('#login-password').setValue('moqui')
+    await wrapper.get('#login-password').trigger('keydown.enter')
     await flushPromises()
 
     expect(loginWithCredentials).toHaveBeenCalledWith('john.doe', 'moqui')
     expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  it('stays on a step left empty and says what it needs', async () => {
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('[data-testid="login-username-next"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Enter your username.')
+    expect(wrapper.text()).toContain('Username?')
+
+    await enterUsername(wrapper, 'john.doe')
+    expect(wrapper.text()).not.toContain('Enter your username.')
+    await wrapper.get('[data-testid="login-current-password-next"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Enter your password.')
+    expect(loginWithCredentials).not.toHaveBeenCalled()
+  })
+
+  it('Back from the password keeps the username typed and drops the password', async () => {
+    const wrapper = mount(LoginPage)
+    await enterUsername(wrapper, 'john.doe')
+    await wrapper.get('#login-password').setValue('half-typed')
+
+    await wrapper.get('.wizard-back').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Username?')
+    expect((wrapper.get('#login-username').element as HTMLInputElement).value).toBe('john.doe')
+    await enterUsername(wrapper, 'john.doe')
+    expect((wrapper.get('#login-password').element as HTMLInputElement).value).toBe('')
+  })
+
+  it('names the fields the way browsers and password managers read them', async () => {
+    const wrapper = mount(LoginPage)
+    const user = wrapper.get('#login-username')
+    expect(user.attributes('name')).toBe('username')
+    expect(user.attributes('autocomplete')).toBe('username webauthn')
+
+    await enterUsername(wrapper, 'john.doe')
+    // The pair a password manager saves: the name rides unseen beside the password, out of the tab order.
+    const carried = wrapper.get('input[autocomplete="username"]')
+    expect((carried.element as HTMLInputElement).value).toBe('john.doe')
+    expect(carried.attributes('readonly')).toBeDefined()
+    expect(carried.attributes('tabindex')).toBe('-1')
+    expect(wrapper.get('#login-password').attributes('autocomplete')).toBe('current-password')
+  })
+
+  it('without WebAuthn offers no passkey anywhere', async () => {
+    const wrapper = mount(LoginPage)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="login-use-passkey"]').exists()).toBe(false)
+    await enterUsername(wrapper, 'john.doe')
+    expect(wrapper.find('[data-testid="login-use-passkey"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="login-passkey-try-again"]').exists()).toBe(false)
   })
 
   it('shows actual login errors after a failed submit', async () => {
@@ -143,12 +215,10 @@ describe('LoginPage', () => {
 
     const wrapper = mount(LoginPage)
 
-    await wrapper.get('input[autocomplete="username"]').setValue('john.doe')
-    await wrapper.get('input[autocomplete="current-password"]').setValue('wrong-password')
-    await wrapper.get('form').trigger('submit.prevent')
-    await flushPromises()
+    await signInWith(wrapper, 'john.doe', 'wrong-password')
 
     expect(wrapper.text()).toContain('Login failed')
+    expect(wrapper.text()).toContain('Password for john.doe?')
     expect(replace).not.toHaveBeenCalled()
   })
 
@@ -288,14 +358,14 @@ describe('LoginPage', () => {
   })
 
   /** A user who signed in as the wrong account must not be trapped in a change flow for it. */
-  it('returns to the sign-in form from the first change step', async () => {
+  it('returns to the password step from the first change step', async () => {
     const wrapper = await signInIntoPasswordChange()
 
     await wrapper.get('.wizard-back').trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Sign In')
-    expect(wrapper.find('input[autocomplete="username"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Password for avnindra.sharma?')
   })
 
   it('does not route back to login when the redirect query points at login', async () => {
@@ -303,10 +373,7 @@ describe('LoginPage', () => {
 
     const wrapper = mount(LoginPage)
 
-    await wrapper.get('input[autocomplete="username"]').setValue('john.doe')
-    await wrapper.get('input[autocomplete="current-password"]').setValue('moqui')
-    await wrapper.get('form').trigger('submit.prevent')
-    await flushPromises()
+    await signInWith(wrapper, 'john.doe', 'moqui')
 
     expect(loginWithCredentials).toHaveBeenCalledWith('john.doe', 'moqui')
     expect(replace).toHaveBeenCalledWith('/')
@@ -327,10 +394,11 @@ describe('LoginPage', () => {
     await flushPromises()
   }
 
-  async function openReset(typedUsername = ''): Promise<ReturnType<typeof mount>> {
+  /** Forgot password? sits on the password step (DAR-UI-120), so a username is typed to reach it. */
+  async function openReset(typedUsername = 'someone'): Promise<ReturnType<typeof mount>> {
     const wrapper = mount(LoginPage)
     await flushPromises()
-    if (typedUsername) await wrapper.get('input[autocomplete="username"]').setValue(typedUsername)
+    await enterUsername(wrapper, typedUsername)
     await wrapper.get('[data-testid="login-forgot-password"]').trigger('click')
     await flushPromises()
     return wrapper
@@ -340,17 +408,20 @@ describe('LoginPage', () => {
     getPasswordResetAvailable.mockResolvedValue(false)
     const wrapper = mount(LoginPage)
     await flushPromises()
+    await enterUsername(wrapper, 'john.doe')
 
     expect(wrapper.find('[data-testid="login-forgot-password"]').exists()).toBe(false)
   })
 
-  it('shows Forgot password? as a text link below Sign In, not a second button beside it', async () => {
+  it('shows Forgot password? on the password step as a text link, not a second button beside Next', async () => {
     const wrapper = mount(LoginPage)
     await flushPromises()
+    expect(wrapper.find('[data-testid="login-forgot-password"]').exists()).toBe(false)
+    await enterUsername(wrapper, 'john.doe')
 
     const link = wrapper.get('[data-testid="login-forgot-password"]')
     expect(link.classes()).toContain('login-text-link')
-    expect(wrapper.get('.action-row').find('[data-testid="login-forgot-password"]').exists()).toBe(false)
+    expect(wrapper.get('.wizard-actions').find('[data-testid="login-forgot-password"]').exists()).toBe(false)
   })
 
   it('opens the reset on the username, prefilled from the sign-in form', async () => {
@@ -459,22 +530,19 @@ describe('LoginPage', () => {
     expect(loginWithCredentials).not.toHaveBeenCalled()
   })
 
-  it('returns to sign-in from the first reset step', async () => {
-    const wrapper = await openReset()
+  it('returns to the password step from the first reset step', async () => {
+    const wrapper = await openReset('pwr.user')
     await wrapper.get('.wizard-back').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('form').exists()).toBe(true)
     expect(wrapper.text()).toContain('Sign In')
+    expect(wrapper.text()).toContain('Password for pwr.user?')
   })
 
   // ---- DAR-BE-028: recovery email at sign-in ----
 
   async function signIn(wrapper: ReturnType<typeof mount>, user = 'pwr.user', pass = 'Old-pass1!'): Promise<void> {
-    await wrapper.get('input[autocomplete="username"]').setValue(user)
-    await wrapper.get('input[autocomplete="current-password"]').setValue(pass)
-    await wrapper.get('form').trigger('submit.prevent')
-    await flushPromises()
+    await signInWith(wrapper, user, pass)
   }
 
   it('asks for a recovery email after sign-in when the account has none', async () => {

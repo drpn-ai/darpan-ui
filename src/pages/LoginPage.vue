@@ -23,43 +23,104 @@
            instruction, and a title above it only restated that in larger type. -->
       <h1 v-if="isSignInForm">Sign In</h1>
 
-      <form v-if="isSignInForm" class="stack-md" @submit.prevent="submit" @keydown.enter="requestSubmitOnEnter">
-        <!-- The wrapping label already names each field for assistive tech; id/name are here for the
-             password managers that still key off them rather than the autocomplete tokens. -->
-        <label for="login-username">
-          <span>Username</span>
-          <input id="login-username" v-model="username" name="username" type="text" autocomplete="username" required />
-        </label>
-
-        <label for="login-password">
-          <span>Password</span>
-          <input id="login-password" v-model="password" name="password" type="password" autocomplete="current-password" required />
-        </label>
-
-        <div class="action-row">
-          <button type="submit" :disabled="loading">Sign In</button>
-        </div>
-        <!-- DAR-BE-301: the passkey alone is the whole sign-in, so neither field is required for it. -->
-        <button
-          v-if="passkeysOffered"
-          type="button"
-          class="login-text-link"
-          data-testid="login-passkey-sign-in"
-          :disabled="loading"
-          @click="signInWithPasskey"
+      <!-- DAR-UI-120: username first, then the passkey (for a username this browser saw sign in with one) or the
+           password. id/name stay on the fields for the password managers that key off them, not the autocomplete tokens. -->
+      <template v-if="isSignInForm">
+        <WorkflowStepForm
+          v-if="signInStep === 'username'"
+          question="Username?"
+          primary-label="Next"
+          :submit-disabled="loading"
+          :show-enter-hint="true"
+          primary-test-id="login-username-next"
+          @submit="submitUsername"
         >
-          Sign in with a passkey
-        </button>
-        <button
-          v-if="passwordResetAvailable"
-          type="button"
-          class="login-text-link"
-          data-testid="login-forgot-password"
-          @click="enterResetMode"
+          <!-- "webauthn" lets the browser offer this site's passkeys in the field's own autofill. -->
+          <label class="workflow-context-block" aria-label="Username">
+            <input
+              id="login-username"
+              v-model="username"
+              class="wizard-answer-control"
+              name="username"
+              type="text"
+              autocomplete="username webauthn"
+              autocapitalize="none"
+              spellcheck="false"
+            />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="signInStep === 'passkey'"
+          question="Use your passkey."
+          :primary-label="loading ? 'Waiting' : 'Try again'"
+          :submit-disabled="loading"
+          :show-back="true"
+          :show-enter-hint="true"
+          primary-test-id="login-passkey-try-again"
+          @back="backToUsername"
+          @submit="signInWithPasskey"
         >
-          Forgot password?
-        </button>
-      </form>
+          <p class="section-note" data-testid="login-passkey-username">{{ username }}</p>
+          <button type="button" class="login-text-link" data-testid="login-use-password" @click="usePasswordInstead">
+            Use password instead
+          </button>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else
+          :question="`Password for ${username}?`"
+          primary-label="Next"
+          :submit-disabled="loading"
+          :show-back="true"
+          :show-enter-hint="true"
+          primary-test-id="login-current-password-next"
+          @back="backToUsername"
+          @submit="submitPassword"
+        >
+          <!-- The name was asked on the step before; it rides here unseen so a password manager saves and fills the pair. -->
+          <input
+            class="sr-only"
+            name="username"
+            type="text"
+            autocomplete="username"
+            :value="username"
+            readonly
+            tabindex="-1"
+            aria-hidden="true"
+          />
+          <label class="workflow-context-block" aria-label="Password">
+            <input
+              id="login-password"
+              v-model="password"
+              class="wizard-answer-control"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+            />
+          </label>
+          <!-- Scoped to the username: a security key that holds no discoverable passkey, or a passkey on a phone. -->
+          <button
+            v-if="passkeysOffered"
+            type="button"
+            class="login-text-link"
+            data-testid="login-use-passkey"
+            :disabled="loading"
+            @click="signInWithPasskey"
+          >
+            Use a passkey or security key
+          </button>
+          <button
+            v-if="passwordResetAvailable"
+            type="button"
+            class="login-text-link"
+            data-testid="login-forgot-password"
+            @click="enterResetMode"
+          >
+            Forgot password?
+          </button>
+        </WorkflowStepForm>
+      </template>
 
       <!-- DAR-BE-264: the password was right; the session waits for a code, or for a required first setup. -->
       <TwoFactorCodeSteps
@@ -245,7 +306,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InlineValidation from '../components/ui/InlineValidation.vue'
 import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
@@ -257,8 +318,8 @@ import type { TwoFactorChallengePurpose } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
 import { useAuthStore } from '../stores/auth'
-import { getPasskeyAssertion, passkeysSupported } from '../lib/passkeys'
-import { requestSubmitOnEnter } from '../lib/keyboard'
+import { conditionalMediationAvailable, getPasskeyAssertion, passkeysSupported } from '../lib/passkeys'
+import { forgetPasskey, hasRememberedPasskey, rememberPasskey } from '../lib/passkeyHint'
 import { resolveInternalRedirectTarget } from '../lib/navigation'
 
 const route = useRoute()
@@ -269,6 +330,9 @@ const username = ref('')
 const password = ref('')
 const loading = ref(false)
 const localError = ref<string | null>(null)
+// DAR-UI-120: the sign-in card asks one thing at a time. The two-factor steps, the forced change and the reset all
+// return to the password step they left from.
+const signInStep = ref<'username' | 'passkey' | 'password'>('username')
 
 const INITIAL_UNAUTHENTICATED_MESSAGE = 'No active authenticated session detected.'
 const FALLBACK_PASSWORD_CHANGE_NOTICE = 'Your password must be changed before you can sign in.'
@@ -453,57 +517,191 @@ onMounted(async () => {
 })
 watch(() => route.query.redirect, cleanupLoginSelfRedirect)
 
-// DAR-BE-301. Read once: a browser does not gain WebAuthn while the page is open.
+// DAR-UI-120. Read once: a browser does not gain WebAuthn while the page is open. Without it the steps are username,
+// then password, and no passkey is offered anywhere.
 const passkeysOffered = passkeysSupported()
 const PASSKEY_CANCELLED_TEXT = 'Passkey sign-in was cancelled.'
+const USERNAME_NEEDED_TEXT = 'Enter your username.'
+const PASSWORD_NEEDED_TEXT = 'Enter your password.'
 
-/** Sign in with a passkey alone. The username, when typed, narrows the prompt to that account's passkeys (a security key
- *  needs it); the password is never read. */
+const showsUsernameStep = computed(() => isSignInForm.value && signInStep.value === 'username')
+
+/** Next on the username step. Whether the account has a passkey is never asked of the server (begin#PasskeyFirstSignIn
+ *  answers a decoy for an unknown username, DAR-BE-301): only this browser's memory of a passkey sign-in opens the
+ *  prompt; everyone else gets the password. */
+async function submitUsername(): Promise<void> {
+  if (loading.value) return
+  localError.value = null
+  const who = username.value.trim()
+  if (!who) {
+    localError.value = USERNAME_NEEDED_TEXT
+    return
+  }
+  username.value = who
+  stopAutofill()
+  loading.value = true
+  const remembered = passkeysOffered && (await hasRememberedPasskey(who))
+  loading.value = false
+  signInStep.value = remembered ? 'passkey' : 'password'
+  if (remembered) await signInWithPasskey()
+}
+
+async function submitPassword(): Promise<void> {
+  if (loading.value) return
+  localError.value = null
+  if (!password.value) {
+    localError.value = PASSWORD_NEEDED_TEXT
+    return
+  }
+  loading.value = true
+  try {
+    await signIn(username.value, password.value, 'Invalid username or password.')
+  } finally {
+    loading.value = false
+  }
+}
+
+/** Back from the passkey or password step: the name typed stays, the password does not. */
+function backToUsername(): void {
+  leavePasskeyPrompt()
+  localError.value = null
+  password.value = ''
+  signInStep.value = 'username'
+}
+
+function usePasswordInstead(): void {
+  leavePasskeyPrompt()
+  localError.value = null
+  signInStep.value = 'password'
+}
+
+// The open passkey prompt, so leaving its step closes it.
+let passkeyPrompt: AbortController | null = null
+
+function leavePasskeyPrompt(): void {
+  if (!passkeyPrompt) return
+  passkeyPrompt.abort()
+  passkeyPrompt = null
+  loading.value = false
+}
+
+/** The browser's passkey prompt, scoped to the username typed (a security key with no discoverable passkey needs that).
+ *  The password is never read. */
 async function signInWithPasskey(): Promise<void> {
   if (loading.value) return
+  // One WebAuthn request at a time: the autofill's waiting one goes first.
+  stopAutofill()
+  const who = username.value
+  const step = signInStep.value
+  const controller = new AbortController()
+  passkeyPrompt = controller
+  // Left by Back or Use password instead while it ran: however it ends is not said.
+  const left = () => controller.signal.aborted || signInStep.value !== step
   loading.value = true
   localError.value = null
   try {
-    const begun = await authStore.beginPasskeyFirstSignIn(username.value)
+    const begun = await authStore.beginPasskeyFirstSignIn(who)
+    if (left()) return
     if (begun.outcome !== 'begun') {
       localError.value = begun.message
       return
     }
-    const asserted = await getPasskeyAssertion(begun.publicKeyOptions)
+    const asserted = await getPasskeyAssertion(begun.publicKeyOptions, controller.signal)
+    if (left()) return
     if (asserted.outcome === 'cancelled') {
       localError.value = PASSKEY_CANCELLED_TEXT
       return
     }
     if (asserted.outcome === 'failed') {
       localError.value = asserted.message
+      await forgetPasskey(who)
       return
     }
-    const finished = await authStore.finishPasskeyFirstSignIn(begun.challengeToken, asserted.json)
-    if (finished.outcome === 'signedIn') {
-      // No password was typed, so the steps that need one (a recovery email) are not asked here.
-      await leaveSignIn()
-      return
+    await finishPasskeySignIn(begun.challengeToken, asserted.json, who)
+  } finally {
+    if (passkeyPrompt === controller) {
+      passkeyPrompt = null
+      loading.value = false
     }
-    localError.value = finished.message
-    if (finished.reason === 'PASSWORD_CHANGE_REQUIRED') await focusPasswordField()
+  }
+}
+
+/** Every passkey-first sign-in ends here. `typed` is the username the prompt was scoped to; the autofill has none, so the
+ *  signed-in account's own name is remembered instead. True when signed in. */
+async function finishPasskeySignIn(challengeToken: string, assertion: string, typed: string | null): Promise<boolean> {
+  const finished = await authStore.finishPasskeyFirstSignIn(challengeToken, assertion)
+  if (finished.outcome === 'signedIn') {
+    const who = typed || authStore.username
+    if (who) await rememberPasskey(who)
+    // No password was typed, so the steps that need one (a recovery email) are not asked here.
+    await leaveSignIn()
+    return true
+  }
+  localError.value = finished.message
+  if (!typed) return false
+  if (finished.reason === 'PASSWORD_CHANGE_REQUIRED') {
+    // The password leads to setting a new one.
+    signInStep.value = 'password'
+    await focusPasswordField()
+  } else if (finished.reason === 'PASSKEY_REFUSED') {
+    // Not that account's passkey (or not one at all): Next goes to the password from now on.
+    await forgetPasskey(typed)
+  }
+  return false
+}
+
+// The username field's autofill offers this site's passkeys while the username step shows (conditional mediation).
+// Challenges live 300 s, so a fresh one is begun before then. Begins are rate-limited and the browser may say no: any
+// failure here just leaves the autofill without passkeys, and says nothing.
+const AUTOFILL_RENEW_MS = 270_000
+let autofill: AbortController | null = null
+let autofillRenewal: ReturnType<typeof setTimeout> | null = null
+
+function stopAutofill(): void {
+  if (autofillRenewal !== null) clearTimeout(autofillRenewal)
+  autofillRenewal = null
+  autofill?.abort()
+  autofill = null
+}
+
+async function startAutofill(): Promise<void> {
+  stopAutofill()
+  if (!passkeysOffered) return
+  const controller = new AbortController()
+  autofill = controller
+  if (!(await conditionalMediationAvailable()) || controller.signal.aborted) return
+  autofillRenewal = setTimeout(() => { void startAutofill() }, AUTOFILL_RENEW_MS)
+  const begun = await authStore.beginPasskeyFirstSignIn('')
+  if (begun.outcome !== 'begun' || controller.signal.aborted) return
+  const asserted = await getPasskeyAssertion(begun.publicKeyOptions, controller.signal, 'conditional')
+  if (asserted.outcome !== 'ok' || controller.signal.aborted) return
+  stopAutofill()
+  loading.value = true
+  let signedIn = false
+  try {
+    signedIn = await finishPasskeySignIn(begun.challengeToken, asserted.json, null)
   } finally {
     loading.value = false
   }
+  // Refused: that challenge is spent, so the autofill gets a fresh one.
+  if (!signedIn && showsUsernameStep.value && autofill === null) void startAutofill()
 }
+
+watch(showsUsernameStep, (shown) => {
+  if (shown) void startAutofill()
+  else stopAutofill()
+})
+onMounted(() => {
+  if (showsUsernameStep.value) void startAutofill()
+})
+onBeforeUnmount(() => {
+  stopAutofill()
+  leavePasskeyPrompt()
+})
 
 async function focusPasswordField(): Promise<void> {
   await nextTick()
   document.getElementById('login-password')?.focus()
-}
-
-async function submit(): Promise<void> {
-  loading.value = true
-  localError.value = null
-  try {
-    await signIn(username.value, password.value, 'Invalid username or password.')
-  } finally {
-    loading.value = false
-  }
 }
 
 /** Every password sign-in (the form, after a forced change, after a reset) goes through here, so each reaches the
@@ -632,7 +830,7 @@ async function leaveSignIn(): Promise<void> {
   await router.replace(resolveInternalRedirectTarget(route.query.redirect))
 }
 
-/** Back to the password form, by choice: the person types the password again. */
+/** Back to the password step, by choice: the person types the password again. */
 function leaveTwoFactorStep(): void {
   authStore.abandonTwoFactorChallenge()
   twoFactorMode.value = null
@@ -646,7 +844,9 @@ function endTwoFactorStep(message: string): void {
   localError.value = message
 }
 
-async function finishTwoFactorSignIn(codesLeft: number | null): Promise<void> {
+async function finishTwoFactorSignIn(codesLeft: number | null, byPasskey = false): Promise<void> {
+  // DAR-UI-120: a passkey that answered the second step can be the whole sign-in next time.
+  if (byPasskey) await rememberPasskey(username.value)
   twoFactorMode.value = null
   localError.value = null
   if (codesLeft !== null && codesLeft <= LOW_RECOVERY_CODES) {

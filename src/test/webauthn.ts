@@ -9,6 +9,7 @@ export interface WebAuthnStub {
   get: Mock
   parseCreationOptionsFromJSON: Mock
   parseRequestOptionsFromJSON: Mock
+  isConditionalMediationAvailable: Mock
   restore: () => void
 }
 
@@ -22,7 +23,8 @@ export function notAllowed(): DOMException {
   return new DOMException('The operation either timed out or was not allowed.', 'NotAllowedError')
 }
 
-export function installWebAuthnStub(options: { json?: boolean } = {}): WebAuthnStub {
+/** `conditional` (DAR-UI-120): the browser offers passkeys in a username field's autofill. */
+export function installWebAuthnStub(options: { json?: boolean; conditional?: boolean } = {}): WebAuthnStub {
   const json = options.json ?? true
   const credential = (made: 'create' | 'get') => ({
     id: 'cred-1',
@@ -39,9 +41,11 @@ export function installWebAuthnStub(options: { json?: boolean } = {}): WebAuthnS
   const get = vi.fn(async () => credential('get'))
   const parseCreationOptionsFromJSON = vi.fn((value: Record<string, unknown>) => ({ ...value, parsed: 'creation' }))
   const parseRequestOptionsFromJSON = vi.fn((value: Record<string, unknown>) => ({ ...value, parsed: 'request' }))
+  const isConditionalMediationAvailable = vi.fn(async () => true)
 
   const FakePublicKeyCredential = function PublicKeyCredential() {} as unknown as Record<string, unknown>
   if (json) Object.assign(FakePublicKeyCredential, { parseCreationOptionsFromJSON, parseRequestOptionsFromJSON })
+  if (options.conditional) Object.assign(FakePublicKeyCredential, { isConditionalMediationAvailable })
 
   const previousCredentials = Object.getOwnPropertyDescriptor(navigator, 'credentials')
   Object.defineProperty(window, 'PublicKeyCredential', { value: FakePublicKeyCredential, configurable: true, writable: true })
@@ -52,6 +56,7 @@ export function installWebAuthnStub(options: { json?: boolean } = {}): WebAuthnS
     get,
     parseCreationOptionsFromJSON,
     parseRequestOptionsFromJSON,
+    isConditionalMediationAvailable,
     restore() {
       delete (window as unknown as Record<string, unknown>).PublicKeyCredential
       if (previousCredentials) Object.defineProperty(navigator, 'credentials', previousCredentials)

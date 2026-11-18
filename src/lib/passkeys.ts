@@ -22,6 +22,7 @@ type JsonOptions = Record<string, unknown> & { challenge: string; user?: { id: s
 type CredentialStatics = {
   parseCreationOptionsFromJSON?: (json: unknown) => CredentialCreationOptions['publicKey']
   parseRequestOptionsFromJSON?: (json: unknown) => CredentialRequestOptions['publicKey']
+  isConditionalMediationAvailable?: () => Promise<boolean>
 }
 type JsonCapableCredential = PublicKeyCredential & { toJSON?: () => unknown }
 
@@ -35,6 +36,17 @@ function credentialStatics(): CredentialStatics | null {
 export function passkeysSupported(): boolean {
   if (!credentialStatics() || typeof navigator === 'undefined') return false
   return typeof navigator.credentials?.create === 'function' && typeof navigator.credentials?.get === 'function'
+}
+
+/** DAR-UI-120: true when the browser can offer passkeys in a username field's autofill (conditional mediation). */
+export async function conditionalMediationAvailable(): Promise<boolean> {
+  const statics = passkeysSupported() ? credentialStatics() : null
+  if (typeof statics?.isConditionalMediationAvailable !== 'function') return false
+  try {
+    return (await statics.isConditionalMediationAvailable()) === true
+  } catch {
+    return false
+  }
 }
 
 // ─── base64url fallback for browsers without the WebAuthn L3 JSON methods ─────────────────────────────────────────
@@ -131,10 +143,16 @@ export function createPasskey(publicKeyOptions: string, signal?: AbortSignal): P
   return ceremony('create', () => navigator.credentials.create({ publicKey: creationOptions(json), signal }))
 }
 
-/** navigator.credentials.get over begin#PasskeySignIn's or begin#PasskeyProof's options; the assertion as JSON text. */
-export function getPasskeyAssertion(publicKeyOptions: string, signal?: AbortSignal): Promise<PasskeyCeremony> {
+/** navigator.credentials.get over begin#PasskeySignIn's, begin#PasskeyProof's or begin#PasskeyFirstSignIn's options; the
+ *  assertion as JSON text. `mediation: 'conditional'` (DAR-UI-120) offers the passkeys in the username field's autofill
+ *  instead of opening a prompt, and waits until one is picked or `signal` aborts it. */
+export function getPasskeyAssertion(
+  publicKeyOptions: string,
+  signal?: AbortSignal,
+  mediation?: CredentialMediationRequirement,
+): Promise<PasskeyCeremony> {
   const json = parseOptions(publicKeyOptions)
   if (!json) return Promise.resolve({ outcome: 'failed', message: PASSKEY_REFUSAL_TEXT })
-  return ceremony('get', () => navigator.credentials.get({ publicKey: requestOptions(json), signal }))
+  return ceremony('get', () => navigator.credentials.get({ publicKey: requestOptions(json), signal, ...(mediation ? { mediation } : {}) }))
 }
 

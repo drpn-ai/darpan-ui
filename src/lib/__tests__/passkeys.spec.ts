@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { createPasskey, getPasskeyAssertion, passkeysSupported, PASSKEY_REFUSAL_TEXT, PASSKEYS_UNSUPPORTED_TEXT } from '../passkeys'
+import { conditionalMediationAvailable, createPasskey, getPasskeyAssertion, passkeysSupported, PASSKEY_REFUSAL_TEXT, PASSKEYS_UNSUPPORTED_TEXT } from '../passkeys'
 import { ASSERTION_JSON, CREATED_JSON, CREATION_OPTIONS, REQUEST_OPTIONS, installWebAuthnStub, notAllowed, type WebAuthnStub } from '../../test/webauthn'
 
 // DAR-BE-270: the browser side of a passkey ceremony. What could bite: an older browser without the L3 JSON methods
@@ -85,5 +85,27 @@ describe('passkeys', () => {
     await getPasskeyAssertion(REQUEST_OPTIONS, controller.signal)
     expect(stub.create.mock.calls[0]?.[0].signal).toBe(controller.signal)
     expect(stub.get.mock.calls[0]?.[0].signal).toBe(controller.signal)
+    // A modal prompt names no mediation; the browser's default is the prompt.
+    expect(stub.get.mock.calls[0]?.[0]).not.toHaveProperty('mediation')
+  })
+
+  it('DAR-UI-120: asks for conditional mediation when the page offers passkeys in autofill', async () => {
+    stub = installWebAuthnStub({ conditional: true })
+    const controller = new AbortController()
+    expect(await getPasskeyAssertion(REQUEST_OPTIONS, controller.signal, 'conditional')).toEqual({ outcome: 'ok', json: ASSERTION_JSON })
+    expect(stub.get.mock.calls[0]?.[0]).toMatchObject({ mediation: 'conditional', signal: controller.signal })
+  })
+
+  it('DAR-UI-120: autofill is available only where the browser says so, and a throwing probe is a no', async () => {
+    expect(await conditionalMediationAvailable()).toBe(false)
+    stub = installWebAuthnStub()
+    expect(await conditionalMediationAvailable()).toBe(false)
+    stub.restore()
+    stub = installWebAuthnStub({ conditional: true })
+    expect(await conditionalMediationAvailable()).toBe(true)
+    stub.isConditionalMediationAvailable.mockResolvedValueOnce(false)
+    expect(await conditionalMediationAvailable()).toBe(false)
+    stub.isConditionalMediationAvailable.mockRejectedValueOnce(new Error('nope'))
+    expect(await conditionalMediationAvailable()).toBe(false)
   })
 })

@@ -49,10 +49,13 @@ const setupStart = {
   expiresInSeconds: 900,
 }
 
+/** DAR-UI-120: the username step, Next, then the password step and its Next. */
 async function signIn(wrapper: ReturnType<typeof mount>): Promise<void> {
-  await wrapper.get('input[autocomplete="username"]').setValue('ada')
-  await wrapper.get('input[autocomplete="current-password"]').setValue('right-password')
-  await wrapper.get('form').trigger('submit.prevent')
+  await wrapper.get('#login-username').setValue('ada')
+  await wrapper.get('[data-testid="login-username-next"]').trigger('click')
+  await flushPromises()
+  await wrapper.get('#login-password').setValue('right-password')
+  await wrapper.get('[data-testid="login-current-password-next"]').trigger('click')
   await flushPromises()
 }
 
@@ -80,6 +83,7 @@ describe('LoginPage two-factor', () => {
     const wrapper = mount(LoginPage)
 
     await signIn(wrapper)
+    expect(loginSession).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Enter the code from your app.')
     expect(wrapper.find('h1').exists()).toBe(false)
 
@@ -114,6 +118,7 @@ describe('LoginPage two-factor', () => {
 
     expect(wrapper.find('h1').text()).toBe('Sign In')
     expect(wrapper.text()).toContain('Sign in again.')
+    expect(wrapper.text()).toContain('Password for ada?')
     expect((wrapper.get('input[autocomplete="current-password"]').element as HTMLInputElement).value).toBe('')
   })
 
@@ -170,7 +175,7 @@ describe('LoginPage two-factor', () => {
     expect(replace).toHaveBeenCalledWith('/')
   })
 
-  it('Back from the code step returns to the password form', async () => {
+  it('Back from the code step returns to the password step, not the username', async () => {
     loginSession.mockResolvedValue(challengeReply('code'))
     const wrapper = mount(LoginPage)
 
@@ -179,6 +184,8 @@ describe('LoginPage two-factor', () => {
     await flushPromises()
 
     expect(wrapper.find('h1').text()).toBe('Sign In')
+    expect(wrapper.text()).toContain('Password for ada?')
+    expect((wrapper.get('#login-password').element as HTMLInputElement).value).toBe('')
   })
 
   it('Back after a refused code opens a clean sign-in form: the refusal stayed with the step', async () => {
