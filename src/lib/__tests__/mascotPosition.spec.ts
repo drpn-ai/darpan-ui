@@ -1,32 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  MASCOT_EDGE_MARGIN_PX,
-  MASCOT_POSITION_KEY,
-  placeMascotDock,
-  readMascotSpot,
-  saveMascotSpot,
-} from '../mascotPosition'
+import { describe, expect, it } from 'vitest'
+import { MASCOT_EDGE_MARGIN_PX, placeMascotDock } from '../mascotPosition'
 
 describe('mascotPosition (DAR-UI-131)', () => {
-  beforeEach(() => window.sessionStorage.clear())
-
-  it('keeps the spot in this tab only, in sessionStorage', () => {
-    saveMascotSpot({ x: 0.25, y: 0.4 })
-
-    expect(window.sessionStorage.getItem(MASCOT_POSITION_KEY)).toBe('{"x":0.25,"y":0.4}')
-    expect(readMascotSpot()).toEqual({ x: 0.25, y: 0.4 })
-  })
-
-  it('starts in the corner when nothing, or nonsense, is stored', () => {
-    expect(readMascotSpot()).toBeNull()
-
-    window.sessionStorage.setItem(MASCOT_POSITION_KEY, '{"x":1.7,"y":0.2}')
-    expect(readMascotSpot()).toBeNull()
-
-    window.sessionStorage.setItem(MASCOT_POSITION_KEY, 'not json')
-    expect(readMascotSpot()).toBeNull()
-  })
-
   it('anchors right on the right half, so her bubble keeps growing leftward', () => {
     const placed = placeMascotDock({ x: 0.75, y: 0.5 }, 100, 1000, 800)
 

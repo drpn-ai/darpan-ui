@@ -1,17 +1,14 @@
 /**
  * DAR-UI-131. Where Tara stands once she has been dragged out of her corner.
  *
- * The spot lives in sessionStorage on purpose: it belongs to this tab and dies with it, so a new
- * tab, or this one reopened later, finds her back in the corner. (A tab the browser DUPLICATES
- * copies its sessionStorage, so a duplicate starts where the original stood. That is the
- * browser's rule, not ours.)
+ * Nothing here is stored. The spot lives in the dock's memory for the life of the page, so moving
+ * between screens keeps her where she was put, and any reload (a hard refresh included; a script
+ * cannot tell the two apart), a new tab or a closed one finds her back in the corner.
  *
- * Stored as the centre of the face in fractions of the viewport rather than pixels, so a window
- * that is resized, or a laptop moved to a bigger screen, keeps her in the same part of the page;
- * {@link placeMascotDock} then clamps her back inside whatever viewport there is.
+ * Kept as the centre of the face in fractions of the viewport rather than pixels, so a window
+ * that is resized keeps her in the same part of the page; {@link placeMascotDock} then clamps her
+ * back inside whatever viewport there is.
  */
-export const MASCOT_POSITION_KEY = 'darpan.mascotPosition'
-
 /** The face's centre, each axis as a fraction of the viewport (0 = left/top, 1 = right/bottom). */
 export interface MascotSpot {
   x: number
@@ -29,32 +26,8 @@ export interface MascotDockPlacement {
    * bubble grows away from it, exactly as it does from the corner on the right.
    */
   flipped: boolean
-  /** The clamped spot, which is what gets saved: she stays exactly where she was let go. */
+  /** The clamped spot, which is what the dock keeps: she stays exactly where she was let go. */
   spot: MascotSpot
-}
-
-function isFraction(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
-}
-
-export function readMascotSpot(): MascotSpot | null {
-  try {
-    const raw = window.sessionStorage.getItem(MASCOT_POSITION_KEY)
-    if (!raw) return null
-    const stored = JSON.parse(raw) as Record<string, unknown>
-    return isFraction(stored.x) && isFraction(stored.y) ? { x: stored.x, y: stored.y } : null
-  } catch {
-    // Blocked storage or a hand-edited value: she simply starts in the corner.
-    return null
-  }
-}
-
-export function saveMascotSpot(spot: MascotSpot): void {
-  try {
-    window.sessionStorage.setItem(MASCOT_POSITION_KEY, JSON.stringify(spot))
-  } catch {
-    // Storage refused: she still stands where she was dropped until the page reloads.
-  }
 }
 
 function clamp(value: number, low: number, high: number): number {

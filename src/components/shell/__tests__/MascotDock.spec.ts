@@ -265,7 +265,7 @@ describe('MascotDock warnings', () => {
   })
 })
 
-// DAR-UI-131: Tara can be carried anywhere; the spot is this tab's alone.
+// DAR-UI-131: Tara can be carried anywhere; the spot lasts only as long as the page.
 describe('MascotDock dragging', () => {
   const FACE = { left: 900, top: 650, width: 98, height: 98, right: 998, bottom: 748, x: 900, y: 650 }
   // jsdom's viewport: 1024 x 768.
@@ -286,7 +286,7 @@ describe('MascotDock dragging', () => {
     expect(wrapper.get('.mascot-dock').attributes('style')).toBeUndefined()
   })
 
-  it('moves where she is dropped, keeps it for the tab, and the drop does not open the launcher', async () => {
+  it('moves where she is dropped, stores nothing, and the drop does not open the launcher', async () => {
     const wrapper = mountDock()
     const fab = wrapper.get('.mascot-fab')
 
@@ -301,10 +301,19 @@ describe('MascotDock dragging', () => {
     expect(dock.classes()).toEqual(expect.arrayContaining(['mascot-dock--moved', 'mascot-dock--flipped']))
     expect(dock.attributes('style')).toContain('left: 251px')
     expect(dock.attributes('style')).toContain('bottom: 419px')
-    expect(JSON.parse(window.sessionStorage.getItem('darpan.mascotPosition') ?? 'null')).toEqual({
-      x: 300 / 1024,
-      y: 300 / 768,
-    })
+    // Nothing outlives the page: a reload, hard or soft, is how she goes home.
+    expect(window.sessionStorage.length).toBe(0)
+  })
+
+  it('captures the pointer on the press, so a flick whose first move is already off her face still carries her', async () => {
+    const wrapper = mountDock()
+    const fab = wrapper.get('.mascot-fab')
+    const capture = vi.fn()
+    ;(fab.element as HTMLElement).setPointerCapture = capture
+
+    await fab.trigger('pointerdown', press({ clientX: 949, clientY: 699 }))
+
+    expect(capture).toHaveBeenCalledWith(1)
   })
 
   it('treats a wobble under the threshold as a click', async () => {
@@ -320,16 +329,18 @@ describe('MascotDock dragging', () => {
     expect(wrapper.get('.mascot-dock').classes()).not.toContain('mascot-dock--moved')
   })
 
-  it('comes back where this tab left her after a reload', async () => {
-    window.sessionStorage.setItem('darpan.mascotPosition', JSON.stringify({ x: 0.8, y: 0.25 }))
+  it('is back in the corner after a reload', async () => {
+    const first = mountDock()
+    const fab = first.get('.mascot-fab')
+    await fab.trigger('pointerdown', press({ clientX: 949, clientY: 699 }))
+    await fab.trigger('pointermove', press({ clientX: 300, clientY: 300 }))
+    await fab.trigger('pointerup', press({ clientX: 300, clientY: 300 }))
+    first.unmount()
 
-    const wrapper = mountDock()
-    // She is placed once the face has been measured, on mount.
-    await wrapper.vm.$nextTick()
-    const dock = wrapper.get('.mascot-dock')
+    const reloaded = mountDock()
+    await reloaded.vm.$nextTick()
 
-    expect(dock.classes()).toContain('mascot-dock--moved')
-    expect(dock.classes()).not.toContain('mascot-dock--flipped')
-    expect(dock.attributes('style')).toContain('bottom:')
+    expect(reloaded.get('.mascot-dock').classes()).not.toContain('mascot-dock--moved')
+    expect(reloaded.get('.mascot-dock').attributes('style')).toBeUndefined()
   })
 })

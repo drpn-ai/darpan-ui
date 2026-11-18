@@ -86,7 +86,7 @@ import { createDwellController, type DwellController } from '../../composables/u
 import { createIdleHintController } from '../../composables/useIdleHints'
 import { resolveExplainTarget } from '../../lib/mascotTargets'
 import { hintsFor } from '../../lib/mascotHints'
-import { placeMascotDock, readMascotSpot, saveMascotSpot, type MascotSpot } from '../../lib/mascotPosition'
+import { placeMascotDock, type MascotSpot } from '../../lib/mascotPosition'
 
 /**
  * The route arrives as a prop rather than through useRoute(): the dock is shell furniture
@@ -173,13 +173,13 @@ function onFaceClick(event: MouseEvent): void {
 }
 
 /* ── Dragging (DAR-UI-131) ─────────────────────────────────────────────────────
-   She can be picked up and set down anywhere. The spot is kept for this tab only
-   (sessionStorage), so a new tab or a reopened one finds her back in the corner. Until she
-   is moved there is no inline style at all and the corner is pure CSS, as before. */
+   She can be picked up and set down anywhere. The spot is held here, in memory, for the life of
+   the page: screens change around her and she stays put, while any reload or new tab finds her
+   back in the corner. Until she is moved there is no inline style and the corner is pure CSS. */
 /** Under this, a press is a click with a wobble, not a drag. */
 const DRAG_THRESHOLD_PX = 6
 
-const spot = ref<MascotSpot | null>(readMascotSpot())
+const spot = ref<MascotSpot | null>(null)
 const fabSize = ref(0)
 const viewport = ref({ width: 0, height: 0 })
 const dragging = ref(false)
@@ -209,6 +209,9 @@ function onFacePointerDown(event: PointerEvent): void {
     cy: rect.top + rect.height / 2,
   }
   if (rect.width) fabSize.value = rect.width
+  // Captured on the press, not once the drag is under way: a quick flick's first move can already
+  // be off her face, and without capture that move goes to whatever is underneath and she stays put.
+  ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
 }
 
 function onFacePointerMove(event: PointerEvent): void {
@@ -218,8 +221,6 @@ function onFacePointerMove(event: PointerEvent): void {
   if (!dragging.value) {
     if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
     dragging.value = true
-    // Captured so a fast drag that outruns the face still lands, and still ends, on it.
-    ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
     // She is being carried, not asked: whatever she was saying goes.
     mascot.clear()
   }
@@ -231,11 +232,8 @@ function endDrag(): void {
   press = null
   if (!dragging.value) return
   dragging.value = false
-  // Saved clamped, so she stays exactly where she was let go rather than where the pointer was.
-  if (placement.value) {
-    spot.value = placement.value.spot
-    saveMascotSpot(placement.value.spot)
-  }
+  // Kept clamped, so she stays exactly where she was let go rather than where the pointer was.
+  if (placement.value) spot.value = placement.value.spot
 }
 
 function onFacePointerUp(event: PointerEvent): void {
