@@ -272,6 +272,7 @@ describe('every label in the app has an answer', () => {
     'darpan': 'the login page has no mascot dock (design system: MascotDock.prompt.md)',
     'sign in': 'the login page has no mascot dock, and the Sign In button answers once signed out pages gain one',
     'user settings': 'page title: it names the page you are on',
+    'audit settings': 'page title only while the audit loads or fails to; the audit\'s own name replaces it',
     'account': 'section title over fields that each answer for themselves',
     'approve cli': 'page title; the Approve button carries the consequence',
     'scripts': 'page title; the section note says what a script is',
@@ -358,8 +359,11 @@ describe('every label in the app has an answer', () => {
     for (const [file, word, key, count] of PINNED) {
       const source = readFileSync(`src/${file}`, 'utf-8')
       const labels = Array.from(source.matchAll(new RegExp(`<[a-z0-9]+[^>]*class="[^"]*label[^"]*"[^>]*>${word}<`, 'g'))).map((m) => m[0])
-      expect(labels.length, `${file}: expected ${count} "${word}" label(s)`).toBe(count)
+      // A StaticFactStrip fact names its label in script (DAR-UI-126): { label: 'Schedule', …, explain: 'auditScheduleTime', … }.
+      const facts = Array.from(source.matchAll(new RegExp(`label: '${word}'[^{}]*`, 'g'))).map((m) => m[0])
+      expect(labels.length + facts.length, `${file}: expected ${count} "${word}" label(s)`).toBe(count)
       for (const tag of labels) expect(tag, `${file}: "${word}"`).toContain(`v-explain="'${key}'"`)
+      for (const fact of facts) expect(fact, `${file}: "${word}"`).toContain(`explain: '${key}'`)
     }
   })
 

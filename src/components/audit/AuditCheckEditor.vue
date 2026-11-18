@@ -246,10 +246,8 @@
         <InlineValidation v-for="message in errors" :key="message" tone="error" :message="message" />
       </div>
       <div class="audit-check-actions">
-        <!-- Words, not the save icon: the settings page's own Save sits just below. -->
-        <button type="button" class="ghost-btn" data-testid="audit-check-save" :disabled="busy" @click="void save()">
-          Save check
-        </button>
+        <!-- DAR-UI-127: the editor has a popup of its own now, so its Save is the save icon like every popup's. -->
+        <AppSaveAction label="Save check" test-id="audit-check-save" :disabled="busy" @click="void save()" />
         <AppCancelAction test-id="audit-check-cancel" :disabled="saving" @click="emit('cancel')" />
       </div>
     </template>
@@ -260,6 +258,7 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppCancelAction from '../ui/AppCancelAction.vue'
+import AppSaveAction from '../ui/AppSaveAction.vue'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowSelect from '../workflow/WorkflowSelect.vue'

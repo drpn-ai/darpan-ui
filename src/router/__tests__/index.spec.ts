@@ -50,7 +50,7 @@ describe('router release scope', () => {
     { name: 'hub', path: '/', surfaceMode: 'static' },
     { name: 'audit-report', path: '/audits/:audit', surfaceMode: 'static', staticPageLabel: 'Audit' },
     { name: 'audit-run-start', path: '/audits/:audit/run', surfaceMode: 'workflow' },
-    { name: 'audit-settings', path: '/audits/:audit/settings', surfaceMode: 'workflow' },
+    { name: 'audit-settings', path: '/audits/:audit/settings', surfaceMode: 'static', staticPageLabel: 'Audit settings' },
   ]
 
   it.each(expectedRoutes)('registers $name at $path', ({ name, path, surfaceMode, staticPageLabel, redirect }) => {

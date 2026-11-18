@@ -205,15 +205,11 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   // DAR-UI-078. Making an audit in the app.
   'new statement': {
     title: 'New statement',
-    body: 'adds one thing this audit must find true, coded the next R number and saved at once. It raises nothing until a check is added to it.',
+    body: 'one more thing this audit must find true, in your words. Saving codes it the next R number; it raises nothing until a check is added to it.',
   },
   'save check': {
     title: 'Save check',
-    body: 'adds the check to the statements it names; the audit schedules its run on the next play. The page\'s own Save is not needed for it.',
-  },
-  'save statement': {
-    title: 'Save statement',
-    body: 'writes the new statement now, on its own; the page\'s Save is for the name, schedule and the statements already there.',
+    body: 'adds the check to the statements it names, then goes back to this one. The audit schedules its run on the next play.',
   },
   'create audit': {
     title: 'Create audit',
@@ -222,7 +218,12 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   // DAR-UI-063. The audit settings page.
   'daily schedule': {
     title: 'Daily schedule',
-    body: 'pauses or resumes every check of this audit at once. A paused check keeps its findings; it just stops looking for new ones.',
+    body: 'pauses or resumes every check of this audit, saved on the click. A paused check keeps its findings; it just stops looking for new ones.',
+  },
+  // DAR-UI-127.
+  'back to the audit': {
+    title: 'Back to the audit',
+    body: 'its report, on the morning it was showing. Every change here was saved as it was made, so nothing is left behind.',
   },
   'delete run': {
     title: 'Delete run',
@@ -954,6 +955,23 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^(expand|collapse) .+ (object|array)$/, {
     title: 'Expand',
     body: 'opens this branch of the record. It is the value the run actually compared, not a re-formatting of it.',
+  }],
+  // DAR-UI-127: Audit settings names each statement row "Open statement <code>" and its facts "<fact>: <value>".
+  [/^open statement .+$/, {
+    title: 'Statement',
+    body: 'opens its words and the checks that test it. A change saves from there and counts from the next run.',
+  }],
+  [/^audit schedule: .+$/, {
+    title: 'Schedule',
+    body: 'sets when every check of this audit starts each day, and in which zone. The switch by the name pauses them all.',
+  }],
+  [/^after each run: .+$/, {
+    title: 'After each run',
+    body: 'turns the email after each run on or off and adds addresses beyond the members. Only tenant admins can change it.',
+  }],
+  [/^audit posts to: .+$/, {
+    title: 'Posts to',
+    body: 'picks the chat space that gets a summary card after each run, or None. The same choice as this audit’s row in Notifications.',
   }],
   // DAR-UI-125: each earlier row on Config history is named "Restore version <n>".
   [/^restore version .+$/, {

@@ -786,11 +786,6 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'the title the report and the admin live view show for this audit. Its links use the audit code, so renaming breaks no bookmark.',
     byDirectiveOnly: true,
   },
-  auditScheduleDaily: {
-    title: 'Daily',
-    body: 'on, every check in this audit runs once a day. Off pauses them all, so no findings are recorded or closed until it is back on.',
-    byDirectiveOnly: true,
-  },
   auditScheduleTime: {
     title: 'Audit time',
     body: 'when every check in this audit starts each day, in the timezone beside it. Saving moves them all here, even checks that ran at other times.',
@@ -799,6 +794,22 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   auditRunEmail: {
     title: 'After each run',
     body: 'an email to everyone with access to this tenant, and a card in the chat space if one is picked, once each run finishes. Off, findings still record but nobody is told.',
+  },
+  // DAR-UI-127: the Audit settings strip and popups.
+  auditPostsTo: {
+    title: 'Posts to',
+    body: 'the chat space that gets a summary card when each run finishes. Off after each run, or None here, and no card is sent.',
+    byDirectiveOnly: true,
+  },
+  auditStatementCategory: {
+    title: 'Category',
+    body: 'where the statement sits on the audit’s report: orders, refunds and credits, returns, or exchanges and warranty.',
+    byDirectiveOnly: true,
+  },
+  auditStatementWeight: {
+    title: 'Weight',
+    body: 'firm when the tenant said it; derived when it is inferred and waits for the tenant to confirm it.',
+    byDirectiveOnly: true,
   },
   auditRunEmailExtra: {
     title: 'Also send to',

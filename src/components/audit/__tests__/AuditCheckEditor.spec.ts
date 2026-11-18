@@ -339,9 +339,9 @@ describe('AuditCheckEditor', () => {
     expect(w.get('[data-testid="audit-check-errors"]').text()).toBe('Name the check: what it compares, in a few words.')
   })
 
-  it('says "Save check" in words, and clears a refusal once the form changes', async () => {
+  it('names its save icon "Save check", and clears a refusal once the form changes', async () => {
     const w = await mountEditor()
-    expect(trigger(w, 'audit-check-save').text()).toBe('Save check')
+    expect(trigger(w, 'audit-check-save').attributes('aria-label')).toBe('Save check')
     await trigger(w, 'audit-check-label').setValue('Returns credited')
     await trigger(w, 'audit-check-save').trigger('click')
     await flushPromises()

@@ -115,11 +115,11 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
-    // DAR-UI-063. An audit's settings gear: its name, schedule and statements.
+    // DAR-UI-063. An audit's settings gear: its name, schedule and statements. DAR-UI-127: a static settings page.
     path: '/audits/:audit/settings',
     name: 'audit-settings',
     component: () => import('../pages/reconciliation/AuditSettingsPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Audit settings' },
   },
   {
     // DAR-UI-058. An audit run's report; ?period, ?date and ?finding pick what it shows.

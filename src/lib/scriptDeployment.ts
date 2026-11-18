@@ -45,8 +45,8 @@ export function isFailedStatus(status: string | null | undefined): boolean {
   return Boolean(status && FAILED_STATUSES.has(status))
 }
 
-/** "07:30" -> "7:30 AM": how a schedule reads back everywhere else in the product. */
-function twelveHourTime(time: string): string {
+/** "07:30" -> "7:30 AM": how a schedule reads back everywhere else in the product (scripts, audit settings). */
+export function twelveHourTime(time: string): string {
   const [hourText, minute] = time.split(':')
   const hour = Number(hourText)
   return `${hour % 12 === 0 ? 12 : hour % 12}:${minute} ${hour >= 12 ? 'PM' : 'AM'}`
