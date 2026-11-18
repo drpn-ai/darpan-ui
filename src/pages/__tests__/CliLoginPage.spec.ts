@@ -102,12 +102,18 @@ describe('CliLoginPage', () => {
   })
 
   it('an unrecognised scope says so and offers no approve control', async () => {
+    authState.twoFactorEnabled = true
     getCliLoginRequest.mockResolvedValue({ ...pending, scope: 'ROOT' })
     const wrapper = mount(CliLoginPage)
     await typeCode(wrapper, 'BCDF-GH23')
     expect(wrapper.get('[data-testid="cli-login-unknown-scope"]').text())
       .toBe('This sign-in asks for access Darpan does not recognise. Do not approve it.')
     expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="cli-login-deny"]').trigger('click')
+    await flushPromises()
+    expect(denyCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23' }, expect.anything())
+    expect(approveCliLogin).not.toHaveBeenCalled()
   })
 
   it.each([['?code=ABCD-EFGH', ''], ['', '#ABCD-EFGH']])('never reads a code from the route (%s%s)', async (search, hash) => {

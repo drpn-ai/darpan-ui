@@ -79,15 +79,15 @@
             Use the app code
           </button>
           <p v-if="codeError" class="section-note" role="alert" data-testid="cli-login-code-error">{{ codeError }}</p>
-          <div class="cli-login-actions">
-            <button class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
-              Approve
-            </button>
-            <button class="btn-primary" type="button" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
-              Deny
-            </button>
-          </div>
         </template>
+        <div class="cli-login-actions">
+          <button v-if="scopeKnown" class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
+            Approve
+          </button>
+          <button class="btn-primary" type="button" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
+            Deny
+          </button>
+        </div>
       </template>
 
       <form v-else class="stack-md" @submit.prevent="lookUp">
