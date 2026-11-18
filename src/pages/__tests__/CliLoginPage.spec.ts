@@ -10,7 +10,7 @@ const requestCliAccess = vi.hoisted(() => vi.fn())
 const getTwoFactorStatus = vi.hoisted(() => vi.fn())
 const beginPasskeyProof = vi.hoisted(() => vi.fn())
 
-const authState = vi.hoisted(() => ({ twoFactorEnabled: false }))
+const authState = vi.hoisted(() => ({ twoFactorEnabled: false, sessionInfo: { isSuperAdmin: true } as { isSuperAdmin: boolean } }))
 
 vi.mock('vue-router', () => ({ useRoute: () => route }))
 vi.mock('../../stores/auth', () => ({ useAuthStore: () => authState }))
@@ -46,6 +46,7 @@ describe('CliLoginPage', () => {
   beforeEach(() => {
     route.query = {}
     authState.twoFactorEnabled = false
+    authState.sessionInfo = { isSuperAdmin: true }
     getCliLoginRequest.mockReset().mockResolvedValue(pending)
     approveCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
     denyCliLogin.mockReset().mockResolvedValue({ ok: true, messages: [], errors: [] })
@@ -90,6 +91,26 @@ describe('CliLoginPage', () => {
     const html = wrapper.html()
     expect(html.indexOf('cli-login-admin-warning')).toBeLessThan(html.indexOf('cli-login-approve'))
     expect(wrapper.get('[data-testid="cli-login-approve"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('hides the proof and Approve on an ADMIN sign-in for a session that is not a super admin, keeping Deny', async () => {
+    authState.sessionInfo = { isSuperAdmin: false }
+    authState.twoFactorEnabled = true
+    getCliLoginRequest.mockResolvedValue({ ...pending, scope: 'ADMIN' })
+    const wrapper = mount(CliLoginPage)
+    await typeCode(wrapper, 'BCDF-GH23')
+    expect(wrapper.get('[data-testid="cli-login-super-admin-only"]').text()).toBe('Only a super admin can approve a darpan-admin sign-in.')
+    expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cli-login-deny"]').exists()).toBe(true)
+  })
+
+  it('a TENANT sign-in still offers Approve to a session that is not a super admin', async () => {
+    authState.sessionInfo = { isSuperAdmin: false }
+    const wrapper = mount(CliLoginPage)
+    await typeCode(wrapper, 'BCDF-GH23')
+    expect(wrapper.find('[data-testid="cli-login-super-admin-only"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(true)
   })
 
   it.each([['TENANT'], [undefined]])('a %s sign-in reads as the Darpan CLI with no admin line', async (scope) => {

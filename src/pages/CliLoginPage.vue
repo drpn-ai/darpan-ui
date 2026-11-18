@@ -33,7 +33,10 @@
         <p v-if="!scopeKnown" class="section-note" role="alert" data-testid="cli-login-unknown-scope">
           This sign-in asks for access Darpan does not recognise. Do not approve it.
         </p>
-        <template v-if="scopeKnown">
+        <p v-if="notSuperAdminOnAdmin" class="section-note" role="alert" data-testid="cli-login-super-admin-only">
+          Only a super admin can approve a darpan-admin sign-in.
+        </p>
+        <template v-if="scopeKnown && !notSuperAdminOnAdmin">
           <!-- DAR-BE-264: approving mints a 7-day key, so a two-factor account proves it with a fresh code. A code
              already used to sign in is refused for 30 s, so the label asks for a current one. DAR-BE-270: or a passkey,
              whose prompt opens from Approve. -->
@@ -81,7 +84,7 @@
           <p v-if="codeError" class="section-note" role="alert" data-testid="cli-login-code-error">{{ codeError }}</p>
         </template>
         <div class="cli-login-actions">
-          <button v-if="scopeKnown" class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
+          <button v-if="scopeKnown && !notSuperAdminOnAdmin" class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
             Approve
           </button>
           <button class="btn-primary" type="button" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
@@ -148,6 +151,8 @@ const controller = new AbortController()
 let confirmedCode = ''
 
 const authStore = useAuthStore()
+// DAR-BE-295: only a super admin may approve a darpan-admin sign-in; anyone else sees why, with Deny, and no proof step.
+const notSuperAdminOnAdmin = computed(() => scope.value === 'ADMIN' && authStore.sessionInfo?.isSuperAdmin !== true)
 const twoFactorCode = ref('')
 const codeError = ref<string | null>(null)
 // The session's flag, or the backend asking for a code (two-factor turned on in another tab since this one loaded).
