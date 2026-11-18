@@ -36,6 +36,8 @@ Use this file as the shared contract reference before migrating or creating sett
 - Use `StaticEditableTitle` for inline title editing instead of page-local `contenteditable` handlers or bordered title inputs.
 - Use `AppTableFrame` for editable table patterns and prefer shared table cell classes over scoped alignment fixes.
 - Use `resolveRecordLabel()` for saved-record titles so pages stay resilient when descriptions are missing.
+- **Edit buttons are icons, everywhere.** A control that edits, changes or renames something is the pencil `app-icon-action` (`editIconPath`), never a text button reading "Edit", "Change", "Rename", "Change rules →" and the like. Its accessible name (`aria-label`, `title`) carries the words ("Change timezone", "Edit rules"). Where the same control adds when nothing exists, it is the plus icon (`plusIconPath`) with an "Add …" name. A fact cell or row that opens its own popup needs no edit control at all: the cell is the button (`StaticFactStrip`). Submit labels inside a workflow step ("Change" on a password step) are not edit buttons. `src/__tests__/editButtonsAreIcons.spec.ts` fails on a text edit button.
+- Every settings or record page opens with `StaticRecordTitle` (the name, caret-only in place, optional bare toggle) and `StaticFactStrip`.
 
 ## Migration rules
 

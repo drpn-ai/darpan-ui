@@ -55,13 +55,16 @@
                   />
                   <button
                     type="button"
-                    class="wizard-secondary-link"
+                    class="app-icon-action"
                     :aria-label="row.rule ? 'Change this filter' : 'Add this filter'"
+                    :title="row.rule ? 'Change this filter' : 'Add this filter'"
                     :disabled="!newField || !newValue"
                     data-testid="lifecycle-settings-add-rule"
                     @click="addRule"
                   >
-                    {{ row.rule ? 'Change' : 'Add' }}
+                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                      <path :d="row.rule ? editIconPath : plusIconPath" fill="currentColor" />
+                    </svg>
                   </button>
                   <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
                 </div>
@@ -94,7 +97,9 @@
                   searchable
                   test-id="lifecycle-settings-detail-field"
                 />
-                <button type="button" class="wizard-secondary-link" aria-label="Show this field" :disabled="!newDetail" data-testid="lifecycle-settings-add-detail" @click="addDetail">Add</button>
+                <button type="button" class="app-icon-action" aria-label="Show this field" title="Show this field" :disabled="!newDetail" data-testid="lifecycle-settings-add-detail" @click="addDetail">
+                  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="plusIconPath" fill="currentColor" /></svg>
+                </button>
                 <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
               </div>
               <button v-else type="button" class="lifecycle-spine-ghost" aria-label="Show a field" data-testid="lifecycle-settings-show-field" @click="startAdding({ kind: 'detail' })">+ shows</button>
@@ -153,13 +158,16 @@
                   />
                   <button
                     type="button"
-                    class="wizard-secondary-link"
+                    class="app-icon-action"
                     :aria-label="row.exception ? 'Change this exception' : 'Add this exception'"
+                    :title="row.exception ? 'Change this exception' : 'Add this exception'"
                     :disabled="!exField || !exValue"
                     data-testid="lifecycle-settings-add-exception"
                     @click="addException(stage)"
                   >
-                    {{ row.exception ? 'Change' : 'Add' }}
+                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                      <path :d="row.exception ? editIconPath : plusIconPath" fill="currentColor" />
+                    </svg>
                   </button>
                   <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
                 </div>
@@ -242,7 +250,9 @@
                   searchable
                   test-id="lifecycle-settings-finding-value"
                 />
-                <button type="button" class="wizard-secondary-link" aria-label="Add this finding" :disabled="!fdField || !fdValue" data-testid="lifecycle-settings-add-written" @click="addWritten(stage)">Add</button>
+                <button type="button" class="app-icon-action" aria-label="Add this finding" title="Add this finding" :disabled="!fdField || !fdValue" data-testid="lifecycle-settings-add-written" @click="addWritten(stage)">
+                  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="plusIconPath" fill="currentColor" /></svg>
+                </button>
                 <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
               </div>
               <button
@@ -277,6 +287,7 @@ import { accountLabelOf } from '../../lib/nsAccountLabel'
 import { lifecycleChart } from '../../lib/api/queries'
 import { readQueryOnce } from '../../lib/api/readCache'
 import { useLifecycleRuleOptions, type LifecycleRuleSource } from '../../lib/useLifecycleRuleOptions'
+import { editIconPath, plusIconPath } from '../../lib/iconPaths'
 
 // DAR-UI-050. A lifecycle's settings as one line that grows downward (research: funnel builders put an exclusion
 // between the two steps it affects; progressive disclosure shows only the next action). The starting records, with

@@ -32,13 +32,16 @@
         </div>
         <div class="user-settings-card-actions">
           <button
-            class="user-settings-control"
+            class="app-icon-action"
             type="button"
             aria-label="Rename display name"
+            title="Rename display name"
             data-testid="user-rename"
             @click="startRename"
           >
-            Rename
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path :d="editIconPath" fill="currentColor" />
+            </svg>
           </button>
           <button
             v-if="availableTenants.length > 1"
@@ -64,13 +67,16 @@
           </div>
           <div class="user-settings-card-actions">
             <button
-              class="user-settings-control"
+              class="app-icon-action"
               type="button"
               aria-label="Change timezone"
+              title="Change timezone"
               data-testid="user-timezone-change"
               @click="openTimezoneWorkflow"
             >
-              Change
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="editIconPath" fill="currentColor" />
+              </svg>
             </button>
           </div>
         </article>
@@ -81,13 +87,16 @@
           </div>
           <div class="user-settings-card-actions">
             <button
-              class="user-settings-control"
+              class="app-icon-action"
               type="button"
               aria-label="Change notifications"
+              title="Change notifications"
               data-testid="user-notification-default-change"
               @click="openNotificationDefaultWorkflow"
             >
-              Change
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="editIconPath" fill="currentColor" />
+              </svg>
             </button>
           </div>
         </article>
@@ -143,8 +152,17 @@
             <span aria-hidden="true">••••••••</span>
           </div>
           <div class="user-settings-card-actions">
-            <button class="user-settings-control user-settings-password-trigger" type="button" aria-label="Change password" @click="openPasswordWorkflow">
-              Change
+            <button
+              class="app-icon-action user-settings-password-trigger"
+              type="button"
+              aria-label="Change password"
+              title="Change password"
+              data-testid="user-password-change"
+              @click="openPasswordWorkflow"
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="editIconPath" fill="currentColor" />
+              </svg>
             </button>
           </div>
         </article>
@@ -212,12 +230,16 @@
           </div>
           <div class="user-settings-card-actions">
             <button
-              class="user-settings-control"
+              class="app-icon-action"
               type="button"
+              :aria-label="authStore.emailAddressMasked ? 'Change recovery email' : 'Add recovery email'"
+              :title="authStore.emailAddressMasked ? 'Change recovery email' : 'Add recovery email'"
               data-testid="recovery-email-change"
               @click="openRecoveryEmailWorkflow"
             >
-              {{ authStore.emailAddressMasked ? 'Change' : 'Add' }}
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="authStore.emailAddressMasked ? editIconPath : plusIconPath" fill="currentColor" />
+              </svg>
             </button>
           </div>
         </article>
@@ -555,6 +577,7 @@ import {
   type CommandPaletteOpenRequestDetail,
 } from '../../lib/uiEvents'
 import { formatDateTime, formatShortDate } from '../../lib/utils/date'
+import { editIconPath, plusIconPath } from '../../lib/iconPaths'
 
 const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()

@@ -49,12 +49,16 @@
                     </button>
                     <button
                       type="button"
+                      class="app-icon-action"
                       :aria-label="`Edit chat space ${space.spaceName}`"
+                      :title="`Edit chat space ${space.spaceName}`"
                       data-testid="notifications-space-edit"
                       :disabled="!canEdit"
                       @click="openSpaceMenu(space.chatSpaceId)"
                     >
-                      Edit
+                      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                        <path :d="editIconPath" fill="currentColor" />
+                      </svg>
                     </button>
                   </span>
                 </span>
@@ -305,7 +309,7 @@ import { forgetPendingAddSpace, takePendingAddSpace, useSlackWorkspace } from '.
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import type { NotificationRoute, NotificationRouteSpace, TenantChatSpace } from '../../lib/api/types'
-import { plusIconPath } from '../../lib/iconPaths'
+import { editIconPath, plusIconPath } from '../../lib/iconPaths'
 import { normalizeStringOrEmpty } from '../../lib/utils/strings'
 import { usePermissionsStore } from '../../stores/permissions'
 
@@ -741,7 +745,7 @@ onBeforeUnmount(() => {
   margin-top: var(--space-1);
 }
 
-.notifications-grid__space-actions button {
+.notifications-grid__space-actions button:not(.app-icon-action) {
   min-height: 2rem;
   padding: var(--space-0) var(--space-1-5);
   font-size: var(--type-label-size);

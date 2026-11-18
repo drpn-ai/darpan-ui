@@ -35,11 +35,15 @@
           <span class="tenant-settings-row__actions">
             <button
               type="button"
+              class="app-icon-action"
               aria-label="Change tenant timezone"
+              title="Change tenant timezone"
               data-testid="tenant-module-timezone"
               @click="openTimezoneWorkflow"
             >
-              Change
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="editIconPath" fill="currentColor" />
+              </svg>
             </button>
           </span>
         </li>
@@ -94,11 +98,15 @@
           <span class="tenant-settings-row__actions">
             <button
               type="button"
+              class="app-icon-action"
               aria-label="Edit AI provider"
+              title="Edit AI provider"
               data-testid="tenant-ai-provider-tile"
               @click="openAiProviderWorkflow"
             >
-              Edit
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="editIconPath" fill="currentColor" />
+              </svg>
             </button>
           </span>
         </li>
@@ -349,6 +357,7 @@ import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReferenceDataStore } from '../../stores/referenceData'
 import { buildTimezoneOptions } from '../../lib/timezones'
+import { editIconPath } from '../../lib/iconPaths'
 import { normalizeStringOrEmpty } from '../../lib/utils/strings'
 import { useTenantSettingsPopup } from '../../composables/useActivePopup'
 
@@ -926,7 +935,7 @@ onMounted(() => {
   gap: var(--space-1);
 }
 
-.tenant-settings-row__actions button {
+.tenant-settings-row__actions button:not(.app-icon-action) {
   min-height: 2.2rem;
   padding: var(--space-0) var(--space-2);
   font-size: var(--type-label-size);

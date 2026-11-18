@@ -328,8 +328,11 @@ describe('TenantSettingsPage', () => {
 
     expect(wrapper.get('[data-testid="tenant-module-notifications"]').text()).toBe('Open →')
     expect(wrapper.find('[data-testid="tenant-module-streaks-space"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toBe('Change')
-    expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').text()).toBe('Edit')
+    // DAR-UI-129: edit buttons are icons; the words are the accessible name.
+    expect(wrapper.get('[data-testid="tenant-module-timezone"]').attributes('aria-label')).toBe('Change tenant timezone')
+    expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toBe('')
+    expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').attributes('aria-label')).toBe('Edit AI provider')
+    expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').text()).toBe('')
     expect(wrapper.get('[data-testid="tenant-module-config-history"]').text()).toBe('Open →')
     expect(wrapper.get('[data-testid="tenant-module-scripts"]').text()).toBe('Open →')
     expect(rowValue(wrapper, 'tenant-module-config-history')).toBe('Versions and restores')

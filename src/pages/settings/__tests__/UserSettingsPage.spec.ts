@@ -265,7 +265,9 @@ describe('UserSettingsPage', () => {
     expect(wrapper.find('.static-page-section-head .user-settings-password-trigger').exists()).toBe(false)
     const passwordCard = wrapper.get('[data-testid="password-card"]')
     expect(passwordCard.get('.static-page-summary-label').text()).toBe('Password')
-    expect(passwordCard.get('.user-settings-password-trigger').text()).toBe('Change')
+    // DAR-UI-129: edit buttons are icons; the words are the accessible name.
+    expect(passwordCard.get('.user-settings-password-trigger').attributes('aria-label')).toBe('Change password')
+    expect(passwordCard.get('.user-settings-password-trigger').text()).toBe('')
     expect(wrapper.get('.user-settings-card-grid').classes()).toContain('static-page-summary-grid')
     // Before the two-factor status reads: Timezone, Notifications, then Password, Recovery email, Last sign-in.
     expect(wrapper.findAll('.user-settings-stretch-card')).toHaveLength(5)
@@ -826,13 +828,13 @@ describe('UserSettingsPage', () => {
     await flushPromises()
     expect(empty.get('[data-testid="recovery-email-card"]').text()).toContain('None')
     expect(empty.get('[data-testid="recovery-email-card"]').text()).not.toContain('add one')
-    expect(empty.get('[data-testid="recovery-email-change"]').text()).toBe('Add')
+    expect(empty.get('[data-testid="recovery-email-change"]').attributes('aria-label')).toBe('Add recovery email')
 
     authState.emailAddressMasked = 'a•••@hotwax.co'
     const set = mountPage()
     await flushPromises()
     expect(set.get('[data-testid="recovery-email-card"]').text()).toContain('a•••@hotwax.co')
-    expect(set.get('[data-testid="recovery-email-change"]').text()).toBe('Change')
+    expect(set.get('[data-testid="recovery-email-change"]').attributes('aria-label')).toBe('Change recovery email')
   })
 
   it('changes the recovery email after the current password', async () => {

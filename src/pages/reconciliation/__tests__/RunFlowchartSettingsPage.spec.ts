@@ -221,7 +221,8 @@ describe('RunFlowchartSettingsPage', () => {
     expect(select(w, 'lifecycle-settings-value').props('modelValue')).toBe('Shopify Draft Order')
     // The value being changed stays offered even when the account's recent values no longer hold it.
     expect(select(w, 'lifecycle-settings-value').props('options')).toContainEqual({ value: 'Shopify Draft Order', label: 'Shopify Draft Order' })
-    expect(w.get('[data-testid="lifecycle-settings-add-rule"]').text()).toBe('Change')
+    // DAR-UI-129: the commit is the pencil while a line is being changed; its words are its name.
+    expect(w.get('[data-testid="lifecycle-settings-add-rule"]').attributes('aria-label')).toBe('Change this filter')
     select(w, 'lifecycle-settings-field').vm.$emit('update:modelValue', 'custbody_hc_order_id')
     await flushPromises()
     select(w, 'lifecycle-settings-value').vm.$emit('update:modelValue', 'NO_VALUE')
