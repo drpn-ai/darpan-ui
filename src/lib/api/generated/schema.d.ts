@@ -3416,9 +3416,9 @@ export interface components {
         /**
          * @description DAR-BE-301. Start a sign-in with a passkey alone (no password). Request options for
          *                 navigator.credentials.get() and a challengeToken for finish#PasskeyFirstSignIn. With a username, allowCredentials
-         *                 lists that account's passkeys; with none (or one that names no account with a passkey) it is empty and the
-         *                 browser offers its own passkeys for this site. The answer has the same keys either way and never says whether
-         *                 the username exists. At most 10 begins a minute from one address (TOO_MANY_ATTEMPTS).
+         *                 lists that account's passkeys, and for a username that names no account with a passkey one decoy credential
+         *                 (the same for the same username, which no authenticator holds); with no username it is empty and the browser
+         *                 offers its own passkeys for this site. The answer never says whether the username exists. At most 10 begins a minute from one address (TOO_MANY_ATTEMPTS).
          */
         BeginPasskeyFirstSignInParams: {
             /** @description Optional: the username or email typed first. */
@@ -4132,7 +4132,8 @@ export interface components {
             errors?: string[];
             /**
              * @description With ok false: why, as a code the client switches on (never
-             *                     the message text): PASSKEY_REFUSED, CANNOT_SIGN_IN or PASSKEYS_UNAVAILABLE.
+             *                     the message text): PASSKEY_REFUSED, ACCOUNT_CANNOT_SIGN_IN, PASSWORD_CHANGE_REQUIRED (the password must
+             *                     be changed first: sign in with it) or PASSKEYS_UNAVAILABLE.
              */
             reason?: string;
             /** @description True when a session was issued. */
