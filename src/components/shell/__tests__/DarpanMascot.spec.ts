@@ -422,3 +422,63 @@ describe('DarpanMascot warning posture', () => {
     expect(shared).toEqual([])
   })
 })
+
+/* DAR-UI-119. The mascot wears the active tenant as a hand-tied bowtie: the full name in the knot,
+   the chin drawn over the bow's top edge so it reads as worn rather than stuck on. */
+describe('DarpanMascot bowtie', () => {
+  const CHIN_Y = 56.5
+
+  function bow(tenantLabel?: string | null) {
+    return mount(DarpanMascot, { props: { detail: 3, tenantLabel } })
+  }
+
+  function knotLines(wrapper: ReturnType<typeof bow>): string[] {
+    return wrapper.findAll('.mascot-bow-text tspan').map((line) => line.text())
+  }
+
+  it('wears no bow without a tenant, or with a blank one', () => {
+    expect(bow().find('.mascot-bow').exists()).toBe(false)
+    expect(bow('   ').find('.mascot-bow').exists()).toBe(false)
+  })
+
+  it('draws the bow before the head, so the chin covers its top edge', () => {
+    const wrapper = bow('Acme')
+    const shapes = [...wrapper.get('svg.mascot').element.children].map((node) => node.getAttribute('class') ?? '')
+    const bowAt = shapes.indexOf('mascot-bow')
+    const headAt = shapes.indexOf('mascot-head')
+
+    expect(bowAt).toBeGreaterThan(-1)
+    expect(bowAt).toBeLessThan(headAt)
+    const knotTop = Number(wrapper.get('.mascot-bow-knot').attributes('y'))
+    expect(knotTop).toBeLessThan(CHIN_Y)
+    // Covered, not swallowed: the name's line starts below the chin.
+    expect(Number(wrapper.get('.mascot-bow-text tspan').attributes('y'))).toBeGreaterThan(CHIN_Y)
+  })
+
+  it('keeps a short name on one line', () => {
+    expect(knotLines(bow('Acme'))).toEqual(['Acme'])
+  })
+
+  it('wraps a long name onto two balanced lines and never cuts it', () => {
+    const wrapper = bow('Northwind Outfitters Europe')
+
+    expect(knotLines(wrapper)).toEqual(['Northwind', 'Outfitters Europe'])
+    expect(wrapper.text()).not.toContain('…')
+  })
+
+  it('grows a two-line knot downward, so the chin covers the same sliver', () => {
+    const top = (label: string) => Number(bow(label).get('.mascot-bow-knot').attributes('y'))
+
+    expect(top('Northwind Outfitters Europe')).toBeCloseTo(top('Acme'), 1)
+  })
+
+  it('keeps one unbreakable word whole on a single line', () => {
+    expect(knotLines(bow('SupercalifragilisticRetail'))).toEqual(['SupercalifragilisticRetail'])
+  })
+
+  it('sizes the knot to the name, so a longer name gets a wider knot', () => {
+    const width = (label: string) => Number(bow(label).get('.mascot-bow-knot').attributes('width'))
+
+    expect(width('Acme Retail')).toBeGreaterThan(width('Acme'))
+  })
+})

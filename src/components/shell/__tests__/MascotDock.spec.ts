@@ -31,6 +31,26 @@ describe('MascotDock', () => {
     expect(wrapper.emitted('open')).toHaveLength(1)
   })
 
+  // DAR-UI-119: the bow names the tenant; clicking it goes straight to switching.
+  it('wears the active tenant and sends a bow click to switching, even with a warning standing', async () => {
+    const wrapper = mountDock({ props: { tenantLabel: 'Acme Retail' } })
+    const mascot = useMascotStore()
+    mascot.raise({ id: 'w1', title: 'Two runs failed', prompt: 'Two runs failed', body: 'Overnight.', actions: [] })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.mascot-bow').text()).toContain('Acme Retail')
+    await wrapper.get('.mascot-bow-knot').trigger('click')
+
+    expect(wrapper.emitted('switch-tenant')).toHaveLength(1)
+    expect(wrapper.emitted('open')).toBeUndefined()
+  })
+
+  it('names the tenant to a screen reader, who cannot see the bow', () => {
+    const wrapper = mountDock({ props: { tenantLabel: 'Acme Retail' } })
+
+    expect(wrapper.get('.mascot-fab').attributes('aria-label')).toContain('Acme Retail')
+  })
+
   it('offers only the shortcut when you look at the face', async () => {
     const wrapper = mountDock()
 

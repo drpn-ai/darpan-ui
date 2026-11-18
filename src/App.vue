@@ -39,7 +39,9 @@
     <MascotDock
       :route-name="typeof route.name === 'string' ? route.name : null"
       :route-key="route.fullPath"
-      @open="openCommandPalette"
+      :tenant-label="activeTenantName"
+      @open="openCommandPalette()"
+      @switch-tenant="openCommandPalette('/switch-tenant ')"
     />
   </div>
 
@@ -50,6 +52,7 @@
     :recent-command-ids="recentCommandIds"
     :data-search-loading="isLoadingCommandData"
     :slash-context="slashContext"
+    :initial-query="paletteInitialQuery"
     @close="closeCommandPalette"
     @execute="executeCommand"
     @run-slash="runSlashCommand"
@@ -338,8 +341,12 @@ const staticCommandActions: CommandAction[] = [
 
 let workflowEscapeHintTimer: ReturnType<typeof globalThis.setTimeout> | null = null
 
-function openCommandPalette(): void {
+/** DAR-UI-119. Set by the mascot's bow so the palette opens already in /switch-tenant. */
+const paletteInitialQuery = ref('')
+
+function openCommandPalette(initialQuery = ''): void {
   document.dispatchEvent(new Event(DISMISS_INLINE_MENUS_EVENT))
+  paletteInitialQuery.value = initialQuery
   commandPalette.open()
 }
 

@@ -54,6 +54,7 @@
         :speaking="mascot.isSpeaking"
         :alerting="bursting"
         :alerted="mascot.hasWarnings"
+        :tenant-label="tenantLabel"
       />
     </button>
 
@@ -78,22 +79,31 @@ import { hintsFor } from '../../lib/mascotHints'
  * that its own tests mount on their own, and reaching for the router from in here made
  * every one of them depend on a router they have no reason to build.
  */
-const props = withDefaults(defineProps<{ routeName?: string | null, routeKey?: string | null }>(), {
+const props = withDefaults(defineProps<{
+  routeName?: string | null
+  routeKey?: string | null
+  /** DAR-UI-119. The active tenant, which the mascot wears as a bowtie. */
+  tenantLabel?: string | null
+}>(), {
   routeName: null,
   routeKey: null,
+  tenantLabel: null,
 })
 
-const emit = defineEmits<{ (event: 'open'): void }>()
+const emit = defineEmits<{ (event: 'open'): void, (event: 'switch-tenant'): void }>()
 
 const mascot = useMascotStore()
 const dockEl = ref<HTMLElement | null>(null)
 
 /* The announced destination has to be true for a screen reader too, not only on hover. */
-const fabLabel = computed(() =>
-  mascot.hasWarnings
+const fabLabel = computed(() => {
+  const label = mascot.hasWarnings
     ? `${mascot.warnings[0]?.title} — open the warning`
-    : 'Tara: open Ask Darpan to search, or rest on a value to have it explained',
-)
+    : 'Tara: open Ask Darpan to search, or rest on a value to have it explained'
+  // The bow is drawn, so a screen reader would never learn the tenant from it.
+  const tenant = props.tenantLabel?.trim()
+  return tenant ? `${label}. Tenant: ${tenant}` : label
+})
 
 const liveAnnouncement = computed(() =>
   mascot.hasWarnings ? `${mascot.warnings[0]?.title}. ${mascot.warnings[0]?.body}` : '',
@@ -128,7 +138,14 @@ watch(() => mascot.hasWarnings, (standing, wasStanding) => {
    change of destination, which is how a button that changed its label differentiates itself
    rather than how two buttons do. CMD-K is untouched in App.vue, so navigation is never
    actually removed -- only the pointer route to it is occupied while a warning stands. */
-function onFaceClick(): void {
+function onFaceClick(event: MouseEvent): void {
+  // The bow is part of the face's drawing (so it hops and tilts with it), which puts it inside this
+  // button; a click on it means "switch tenant", ahead of a standing warning. Keyboard users switch
+  // through Ask Darpan's /switch-tenant, which this opens.
+  if (event.target instanceof Element && event.target.closest('[data-mascot-bow]')) {
+    emit('switch-tenant')
+    return
+  }
   if (mascot.hasWarnings) {
     mascot.openWarnings()
     return

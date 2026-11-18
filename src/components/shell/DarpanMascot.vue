@@ -21,6 +21,7 @@
       'mascot--speaking': speaking,
       'mascot--alerting': alerting,
       'mascot--alerted': alerted,
+      'mascot--wearing-bow': bow !== null,
     }]"
     viewBox="-6 -9 76 76"
     focusable="false"
@@ -49,6 +50,38 @@
         ry="6"
         transform="rotate(28 52.5 18.5)"
       />
+    </g>
+
+    <!--
+      DAR-UI-119. The bow is the active tenant, worn. It is drawn BEFORE the head so the chin covers
+      its top edge — that overlap is the whole illusion of wearing it — and it lives inside this svg
+      so the warning hop and the listening tilt carry it; an overlay beside the face stayed put while
+      the face moved. Hand-tied on purpose: uneven wings and a knot a few degrees off level. The knot
+      holds the FULL name, wrapping to two lines rather than cutting it.
+    -->
+    <g v-if="bow" class="mascot-bow" data-mascot-bow>
+      <g
+        v-for="wing in bow.wings"
+        :key="wing.side"
+        :class="['mascot-bow-wing', `mascot-bow-wing--${wing.side}`]"
+        :transform="wing.transform"
+      >
+        <path class="mascot-bow-lobe" :d="BOW_WING_LOBE" />
+        <path v-for="fold in BOW_WING_FOLDS" :key="fold" class="mascot-bow-fold" :d="fold" />
+      </g>
+      <g :transform="bow.knotTransform">
+        <rect
+          class="mascot-bow-knot"
+          :x="bow.knot.x"
+          :y="bow.knot.y"
+          :width="bow.knot.width"
+          :height="bow.knot.height"
+          :rx="BOW_KNOT_RADIUS"
+        />
+        <text class="mascot-bow-text" text-anchor="middle" dominant-baseline="central" :font-size="BOW_FONT_SIZE">
+          <tspan v-for="line in bow.lines" :key="line.y" x="32" :y="line.y">{{ line.text }}</tspan>
+        </text>
+      </g>
     </g>
 
     <path
@@ -143,7 +176,8 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { bowtieFor, BOW_FONT_SIZE, BOW_KNOT_RADIUS, BOW_WING_FOLDS, BOW_WING_LOBE } from '../../lib/mascotBowtie'
 
 /**
  * A blink lands somewhere in a 3-6s window rather than on a beat: a metronome reads as a
@@ -159,7 +193,7 @@ const BLINK_GAP_SPREAD_MS = 3000
  */
 const BLINK_HOLD_MS = 180
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /**
      * Detail drops on a schedule rather than by shrinking the full mark: 3 keeps
@@ -174,9 +208,13 @@ withDefaults(
     alerting?: boolean
     /** The held posture. Persists until the warning is dismissed. */
     alerted?: boolean
+    /** DAR-UI-119. The active tenant's name, worn as a bowtie. Blank or absent: no bow. */
+    tenantLabel?: string | null
   }>(),
-  { detail: 3, listening: false, speaking: false, alerting: false, alerted: false },
+  { detail: 3, listening: false, speaking: false, alerting: false, alerted: false, tenantLabel: null },
 )
+
+const bow = computed(() => bowtieFor(props.tenantLabel))
 
 const blinking = ref(false)
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -250,6 +288,33 @@ onBeforeUnmount(() => {
 .mascot-head,
 .mascot-ear-out {
   fill: currentColor;
+}
+
+/* The bow hangs past the viewBox's bottom edge (y 67), and a two-line knot further still. The
+   viewBox is not grown to hold it: that would shrink the face to make room for an accessory. */
+.mascot--wearing-bow {
+  overflow: visible;
+}
+
+/* Rust is the one hue the mascot owns (inner ears, stripes), so the tie wears it: the knot in it,
+   the wings a step darker so the knot reads in front, the folds darker again. Flat fills only. */
+.mascot-bow-knot {
+  fill: var(--mascot-rust);
+}
+
+.mascot-bow-lobe {
+  fill: color-mix(in oklab, var(--mascot-rust) 86%, black);
+}
+
+.mascot-bow-fold {
+  fill: color-mix(in oklab, var(--mascot-rust) 62%, black);
+}
+
+/* Near-white in both themes: the ground colour the eyes use would turn the name dark on the
+   darker rust of the dark theme. */
+.mascot-bow-text {
+  fill: color-mix(in oklab, var(--mascot-rust) 6%, white);
+  font-family: inherit;
 }
 
 /* The one place in the product that carries a hue. Every other marking is the

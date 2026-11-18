@@ -196,6 +196,20 @@ describe('CommandPalette', () => {
       })
     }
 
+    // DAR-UI-119: the mascot's bow opens the palette already in /switch-tenant.
+    it('opens with the query it was given, ready to pick a tenant', async () => {
+      const wrapper = mount(CommandPalette, {
+        attachTo: document.body,
+        global: { stubs: { teleport: true } },
+        props: { open: false, actions, slashContext, initialQuery: '/switch-tenant ' },
+      })
+      await wrapper.setProps({ open: true })
+
+      expect(searchValue(wrapper)).toBe('/switch-tenant ')
+      expect(wrapper.findAll('.command-item')[0]?.text()).toContain('Acme Retail')
+      wrapper.unmount()
+    })
+
     it('lists the slash commands instead of navigation results once the query opens with a slash', async () => {
       const wrapper = mountPalette()
       await wrapper.get('#command-palette-search').setValue('/')

@@ -89,6 +89,8 @@ import type { CommandAction } from '../../lib/types/ux'
 
 const props = defineProps<{
   open: boolean
+  /** DAR-UI-119. What the search box holds when the palette opens, e.g. '/switch-tenant '. */
+  initialQuery?: string
   actions: CommandAction[]
   recentCommandIds?: string[]
   dataSearchLoading?: boolean
@@ -375,6 +377,7 @@ watch(
     }
 
     interactionMode.value = 'keyboard'
+    if (props.initialQuery) query.value = props.initialQuery
     resetActiveIndex()
     void nextTick(() => {
       searchInput.value?.focus()
