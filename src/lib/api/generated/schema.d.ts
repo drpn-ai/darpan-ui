@@ -1584,9 +1584,9 @@ export interface components {
         /**
          * @description Every scheduled job: jobName, description, serviceName, cronExpression, paused (Y/N), defaultCronExpression,
          *                 defaultPaused, minIntervalMinutes (the smallest gap an edited cron may leave), editable (Darpan's own jobs),
-         *                 edited, editedByUserId, editedDate, nextRuns (the next 3, UTC), lastRun {startTime, endTime, hasError} from the newest
+         *                 edited, editedByUserId, editedDate, nextRuns (the next 3), lastRun {startTime, endTime, hasError} from the newest
          *                 run, resumeNeedsPreview (resuming it deletes data: update#ServiceJob then needs previewedRows) and parameters
-         *                 [{parameterName, value, defaultValue, edited, type}].
+         *                 [{parameterName, value, defaultValue, edited, type}]. Crons run in the server's time zone (what the job runner uses).
          */
         GetServiceJobsParams: Record<string, never>;
         GetServiceJobsResult: {
@@ -1613,7 +1613,7 @@ export interface components {
         };
         /**
          * @description Checks a cron for a job without saving anything: problem (empty when fine; names the job's floor when the cron
-         *                 runs more often than it allows, or says it never runs), the next 5 runs (UTC) and the smallest gap in minutes
+         *                 runs more often than it allows, or says it never runs), the next 5 runs and the smallest gap in minutes
          *                 between runs. Quartz cron: six fields (seconds first), at most 120 characters, must run within 400 days.
          */
         PreviewJobScheduleParams: {
@@ -1648,9 +1648,9 @@ export interface components {
          * @description Puts a Darpan job back on its shipped defaults. With no parameterNames: the cron and pause state go back to the
          *                 shipped ones, every parameter edited here goes back to its default (a parameter with no default is deleted), and the
          *                 job follows the defaults on every later deploy again. With parameterNames: only those parameters (the cron and pause
-         *                 state stay edited). A reset that resumes a job with resumePreviewService needs previewedRows, as update#ServiceJob does.
-         *                 A job already on its defaults changes nothing and writes no audit row. Writes one AdminAuditLog row naming each
-         *                 change.
+         *                 state stay edited). A reset that resumes a job with resumePreviewService needs previewedRows, as update#ServiceJob does,
+         *                 and a reset that changes the cron counts as a run made now, as there. A job already on its defaults changes nothing and
+         *                 writes no audit row. Writes one AdminAuditLog row naming each change.
          */
         ResetServiceJobParams: {
             jobName: string;
@@ -1686,10 +1686,14 @@ export interface components {
          * @description Edits a Darpan job: its cron, its pause state, its parameters, in one call; refused as a whole, with the reason and
          *                 nothing saved, when any part is wrong. Refused: a job that is not Darpan's, a cron that does not parse, is blank,
          *                 over 120 characters, never runs within 400 days or leaves a gap under the job's minIntervalMinutes, paused other than Y or N,
-         *                 a parameter the job's service does not take, a blank value or one that does not convert to the parameter's type.
+         *                 a parameter the job's service does not take, a blank value or one that does not convert to the parameter's type (a
+         *                 Boolean takes true, false, Y or N).
          *                 Resuming (Y to N) a job with resumePreviewService (retention) needs previewedRows, the total the preview showed: the
          *                 preview is run again and the resume is refused when today's count is more than 100 rows or 5% above it. Pausing needs
-         *                 no preview. A value equal to the live one is not a change; no change writes no audit row. Writes one AdminAuditLog row
+         *                 no preview. A resumed job runs within about a minute (the runner catches up a run that was due while it was paused),
+         *                 unless the same call changes its cron. A cron change counts as a run made now (ServiceJobRunLock.lastRunTime), so moving
+         *                 the time to one already past today does not fire the job at once and break its floor; the next run is the cron's next
+         *                 time. A value equal to the live one is not a change; no change writes no audit row. Writes one AdminAuditLog row
          *                 (`cron: a -> b; paused: Y -> N (preview showed N rows, today's dry run counts M); name: a -> b`).
          */
         UpdateServiceJobParams: {
