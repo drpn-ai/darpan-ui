@@ -5,7 +5,7 @@ import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { MASCOT_HINTS } from '../mascotHints'
 import { routeAnchors } from '../mascotRouteAnchors'
 import { LABEL_ALIASES, normalizeLabel } from '../mascotTargets'
-import { actionPatternKey, hintKey, mascotSeedRows, mascotSeedXml } from '../mascotSeed'
+import { actionPatternKey, hintKey, mascotSeedMark, mascotSeedRows, mascotSeedXml } from '../mascotSeed'
 
 const rows = mascotSeedRows()
 const ofKind = (kind: string) => rows.filter((row) => row.contentKind === kind)
@@ -87,6 +87,14 @@ describe('mascotSeedXml', () => {
     expect(doc.querySelector('parsererror')).toBeNull()
     expect(doc.getElementsByTagName('darpan.content.AppContentEntry').length).toBe(rows.length)
     expect(doc.getElementsByTagName('darpan.content.AppRoute').length).toBe(Object.keys(routeAnchors()).length)
+  })
+
+  it('stamps every seed entry with one mark that the CURRENT row carries', () => {
+    const mark = mascotSeedMark()
+    expect(mark).toMatch(/^[0-9a-f]{16}$/)
+    expect(xml).toContain(`<darpan.content.AppContentSeed seedId="CURRENT" seedMark="${mark}"/>`)
+    expect(xml.match(new RegExp(`source="SEED" seedMark="${mark}"`, 'g'))?.length).toBe(rows.length)
+    expect(mascotSeedMark()).toBe(mark)
   })
 
   it('writes the seed file when MASCOT_SEED_OUT is set', () => {
