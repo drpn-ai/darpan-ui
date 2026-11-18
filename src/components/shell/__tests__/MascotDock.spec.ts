@@ -264,3 +264,72 @@ describe('MascotDock warnings', () => {
     expect(wrapper.get('p.sr-only[aria-live="polite"]').text()).toContain('Out of date')
   })
 })
+
+// DAR-UI-131: Tara can be carried anywhere; the spot is this tab's alone.
+describe('MascotDock dragging', () => {
+  const FACE = { left: 900, top: 650, width: 98, height: 98, right: 998, bottom: 748, x: 900, y: 650 }
+  // jsdom's viewport: 1024 x 768.
+  const press = (extra: Record<string, unknown> = {}) => ({ pointerId: 1, pointerType: 'mouse', button: 0, ...extra })
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    window.sessionStorage.clear()
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ ...FACE, toJSON: () => FACE } as DOMRect)
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('starts in the corner with no inline position', () => {
+    const wrapper = mountDock()
+
+    expect(wrapper.get('.mascot-dock').classes()).not.toContain('mascot-dock--moved')
+    expect(wrapper.get('.mascot-dock').attributes('style')).toBeUndefined()
+  })
+
+  it('moves where she is dropped, keeps it for the tab, and the drop does not open the launcher', async () => {
+    const wrapper = mountDock()
+    const fab = wrapper.get('.mascot-fab')
+
+    await fab.trigger('pointerdown', press({ clientX: 949, clientY: 699 }))
+    await fab.trigger('pointermove', press({ clientX: 300, clientY: 300 }))
+    await fab.trigger('pointerup', press({ clientX: 300, clientY: 300 }))
+    await fab.trigger('click')
+
+    expect(wrapper.emitted('open')).toBeUndefined()
+    const dock = wrapper.get('.mascot-dock')
+    // Centre went 949,699 -> 300,300: the left half, so anchored left with the bubble on her right.
+    expect(dock.classes()).toEqual(expect.arrayContaining(['mascot-dock--moved', 'mascot-dock--flipped']))
+    expect(dock.attributes('style')).toContain('left: 251px')
+    expect(dock.attributes('style')).toContain('bottom: 419px')
+    expect(JSON.parse(window.sessionStorage.getItem('darpan.mascotPosition') ?? 'null')).toEqual({
+      x: 300 / 1024,
+      y: 300 / 768,
+    })
+  })
+
+  it('treats a wobble under the threshold as a click', async () => {
+    const wrapper = mountDock()
+    const fab = wrapper.get('.mascot-fab')
+
+    await fab.trigger('pointerdown', press({ clientX: 949, clientY: 699 }))
+    await fab.trigger('pointermove', press({ clientX: 952, clientY: 701 }))
+    await fab.trigger('pointerup', press({ clientX: 952, clientY: 701 }))
+    await fab.trigger('click')
+
+    expect(wrapper.emitted('open')).toHaveLength(1)
+    expect(wrapper.get('.mascot-dock').classes()).not.toContain('mascot-dock--moved')
+  })
+
+  it('comes back where this tab left her after a reload', async () => {
+    window.sessionStorage.setItem('darpan.mascotPosition', JSON.stringify({ x: 0.8, y: 0.25 }))
+
+    const wrapper = mountDock()
+    // She is placed once the face has been measured, on mount.
+    await wrapper.vm.$nextTick()
+    const dock = wrapper.get('.mascot-dock')
+
+    expect(dock.classes()).toContain('mascot-dock--moved')
+    expect(dock.classes()).not.toContain('mascot-dock--flipped')
+    expect(dock.attributes('style')).toContain('bottom:')
+  })
+})

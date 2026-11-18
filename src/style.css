@@ -121,6 +121,13 @@
      unchanged; the light block is where this earns its keep. */
   --mascot-ink: var(--text);
 
+  /* Eyes, lashes, brows, nose and mouth. On this ground they are knocked out in the page colour,
+     so the face is one light shape with dark features. The glint takes the fur colour, and the
+     bow wears the rust. The light block overrides all three (DAR-UI-131). */
+  --mascot-feature: var(--bg);
+  --mascot-glint: var(--mascot-ink);
+  --mascot-bow: var(--mascot-rust);
+
   /* Static system: boards, dashboards, editors */
   --static-frame-width: 920px;
   --static-shell-padding-y: var(--space-3);
@@ -203,21 +210,19 @@
   --shadow: 0 0 0 rgba(0, 0, 0, 0);
   --selection-bg: color-mix(in oklab, var(--accent) 18%, white);
   --selection-text: var(--text);
-  /* The mascot is the one mark in the product that does not simply take --text. Drawn in the
-     light theme's near-black it became a solid 18:1 blob roughly 85px across: the tear stripes
-     and inner ears had nothing to separate from, so the markings that carry the species were
-     invisible and what was left was a dark shape in the corner. A medium grey head at 11.7:1
-     is still unambiguously present and gives those markings a ground to sit on.
+  /* DAR-UI-131. On white, Tara is coloured like a real red panda: rust fur, white markings,
+     black eyes, nose and brows, and a white glint in each eye. The dark theme's recipe (one
+     light fur, features knocked out in the page ground) cannot carry over: on a white page it
+     inverts, giving a dark head with WHITE eyes and a small dark dot for a pupil, which reads
+     as a stare. Dark eyes with a light glint are what make the face read as alive.
 
-     #383838 is the light theme's --text-soft to the byte. It is written as a literal anyway,
-     because the mascot should not move the next time the reading colours are re-tuned — the
-     match is a coincidence worth noting, not a dependency worth taking.
-
-     The rust darkens with it. It is the one hue in the product and it only ever touches the
-     head, never the page, so its job is to separate from the body colour — and once the body
-     lifted out of near-black, the old #a85c30 sat too close above it. */
-  --mascot-ink: #383838;
-  --mascot-rust: #8a4926;
+     The bow cannot stay rust on rust fur, so it turns charcoal here; its wing and fold shades
+     are mixed from this one colour in DarpanMascot. */
+  --mascot-ink: #c56934;
+  --mascot-rust: #fbf6f1;
+  --mascot-feature: #161412;
+  --mascot-glint: #ffffff;
+  --mascot-bow: #2b2826;
 }
 
 *,
@@ -1954,6 +1959,23 @@ label > span {
   gap: var(--space-2);
 }
 
+/* DAR-UI-131. Once dragged, the dock leaves the corner and stands where it was put. The inline
+   left/right + bottom come from lib/mascotPosition, anchored to the nearer side so the face
+   stays still while the bubble grows away from it. .floating-actions sits outside the blurred
+   .app-shell, so no filtered ancestor turns this fixed into something relative. */
+.mascot-dock--moved {
+  position: fixed;
+}
+
+/* On the left half she speaks to her right. */
+.mascot-dock--flipped {
+  flex-direction: row-reverse;
+}
+
+.mascot-dock--dragging .mascot-fab {
+  cursor: grabbing;
+}
+
 /* No pill. The other two are icons and need a container to be legible as buttons; the
    mascot is a character and reads as itself, so a disc around it is packaging rather
    than affordance. The button element stays at the full FAB size for the hit area —
@@ -1969,6 +1991,8 @@ label > span {
   align-items: center;
   justify-content: center;
   padding: 0;
+  /* A finger on her drags her, not the page underneath (DAR-UI-131). */
+  touch-action: none;
 }
 
 /* The mascot does not react to being hovered — the bubble it opens is the response, and

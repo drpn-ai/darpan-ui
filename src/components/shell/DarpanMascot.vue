@@ -1,8 +1,9 @@
 <template>
   <!--
     The mark is built from flat fills only — no stroke. A stroked version needs its
-    weight re-tuned at every size and goes muddy under 24px. The face takes
-    currentColor, so one copy works on every surface and in both themes.
+    weight re-tuned at every size and goes muddy under 24px. Every colour is a --mascot-*
+    token, so one copy serves both themes: one light fur with knocked-out features on dark,
+    rust fur with white markings and black features on light (DAR-UI-131).
 
     Three things carry the species: ears set wide and tilted out, a broad fluffy
     head, and the tear stripes running from each eye to the jaw. Drafts that shrank
@@ -113,8 +114,8 @@
     </template>
 
     <!--
-      Lashes. Drawn in the ground colour, not the ink, and that inversion is forced by the
-      construction rather than chosen: the head is a solid currentColor fill and each eye is
+      Lashes. Drawn in the feature colour, like the eyes (the page ground in the dark theme, black
+      on rust in the light one). In the dark theme that is forced by the construction: the head is a solid currentColor fill and each eye is
       punched out of it, so a dark lash would be dark-on-dark the instant it left the patch.
       Light wedges leaving a light patch are the only version whose silhouette survives.
 
@@ -296,48 +297,47 @@ onBeforeUnmount(() => {
   overflow: visible;
 }
 
-/* Rust is the one hue the mascot owns (inner ears, stripes), so the tie wears it: the knot in it,
-   the wings a step darker so the knot reads in front, the folds darker again. Flat fills only. */
+/* --mascot-bow is the rust in the dark theme and charcoal in the light one, where the fur itself is
+   rust. The knot takes it, the wings a step darker so the knot reads in front, the folds darker
+   again. Flat fills only. */
 .mascot-bow-knot {
-  fill: var(--mascot-rust);
+  fill: var(--mascot-bow);
 }
 
 .mascot-bow-lobe {
-  fill: color-mix(in oklab, var(--mascot-rust) 86%, black);
+  fill: color-mix(in oklab, var(--mascot-bow) 86%, black);
 }
 
 .mascot-bow-fold {
-  fill: color-mix(in oklab, var(--mascot-rust) 62%, black);
+  fill: color-mix(in oklab, var(--mascot-bow) 62%, black);
 }
 
-/* Near-white in both themes: the ground colour the eyes use would turn the name dark on the
-   darker rust of the dark theme. */
+/* Near-white in both themes, which suits the rust knot and the charcoal one alike. */
 .mascot-bow-text {
-  fill: color-mix(in oklab, var(--mascot-rust) 6%, white);
+  fill: color-mix(in oklab, var(--mascot-bow) 6%, white);
   font-family: inherit;
 }
 
-/* The one place in the product that carries a hue. Every other marking is the
-   page's own ground, so the face works on any surface without a second copy. */
+/* Rust in the dark theme; white in the light one, where the fur takes the rust (DAR-UI-131). */
 .mascot-ear-in,
 .mascot-stripe {
   fill: var(--mascot-rust);
 }
 
-/* The dark features are knocked out in whatever sits behind the face. That is the page
-   ground by default, but a filled button overrides --mascot-ground so the eyes do not
-   disappear into a surface the same colour as they are. */
+/* The features. In the dark theme they are knocked out in the page ground; in the light theme
+   they are drawn black on rust fur, because knocking them out in white gave her white eyes with
+   a dot for a pupil. */
 .mascot-eye,
 .mascot-eye-shut,
 .mascot-lash,
 .mascot-nose,
 .mascot-mouth,
 .mascot-brow {
-  fill: var(--mascot-ground, var(--bg));
+  fill: var(--mascot-feature, var(--bg));
 }
 
 .mascot-glint {
-  fill: currentColor;
+  fill: var(--mascot-glint, currentColor);
   transform: translate(
     calc(var(--mascot-gaze-x, 0) * 1.5px),
     calc(var(--mascot-gaze-y, 0) * 1.3px)

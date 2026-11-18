@@ -7,7 +7,16 @@
     label when you hover it, and an explanation when you rest on a value elsewhere on
     the page. Nothing else ever appears here.
   -->
-  <div ref="dockEl" class="mascot-dock">
+  <div
+    ref="dockEl"
+    class="mascot-dock"
+    :class="{
+      'mascot-dock--moved': placement !== null,
+      'mascot-dock--flipped': placement?.flipped === true,
+      'mascot-dock--dragging': dragging,
+    }"
+    :style="placement?.style"
+  >
     <p
       v-if="bubbleText"
       class="mascot-say"
@@ -39,6 +48,10 @@
       class="mascot-fab"
       :aria-label="fabLabel"
       @click="onFaceClick"
+      @pointerdown="onFacePointerDown"
+      @pointermove="onFacePointerMove"
+      @pointerup="onFacePointerUp"
+      @pointercancel="onFacePointerCancel"
       @pointerenter="onFaceEnter"
       @pointerleave="onFaceLeave"
       @focus="mascot.showHint()"
@@ -73,6 +86,7 @@ import { createDwellController, type DwellController } from '../../composables/u
 import { createIdleHintController } from '../../composables/useIdleHints'
 import { resolveExplainTarget } from '../../lib/mascotTargets'
 import { hintsFor } from '../../lib/mascotHints'
+import { placeMascotDock, readMascotSpot, saveMascotSpot, type MascotSpot } from '../../lib/mascotPosition'
 
 /**
  * The route arrives as a prop rather than through useRoute(): the dock is shell furniture
@@ -139,6 +153,11 @@ watch(() => mascot.hasWarnings, (standing, wasStanding) => {
    rather than how two buttons do. CMD-K is untouched in App.vue, so navigation is never
    actually removed -- only the pointer route to it is occupied while a warning stands. */
 function onFaceClick(event: MouseEvent): void {
+  // Letting go after a drag is not a click on her.
+  if (swallowClick) {
+    swallowClick = false
+    return
+  }
   // The bow is part of the face's drawing (so it hops and tilts with it), which puts it inside this
   // button; a click on it means "switch tenant", ahead of a standing warning. Keyboard users switch
   // through Ask Darpan's /switch-tenant, which this opens.
@@ -151,6 +170,86 @@ function onFaceClick(event: MouseEvent): void {
     return
   }
   emit('open')
+}
+
+/* ── Dragging (DAR-UI-131) ─────────────────────────────────────────────────────
+   She can be picked up and set down anywhere. The spot is kept for this tab only
+   (sessionStorage), so a new tab or a reopened one finds her back in the corner. Until she
+   is moved there is no inline style at all and the corner is pure CSS, as before. */
+/** Under this, a press is a click with a wobble, not a drag. */
+const DRAG_THRESHOLD_PX = 6
+
+const spot = ref<MascotSpot | null>(readMascotSpot())
+const fabSize = ref(0)
+const viewport = ref({ width: 0, height: 0 })
+const dragging = ref(false)
+let press: { pointerId: number, x: number, y: number, cx: number, cy: number } | null = null
+let swallowClick = false
+
+const placement = computed(() => {
+  if (!spot.value || !fabSize.value || !viewport.value.width || !viewport.value.height) return null
+  return placeMascotDock(spot.value, fabSize.value, viewport.value.width, viewport.value.height)
+})
+
+function measure(): void {
+  viewport.value = { width: window.innerWidth, height: window.innerHeight }
+  const fab = dockEl.value?.querySelector<HTMLElement>('.mascot-fab')
+  const width = fab?.getBoundingClientRect().width ?? 0
+  if (width) fabSize.value = width
+}
+
+function onFacePointerDown(event: PointerEvent): void {
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  press = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    cx: rect.left + rect.width / 2,
+    cy: rect.top + rect.height / 2,
+  }
+  if (rect.width) fabSize.value = rect.width
+}
+
+function onFacePointerMove(event: PointerEvent): void {
+  if (!press || event.pointerId !== press.pointerId) return
+  const dx = event.clientX - press.x
+  const dy = event.clientY - press.y
+  if (!dragging.value) {
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
+    dragging.value = true
+    // Captured so a fast drag that outruns the face still lands, and still ends, on it.
+    ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
+    // She is being carried, not asked: whatever she was saying goes.
+    mascot.clear()
+  }
+  viewport.value = { width: window.innerWidth, height: window.innerHeight }
+  spot.value = { x: (press.cx + dx) / viewport.value.width, y: (press.cy + dy) / viewport.value.height }
+}
+
+function endDrag(): void {
+  press = null
+  if (!dragging.value) return
+  dragging.value = false
+  // Saved clamped, so she stays exactly where she was let go rather than where the pointer was.
+  if (placement.value) {
+    spot.value = placement.value.spot
+    saveMascotSpot(placement.value.spot)
+  }
+}
+
+function onFacePointerUp(event: PointerEvent): void {
+  if (!press || event.pointerId !== press.pointerId) return
+  if (dragging.value) {
+    swallowClick = true
+    // The click lands in this same task; if none comes (pointer released off the page), forget it.
+    setTimeout(() => { swallowClick = false }, 0)
+  }
+  endDrag()
+}
+
+function onFacePointerCancel(): void {
+  endDrag()
 }
 
 /* The one line a warning gets in the bubble: what it is, and where the rest of it lives. It
@@ -172,7 +271,7 @@ const bodyText = computed(() =>
 function onFaceEnter(event: PointerEvent): void {
   // Touch has no hover, and a tap would otherwise latch the label open with no way
   // to dismiss it. The tap still opens the launcher through @click.
-  if (event.pointerType !== 'mouse') return
+  if (event.pointerType !== 'mouse' || dragging.value) return
   mascot.showHint()
 }
 
@@ -236,7 +335,7 @@ function stopWatching(): void {
 }
 
 function onPointerOver(event: PointerEvent): void {
-  if (event.pointerType !== 'mouse' || !hasFinePointer()) return
+  if (event.pointerType !== 'mouse' || !hasFinePointer() || dragging.value) return
   const target = resolveExplainTarget(event.target as Element | null)
 
   if (!target) {
@@ -316,6 +415,8 @@ onMounted(() => {
   document.addEventListener('pointerdown', noteActivity, { passive: true })
   document.addEventListener('keydown', noteActivity, { passive: true })
   document.addEventListener('input', noteActivity, { passive: true })
+  window.addEventListener('resize', measure, { passive: true })
+  measure()
   idle.enter()
 })
 
@@ -328,6 +429,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', noteActivity)
   document.removeEventListener('keydown', noteActivity)
   document.removeEventListener('input', noteActivity)
+  window.removeEventListener('resize', measure)
   idle.stop()
   stopWatching()
   mascot.clear()
