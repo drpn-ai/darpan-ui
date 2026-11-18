@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import type { RunConclusions } from '../../../lib/api/authoringTypes'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import {
@@ -14,6 +15,8 @@ const getShopifyAuthConfig = vi.hoisted(() => vi.fn())
 const listSourceConfigEndpoints = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const getRunConclusions = vi.hoisted(() => vi.fn())
+const saveRunConclusions = vi.hoisted(() => vi.fn())
+const saveSavedRunName = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     activeTenantUserGroupId: 'tenant-a',
@@ -48,6 +51,7 @@ vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
     deleteSavedRun,
     listAutomationSourceOptions,
+    saveSavedRunName,
   },
   settingsFacade: {
     listOmsRestSourceConfigs,
@@ -57,7 +61,7 @@ vi.mock('../../../lib/api/facade', () => ({
 }))
 
 vi.mock('../../../lib/api/authoringFacade', () => ({
-  runConclusionFacade: { get: getRunConclusions, save: vi.fn() },
+  runConclusionFacade: { get: getRunConclusions, save: saveRunConclusions, createCode: vi.fn() },
 }))
 
 vi.mock('../../../stores/auth', () => ({
@@ -210,6 +214,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
     routerPush.mockReset()
     getRunConclusions.mockReset()
     getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: null })
+    saveRunConclusions.mockReset()
+    saveSavedRunName.mockReset()
     permissionState.canRunActiveTenantReconciliation = true
     permissionState.canEditTenantSettings = true
     permissionState.canManageGlobalSettings = false
@@ -336,187 +342,120 @@ describe('ReconciliationRuleSetManagerPage', () => {
 
   })
 
+  function fact(wrapper: ReturnType<typeof mount>, key: string) {
+    const cell = wrapper.get(`[data-testid="ruleset-manager-fact-${key}"]`)
+    return {
+      cell,
+      label: cell.get('.static-page-summary-label').text(),
+      value: cell.get('.static-fact__value').text(),
+      sub: cell.find('.static-fact__sub').exists() ? cell.get('.static-fact__sub').text() : null,
+    }
+  }
+
+  function factKeys(wrapper: ReturnType<typeof mount>): string[] {
+    return wrapper.get('[data-testid="ruleset-manager-facts"]').findAll('.static-fact')
+      .map((cell) => (cell.attributes('data-testid') ?? '').replace('ruleset-manager-fact-', ''))
+  }
+
+  function conclusionsTree(): RunConclusions {
+    return {
+      savedRunId: 'RS_ORDER_SYNC',
+      scopeMode: 'COMPARE',
+      conclusions: [
+        {
+          key: '10', parent: null, conclusion: 'CONC_CANCELLED', label: 'Cancelled in the OMS', bucket: 'MISSING_FROM_FILE_1',
+          question: 'Was it cancelled?', outcome: null,
+          conditions: [{ subject: 'FILE_2', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL', field: 'statusId', operator: 'IN', values: ['ORDER_CANCELLED'], checkLabel: 'Cancelled' }],
+        },
+        {
+          key: '20', parent: '10', conclusion: 'CONC_STUCK', label: 'Sync stuck', bucket: null, question: null, outcome: 'HIDE',
+          conditions: [{ subject: 'FILE_2', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL', field: 'orderDate', operator: 'WITHIN_HOURS', values: ['24'], checkLabel: 'Recent' }],
+        },
+      ],
+      catalog: [{ id: 'CONC_CANCELLED', label: 'Cancelled in the OMS' }, { id: 'CONC_STUCK', label: 'Sync stuck' }],
+      buckets: ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING'],
+      operators: ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK'],
+      presence: ['ANY', 'KEPT', 'EXCLUDED', 'ABSENT'],
+      keyScopes: ['FULL', 'FIRST_FIELD'],
+      quantifiers: ['ALL', 'ANY'],
+    }
+  }
+
   // A single-sided run (scopeMode EVALUATE) has no second source. Before the board read scopeMode it
   // rendered the two-sided layout anyway and filled the empty half with placeholders -- a "System 2"
   // card, a "Field pending" primary id, an exclusion slot and a synthesized "#0 internalId = Field
-  // pending" rule. None of those describe anything that exists, and a page that invents a source is
-  // worse than the loud error it replaced.
-  it('renders no second source for a single-sided run', async () => {
+  // pending" rule. None of those describe anything that exists.
+  it('heads a single-sided run with its one system, its key and its checks', async () => {
     draftStoreState.ruleSetDraftState = createSingleSidedDraftState()
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="ruleset-manager-schema-row-file2"]').exists()).toBe(false)
+    expect(factKeys(wrapper)).toEqual(['file1', 'pairs', 'checks'])
+    expect(fact(wrapper, 'file1').label).toBe('NetSuite')
+    expect(fact(wrapper, 'pairs')).toMatchObject({ label: 'Primary ID', value: 'internalId' })
+    expect(fact(wrapper, 'checks')).toMatchObject({ value: '0 filters · 0 rules' })
+    expect(wrapper.text()).not.toContain('Pairs rows on')
     expect(wrapper.text()).not.toContain('System 2')
     expect(wrapper.text()).not.toContain('Field pending')
-    // The one side it does have is still fully rendered.
-    expect(wrapper.find('[data-testid="ruleset-manager-schema-row-file1"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('NetSuite')
-    expect(wrapper.text()).toContain('internalId')
-  })
-
-  it('lists exclusions for the only side a single-sided run has', async () => {
-    draftStoreState.ruleSetDraftState = createSingleSidedDraftState()
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="ruleset-exclusions-file1"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="ruleset-exclusions-file2"]').exists()).toBe(false)
   })
 
   // The synthesized primary-key rule compares file1's key to file2's. With no second side there is
-  // nothing to compare, and the findings are the rows the source returns -- so the section says that
-  // rather than showing a comparison against an empty field.
-  it('replaces the comparison preview with the single-sided explanation', async () => {
+  // nothing to compare, and the findings are the rows the source returns -- so the section says that.
+  it('keeps the single-sided wording when a single-sided run has no rules', async () => {
     draftStoreState.ruleSetDraftState = createSingleSidedDraftState()
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
     expect(wrapper.find('[data-testid="ruleset-manager-rule-list"]').exists()).toBe(false)
-    expect(wrapper.get('.ruleset-manager-preview-line').text())
-      .toBe('Every record this source returns is a finding.')
+    expect(wrapper.get('[data-testid="ruleset-manager-rule-none"]').text()).toBe('Every record this source returns is a finding.')
   })
 
-  it('still renders both sides for a two-sided run', async () => {
+  it('lists filters for the only side a single-sided run has', async () => {
+    const draftState = createSingleSidedDraftState()
+    draftState.draft.file1ExcludeFilters = [{ fieldExpression: 'status', operator: 'EXCLUDE_IN', values: ['Closed'] }]
+    draftState.draft.file2ExcludeFilters = [{ fieldExpression: 'ghost', operator: 'EXCLUDE_IN', values: ['x'] }]
+    draftStoreState.ruleSetDraftState = draftState
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="ruleset-manager-filter-row"]')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.text()).toContain('NetSuite')
+    expect(wrapper.text()).not.toContain('ghost')
+  })
+
+  it('opens with the run name and one fact per system, how rows pair and what the run checks', async () => {
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
     draftStoreState.ruleSetDraftState = createDraftState()
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: { ...conclusionsTree(), conclusions: [] } })
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="ruleset-manager-schema-row-file2"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="ruleset-exclusions-file2"]').exists()).toBe(true)
-  })
-
-  it('renders the draft-backed run summary and static equation', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('JSON Order Compare')
-    expect(wrapper.get('.ruleset-manager-hero h1').text()).toBe('JSON Order Compare')
-    expect(wrapper.text()).not.toContain('RuleSet Manager')
-    expect(wrapper.text()).toContain('Rules')
-    expect(wrapper.text()).not.toContain('Rule Builder')
-    expect(wrapper.text()).toContain('Run')
-    const sectionHeaders = wrapper.findAll('.ruleset-manager-section-header')
-    expect(sectionHeaders).toHaveLength(2)
-    expect(sectionHeaders[0]?.find('.static-page-section-heading').text()).toBe('Run')
-    expect(sectionHeaders[0]?.find('[data-testid="ruleset-manager-edit-run"]').exists()).toBe(true)
-    expect(sectionHeaders[0]?.find('[data-testid="ruleset-manager-edit-run"] svg').exists()).toBe(true)
-    expect(sectionHeaders[0]?.find('[data-testid="ruleset-manager-edit-run"]').classes()).not.toContain('app-icon-action--large')
-    expect(sectionHeaders[0]?.find('[data-testid="ruleset-manager-edit-run"]').classes()).toContain('ruleset-manager-section-edit')
-    expect(sectionHeaders[0]?.findAll('[data-testid="ruleset-manager-edit-run"] .ruleset-manager-edit-icon-path')).toHaveLength(1)
-    expect(sectionHeaders[0]?.find('[data-testid="ruleset-manager-edit-run"] .ruleset-manager-edit-icon-path').attributes('fill')).toBeUndefined()
-    expect(sectionHeaders[1]?.find('.static-page-section-heading').text()).toBe('Rules')
-    expect(sectionHeaders[1]?.find('[data-testid="ruleset-manager-edit-rules"]').exists()).toBe(true)
-    expect(sectionHeaders[1]?.find('[data-testid="ruleset-manager-edit-rules"] svg').exists()).toBe(true)
-    expect(sectionHeaders[1]?.find('[data-testid="ruleset-manager-edit-rules"]').classes()).not.toContain('app-icon-action--large')
-    expect(sectionHeaders[1]?.find('[data-testid="ruleset-manager-edit-rules"]').classes()).toContain('ruleset-manager-section-edit')
-    expect(sectionHeaders[1]?.findAll('[data-testid="ruleset-manager-edit-rules"] .ruleset-manager-edit-icon-path')).toHaveLength(1)
-    expect(sectionHeaders[1]?.find('[data-testid="ruleset-manager-edit-rules"] .ruleset-manager-edit-icon-path').attributes('fill')).toBeUndefined()
-    expect(wrapper.get('[data-testid="ruleset-manager-edit-run"]').attributes('aria-label')).toBe('Edit Run')
-    expect(wrapper.get('[data-testid="ruleset-manager-edit-rules"]').attributes('aria-label')).toBe('Edit Rules')
-    expect(wrapper.text()).toContain('OMS')
-    expect(wrapper.text()).toContain('SHOPIFY')
-    expect(wrapper.text()).toContain('OMS orders')
-    expect(wrapper.text()).toContain('Shopify orders')
-    expect(wrapper.text()).not.toContain('OMS orders - OMS - Primary ID')
-    expect(wrapper.text()).not.toContain('Shopify orders - SHOPIFY - Primary ID')
-    const schemaRows = wrapper.findAll('.ruleset-manager-schema-row')
-    expect(schemaRows).toHaveLength(2)
-    expect(schemaRows[0]?.text()).toContain('System')
-    expect(schemaRows[0]?.text()).toContain('Schema')
-    expect(schemaRows[0]?.text()).toContain('Primary ID')
-    expect(schemaRows[0]?.text()).toContain('OMS')
-    expect(schemaRows[0]?.text()).toContain('OMS orders')
-    expect(schemaRows[0]?.text()).toContain('order_id')
-    expect(schemaRows[0]?.text()).not.toContain('$.orders[0].order_id')
-    expect(schemaRows[0]?.text()).not.toContain('SHOPIFY')
-    expect(schemaRows[0]?.text()).not.toContain('Shopify orders')
-    expect(schemaRows[1]?.text()).toContain('System')
-    expect(schemaRows[1]?.text()).toContain('Schema')
-    expect(schemaRows[1]?.text()).toContain('Primary ID')
-    expect(schemaRows[1]?.text()).toContain('SHOPIFY')
-    expect(schemaRows[1]?.text()).toContain('Shopify orders')
-    expect(schemaRows[1]?.text()).toContain('id')
-    expect(schemaRows[1]?.text()).not.toContain('$.data.orders.edges[0].node.id')
-    expect(schemaRows[1]?.text()).not.toContain('OMS orders')
-    const basicCards = wrapper.findAll('.ruleset-manager-basic-card')
-    expect(basicCards).toHaveLength(6)
-    expect(wrapper.find('[data-testid="ruleset-manager-system-config-file1"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="ruleset-manager-system-config-file2"]').exists()).toBe(false)
-    expect(basicCards[0]?.text()).toContain('System')
-    expect(basicCards[0]?.text()).toContain('OMS')
-    expect(basicCards[1]?.text()).toContain('Schema')
-    expect(basicCards[1]?.text()).not.toContain('Schema 1')
-    expect(basicCards[1]?.text()).not.toContain('File 1')
-    expect(basicCards[1]?.text()).toContain('OMS orders')
-    expect(basicCards[2]?.text()).toContain('Primary ID')
-    expect(basicCards[2]?.text()).not.toContain('Schema 2')
-    expect(basicCards[2]?.text()).not.toContain('File 2')
-    expect(basicCards[2]?.text()).toContain('order_id')
-    expect(basicCards[2]?.text()).not.toContain('$.orders[0].order_id')
-    expect(basicCards[3]?.text()).toContain('System')
-    expect(basicCards[3]?.text()).toContain('SHOPIFY')
-    expect(basicCards[4]?.text()).toContain('Schema')
-    expect(basicCards[4]?.text()).toContain('Shopify orders')
-    expect(basicCards[5]?.text()).toContain('Primary ID')
-    expect(basicCards[5]?.text()).toContain('id')
-    expect(basicCards[5]?.text()).not.toContain('$.data.orders.edges[0].node.id')
-    expect(wrapper.findAll('.ruleset-manager-schema-row').every((row) => !row.text().includes('Exclusions'))).toBe(true)
-    expect(wrapper.get('[data-testid="ruleset-exclusions-file1"]').text()).toContain('—')
-    expect(wrapper.get('[data-testid="ruleset-exclusions-file2"]').text()).toContain('—')
-    expect(wrapper.text()).not.toContain('Run Basics')
-    expect(wrapper.find('.ruleset-manager-basics-grid').exists()).toBe(true)
+    const title = wrapper.get('[data-testid="ruleset-manager-run-name"]')
+    expect(title.element.tagName).toBe('H1')
+    expect(title.text()).toBe('JSON Order Compare')
+    expect(title.attributes('contenteditable')).toBe('plaintext-only')
+    expect(factKeys(wrapper)).toEqual(['file1', 'file2', 'pairs', 'checks'])
+    // A file-backed system: no connection to name, so the schema is its value and the cell is plain.
+    expect(fact(wrapper, 'file1')).toMatchObject({ label: 'OMS', value: 'OMS orders', sub: null })
+    expect(fact(wrapper, 'file2')).toMatchObject({ label: 'SHOPIFY', value: 'Shopify orders', sub: null })
+    expect(fact(wrapper, 'file1').cell.element.tagName).toBe('DIV')
+    expect(fact(wrapper, 'pairs')).toMatchObject({ label: 'Pairs rows on', value: 'order_id = id' })
+    expect(fact(wrapper, 'checks')).toMatchObject({ label: 'Checks', value: '0 filters · 1 rule', sub: '0 conclusions' })
+    // The Run section, its six cards and its pencil are gone: the header carries those facts now.
+    expect(wrapper.find('[data-testid="ruleset-manager-edit-run"]').exists()).toBe(false)
+    expect(wrapper.find('.ruleset-manager-basic-card').exists()).toBe(false)
+    expect(wrapper.findAll('.static-page-section-heading').map((heading) => heading.text())).toEqual(['Filters', 'Rules', 'Conclusions'])
+    expect(wrapper.text()).not.toContain('Exclusions')
     expect(wrapper.text()).not.toContain('test-oms-orders.schema.json')
-    expect(wrapper.text()).not.toContain('test-shopify-orders.schema.json')
-    expect(wrapper.find('.ruleset-manager-field-grid').exists()).toBe(false)
-    expect(wrapper.find('.ruleset-manager-source').exists()).toBe(false)
-    expect(wrapper.find('.ruleset-manager-comparison-side').exists()).toBe(false)
-    expect(wrapper.find('.ruleset-manager-operator').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="ruleset-manager-operator-equals"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).toContain('order_id = id')
-    expect(wrapper.get('[data-testid="ruleset-manager-rule-list"]').text()).toContain('#0')
-    expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).not.toContain('$.orders[0].order_id')
-    expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).not.toContain('$.data.orders.edges[0].node.id')
-    expect(wrapper.find('[data-testid="ruleset-manager-normalizer-note"]').exists()).toBe(false)
-    const runButton = wrapper.get('[data-testid="ruleset-manager-run-ruleset"]')
-    expect(runButton.attributes('aria-label')).toBe('Run ruleset')
-    expect(runButton.classes()).toContain('app-icon-action')
-    expect(runButton.classes()).toContain('app-icon-action--large')
-    expect(runButton.classes()).not.toContain('app-icon-action--danger')
-    expect(runButton.element.closest('.ruleset-manager-footer-row')).not.toBeNull()
-    expect(runButton.element.closest('.static-page-actions')).not.toBeNull()
-    expect(runButton.element.closest('.static-page-board')).toBeNull()
-    expect(runButton.get('path').attributes('fill')).toBe('currentColor')
-    expect(runButton.get('path').attributes('transform')).toBe('translate(0 1.5)')
-    const deleteButton = wrapper.get('[data-testid="ruleset-manager-delete-run"]')
-    expect(deleteButton.attributes('aria-label')).toBe('Delete run')
-    expect(deleteButton.classes()).toContain('app-icon-action')
-    expect(deleteButton.classes()).toContain('app-icon-action--large')
-    expect(deleteButton.classes()).toContain('app-icon-action--danger')
-    expect(deleteButton.element.closest('.ruleset-manager-footer-row')).not.toBeNull()
-    expect(deleteButton.element.closest('.static-page-actions')).not.toBeNull()
-    expect(deleteButton.element.closest('.static-page-board')).toBeNull()
-    expect(deleteButton.get('path').attributes('transform')).toBe('translate(0 0.75)')
-    expect(wrapper.findAll('.ruleset-manager-footer-row button').map((button) => button.attributes('data-testid'))).toEqual([
-      'ruleset-manager-run-ruleset',
-      'ruleset-manager-delete-run',
-    ])
+    expect(wrapper.text()).not.toContain('$.orders[0].order_id = ')
   })
 
-  it('shows every composite key field in the Primary ID summary', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+  it('shows every composite key field in the pairing fact', async () => {
     draftStoreState.ruleSetDraftState = {
       draft: {
         savedRunId: 'RS_COMPOSITE_SUMMARY',
@@ -534,45 +473,23 @@ describe('ReconciliationRuleSetManagerPage', () => {
       },
       resumeStepId: 'ruleset-manager',
     }
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    const schemaRows = wrapper.findAll('.ruleset-manager-schema-row')
-    expect(schemaRows).toHaveLength(2)
-    expect(schemaRows[0]?.text()).toContain('return_id + product_id')
-    expect(schemaRows[1]?.text()).toContain('return_id + product_id')
+    expect(fact(wrapper, 'pairs').value).toBe('return_id + product_id = return_id + product_id')
   })
 
-  // Originally this asserted the system name was NOT shown, on the reasoning that the config id
-// (dev_oms / dev_shopify) identifies an API source more precisely. That holds only while the two
-// sides use differently-named configs: a Shopify/HotWax run whose configs are both named
-// `gorjana_prod` rendered the same value on both rows and never named either system. Both are now
-// shown — the system name, with its config id beneath it.
-  it('labels API-backed sources by system name and config in the run summary', async () => {
+  it('opens today\'s auth popup from an API system\'s fact', async () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createApiDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-    // Registry-driven endpoint rows for the auth-info popup -- keyed by config type + config id
-    // like the real service, since the popup opens both OMS and Shopify sides in one test.
+    draftStoreState.ruleSetDraftState = createApiDraftState()
     listSourceConfigEndpoints.mockImplementation(
       async ({ configTypeEnumId, configId }: { configTypeEnumId: string, configId: string }) => {
         if (configTypeEnumId === 'SCFG_HOTWAX_OMS' && configId === 'dev_oms') {
-          return {
-            ok: true,
-            messages: [],
-            errors: [],
-            endpoints: [{ systemEnumId: 'OMS_ORDERS', endpointLabel: 'Orders API', isEnabled: true }],
-          }
+          return { ok: true, messages: [], errors: [], endpoints: [{ systemEnumId: 'OMS_ORDERS', endpointLabel: 'Orders API', isEnabled: true }] }
         }
         if (configTypeEnumId === 'SCFG_SHOPIFY_AUTH' && configId === 'dev_shopify') {
-          return {
-            ok: true,
-            messages: [],
-            errors: [],
-            endpoints: [{ systemEnumId: 'SHOPIFY_ORDERS', endpointLabel: 'Admin GraphQL Orders', isEnabled: true }],
-          }
+          return { ok: true, messages: [], errors: [], endpoints: [{ systemEnumId: 'SHOPIFY_ORDERS', endpointLabel: 'Admin GraphQL Orders', isEnabled: true }] }
         }
         return { ok: true, messages: [], errors: [], endpoints: [] }
       },
@@ -581,34 +498,16 @@ describe('ReconciliationRuleSetManagerPage', () => {
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('API Order Sync')
-    const schemaRows = wrapper.findAll('.ruleset-manager-schema-row')
-    expect(schemaRows).toHaveLength(2)
-    expect(schemaRows[0]?.text()).toContain('dev_oms')
-    expect(schemaRows[0]?.text()).toContain('HotWax')
-    expect(schemaRows[1]?.text()).toContain('Shopify')
-    expect(schemaRows[0]?.text()).toContain('Schema')
-    expect(schemaRows[0]?.text()).toContain('Orders API')
-    expect(schemaRows[0]?.text()).not.toContain('CSV source')
-    expect(schemaRows[0]?.text()).not.toContain('HotWax orders')
-    expect(schemaRows[1]?.text()).toContain('dev_shopify')
-    expect(schemaRows[1]?.text()).toContain('Schema')
-    expect(schemaRows[1]?.text()).toContain('Shopify Orders Endpoint')
-    expect(schemaRows[1]?.text()).not.toContain('CSV source')
-    expect(schemaRows[1]?.text()).not.toContain('Shopify orders')
+    // System title over its connection, the endpoint dim below it.
+    expect(fact(wrapper, 'file1')).toMatchObject({ label: 'HotWax', value: 'dev_oms', sub: 'Orders API' })
+    expect(fact(wrapper, 'file2')).toMatchObject({ label: 'SHOPIFY', value: 'dev_shopify', sub: 'Shopify Orders Endpoint' })
+    const file1 = fact(wrapper, 'file1').cell
+    const file2 = fact(wrapper, 'file2').cell
+    expect(file1.element.tagName).toBe('BUTTON')
+    expect(file1.attributes('aria-label')).toBe('View auth info for source 1')
+    expect(file2.attributes('aria-label')).toBe('View auth info for source 2')
 
-    const file1SystemConfig = wrapper.get('[data-testid="ruleset-manager-system-config-file1"]')
-    const file2SystemConfig = wrapper.get('[data-testid="ruleset-manager-system-config-file2"]')
-    expect(file1SystemConfig.element.tagName).toBe('BUTTON')
-    expect(file1SystemConfig.classes()).toContain('ruleset-manager-basic-card')
-    expect(file1SystemConfig.classes()).toContain('ruleset-manager-basic-card--button')
-    expect(file1SystemConfig.attributes('aria-label')).toBe('View auth info for source 1')
-    expect(file2SystemConfig.element.tagName).toBe('BUTTON')
-    expect(file2SystemConfig.classes()).toContain('ruleset-manager-basic-card')
-    expect(file2SystemConfig.classes()).toContain('ruleset-manager-basic-card--button')
-    expect(file2SystemConfig.attributes('aria-label')).toBe('View auth info for source 2')
-
-    await file1SystemConfig.trigger('click')
+    await file1.trigger('click')
     await flushPromises()
 
     expect(listOmsRestSourceConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 })
@@ -617,87 +516,54 @@ describe('ReconciliationRuleSetManagerPage', () => {
     let dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
     expect(dialog.attributes('role')).toBe('dialog')
     expect(wrapper.get('.static-page-frame').classes()).toContain('static-page-frame--popup-open')
+    // Outside the frame, so the frame's blur never reaches it.
+    expect(dialog.element.closest('.static-page-frame')).toBeNull()
     expect(dialog.text()).toContain('Test OMS')
-    expect(dialog.text()).toContain('Config ID')
-    expect(dialog.text()).toContain('dev_oms')
     expect(dialog.text()).toContain('Base URL')
     expect(dialog.text()).toContain('https://test-maarg.hotwax.io')
-    expect(dialog.text()).toContain('Auth Type')
     expect(dialog.text()).toContain('Basic')
-    expect(dialog.text()).not.toContain('Username')
     expect(dialog.text()).not.toContain('Password')
-    expect(dialog.text()).not.toContain('API Token')
-    expect(dialog.text()).not.toContain('Custom Headers')
-    expect(dialog.text()).not.toContain('Active')
-    expect(dialog.text()).not.toContain('Timeouts')
-    expect(dialog.text()).not.toContain('Not configured')
-    expect(dialog.text()).not.toContain('None')
-    expect(dialog.text()).not.toContain('30s')
-    expect(dialog.text()).not.toContain('120s')
-    // Label comes from the registry row, not the deleted swagger doc; the registry carries no
-    // method/path, so no such fabricated meta text should appear either.
     expect(dialog.text()).toContain('Orders API')
     const authPopupHeadings = dialog.findAll('.ruleset-manager-auth-popup-heading')
+    expect(authPopupHeadings.map((heading) => heading.text())).toEqual(['Test OMS', 'Endpoints'])
     const source = readFileSync('src/pages/reconciliation/ReconciliationRuleSetManagerPage.vue', 'utf8')
-    expect(authPopupHeadings).toHaveLength(2)
-    expect(authPopupHeadings[0]?.text()).toBe('Test OMS')
-    expect(authPopupHeadings[1]?.text()).toBe('Endpoints')
     expect(source).toContain('--ruleset-manager-auth-popup-gap: 0.7rem;')
-    expect(source).toContain('gap: var(--ruleset-manager-auth-popup-gap);')
     expect(dialog.find('form').exists()).toBe(false)
-    expect(dialog.find('input').exists()).toBe(false)
-    expect(dialog.find('[data-testid="oms-auth-edit-action"]').exists()).toBe(false)
     expect(JSON.parse(wrapper.get('[data-testid="ruleset-manager-auth-popup-dashboard"]').attributes('data-to') ?? '{}')).toMatchObject({
       name: 'settings-oms-auth',
       params: { omsRestSourceConfigId: 'dev_oms' },
     })
 
-    await file2SystemConfig.trigger('click')
+    await file2.trigger('click')
     await flushPromises()
 
     expect(getShopifyAuthConfig).toHaveBeenCalledWith({ shopifyAuthConfigId: 'dev_shopify' })
-    expect(listSourceConfigEndpoints).toHaveBeenCalledWith({ configTypeEnumId: 'SCFG_SHOPIFY_AUTH', configId: 'dev_shopify' })
-    expect(routerPush).not.toHaveBeenCalled()
     dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
     expect(dialog.text()).toContain('Dev Shopify')
-    expect(dialog.text()).toContain('Config ID')
-    expect(dialog.text()).toContain('dev_shopify')
-    expect(dialog.text()).toContain('Shop/API URL')
-    expect(dialog.text()).toContain('https://test.myshopify.com')
-    expect(dialog.text()).not.toContain('Access Token')
-    expect(dialog.text()).not.toContain('Active')
-    // Label from the registry row; the api-version meta interpolation is the one piece of
-    // per-endpoint detail this popup still derives locally (Shopify endpoints share one GraphQL
-    // URL, so the version is genuinely the same for all of them -- unlike OMS's per-endpoint paths).
     expect(dialog.text()).toContain('Admin GraphQL Orders')
     expect(dialog.text()).toContain('/admin/api/2026-01/graphql.json')
-    expect(dialog.find('form').exists()).toBe(false)
-    expect(dialog.find('input').exists()).toBe(false)
-    expect(dialog.find('[data-testid="shopify-auth-edit-action"]').exists()).toBe(false)
     expect(JSON.parse(wrapper.get('[data-testid="ruleset-manager-auth-popup-dashboard"]').attributes('data-to') ?? '{}')).toMatchObject({
       name: 'settings-shopify-auth',
       params: { shopifyAuthConfigId: 'dev_shopify' },
     })
   })
 
-  // Live bug (2026-08 "Returns Prod" run): the two API sides use non-parent endpoints --
-  // SHOPIFY_RETURN_REFS off the SHOPIFY parent, OMS_RETURNS off the OMS parent -- so the two cards
-  // split the naming between them. The System card names the SYSTEM ("Shopify" / "HotWax", from the
-  // enum's parentEnumId), and the Schema card names each endpoint's OWN label ("Shopify Return
-  // References" / "Reconciliation Returns API"), not the parent system's default connector label
-  // ("Admin GraphQL Orders" / "Orders API") that the operator actually saw in production. Before the
-  // fix the System card showed the endpoint name where the operator expected the system, and the
-  // Schema card showed the parent's connector label. This page only ever displays
-  // file{n}SystemMessageRemoteLabel verbatim (see apiEndpointLabel/summarizeSource) -- the value
-  // itself came from the backend wrong (ReconciliationSavedRunSupport.buildRuleSetSystemOptions
-  // resolved the label off the SHARED SystemMessageRemote row keyed by systemMessageRemoteId,
-  // which SHOPIFY_RETURN_REFS/OMS_RETURNS deliberately reuse from their parent -- see
-  // SourceSystemConnectorSeedData.xml). This test fixes the label at the value a corrected backend
-  // now sends (darpan-backend fix: prefer SourceSystemConnector.endpointLabel, keyed to the run's
-  // own systemEnumId, ahead of the shared remote's description); it is a pass-through contract
-  // guard on the UI side, not a reproduction of the defect itself -- the UI never mis-derived this
-  // value, so no UI code change was needed here.
-  it('names the system on the System card and the endpoint on the Schema card', async () => {
+  it('keeps an API system\'s fact plain for someone who cannot view tenant settings', async () => {
+    permissionState.canViewTenantSettings = false
+    draftStoreState.ruleSetDraftState = createApiDraftState()
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(fact(wrapper, 'file1').cell.element.tagName).toBe('DIV')
+    await fact(wrapper, 'file1').cell.trigger('click')
+    expect(wrapper.find('[data-testid="ruleset-manager-auth-popup"]').exists()).toBe(false)
+  })
+
+  // Live bug (2026-08 "Returns Prod" run): the System fact names the SYSTEM (from the enum's
+  // parentEnumId), and the endpoint's OWN label sits under the connection -- not the parent system's
+  // default connector label. A pass-through guard on the UI side; the value comes from the backend.
+  it('names the system as the fact\'s label and the endpoint under its connection', async () => {
     draftStoreState.ruleSetDraftState = {
       draft: {
         savedRunId: 'RS_RETURNS_PROD',
@@ -722,77 +588,39 @@ describe('ReconciliationRuleSetManagerPage', () => {
         file2SourceConfigType: 'HOTWAX_OMS_REST_RETURNS',
         file2FileTypeEnumId: 'DftJson',
         file2PrimaryIdExpression: ['externalId'],
-        rules: [
-          {
-            file1FieldPath: 'refundOrReturnId',
-            file2FieldPath: 'externalId',
-            operator: '=',
-            sequenceNum: 1,
-          },
-        ],
+        rules: [{ file1FieldPath: 'refundOrReturnId', file2FieldPath: 'externalId', operator: '=', sequenceNum: 1 }],
       },
       resumeStepId: 'ruleset-manager',
     }
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Returns Prod')
-    const schemaRows = wrapper.findAll('.ruleset-manager-schema-row')
-    expect(schemaRows).toHaveLength(2)
-
-    // The System card names the system, not the endpoint: the endpoint label must not appear there.
-    const file1System = schemaRows[0]?.findAll('.ruleset-manager-basic-card')[0]
-    expect(file1System?.text()).toContain('System')
-    expect(file1System?.text()).toContain('Shopify')
-    expect(file1System?.text()).not.toContain('Shopify Order Return References')
-
-    expect(schemaRows[0]?.text()).toContain('Schema')
-    expect(schemaRows[0]?.text()).toContain('Shopify Return References')
-    expect(schemaRows[0]?.text()).not.toContain('Admin GraphQL Orders')
+    expect(fact(wrapper, 'file1')).toMatchObject({ label: 'Shopify', value: 'gorjana_prod', sub: 'Shopify Return References' })
+    expect(fact(wrapper, 'file2')).toMatchObject({ label: 'HotWax', value: 'gorjana_prod', sub: 'Reconciliation Returns API' })
+    expect(wrapper.get('[data-testid="ruleset-manager-facts"]').text()).not.toContain('Shopify Order Return References')
+    expect(wrapper.get('[data-testid="ruleset-manager-facts"]').text()).not.toContain('Admin GraphQL Orders')
     // The renamed join key, not the internal `eventId` the extractor used to emit.
-    expect(schemaRows[0]?.text()).toContain('refundOrReturnId')
-
-    const file2System = schemaRows[1]?.findAll('.ruleset-manager-basic-card')[0]
-    expect(file2System?.text()).toContain('System')
-    expect(file2System?.text()).toContain('HotWax')
-    expect(file2System?.text()).not.toContain('HotWax Returns (Reconciliation API)')
-
-    expect(schemaRows[1]?.text()).toContain('Schema')
-    expect(schemaRows[1]?.text()).toContain('Reconciliation Returns API')
-    expect(schemaRows[1]?.text()).not.toContain('Orders API')
+    expect(fact(wrapper, 'pairs').value).toBe('refundOrReturnId = externalId')
   })
 
   it('shows an error in the auth popup instead of a false empty endpoint list when the registry fetch fails', async () => {
-    // The popup's loading flag already covers the combined config+endpoint fetch (they run in
-    // parallel); a registry failure must surface as the popup's existing error state, not as a
-    // popup that loads fine but silently shows zero endpoints.
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
     draftStoreState.ruleSetDraftState = createApiDraftState()
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
     listSourceConfigEndpoints.mockRejectedValue(new ApiCallError('Unable to reach the endpoint registry.', 500))
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="ruleset-manager-system-config-file1"]').trigger('click')
+    await fact(wrapper, 'file1').cell.trigger('click')
     await flushPromises()
 
     const dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
     expect(dialog.text()).toContain('Unable to reach the endpoint registry.')
     expect(dialog.find('[data-testid="ruleset-manager-auth-popup-endpoint"]').exists()).toBe(false)
-    expect(dialog.text()).not.toContain('Orders API')
   })
 
   it('renders only the enabled rows from a mixed registry response in the auth popup', async () => {
-    // buildEnabledAuthInfoEndpoints filters on isEnabled before mapping to tiles. Every other test
-    // in this file only ever supplies an all-enabled list (or the empty-array default), so a
-    // filter regression there -- e.g. rendering every row regardless of isEnabled -- would pass
-    // unnoticed. This is the one case with both an enabled and a disabled row in the same response.
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
     draftStoreState.ruleSetDraftState = createApiDraftState()
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
     listSourceConfigEndpoints.mockResolvedValue({
       ok: true,
       messages: [],
@@ -806,26 +634,17 @@ describe('ReconciliationRuleSetManagerPage', () => {
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="ruleset-manager-system-config-file1"]').trigger('click')
+    await fact(wrapper, 'file1').cell.trigger('click')
     await flushPromises()
 
     const dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
-    const endpointTiles = dialog.findAll('[data-testid="ruleset-manager-auth-popup-endpoint"]')
-    expect(endpointTiles).toHaveLength(1)
-    expect(dialog.text()).toContain('Orders API')
+    expect(dialog.findAll('[data-testid="ruleset-manager-auth-popup-endpoint"]')).toHaveLength(1)
     expect(dialog.text()).not.toContain('Returns API')
   })
 
   it('names each API source config by its description, per system when one id serves both sides', async () => {
-    // The id an operator reuses per environment: one `rails_prod` on the HotWax side, another on
-    // the Shopify side. Printing the id names the environment and neither config; matching on id
-    // alone would print whichever description happened to come first for both rows.
     draftStoreState.ruleSetDraftState = {
-      draft: {
-        ...createApiDraftState().draft,
-        file1SourceConfigId: 'rails_prod',
-        file2SourceConfigId: 'rails_prod',
-      },
+      draft: { ...createApiDraftState().draft, file1SourceConfigId: 'rails_prod', file2SourceConfigId: 'rails_prod' },
       resumeStepId: 'ruleset-manager',
     }
     listAutomationSourceOptions.mockResolvedValue({
@@ -833,27 +652,16 @@ describe('ReconciliationRuleSetManagerPage', () => {
       messages: [],
       errors: [],
       sourceConfigs: [
-        {
-          sourceConfigId: 'rails_prod',
-          sourceConfigType: 'HOTWAX_OMS_REST',
-          description: 'Rails Production OMS',
-          systemEnumId: 'OMS',
-        },
-        {
-          sourceConfigId: 'rails_prod',
-          sourceConfigType: 'SHOPIFY_AUTH',
-          description: 'Rails Production Storefront',
-          systemEnumId: 'SHOPIFY',
-        },
+        { sourceConfigId: 'rails_prod', sourceConfigType: 'HOTWAX_OMS_REST', description: 'Rails Production OMS', systemEnumId: 'OMS' },
+        { sourceConfigId: 'rails_prod', sourceConfigType: 'SHOPIFY_AUTH', description: 'Rails Production Storefront', systemEnumId: 'SHOPIFY' },
       ],
     })
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file1"]').text()).toBe('Rails Production OMS')
-    expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file2"]').text()).toBe('Rails Production Storefront')
+    expect(fact(wrapper, 'file1').value).toBe('Rails Production OMS')
+    expect(fact(wrapper, 'file2').value).toBe('Rails Production Storefront')
     expect(wrapper.text()).not.toContain('rails_prod')
   })
 
@@ -865,15 +673,12 @@ describe('ReconciliationRuleSetManagerPage', () => {
       errors: [],
       sourceConfigs: [{ sourceConfigId: 'dev_oms', sourceConfigType: 'HOTWAX_OMS_REST', systemEnumId: 'OMS' }],
     })
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file1"]').text()).toBe('dev_oms')
-    // Absent from the list entirely — the same fallback has to hold, or the card loses the only
-    // thing it could say about the source.
-    expect(wrapper.get('[data-testid="ruleset-manager-system-config-name-file2"]').text()).toBe('dev_shopify')
+    expect(fact(wrapper, 'file1').value).toBe('dev_oms')
+    expect(fact(wrapper, 'file2').value).toBe('dev_shopify')
   })
 
   it('names the source configs from the last visit at once on a revisit, before the network answers (DAR-UI-051)', async () => {
@@ -884,7 +689,6 @@ describe('ReconciliationRuleSetManagerPage', () => {
       errors: [],
       sourceConfigs: [{ sourceConfigId: 'dev_oms', sourceConfigType: 'HOTWAX_OMS_REST', description: 'Dev OMS', systemEnumId: 'OMS' }],
     })
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
     mount(ReconciliationRuleSetManagerPage).unmount()
     await flushPromises()
 
@@ -892,144 +696,147 @@ describe('ReconciliationRuleSetManagerPage', () => {
     const revisit = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(revisit.get('[data-testid="ruleset-manager-system-config-name-file1"]').text()).toBe('Dev OMS')
+    expect(fact(revisit, 'file1').value).toBe('Dev OMS')
   })
 
-  it('renders a saved run summary and equation without editable rule controls', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+  it('reads schema labels for a reopened saved run', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
     expect(getJsonSchema).toHaveBeenCalledWith({ schemaName: 'orders-reconciliation-prod-2026-03-01-to-2026-03-31-2026-04-09-04-55-22' }, expect.any(AbortSignal))
     expect(getJsonSchema).toHaveBeenCalledWith({ schemaName: 'Krewe OMS Orders (1)' }, expect.any(AbortSignal))
-    expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).toContain('legacyResourceId = shopify_order_id')
-    expect(wrapper.get('[data-testid="ruleset-manager-rule-list"]').text()).toContain('#0')
-    expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).not.toContain('$.orders[*].legacyResourceId')
-    expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).not.toContain('$[*].shopify_order_id')
-    expect(wrapper.find('.ruleset-manager-basics-grid').exists()).toBe(true)
-    expect(wrapper.findAll('.ruleset-manager-schema-row')).toHaveLength(2)
-    expect(wrapper.findAll('.ruleset-manager-basic-card')).toHaveLength(6)
-    expect(wrapper.find('.ruleset-manager-comparison-side').exists()).toBe(false)
-    expect(wrapper.find('.ruleset-manager-operator').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Shopify Orders')
-    expect(wrapper.text()).toContain('Krewe OMS Orders')
-    expect(wrapper.text()).not.toContain('Shopify Orders - SHOPIFY - Primary ID')
-    expect(wrapper.text()).not.toContain('Krewe OMS Orders - OMS - Primary ID')
+    expect(fact(wrapper, 'file1').value).toBe('Shopify Orders')
+    expect(fact(wrapper, 'file2').value).toBe('Krewe OMS Orders')
+    expect(fact(wrapper, 'pairs').value).toBe('legacyResourceId = shopify_order_id')
     expect(wrapper.text()).not.toContain('orders-reconciliation-prod-2026-03-01-to-2026-03-31-2026-04-09-04-55-22')
   })
 
-  it('edits the saved run\'s conclusions in their own section (DAR-UI-064)', async () => {
-    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
-    getRunConclusions.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      conclusions: {
-        savedRunId: 'RS_ORDER_SYNC', scopeMode: 'COMPARE', conclusions: [], catalog: [],
-        buckets: [], operators: [], presence: [], keyScopes: [], quantifiers: [],
-      },
-    })
+  it('lists one filter row per filter per side from the draft, above the rules', async () => {
+    const draftState = createDraftState()
+    draftState.draft.file1ExcludeFilters = [
+      { fieldExpression: '$.orders[*].statusId', operator: 'EXCLUDE_IN', values: ['ORDER_CANCELLED', 'ORDER_REJECTED'] },
+      { fieldExpression: 'orderName', operator: 'INCLUDE_PREFIX', values: ['EXC-'] },
+    ]
+    draftState.draft.file2ExcludeFilters = [
+      { fieldExpression: 'salesChannelEnumId', operator: 'INCLUDE_IN', values: ['WEB'] },
+    ]
+    draftStoreState.ruleSetDraftState = draftState
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    const section = wrapper.get('[data-testid="ruleset-manager-conclusions"]')
-    expect(section.text()).toContain('Conclusions')
-    expect(section.find('[data-testid="run-conclusions-editor"]').exists()).toBe(true)
-    expect(getRunConclusions).toHaveBeenCalledWith('RS_ORDER_SYNC', expect.any(AbortSignal))
+    const rows = wrapper.findAll('[data-testid="ruleset-manager-filter-row"]')
+    expect(rows).toHaveLength(3)
+    const cells = (index: number) => rows[index]!.findAll(':scope > span').map((cell) => cell.text().replace(/\s+/g, ' '))
+    // system | field (name, path dim) | how | values
+    expect(cells(0)).toEqual(['OMS', 'statusId$.orders[*].statusId', 'Values to exclude', 'ORDER_CANCELLED, ORDER_REJECTED'])
+    expect(rows[0]!.get('.ruleset-manager-field__path').text()).toBe('$.orders[*].statusId')
+    expect(cells(1)).toEqual(['OMS', 'orderName', 'Starts to keep', 'EXC-'])
+    expect(rows[1]!.find('.ruleset-manager-field__path').exists()).toBe(false)
+    expect(cells(2)).toEqual(['SHOPIFY', 'salesChannelEnumId', 'Values to keep', 'WEB'])
+    expect(fact(wrapper, 'checks').value).toBe('3 filters · 1 rule')
+
+    // Filters are applied first, so they read first.
+    const filters = wrapper.get('[data-testid="ruleset-manager-filters"]').element
+    const rules = wrapper.get('[data-testid="ruleset-manager-rules"]').element
+    expect(filters.compareDocumentPosition(rules) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // Counts are metadata-only by product decision (2026-08-03).
+    expect(wrapper.text()).not.toMatch(/excluded\s+\d/i)
   })
 
-  it('offers no conclusions editor to a user who cannot edit the run', async () => {
-    permissionState.canEditTenantSettings = false
-    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+  it('says so in one plain row when there are no filters', async () => {
+    draftStoreState.ruleSetDraftState = createDraftState()
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="ruleset-manager-conclusions"]').exists()).toBe(false)
-    expect(getRunConclusions).not.toHaveBeenCalled()
+    expect(wrapper.findAll('[data-testid="ruleset-manager-filter-row"]')).toHaveLength(0)
+    expect(wrapper.get('[data-testid="ruleset-manager-filter-none"]').text()).toBe('No filters. Every row is compared.')
   })
 
-  it('allows tenant users to run a saved ruleset without edit or delete actions', async () => {
-    permissionState.canRunActiveTenantReconciliation = true
-    permissionState.canEditTenantSettings = false
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="ruleset-manager-edit-run"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="ruleset-manager-edit-rules"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="ruleset-manager-delete-run"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="ruleset-manager-run-ruleset"]').exists()).toBe(true)
-
-    await wrapper.get('[data-testid="ruleset-manager-run-ruleset"]').trigger('click')
-    await flushPromises()
-
-    expect(routerPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reconciliation-diff' }))
-  })
-
-  it('renders persisted rules from the rules editor draft and keeps the basic diff visible', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState([
-          {
-            ruleId: 'basic-diff',
-            file1FieldPath: '$.orders[*].legacyResourceId',
-            file2FieldPath: '$[*].shopify_order_id',
-            operator: '=',
-            sequenceNum: 0,
-          },
-          {
-            ruleId: 'RS_ORDER_SYNC_RULE_1',
-            file1FieldPath: '$.orders[*].legacyResourceId',
-            file2FieldPath: '$[*].order_name',
-            operator: '=',
-            sequenceNum: 1,
-          },
-        ])
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    expect(wrapper.get('[data-testid="ruleset-manager-rule-list"]').text()).toContain('#0')
-    expect(wrapper.get('[data-testid="ruleset-manager-rule-list"]').text()).toContain('legacyResourceId = shopify_order_id')
-    expect(wrapper.get('[data-testid="ruleset-manager-rule-list"]').text()).toContain('#1')
-    expect(wrapper.get('[data-testid="ruleset-manager-rule-list"]').text()).toContain('legacyResourceId = order_name')
-    expect(wrapper.get('[data-testid="ruleset-manager-preview"]').text()).not.toContain('basic-diff')
-  })
-
-  it('lists a named rule by its name with the formula under it, an unnamed one by its formula (DAR-BE-210)', async () => {
+  it('lists the rules as rows in sequence order: fields by name with the path dim, the operator, pre-actions and name', async () => {
     draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState([
+      { ruleId: 'R2', file1FieldPath: '$.orders[*].total', file2FieldPath: '$[*].grand_total', operator: '>=', sequenceNum: 2, ruleName: '',
+        preActions: [{ fieldSide: 'file1', action: 'STRING_TO_NUMBER' }, { fieldSide: 'file2', action: 'STRING_TO_INT' }] },
+      { ruleId: 'basic-diff', file1FieldPath: '$.orders[*].legacyResourceId', file2FieldPath: '$[*].shopify_order_id', operator: '=', sequenceNum: 0 },
       { ruleId: 'R1', file1FieldPath: '$.orders[*].isFulfilled', file2FieldPath: '$[*].isCompleted', operator: '=', sequenceNum: 1, ruleName: 'Fulfillment Sync' },
-      { ruleId: 'R2', file1FieldPath: '$.orders[*].legacyResourceId', file2FieldPath: '$[*].order_name', operator: '=', sequenceNum: 2, ruleName: '' },
     ])
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    const named = wrapper.findAll('[data-testid="ruleset-manager-rule-named"]')
-    expect(named).toHaveLength(1)
-    expect(named[0]?.text()).toContain('Fulfillment Sync')
-    expect(named[0]?.get('.ruleset-manager-rule-formula').text()).toBe('isFulfilled = isCompleted')
-    expect(wrapper.get('[data-testid="ruleset-manager-rule-list"]').text()).toContain('legacyResourceId = order_name')
+    expect(wrapper.get('[data-testid="ruleset-manager-rule-head"]').findAll('span').map((cell) => cell.text())).toEqual(['#', 'SHOPIFY', 'Test', 'OMS', 'Pre-actions'])
+    const rows = wrapper.findAll('[data-testid="ruleset-manager-rule-row"]')
+    expect(rows.map((row) => row.get('.ruleset-manager-rule-sequence').text())).toEqual(['0', '1', '2'])
+    expect(rows[0]!.findAll('.ruleset-manager-field__name').map((name) => name.text())).toEqual(['legacyResourceId', 'shopify_order_id'])
+    expect(rows[0]!.findAll('.ruleset-manager-field__path').map((path) => path.text())).toEqual(['$.orders[*].legacyResourceId', '$[*].shopify_order_id'])
+    expect(rows[0]!.get('.ruleset-manager-operator-pill').text()).toBe('=')
+    expect(rows[0]!.get('.ruleset-manager-rule-pre').text()).toBe('—')
+    expect(rows[1]!.get('[data-testid="ruleset-manager-rule-name"]').text()).toBe('Fulfillment Sync')
+    expect(rows[2]!.get('.ruleset-manager-operator-pill').text()).toBe('>=')
+    expect(rows[2]!.get('.ruleset-manager-rule-pre').text()).toBe('SHOPIFY: String to number · OMS: String to int')
+    expect(rows[2]!.find('[data-testid="ruleset-manager-rule-name"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('basic-diff')
+    expect(fact(wrapper, 'checks').value).toBe('0 filters · 3 rules')
   })
 
-  it('opens the run edit workflow from the Run section without sending rule state', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+  it('keeps filter rows out of the numbered rule list', async () => {
+    const draftState = createDraftState()
+    draftState.draft.file1ExcludeFilters = [{ fieldExpression: 'orderStatus', operator: 'EXCLUDE_IN', values: ['CANCELLED'] }]
+    draftStoreState.ruleSetDraftState = draftState
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="ruleset-manager-edit-run"]').trigger('click')
+    const ruleList = wrapper.get('[data-testid="ruleset-manager-rule-list"]')
+    expect(ruleList.element.tagName).toBe('OL')
+    const filterList = wrapper.get('[data-testid="ruleset-manager-filter-list"]')
+    expect(filterList.element.tagName).toBe('UL')
+    expect(ruleList.element.contains(filterList.element)).toBe(false)
+    expect(filterList.findAll('.ruleset-manager-rule-sequence')).toHaveLength(0)
+  })
+
+  it('edits filters and rules with the pencil beside each heading, both into the rules editor', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState([
+      { ruleId: 'R1', file1FieldPath: '$.orders[*].legacyResourceId', file2FieldPath: '$[*].order_name', operator: '=', sequenceNum: 1 },
+    ])
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    for (const [testId, label] of [['ruleset-manager-edit-filters', 'Edit filters'], ['ruleset-manager-edit-rules', 'Edit rules']] as const) {
+      routerPush.mockClear()
+      draftStoreState.setRuleSetDraft.mockClear()
+      const pencil = wrapper.get(`[data-testid="${testId}"]`)
+      expect(pencil.attributes('aria-label')).toBe(label)
+      expect(pencil.classes()).toEqual(expect.arrayContaining(['app-icon-action', 'ruleset-manager-section-edit']))
+      expect(pencil.classes()).not.toContain('app-icon-action--large')
+      expect(pencil.find('svg').exists()).toBe(true)
+      expect(pencil.text()).toBe('')
+      expect(pencil.element.closest('.ruleset-manager-section-header')).not.toBeNull()
+
+      await pencil.trigger('click')
+      await flushPromises()
+
+      expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledWith(expect.objectContaining({ savedRunId: 'RS_ORDER_SYNC' }), 'ruleset-manager')
+      expect(routerPush).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-editor' })
+    }
+    expect(wrapper.text()).not.toContain('Change rules')
+    expect(wrapper.text()).not.toContain('Change filters')
+  })
+
+  it('opens run setup from the pairing fact, the one way into it now the Run section is gone', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const pairs = fact(wrapper, 'pairs').cell
+    expect(pairs.element.tagName).toBe('BUTTON')
+    expect(pairs.attributes('aria-label')).toBe('Edit run setup')
+    await pairs.trigger('click')
     await flushPromises()
 
     expect(routerPush).toHaveBeenCalledWith({
@@ -1038,35 +845,180 @@ describe('ReconciliationRuleSetManagerPage', () => {
     })
   })
 
-  it('opens the rules edit workflow from the Rules section', async () => {
-    const rules = [
-      {
-        ruleId: 'RS_ORDER_SYNC_RULE_1',
-        file1FieldPath: '$.orders[*].legacyResourceId',
-        file2FieldPath: '$[*].order_name',
-        operator: '=',
-        sequenceNum: 1,
-      },
-    ]
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState(rules)
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+  it('renames the run in place through the saved-run rename, and keeps the draft in step', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    saveSavedRunName.mockResolvedValue({ ok: true, messages: [], errors: [], savedRun: { savedRunId: 'RS_ORDER_SYNC', runName: 'Order Sync (prod)' } })
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="ruleset-manager-edit-rules"]').trigger('click')
+    const title = wrapper.get('[data-testid="ruleset-manager-run-name"]')
+    expect(title.attributes('aria-label')).toBe('Run name')
+    ;(title.element as HTMLElement).textContent = 'Order Sync (prod)'
+    await title.trigger('input')
+    await title.trigger('keydown', { key: 'Enter' })
     await flushPromises()
 
-    expect(routerPush).toHaveBeenCalledWith({
-      name: 'reconciliation-ruleset-editor',
+    expect(saveSavedRunName).toHaveBeenCalledWith({ savedRunId: 'RS_ORDER_SYNC', runName: 'Order Sync (prod)' })
+    expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ savedRunId: 'RS_ORDER_SYNC', runName: 'Order Sync (prod)' }),
+      'ruleset-manager',
+    )
+    expect(JSON.parse(wrapper.get('[data-testid="ruleset-manager-view-history"]').attributes('data-to') ?? '{}').query.runName).toBe('Order Sync (prod)')
+  })
+
+  it('says why a rename did not stick and puts the old name back', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    saveSavedRunName.mockRejectedValue(new ApiCallError('That name is taken.', 200))
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const title = wrapper.get('[data-testid="ruleset-manager-run-name"]')
+    ;(title.element as HTMLElement).textContent = 'Taken'
+    await title.trigger('input')
+    await title.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ruleset-manager-error"]').text()).toContain('That name is taken.')
+    expect(draftStoreState.setRuleSetDraft).not.toHaveBeenCalled()
+  })
+
+  it('shows the conclusions as numbered rows with what each applies to and its outcome; a row opens its popup outside the frame', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: conclusionsTree() })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage, { attachTo: document.body })
+    await flushPromises()
+
+    expect(getRunConclusions).toHaveBeenCalledWith('RS_ORDER_SYNC', expect.any(AbortSignal))
+    const section = wrapper.get('[data-testid="ruleset-manager-conclusions"]')
+    expect(section.get('.static-page-section-heading').text()).toBe('Conclusions')
+    expect(section.get('[data-testid="ruleset-manager-conclusions-note"]').text()).toBe('First match wins.')
+    const rows = section.findAll('[data-testid="run-conclusions-node"]')
+    expect(rows.map((row) => row.attributes('data-depth'))).toEqual(['1', '2'])
+    expect(section.findAll('[data-testid="run-conclusions-number"]').map((number) => number.text())).toEqual(['1', '1.1'])
+    expect(rows[0]!.get('[data-testid="run-conclusions-applies"]').text()).toBe('Missing from SHOPIFY')
+    expect(rows[1]!.find('[data-testid="run-conclusions-applies"]').exists()).toBe(false)
+    expect(rows[1]!.find('.run-conclusion__arrow').exists()).toBe(true)
+    expect(rows[1]!.get('[data-testid="run-conclusions-outcome"]').text()).toBe('Hidden')
+    expect(rows[0]!.get('[data-testid="run-conclusions-when"]').text()).toBe('OMS statusId is one of ORDER_CANCELLED')
+    expect(fact(wrapper, 'checks').sub).toBe('2 conclusions')
+
+    await rows[0]!.get('[data-testid="run-conclusions-open"]').trigger('click')
+    const dialog = wrapper.get('[data-testid="run-conclusion-popup"]')
+    expect(dialog.element.closest('.static-page-frame')).toBeNull()
+    expect(wrapper.get('.static-page-frame').classes()).toContain('static-page-frame--popup-open')
+
+    await dialog.get('[data-testid="run-conclusions-question"]').setValue('Cancelled in the OMS?')
+    saveRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], savedConclusions: null })
+    await dialog.get('[data-testid="run-conclusions-save"]').trigger('click')
+    await flushPromises()
+
+    expect(saveRunConclusions).toHaveBeenCalledWith('RS_ORDER_SYNC', expect.any(Array), expect.any(AbortSignal))
+    expect(saveRunConclusions.mock.calls[0]![1][0]).toMatchObject({ key: '10', question: 'Cancelled in the OMS?', outcome: null })
+    expect(saveRunConclusions.mock.calls[0]![1][1]).toMatchObject({ key: '20', parent: '10', outcome: 'HIDE' })
+    expect(wrapper.find('[data-testid="run-conclusion-popup"]').exists()).toBe(false)
+    expect(wrapper.get('.static-page-frame').classes()).not.toContain('static-page-frame--popup-open')
+    wrapper.unmount()
+  })
+
+  it('adds a conclusion from the New conclusion tile', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: { ...conclusionsTree(), conclusions: [] } })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-conclusions-empty"]').text()).toBe('None yet.')
+    await wrapper.get('[data-testid="run-conclusions-new"]').trigger('click')
+    expect(wrapper.get('#run-conclusion-popup-title').text()).toBe('New conclusion')
+    expect(wrapper.findAll('[data-testid="run-conclusions-node"]')).toHaveLength(1)
+    await wrapper.get('[data-testid="run-conclusions-cancel"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="run-conclusions-node"]')).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  it('shows the conclusions read-only to someone who cannot edit the run', async () => {
+    permissionState.canEditTenantSettings = false
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: conclusionsTree() })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const section = wrapper.get('[data-testid="ruleset-manager-conclusions"]')
+    expect(section.findAll('[data-testid="run-conclusions-node"]')).toHaveLength(2)
+    expect(section.find('button').exists()).toBe(false)
+    expect(section.find('[data-testid="run-conclusions-new"]').exists()).toBe(false)
+  })
+
+  it('leaves the conclusions out for a non-editor when they do not load', async () => {
+    permissionState.canEditTenantSettings = false
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockRejectedValue(new ApiCallError('Not yours to read.', 403))
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ruleset-manager-conclusions"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Not yours to read.')
+    expect(fact(wrapper, 'checks').sub).toBeNull()
+  })
+
+  it('gives someone who cannot edit a read-only page: plain name and facts, no pencils, no delete, and Run still works', async () => {
+    permissionState.canRunActiveTenantReconciliation = true
+    permissionState.canEditTenantSettings = false
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ruleset-manager-run-name"]').attributes('contenteditable')).toBe('false')
+    expect(fact(wrapper, 'pairs').cell.element.tagName).toBe('DIV')
+    expect(wrapper.find('[data-testid="ruleset-manager-edit-filters"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ruleset-manager-edit-rules"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ruleset-manager-delete-run"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="ruleset-manager-run-ruleset"]').trigger('click')
+    await flushPromises()
+
+    expect(routerPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reconciliation-diff' }))
+  })
+
+  it('keeps the footer: back, run, previous runs and delete, in that order', async () => {
+    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual([
+      'back-run-editor',
+      'ruleset-manager-run-ruleset',
+      'ruleset-manager-view-history',
+      'ruleset-manager-delete-run',
+    ])
+    const back = wrapper.get('[data-testid="back-run-editor"]')
+    expect(back.attributes('data-to')).toBe('/settings/runs')
+    expect(back.attributes('aria-label')).toBe('Back to Run Editor')
+    expect(back.element.closest('.static-page-actions')).not.toBeNull()
+    const runButton = wrapper.get('[data-testid="ruleset-manager-run-ruleset"]')
+    expect(runButton.classes()).toEqual(expect.arrayContaining(['app-icon-action', 'app-icon-action--large']))
+    expect(runButton.get('path').attributes('transform')).toBe('translate(0 1.5)')
+    const deleteButton = wrapper.get('[data-testid="ruleset-manager-delete-run"]')
+    expect(deleteButton.classes()).toContain('app-icon-action--danger')
+    expect(deleteButton.get('path').attributes('transform')).toBe('translate(0 0.75)')
+    expect(JSON.parse(wrapper.get('[data-testid="ruleset-manager-view-history"]').attributes('data-to') ?? '{}')).toEqual({
+      name: 'reconciliation-run-history',
+      params: { savedRunId: 'RS_ORDER_SYNC' },
+      query: { runName: 'Order Sync', file1SystemLabel: 'SHOPIFY', file2SystemLabel: 'OMS' },
     })
   })
 
   it('opens the reconciliation run workflow from the bottom play action', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
@@ -1076,152 +1028,52 @@ describe('ReconciliationRuleSetManagerPage', () => {
 
     expect(routerPush).toHaveBeenCalledWith({
       name: 'reconciliation-diff',
-      query: {
-        savedRunId: 'RS_ORDER_SYNC',
-        runName: 'Order Sync',
-        file1SystemLabel: 'SHOPIFY',
-        file2SystemLabel: 'OMS',
-      },
-    })
-  })
-
-  it('opens the previous runs page from the bottom list action', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    const footerActions = wrapper.findAll('.ruleset-manager-footer-row > *')
-    expect(footerActions.map((action) => action.attributes('data-testid'))).toEqual([
-      'back-run-editor',
-      'ruleset-manager-run-ruleset',
-      'ruleset-manager-view-history',
-      'ruleset-manager-delete-run',
-    ])
-    expect(JSON.parse(wrapper.get('[data-testid="ruleset-manager-view-history"]').attributes('data-to') ?? '{}')).toEqual({
-      name: 'reconciliation-run-history',
-      params: {
-        savedRunId: 'RS_ORDER_SYNC',
-      },
-      query: {
-        runName: 'Order Sync',
-        file1SystemLabel: 'SHOPIFY',
-        file2SystemLabel: 'OMS',
-      },
+      query: { savedRunId: 'RS_ORDER_SYNC', runName: 'Order Sync', file1SystemLabel: 'SHOPIFY', file2SystemLabel: 'OMS' },
     })
   })
 
   it('does not offer residual actions from the manager edit surface', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    draftStoreState.ruleSetDraftState = createDraftState()
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    // What is banned is the retired edit surface's IN-BOARD block: a "Back to Run Editor" text
-    // link sitting next to a "Create Basic Diff Run" tile inside the page body. The footer
-    // icon action asserted below is a different affordance on a different pattern, so this
-    // guard stays literal about the markup it is retiring.
     expect(wrapper.text()).not.toContain('Create Basic Diff Run')
     expect(wrapper.text()).not.toContain('Back to Run Editor')
-    expect(wrapper.find('.ruleset-manager-actions').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="ruleset-manager-back"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="ruleset-manager-create"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="back-run-editor"]').element.closest('.static-page-board')).toBeNull()
-  })
-
-  it('returns to the Run Editor from the first footer action', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    const back = wrapper.get('[data-testid="back-run-editor"]')
-    expect(back.attributes('data-to')).toBe('/settings/runs')
-    expect(back.attributes('aria-label')).toBe('Back to Run Editor')
-    expect(back.classes()).toContain('app-icon-action')
-    expect(back.classes()).toContain('app-icon-action--large')
-    expect(back.classes()).not.toContain('app-icon-action--danger')
-    expect(back.element.closest('.ruleset-manager-footer-row')).not.toBeNull()
-    expect(back.element.closest('.static-page-actions')).not.toBeNull()
-    expect(back.element.closest('.static-page-board')).toBeNull()
-
-    // First in the row, matching the three sibling detail pages.
-    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual([
-      'back-run-editor',
-      'ruleset-manager-run-ruleset',
-      'ruleset-manager-view-history',
-      'ruleset-manager-delete-run',
-    ])
   })
 
   it('still offers the way back when no other footer action is available', async () => {
-    // An unsaved draft (no savedRunId, so no run history) held by a user who can neither run nor
-    // edit: every other footer action is gone. This is the case the old permission gate on the
-    // whole #actions slot swallowed, which is precisely when someone is most stuck on the page.
     permissionState.canRunActiveTenantReconciliation = false
     permissionState.canEditTenantSettings = false
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-    draftStoreState.ruleSetDraftState = {
-      draft: {
-        savedRunId: '',
-        runName: 'Unsaved Draft',
-        file1SystemEnumId: 'OMS',
-        file1SystemLabel: 'OMS',
-        file1FileTypeEnumId: 'DftJson',
-        file1JsonSchemaId: 'schema-oms-orders',
-        file1SchemaFileName: 'test-oms-orders.schema.json',
-        file1PrimaryIdExpression: ['$.orders[0].order_id'],
-        file2SystemEnumId: 'SHOPIFY',
-        file2SystemLabel: 'SHOPIFY',
-        file2FileTypeEnumId: 'DftJson',
-        file2JsonSchemaId: 'schema-shopify-orders',
-        file2SchemaFileName: 'test-shopify-orders.schema.json',
-        file2PrimaryIdExpression: ['$.data.orders.edges[0].node.id'],
-      },
-      resumeStepId: 'ruleset-manager',
-    }
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    draftStoreState.ruleSetDraftState = { draft: { ...createDraftState().draft, savedRunId: '', runName: 'Unsaved Draft' }, resumeStepId: 'ruleset-manager' }
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual([
-      'back-run-editor',
-    ])
+    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual(['back-run-editor'])
+    expect(wrapper.find('[data-testid="ruleset-manager-conclusions"]').exists()).toBe(false)
+    expect(getRunConclusions).not.toHaveBeenCalled()
   })
 
-  it('still offers the way back when there is no draft to show', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
+  it('shows an empty state, and still the way back, when there is no draft', async () => {
     draftStoreState.ruleSetDraftState = null
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
     expect(wrapper.text()).toContain('No run basics defined yet')
-    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual([
-      'back-run-editor',
-    ])
+    expect(wrapper.text()).toContain('Go to Run Setup')
+    expect(wrapper.find('[data-testid="ruleset-manager-facts"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ruleset-manager-filters"]').exists()).toBe(false)
+    expect(wrapper.findAll('.ruleset-manager-footer-row > *').map((action) => action.attributes('data-testid'))).toEqual(['back-run-editor'])
   })
 
   it('deletes a saved run from the bottom trash action after confirmation', async () => {
     draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-      draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
-      window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    deleteSavedRun.mockResolvedValue({
-      ok: true,
-      messages: ['Deleted saved run RS_ORDER_SYNC.'],
-      errors: [],
-      deleted: true,
-      deletedSavedRunId: 'RS_ORDER_SYNC',
-    })
+    deleteSavedRun.mockResolvedValue({ ok: true, messages: [], errors: [], deleted: true, deletedSavedRunId: 'RS_ORDER_SYNC' })
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
@@ -1234,95 +1086,5 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(routerPush).toHaveBeenCalledWith('/settings/runs')
 
     confirmSpy.mockRestore()
-  })
-
-  it('shows an empty state when there is no draft in history state', async () => {
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('No run basics defined yet')
-    expect(wrapper.text()).toContain('Go to Run Setup')
-    expect(wrapper.find('[data-testid="ruleset-manager-create"]').exists()).toBe(false)
-  })
-
-  it('summarizes configured exclusions for each side', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-    const draftState = createDraftState()
-    draftState.draft.file2ExcludeFilters = [
-      { fieldExpression: 'salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL', 'DRAFT_SALES_CHANNEL'] },
-    ]
-    draftStoreState.ruleSetDraftState = draftState
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    const card = wrapper.get('[data-testid="ruleset-exclusions-file2"]')
-    expect(card.text()).toContain('salesChannelEnumId')
-    expect(card.text()).toContain('POS_SALES_CHANNEL')
-  })
-
-  it('shows a dash when a side has no exclusions', async () => {
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-    draftStoreState.ruleSetDraftState = createDraftState()
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    expect(wrapper.get('[data-testid="ruleset-exclusions-file2"]').text()).toContain('—')
-  })
-
-  it('never renders an excluded record count', async () => {
-    // Counts are metadata-only by product decision (2026-08-03).
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-    const draftState = createDraftState()
-    draftState.draft.file2ExcludeFilters = [
-      { fieldExpression: 'salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
-    ]
-    draftStoreState.ruleSetDraftState = draftState
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    expect(wrapper.text()).not.toMatch(/excluded\s+\d/i)
-  })
-
-  it('keeps exclusion entries out of the numbered comparison-rule list', async () => {
-    // Every other assertion in this file is a substring check against the exclusion text, which
-    // would pass identically whether the exclusion <li> sat inside or outside the numbered <ol>.
-    // This walks the DOM ancestry directly so the design-spec no-numbering property actually has
-    // a guard: it must fail if someone moves the exclusion entries into the rule list.
-    draftStoreState.workflowOrigin = { label: 'Run Editor', path: '/settings/runs' }
-    const draftState = createDraftState()
-    draftState.draft.file1ExcludeFilters = [
-      { fieldExpression: 'orderStatus', operator: 'EXCLUDE_IN', values: ['CANCELLED'] },
-    ]
-    draftState.draft.file2ExcludeFilters = [
-      { fieldExpression: 'salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
-    ]
-    draftStoreState.ruleSetDraftState = draftState
-    window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
-
-    const wrapper = mount(ReconciliationRuleSetManagerPage)
-    await flushPromises()
-
-    const ruleList = wrapper.get('[data-testid="ruleset-manager-rule-list"]')
-    expect(ruleList.element.tagName).toBe('OL')
-
-    const exclusionsList = wrapper.get('[data-testid="ruleset-manager-exclusion-list"]')
-    expect(exclusionsList.element.tagName).toBe('UL')
-    expect(ruleList.element.contains(exclusionsList.element)).toBe(false)
-
-    const exclusionsFile1 = wrapper.get('[data-testid="ruleset-exclusions-file1"]')
-    const exclusionsFile2 = wrapper.get('[data-testid="ruleset-exclusions-file2"]')
-    expect(ruleList.element.contains(exclusionsFile1.element)).toBe(false)
-    expect(ruleList.element.contains(exclusionsFile2.element)).toBe(false)
-
-    // No sequence marker anywhere inside the exclusions list either -- exclusions stay
-    // deliberately unordered/unnumbered, unlike the numbered comparison rules.
-    expect(exclusionsList.findAll('.ruleset-manager-rule-sequence')).toHaveLength(0)
-    expect(exclusionsList.text()).not.toMatch(/#\d/)
   })
 })

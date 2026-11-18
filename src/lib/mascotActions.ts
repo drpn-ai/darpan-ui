@@ -128,13 +128,18 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
 
   /* ── Editing a saved run ────────────────────────────────────────────────────── */
-  'edit run': {
-    title: 'Edit Run',
+  // DAR-UI-128: the Ruleset manager's pairing fact opens run setup; each section's pencil opens the rules board.
+  'edit run setup': {
+    title: 'Edit run setup',
     body: 'changes the sources, schemas and primary IDs. Finished runs keep the setup they ran with; this affects the next one.',
   },
   'edit rules': {
-    title: 'Edit Rules',
+    title: 'Edit rules',
     body: 'opens the board where fields are paired and exclusions set. It takes effect from the next run, never on a finished one.',
+  },
+  'edit filters': {
+    title: 'Edit filters',
+    body: 'opens the rules board; double-click a field there to set what its source leaves out as it pulls. From the next run on.',
   },
   'run settings': {
     title: 'Run settings',
@@ -156,31 +161,27 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'new conclusion': {
     title: 'New conclusion',
+    body: 'a new top-level answer, tried after the ones above it. Pick which rows it applies to, then the conditions that prove it.',
+  },
+  'new conclusion code': {
+    title: 'New conclusion code',
     body: 'names a new answer for your findings, e.g. \'RMA still open\'. It is yours alone: no other company sees it.',
   },
-  'move up': {
-    title: 'Move up',
-    body: 'conclusions are tried top to bottom and the first that holds wins, so order is the decision. Its children move with it.',
+  'add conclusion code': {
+    title: 'Add conclusion code',
+    body: 'makes the code now and picks it here. The conclusion itself keeps it only once you save.',
   },
-  'move down': {
-    title: 'Move down',
-    body: 'conclusions are tried top to bottom and the first that holds wins, so order is the decision. Its children move with it.',
+  'delete conclusion': {
+    title: 'Delete conclusion',
+    body: 'removes it and every conclusion under it, saved at once. Rows it named are named by the rest from the next run.',
   },
   'add child conclusion': {
     title: 'Add child conclusion',
     body: 'refines a conclusion once it holds: a cancelled return with an open RMA, and then whether that RMA is still waiting for its receipt. Three levels deep at most.',
   },
-  'add': {
-    title: 'Add',
-    body: 'adds what you typed. Nothing is saved until you save.',
-  },
   'add condition': {
     title: 'Add condition',
     body: 'every condition of a conclusion must hold. Say what it checks in words: that line is what a finding shows as its proof.',
-  },
-  'add conclusion': {
-    title: 'Add conclusion',
-    body: 'a new top-level answer, tried after the ones above it. Pick which rows it applies to, then the conditions that prove it.',
   },
   'add match rule': {
     title: 'Add match rule',
@@ -586,9 +587,14 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Send a new code',
     body: 'only the newest code works, so codes in older emails stop counting. Sends are capped each hour, so check spam before asking again.',
   },
-  change: {
-    title: 'Change',
-    body: 'replaces your recovery email, the one password reset codes go to. Until the new address saves, codes keep going to the old one.',
+  // DAR-UI-129: the recovery email's pencil and plus.
+  'change recovery email': {
+    title: 'Change recovery email',
+    body: 'replaces the address password reset codes go to. Until the new address saves, codes keep going to the old one.',
+  },
+  'add recovery email': {
+    title: 'Add recovery email',
+    body: 'sets the address password reset codes go to. Nothing changes until it saves.',
   },
   'keep a version now': {
     title: 'Keep a version now',
@@ -807,10 +813,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Save refined fields',
     body: 'replaces this schema’s field list for the whole tenant. Source files are checked against it from the next run; finished runs are not re-checked.',
   },
-  'revert': {
-    title: 'Revert',
-    body: 'throws away the edits made here since the last save and puts back what is saved. Nothing saved is touched.',
-  },
   'after each run': {
     title: 'After each run',
     body: 'whether the email to everyone with access, plus the extra addresses, and the chat space’s card go out when each audit run finishes. It takes effect on save.',
@@ -818,10 +820,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   'save script': {
     title: 'Save script',
     body: 'checks the code and keeps it, with what it reads and its schedule, for the whole tenant. The schedule runs the saved version; an unsaved edit never runs on schedule.',
-  },
-  'save conclusions': {
-    title: 'Save conclusions',
-    body: 'replaces this run’s whole conclusion tree, all or nothing — one refusal and nothing is saved. Results get named by it; the records never change.',
   },
 
   /* ── The audit's agent (DAR-UI-104/105) ─────────────────────────────────────── */
@@ -972,6 +970,11 @@ const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Object.free
   [/^audit posts to: .+$/, {
     title: 'Posts to',
     body: 'picks the chat space that gets a summary card after each run, or None. The same choice as this audit’s row in Notifications.',
+  }],
+  // DAR-UI-128: each Ruleset manager conclusion row is named "Open conclusion <name>".
+  [/^open conclusion .+$/, {
+    title: 'Conclusion',
+    body: 'opens its question and the conditions that prove it. Saving there replaces the run’s whole tree, all or nothing; results get named by it from the next run.',
   }],
   // DAR-UI-125: each earlier row on Config history is named "Restore version <n>".
   [/^restore version .+$/, {

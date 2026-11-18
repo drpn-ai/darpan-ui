@@ -1,166 +1,123 @@
 <template>
-  <StaticPageFrame :class="{ 'static-page-frame--popup-open': isAuthInfoPopupOpen }">
+  <StaticPageFrame :class="{ 'static-page-frame--popup-open': isPopupOpen }">
     <template #hero>
-      <div class="ruleset-manager-hero">
-        <h1>{{ heroTitle }}</h1>
-      </div>
+      <StaticRecordTitle
+        v-if="draft"
+        v-model="editableRunName"
+        aria-label="Run name"
+        test-id="ruleset-manager-run-name"
+        explain="runName"
+        fallback="Run"
+        :editable="canRenameRun"
+        @commit="void commitRunName($event)"
+      />
+      <h1 v-else>Run</h1>
     </template>
 
-    <InlineValidation v-if="deleteError" tone="error" :message="deleteError" />
+    <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="ruleset-manager-error" />
 
-    <StaticPageSection v-if="draft">
+    <!-- DAR-UI-128. The settings-page header (DAR-UI-126): a fact per system (its connection opens today's auth popup),
+         how the two sides pair (an editor's way into run setup), and what the run checks. -->
+    <StaticFactStrip v-if="draft" :facts="facts" test-id="ruleset-manager-facts" @open="openFact" />
+
+    <!-- Filters come first: they are applied as each source is read, before any rule compares a row. -->
+    <StaticPageSection v-if="draft" data-testid="ruleset-manager-filters">
       <template #header>
         <div class="ruleset-manager-section-header section-header-row">
-          <h2 class="static-page-section-heading">Run</h2>
+          <h2 class="static-page-section-heading">Filters</h2>
           <button
             v-if="canEditTenantSettings"
             type="button"
             class="app-icon-action ruleset-manager-section-edit"
-            data-testid="ruleset-manager-edit-run"
-            aria-label="Edit Run"
-            @click="openRunEditWorkflow"
+            data-testid="ruleset-manager-edit-filters"
+            aria-label="Edit filters"
+            @click="openRuleEditWorkflow"
           >
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path
-                :d="editIconPath"
-                class="ruleset-manager-edit-icon-path"
-              />
+              <path :d="editIconPath" fill="currentColor" />
             </svg>
           </button>
         </div>
       </template>
 
-      <div class="ruleset-manager-basics-grid">
-        <div class="ruleset-manager-schema-row" data-testid="ruleset-manager-schema-row-file1">
-          <button
-            v-if="file1SystemConfig"
-            type="button"
-            class="ruleset-manager-basic-card ruleset-manager-basic-card--button"
-            data-testid="ruleset-manager-system-config-file1"
-            aria-label="View auth info for source 1"
-            @click="openAuthInfoPopupForSide('file1')"
-          >
-            <span class="static-page-summary-label">System</span>
-            <span class="ruleset-manager-system-line">
-              <strong>{{ file1Title }}</strong>
-              <template v-if="file1SystemConfigName">
-                <span class="ruleset-manager-system-separator" aria-hidden="true">·</span>
-                <span class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file1">{{ file1SystemConfigName }}</span>
-              </template>
-            </span>
-          </button>
-          <article v-else class="ruleset-manager-basic-card">
-            <span class="static-page-summary-label">System</span>
-            <span class="ruleset-manager-system-line">
-              <strong>{{ file1Title }}</strong>
-              <template v-if="file1SystemConfigName">
-                <span class="ruleset-manager-system-separator" aria-hidden="true">·</span>
-                <span class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file1">{{ file1SystemConfigName }}</span>
-              </template>
-            </span>
-          </article>
-          <article class="ruleset-manager-basic-card">
-            <span class="static-page-summary-label">Schema</span>
-            <span class="ruleset-manager-summary-copy">{{ file1SourceLabel }}</span>
-          </article>
-          <article class="ruleset-manager-basic-card">
-            <span class="static-page-summary-label">Primary ID</span>
-            <span>{{ file1PrimaryId }}</span>
-          </article>
-        </div>
-
-        <!-- A single-sided run (scopeMode EVALUATE) has no second source. Rendering the row anyway
-             filled it with placeholders - a "System 2" card and a "Field pending" primary id - which
-             describe a source that does not exist. -->
-        <div v-if="!isSingleSided" class="ruleset-manager-schema-row" data-testid="ruleset-manager-schema-row-file2">
-          <button
-            v-if="file2SystemConfig"
-            type="button"
-            class="ruleset-manager-basic-card ruleset-manager-basic-card--button"
-            data-testid="ruleset-manager-system-config-file2"
-            aria-label="View auth info for source 2"
-            @click="openAuthInfoPopupForSide('file2')"
-          >
-            <span class="static-page-summary-label">System</span>
-            <span class="ruleset-manager-system-line">
-              <strong>{{ file2Title }}</strong>
-              <template v-if="file2SystemConfigName">
-                <span class="ruleset-manager-system-separator" aria-hidden="true">·</span>
-                <span class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file2">{{ file2SystemConfigName }}</span>
-              </template>
-            </span>
-          </button>
-          <article v-else class="ruleset-manager-basic-card">
-            <span class="static-page-summary-label">System</span>
-            <span class="ruleset-manager-system-line">
-              <strong>{{ file2Title }}</strong>
-              <template v-if="file2SystemConfigName">
-                <span class="ruleset-manager-system-separator" aria-hidden="true">·</span>
-                <span class="ruleset-manager-system-config" data-testid="ruleset-manager-system-config-name-file2">{{ file2SystemConfigName }}</span>
-              </template>
-            </span>
-          </article>
-          <article class="ruleset-manager-basic-card">
-            <span class="static-page-summary-label">Schema</span>
-            <span class="ruleset-manager-summary-copy">{{ file2SourceLabel }}</span>
-          </article>
-          <article class="ruleset-manager-basic-card">
-            <span class="static-page-summary-label">Primary ID</span>
-            <span>{{ file2PrimaryId }}</span>
-          </article>
-        </div>
-      </div>
+      <ul class="ruleset-manager-rows" data-testid="ruleset-manager-filter-list">
+        <li
+          v-for="row in filterRows"
+          :key="row.key"
+          class="ruleset-manager-row ruleset-manager-row--filter"
+          data-testid="ruleset-manager-filter-row"
+        >
+          <span class="ruleset-manager-row__dim">{{ row.system }}</span>
+          <span class="ruleset-manager-field">
+            <span class="ruleset-manager-field__name">{{ row.name }}</span>
+            <span v-if="row.path !== row.name" class="ruleset-manager-field__path">{{ row.path }}</span>
+          </span>
+          <span class="ruleset-manager-row__dim">{{ row.how }}</span>
+          <span class="ruleset-manager-row__values">{{ row.values }}</span>
+        </li>
+        <li v-if="!filterRows.length" class="ruleset-manager-row ruleset-manager-row--note" data-testid="ruleset-manager-filter-none">
+          No filters. Every row is compared.
+        </li>
+      </ul>
     </StaticPageSection>
 
-    <StaticPageSection>
+    <StaticPageSection data-testid="ruleset-manager-rules">
       <template #header>
         <div class="ruleset-manager-section-header section-header-row">
           <h2 class="static-page-section-heading">Rules</h2>
           <button
-            v-if="canEditTenantSettings"
+            v-if="draft && canEditTenantSettings"
             type="button"
             class="app-icon-action ruleset-manager-section-edit"
             data-testid="ruleset-manager-edit-rules"
-            aria-label="Edit Rules"
+            aria-label="Edit rules"
             @click="openRuleEditWorkflow"
           >
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path
-                :d="editIconPath"
-                class="ruleset-manager-edit-icon-path"
-              />
+              <path :d="editIconPath" fill="currentColor" />
             </svg>
           </button>
         </div>
       </template>
 
       <template v-if="draft">
-        <div class="ruleset-manager-builder">
-          <!-- Exclusions are applied during extraction, before any comparison rule runs, so they are
-               listed first here to match execution order -- not because they take precedence over the
-               comparison rules, and not as a count of any kind. -->
-          <section class="ruleset-manager-equation-panel" data-testid="ruleset-manager-exclusions" aria-label="Exclusions">
-            <span class="static-page-summary-label">Exclusions</span>
-            <ul class="ruleset-manager-exclusion-list" data-testid="ruleset-manager-exclusion-list">
-              <li data-testid="ruleset-exclusions-file1">{{ file1Exclusions }}</li>
-              <li v-if="!isSingleSided" data-testid="ruleset-exclusions-file2">{{ file2Exclusions }}</li>
-            </ul>
-          </section>
-
-          <section class="ruleset-manager-equation-panel" data-testid="ruleset-manager-preview" aria-label="Active comparison">
-            <ol v-if="visibleRules.length" class="ruleset-manager-rule-list" data-testid="ruleset-manager-rule-list">
-              <li v-for="rule in visibleRules" :key="rule.ruleId || `${rule.sequenceNum}-${rule.file1FieldPath}-${rule.file2FieldPath}`">
-                <span class="ruleset-manager-rule-sequence">#{{ rule.sequenceNum }}</span>
-                <span v-if="rule.ruleName?.trim()" class="ruleset-manager-rule-named" data-testid="ruleset-manager-rule-named">
-                  <span>{{ rule.ruleName.trim() }}</span>
-                  <span class="ruleset-manager-rule-formula">{{ formatRulePreview(rule) }}</span>
-                </span>
-                <span v-else>{{ formatRulePreview(rule) }}</span>
-              </li>
-            </ol>
-            <p v-else class="ruleset-manager-preview-line">{{ comparisonPreview }}</p>
-          </section>
+        <div v-if="visibleRules.length" class="ruleset-manager-rule-table">
+          <div class="ruleset-manager-rule-head" data-testid="ruleset-manager-rule-head">
+            <span>#</span>
+            <span>{{ file1Title }}</span>
+            <span class="ruleset-manager-rule-head__test">Test</span>
+            <span>{{ file2Title }}</span>
+            <span>Pre-actions</span>
+          </div>
+          <ol class="ruleset-manager-rows" data-testid="ruleset-manager-rule-list">
+            <li
+              v-for="rule in visibleRules"
+              :key="rule.ruleId || `${rule.sequenceNum}-${rule.file1FieldPath}-${rule.file2FieldPath}`"
+              class="ruleset-manager-row ruleset-manager-row--rule"
+              data-testid="ruleset-manager-rule-row"
+            >
+              <span class="ruleset-manager-rule-sequence">{{ rule.sequenceNum }}</span>
+              <span class="ruleset-manager-field">
+                <span class="ruleset-manager-field__name">{{ formatFieldKey(rule.file1FieldPath) }}</span>
+                <span v-if="showsPath(rule.file1FieldPath)" class="ruleset-manager-field__path">{{ rule.file1FieldPath }}</span>
+              </span>
+              <span class="ruleset-manager-operator-pill">{{ rule.operator?.trim() || '=' }}</span>
+              <span class="ruleset-manager-field">
+                <span class="ruleset-manager-field__name">{{ formatFieldKey(rule.file2FieldPath) }}</span>
+                <span v-if="showsPath(rule.file2FieldPath)" class="ruleset-manager-field__path">{{ rule.file2FieldPath }}</span>
+              </span>
+              <span class="ruleset-manager-rule-pre">
+                <span>{{ preActionWords(rule) }}</span>
+                <span v-if="rule.ruleName?.trim()" class="ruleset-manager-rule-name" data-testid="ruleset-manager-rule-name">{{ rule.ruleName.trim() }}</span>
+              </span>
+            </li>
+          </ol>
         </div>
+        <ul v-else class="ruleset-manager-rows">
+          <li class="ruleset-manager-row ruleset-manager-row--note ruleset-manager-preview-line" data-testid="ruleset-manager-rule-none">
+            {{ comparisonPreview }}
+          </li>
+        </ul>
       </template>
 
       <template v-else>
@@ -178,9 +135,16 @@
       </template>
     </StaticPageSection>
 
-    <!-- DAR-UI-064 (S3): what each row of this run is concluded to be. Edited in place; it saves on its own. -->
-    <StaticPageSection v-if="draft && savedRunId && canEditTenantSettings" title="Conclusions" data-testid="ruleset-manager-conclusions">
-      <RunConclusionsEditor :saved-run-id="savedRunId" :file1-label="file1Title" :file2-label="file2Title" />
+    <!-- DAR-UI-064 (S3), DAR-UI-128: what each row of this run is concluded to be. An editor opens a row in its popup;
+         anyone else whose read is allowed sees the rows only. -->
+    <StaticPageSection v-if="showConclusions" data-testid="ruleset-manager-conclusions">
+      <template #header>
+        <div class="ruleset-manager-section-title">
+          <h2 class="static-page-section-heading">Conclusions</h2>
+          <p class="ruleset-manager-section-note" data-testid="ruleset-manager-conclusions-note">First match wins.</p>
+        </div>
+      </template>
+      <RunConclusionRows :editable="canEditTenantSettings" />
     </StaticPageSection>
 
     <template #actions>
@@ -236,6 +200,9 @@
       </div>
     </template>
   </StaticPageFrame>
+
+  <!-- Outside the frame, which blurs while a popup is open; a popup inside it would blur too. -->
+  <RunConclusionsEditor />
 
   <div
     v-if="authInfoPopup"
@@ -297,13 +264,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
+import StaticFactStrip, { type StaticFact } from '../../components/ui/StaticFactStrip.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
+import RunConclusionRows from '../../components/reconciliation/RunConclusionRows.vue'
 import RunConclusionsEditor from '../../components/reconciliation/RunConclusionsEditor.vue'
+import { RUN_CONCLUSIONS_KEY, useRunConclusions } from '../../composables/useRunConclusions'
+import { useRunResultName } from '../../composables/useRunResultName'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
@@ -320,12 +292,17 @@ import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { backIconPath, editIconPath, listIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
   formatReconciliationFieldKey,
+  normalizeReconciliationFieldPath,
   type ReconciliationRuleSetDraft,
   type ReconciliationRuleSetDraftRule,
   reconciliationSystemTitle,
 } from '../../lib/reconciliationRuleSetDraft'
 import { buildReconciliationDiffRoute, buildReconciliationRunHistoryRoute } from '../../lib/reconciliationRoutes'
-import type { SourceExcludeFilter } from '../../lib/sourceExcludeFilters'
+import {
+  INCLUDE_FILTER_OPERATOR,
+  INCLUDE_PREFIX_FILTER_OPERATOR,
+  type SourceExcludeFilter,
+} from '../../lib/sourceExcludeFilters'
 import { buildWorkflowOriginState } from '../../lib/workflowOrigin'
 import { darpanSystemIdsMatch } from '../../lib/utils/darpanSystems'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
@@ -339,7 +316,7 @@ const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 const schemaLabels = ref<Record<string, string>>({})
 const deletingSavedRun = ref(false)
-const deleteError = ref<string | null>(null)
+const pageError = ref<string | null>(null)
 type SourceSide = 'file1' | 'file2'
 type AuthInfoKind = 'oms' | 'shopify'
 
@@ -378,7 +355,7 @@ const ellipsisIconPath =
 const draftState = computed(() => draftStore.ruleSetDraftState)
 const draft = computed<ReconciliationRuleSetDraft | null>(() => draftState.value?.draft ?? null)
 const savedRunId = computed(() => draft.value?.savedRunId?.trim() ?? '')
-const heroTitle = computed(() => draft.value?.runName || 'Run')
+const draftRunName = computed(() => draft.value?.runName ?? '')
 const file1Title = computed(() => reconciliationSystemTitle(draft.value, 'file1'))
 const file2Title = computed(() => reconciliationSystemTitle(draft.value, 'file2'))
 const file1SystemConfigName = computed(() => systemConfigName(draft.value, 'file1'))
@@ -389,14 +366,26 @@ const file1SystemConfig = computed<SourceConfigSummary | null>(() => buildSource
 const file2SystemConfig = computed<SourceConfigSummary | null>(() => buildSourceConfigSummary(draft.value, 'file2'))
 const file1PrimaryId = computed(() => formatFieldKeyList(draft.value?.file1PrimaryIdExpression))
 const file2PrimaryId = computed(() => formatFieldKeyList(draft.value?.file2PrimaryIdExpression))
-const file1Exclusions = computed(() => formatExclusionSummary(file1Title.value, draft.value?.file1ExcludeFilters))
-const file2Exclusions = computed(() => formatExclusionSummary(file2Title.value, draft.value?.file2ExcludeFilters))
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
+const canRenameRun = computed(() => canEditTenantSettings.value && Boolean(savedRunId.value))
+// The run's name, renamed in place through save#SavedRunName (the run history's rename).
+const { editableRunName, persistedRunName, saveRunName, resetRunNameState } = useRunResultName({
+  savedRunId,
+  fallbackRunName: draftRunName,
+  canEditTenantSettings,
+  setLoadError: (message) => { pageError.value = message },
+})
+const heroTitle = computed(() => persistedRunName.value || draftRunName.value || 'Run')
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
 const canViewRunHistory = computed(() => Boolean(savedRunId.value))
 const sourceConfigOptions = ref<AutomationSourceConfigOption[]>([])
 const authInfoPopup = ref<AuthInfoPopupState | null>(null)
-const isAuthInfoPopupOpen = computed(() => Boolean(authInfoPopup.value))
+const conclusions = useRunConclusions({ savedRunId, file1Label: file1Title, file2Label: file2Title })
+provide(RUN_CONCLUSIONS_KEY, conclusions)
+const isPopupOpen = computed(() => Boolean(authInfoPopup.value) || Boolean(conclusions.editingNode.value))
+// An editor always has the section (to add the first conclusion); anyone else sees it once the tree has loaded.
+const showConclusions = computed(() => Boolean(draft.value && savedRunId.value)
+  && (canEditTenantSettings.value || conclusions.loaded.value))
 const runHistoryRoute = computed(() => buildReconciliationRunHistoryRoute({
   savedRunId: savedRunId.value,
   runName: heroTitle.value,
@@ -445,21 +434,114 @@ function formatFieldKeyList(fieldPaths: string[] | undefined): string {
   return fieldPaths.map((fieldPath) => formatFieldKey(fieldPath)).join(' + ')
 }
 
-function formatExclusions(filters: SourceExcludeFilter[] | undefined): string {
-  if (!filters?.length) return '—'
-  return filters.map((filter) => `${formatFieldKey(filter.fieldExpression)}: ${filter.values.join(', ')}`).join(' · ')
+/** The full path goes dim under the field's name, unless the name already is the whole path. */
+function showsPath(fieldPath: string | undefined): boolean {
+  const normalized = normalizeReconciliationFieldPath(fieldPath)
+  return Boolean(normalized) && normalized !== formatFieldKey(fieldPath)
 }
 
-// The Rules section shows exclusions unordered and unnumbered (that decision is deliberate — see
-// the manager page's Rules section markup) alongside the numbered comparison rules, so each entry
-// names its own side rather than relying on row position the way the old Run-section cards did.
-function formatExclusionSummary(title: string, filters: SourceExcludeFilter[] | undefined): string {
-  return `${title} · ${formatExclusions(filters)}`
+interface FilterRow {
+  key: string
+  system: string
+  name: string
+  path: string
+  how: string
+  values: string
 }
 
-function formatRulePreview(rule: ReconciliationRuleSetDraftRule): string {
-  return `${formatFieldKey(rule.file1FieldPath)} ${rule.operator?.trim() || '='} ${formatFieldKey(rule.file2FieldPath)}`
+/** The board's own words for a filter's direction (RuleSetBoard's value input). */
+function filterHowWords(operator: string | undefined): string {
+  if (operator === INCLUDE_PREFIX_FILTER_OPERATOR) return 'Starts to keep'
+  if (operator === INCLUDE_FILTER_OPERATOR) return 'Values to keep'
+  return 'Values to exclude'
 }
+
+function toFilterRows(side: SourceSide, system: string, filters: SourceExcludeFilter[] | undefined): FilterRow[] {
+  return (filters ?? []).map((filter, index) => ({
+    key: `${side}-${index}-${filter.fieldExpression}`,
+    system,
+    name: formatFieldKey(filter.fieldExpression),
+    path: normalizeReconciliationFieldPath(filter.fieldExpression) || filter.fieldExpression,
+    how: filterHowWords(filter.operator),
+    values: filter.values.join(', '),
+  }))
+}
+
+// One row per filter per side, from the draft itself; a single-sided run has only its one side.
+const filterRows = computed<FilterRow[]>(() => [
+  ...toFilterRows('file1', file1Title.value, draft.value?.file1ExcludeFilters),
+  ...(isSingleSided.value ? [] : toFilterRows('file2', file2Title.value, draft.value?.file2ExcludeFilters)),
+])
+
+const PRE_ACTION_WORDS: Record<string, string> = { STRING_TO_INT: 'String to int', STRING_TO_NUMBER: 'String to number' }
+
+/** Each side's pre-actions in words, named by the side's system: "Shopify: String to number". */
+function preActionWords(rule: ReconciliationRuleSetDraftRule): string {
+  const words = (rule.preActions ?? []).map((preAction) => {
+    const system = preAction.fieldSide === 'file2' ? file2Title.value : file1Title.value
+    return `${system}: ${PRE_ACTION_WORDS[preAction.action] ?? preAction.action}`
+  })
+  return words.length ? words.join(' · ') : '—'
+}
+
+function countWords(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+// The header strip (DAR-UI-126). A system's fact opens its connection when today's auth popup applies; the pairing
+// fact is an editor's way into run setup, the one place the systems, schemas and primary IDs change.
+const facts = computed<StaticFact[]>(() => {
+  if (!draft.value) return []
+  const systemFact = (side: SourceSide): StaticFact => {
+    const configName = side === 'file1' ? file1SystemConfigName.value : file2SystemConfigName.value
+    const sourceLabel = side === 'file1' ? file1SourceLabel.value : file2SourceLabel.value
+    const interactive = Boolean(sourceConfigForSide(side))
+    return {
+      key: side,
+      label: side === 'file1' ? file1Title.value : file2Title.value,
+      value: configName || sourceLabel,
+      sub: configName ? sourceLabel : undefined,
+      explain: 'systemLabel',
+      interactive,
+      ariaLabel: interactive ? `View auth info for source ${side === 'file1' ? 1 : 2}` : undefined,
+      testId: `ruleset-manager-fact-${side}`,
+    }
+  }
+  const editsSetup = canRenameRun.value
+  const pairing: StaticFact = isSingleSided.value
+    ? { key: 'pairs', label: 'Primary ID', value: file1PrimaryId.value, explain: 'primaryId' }
+    : { key: 'pairs', label: 'Pairs rows on', value: `${file1PrimaryId.value} = ${file2PrimaryId.value}`, explain: 'primaryId' }
+  const conclusionCount = conclusions.loaded.value ? conclusions.rows.value.length : null
+  return [
+    systemFact('file1'),
+    ...(isSingleSided.value ? [] : [systemFact('file2')]),
+    { ...pairing, interactive: editsSetup, ariaLabel: editsSetup ? 'Edit run setup' : undefined, testId: 'ruleset-manager-fact-pairs' },
+    {
+      key: 'checks',
+      label: 'Checks',
+      value: `${countWords(filterRows.value.length, 'filter')} · ${countWords(visibleRules.value.length, 'rule')}`,
+      sub: conclusionCount === null ? undefined : countWords(conclusionCount, 'conclusion'),
+      explain: 'ruleSetChecks',
+      testId: 'ruleset-manager-fact-checks',
+    },
+  ]
+})
+
+function openFact(key: string): void {
+  if (key === 'file1' || key === 'file2') openAuthInfoPopupForSide(key)
+  else if (key === 'pairs') void openRunEditWorkflow()
+}
+
+async function commitRunName(value: string): Promise<void> {
+  await saveRunName(value)
+  const saved = persistedRunName.value
+  // The draft is what every other surface of this run reads its name from; keep it in step with the rename.
+  if (draft.value && saved && saved !== draft.value.runName) {
+    draftStore.setRuleSetDraft({ ...draft.value, runName: saved }, draftState.value?.resumeStepId ?? null)
+  }
+}
+
+watch(draftRunName, () => resetRunNameState(), { immediate: true })
 
 
 /**
@@ -859,10 +941,10 @@ async function openRuleEditWorkflow(): Promise<void> {
 }
 
 async function openRunWorkflow(): Promise<void> {
-  deleteError.value = null
+  pageError.value = null
   if (!canRunActiveTenantReconciliation.value) return
   if (!draft.value || !savedRunId.value) {
-    deleteError.value = 'Saved run ID is missing.'
+    pageError.value = 'Saved run ID is missing.'
     return
   }
 
@@ -881,9 +963,9 @@ async function deleteSavedRun(): Promise<void> {
   if (!canEditTenantSettings.value) return
   if (deletingSavedRun.value) return
 
-  deleteError.value = null
+  pageError.value = null
   if (!savedRunId.value) {
-    deleteError.value = 'Saved run ID is missing.'
+    pageError.value = 'Saved run ID is missing.'
     return
   }
 
@@ -894,7 +976,7 @@ async function deleteSavedRun(): Promise<void> {
     await reconciliationFacade.deleteSavedRun({ savedRunId: savedRunId.value })
     await router.push(draftStore.workflowOrigin?.path ?? '/settings/runs')
   } catch (error) {
-    deleteError.value = error instanceof ApiCallError ? error.message : 'This run refuses to leave. Still here.'
+    pageError.value = error instanceof ApiCallError ? error.message : 'This run refuses to leave. Still here.'
   } finally {
     deletingSavedRun.value = false
   }
@@ -907,24 +989,21 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.ruleset-manager-hero {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.ruleset-manager-hero h1 {
-  margin: 0;
-}
-
-
 .ruleset-manager-section-edit {
   flex: 0 0 auto;
   width: 2.2rem;
   min-height: 2.2rem;
 }
 
-.ruleset-manager-edit-icon-path {
-  fill: currentColor;
+.ruleset-manager-section-title {
+  display: grid;
+  gap: var(--space-00);
+}
+
+.ruleset-manager-section-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--type-note-size);
 }
 
 .ruleset-manager-footer-row {
@@ -932,127 +1011,124 @@ onMounted(() => {
   justify-content: center;
 }
 
-.ruleset-manager-basic-card--button {
-  width: 100%;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    color 160ms ease;
-}
-
-.ruleset-manager-basic-card--button:hover,
-.ruleset-manager-basic-card--button:focus-visible {
-  border-color: color-mix(in oklab, var(--accent) 58%, var(--border));
-  background: color-mix(in oklab, var(--surface-2) 82%, var(--accent));
-  color: var(--text);
-}
-
-.ruleset-manager-summary-copy {
-  color: var(--text-soft);
-}
-
-.ruleset-manager-basics-grid {
+/* DAR-UI-128. Filters and rules as one bordered list each, of equal read-only rows (the settings-page rows). */
+.ruleset-manager-rows {
   display: grid;
-  gap: var(--space-2);
-}
-
-.ruleset-manager-schema-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.ruleset-manager-basic-card {
-  display: grid;
-  min-width: 0;
-  gap: var(--space-1);
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--static-surface-radius);
-  background: var(--surface-2);
-}
-
-/* System name and its connection sit on one line, dot-separated, so the card stays a single row
-   like its Schema and Primary ID neighbours. */
-.ruleset-manager-system-line {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.ruleset-manager-system-separator,
-.ruleset-manager-system-config {
-  color: var(--text-muted);
-  font-size: var(--type-summary-label-size);
-  overflow-wrap: anywhere;
-}
-
-.ruleset-manager-basic-card strong,
-.ruleset-manager-summary-copy {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.ruleset-manager-builder {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.ruleset-manager-equation-panel {
-  display: grid;
-  gap: var(--space-1-5);
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--static-surface-radius);
-  background: var(--surface-2);
-}
-
-.ruleset-manager-preview-line {
-  margin: 0;
-  color: var(--text-soft);
-  overflow-wrap: anywhere;
-  line-height: 1.35;
-}
-
-.ruleset-manager-rule-list,
-.ruleset-manager-exclusion-list {
-  display: grid;
-  gap: var(--space-1-5);
   margin: 0;
   padding: 0;
   list-style: none;
+  border: 1px solid var(--static-tile-border);
+  border-radius: var(--static-surface-radius);
+  background: var(--static-tile-bg);
+  overflow: hidden;
+  font-size: var(--static-tile-text-size);
 }
 
-.ruleset-manager-rule-list li,
-.ruleset-manager-exclusion-list li {
-  display: flex;
-  gap: var(--space-1-5);
-  align-items: baseline;
+.ruleset-manager-row {
+  display: grid;
+  align-items: center;
+  gap: var(--space-3);
   min-width: 0;
-  color: var(--text-soft);
-  line-height: 1.35;
-  overflow-wrap: anywhere;
+  min-height: 3.4rem;
+  padding: var(--space-1-5) var(--space-3);
 }
 
-.ruleset-manager-rule-sequence {
-  flex: 0 0 auto;
+.ruleset-manager-row + .ruleset-manager-row {
+  border-top: 1px solid var(--static-tile-border);
+}
+
+.ruleset-manager-row--filter {
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.3fr);
+}
+
+.ruleset-manager-row--note {
+  display: flex;
   color: var(--text-muted);
 }
 
-.ruleset-manager-rule-named {
+.ruleset-manager-rule-table {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.ruleset-manager-row--rule,
+.ruleset-manager-rule-head {
+  grid-template-columns: 2rem minmax(0, 1fr) 7.5rem minmax(0, 1fr) minmax(0, 0.9fr);
+}
+
+.ruleset-manager-rule-head {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--type-note-size);
+}
+
+.ruleset-manager-rule-head > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ruleset-manager-rule-head__test {
+  text-align: center;
+}
+
+.ruleset-manager-field,
+.ruleset-manager-rule-pre {
   display: grid;
   min-width: 0;
 }
 
-.ruleset-manager-rule-formula {
+.ruleset-manager-field__name,
+.ruleset-manager-row__values {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ruleset-manager-row__values {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.ruleset-manager-field__path,
+.ruleset-manager-rule-name {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--type-note-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ruleset-manager-row__dim,
+.ruleset-manager-rule-sequence,
+.ruleset-manager-rule-pre {
+  min-width: 0;
   color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ruleset-manager-rule-pre {
+  font-size: var(--type-note-size);
+}
+
+.ruleset-manager-rule-sequence {
+  font-variant-numeric: tabular-nums;
+}
+
+.ruleset-manager-operator-pill {
+  justify-self: center;
+  max-width: 100%;
+  padding: 0 var(--space-1-5);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--type-note-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ruleset-manager-auth-popup {
@@ -1097,9 +1173,23 @@ onMounted(() => {
   gap: var(--ruleset-manager-auth-popup-gap);
 }
 
-@media (max-width: 980px) {
-  .ruleset-manager-schema-row {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 768px) {
+  .ruleset-manager-row--filter {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .ruleset-manager-rule-head {
+    display: none;
+  }
+
+  /* The pair on one line under its number; the pre-actions under the pair. */
+  .ruleset-manager-row--rule {
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .ruleset-manager-rule-pre {
+    grid-column: 2 / -1;
   }
 }
 

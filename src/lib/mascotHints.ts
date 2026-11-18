@@ -45,8 +45,9 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { text: 'Enter on a field, then Enter on its partner, pairs them without the drag.', when: control('ruleset-editor-board') },
   ]),
   'reconciliation-ruleset-manager': Object.freeze([
-    { text: 'Edit Run or Rules with the pencil beside each — finished runs keep whatever they already compared.', when: control('ruleset-manager-edit-rules') },
-    { text: 'Filters are per source — each side can leave out different records as it pulls.', when: control('ruleset-manager-exclusions') },
+    { text: 'Filters or rules change with the pencil beside each — finished runs keep whatever they already compared.', when: control('ruleset-manager-edit-rules') },
+    { text: 'Filters are per source — each side can leave out different records as it pulls.', when: control('ruleset-manager-filters') },
+    { text: 'Open a conclusion row to change its question or conditions; New conclusion adds one after the rest.', when: control('run-conclusions-new') },
     { text: 'Run this rule set from here; its history is one step further on.', when: control('ruleset-manager-run-ruleset') },
   ]),
   'reconciliation-automations': Object.freeze([

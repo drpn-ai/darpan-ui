@@ -277,6 +277,10 @@ describe('every button in the app has an answer', () => {
     expect(lookupAction('audit schedule: daily at 6:00 am')?.body).toContain('every check of this audit')
     expect(lookupAction('after each run: email to 4 people + 1 more')?.title).toBe('After each run')
     expect(lookupAction('audit posts to: gorjana ops')?.body).toContain('summary card')
+    // DAR-UI-128: the Ruleset manager's facts and conclusion rows.
+    expect(lookupAction('view auth info for source 1')?.title).toBe('Source 1 connection')
+    expect(lookupAction('edit run setup')?.title).toBe('Edit run setup')
+    expect(lookupAction('open conclusion return not in netsuite')?.title).toBe('Conclusion')
   })
 
   it('resolves every button name written in a template', () => {

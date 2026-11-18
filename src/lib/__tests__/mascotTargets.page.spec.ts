@@ -10,29 +10,31 @@ import { resolveExplainTarget } from '../mascotTargets'
  * asserts against the shapes the page genuinely renders rather than idealised ones.
  */
 const PAGE = `
-  <div class="ruleset-manager-section-header section-header-row">
-    <h2 class="static-page-section-heading">Run</h2>
-  </div>
-  <div class="ruleset-manager-basics-grid">
-    <button type="button" class="ruleset-manager-basic-card ruleset-manager-basic-card--button">
-      <span class="static-page-summary-label">System</span>
-      <span class="ruleset-manager-system-line"><strong>Shopify</strong></span>
+  <div class="static-fact-strip">
+    <button type="button" class="static-fact static-fact--button" aria-label="View auth info for source 1">
+      <span class="static-page-summary-label">Shopify</span>
+      <span class="static-fact__value">gorjana_prod</span>
+      <span class="static-fact__sub">Shopify Return References</span>
     </button>
-    <article class="ruleset-manager-basic-card">
-      <span class="static-page-summary-label">Schema</span>
-      <span>Shopify Return References</span>
-    </article>
-    <article class="ruleset-manager-basic-card">
+    <button type="button" class="static-fact static-fact--button" aria-label="Edit run setup">
+      <span class="static-page-summary-label">Pairs rows on</span>
+      <span class="static-fact__value">refundOrReturnId = externalId</span>
+    </button>
+    <div class="static-fact">
       <span class="static-page-summary-label">Primary ID</span>
-      <span>refundOrReturnId</span>
-    </article>
+      <span class="static-fact__value">refundOrReturnId</span>
+    </div>
+  </div>
+  <div class="ruleset-manager-section-header section-header-row">
+    <h2 class="static-page-section-heading">Filters</h2>
+    <button type="button" class="app-icon-action" aria-label="Edit filters"><svg></svg></button>
   </div>
   <div class="ruleset-manager-section-header section-header-row">
     <h2 class="static-page-section-heading">Rules</h2>
+    <button type="button" class="app-icon-action" aria-label="Edit rules"><svg></svg></button>
   </div>
-  <article class="ruleset-manager-basic-card">
-    <span class="static-page-summary-label">Exclusions</span>
-  </article>
+  <h2 class="static-page-section-heading">Conclusions</h2>
+  <button type="button" class="run-conclusion__open" aria-label="Open conclusion Sync stuck"><span>Sync stuck</span></button>
 `
 
 function mountPage(): HTMLElement {
@@ -50,31 +52,33 @@ function termFor(host: HTMLElement, selector: string, text: string): string | un
 }
 
 describe('the saved run page', () => {
-  it('explains every label it puts on screen', () => {
+  it('explains every heading and control it puts on screen', () => {
     const host = mountPage()
 
-    expect(termFor(host, 'h2', 'Run')).toBe('reconciliationRun')
+    expect(termFor(host, 'h2', 'Filters')).toBe('exclusions')
     expect(termFor(host, 'h2', 'Rules')).toBe('ruleSet')
-    expect(termFor(host, 'span', 'System')).toBe('systemLabel')
-    expect(termFor(host, 'span', 'Schema')).toBe('schema')
+    expect(termFor(host, 'h2', 'Conclusions')).toBe('runConclusions')
     expect(termFor(host, 'span', 'Primary ID')).toBe('primaryId')
-    expect(termFor(host, 'span', 'Exclusions')).toBe('exclusions')
+    expect(resolveExplainTarget(host.querySelector('[aria-label="Edit filters"] svg'))?.term).toBe('edit filters')
+    expect(resolveExplainTarget(host.querySelector('[aria-label="Edit rules"] svg'))?.term).toBe('edit rules')
+    expect(resolveExplainTarget(host.querySelector('[aria-label="Edit run setup"]'))?.term).toBe('edit run setup')
+    expect(resolveExplainTarget(host.querySelector('[aria-label="Open conclusion Sync stuck"] span'))?.term).toBe('open conclusion sync stuck')
   })
 
-  it('resolves a label that sits inside a button, not only in plain markup', () => {
-    // The System card is a <button> — the pointer lands on the label span inside it,
-    // and resolution has to work from there rather than bailing at the control.
+  it('answers a system fact through its connection, the button it sits in', () => {
+    // The system's own name is the fact's label and is data; v-explain answers it at runtime, and the cell itself
+    // answers as the auth popup it opens.
     const host = mountPage()
-    const label = host.querySelector('button .static-page-summary-label')
+    const value = Array.from(host.querySelectorAll('span')).find((node) => node.textContent?.trim() === 'gorjana_prod')
 
-    expect(resolveExplainTarget(label)?.term).toBe('systemLabel')
+    expect(resolveExplainTarget(value as HTMLElement)?.term).toBe('view auth info for source 1')
   })
 
-  it('says nothing about the values themselves', () => {
-    // "Shopify" and "refundOrReturnId" are data, not vocabulary. Explaining a value
-    // would mean inventing an answer about this tenant's own records.
+  it('says nothing about the values themselves outside a control', () => {
+    // "refundOrReturnId" is data, not vocabulary. Explaining a value would mean inventing an answer about this
+    // tenant's own records.
     const host = mountPage()
-    const value = Array.from(host.querySelectorAll('span'))
+    const value = Array.from(host.querySelectorAll('div.static-fact span'))
       .find((node) => node.textContent?.trim() === 'refundOrReturnId')
 
     expect(resolveExplainTarget(value as HTMLElement)).toBeNull()
