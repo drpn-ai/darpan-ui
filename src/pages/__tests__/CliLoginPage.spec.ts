@@ -86,6 +86,8 @@ describe('CliLoginPage', () => {
     expect(wrapper.get('.wizard-question').text()).toBe('Approve Darpan CLI on ada-laptop?')
     expect(wrapper.find('[data-testid="cli-login-started"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="cli-login-expires"]').exists()).toBe(true)
+    // The device-code phishing guard: someone else's code, sent to you, would sign their terminal in as you.
+    expect(wrapper.get('[data-testid="cli-login-own-code"]').text()).toBe('Approve only a code you just started in your own terminal.')
     // Deny is a quiet link under the one answer.
     expect(wrapper.get('[data-testid="cli-login-deny"]').classes()).toContain('login-text-link')
   })
@@ -120,6 +122,7 @@ describe('CliLoginPage', () => {
     await typeCode(wrapper, 'BCDF-GH23')
     expect(wrapper.get('[data-testid="cli-login-super-admin-only"]').text()).toBe('Only a super admin can approve a darpan-admin sign-in.')
     expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cli-login-own-code"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="cli-login-deny"]').exists()).toBe(true)
   })

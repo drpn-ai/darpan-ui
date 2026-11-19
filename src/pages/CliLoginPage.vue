@@ -46,6 +46,8 @@
             <span data-testid="cli-login-expires">{{ expiresLabel }}</span>
           </div>
         </div>
+        <!-- Device-code phishing guard: a code someone sent you would sign their terminal in as you. -->
+        <p v-if="canApprove" class="section-note" data-testid="cli-login-own-code">Approve only a code you just started in your own terminal.</p>
         <p v-if="scope === 'ADMIN'" class="section-note" role="alert" data-testid="cli-login-admin-warning">This sign-in can use the admin app's powers for 12 hours.</p>
         <p v-if="!scopeKnown" class="section-note" role="alert" data-testid="cli-login-unknown-scope">
           This sign-in asks for access Darpan does not recognise. Do not approve it.
