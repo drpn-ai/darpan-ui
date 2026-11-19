@@ -1006,13 +1006,6 @@ button:disabled {
   animation: fade-up 320ms ease;
 }
 
-.login-panel h1 {
-  margin: 0;
-  font-size: clamp(1.6rem, 1.4vw + 1rem, 2.1rem);
-  letter-spacing: var(--tracking-tight);
-  text-wrap: balance;
-}
-
 /* DAR-UI-084: "Forgot password?" reads as a quiet text link under the step, so its Next stays the one
    button. Still a <button>: it switches the panel in place rather than navigating. */
 .login-text-link {

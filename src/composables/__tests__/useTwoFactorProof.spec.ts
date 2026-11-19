@@ -103,11 +103,27 @@ describe('useTwoFactorProof', () => {
     expect(signal?.aborted).toBe(true)
   })
 
-  it('starts on the app, else a passkey this browser can use, else the fallback', () => {
-    const { proof } = mountProof(vi.fn().mockResolvedValue(begun('AQID')))
+  // DAR-UI-132: the passkey by default; a caller that knows better (the sign-in page on a new device) asks for the code.
+  it('starts on a passkey this browser can use, else the app, else the fallback; prefer code flips the first two', async () => {
+    const begin = vi.fn().mockResolvedValue(begun('AQID'))
+    const { proof } = mountProof(begin)
+    proof().start({ app: true, passkey: true })
+    expect(proof().mode.value).toBe('passkey')
+    // Started on the passkey, its options are fetched at once, ahead of the click.
+    await flushPromises()
+    expect(begin).toHaveBeenCalledTimes(1)
+    expect(proof().ready.value).toBe(true)
+
+    proof().start({ app: true, passkey: true }, null, 'code')
+    expect(proof().mode.value).toBe('code')
+    proof().start({ app: false, passkey: true }, null, 'code')
+    expect(proof().mode.value).toBe('passkey')
+    proof().start({ app: true, passkey: false })
+    expect(proof().mode.value).toBe('code')
+
+    stub.restore()
     proof().start({ app: true, passkey: true })
     expect(proof().mode.value).toBe('code')
-    stub.restore()
     proof().start({ app: false, passkey: true }, 'recovery')
     expect(proof().mode.value).toBe('recovery')
     proof().start({ app: false, passkey: true })

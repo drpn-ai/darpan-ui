@@ -19,15 +19,43 @@
 
     <section class="login-panel">
       <p class="eyebrow">Darpan</p>
-      <!-- No heading in change mode: the step's own question ("Enter your new password.") is the
-           instruction, and a title above it only restated that in larger type. -->
-      <h1 v-if="isSignInForm">Sign In</h1>
 
-      <!-- DAR-UI-120: username first, then the passkey (for a username this browser saw sign in with one) or the
-           password. id/name stay on the fields for the password managers that key off them, not the autocomplete tokens. -->
+      <!-- DAR-UI-120/132: no heading on any step: the question is the heading. A browser with a device note opens on
+           its one kept account; otherwise username first, then the passkey (only where the note says a passkey proved
+           that username on this browser) or the password. id/name stay on the fields for the password managers that key
+           off them, not the autocomplete tokens. -->
       <template v-if="isSignInForm">
         <WorkflowStepForm
-          v-if="signInStep === 'username'"
+          v-if="signInStep === 'welcome' && kept"
+          question="Welcome back."
+          :show-primary-action="false"
+        >
+          <!-- The row is the button: no arrow, no Continue. Named by what it does; the account is its description. -->
+          <button
+            id="login-welcome-row"
+            type="button"
+            class="login-account-row"
+            data-testid="login-welcome-row"
+            :aria-label="welcomeByPasskey ? 'Sign in with your passkey' : 'Sign in with your password'"
+            aria-describedby="login-welcome-username"
+            :disabled="loading"
+            @click="continueAsKept"
+          >
+            <span class="login-account-badge" aria-hidden="true">{{ kept.username.trim().charAt(0).toUpperCase() }}</span>
+            <span class="login-account-name">
+              <span id="login-welcome-username" data-testid="login-welcome-username">{{ kept.username }}</span>
+              <span data-testid="login-welcome-method">{{ welcomeByPasskey ? 'Passkey' : 'Password' }}</span>
+            </span>
+          </button>
+          <template #links>
+            <button type="button" class="login-text-link" data-testid="login-another-account" @click="useAnotherAccount">
+              Another account
+            </button>
+          </template>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="signInStep === 'username'"
           question="Username?"
           primary-label="Next"
           :submit-disabled="loading"
@@ -46,6 +74,7 @@
               autocomplete="username webauthn"
               autocapitalize="none"
               spellcheck="false"
+              @blur="prebeginTyped"
             />
           </label>
         </WorkflowStepForm>
@@ -62,9 +91,11 @@
           @submit="signInWithPasskey"
         >
           <p class="section-note" data-testid="login-passkey-username">{{ username }}</p>
-          <button type="button" class="login-text-link" data-testid="login-use-password" @click="usePasswordInstead">
-            Use password instead
-          </button>
+          <template #links>
+            <button type="button" class="login-text-link" data-testid="login-use-password" @click="usePasswordInstead">
+              Use password instead
+            </button>
+          </template>
         </WorkflowStepForm>
 
         <WorkflowStepForm
@@ -99,32 +130,36 @@
               autocomplete="current-password"
             />
           </label>
-          <!-- Scoped to the username: a security key that holds no discoverable passkey, or a passkey on a phone. -->
-          <button
-            v-if="passkeysOffered"
-            type="button"
-            class="login-text-link"
-            data-testid="login-use-passkey"
-            :disabled="loading"
-            @click="signInWithPasskey"
-          >
-            Use a passkey or security key
-          </button>
-          <button
-            v-if="passwordResetAvailable"
-            type="button"
-            class="login-text-link"
-            data-testid="login-forgot-password"
-            @click="enterResetMode"
-          >
-            Forgot password?
-          </button>
+          <template #links>
+            <!-- Scoped to the username: a security key that holds no discoverable passkey, or a passkey on a phone. -->
+            <button
+              v-if="passkeysOffered"
+              type="button"
+              class="login-text-link"
+              data-testid="login-use-passkey"
+              :disabled="loading"
+              @click="signInWithPasskey"
+            >
+              Use a passkey or security key
+            </button>
+            <button
+              v-if="passwordResetAvailable"
+              type="button"
+              class="login-text-link"
+              data-testid="login-forgot-password"
+              @click="enterResetMode"
+            >
+              Forgot password?
+            </button>
+          </template>
         </WorkflowStepForm>
       </template>
 
       <!-- DAR-BE-264: the password was right; the session waits for a code, or for a required first setup. -->
+      <!-- DAR-UI-132: the passkey first only where this browser's note says one proved them here. -->
       <TwoFactorCodeSteps
         v-else-if="twoFactorMode === 'code'"
+        :prefer="passkeyKeptFor(username) ? 'passkey' : 'code'"
         @back="leaveTwoFactorStep"
         @ended="endTwoFactorStep"
         @signed-in="finishTwoFactorSignIn"
@@ -135,7 +170,7 @@
         :username="username"
         @back="leaveTwoFactorStep"
         @ended="endTwoFactorStep"
-        @done="finishTwoFactorSignIn(null)"
+        @done="finishTwoFactorSetup"
       />
 
       <!-- DAR-BE-264: signed in with a recovery code and few are left. Said once, then on to where they were going. -->
@@ -207,6 +242,38 @@
         </WorkflowStepForm>
       </template>
 
+      <!-- DAR-UI-132: the last step after a password and a code from the app (or a recovery code), on a browser that can
+           make a passkey. Its registration was begun before it showed (the sign-in just finished two-factor, so it needs
+           no proof for 5 minutes), so Add opens the browser's sheet straight from the click. -->
+      <template v-else-if="passkeyOffer !== null">
+        <WorkflowStepForm
+          v-if="passkeyAdded"
+          question="Passkey added."
+          primary-label="Continue"
+          :show-enter-hint="true"
+          primary-test-id="login-passkey-added-continue"
+          @submit="leaveSignIn"
+        >
+          <p class="section-note">Darpan asks for it next time on this device.</p>
+        </WorkflowStepForm>
+        <PasskeyAddSteps
+          v-else
+          :options="passkeyOffer"
+          :rebegin="beginPasskeyOffer"
+          :username="signedInName()"
+          question="Add a passkey on this device?"
+          primary-label="Add passkey"
+          :show-back="false"
+          @done="passkeyAdded = true"
+          @ended="leaveSignIn"
+        >
+          <p class="section-note">Next time on this device, Touch ID signs you in.</p>
+          <template #links>
+            <button type="button" class="login-text-link" data-testid="login-passkey-not-now" @click="leaveSignIn">Not now</button>
+          </template>
+        </PasskeyAddSteps>
+      </template>
+
       <!-- DAR-BE-028: one question per step, as the expired-password change below. -->
       <template v-else-if="isResettingMode">
         <WorkflowStepForm
@@ -260,7 +327,7 @@
         </WorkflowStepForm>
       </template>
 
-      <template v-else>
+      <template v-else-if="isChangingPasswordMode">
         <WorkflowStepForm
           :question="passwordStepQuestion"
           :primary-label="passwordPrimaryLabel"
@@ -312,14 +379,15 @@ import InlineValidation from '../components/ui/InlineValidation.vue'
 import WorkflowCodeInput from '../components/workflow/WorkflowCodeInput.vue'
 import TwoFactorCodeSteps from '../components/auth/TwoFactorCodeSteps.vue'
 import TwoFactorEnrolSteps from '../components/auth/TwoFactorEnrolSteps.vue'
+import PasskeyAddSteps from '../components/auth/PasskeyAddSteps.vue'
 import { formatShortDate } from '../lib/utils/date'
 import { authFacade } from '../lib/api/facade'
 import type { TwoFactorChallengePurpose } from '../stores/auth'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore, type PasskeyFirstBeginOutcome } from '../stores/auth'
 import { conditionalMediationAvailable, getPasskeyAssertion, passkeysSupported } from '../lib/passkeys'
-import { forgetPasskey, hasRememberedPasskey, rememberPasskey } from '../lib/passkeyHint'
+import { keepAccount, keptAccount, passkeyKeptFor } from '../lib/passkeyHint'
 import { resolveInternalRedirectTarget } from '../lib/navigation'
 
 const route = useRoute()
@@ -330,9 +398,16 @@ const username = ref('')
 const password = ref('')
 const loading = ref(false)
 const localError = ref<string | null>(null)
+// DAR-UI-120. Read once: a browser does not gain WebAuthn while the page is open. Without it the steps are username,
+// then password, and no passkey is offered anywhere.
+const passkeysOffered = passkeysSupported()
+// DAR-UI-132: this browser's device note, read once. With one, the card opens on "Welcome back." for that account,
+// and its row goes to the passkey only when the note says a passkey proved them here (and this browser has WebAuthn).
+const kept = keptAccount()
+const welcomeByPasskey = kept?.method === 'passkey' && passkeysOffered
 // DAR-UI-120: the sign-in card asks one thing at a time. The two-factor steps, the forced change and the reset all
 // return to the password step they left from.
-const signInStep = ref<'username' | 'passkey' | 'password'>('username')
+const signInStep = ref<'welcome' | 'username' | 'passkey' | 'password'>(kept ? 'welcome' : 'username')
 
 const INITIAL_UNAUTHENTICATED_MESSAGE = 'No active authenticated session detected.'
 const FALLBACK_PASSWORD_CHANGE_NOTICE = 'Your password must be changed before you can sign in.'
@@ -371,6 +446,14 @@ const isAskingTwoFactorDue = ref(false)
 // sign-in without a challenge does not say). Null while the prompt is showing.
 const gracePasskeysAvailable = ref<boolean | null>(null)
 const isStartingGraceSetup = ref(false)
+// DAR-UI-132: set by a sign-in whose second factor was a code from the app or a recovery code, on a passkey browser;
+// leaveSignIn then offers a passkey for this device last, after every other after-sign-in step.
+let offerPasskeyAfterSignIn = false
+// The begun registration's options while "Add a passkey on this device?" shows, and whether one was added.
+const passkeyOffer = ref<string | null>(null)
+const passkeyAdded = ref(false)
+// Signed in and on the way out: the card shows no step while the passkey offer is begun and the route changes.
+const isLeaving = ref(false)
 // Fewest recovery codes left before the sign-in says so (the backend's own threshold for asking for new ones).
 const LOW_RECOVERY_CODES = 3
 
@@ -472,7 +555,9 @@ const isPasswordStepBlocked = computed(() => {
 })
 
 const isSignInForm = computed(() => (
-  !isChangingPasswordMode.value
+  !isLeaving.value
+  && passkeyOffer.value === null
+  && !isChangingPasswordMode.value
   && !isResettingMode.value
   && !isAskingRecoveryEmail.value
   && twoFactorMode.value === null
@@ -517,19 +602,20 @@ onMounted(async () => {
 })
 watch(() => route.query.redirect, cleanupLoginSelfRedirect)
 
-// DAR-UI-120. Read once: a browser does not gain WebAuthn while the page is open. Without it the steps are username,
-// then password, and no passkey is offered anywhere.
-const passkeysOffered = passkeysSupported()
-const PASSKEY_CANCELLED_TEXT = 'Passkey sign-in was cancelled.'
 const USERNAME_NEEDED_TEXT = 'Enter your username.'
 const PASSWORD_NEEDED_TEXT = 'Enter your password.'
 
 const showsUsernameStep = computed(() => isSignInForm.value && signInStep.value === 'username')
 
+/** The account just signed in, as the server names it, else as typed. */
+function signedInName(): string {
+  return authStore.username || username.value
+}
+
 /** Next on the username step. Whether the account has a passkey is never asked of the server (begin#PasskeyFirstSignIn
- *  answers a decoy for an unknown username, DAR-BE-301): only this browser's memory of a passkey sign-in opens the
- *  prompt; everyone else gets the password. */
-async function submitUsername(): Promise<void> {
+ *  answers a decoy for an unknown username, DAR-BE-301): only this browser's note opens the prompt (DAR-UI-132), so a
+ *  new device, or another person on this one, gets the password. */
+function submitUsername(): void {
   if (loading.value) return
   localError.value = null
   const who = username.value.trim()
@@ -539,11 +625,32 @@ async function submitUsername(): Promise<void> {
   }
   username.value = who
   stopAutofill()
-  loading.value = true
-  const remembered = passkeysOffered && (await hasRememberedPasskey(who))
-  loading.value = false
-  signInStep.value = remembered ? 'passkey' : 'password'
-  if (remembered) await signInWithPasskey()
+  if (passkeysOffered && passkeyKeptFor(who)) {
+    signInStep.value = 'passkey'
+    void signInWithPasskey()
+    return
+  }
+  signInStep.value = 'password'
+}
+
+/** The Welcome back row: that account's passkey, or its password, by what the note says. */
+function continueAsKept(): void {
+  if (!kept || loading.value) return
+  localError.value = null
+  username.value = kept.username
+  if (welcomeByPasskey) {
+    signInStep.value = 'passkey'
+    void signInWithPasskey()
+    return
+  }
+  signInStep.value = 'password'
+  void focusPasswordField()
+}
+
+function useAnotherAccount(): void {
+  localError.value = null
+  username.value = ''
+  signInStep.value = 'username'
 }
 
 async function submitPassword(): Promise<void> {
@@ -575,6 +682,14 @@ function usePasswordInstead(): void {
   signInStep.value = 'password'
 }
 
+/** DAR-UI-132: the passkey is not on this device (an empty sheet, a closed one, a refusal): straight to the password,
+ *  with nothing said. Its link still offers the passkey again. */
+function passkeyUnavailable(): void {
+  localError.value = null
+  signInStep.value = 'password'
+  void focusPasswordField()
+}
+
 // The open passkey prompt, so leaving its step closes it.
 let passkeyPrompt: AbortController | null = null
 
@@ -585,14 +700,65 @@ function leavePasskeyPrompt(): void {
   loading.value = false
 }
 
+// DAR-UI-132: Safari opens the passkey prompt only inside a click, and a click that first waits on begin#PasskeyFirstSignIn
+// has spent it. So options for the one name the note says has a passkey are begun ahead (as Welcome back shows, and as
+// the username field is left holding that name), held, and begun again before their 300 s run out. One name at a time;
+// begins are rate-limited (10 a minute an address), so a name already held or on its way is not begun again.
+const PREBEGIN_MARGIN_MS = 30_000
+let prebegun: { name: string; pending: Promise<PasskeyFirstBeginOutcome>; begun: PasskeyFirstBeginOutcome | null } | null = null
+let prebeginRenewal: ReturnType<typeof setTimeout> | null = null
+
+const nameKey = (name: string) => name.trim().toLowerCase()
+
+function prebegin(who: string): void {
+  const name = nameKey(who)
+  if (!passkeysOffered || !name || prebegun?.name === name) return
+  dropPrebegun()
+  const pending = authStore.beginPasskeyFirstSignIn(who)
+  const held: NonNullable<typeof prebegun> = { name, pending, begun: null }
+  prebegun = held
+  void pending.then((begun) => {
+    if (prebegun !== held) return
+    if (begun.outcome !== 'begun') {
+      prebegun = null
+      return
+    }
+    held.begun = begun
+    const lifeMs = (begun.expiresInSeconds ?? 300) * 1000
+    prebeginRenewal = setTimeout(() => {
+      dropPrebegun()
+      prebegin(who)
+    }, Math.max(0, lifeMs - PREBEGIN_MARGIN_MS))
+  })
+}
+
+/** The options begun ahead for `who`, taken (each challenge is used once): in hand, on their way, or null. */
+function takePrebegun(who: string): { begun: PasskeyFirstBeginOutcome | null; pending: Promise<PasskeyFirstBeginOutcome> } | null {
+  const held = prebegun?.name === nameKey(who) ? prebegun : null
+  dropPrebegun()
+  return held
+}
+
+function dropPrebegun(): void {
+  if (prebeginRenewal !== null) clearTimeout(prebeginRenewal)
+  prebeginRenewal = null
+  prebegun = null
+}
+
+function prebeginTyped(): void {
+  if (passkeysOffered && passkeyKeptFor(username.value)) prebegin(username.value)
+}
+
 /** The browser's passkey prompt, scoped to the username typed (a security key with no discoverable passkey needs that).
- *  The password is never read. */
+ *  The password is never read. From the passkey step any way it fails goes to the password quietly; from the password
+ *  step's link a failure says why. Either way the note now says password: the passkey did not prove them here. */
 async function signInWithPasskey(): Promise<void> {
   if (loading.value) return
   // One WebAuthn request at a time: the autofill's waiting one goes first.
   stopAutofill()
   const who = username.value
   const step = signInStep.value
+  const scoped = step === 'passkey'
   const controller = new AbortController()
   passkeyPrompt = controller
   // Left by Back or Use password instead while it ran: however it ends is not said.
@@ -600,24 +766,25 @@ async function signInWithPasskey(): Promise<void> {
   loading.value = true
   localError.value = null
   try {
-    const begun = await authStore.beginPasskeyFirstSignIn(who)
+    // Options in hand open the prompt with no wait between the click and it.
+    const held = takePrebegun(who)
+    const begun = held?.begun ?? (await (held?.pending ?? authStore.beginPasskeyFirstSignIn(who)))
     if (left()) return
     if (begun.outcome !== 'begun') {
-      localError.value = begun.message
+      // Nothing was asked of the passkey, so the note stays.
+      if (scoped) passkeyUnavailable()
+      else localError.value = begun.message
       return
     }
     const asserted = await getPasskeyAssertion(begun.publicKeyOptions, controller.signal)
     if (left()) return
-    if (asserted.outcome === 'cancelled') {
-      localError.value = PASSKEY_CANCELLED_TEXT
+    if (asserted.outcome !== 'ok') {
+      keepAccount(who, 'password')
+      if (scoped) passkeyUnavailable()
+      else if (asserted.outcome === 'failed') localError.value = asserted.message
       return
     }
-    if (asserted.outcome === 'failed') {
-      localError.value = asserted.message
-      await forgetPasskey(who)
-      return
-    }
-    await finishPasskeySignIn(begun.challengeToken, asserted.json, who)
+    await finishPasskeySignIn(begun.challengeToken, asserted.json, who, scoped)
   } finally {
     if (passkeyPrompt === controller) {
       passkeyPrompt = null
@@ -626,27 +793,33 @@ async function signInWithPasskey(): Promise<void> {
   }
 }
 
-/** Every passkey-first sign-in ends here. `typed` is the username the prompt was scoped to; the autofill has none, so the
- *  signed-in account's own name is remembered instead. True when signed in. */
-async function finishPasskeySignIn(challengeToken: string, assertion: string, typed: string | null): Promise<boolean> {
+/** Every passkey-first sign-in ends here. `typed` is the username the prompt was scoped to; the autofill has none.
+ *  True when signed in. */
+async function finishPasskeySignIn(challengeToken: string, assertion: string, typed: string | null, scoped = false): Promise<boolean> {
   const finished = await authStore.finishPasskeyFirstSignIn(challengeToken, assertion)
   if (finished.outcome === 'signedIn') {
-    const who = typed || authStore.username
-    if (who) await rememberPasskey(who)
+    const who = authStore.username || typed
+    if (who) keepAccount(who, 'passkey')
     // No password was typed, so the steps that need one (a recovery email) are not asked here.
     await leaveSignIn()
     return true
   }
-  localError.value = finished.message
-  if (!typed) return false
-  if (finished.reason === 'PASSWORD_CHANGE_REQUIRED') {
+  if (typed && finished.reason === 'PASSWORD_CHANGE_REQUIRED') {
     // The password leads to setting a new one.
+    localError.value = finished.message
     signInStep.value = 'password'
     await focusPasswordField()
-  } else if (finished.reason === 'PASSKEY_REFUSED') {
-    // Not that account's passkey (or not one at all): Next goes to the password from now on.
-    await forgetPasskey(typed)
+    return false
   }
+  if (typed && finished.reason === 'PASSKEY_REFUSED') {
+    // Not that account's passkey (or not one at all): the password, here and next time.
+    keepAccount(typed, 'password')
+    if (scoped) {
+      passkeyUnavailable()
+      return false
+    }
+  }
+  localError.value = finished.message
   return false
 }
 
@@ -691,12 +864,21 @@ watch(showsUsernameStep, (shown) => {
   if (shown) void startAutofill()
   else stopAutofill()
 })
+// Options begun ahead serve only the first card and the username step; leaving them drops what is held.
+watch(
+  () => isSignInForm.value && (signInStep.value === 'welcome' || signInStep.value === 'username'),
+  (shown) => {
+    if (!shown) dropPrebegun()
+  },
+)
 onMounted(() => {
   if (showsUsernameStep.value) void startAutofill()
+  if (signInStep.value === 'welcome' && kept && welcomeByPasskey) prebegin(kept.username)
 })
 onBeforeUnmount(() => {
   stopAutofill()
   leavePasskeyPrompt()
+  dropPrebegun()
 })
 
 async function focusPasswordField(): Promise<void> {
@@ -709,6 +891,8 @@ async function focusPasswordField(): Promise<void> {
 async function signIn(who: string, typedPassword: string, refusedText: string): Promise<void> {
   const authenticated = await authStore.loginWithCredentials(who, typedPassword)
   if (authenticated) {
+    // DAR-UI-132: a password with no second factor: this browser leads with the password next time.
+    keepAccount(signedInName(), 'password')
     await finishSignIn(typedPassword)
     return
   }
@@ -822,12 +1006,31 @@ async function continueAfterSignIn(): Promise<void> {
 }
 
 async function leaveSignIn(): Promise<void> {
+  isLeaving.value = true
   isAskingRecoveryEmail.value = false
   isAskingTwoFactorDue.value = false
   gracePasskeysAvailable.value = null
   signInPassword.value = ''
   localError.value = null
+  if (offerPasskeyAfterSignIn) {
+    offerPasskeyAfterSignIn = false
+    // Refused (the 5 minutes after two-factor have passed, passkeys are off here, or anything else): no question, on in.
+    if (await beginPasskeyOffer().then((begun) => begun.outcome === 'begun')) return
+  }
+  passkeyOffer.value = null
+  passkeyAdded.value = false
   await router.replace(resolveInternalRedirectTarget(route.query.redirect))
+}
+
+/** begin#PasskeyRegistration with no proof: the sign-in that just finished two-factor is the proof, on this session,
+ *  for 5 minutes. Holds the options for the offer step; PasskeyAddSteps calls it again after a refused finish. */
+async function beginPasskeyOffer() {
+  const begun = await authStore.beginPasskeyRegistration()
+  if (begun.outcome === 'begun') {
+    passkeyOffer.value = begun.publicKeyOptions
+    isLeaving.value = false
+  }
+  return begun
 }
 
 /** Back to the password step, by choice: the person types the password again. */
@@ -844,9 +1047,22 @@ function endTwoFactorStep(message: string): void {
   localError.value = message
 }
 
-async function finishTwoFactorSignIn(codesLeft: number | null, byPasskey = false): Promise<void> {
-  // DAR-UI-120: a passkey that answered the second step can be the whole sign-in next time.
-  if (byPasskey) await rememberPasskey(username.value)
+async function finishTwoFactorSignIn(codesLeft: number | null, byPasskey: boolean): Promise<void> {
+  // DAR-UI-120/132: a passkey that answered the second step can be the whole sign-in on this browser next time. A code
+  // from the app or a recovery code leaves it on the password, and asks (last) whether to add a passkey here.
+  keepAccount(signedInName(), byPasskey ? 'passkey' : 'password')
+  offerPasskeyAfterSignIn = !byPasskey && passkeysOffered
+  await afterTwoFactor(codesLeft)
+}
+
+/** A required first setup at sign-in. A passkey made there kept the note on the passkey already; an app leaves the
+ *  password. */
+async function finishTwoFactorSetup(): Promise<void> {
+  if (!passkeyKeptFor(signedInName())) keepAccount(signedInName(), 'password')
+  await afterTwoFactor(null)
+}
+
+async function afterTwoFactor(codesLeft: number | null): Promise<void> {
   twoFactorMode.value = null
   localError.value = null
   if (codesLeft !== null && codesLeft <= LOW_RECOVERY_CODES) {
@@ -1021,3 +1237,52 @@ async function submitPasswordReset(who: string): Promise<void> {
   await signIn(who, nextPassword, 'Password reset. Sign in with your new password.')
 }
 </script>
+
+<style scoped>
+/* DAR-UI-132: Welcome back's one account, an even row the width of the card; the whole row is the button. */
+.login-account-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--static-tile-min-height);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--static-tile-border);
+  border-radius: var(--static-surface-radius);
+  background: var(--static-tile-bg);
+  color: var(--text);
+  text-align: left;
+}
+
+.login-account-row:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--static-tile-border) 64%, var(--accent));
+  background: color-mix(in oklab, var(--static-tile-bg) 88%, var(--accent));
+}
+
+.login-account-badge {
+  width: 2.4rem;
+  height: 2.4rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--type-tile-size);
+}
+
+.login-account-name {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-00);
+}
+
+.login-account-name > :first-child {
+  overflow-wrap: anywhere;
+}
+
+.login-account-name > :last-child {
+  color: var(--text-dim);
+  font-size: var(--type-note-size);
+}
+</style>

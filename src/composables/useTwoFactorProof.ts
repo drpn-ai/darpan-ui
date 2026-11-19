@@ -52,10 +52,12 @@ export function useTwoFactorProof(options: {
     return has.value[kind]
   }
 
-  /** Starts on the first way this person has: the app, a passkey, else `fallback` (null: none works here). */
-  function start(methods: { app: boolean; passkey: boolean }, fallback: ProofMode | null = null): void {
+  /** Starts on the first way this person has: a passkey this browser can use, then the app (`prefer: 'code'` swaps the
+   *  two, DAR-UI-132), else `fallback` (null: none works here). */
+  function start(methods: { app: boolean; passkey: boolean }, fallback: ProofMode | null = null, prefer: 'passkey' | 'code' = 'passkey'): void {
     has.value = { code: methods.app, passkey: methods.passkey && passkeysSupported() }
-    choose(has.value.code ? 'code' : has.value.passkey ? 'passkey' : fallback)
+    const order: ('passkey' | 'code')[] = prefer === 'passkey' ? ['passkey', 'code'] : ['code', 'passkey']
+    choose(order.find((kind) => has.value[kind]) ?? fallback)
   }
 
   function choose(next: ProofMode | null): void {

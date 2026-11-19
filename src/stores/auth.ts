@@ -47,7 +47,7 @@ export type TwoFactorChallengePurpose = 'code' | 'setup'
 /** DAR-BE-270: what a 'code' challenge can be answered with here (login#Session's twoFactorMethods). */
 export type TwoFactorMethod = 'app' | 'passkey'
 
-export type PasskeyFirstBeginOutcome = { outcome: 'begun'; publicKeyOptions: string; challengeToken: string } | TwoFactorRefusal
+export type PasskeyFirstBeginOutcome = { outcome: 'begun'; publicKeyOptions: string; challengeToken: string; expiresInSeconds?: number } | TwoFactorRefusal
 export type PasskeyFirstFinishOutcome = { outcome: 'signedIn' } | (TwoFactorRefusal & { reason?: string })
 export type TwoFactorVerifyOutcome = { outcome: 'signedIn'; recoveryCodesLeft: number | null } | TwoFactorRefusal
 

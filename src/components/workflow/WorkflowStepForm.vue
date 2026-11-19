@@ -37,6 +37,7 @@
         data-primary-action="true"
         :disabled="submitDisabled"
         :data-testid="primaryTestId || undefined"
+        :aria-label="primaryAriaLabel || undefined"
         @click="emit('submit')"
       >
         {{ primaryLabel }}
@@ -51,6 +52,11 @@
       />
 
       <span v-if="showPrimaryAction && showEnterHint" class="wizard-enter-hint">press <strong>Enter</strong> ↵</span>
+    </div>
+
+    <!-- DAR-UI-132: the quiet ways out (another account, the app code, Deny), under the step's one answer. -->
+    <div v-if="$slots.links" class="wizard-links">
+      <slot name="links"></slot>
     </div>
   </form>
 </template>
@@ -74,6 +80,8 @@ const props = withDefaults(
     allowSelectEnter?: boolean
     allowFileEnter?: boolean
     primaryTestId?: string
+    /** A fuller name than the label, where the short verb alone would not say what it acts on (the CLI approval). */
+    primaryAriaLabel?: string
     showCancelAction?: boolean
     cancelDisabled?: boolean
     cancelLabel?: string
@@ -89,6 +97,7 @@ const props = withDefaults(
     allowSelectEnter: false,
     allowFileEnter: false,
     primaryTestId: '',
+    primaryAriaLabel: '',
     showCancelAction: false,
     cancelDisabled: false,
     cancelLabel: 'Cancel',
@@ -374,6 +383,11 @@ onBeforeUnmount(() => {
   justify-content: flex-start;
   gap: var(--space-2);
   margin-top: 0.85rem;
+}
+
+.wizard-links {
+  display: grid;
+  justify-items: start;
 }
 
 .wizard-back {

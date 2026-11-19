@@ -1,53 +1,46 @@
-// DAR-UI-120: the usernames that signed in with a passkey on this browser, so the sign-in page can go from Next
-// straight to the passkey prompt for them. The server is never asked (begin#PasskeyFirstSignIn answers a decoy for an
-// unknown username, DAR-BE-301), so this browser's memory is the only hint. Stored as SHA-256 hashes, never the names,
-// and anything that fails (blocked storage, no crypto.subtle on an insecure origin) reads as "not remembered".
+// DAR-UI-132: the device note. The server never says whether an account has a passkey (begin#PasskeyFirstSignIn
+// answers a decoy for an unknown username, DAR-BE-301), and a website cannot see which passkeys a device holds, so this
+// browser keeps one account: its username in plain text and how it last proved that person here. The sign-in page opens
+// on "Welcome back." for it, and goes to the passkey only when the note says a passkey proved them on this browser.
+// Anything that fails (blocked storage, a value from elsewhere) reads as no note: a new device.
 
-const STORAGE_KEY = 'darpan.passkeySignInHints'
-const HINT_LIMIT = 5
+const STORAGE_KEY = 'darpan.signInAccount'
 
-async function hintFor(username: string): Promise<string | null> {
-  const name = username.trim().toLowerCase()
-  if (!name) return null
+export type SignInMethod = 'passkey' | 'password'
+
+export interface KeptAccount {
+  username: string
+  method: SignInMethod
+}
+
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+export function keptAccount(): KeptAccount | null {
   try {
-    const subtle = globalThis.crypto?.subtle
-    if (!subtle) return null
-    const digest = await subtle.digest('SHA-256', new TextEncoder().encode(`darpan-passkey:${name}`))
-    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null')
+    if (!parsed || typeof parsed !== 'object') return null
+    const { username, method } = parsed as Record<string, unknown>
+    if (typeof username !== 'string' || !username.trim()) return null
+    if (method !== 'passkey' && method !== 'password') return null
+    return { username, method }
   } catch {
     return null
   }
 }
 
-function readHints(): string[] {
+/** Replaces the note: this browser's account is now `username`, last proved by `method`. */
+export function keepAccount(username: string, method: SignInMethod): void {
+  const name = username.trim()
+  if (!name) return
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '[]')
-    return Array.isArray(parsed) ? parsed.filter((hint): hint is string => typeof hint === 'string') : []
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: name, method }))
   } catch {
-    return []
+    // Not kept: the next visit is a new device.
   }
 }
 
-function writeHints(hints: string[]): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(hints.slice(0, HINT_LIMIT)))
-  } catch {
-    // Not remembered: the password step still follows Next.
-  }
-}
-
-export async function hasRememberedPasskey(username: string): Promise<boolean> {
-  const hint = await hintFor(username)
-  return hint !== null && readHints().includes(hint)
-}
-
-/** Most recent first, so the five kept are the five last used. */
-export async function rememberPasskey(username: string): Promise<void> {
-  const hint = await hintFor(username)
-  if (hint) writeHints([hint, ...readHints().filter((kept) => kept !== hint)])
-}
-
-export async function forgetPasskey(username: string): Promise<void> {
-  const hint = await hintFor(username)
-  if (hint) writeHints(readHints().filter((kept) => kept !== hint))
+/** The note says a passkey last proved `username` on this browser. */
+export function passkeyKeptFor(username: string): boolean {
+  const kept = keptAccount()
+  return kept !== null && kept.method === 'passkey' && Boolean(username.trim()) && sameName(kept.username, username)
 }

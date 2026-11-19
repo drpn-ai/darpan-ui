@@ -1248,6 +1248,9 @@ describe('UserSettingsPage', () => {
       await wrapper.findAll('[data-testid="passkey-remove"]')[1]?.trigger('click')
       await flushPromises()
       expect(wrapper.find('[data-testid="passkeys-manage-popup"]').exists()).toBe(false)
+      // DAR-UI-132: the passkey is the first proof; the app code is a link away.
+      expect(wrapper.text()).toContain('Confirm with your passkey.')
+      await click(wrapper, 'two-factor-proof-use-app')
       expect(wrapper.find('[data-testid="two-factor-proof-use-passkey"]').exists()).toBe(true)
       await typeCode(wrapper, 'two-factor-proof-code', '123456')
       expect(deletePasskey).not.toHaveBeenCalled()
@@ -1261,6 +1264,7 @@ describe('UserSettingsPage', () => {
       deletePasskey.mockResolvedValue({ ok: true, messages: [], errors: [], twoFactorEnabled: false })
       await click(wrapper, 'passkeys-manage')
       await click(wrapper, 'passkey-remove')
+      await click(wrapper, 'two-factor-proof-use-app')
       await typeCode(wrapper, 'two-factor-proof-code', '654321')
       await click(wrapper, 'two-factor-proof-next')
       expect(wrapper.get('[data-testid="two-factor-message"]').text()).toContain('Two-factor off.')
@@ -1276,6 +1280,8 @@ describe('UserSettingsPage', () => {
       expect(wrapper.get('[data-testid="two-factor-state"]').text()).toBe('On')
       await click(wrapper, 'two-factor-off')
       expect(wrapper.text()).toContain('Remove authenticator app')
+      expect(wrapper.text()).toContain('Confirm with your passkey.')
+      await click(wrapper, 'two-factor-proof-use-app')
       await typeCode(wrapper, 'two-factor-proof-code', '111222')
       await click(wrapper, 'two-factor-proof-next')
 

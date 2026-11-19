@@ -10,7 +10,7 @@ const requestCliAccess = vi.hoisted(() => vi.fn())
 const getTwoFactorStatus = vi.hoisted(() => vi.fn())
 const beginPasskeyProof = vi.hoisted(() => vi.fn())
 
-const authState = vi.hoisted(() => ({ twoFactorEnabled: false, sessionInfo: { isSuperAdmin: true } as { isSuperAdmin: boolean } }))
+const authState = vi.hoisted(() => ({ twoFactorEnabled: false, username: 'ada', sessionInfo: { isSuperAdmin: true } as { isSuperAdmin: boolean } }))
 
 vi.mock('vue-router', () => ({ useRoute: () => route }))
 vi.mock('../../stores/auth', () => ({ useAuthStore: () => authState }))
@@ -21,6 +21,8 @@ vi.mock('../../lib/api/facade', () => ({
 import CliLoginPage from '../CliLoginPage.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { ASSERTION_JSON, REQUEST_OPTIONS, installWebAuthnStub, notAllowed, type WebAuthnStub } from '../../test/webauthn'
+import { installLocalStorageStub } from '../../test/localStorage'
+import { keptAccount } from '../../lib/passkeyHint'
 
 const access = { tenantUserGroupId: 'ACME', tenantLabel: 'Acme', state: 'NOT_GRANTED', lifetimeDays: 7, canUseCli: false, request: null }
 // approve#CliLogin refuses as a JSON-RPC error with no reason code: the page reads what the backend still holds.
@@ -44,6 +46,7 @@ async function typeCode(wrapper: ReturnType<typeof mount>, value: string) {
 
 describe('CliLoginPage', () => {
   beforeEach(() => {
+    installLocalStorageStub()
     route.query = {}
     authState.twoFactorEnabled = false
     authState.sessionInfo = { isSuperAdmin: true }
@@ -71,14 +74,30 @@ describe('CliLoginPage', () => {
     expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(false)
   })
 
-  it('shows the host as what the CLI reports, with start and expiry, after a successful lookup', async () => {
+  // DAR-UI-132: the sign-in card, one question per step.
+  it('asks for the code on the sign-in card, then asks to approve the CLI on the host, with start and expiry', async () => {
     const wrapper = mount(CliLoginPage)
+    expect(wrapper.find('.login-panel').exists()).toBe(true)
+    expect(wrapper.get('.eyebrow').text()).toBe('Darpan')
+    expect(wrapper.find('h1').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Code from your terminal?')
+
     await typeCode(wrapper, 'BCDF-GH23')
-    expect(wrapper.text()).toContain('Darpan CLI on ada-laptop')
-    expect(wrapper.text()).toContain('That is the name the CLI gave. Darpan has not checked it.')
-    expect(wrapper.text()).toContain('Approve only a code you just started in your own terminal.')
+    expect(wrapper.get('.wizard-question').text()).toBe('Approve Darpan CLI on ada-laptop?')
     expect(wrapper.find('[data-testid="cli-login-started"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="cli-login-expires"]').exists()).toBe(true)
+    // Deny is a quiet link under the one answer.
+    expect(wrapper.get('[data-testid="cli-login-deny"]').classes()).toContain('login-text-link')
+  })
+
+  it('Back returns to the code, answering nothing', async () => {
+    const wrapper = mount(CliLoginPage)
+    await typeCode(wrapper, 'BCDF-GH23')
+    await wrapper.get('.wizard-back').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Code from your terminal?')
+    expect(approveCliLogin).not.toHaveBeenCalled()
+    expect(denyCliLogin).not.toHaveBeenCalled()
   })
 
   it('names an ADMIN sign-in and warns before the approve control', async () => {
@@ -131,6 +150,10 @@ describe('CliLoginPage', () => {
       .toBe('This sign-in asks for access Darpan does not recognise. Do not approve it.')
     expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
+    // Enter on the card approves nothing either.
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(approveCliLogin).not.toHaveBeenCalled()
     await wrapper.get('[data-testid="cli-login-deny"]').trigger('click')
     await flushPromises()
     expect(denyCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23' }, expect.anything())
@@ -187,7 +210,10 @@ describe('CliLoginPage', () => {
     resolveApprove({ ok: true, messages: [], errors: [] })
     await flushPromises()
     expect(approveCliLogin).toHaveBeenCalledTimes(1)
-    expect(wrapper.find('[data-testid="cli-login-done"]').exists()).toBe(true)
+    expect(wrapper.get('.wizard-question').text()).toBe('Approved.')
+    expect(wrapper.get('[data-testid="cli-login-done"]').text()).toBe('Return to your terminal.')
+    // No passkey proved anyone here: the device note is untouched.
+    expect(keptAccount()).toBeNull()
   })
 
   it('Deny calls deny#CliLogin', async () => {
@@ -197,7 +223,8 @@ describe('CliLoginPage', () => {
     await flushPromises()
     expect(denyCliLogin).toHaveBeenCalledTimes(1)
     expect(approveCliLogin).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="cli-login-done"]').exists()).toBe(true)
+    expect(wrapper.get('.wizard-question').text()).toBe('Denied.')
+    expect(wrapper.get('[data-testid="cli-login-done"]').text()).toBe('The CLI was not signed in.')
   })
 
   it('nothing is sent on mount or on remount', async () => {
@@ -295,7 +322,7 @@ describe('CliLoginPage', () => {
       const wrapper = mount(CliLoginPage)
       await typeCode(wrapper, 'BCDF-GH23')
 
-      expect(wrapper.text()).toContain('Current code from your app')
+      expect(wrapper.text()).toContain('Current code from your app.')
       const approve = wrapper.get('[data-testid="cli-login-approve"]')
       expect(approve.attributes('disabled')).toBeDefined()
       await wrapper.get('[data-testid="cli-login-two-factor-code"]').setValue('12345')
@@ -306,7 +333,8 @@ describe('CliLoginPage', () => {
       await approve.trigger('click')
       await flushPromises()
       expect(approveCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23', code: '123456' }, expect.anything())
-      expect(wrapper.find('[data-testid="cli-login-done"]').text()).toContain('CLI approved.')
+      expect(wrapper.get('.wizard-question').text()).toBe('Approved.')
+      expect(keptAccount()).toBeNull()
     })
 
     it('a refused code keeps the request on screen with the refusal, and clears the code', async () => {
@@ -377,7 +405,6 @@ describe('CliLoginPage', () => {
       await typeCode(wrapper, 'BCDF-GH23')
 
       expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="cli-login-passkey-note"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="cli-login-use-app"]').exists()).toBe(false)
       expect(beginPasskeyProof).toHaveBeenCalledTimes(1)
       expect(wrapper.get('[data-testid="cli-login-approve"]').attributes('disabled')).toBeUndefined()
@@ -387,7 +414,9 @@ describe('CliLoginPage', () => {
 
       expect(webauthn?.get).toHaveBeenCalledTimes(1)
       expect(approveCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23', passkeyAssertion: ASSERTION_JSON }, expect.anything())
-      expect(wrapper.get('[data-testid="cli-login-done"]').text()).toContain('CLI approved.')
+      expect(wrapper.get('.wizard-question').text()).toBe('Approved.')
+      // DAR-UI-132: a passkey proved them on this browser, so sign-in here leads with it next time.
+      expect(keptAccount()).toEqual({ username: 'ada', method: 'passkey' })
     })
 
     it('a closed prompt sends nothing, says nothing, and keeps the request on screen', async () => {
@@ -402,26 +431,47 @@ describe('CliLoginPage', () => {
       expect(approveCliLogin).not.toHaveBeenCalled()
       expect(wrapper.find('[data-testid="cli-login-code-error"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(true)
+      expect(keptAccount()).toBeNull()
     })
 
-    it('with the app as well, the code stays first; Use a passkey switches, and a refused passkey stays with the message', async () => {
+    // DAR-UI-132: the passkey by default; the app code is a link.
+    it('with the app as well, the passkey is first; Use the app code switches and back, and a refused passkey stays with the message', async () => {
       getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: true, appEnabled: true, passkeys: [PASSKEY] })
       approveCliLogin.mockRejectedValue(refusal("That passkey didn't work."))
       const wrapper = mount(CliLoginPage)
       await typeCode(wrapper, 'BCDF-GH23')
 
+      expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
+      expect(beginPasskeyProof).toHaveBeenCalledTimes(1)
+      await wrapper.get('[data-testid="cli-login-use-app"]').trigger('click')
+      await flushPromises()
       expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Current code from your app.')
+      expect(wrapper.find('[data-testid="cli-login-use-app"]').exists()).toBe(false)
       await wrapper.get('[data-testid="cli-login-use-passkey"]').trigger('click')
       await flushPromises()
       expect(wrapper.find('[data-testid="cli-login-two-factor-code"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="cli-login-use-app"]').exists()).toBe(true)
 
       await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
       await flushPromises()
 
+      expect(webauthn?.get).toHaveBeenCalledTimes(1)
       expect(wrapper.get('[data-testid="cli-login-code-error"]').text()).toBe("That passkey didn't work.")
       expect(wrapper.find('[data-testid="cli-login-approve"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="cli-login-notfound"]').exists()).toBe(false)
+    })
+
+    it('an ADMIN request for a super admin with both: the warning, then Approve opens the passkey', async () => {
+      getTwoFactorStatus.mockResolvedValue({ ok: true, enabled: true, appEnabled: true, passkeys: [PASSKEY] })
+      getCliLoginRequest.mockResolvedValue({ ...pending, scope: 'ADMIN' })
+      const wrapper = mount(CliLoginPage)
+      await typeCode(wrapper, 'BCDF-GH23')
+
+      expect(wrapper.get('.wizard-question').text()).toBe('Approve darpan-admin on ada-laptop?')
+      expect(wrapper.find('[data-testid="cli-login-admin-warning"]').exists()).toBe(true)
+      await wrapper.get('[data-testid="cli-login-approve"]').trigger('click')
+      await flushPromises()
+      expect(approveCliLogin).toHaveBeenCalledWith({ userCode: 'BCDF-GH23', passkeyAssertion: ASSERTION_JSON }, expect.anything())
     })
 
     it('passkey only, on a browser without passkeys: no code field, and it says what would work', async () => {

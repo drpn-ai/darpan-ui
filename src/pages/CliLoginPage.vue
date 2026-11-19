@@ -1,13 +1,18 @@
 <template>
-  <StaticPageFrame>
-    <template #hero>
-      <h1>Approve CLI</h1>
-    </template>
+  <!-- DAR-UI-132: the sign-in card, one question per step, so `darpan login` reads as one flow from sign-in to approval. -->
+  <main class="login-page">
+    <section class="login-panel">
+      <p class="eyebrow">Darpan</p>
 
-    <StaticPageSection>
-      <p v-if="phase === 'done'" class="section-note" role="status" data-testid="cli-login-done">
-        {{ outcome === 'approved' ? 'CLI approved. Return to your terminal.' : 'CLI denied.' }}
-      </p>
+      <WorkflowStepForm
+        v-if="phase === 'done'"
+        :question="outcome === 'approved' ? 'Approved.' : 'Denied.'"
+        :show-primary-action="false"
+      >
+        <p class="section-note" role="status" data-testid="cli-login-done">
+          {{ outcome === 'approved' ? 'Return to your terminal.' : 'The CLI was not signed in.' }}
+        </p>
+      </WorkflowStepForm>
 
       <template v-else-if="phase === 'noaccess' && myAccess">
         <p class="section-note" role="alert" data-testid="cli-login-noaccess">
@@ -16,63 +21,68 @@
         <CliAccessRequestCard :access="myAccess" />
       </template>
 
-      <template v-else-if="phase === 'ready'">
-        <article class="static-page-summary-card">
-          <span class="static-page-summary-label">Sign-in request</span>
-          <span data-testid="cli-login-host">{{ scope === 'ADMIN' ? 'darpan-admin' : 'Darpan CLI' }} on {{ hostLabel }}</span>
-          <span class="section-note">That is the name the CLI gave. Darpan has not checked it.</span>
-          <template v-if="startedLabel">
-            <span v-explain="'cliCodeStarted'" class="static-page-summary-label">Started</span>
+      <WorkflowStepForm
+        v-else-if="phase === 'ready'"
+        :question="approveQuestion"
+        primary-label="Approve"
+        primary-aria-label="Approve CLI sign-in"
+        :show-primary-action="canApprove"
+        :submit-disabled="busy || approveBlocked"
+        :show-back="true"
+        :show-enter-hint="true"
+        primary-test-id="cli-login-approve"
+        @back="backToCode"
+        @submit="answer('approved')"
+      >
+        <template #question>Approve <span data-testid="cli-login-host">{{ scopeName }} on {{ hostLabel }}</span>?</template>
+        <!-- The request as short label lines (the computer's name above is what the CLI gave). -->
+        <div class="cli-request-lines">
+          <div v-if="startedLabel">
+            <span v-explain="'cliCodeStarted'">Started</span>
             <span data-testid="cli-login-started">{{ startedLabel }}</span>
-          </template>
-          <span v-explain="'cliCodeExpires'" class="static-page-summary-label">Expires</span>
-          <span data-testid="cli-login-expires">{{ expiresLabel }}</span>
-        </article>
+          </div>
+          <div>
+            <span v-explain="'cliCodeExpires'">Expires</span>
+            <span data-testid="cli-login-expires">{{ expiresLabel }}</span>
+          </div>
+        </div>
         <p v-if="scope === 'ADMIN'" class="section-note" role="alert" data-testid="cli-login-admin-warning">This sign-in can use the admin app's powers for 12 hours.</p>
-        <p class="section-note">Approve only a code you just started in your own terminal.</p>
         <p v-if="!scopeKnown" class="section-note" role="alert" data-testid="cli-login-unknown-scope">
           This sign-in asks for access Darpan does not recognise. Do not approve it.
         </p>
         <p v-if="notSuperAdminOnAdmin" class="section-note" role="alert" data-testid="cli-login-super-admin-only">
           Only a super admin can approve a darpan-admin sign-in.
         </p>
-        <template v-if="scopeKnown && !notSuperAdminOnAdmin">
+        <template v-if="canApprove">
           <!-- DAR-BE-264: approving mints a 7-day key, so a two-factor account proves it with a fresh code. A code
-             already used to sign in is refused for 30 s, so the label asks for a current one. DAR-BE-270: or a passkey,
-             whose prompt opens from Approve. -->
-          <label v-if="needsTwoFactorCode && proof.mode.value === 'code'" for="cli-login-two-factor">
-            <span>Current code from your app</span>
-            <input
-              id="cli-login-two-factor"
-              v-model="twoFactorCode"
-              name="twoFactorCode"
-              type="text"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              maxlength="6"
-              spellcheck="false"
-              data-testid="cli-login-two-factor-code"
-            />
-          </label>
-          <p v-if="needsTwoFactorCode && proof.mode.value === 'passkey'" class="section-note" data-testid="cli-login-passkey-note">
-            Approve opens your passkey prompt.
-          </p>
+             already used to sign in is refused for 30 s, so the note asks for a current one. DAR-BE-270/DAR-UI-132: a
+             passkey first when they have one, its prompt opened by Approve. -->
+          <template v-if="needsTwoFactorCode && proof.mode.value === 'code'">
+            <label class="workflow-context-block" aria-label="Code from your app">
+              <input
+                id="cli-login-two-factor"
+                v-model="twoFactorCode"
+                class="wizard-answer-control"
+                name="twoFactorCode"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                spellcheck="false"
+                data-testid="cli-login-two-factor-code"
+              />
+            </label>
+            <p class="section-note">Current code from your app.</p>
+          </template>
           <!-- Their only factor is a passkey and this browser cannot use one: never ask them for an app code. -->
           <p v-if="noProofHere" class="section-note" role="alert" data-testid="cli-login-no-proof">
             {{ PASSKEYS_UNSUPPORTED_TEXT }} {{ PASSKEY_BROWSER_NEEDED_TEXT }}
           </p>
+          <p v-if="codeError" class="section-note" role="alert" data-testid="cli-login-code-error">{{ codeError }}</p>
+        </template>
+        <template #links>
           <button
-            v-if="needsTwoFactorCode && proof.mode.value === 'code' && proof.offers('passkey')"
-            type="button"
-            class="login-text-link"
-            data-testid="cli-login-use-passkey"
-            :disabled="busy"
-            @click="useProof('passkey')"
-          >
-            Use a passkey
-          </button>
-          <button
-            v-if="needsTwoFactorCode && proof.mode.value === 'passkey' && proof.offers('code')"
+            v-if="canApprove && needsTwoFactorCode && proof.mode.value === 'passkey' && proof.offers('code')"
             type="button"
             class="login-text-link"
             data-testid="cli-login-use-app"
@@ -81,24 +91,37 @@
           >
             Use the app code
           </button>
-          <p v-if="codeError" class="section-note" role="alert" data-testid="cli-login-code-error">{{ codeError }}</p>
-        </template>
-        <div class="cli-login-actions">
-          <button v-if="scopeKnown && !notSuperAdminOnAdmin" class="btn-primary" type="button" data-testid="cli-login-approve" aria-label="Approve CLI sign-in" :disabled="busy || approveBlocked" @click="answer('approved')">
-            Approve
+          <button
+            v-if="canApprove && needsTwoFactorCode && proof.mode.value === 'code' && proof.offers('passkey')"
+            type="button"
+            class="login-text-link"
+            data-testid="cli-login-use-passkey"
+            :disabled="busy"
+            @click="useProof('passkey')"
+          >
+            Use a passkey
           </button>
-          <button class="btn-primary" type="button" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
+          <button type="button" class="login-text-link" data-testid="cli-login-deny" aria-label="Deny CLI sign-in" :disabled="busy" @click="answer('denied')">
             Deny
           </button>
-        </div>
-      </template>
+        </template>
+      </WorkflowStepForm>
 
-      <form v-else class="stack-md" @submit.prevent="lookUp">
-        <label for="cli-login-code">
-          <span>Code from your terminal</span>
+      <WorkflowStepForm
+        v-else
+        question="Code from your terminal?"
+        primary-label="Continue"
+        primary-aria-label="Continue with this code"
+        :submit-disabled="busy"
+        :show-enter-hint="true"
+        primary-test-id="cli-login-lookup"
+        @submit="lookUp"
+      >
+        <label class="workflow-context-block" aria-label="Code from your terminal">
           <input
             id="cli-login-code"
             v-model="typedCode"
+            class="wizard-answer-control"
             name="code"
             type="text"
             autocomplete="off"
@@ -111,24 +134,21 @@
         <p v-if="phase === 'notfound'" class="section-note" role="alert" data-testid="cli-login-notfound">
           Code not found or expired. Check your terminal, or run darpan login again.
         </p>
-        <div class="action-row">
-          <button type="submit" data-testid="cli-login-lookup" aria-label="Continue with this code" :disabled="busy">Continue</button>
-        </div>
-      </form>
-    </StaticPageSection>
-  </StaticPageFrame>
+      </WorkflowStepForm>
+    </section>
+  </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import StaticPageFrame from '../components/ui/StaticPageFrame.vue'
-import StaticPageSection from '../components/ui/StaticPageSection.vue'
+import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
 import CliAccessRequestCard from '../components/settings/CliAccessRequestCard.vue'
 import { authFacade } from '../lib/api/facade'
 import type { MyCliAccess } from '../lib/api/types'
 import { formatDateTime } from '../lib/utils/date'
 import { callFailure } from '../lib/twoFactor'
 import { PASSKEY_BROWSER_NEEDED_TEXT, PASSKEYS_UNSUPPORTED_TEXT } from '../lib/passkeys'
+import { keepAccount } from '../lib/passkeyHint'
 import { beginPasskeyProof, useTwoFactorProof } from '../composables/useTwoFactorProof'
 import { useAuthStore } from '../stores/auth'
 
@@ -142,6 +162,8 @@ const hostLabel = ref('')
 // TENANT or ADMIN; a missing scope (older backend) is TENANT. Anything else is shown as unrecognised, with no approve.
 const scope = ref('TENANT')
 const scopeKnown = computed(() => scope.value === 'TENANT' || scope.value === 'ADMIN')
+const scopeName = computed(() => (scope.value === 'ADMIN' ? 'darpan-admin' : 'Darpan CLI'))
+const approveQuestion = computed(() => `Approve ${scopeName.value} on ${hostLabel.value}?`)
 const startedLabel = ref('')
 const expiresLabel = ref('')
 const outcome = ref<'approved' | 'denied'>('approved')
@@ -153,6 +175,8 @@ let confirmedCode = ''
 const authStore = useAuthStore()
 // DAR-BE-295: only a super admin may approve a darpan-admin sign-in; anyone else sees why, with Deny, and no proof step.
 const notSuperAdminOnAdmin = computed(() => scope.value === 'ADMIN' && authStore.sessionInfo?.isSuperAdmin !== true)
+// An unrecognised scope, or darpan-admin for anyone but a super admin: no proof, no Approve; Deny stays.
+const canApprove = computed(() => scopeKnown.value && !notSuperAdminOnAdmin.value)
 const twoFactorCode = ref('')
 const codeError = ref<string | null>(null)
 // The session's flag, or the backend asking for a code (two-factor turned on in another tab since this one loaded).
@@ -195,6 +219,14 @@ watch(
     if (ready) void loadProofMethods()
   },
 )
+
+/** Back to the code: the request stays unanswered and expires on its own. */
+function backToCode(): void {
+  confirmedCode = ''
+  codeError.value = null
+  twoFactorCode.value = ''
+  phase.value = 'enter'
+}
 
 /** The fresh proof approve#CliLogin takes: a code, a passkey assertion, nothing (no two-factor), or null to stop. */
 async function approvalProof(): Promise<{ code?: string; passkeyAssertion?: string } | null> {
@@ -283,7 +315,7 @@ function proofRefused(message: string): void {
 
 async function answer(choice: 'approved' | 'denied') {
   if (busy.value || !confirmedCode) return
-  if (choice === 'approved' && approveBlocked.value) return
+  if (choice === 'approved' && (!canApprove.value || approveBlocked.value)) return
   busy.value = true
   codeError.value = null
   try {
@@ -292,6 +324,8 @@ async function answer(choice: 'approved' | 'denied') {
       const given = await approvalProof()
       if (!given || controller.signal.aborted) return
       await authFacade.approveCliLogin({ ...payload, ...given }, controller.signal)
+      // DAR-UI-132: a passkey proved them on this browser, so sign-in here leads with it next time.
+      if (given.passkeyAssertion && authStore.username) keepAccount(authStore.username, 'passkey')
     } else {
       await authFacade.denyCliLogin(payload, controller.signal)
     }
@@ -313,5 +347,29 @@ async function answer(choice: 'approved' | 'denied') {
 </script>
 
 <style scoped>
-.cli-login-actions { display: flex; gap: var(--space-2); }
+/* The request as short label lines: a label column, the value beside it. */
+.cli-request-lines {
+  width: 100%;
+  display: grid;
+  gap: var(--space-0);
+}
+
+.cli-request-lines > div {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: var(--type-note-size);
+}
+
+.cli-request-lines span:first-child {
+  color: var(--text-dim);
+  font-size: var(--type-summary-label-size);
+  letter-spacing: var(--type-summary-label-tracking);
+  text-transform: uppercase;
+}
+
+.cli-request-lines span:last-child {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
 </style>

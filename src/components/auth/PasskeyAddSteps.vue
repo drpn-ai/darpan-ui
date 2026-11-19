@@ -4,15 +4,18 @@
   <WorkflowStepForm
     v-if="!recoveryCodes"
     :class="formClass"
-    question="Add a passkey."
-    :primary-label="busy ? 'Waiting' : 'Continue'"
+    :question="question"
+    :primary-label="busy ? 'Waiting' : primaryLabel"
     :submit-disabled="busy"
-    :show-back="!busy"
+    :show-back="showBack && !busy"
     :show-enter-hint="true"
     primary-test-id="passkey-add-next"
     @back="emit('back')"
     @submit="add"
-  />
+  >
+    <slot></slot>
+    <template v-if="$slots.links" #links><slot name="links"></slot></template>
+  </WorkflowStepForm>
 
   <TwoFactorRecoveryCodes v-else :class="formClass" :codes="recoveryCodes" :username="username" @done="emit('done')" />
 
@@ -25,10 +28,11 @@ import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
 import TwoFactorRecoveryCodes from './TwoFactorRecoveryCodes.vue'
 import { createPasskey } from '../../lib/passkeys'
+import { keepAccount } from '../../lib/passkeyHint'
 import type { PasskeyBeginOutcome } from '../../lib/twoFactor'
 import { useAuthStore } from '../../stores/auth'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** begin#PasskeyRegistration's options. */
   options: string
   /** Begins again after a refused finish, when the proof can be used again (a setup challenge, the password). */
@@ -36,7 +40,11 @@ const props = defineProps<{
   username?: string | null
   /** `workflow-form--popup-compact` inside a settings popup. */
   formClass?: string
-}>()
+  /** DAR-UI-132: the sign-in page asks it as its own question, with Not now beside it instead of Back. */
+  question?: string
+  primaryLabel?: string
+  showBack?: boolean
+}>(), { rebegin: undefined, username: null, formClass: undefined, question: 'Add a passkey.', primaryLabel: 'Continue', showBack: true })
 
 const emit = defineEmits<{
   /** The passkey is saved. firstFactor: two-factor just turned on and this tab holds the new key. */
@@ -73,6 +81,9 @@ async function add(): Promise<void> {
     }
     const result = await authStore.finishPasskeyRegistration(ceremony.json)
     if (result.outcome === 'added') {
+      // DAR-UI-132: this browser now holds a passkey for them, so it leads with the passkey next time.
+      const who = props.username || authStore.username
+      if (who) keepAccount(who, 'passkey')
       emit('added', result.recoveryCodes.length > 0)
       if (result.recoveryCodes.length > 0) recoveryCodes.value = result.recoveryCodes
       else emit('done')

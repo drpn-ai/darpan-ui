@@ -14,12 +14,14 @@
   >
     <!-- Like the reset code: the sixth digit submits. -->
     <WorkflowCodeInput v-model="code" label="Authenticator code" test-id="login-two-factor-code" @complete="submitCode" />
-    <button v-if="proof.offers('passkey')" type="button" class="login-text-link" data-testid="login-two-factor-use-passkey" :disabled="busy" @click="switchTo('passkey')">
-      Use a passkey
-    </button>
-    <button type="button" class="login-text-link" data-testid="login-two-factor-use-recovery" :disabled="busy" @click="switchTo('recovery')">
-      Use a recovery code
-    </button>
+    <template #links>
+      <button v-if="proof.offers('passkey')" type="button" class="login-text-link" data-testid="login-two-factor-use-passkey" :disabled="busy" @click="switchTo('passkey')">
+        Use a passkey
+      </button>
+      <button type="button" class="login-text-link" data-testid="login-two-factor-use-recovery" :disabled="busy" @click="switchTo('recovery')">
+        Use a recovery code
+      </button>
+    </template>
   </WorkflowStepForm>
 
   <!-- DAR-BE-270: the browser's own prompt does the asking; Continue opens it again after a closed one. -->
@@ -34,12 +36,14 @@
     @back="leave"
     @submit="submitPasskey"
   >
-    <button v-if="proof.offers('code')" type="button" class="login-text-link" data-testid="login-two-factor-use-app" :disabled="busy" @click="switchTo('code')">
-      Use the app code
-    </button>
-    <button type="button" class="login-text-link" data-testid="login-two-factor-use-recovery" :disabled="busy" @click="switchTo('recovery')">
-      Use a recovery code
-    </button>
+    <template #links>
+      <button v-if="proof.offers('code')" type="button" class="login-text-link" data-testid="login-two-factor-use-app" :disabled="busy" @click="switchTo('code')">
+        Use the app code
+      </button>
+      <button type="button" class="login-text-link" data-testid="login-two-factor-use-recovery" :disabled="busy" @click="switchTo('recovery')">
+        Use a recovery code
+      </button>
+    </template>
   </WorkflowStepForm>
 
   <WorkflowStepForm
@@ -67,12 +71,14 @@
         required
       />
     </label>
-    <button v-if="proof.offers('code')" type="button" class="login-text-link" data-testid="login-two-factor-use-app" :disabled="busy" @click="switchTo('code')">
-      Use the app code
-    </button>
-    <button v-if="proof.offers('passkey')" type="button" class="login-text-link" data-testid="login-two-factor-use-passkey" :disabled="busy" @click="switchTo('passkey')">
-      Use a passkey
-    </button>
+    <template #links>
+      <button v-if="proof.offers('code')" type="button" class="login-text-link" data-testid="login-two-factor-use-app" :disabled="busy" @click="switchTo('code')">
+        Use the app code
+      </button>
+      <button v-if="proof.offers('passkey')" type="button" class="login-text-link" data-testid="login-two-factor-use-passkey" :disabled="busy" @click="switchTo('passkey')">
+        Use a passkey
+      </button>
+    </template>
   </WorkflowStepForm>
 
   <InlineValidation tone="error" :message="error" />
@@ -86,6 +92,12 @@ import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
 import { useTwoFactorProof, type ProofMode } from '../../composables/useTwoFactorProof'
 import type { TwoFactorRefusal } from '../../lib/twoFactor'
 import { useAuthStore, type TwoFactorVerifyOutcome } from '../../stores/auth'
+
+const props = withDefaults(defineProps<{
+  /** DAR-UI-132: which answer the step opens on when the person has both. The sign-in page asks for the code on a
+   *  browser whose note does not say a passkey proved them here, so a new device never opens an empty passkey sheet. */
+  prefer?: 'passkey' | 'code'
+}>(), { prefer: 'passkey' })
 
 const emit = defineEmits<{
   /** Signed in. recoveryCodesLeft is set only after a recovery code; byPasskey (DAR-UI-120) when a passkey answered. */
@@ -103,9 +115,9 @@ const busy = ref(false)
 const error = ref<string | null>(null)
 
 const proof = useTwoFactorProof({ begin: authStore.beginPasskeySignIn, onRefused: settle })
-// What this person can answer with (login#Session's twoFactorMethods): the app first, else a passkey, else a recovery
-// code. Back from the others returns here.
-proof.start({ app: authStore.twoFactorMethods.includes('app'), passkey: authStore.twoFactorMethods.includes('passkey') }, 'recovery')
+// What this person can answer with (login#Session's twoFactorMethods): the preferred of a passkey and the app, then the
+// other, else a recovery code. Back from the others returns here.
+proof.start({ app: authStore.twoFactorMethods.includes('app'), passkey: authStore.twoFactorMethods.includes('passkey') }, 'recovery', props.prefer)
 const firstMode: ProofMode = proof.mode.value ?? 'recovery'
 
 onMounted(async () => {

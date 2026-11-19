@@ -116,7 +116,6 @@ describe('LoginPage two-factor', () => {
     await signIn(wrapper)
     await typeCode(wrapper, 'login-two-factor-code', '000000')
 
-    expect(wrapper.find('h1').text()).toBe('Sign In')
     expect(wrapper.text()).toContain('Sign in again.')
     expect(wrapper.text()).toContain('Password for ada?')
     expect((wrapper.get('input[autocomplete="current-password"]').element as HTMLInputElement).value).toBe('')
@@ -135,7 +134,7 @@ describe('LoginPage two-factor', () => {
     await typeCode(wrapper, 'login-two-factor-code', '000000')
 
     expect(verifySignInCode).toHaveBeenCalledTimes(5)
-    expect(wrapper.find('h1').text()).toBe('Sign In')
+    expect(wrapper.text()).toContain('Password for ada?')
     expect(wrapper.text()).toContain('Sign in again.')
   })
 
@@ -183,7 +182,6 @@ describe('LoginPage two-factor', () => {
     await wrapper.get('.wizard-back').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('h1').text()).toBe('Sign In')
     expect(wrapper.text()).toContain('Password for ada?')
     expect((wrapper.get('#login-password').element as HTMLInputElement).value).toBe('')
   })
@@ -199,7 +197,7 @@ describe('LoginPage two-factor', () => {
     await wrapper.get('.wizard-back').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('h1').text()).toBe('Sign In')
+    expect(wrapper.text()).toContain('Password for ada?')
     expect(wrapper.text()).not.toContain("didn't work")
   })
 
@@ -245,7 +243,7 @@ describe('LoginPage two-factor', () => {
     await flushPromises()
     await typeCode(wrapper, 'two-factor-setup-code', '654321')
 
-    expect(wrapper.find('h1').text()).toBe('Sign In')
+    expect(wrapper.text()).toContain('Password for ada?')
     expect(wrapper.text()).toContain('Sign in again.')
     expect(getAuthToken()).toBeNull()
   })

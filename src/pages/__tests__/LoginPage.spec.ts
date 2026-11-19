@@ -68,6 +68,8 @@ vi.mock('../../stores/auth', () => ({
 }))
 
 import LoginPage from '../LoginPage.vue'
+import { installLocalStorageStub } from '../../test/localStorage'
+import { keepAccount, keptAccount } from '../../lib/passkeyHint'
 
 /** DAR-UI-120: the username step, Next, then the password step and its Next. */
 async function enterUsername(wrapper: ReturnType<typeof mount>, user: string): Promise<void> {
@@ -92,6 +94,8 @@ async function completePasswordStep(wrapper: ReturnType<typeof mount>, value: st
 
 describe('LoginPage', () => {
   beforeEach(() => {
+    // DAR-UI-132: each test starts as a new device (no device note).
+    installLocalStorageStub()
     replace.mockClear()
     loginWithCredentials.mockReset()
     loginWithCredentials.mockResolvedValue(true)
@@ -153,6 +157,57 @@ describe('LoginPage', () => {
 
     expect(loginWithCredentials).toHaveBeenCalledWith('john.doe', 'moqui')
     expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  // DAR-UI-132: the question is the heading; the eyebrow is the only branding.
+  it('has no Sign In heading on any sign-in step', async () => {
+    const wrapper = mount(LoginPage)
+    expect(wrapper.find('h1').exists()).toBe(false)
+    expect(wrapper.get('.eyebrow').text()).toBe('Darpan')
+    await enterUsername(wrapper, 'john.doe')
+    expect(wrapper.find('h1').exists()).toBe(false)
+  })
+
+  it('a password sign-in keeps this browser\'s account as password; the next visit opens on Welcome back with it', async () => {
+    const first = mount(LoginPage)
+    await signInWith(first, 'john.doe', 'moqui')
+    expect(keptAccount()).toEqual({ username: 'john.doe', method: 'password' })
+    first.unmount()
+
+    const wrapper = mount(LoginPage)
+    expect(wrapper.text()).toContain('Welcome back.')
+    expect(wrapper.find('#login-username').exists()).toBe(false)
+    const row = wrapper.get('[data-testid="login-welcome-row"]')
+    expect(row.attributes('aria-label')).toBe('Sign in with your password')
+    expect(wrapper.get('[data-testid="login-welcome-username"]').text()).toBe('john.doe')
+    expect(wrapper.get('[data-testid="login-welcome-method"]').text()).toBe('Password')
+    // The whole row is the one control: no Continue, no forget.
+    expect(wrapper.find('.wizard-next').exists()).toBe(false)
+    expect(wrapper.findAll('button')).toHaveLength(2)
+
+    await row.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Password for john.doe?')
+  })
+
+  it('Another account leaves the kept one for an empty Username?', async () => {
+    keepAccount('john.doe', 'password')
+    const wrapper = mount(LoginPage)
+    await wrapper.get('[data-testid="login-another-account"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Username?')
+    expect((wrapper.get('#login-username').element as HTMLInputElement).value).toBe('')
+    await enterUsername(wrapper, 'jane.roe')
+    expect(wrapper.text()).toContain('Password for jane.roe?')
+  })
+
+  it('a passkey note on a browser without WebAuthn reads as the password', async () => {
+    keepAccount('john.doe', 'passkey')
+    const wrapper = mount(LoginPage)
+    expect(wrapper.get('[data-testid="login-welcome-method"]').text()).toBe('Password')
+    await wrapper.get('[data-testid="login-welcome-row"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Password for john.doe?')
   })
 
   it('stays on a step left empty and says what it needs', async () => {
@@ -364,7 +419,6 @@ describe('LoginPage', () => {
     await wrapper.get('.wizard-back').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Sign In')
     expect(wrapper.text()).toContain('Password for avnindra.sharma?')
   })
 
@@ -377,6 +431,57 @@ describe('LoginPage', () => {
 
     expect(loginWithCredentials).toHaveBeenCalledWith('john.doe', 'moqui')
     expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  // DAR-UI-132: the question is the heading; the eyebrow is the only branding.
+  it('has no Sign In heading on any sign-in step', async () => {
+    const wrapper = mount(LoginPage)
+    expect(wrapper.find('h1').exists()).toBe(false)
+    expect(wrapper.get('.eyebrow').text()).toBe('Darpan')
+    await enterUsername(wrapper, 'john.doe')
+    expect(wrapper.find('h1').exists()).toBe(false)
+  })
+
+  it('a password sign-in keeps this browser\'s account as password; the next visit opens on Welcome back with it', async () => {
+    const first = mount(LoginPage)
+    await signInWith(first, 'john.doe', 'moqui')
+    expect(keptAccount()).toEqual({ username: 'john.doe', method: 'password' })
+    first.unmount()
+
+    const wrapper = mount(LoginPage)
+    expect(wrapper.text()).toContain('Welcome back.')
+    expect(wrapper.find('#login-username').exists()).toBe(false)
+    const row = wrapper.get('[data-testid="login-welcome-row"]')
+    expect(row.attributes('aria-label')).toBe('Sign in with your password')
+    expect(wrapper.get('[data-testid="login-welcome-username"]').text()).toBe('john.doe')
+    expect(wrapper.get('[data-testid="login-welcome-method"]').text()).toBe('Password')
+    // The whole row is the one control: no Continue, no forget.
+    expect(wrapper.find('.wizard-next').exists()).toBe(false)
+    expect(wrapper.findAll('button')).toHaveLength(2)
+
+    await row.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Password for john.doe?')
+  })
+
+  it('Another account leaves the kept one for an empty Username?', async () => {
+    keepAccount('john.doe', 'password')
+    const wrapper = mount(LoginPage)
+    await wrapper.get('[data-testid="login-another-account"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Username?')
+    expect((wrapper.get('#login-username').element as HTMLInputElement).value).toBe('')
+    await enterUsername(wrapper, 'jane.roe')
+    expect(wrapper.text()).toContain('Password for jane.roe?')
+  })
+
+  it('a passkey note on a browser without WebAuthn reads as the password', async () => {
+    keepAccount('john.doe', 'passkey')
+    const wrapper = mount(LoginPage)
+    expect(wrapper.get('[data-testid="login-welcome-method"]').text()).toBe('Password')
+    await wrapper.get('[data-testid="login-welcome-row"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Password for john.doe?')
   })
 
   // ---- DAR-BE-028: forgot password ----
@@ -535,7 +640,6 @@ describe('LoginPage', () => {
     await wrapper.get('.wizard-back').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Sign In')
     expect(wrapper.text()).toContain('Password for pwr.user?')
   })
 

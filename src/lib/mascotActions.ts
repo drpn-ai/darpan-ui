@@ -579,7 +579,29 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'use password instead': {
     title: 'Use password instead',
-    body: 'asks for your password this time. Your passkey stays registered, and Next offers it first again next time.',
+    body: 'asks for your password this time. Your passkey stays registered, but this browser leads with the password until a passkey signs you in here again.',
+  },
+  // DAR-UI-132: the first card on a browser that kept an account, and the offer after a password sign-in.
+  // The Welcome back row, named by what it does; the account it signs in as is its description.
+  'sign in with your passkey': {
+    title: 'Sign in',
+    body: 'opens the passkey sheet for this account. If the passkey is not on this device any more, the password step follows.',
+  },
+  'sign in with your password': {
+    title: 'Sign in',
+    body: 'asks for this account\'s password. A passkey used here later, to sign in or approve the CLI, makes this browser lead with it.',
+  },
+  'another account': {
+    title: 'Another account',
+    body: 'asks for a username instead. The account shown stays on this browser until someone else signs in here.',
+  },
+  'add passkey': {
+    title: 'Add passkey',
+    body: 'saves a passkey on this device, so next time Touch ID or your screen lock signs you in with no password or code.',
+  },
+  'not now': {
+    title: 'Not now',
+    body: 'skips this question for this sign-in only. Darpan asks again the next time you sign in.',
   },
   'forgot password?': {
     title: 'Forgot password?',
@@ -783,7 +805,7 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'use the app code': {
     title: 'Use the app code',
-    body: 'goes back to the six digits from your authenticator app. Switching uses nothing up; your passkeys stay registered.',
+    body: 'answers with the six digits from your authenticator app instead. Switching uses nothing up; your passkeys stay registered.',
   },
   'copy': {
     title: 'Copy',
