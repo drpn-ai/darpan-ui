@@ -45,6 +45,16 @@ import type {
   SaveTenantScriptDeploymentResponse,
   SaveTenantScriptResponse,
 } from './scriptTypes'
+import type {
+  DeletePeakPeriodResponse,
+  DeletePeakRunTimeResponse,
+  GetPeakPeriodResponse,
+  ListPeakPeriodsResponse,
+  SavePeakPeriodPayload,
+  SavePeakPeriodResponse,
+  SavePeakRunTimePayload,
+  SavePeakRunTimeResponse,
+} from './peakTypes'
 
 // Cache-reset coordinator. The actual reset implementation is wired up in
 // main.ts after Pinia is installed, so this module stays free of store
@@ -830,6 +840,37 @@ export const scriptFacade = {
   /** send=false (default) previews the message; send=true posts it and records the run. */
   runTenantScriptDeployment(payload: { tenantScriptDeploymentId: string; send?: boolean }, signal?: AbortSignal): Promise<RunTenantScriptDeploymentResponse> {
     return callService<RunTenantScriptDeploymentResponse>(SCRIPT.runTenantScriptDeployment, payload, signal)
+  },
+}
+
+// DAR-BE-328. The active tenant's peak periods and the run-time moves inside them.
+const PEAK = {
+  listPeakPeriods: 'facade.PeakPeriodFacadeServices.list#PeakPeriods',
+  getPeakPeriod: 'facade.PeakPeriodFacadeServices.get#PeakPeriod',
+  savePeakPeriod: 'facade.PeakPeriodFacadeServices.save#PeakPeriod',
+  deletePeakPeriod: 'facade.PeakPeriodFacadeServices.delete#PeakPeriod',
+  savePeakRunTime: 'facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime',
+  deletePeakRunTime: 'facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime',
+} as const
+
+export const peakFacade = {
+  listPeakPeriods(signal?: AbortSignal): Promise<ListPeakPeriodsResponse> {
+    return callService<ListPeakPeriodsResponse>(PEAK.listPeakPeriods, {}, signal)
+  },
+  getPeakPeriod(payload: { peakPeriodId: string }, signal?: AbortSignal): Promise<GetPeakPeriodResponse> {
+    return callService<GetPeakPeriodResponse>(PEAK.getPeakPeriod, payload, signal)
+  },
+  savePeakPeriod(payload: SavePeakPeriodPayload, signal?: AbortSignal): Promise<SavePeakPeriodResponse> {
+    return callService<SavePeakPeriodResponse>(PEAK.savePeakPeriod, payload, signal)
+  },
+  deletePeakPeriod(payload: { peakPeriodId: string }, signal?: AbortSignal): Promise<DeletePeakPeriodResponse> {
+    return callService<DeletePeakPeriodResponse>(PEAK.deletePeakPeriod, payload, signal)
+  },
+  savePeakRunTime(payload: SavePeakRunTimePayload, signal?: AbortSignal): Promise<SavePeakRunTimeResponse> {
+    return callService<SavePeakRunTimeResponse>(PEAK.savePeakRunTime, payload, signal)
+  },
+  deletePeakRunTime(payload: { runTimeId: string }, signal?: AbortSignal): Promise<DeletePeakRunTimeResponse> {
+    return callService<DeletePeakRunTimeResponse>(PEAK.deletePeakRunTime, payload, signal)
   },
 }
 
