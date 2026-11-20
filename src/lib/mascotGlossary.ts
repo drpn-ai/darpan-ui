@@ -492,6 +492,14 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Peak hours',
     body: 'when the tenant’s systems are busiest each day of the peak. A scheduled run due inside them waits until they end.',
   },
+  peakHotwaxReads: {
+    title: 'HotWax reads',
+    body: 'how much of HotWax’s read budget Darpan may use during the peak. Normal leaves the usual limit; a share slows Darpan’s reads so the tenant’s own work keeps room.',
+  },
+  peakNetsuiteReads: {
+    title: 'NetSuite reads',
+    body: 'how many NetSuite requests Darpan sends at once during the peak. One at a time is the gentlest on a busy account.',
+  },
   peakRunTimes: {
     title: 'Run times',
     body: 'runs moved to another time during the peak, on one day or every day. The window each run reads stays the same.',

@@ -199,6 +199,44 @@
         </WorkflowStepForm>
 
         <WorkflowStepForm
+          v-else-if="activePopup === 'hotwax'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="How much of the HotWax read budget can Darpan use?"
+          primary-label="Save"
+          primary-action-variant="save"
+          primary-test-id="peak-hotwax-save"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="peak-hotwax-cancel"
+          @cancel="closePopup"
+          @submit="saveHotwax"
+        >
+          <label class="wizard-input-shell">
+            <span v-explain="'peakHotwaxReads'" class="workflow-context-label">HotWax reads</span>
+            <AppSelect v-model="hotwaxForm" :options="HOTWAX_OPTIONS" test-id="peak-hotwax-select" />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup === 'netsuite'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="How many NetSuite requests at once?"
+          primary-label="Save"
+          primary-action-variant="save"
+          primary-test-id="peak-netsuite-save"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="peak-netsuite-cancel"
+          @cancel="closePopup"
+          @submit="saveNetsuite"
+        >
+          <label class="wizard-input-shell">
+            <span v-explain="'peakNetsuiteReads'" class="workflow-context-label">NetSuite reads</span>
+            <AppSelect v-model="netsuiteForm" :options="NETSUITE_OPTIONS" test-id="peak-netsuite-select" />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
           v-else-if="activePopup === 'runTime'"
           class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
           question="When should it run in this period?"
@@ -281,7 +319,7 @@
 
 <script setup lang="ts">
 // DAR-BE-328. One peak period on a page of its own: its name and on/off, its dates and peak hours, the runs it moves
-// and the runs that wait for its peak hours. The title, the switch and the two facts only change this page until
+// and the runs that wait for its peak hours. The title, the switch and the four facts only change this page until
 // Save; a run time saves from its own popup, once the period exists. The backend validates every save and its
 // sentences show as they come.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -315,10 +353,25 @@ interface Draft {
   /** "HH:mm", or '' when the period has no peak hours. */
   peakHoursStart: string
   peakHoursEnd: string
+  /** Share of HotWax's read budget Darpan may use in the period; null is normal. */
+  hotwaxReadSharePct: number | null
+  netsuiteSerial: boolean
   isActive: boolean
 }
 
-type Popup = 'dates' | 'hours' | 'runTime' | 'delete'
+type Popup = 'dates' | 'hours' | 'hotwax' | 'netsuite' | 'runTime' | 'delete'
+
+const NORMAL = 'normal'
+const HOTWAX_OPTIONS = [
+  { value: NORMAL, label: 'Normal' },
+  ...[10, 25, 50, 75].map((pct) => ({ value: String(pct), label: `${pct}%` })),
+]
+const PARALLEL = 'parallel'
+const SERIAL = 'serial'
+const NETSUITE_OPTIONS = [
+  { value: PARALLEL, label: 'Parallel' },
+  { value: SERIAL, label: 'One at a time' },
+]
 
 const EVERY_DAY = 'every'
 // A period is planned ahead, so the calendar runs two years forward rather than stopping at today.
@@ -346,6 +399,8 @@ const activePopup = ref<Popup | null>(null)
 const popupBusy = ref(false)
 const popupError = ref('')
 const hoursForm = ref({ start: '', end: '' })
+const hotwaxForm = ref(NORMAL)
+const netsuiteForm = ref(PARALLEL)
 const runForm = ref({ runTimeId: '', target: '', onDate: EVERY_DAY, runTime: '' })
 
 const calendar = useCalendarWidget({ lastPickableDate: () => addDays(startOfLocalDay(new Date()), PICKABLE_DAYS_AHEAD) })
@@ -366,6 +421,12 @@ const datesText = computed(() => {
 const hoursSet = computed(() => Boolean(draft.value?.peakHoursStart && draft.value.peakHoursEnd))
 const hoursText = computed(() => (hoursSet.value ? `${draft.value?.peakHoursStart} – ${draft.value?.peakHoursEnd}` : 'None'))
 
+const hotwaxText = computed(() => {
+  const pct = draft.value?.hotwaxReadSharePct
+  return pct ? `${pct}%` : 'Normal'
+})
+const netsuiteText = computed(() => (draft.value?.netsuiteSerial ? 'One at a time' : 'Parallel'))
+
 const facts = computed<StaticFact[]>(() => {
   const changeable = { interactive: canEdit.value, disabled: busy.value }
   return [
@@ -373,12 +434,18 @@ const facts = computed<StaticFact[]>(() => {
       testId: 'peak-fact-dates', ...changeable },
     { key: 'hours', label: 'Peak hours', value: hoursText.value, sub: hoursSet.value ? 'heavy runs wait' : '',
       explain: 'peakHours', testId: 'peak-fact-hours', ...changeable },
+    { key: 'hotwax', label: 'HotWax reads', value: hotwaxText.value, sub: 'of its read budget',
+      explain: 'peakHotwaxReads', testId: 'peak-fact-hotwax', ...changeable },
+    { key: 'netsuite', label: 'NetSuite reads', value: netsuiteText.value, sub: 'this period',
+      explain: 'peakNetsuiteReads', testId: 'peak-fact-netsuite', ...changeable },
   ]
 })
 
 function openFact(key: string): void {
   if (key === 'dates') openDates()
-  else openHours()
+  else if (key === 'hours') openHours()
+  else if (key === 'hotwax') openHotwax()
+  else openNetsuite()
 }
 
 /** Inside the page's dates, as the facts show them; a run time on a day they no longer cover stays, marked. */
@@ -440,6 +507,8 @@ const popupTitle = computed(() => {
   switch (activePopup.value) {
     case 'dates': return 'Dates'
     case 'hours': return 'Peak hours'
+    case 'hotwax': return 'HotWax reads'
+    case 'netsuite': return 'NetSuite reads'
     case 'runTime': return 'Run time'
     case 'delete': return 'Delete peak period'
     default: return ''
@@ -466,9 +535,11 @@ function resetDraft(): void {
         thruDate: period.thruDate,
         peakHoursStart: period.peakHoursStart ?? '',
         peakHoursEnd: period.peakHoursEnd ?? '',
+        hotwaxReadSharePct: period.hotwaxReadSharePct ?? null,
+        netsuiteSerial: period.netsuiteSerial === 'Y',
         isActive: period.isActive !== 'N',
       }
-    : { peakPeriodId: '', periodName: 'New peak period', fromDate: '', thruDate: '', peakHoursStart: '', peakHoursEnd: '', isActive: true }
+    : { peakPeriodId: '', periodName: 'New peak period', fromDate: '', thruDate: '', peakHoursStart: '', peakHoursEnd: '', hotwaxReadSharePct: null, netsuiteSerial: false, isActive: true }
   baseline.value = snapshot()
 }
 
@@ -562,6 +633,34 @@ function saveHours(): void {
   if (!current || Boolean(start) !== Boolean(end)) return
   current.peakHoursStart = start
   current.peakHoursEnd = end
+  closePopup()
+}
+
+function openHotwax(): void {
+  const current = draft.value
+  if (!current) return
+  hotwaxForm.value = current.hotwaxReadSharePct ? String(current.hotwaxReadSharePct) : NORMAL
+  openPopup('hotwax')
+}
+
+function saveHotwax(): void {
+  const current = draft.value
+  if (!current) return
+  current.hotwaxReadSharePct = hotwaxForm.value === NORMAL ? null : Number(hotwaxForm.value)
+  closePopup()
+}
+
+function openNetsuite(): void {
+  const current = draft.value
+  if (!current) return
+  netsuiteForm.value = current.netsuiteSerial ? SERIAL : PARALLEL
+  openPopup('netsuite')
+}
+
+function saveNetsuite(): void {
+  const current = draft.value
+  if (!current) return
+  current.netsuiteSerial = netsuiteForm.value === SERIAL
   closePopup()
 }
 
@@ -675,6 +774,9 @@ async function save(): Promise<void> {
       // Blank clears them.
       peakHoursStart: current.peakHoursStart,
       peakHoursEnd: current.peakHoursEnd,
+      // Normal is no share at all; the server checks 1 to 100.
+      hotwaxReadSharePct: current.hotwaxReadSharePct,
+      netsuiteSerial: current.netsuiteSerial,
       isActive: current.isActive,
     })
     const refusal = refusalOf(out, 'Could not save the peak period.')

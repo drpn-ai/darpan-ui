@@ -106,11 +106,17 @@ describe('TenantPeakPeriodPage', () => {
     expect(wrapper.find('[data-testid="peak-on"]').attributes('aria-checked')).toBe('true')
 
     const facts = wrapper.findAll('[data-testid="peak-facts"] .static-fact')
-    expect(facts).toHaveLength(2)
+    expect(facts).toHaveLength(4)
     expect(text(wrapper, 'peak-fact-dates')).toContain('Nov 24 – Dec 1')
     expect(text(wrapper, 'peak-fact-dates')).toContain('America/Los_Angeles')
     expect(text(wrapper, 'peak-fact-hours')).toContain('08:00 – 23:00')
     expect(text(wrapper, 'peak-fact-hours')).toContain('heavy runs wait')
+    expect(text(wrapper, 'peak-fact-hotwax')).toContain('HotWax reads')
+    expect(text(wrapper, 'peak-fact-hotwax')).toContain('Normal')
+    expect(text(wrapper, 'peak-fact-hotwax')).toContain('of its read budget')
+    expect(text(wrapper, 'peak-fact-netsuite')).toContain('NetSuite reads')
+    expect(text(wrapper, 'peak-fact-netsuite')).toContain('Parallel')
+    expect(text(wrapper, 'peak-fact-netsuite')).toContain('this period')
 
     const rows = wrapper.findAll('[data-testid="peak-run-time"]')
     expect(rows.map((row) => row.text())).toEqual([
@@ -151,7 +157,7 @@ describe('TenantPeakPeriodPage', () => {
     await flushPromises()
     expect(savePeakPeriod).toHaveBeenCalledWith({
       peakPeriodId: 'PP1', periodName: 'Black Friday sale', fromDate: '2026-11-24', thruDate: '2026-12-01',
-      peakHoursStart: '07:30', peakHoursEnd: '22:00', isActive: true,
+      peakHoursStart: '07:30', peakHoursEnd: '22:00', hotwaxReadSharePct: null, netsuiteSerial: false, isActive: true,
     })
     // The runs that wait depend on the hours, so the page reads the period again.
     expect(getPeakPeriod).toHaveBeenCalledTimes(2)
@@ -333,7 +339,7 @@ describe('TenantPeakPeriodPage', () => {
     await flushPromises()
 
     expect(savePeakPeriod).toHaveBeenCalledWith({
-      periodName: 'New peak period', fromDate: '2026-11-24', thruDate: '2026-12-01', peakHoursStart: '', peakHoursEnd: '', isActive: true,
+      periodName: 'New peak period', fromDate: '2026-11-24', thruDate: '2026-12-01', peakHoursStart: '', peakHoursEnd: '', hotwaxReadSharePct: null, netsuiteSerial: false, isActive: true,
     })
     expect(replace).toHaveBeenCalledWith({ name: 'settings-tenant-peak-period', params: { peakPeriodId: 'PP9' } })
     expect(getPeakPeriod).toHaveBeenCalledWith({ peakPeriodId: 'PP9' })
@@ -354,6 +360,83 @@ describe('TenantPeakPeriodPage', () => {
     expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-peak-periods' })
   })
 
+  it('shows the saved HotWax share and NetSuite setting', async () => {
+    getPeakPeriod.mockResolvedValue(got({ peakPeriod: period({ hotwaxReadSharePct: 25, netsuiteSerial: 'Y' }) }))
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="peak-fact-hotwax"] .static-fact__value').text()).toBe('25%')
+    expect(wrapper.find('[data-testid="peak-fact-netsuite"] .static-fact__value').text()).toBe('One at a time')
+  })
+
+  it('sets the HotWax share in a popup; Save sends it as a whole number', async () => {
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="peak-fact-hotwax"]').trigger('click')
+    expect(wrapper.text()).toContain('How much of the HotWax read budget can Darpan use?')
+    await wrapper.find('[data-testid="peak-hotwax-select"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="app-select-option"]').map((option) => option.text()))
+      .toEqual(['Normal', '10%', '25%', '50%', '75%'])
+    await wrapper.find('[data-testid="app-select-option"][data-option-value="25"]').trigger('click')
+    await wrapper.find('[data-testid="peak-hotwax-save"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(text(wrapper, 'peak-fact-hotwax')).toContain('25%')
+    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(true)
+    expect(savePeakPeriod).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    await flushPromises()
+    expect(savePeakPeriod).toHaveBeenCalledWith(expect.objectContaining({ hotwaxReadSharePct: 25, netsuiteSerial: false }))
+  })
+
+  it('Normal sends a null HotWax share', async () => {
+    getPeakPeriod.mockResolvedValue(got({ peakPeriod: period({ hotwaxReadSharePct: 50 }) }))
+    const wrapper = await mountPage()
+    expect(text(wrapper, 'peak-fact-hotwax')).toContain('50%')
+    await wrapper.find('[data-testid="peak-fact-hotwax"]').trigger('click')
+    await choose(wrapper, 'peak-hotwax-select', 'normal')
+    await wrapper.find('[data-testid="peak-hotwax-save"]').trigger('click')
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    await flushPromises()
+    expect(savePeakPeriod).toHaveBeenCalledWith(expect.objectContaining({ hotwaxReadSharePct: null }))
+  })
+
+  it('sets NetSuite reads to one at a time in a popup; Save sends netsuiteSerial true', async () => {
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="peak-fact-netsuite"]').trigger('click')
+    expect(wrapper.text()).toContain('How many NetSuite requests at once?')
+    await wrapper.find('[data-testid="peak-netsuite-select"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="app-select-option"]').map((option) => option.text()))
+      .toEqual(['Parallel', 'One at a time'])
+    await wrapper.find('[data-testid="app-select-option"][data-option-value="serial"]').trigger('click')
+    await wrapper.find('[data-testid="peak-netsuite-save"]').trigger('click')
+    expect(text(wrapper, 'peak-fact-netsuite')).toContain('One at a time')
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    await flushPromises()
+    expect(savePeakPeriod).toHaveBeenCalledWith(expect.objectContaining({ netsuiteSerial: true }))
+  })
+
+  it('Parallel sends netsuiteSerial false', async () => {
+    getPeakPeriod.mockResolvedValue(got({ peakPeriod: period({ netsuiteSerial: 'Y' }) }))
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="peak-fact-netsuite"]').trigger('click')
+    await choose(wrapper, 'peak-netsuite-select', 'parallel')
+    await wrapper.find('[data-testid="peak-netsuite-save"]').trigger('click')
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    await flushPromises()
+    expect(savePeakPeriod).toHaveBeenCalledWith(expect.objectContaining({ netsuiteSerial: false }))
+  })
+
+  it('shows the server share error verbatim', async () => {
+    savePeakPeriod.mockResolvedValueOnce({
+      ok: false, messages: [], errors: ['HotWax share must be a whole number from 1 to 100.'], peakPeriodId: null,
+    })
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="peak-fact-hotwax"]').trigger('click')
+    await choose(wrapper, 'peak-hotwax-select', '10')
+    await wrapper.find('[data-testid="peak-hotwax-save"]').trigger('click')
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    await flushPromises()
+    expect(text(wrapper, 'peak-page-error')).toBe('HotWax share must be a whole number from 1 to 100.')
+  })
+
   it('reads only, without edit rights', async () => {
     permissions.canEditTenantSettings = false
     const wrapper = await mountPage()
@@ -362,6 +445,8 @@ describe('TenantPeakPeriodPage', () => {
     expect(wrapper.find('[data-testid="peak-delete"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="peak-fact-dates"]').element.tagName).toBe('DIV')
     expect(wrapper.find('[data-testid="peak-fact-hours"]').element.tagName).toBe('DIV')
+    expect(wrapper.find('[data-testid="peak-fact-hotwax"]').element.tagName).toBe('DIV')
+    expect(wrapper.find('[data-testid="peak-fact-netsuite"]').element.tagName).toBe('DIV')
     expect(wrapper.find('[data-testid="peak-run-time"]').element.tagName).toBe('DIV')
     expect(wrapper.find('[data-testid="peak-on"]').attributes('disabled')).toBeDefined()
     expect(wrapper.find('[data-testid="peak-back"]').attributes('data-to')).toBe(JSON.stringify({ name: 'settings-tenant-peak-periods' }))

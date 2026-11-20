@@ -7981,6 +7981,8 @@ export interface components {
             thruDate?: string;
             peakHoursStart?: string;
             peakHoursEnd?: string;
+            hotwaxReadSharePct?: number;
+            netsuiteSerial?: boolean;
             isActive?: boolean;
         };
         SavePeakPeriodResult: {

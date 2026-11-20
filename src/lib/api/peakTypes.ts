@@ -77,6 +77,9 @@ export interface SavePeakPeriodPayload {
   thruDate?: string
   peakHoursStart?: string
   peakHoursEnd?: string
+  /** 1 to 100; null (Normal) clears it. */
+  hotwaxReadSharePct?: number | null
+  netsuiteSerial?: boolean
   isActive?: boolean
 }
 
