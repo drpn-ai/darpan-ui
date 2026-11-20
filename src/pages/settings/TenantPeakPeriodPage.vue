@@ -37,7 +37,7 @@
               aria-label="Move another run"
               title="Move another run"
               data-testid="peak-run-time-add"
-              :disabled="!draft.peakPeriodId || busy"
+              :disabled="!draft.peakPeriodId || busy || datesDirty"
               @click="openRunTime(null)"
             >
               <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -423,9 +423,14 @@ function daysBetween(fromDate: string, thruDate: string): string[] {
   return days
 }
 
+/** The dates were changed and not saved yet: the server still checks a run time against the saved ones. */
+const datesDirty = computed(() => Boolean(draft.value && saved.value)
+  && (draft.value?.fromDate !== saved.value?.fromDate || draft.value?.thruDate !== saved.value?.thruDate))
+
+// The saved dates, which the server checks a run time's date against; never the unsaved ones in the draft.
 const dayOptions = computed(() => {
-  const current = draft.value
-  const days = current?.fromDate && current.thruDate ? daysBetween(current.fromDate, current.thruDate) : []
+  const period = saved.value
+  const days = period?.fromDate && period.thruDate ? daysBetween(period.fromDate, period.thruDate) : []
   const chosen = runForm.value.onDate
   if (chosen !== EVERY_DAY && !days.includes(chosen)) days.push(chosen)
   return [{ value: EVERY_DAY, label: 'Every day' }, ...days.map((day) => ({ value: day, label: peakDay(day) }))]

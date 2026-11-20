@@ -222,6 +222,24 @@ describe('TenantPeakPeriodPage', () => {
     expect(rows[1]!.text()).not.toContain('Outside the dates')
   })
 
+  it('offers run-time dates from the saved period, and waits on the plus while the dates are unsaved', async () => {
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="peak-fact-dates"]').trigger('click')
+    await wrapper.find('[data-testid="peak-dates-day-2026-11-25"]').trigger('click')
+    await wrapper.find('[data-testid="peak-dates-day-2026-11-27"]').trigger('click')
+    await wrapper.find('[data-testid="peak-dates-save"]').trigger('click')
+
+    const plus = wrapper.find('[data-testid="peak-run-time-add"]')
+    expect(plus.attributes('disabled')).toBeDefined()
+    expect(plus.attributes('aria-label')).toBe('Move another run')
+
+    await wrapper.findAll('[data-testid="peak-run-time"]')[0]!.trigger('click')
+    await wrapper.find('[data-testid="peak-run-time-on"]').trigger('click')
+    expect(optionValues(wrapper)).toEqual([
+      'every', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29', '2026-11-30', '2026-12-01',
+    ])
+  })
+
   it('flipping the switch marks the page edited and Save keeps it off', async () => {
     const wrapper = await mountPage()
     await wrapper.find('[data-testid="peak-on"]').trigger('click')
