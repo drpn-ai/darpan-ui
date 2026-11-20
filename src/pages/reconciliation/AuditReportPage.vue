@@ -708,7 +708,8 @@ onMounted(() => {
   const state = window.history.state as Record<string, unknown> | null
   if (!state?.startedAudit) return
   window.history.replaceState({ ...state, startedAudit: false }, '')
-  say('Running. Findings arrive as each check finishes.')
+  // DAR-BE-328: play inside peak hours says so in this one pill, in place of the running line.
+  say(typeof state.peakNotice === 'string' && state.peakNotice ? state.peakNotice : 'Running. Findings arrive as each check finishes.')
   watchPlayUntil = Date.now() + PLAY_WATCH_MS
   scheduleProgress()
 })

@@ -1212,6 +1212,17 @@ describe('AuditReportPage', () => {
     document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
   })
 
+  it('says the peak-hours note instead when play started inside peak hours', async () => {
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail.message)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    window.history.replaceState({ startedAudit: true, peakNotice: 'Peak hours until 23:00.' }, '')
+    mount(AuditReportPage)
+    await flushPromises()
+    expect(heard).toEqual(['Peak hours until 23:00.'])
+    document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+  })
+
   it('says so in words when the audit does not exist', async () => {
     f.getAuditReport.mockResolvedValue({ ok: false, errors: ['Audit month-close was not found'] } as never)
     const w = mount(AuditReportPage)

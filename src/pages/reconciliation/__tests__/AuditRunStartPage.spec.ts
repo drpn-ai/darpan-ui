@@ -11,6 +11,7 @@ vi.mock('../../../lib/api/facade', () => ({ auditFacade: { runAudit: vi.fn(), ge
 
 import { auditFacade } from '../../../lib/api/facade'
 import AuditRunStartPage from '../AuditRunStartPage.vue'
+import { setDefaultDisplayTimeZone } from '../../../lib/utils/date'
 
 const f = vi.mocked(auditFacade)
 const back = { name: 'audit-report', params: { audit: 'month-close' }, query: { period: '2026-09' } }
@@ -77,6 +78,19 @@ describe('AuditRunStartPage', () => {
     await submit(w)
     expect(f.runAudit).toHaveBeenCalledWith({ audit: 'month-close', fromDate: '2026-08-16', thruDate: '2026-08-16' })
     expect(replace).toHaveBeenCalledWith({ ...back, state: { startedAudit: true } })
+  })
+
+  // DAR-BE-328. Inside peak hours the run still starts; the audit says until when, in place of its own "Running" line.
+  it('carries the peak-hours note to the audit when play starts inside peak hours', async () => {
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: null, peakHoursUntil: '2026-08-18T06:00:00Z' } } as never)
+    const w = mount(AuditRunStartPage)
+    await flushPromises()
+    await pick(w, 'previous-day')
+    await submit(w)
+    expect(f.runAudit).toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledWith({ ...back, state: { startedAudit: true, peakNotice: 'Peak hours until 23:00.' } })
+    setDefaultDisplayTimeZone(undefined)
   })
 
   it('runs on Enter after a letter picked the card, as the page says', async () => {

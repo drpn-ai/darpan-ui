@@ -779,6 +779,10 @@ export interface AutomationRecord {
   timezone?: string
   nextScheduledFireTime?: ApiTimestamp
   lastScheduledFireTime?: ApiTimestamp
+  /** DAR-BE-328. Where the next run really starts (a peak-period move or hold); the period behind it; and when peak hours end, only while now is inside them. */
+  effectiveNextStart?: ApiTimestamp
+  peakPeriodName?: string
+  peakHoursUntil?: ApiTimestamp
   relativeWindowTypeEnumId?: string
   relativeWindowLabel?: string
   relativeWindowCount?: number

@@ -335,6 +335,8 @@ export interface AuditSettings {
   audit: { id: string; name: string; period: string | null }
   /** The earliest day a play can record today, YYYY-MM-DD. */
   playableFrom?: string | null
+  /** DAR-BE-328. When peak hours end, an ISO instant; present only while now is inside them. */
+  peakHoursUntil?: string | null
   schedule: AuditSchedule
   /** Absent from a backend before DAR-BE-207; the page then shows no email section. */
   runEmail?: RunEmailSettings | null

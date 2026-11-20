@@ -108,6 +108,7 @@
                 v-explain="{ term: 'timestamp', detail: describeTimeZone(nextRunTime) }"
               >
                 {{ formatTenantDateTime(nextRunTime) }}
+                <span v-if="nextRunMovedFor" class="automation-dashboard-detail-sub" data-testid="automation-next-run-sub">moved for {{ nextRunMovedFor }}</span>
               </dd>
             </div>
           </dl>
@@ -248,7 +249,8 @@ import { useListPagination } from '../../lib/listPagination'
 import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
-import { describeTimeZone as describeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
+import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
+import { describeTimeZone as describeZone, formatClockTime, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
 
@@ -329,9 +331,15 @@ const previousRunTime = computed(() => (
 // from the schedule expression alone, so the backend keeps reporting the next matching instant
 // while paused; printing it verbatim promises a run that will not happen, directly under a chip
 // that says Paused. Falls back to the same "-" Previous Run shows when there is nothing to state.
+// DAR-BE-328: the start the scheduler will really use (a peak-period move or hold), the stored fire when none applies.
 const nextRunTime = computed(() => (
-  automation.value?.active === false ? undefined : automation.value?.nextScheduledFireTime
+  automation.value?.active === false ? undefined : automation.value?.effectiveNextStart ?? automation.value?.nextScheduledFireTime
 ))
+const nextRunMovedFor = computed(() => {
+  const row = automation.value
+  if (!row || row.active === false || !row.peakPeriodName || row.effectiveNextStart == null || row.nextScheduledFireTime == null) return ''
+  return new Date(row.effectiveNextStart).getTime() === new Date(row.nextScheduledFireTime).getTime() ? '' : row.peakPeriodName
+})
 const savedRunRoute = computed<RouteLocationRaw | null>(() => {
   if (automation.value?.savedRun) return buildSavedRunEditorRoute(automation.value.savedRun)
 
@@ -767,6 +775,13 @@ async function load(): Promise<void> {
 
 async function runNow(): Promise<void> {
   if (!automation.value || !canRunAutomation.value || actionInFlight.value) return
+  // DAR-BE-328: peak hours do not stop a person's play; the run starts, and the pill says until when they last.
+  const peakUntil = formatClockTime(automation.value.peakHoursUntil)
+  if (peakUntil) {
+    document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, {
+      detail: { message: `Peak hours until ${peakUntil}.`, durationMs: 5000 },
+    }))
+  }
   actionInFlight.value = true
   runNowInFlight.value = true
   actionError.value = null
@@ -966,6 +981,13 @@ onMounted(() => {
 
 .automation-dashboard-detail-item--date dd {
   white-space: nowrap;
+}
+
+/* DAR-BE-328. The period behind a moved next run, under the time. */
+.automation-dashboard-detail-sub {
+  display: block;
+  font-size: var(--type-note-size);
+  color: var(--text-muted);
 }
 
 @media (max-width: 960px) {

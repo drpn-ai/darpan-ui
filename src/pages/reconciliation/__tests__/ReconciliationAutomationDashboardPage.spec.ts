@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
 import { setDefaultDisplayTimeZone } from '../../../lib/utils/date'
+import { WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
 
 const route = vi.hoisted(() => ({
   params: { automationId: 'AUT_ACTIVE_API' } as Record<string, string>,
@@ -795,6 +796,63 @@ describe('ReconciliationAutomationDashboardPage', () => {
 
     resolveToggle({ ok: true, messages: [], errors: [], automation: mockAutomation(false) })
     await flushPromises()
+  })
+
+  // DAR-BE-328. The next run shows where it will really start; the sub names the period behind a move.
+  it('shows the peak-moved next run with the period behind it, and the stored one when nothing moved it', async () => {
+    getAutomation.mockResolvedValueOnce({
+      ok: true, messages: [], errors: [],
+      automation: { ...mockAutomation(), effectiveNextStart: '2026-05-02T13:00:00Z', peakPeriodName: 'Black Friday sale' },
+    })
+    const moved = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+    expect(moved.get('[data-testid="automation-next-run"]').text()).toContain('May 2, 2026, 6:00 AM')
+    expect(moved.get('[data-testid="automation-next-run-sub"]').text()).toBe('moved for Black Friday sale')
+
+    getAutomation.mockResolvedValueOnce({
+      ok: true, messages: [], errors: [],
+      automation: { ...mockAutomation(), effectiveNextStart: mockAutomation().nextScheduledFireTime },
+    })
+    const same = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+    expect(same.get('[data-testid="automation-next-run"]').text()).toBe('May 2, 2026, 9:49 AM')
+    expect(same.find('[data-testid="automation-next-run-sub"]').exists()).toBe(false)
+  })
+
+  it('notes peak hours when play is pressed inside them, and still starts the run', async () => {
+    const heard: Array<{ message: string }> = []
+    const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    try {
+      getAutomation.mockResolvedValue({
+        ok: true, messages: [], errors: [],
+        automation: { ...mockAutomation(), peakHoursUntil: '2026-05-02T06:00:00Z' },
+      })
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+      await flushPromises()
+      expect(heard.map((hint) => hint.message)).toEqual(['Peak hours until 23:00.'])
+      expect(runAutomationNow).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
+    } finally {
+      document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    }
+  })
+
+  it('says nothing about peak hours when play is pressed outside them', async () => {
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail.message)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    try {
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+      await flushPromises()
+      expect(heard).toEqual([])
+      expect(runAutomationNow).toHaveBeenCalled()
+    } finally {
+      document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    }
   })
 
   /**

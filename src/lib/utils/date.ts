@@ -78,6 +78,13 @@ export interface FormatDateTimeOptions {
   timeZone?: string
 }
 
+/** DAR-BE-328. The 24-hour clock time (HH:mm) of a timestamp in the display zone; empty when it is not a time. */
+export function formatClockTime(value: unknown): string {
+  const parsed = typeof value === 'string' || typeof value === 'number' ? new Date(value) : value instanceof Date ? value : null
+  if (!parsed || Number.isNaN(parsed.getTime())) return ''
+  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: defaultDisplayTimeZone }).format(parsed)
+}
+
 export function formatDateTime(value: unknown, options: FormatDateTimeOptions = {}): string {
   const fallback = options.fallback ?? '-'
   let parsedDate: Date

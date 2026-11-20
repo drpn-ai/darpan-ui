@@ -43,7 +43,7 @@ import {
   runWindowPresetOptions,
   type RunWindowPreset,
 } from '../../lib/runWindow'
-import { addDays, formatDateInputValue, parseDateInput, todayInDisplayTimeZone } from '../../lib/utils/date'
+import { addDays, formatClockTime, formatDateInputValue, parseDateInput, todayInDisplayTimeZone } from '../../lib/utils/date'
 
 // DAR-UI-063. An audit's play, asked as a lifecycle's play asks it (RunFlowchartStartPage): which days, with the run
 // cards and calendar. Every check of the audit then runs over them in the background, recording its findings as the
@@ -60,6 +60,8 @@ const today = todayInDisplayTimeZone()
 // The earliest day a play can record (the first day of the period just ended, or go-live when later; DAR-BE-178), from
 // the audit's settings: nothing before it is offered, so a run is never refused for days the ledger would not take.
 const playableFrom = ref<Date | null>(null)
+// DAR-BE-328: when peak hours end, while now is inside them. Play still starts; the audit says until when.
+const peakHoursUntil = ref<string | null>(null)
 const calendar = useCalendarWidget({ lastPickableDate: () => today, firstPickableDate: () => playableFrom.value })
 const options = computed(() => runWindowPresetOptions(today).filter((option) =>
   option.value === 'custom' || !playableFrom.value || presetWindowRange(option.value, today).startDate >= playableFrom.value))
@@ -111,7 +113,8 @@ async function start() {
       thruDate: formatDateInputValue(addDays(window.endExclusiveDate, -1)),
     })
     // Replace, so Back from the audit does not land on a workflow that already ran.
-    await router.replace({ ...auditRoute.value, state: { startedAudit: true } })
+    const peakUntil = formatClockTime(peakHoursUntil.value)
+    await router.replace({ ...auditRoute.value, state: { startedAudit: true, ...(peakUntil ? { peakNotice: `Peak hours until ${peakUntil}.` } : {}) } })
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : String(caught)
     starting.value = false
@@ -148,8 +151,9 @@ function handleShortcutKeydown(event: KeyboardEvent) {
 onMounted(async () => {
   window.addEventListener('keydown', handleShortcutKeydown)
   try {
-    const playable = (await auditFacade.getAuditSettings({ audit: auditCode.value })).settings?.playableFrom
-    playableFrom.value = playable ? parseDateInput(playable) : null
+    const settings = (await auditFacade.getAuditSettings({ audit: auditCode.value })).settings
+    playableFrom.value = settings?.playableFrom ? parseDateInput(settings.playableFrom) : null
+    peakHoursUntil.value = settings?.peakHoursUntil ?? null
   } catch {
     // The run itself still refuses days it cannot record, in place.
   }

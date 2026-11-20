@@ -4161,7 +4161,7 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /**
-             * @description {audit: {id, name, period}, playableFrom: YYYY-MM-DD (the earliest
+             * @description {audit: {id, name, period}, peakHoursUntil: ISO instant (only while now is inside the tenant's peak hours; DAR-BE-328), playableFrom: YYYY-MM-DD (the earliest
              *                     day play can record today), schedule: {active, time HH:mm,
              *                     timeZone, mixed (some check's automation is off the audit's schedule; saving puts it on), automations,
              *                     checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label, savedRunId, runName}]}],
@@ -4388,7 +4388,7 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /**
-             * @description {audit: {id, name, period}, playableFrom: YYYY-MM-DD (the earliest
+             * @description {audit: {id, name, period}, peakHoursUntil: ISO instant (only while now is inside the tenant's peak hours; DAR-BE-328), playableFrom: YYYY-MM-DD (the earliest
              *                     day play can record today), schedule: {active, time HH:mm,
              *                     timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label,
              *                     savedRunId, runName}]}], runEmail: {active, alsoSendTo, members, admins, chatSpaceId, canEdit}}
@@ -9140,6 +9140,12 @@ export interface components {
                 nextScheduledFireTime?: string | number;
                 /** @description Timestamp — ISO-8601 string or epoch milliseconds */
                 lastScheduledFireTime?: string | number;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds. DAR-BE-328: when the next run really starts (a peak-period move or hold); equals nextScheduledFireTime when none applies. */
+                effectiveNextStart?: string | number;
+                /** @description The peak period behind a differing effectiveNextStart. */
+                peakPeriodName?: string;
+                /** @description Timestamp — ISO-8601 string or epoch milliseconds. Set only while now is inside peak hours: when they end. */
+                peakHoursUntil?: string | number;
                 relativeWindowTypeEnumId?: string;
                 relativeWindowLabel?: string;
                 relativeWindowCount?: number;
