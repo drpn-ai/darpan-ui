@@ -68,6 +68,7 @@
         :alerting="bursting"
         :alerted="mascot.hasWarnings"
         :tenant-label="tenantLabel"
+        :held="dragging"
       />
     </button>
 

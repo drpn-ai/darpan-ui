@@ -889,7 +889,7 @@ function statementText(id: string): string {
   border-radius: var(--radius-lg);
   background: var(--surface);
   overflow: hidden;
-  transition: grid-template-columns 160ms ease;
+  transition: grid-template-columns var(--motion-base) var(--ease-in-out);
 }
 
 .audit-columns--rail .audit-columns-grid {
@@ -1071,7 +1071,7 @@ function statementText(id: string): string {
 
 .audit-group-chevron {
   transform: rotate(90deg);
-  transition: transform 160ms ease;
+  transition: transform var(--motion-base) var(--ease-in-out);
 }
 
 .audit-group-toggle[aria-expanded='false'] .audit-group-chevron {

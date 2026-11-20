@@ -1725,7 +1725,16 @@ onBeforeUnmount(() => {
   text-align: left;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 140ms ease, visibility 140ms ease;
+  /* Scales from the corner nearest its term. Both placements share it: below the card the term
+     sits above the plate's top-left, and on the side shelf (top: 0) the term is level with the
+     plate's top-left edge. Visibility rides the same duration so a hidden plate stops taking focus
+     and clicks once the fade ends, not before. */
+  transform: scale(var(--motion-enter-scale));
+  transform-origin: left top;
+  transition:
+    opacity var(--motion-exit) var(--ease-out),
+    transform var(--motion-exit) var(--ease-out),
+    visibility var(--motion-exit);
 }
 
 /* 1200px, not 1100: the shelf needs (board/2 - popover/2) clear on the right, and below this the
@@ -1750,6 +1759,11 @@ onBeforeUnmount(() => {
 .ruleset-term:focus-visible + .ruleset-term-definition {
   opacity: 1;
   visibility: visible;
+  transform: scale(1);
+  transition:
+    opacity var(--motion-base) var(--ease-out),
+    transform var(--motion-base) var(--ease-out),
+    visibility var(--motion-base);
 }
 
 /* The column header is a system NAME, not a label — "Shopify", "HotWax", "NetSuite". Uppercasing

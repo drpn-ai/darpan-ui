@@ -1482,7 +1482,7 @@ watch([savedRunId, outputFileName], () => {
   width: 1.15rem;
   height: 1.15rem;
   flex: 0 0 auto;
-  transition: transform 160ms ease;
+  transition: transform var(--motion-base) var(--ease-in-out);
 }
 
 .run-result-rule-selector__toggle-icon--collapsed {
@@ -1657,7 +1657,7 @@ watch([savedRunId, outputFileName], () => {
   height: 0.9rem;
   color: var(--text-soft);
   transform: rotate(-90deg);
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-base) var(--ease-in-out);
 }
 
 .run-result-step-timeline__toggle-icon--collapsed {

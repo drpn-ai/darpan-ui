@@ -187,6 +187,17 @@
   --notice-lane-height: calc(var(--notice-lane-top) + var(--notice-pill-max-height) + var(--space-2));
   --popup-background-blur: 3px;
   --popup-background-opacity: 0.5;
+  /* Motion (DAR-UI-134). Motion confirms, it never decorates: border, background, opacity, and
+     scale/blur within 3%. Entrances ease out; on-screen moves ease in-out; exits run ~20% shorter
+     than their entrance. Rule: docs/ui/page-surface-playbook.md (Motion). */
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-exit: 130ms;
+  --motion-press: 100ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --motion-enter-scale: 0.97;
+  --motion-press-scale: 0.97;
 }
 
 :root[data-theme='light'] {
@@ -405,8 +416,9 @@ button:disabled {
   display: grid;
   gap: var(--space-3);
   /* The reserve opens and closes with the notice, so move it rather than snapping the page down.
-     The global prefers-reduced-motion rule already collapses this duration. */
-  transition: padding-top 160ms ease;
+     An on-screen move, so it eases in-out. The global prefers-reduced-motion rule already
+     collapses this duration. */
+  transition: padding-top var(--motion-base) var(--ease-in-out);
 }
 
 .app-shell--workflow {
@@ -1003,7 +1015,7 @@ button:disabled {
   background: var(--surface);
   padding: var(--space-5);
   box-shadow: var(--shadow);
-  animation: fade-up 320ms ease;
+  animation: fade-up var(--motion-base) var(--ease-out);
 }
 
 /* DAR-UI-084: "Forgot password?" reads as a quiet text link under the step, so its Next stays the one
@@ -1620,6 +1632,16 @@ label > span {
 .app-icon-action--large {
   width: 2.8rem;
   min-height: 2.8rem;
+  /* Press feedback (playbook: Motion). Restates the global button border/background tween,
+     because a transition shorthand replaces the whole list rather than adding to it. */
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform var(--motion-press) var(--ease-out);
+}
+
+.app-icon-action--large:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
 }
 
 .app-icon-action--large svg {
@@ -2034,10 +2056,35 @@ label > span {
 
      The bubble moves rather than the mascot: the character's position in the corner is
      already settled, and nudging it to suit its own speech bubble is the wrong way round. */
-  transform: translateY(calc(var(--floating-mascot-size) * 7.25 / 76));
+  --mascot-say-offset: translateY(calc(var(--floating-mascot-size) * 7.25 / 76));
+  transform: var(--mascot-say-offset);
+  /* Grows out of the side that faces her: she sits to the bubble's right in the corner, and the
+     bubble is centred on her face, so the origin is the right edge's middle. Flipped below. */
+  transform-origin: right center;
+  /* The entrance is a keyframe because the bubble mounts with v-if, so there is no prior
+     state for a transition to start from. */
+  animation: mascot-say-in var(--motion-base) var(--ease-out);
   /* The release is visible for its full half second so it stays cancellable —
-     drift back onto the value, or onto the bubble, and it returns. */
+     drift back onto the value, or onto the bubble, and it returns. 500ms is RELEASE_MS in
+     composables/useMascotDwell.ts; the two move together, which is why this is not
+     --motion-exit — a shorter fade would leave an invisible bubble still catching the pointer. */
   transition: opacity 500ms linear;
+}
+
+/* On the left half she is to the bubble's left, so it grows from that side instead. */
+.mascot-dock--flipped .mascot-say {
+  transform-origin: left center;
+}
+
+@keyframes mascot-say-in {
+  from {
+    opacity: 0;
+    transform: var(--mascot-say-offset) scale(var(--motion-enter-scale));
+  }
+  to {
+    opacity: 1;
+    transform: var(--mascot-say-offset) scale(1);
+  }
 }
 
 .mascot-say--going {
@@ -2202,11 +2249,11 @@ label > span {
 @keyframes fade-up {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(8px) scale(var(--motion-enter-scale));
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 

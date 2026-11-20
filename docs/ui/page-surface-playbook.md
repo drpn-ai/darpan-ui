@@ -39,6 +39,20 @@ Use this file as the shared contract reference before migrating or creating sett
 - **Edit buttons are icons, everywhere.** A control that edits, changes or renames something is the pencil `app-icon-action` (`editIconPath`), never a text button reading "Edit", "Change", "Rename", "Change rules →" and the like. Its accessible name (`aria-label`, `title`) carries the words ("Change timezone", "Edit rules"). Where the same control adds when nothing exists, it is the plus icon (`plusIconPath`) with an "Add …" name. A fact cell or row that opens its own popup needs no edit control at all: the cell is the button (`StaticFactStrip`). Submit labels inside a workflow step ("Change" on a password step) are not edit buttons. `src/__tests__/editButtonsAreIcons.spec.ts` fails on a text edit button.
 - Every settings or record page opens with `StaticRecordTitle` (the name, caret-only in place, optional bare toggle) and `StaticFactStrip`.
 
+## Motion
+
+Motion confirms, it never decorates. It may carry border, background, opacity, and scale or blur within 3% (`--motion-enter-scale`, `--motion-press-scale`, never below 0.97). Use the tokens in `src/style.css` (`--motion-*`, `--ease-*`), not literal durations or easings.
+
+- **Entrances** ease out (`--ease-out`, `--motion-base`). Nothing appears from nothing: start at `--motion-enter-scale` with opacity 0.
+- **Exits** run ~20% shorter than their entrance (`--motion-exit`).
+- **On-screen moves** (a reserve opening, a column resizing) ease in-out (`--ease-in-out`).
+- **Popovers and help plates** scale from the side of their trigger (`transform-origin` toward it). Edit popups are modals and stay centred.
+- **Press feedback** is `scale(var(--motion-press-scale))` on `:active` for `app-icon-action--large` only, over `--motion-press`.
+- **Held means no tween.** While something is dragged or held, its transition is `none`; it follows the pointer exactly.
+- **Always instant:** the Cmd+K palette, text-input focus, keyboard-triggered actions, and select menus.
+- **No bounce, stretch, arcs, stagger, or rubber-banding.** The mascot is the one exception, the way `--mascot-rust` is the one hue.
+- `prefers-reduced-motion` collapses all of it (global rule at the end of `src/style.css`).
+
 ## Migration rules
 
 - Split settings pages into static saved-record surfaces and workflow create/edit surfaces when the page is doing both jobs.

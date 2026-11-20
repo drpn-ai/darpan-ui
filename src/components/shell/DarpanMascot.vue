@@ -23,6 +23,7 @@
       'mascot--alerting': alerting,
       'mascot--alerted': alerted,
       'mascot--wearing-bow': bow !== null,
+      'mascot--held': held,
     }]"
     viewBox="-6 -9 76 76"
     focusable="false"
@@ -211,8 +212,10 @@ const props = withDefaults(
     alerted?: boolean
     /** DAR-UI-119. The active tenant's name, worn as a bowtie. Blank or absent: no bow. */
     tenantLabel?: string | null
+    /** DAR-UI-134. Being carried: every state change lands at once instead of tweening. */
+    held?: boolean
   }>(),
-  { detail: 3, listening: false, speaking: false, alerting: false, alerted: false, tenantLabel: null },
+  { detail: 3, listening: false, speaking: false, alerting: false, alerted: false, tenantLabel: null, held: false },
 )
 
 const bow = computed(() => bowtieFor(props.tenantLabel))
@@ -441,6 +444,17 @@ onBeforeUnmount(() => {
    holding something in. */
 .mascot--alerted .mascot-mouth {
   transform: scaleX(0.6);
+}
+
+/* DAR-UI-134. Held means no tween. Picking her up clears the store, so the head tilt, the ears and
+   the mouth would otherwise ease back to rest while she is in the hand, and the glints would lag
+   the pointer carrying her. The hop is an animation, not a transition, and is left alone. */
+.mascot--held,
+.mascot--held .mascot-glint,
+.mascot--held .mascot-ear,
+.mascot--held .mascot-mouth,
+.mascot--held .mascot-brow {
+  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

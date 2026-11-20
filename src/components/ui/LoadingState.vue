@@ -25,7 +25,7 @@ onBeforeUnmount(() => clearInterval(timer))
   align-items: baseline;
   gap: var(--space-1);
 }
-.loading-state__line { animation: fade-up 0.3s ease-out; }
+.loading-state__line { animation: fade-up var(--motion-base) var(--ease-out); }
 .loading-state__dots { display: inline-flex; gap: var(--space-0); }
 .loading-state__dots i {
   width: 0.3em;
