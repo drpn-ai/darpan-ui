@@ -468,6 +468,15 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'what this run tests: filters as each source is read, then rules on every pair, then conclusions naming each row left over.',
     byDirectiveOnly: true,
   },
+  // DAR-BE-328: the Peak periods list and its Tenant Settings row.
+  peakPeriods: {
+    title: 'Peak periods',
+    body: 'busy windows, like a sale, when runs move later or reads ease off so they stay out of the way. Open one to see what it changes.',
+  },
+  peakPeriodsEnded: {
+    title: 'Ended',
+    body: 'peak periods whose last day has passed. Kept for the record; they change nothing now.',
+  },
   configHistory: {
     title: 'Config history',
     body: 'every saved version of this tenant’s setup. Restoring one puts that setup back; runs that already finished keep the results they had.',

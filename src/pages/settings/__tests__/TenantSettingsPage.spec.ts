@@ -12,6 +12,7 @@ const listNsAuthConfigs = vi.hoisted(() => vi.fn())
 const listNsRestletConfigs = vi.hoisted(() => vi.fn())
 const listShopifyAuthConfigs = vi.hoisted(() => vi.fn())
 const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
+const listPeakPeriods = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
 const route = vi.hoisted(() => ({
@@ -43,6 +44,7 @@ vi.mock('vue-router', () => ({
 }))
 
 vi.mock('../../../lib/api/facade', () => ({
+  peakFacade: { listPeakPeriods },
   settingsFacade: {
     getLlmSettings,
     saveLlmSettings,
@@ -142,6 +144,8 @@ describe('TenantSettingsPage', () => {
     listNsRestletConfigs.mockReset()
     listShopifyAuthConfigs.mockReset()
     listOmsRestSourceConfigs.mockReset()
+    listPeakPeriods.mockReset()
+    listPeakPeriods.mockResolvedValue({ ok: true, errors: [], messages: [], peakPeriods: [] })
 
     getLlmSettings.mockImplementation(async (payload?: { llmProvider?: string }) => ({
       ok: true,
@@ -318,7 +322,7 @@ describe('TenantSettingsPage', () => {
     expect(sections.map((section) => section.get('h2').text())).toEqual(['Chat', 'Time', 'Audit', 'AI'])
     for (const section of sections) expect(section.findAll('.tenant-settings-rows')).toHaveLength(1)
     expect(wrapper.findAll('.tenant-settings-row__label').map((label) => label.text())).toEqual([
-      'Notifications', 'Timezone', 'Config history', 'Scripts', 'Provider',
+      'Notifications', 'Timezone', 'Config history', 'Scripts', 'Peak periods', 'Provider',
     ])
   })
 
@@ -337,6 +341,31 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.get('[data-testid="tenant-module-scripts"]').text()).toBe('Open →')
     expect(rowValue(wrapper, 'tenant-module-config-history')).toBe('Versions and restores')
     expect(rowValue(wrapper, 'tenant-module-scripts')).toBe('JEXL used by checks')
+  })
+
+  // DAR-BE-328. The Peak periods row: None + Set up, else the current or next period + Open.
+  it('shows None and Set up when there are no peak periods', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('None')
+    expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').text()).toBe('Set up')
+    await wrapper.get('[data-testid="tenant-module-peak-periods"]').trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-peak-periods' })
+  })
+
+  it('shows the next peak period with its dates and Open', async () => {
+    const year = new Date().getFullYear()
+    listPeakPeriods.mockResolvedValue({ ok: true, errors: [], messages: [], peakPeriods: [
+      { peakPeriodId: '2', periodName: 'Later sale', fromDate: `${year}-12-20`, thruDate: `${year}-12-22`, isActive: 'Y', state: 'upcoming' },
+      { peakPeriodId: '1', periodName: 'Black Friday sale', fromDate: `${year}-11-24`, thruDate: `${year}-12-01`, isActive: 'Y', state: 'upcoming' },
+      { peakPeriodId: '3', periodName: 'Old sale', fromDate: `${year}-01-01`, thruDate: `${year}-01-03`, isActive: 'Y', state: 'ended' },
+    ] })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('Black Friday sale · Nov 24 – Dec 1')
+    expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').text()).toBe('Open →')
   })
 
   // DAR-UI-123. The spaces, streaks among the things that post, moved to Notifications; one row opens it.

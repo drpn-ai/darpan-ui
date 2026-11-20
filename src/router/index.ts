@@ -276,6 +276,25 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Script' },
   },
   {
+    // DAR-BE-328. The active tenant's peak periods: busy windows that move runs out of the way.
+    path: '/settings/tenant/peak-periods',
+    name: 'settings-tenant-peak-periods',
+    component: () => import('../pages/settings/TenantPeakPeriodsPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak periods' },
+  },
+  {
+    path: '/settings/tenant/peak-periods/new',
+    name: 'settings-tenant-peak-period-new',
+    component: () => import('../pages/settings/TenantPeakPeriodPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak period' },
+  },
+  {
+    path: '/settings/tenant/peak-periods/:peakPeriodId',
+    name: 'settings-tenant-peak-period',
+    component: () => import('../pages/settings/TenantPeakPeriodPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak period' },
+  },
+  {
     path: '/settings/ai',
     name: 'settings-ai',
     redirect: { name: 'settings-tenant' },

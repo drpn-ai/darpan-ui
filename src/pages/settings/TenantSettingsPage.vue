@@ -83,6 +83,22 @@
             </button>
           </span>
         </li>
+        <!-- DAR-BE-328. Busy windows that move runs out of the way. -->
+        <li class="tenant-settings-row">
+          <span class="tenant-settings-row__label">Peak periods</span>
+          <span class="tenant-settings-row__value" :class="{ 'tenant-settings-row__dim': !peakPeriods.length }" data-testid="tenant-peak-value">{{ peakValue }}</span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              :aria-label="peakPeriods.length ? 'Open peak periods' : 'Set up peak periods'"
+              data-testid="tenant-module-peak-periods"
+              @click="router.push({ name: 'settings-tenant-peak-periods' })"
+            >
+              <template v-if="peakPeriods.length">Open <span aria-hidden="true">→</span></template>
+              <template v-else>Set up</template>
+            </button>
+          </span>
+        </li>
       </ul>
     </StaticPageSection>
 
@@ -351,7 +367,9 @@ import WorkflowSelect, { type WorkflowSelectOption } from '../../components/work
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
-import { settingsFacade } from '../../lib/api/facade'
+import { peakFacade, settingsFacade } from '../../lib/api/facade'
+import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
+import { peakSettingsValue } from '../../lib/peakPeriodWords'
 import type { LlmSettings, TenantChatSpace, TenantSettings } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -717,6 +735,19 @@ async function loadChatSpaces(): Promise<void> {
   }
 }
 
+const peakPeriods = ref<PeakPeriodSummary[]>([])
+const peakValue = computed(() => peakSettingsValue(peakPeriods.value))
+
+// The row reads "None" until the list arrives; a failed load leaves it so.
+async function loadPeakPeriods(): Promise<void> {
+  try {
+    const response = await peakFacade.listPeakPeriods(pageAbortController.signal)
+    peakPeriods.value = response.peakPeriods ?? []
+  } catch {
+    peakPeriods.value = []
+  }
+}
+
 async function loadAiProvider(llmProvider: LlmProvider): Promise<void> {
   aiWorkflowLoading.value = true
   aiWorkflowError.value = null
@@ -883,6 +914,7 @@ onMounted(() => {
   // in-flight promise (or resolves immediately if hydration already finished).
   void referenceDataStore.ensureLoaded()
   void loadChatSpaces()
+  void loadPeakPeriods()
 })
 </script>
 
