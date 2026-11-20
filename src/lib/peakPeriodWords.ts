@@ -1,6 +1,7 @@
 // DAR-BE-328. Words for a peak period on a list: its dates, when it starts or ends, and the Tenant Settings value.
 // Dates are "YYYY-MM-DD" in the tenant's zone; "today" is the browser's local date, which is close enough for a list.
 import type { PeakPeriodSummary } from './api/peakTypes'
+import { formatClockTime, getDefaultDisplayTimeZone, timeZoneCode } from './utils/date'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -29,15 +30,42 @@ function daysUntil(date: string, today: Date): number {
   return Math.round((Date.UTC(y, m - 1, d) - start) / 86_400_000)
 }
 
-/** The "When" column: On now, Off, Ended, Starts tomorrow, Starts in N days (N <= 30), else Starts MMM d. */
+/** The "When" column: On now, Off, Ended, Starts today, Starts tomorrow, Starts in N days (N <= 30), else Starts MMM d. */
 export function peakWhen(period: PeakPeriodSummary, today: Date = new Date()): string {
   if (period.state === 'on') return 'On now'
   if (period.state === 'off') return 'Off'
   if (period.state === 'ended') return 'Ended'
   const days = daysUntil(period.fromDate, today)
+  // The server says upcoming by the tenant's date; the browser's date can already be the start day, or past it.
+  if (days <= 0) return 'Starts today'
   if (days === 1) return 'Starts tomorrow'
-  if (days >= 0 && days <= 30) return `Starts in ${days} days`
+  if (days <= 30) return `Starts in ${days} days`
   return `Starts ${peakDay(period.fromDate)}`
+}
+
+function usableZone(timeZone: string | undefined): string | undefined {
+  const zone = timeZone?.trim()
+  if (!zone) return undefined
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: zone })
+    return zone
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The note play shows inside peak hours: "Peak hours until 23:00." on the tenant's clock, the one its peak hours are set
+ * in. Without a usable tenant zone, the viewer's clock with its zone code ("23:00 PST"), so the time cannot be read in
+ * the wrong zone. Empty when there is no time.
+ */
+export function peakHoursUntilNotice(until: unknown, tenantTimeZone?: string): string {
+  const zone = usableZone(tenantTimeZone)
+  const clock = formatClockTime(until, zone ?? getDefaultDisplayTimeZone())
+  if (!clock) return ''
+  if (zone) return `Peak hours until ${clock}.`
+  const code = timeZoneCode(until instanceof Date ? until : new Date(until as string | number), getDefaultDisplayTimeZone())
+  return `Peak hours until ${clock}${code ? ` ${code}` : ''}.`
 }
 
 /** The Tenant Settings value: the period on now, else the soonest upcoming one, else "None". */

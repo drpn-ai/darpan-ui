@@ -25,7 +25,7 @@ const authState = vi.hoisted(() => ({
   sessionInfo: {
     userId: 'tenant-user',
     timeZone: 'America/Los_Angeles',
-  },
+  } as { userId: string; timeZone: string; tenantTimeZone?: string },
 }))
 
 vi.mock('vue-router', () => ({
@@ -824,6 +824,9 @@ describe('ReconciliationAutomationDashboardPage', () => {
     const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail)
     document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
     try {
+      // Peak hours are set on the tenant's clock: a viewer in New York still reads the tenant's 23:00.
+      setDefaultDisplayTimeZone('America/New_York')
+      authState.sessionInfo.tenantTimeZone = 'America/Los_Angeles'
       getAutomation.mockResolvedValue({
         ok: true, messages: [], errors: [],
         automation: { ...mockAutomation(), peakHoursUntil: '2026-05-02T06:00:00Z' },
@@ -836,6 +839,29 @@ describe('ReconciliationAutomationDashboardPage', () => {
       expect(runAutomationNow).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
     } finally {
       document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+      delete authState.sessionInfo.tenantTimeZone
+      setDefaultDisplayTimeZone(undefined)
+    }
+  })
+
+  it('names the zone of the peak-hours note when the tenant zone is unknown', async () => {
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail.message)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    try {
+      setDefaultDisplayTimeZone('America/New_York')
+      getAutomation.mockResolvedValue({
+        ok: true, messages: [], errors: [],
+        automation: { ...mockAutomation(), peakHoursUntil: '2026-05-02T06:00:00Z' },
+      })
+      const wrapper = mount(ReconciliationAutomationDashboardPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="automation-run-now-action"]').trigger('click')
+      await flushPromises()
+      expect(heard).toEqual(['Peak hours until 02:00 EDT.'])
+    } finally {
+      document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+      setDefaultDisplayTimeZone(undefined)
     }
   })
 

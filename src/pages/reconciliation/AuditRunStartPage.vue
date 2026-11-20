@@ -43,13 +43,16 @@ import {
   runWindowPresetOptions,
   type RunWindowPreset,
 } from '../../lib/runWindow'
-import { addDays, formatClockTime, formatDateInputValue, parseDateInput, todayInDisplayTimeZone } from '../../lib/utils/date'
+import { addDays, formatDateInputValue, parseDateInput, todayInDisplayTimeZone } from '../../lib/utils/date'
+import { peakHoursUntilNotice } from '../../lib/peakPeriodWords'
+import { useAuthStore } from '../../stores/auth'
 
 // DAR-UI-063. An audit's play, asked as a lifecycle's play asks it (RunFlowchartStartPage): which days, with the run
 // cards and calendar. Every check of the audit then runs over them in the background, recording its findings as the
 // morning run does. The backend takes the days first to last inclusive and refuses any after today.
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const auditCode = computed(() => String(route.params.audit ?? ''))
 const step = ref<'window' | 'custom'>('window')
 const preset = ref<RunWindowPreset | ''>('')
@@ -113,8 +116,8 @@ async function start() {
       thruDate: formatDateInputValue(addDays(window.endExclusiveDate, -1)),
     })
     // Replace, so Back from the audit does not land on a workflow that already ran.
-    const peakUntil = formatClockTime(peakHoursUntil.value)
-    await router.replace({ ...auditRoute.value, state: { startedAudit: true, ...(peakUntil ? { peakNotice: `Peak hours until ${peakUntil}.` } : {}) } })
+    const peakNotice = peakHoursUntilNotice(peakHoursUntil.value, authStore.sessionInfo?.tenantTimeZone)
+    await router.replace({ ...auditRoute.value, state: { startedAudit: true, ...(peakNotice ? { peakNotice } : {}) } })
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : String(caught)
     starting.value = false

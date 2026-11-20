@@ -8,6 +8,8 @@ const { push, replace, route } = vi.hoisted(() => ({
 }))
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push, replace }) }))
 vi.mock('../../../lib/api/facade', () => ({ auditFacade: { runAudit: vi.fn(), getAuditSettings: vi.fn() } }))
+const session = vi.hoisted(() => ({ sessionInfo: { userId: 'U1', tenantTimeZone: 'America/Los_Angeles' as string | undefined } }))
+vi.mock('../../../stores/auth', () => ({ useAuthStore: () => session }))
 
 import { auditFacade } from '../../../lib/api/facade'
 import AuditRunStartPage from '../AuditRunStartPage.vue'
@@ -82,7 +84,8 @@ describe('AuditRunStartPage', () => {
 
   // DAR-BE-328. Inside peak hours the run still starts; the audit says until when, in place of its own "Running" line.
   it('carries the peak-hours note to the audit when play starts inside peak hours', async () => {
-    setDefaultDisplayTimeZone('America/Los_Angeles')
+    // On the tenant's clock, the one its peak hours are set in, though the viewer reads Kolkata time.
+    setDefaultDisplayTimeZone('Asia/Kolkata')
     f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: null, peakHoursUntil: '2026-08-18T06:00:00Z' } } as never)
     const w = mount(AuditRunStartPage)
     await flushPromises()

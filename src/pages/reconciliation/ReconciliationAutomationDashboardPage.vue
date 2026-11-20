@@ -230,6 +230,7 @@ import { reconciliationFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
 import { automationDashboard } from '../../lib/api/queries'
 import type { AutomationExecutionSummary, AutomationRecord } from '../../lib/api/types'
+import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import {
   AUTOMATION_WINDOW_CUSTOM,
@@ -250,7 +251,8 @@ import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
-import { describeTimeZone as describeZone, formatClockTime, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
+import { describeTimeZone as describeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
+import { peakHoursUntilNotice } from '../../lib/peakPeriodWords'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
 
@@ -270,6 +272,7 @@ type AutomationExecutionTableRow = Record<string, unknown> & {
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 const automation = ref<AutomationRecord | null>(null)
@@ -775,11 +778,12 @@ async function load(): Promise<void> {
 
 async function runNow(): Promise<void> {
   if (!automation.value || !canRunAutomation.value || actionInFlight.value) return
-  // DAR-BE-328: peak hours do not stop a person's play; the run starts, and the pill says until when they last.
-  const peakUntil = formatClockTime(automation.value.peakHoursUntil)
-  if (peakUntil) {
+  // DAR-BE-328: peak hours do not stop a person's play; the run starts, and the pill says until when they last, on the
+  // tenant's clock (the one its peak hours are set in).
+  const peakNotice = peakHoursUntilNotice(automation.value.peakHoursUntil, authStore.sessionInfo?.tenantTimeZone)
+  if (peakNotice) {
     document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, {
-      detail: { message: `Peak hours until ${peakUntil}.`, durationMs: 5000 },
+      detail: { message: peakNotice, durationMs: 5000 },
     }))
   }
   actionInFlight.value = true
