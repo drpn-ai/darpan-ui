@@ -357,6 +357,9 @@
                                         "$ref": "#/components/schemas/GetAuditProgressRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/GetAuditReadReportRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/GetAuditReportRequest"
                                     },
                                     {
@@ -580,6 +583,24 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/DeletePeakPeriodRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/DeletePeakPeriodRunTimeRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/GetPeakPeriodRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/ListPeakPeriodsRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/SavePeakPeriodRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/SavePeakPeriodRunTimeRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/ArchiveAutomationRequest"
@@ -925,24 +946,6 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/SaveTenantScriptDeploymentRequest"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/DeletePeakPeriodRequest"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/DeletePeakPeriodRunTimeRequest"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/GetPeakPeriodRequest"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/ListPeakPeriodsRequest"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/SavePeakPeriodRequest"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/SavePeakPeriodRunTimeRequest"
                                     }
                                 ],
                                 "discriminator": {
@@ -1059,6 +1062,7 @@
                                         "facade.AuditFacadeServices.get#AuditFinding": "#/components/schemas/GetAuditFindingRequest",
                                         "facade.AuditFacadeServices.get#AuditFindingsByOrder": "#/components/schemas/GetAuditFindingsByOrderRequest",
                                         "facade.AuditFacadeServices.get#AuditProgress": "#/components/schemas/GetAuditProgressRequest",
+                                        "facade.AuditFacadeServices.get#AuditReadReport": "#/components/schemas/GetAuditReadReportRequest",
                                         "facade.AuditFacadeServices.get#AuditReport": "#/components/schemas/GetAuditReportRequest",
                                         "facade.AuditFacadeServices.get#AuditSettings": "#/components/schemas/GetAuditSettingsRequest",
                                         "facade.AuditFacadeServices.get#Audits": "#/components/schemas/GetAuditsRequest",
@@ -1134,6 +1138,12 @@
                                         "facade.NetSuiteQueryFacadeServices.preview#NsSuiteQlSourceQuery": "#/components/schemas/PreviewNsSuiteQlSourceQueryRequest",
                                         "facade.NetSuiteQueryFacadeServices.run#NsSuiteQlAgentQuery": "#/components/schemas/RunNsSuiteQlAgentQueryRequest",
                                         "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery": "#/components/schemas/SaveNsSuiteQlSourceQueryRequest",
+                                        "facade.PeakPeriodFacadeServices.delete#PeakPeriod": "#/components/schemas/DeletePeakPeriodRequest",
+                                        "facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime": "#/components/schemas/DeletePeakPeriodRunTimeRequest",
+                                        "facade.PeakPeriodFacadeServices.get#PeakPeriod": "#/components/schemas/GetPeakPeriodRequest",
+                                        "facade.PeakPeriodFacadeServices.list#PeakPeriods": "#/components/schemas/ListPeakPeriodsRequest",
+                                        "facade.PeakPeriodFacadeServices.save#PeakPeriod": "#/components/schemas/SavePeakPeriodRequest",
+                                        "facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime": "#/components/schemas/SavePeakPeriodRunTimeRequest",
                                         "facade.ReconciliationFacadeServices.archive#Automation": "#/components/schemas/ArchiveAutomationRequest",
                                         "facade.ReconciliationFacadeServices.archive#SavedRun": "#/components/schemas/ArchiveSavedRunRequest",
                                         "facade.ReconciliationFacadeServices.cancel#ReconciliationRun": "#/components/schemas/CancelReconciliationRunRequest",
@@ -1248,13 +1258,7 @@
                                         "facade.TenantScriptFacadeServices.run#TenantScript": "#/components/schemas/RunTenantScriptRequest",
                                         "facade.TenantScriptFacadeServices.run#TenantScriptDeployment": "#/components/schemas/RunTenantScriptDeploymentRequest",
                                         "facade.TenantScriptFacadeServices.save#TenantScript": "#/components/schemas/SaveTenantScriptRequest",
-                                        "facade.TenantScriptFacadeServices.save#TenantScriptDeployment": "#/components/schemas/SaveTenantScriptDeploymentRequest",
-                                        "facade.PeakPeriodFacadeServices.delete#PeakPeriod": "#/components/schemas/DeletePeakPeriodRequest",
-                                        "facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime": "#/components/schemas/DeletePeakPeriodRunTimeRequest",
-                                        "facade.PeakPeriodFacadeServices.get#PeakPeriod": "#/components/schemas/GetPeakPeriodRequest",
-                                        "facade.PeakPeriodFacadeServices.list#PeakPeriods": "#/components/schemas/ListPeakPeriodsRequest",
-                                        "facade.PeakPeriodFacadeServices.save#PeakPeriod": "#/components/schemas/SavePeakPeriodRequest",
-                                        "facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime": "#/components/schemas/SavePeakPeriodRunTimeRequest"
+                                        "facade.TenantScriptFacadeServices.save#TenantScriptDeployment": "#/components/schemas/SaveTenantScriptDeploymentRequest"
                                     }
                                 }
                             }
@@ -1605,6 +1609,9 @@
                                             "$ref": "#/components/schemas/GetAuditProgressResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/GetAuditReadReportResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/GetAuditReportResponse"
                                         },
                                         {
@@ -1828,6 +1835,24 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/DeletePeakPeriodResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/DeletePeakPeriodRunTimeResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/GetPeakPeriodResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/ListPeakPeriodsResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/SavePeakPeriodResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/SavePeakPeriodRunTimeResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/ArchiveAutomationResponse"
@@ -2173,24 +2198,6 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/SaveTenantScriptDeploymentResponse"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/DeletePeakPeriodResponse"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/DeletePeakPeriodRunTimeResponse"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/GetPeakPeriodResponse"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/ListPeakPeriodsResponse"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/SavePeakPeriodResponse"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/SavePeakPeriodRunTimeResponse"
                                         }
                                     ]
                                 }
@@ -2407,15 +2414,21 @@
                     },
                     "byDay": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "byRoleModel": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "grants": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 }
             },
@@ -2502,7 +2515,9 @@
                 "properties": {
                     "grants": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 }
             },
@@ -2929,7 +2944,9 @@
             },
             "GetAgentConfigParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Everything editable about the agent except its numbers: prompts (promptId, edited, defaultChangedSinceEdit, chars,\n            lastChangedByUserId, lastChangedDate), roles (roleId, modelId, defaultModelId, edited), prices (modelId, the four prices,\n            source DEFAULT, EDITED or ADDED, usedBy), globalDailyUsdCap (effectiveValue, source, min, max; read only), tenantCaps and texts\n            (textId, text, defaultText, tokens, maxChars, edited, defaultChangedSinceEdit)."
             },
             "GetAgentConfigResult": {
@@ -3358,7 +3375,7 @@
                     "roleId",
                     "modelId"
                 ],
-                "description": "Points a role (ROUTER, INVESTIGATOR, AUTHOR, AUTHOR_ESCALATION, EMAIL_SMILE, AUDIT_RUN_WORDS) at a model. Refused:\n            an unknown role, a malformed model id, a model with no price, and none for any role but AUTHOR_ESCALATION. The next turn\n            re-checks the model with the provider."
+                "description": "Points a role (ROUTER, INVESTIGATOR, AUTHOR, AUTHOR_ESCALATION, EMAIL_SMILE, AUDIT_RUN_WORDS, AUDIT_READ_REVIEW) at a model. Refused:\n            an unknown role, a malformed model id, a model with no price, and none for any role but AUTHOR_ESCALATION. The next turn\n            re-checks the model with the provider."
             },
             "UpdateAgentRoleModelResult": {
                 "type": "object",
@@ -3615,7 +3632,9 @@
                 "properties": {
                     "tickets": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 }
             },
@@ -3703,7 +3722,9 @@
             },
             "UpdateBrainChangeTicketResult": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                    
+                }
             },
             "UpdateBrainChangeTicketRequest": {
                 "type": "object",
@@ -3978,7 +3999,9 @@
             },
             "GetAppContentVocabularyParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "What an entry may be bound to: every route with its path and anchors (data-testids), the condition kinds, and\n            the limits the rules enforce."
             },
             "GetAppContentVocabularyResult": {
@@ -3993,7 +4016,9 @@
                     },
                     "conditionKinds": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "limits": {
                         "type": "object"
@@ -4681,7 +4706,9 @@
                 "properties": {
                     "grants": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 }
             },
@@ -4766,7 +4793,9 @@
                 "properties": {
                     "requests": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 }
             },
@@ -5213,7 +5242,9 @@
                     },
                     "subjectVariables": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "The ${variables} the subject may use."
                     },
                     "blocks": {
@@ -5226,7 +5257,9 @@
                     },
                     "branches": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "Sample branches the preview takes, empty when the email has one shape."
                     },
                     "sample": {
@@ -5297,7 +5330,9 @@
             },
             "GetEmailTemplatesParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Every email Darpan sends: id, description, the subject sends use, how many blocks carry a production edit."
             },
             "GetEmailTemplatesResult": {
@@ -5479,7 +5514,9 @@
                     },
                     "blockIds": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "subject": {
                         "type": "boolean"
@@ -5495,7 +5532,9 @@
                 "properties": {
                     "reset": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "What had an edit and went back (block ids, `subject`)."
                     }
                 }
@@ -5584,7 +5623,9 @@
                 "properties": {
                     "updated": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "The block ids saved (and `subject`)."
                     }
                 }
@@ -5754,7 +5795,9 @@
                 "properties": {
                     "entries": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{key, tier, title, source, owner, reviewBy}] soonest first."
                     }
                 }
@@ -5821,7 +5864,9 @@
             },
             "GetKnowledgeIdentifiersParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Every tenant's identifiers the leak check matches (tenant ids, labels, connection hosts, NetSuite\n            accounts), for staff checking a product entry before commit. Names tenants: never ship the list."
             },
             "GetKnowledgeIdentifiersResult": {
@@ -5829,7 +5874,9 @@
                 "properties": {
                     "identifiers": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{value, kind (tenantId | label | host | account),\n                caseSensitive, tenantId}]."
                     }
                 }
@@ -6015,7 +6062,9 @@
                 "properties": {
                     "hits": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{key, tier (product | tenant), title, snippet, source, reviewBy, score}]\n                best first."
                     },
                     "productTier": {
@@ -6196,7 +6245,7 @@
                     },
                     "sendWelcome": {
                         "type": "boolean",
-                        "description": "DAR-BE-290. Queue the tenant welcome\n                email (DARPAN_TENANT_WELCOME) after the grant. Skipped, without failing the grant, when the account\n                has no email address or is disabled."
+                        "description": "DAR-BE-290. Send the tenant welcome\n                email (DARPAN_TENANT_WELCOME) after the grant, with the user's temporary password while one is kept\n                (DAR-BE-325). Skipped, without failing the grant, when the account has no email address or is\n                disabled; a mail server that refuses it never fails the grant either."
                     }
                 },
                 "required": [
@@ -6213,9 +6262,13 @@
                         "type": "boolean",
                         "description": "True when the member was added."
                     },
-                    "welcomeQueued": {
+                    "welcomeSent": {
                         "type": "boolean",
-                        "description": "True when the welcome email was queued."
+                        "description": "True when the mail server accepted the welcome email."
+                    },
+                    "welcomeWithPassword": {
+                        "type": "boolean",
+                        "description": "True when that email carried the temporary password."
                     }
                 }
             },
@@ -6382,18 +6435,22 @@
                     "userId",
                     "tenantUserGroupId"
                 ],
-                "description": "DAR-BE-290. Send the tenant welcome email (DARPAN_TENANT_WELCOME, from the SYSTEM email server) to a\n            current member of a tenant: which tenant, their role, their username and where to sign in. Never a\n            password. add#TenantMember already sends it on a grant; this is the re-send, and the backfill for members\n            granted before it existed. Queued async: ok means queued, not delivered (a failed send is an EmailMessage\n            that never reaches ES_SENT)."
+                "description": "DAR-BE-290. Send the tenant welcome email (DARPAN_TENANT_WELCOME, from the SYSTEM email server) to a\n            current member of a tenant: which tenant, their role, their username, where to sign in, and their temporary\n            password while one is kept (DAR-BE-325). add#TenantMember already sends it on a grant; this is the re-send,\n            and the backfill for members granted before it existed. Waits for the mail server: a refused send is an\n            error, ok means it was accepted (not that it reached the inbox)."
             },
             "SendTenantWelcomeResult": {
                 "type": "object",
                 "properties": {
                     "ok": {
                         "type": "boolean",
-                        "description": "True when the email was queued."
+                        "description": "True when the mail server accepted the email."
                     },
                     "emailAddress": {
                         "type": "string",
                         "description": "Where it was sent."
+                    },
+                    "withPassword": {
+                        "type": "boolean",
+                        "description": "True when it carried the temporary password."
                     }
                 }
             },
@@ -6643,7 +6700,9 @@
             },
             "DryRunPendingMigrationsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Preview what running the pending migrations would do. Writes DRY_RUN ledger rows\n            only; a DRY_RUN row never satisfies the already-applied check."
             },
             "DryRunPendingMigrationsResult": {
@@ -6890,7 +6949,9 @@
             },
             "GetMigrationStatusParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Registry and ledger state for every registered migration on this installation,\n            in sequence order, including the detail of the most recent attempt. Read-only."
             },
             "GetMigrationStatusResult": {
@@ -7120,7 +7181,9 @@
             },
             "RunPendingMigrationsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Run every registered migration on this installation with no SUCCESS ledger row,\n            in sequence order. Idempotent: a second call applies nothing. Sweeps every tenant's data;\n            super admin only."
             },
             "RunPendingMigrationsResult": {
@@ -7317,7 +7380,9 @@
             },
             "GetAdminSessionInfoParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Fence probe + admin-app route guard: returns the operator identity when the caller\n            passes the DARPAN_ADMIN_API artifact fence and the isSuperAdmin() content gate.\n            A non-super-admin caller is denied at the artifact layer before this body runs."
             },
             "GetAdminSessionInfoResult": {
@@ -7406,7 +7471,9 @@
             },
             "GetLiveOperationsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-ADMIN-008. What is running on this instance right now, across every tenant: each\n            in-flight reconciliation, automation and audit run with its stage, progress and health, the\n            automation slots and overdue schedule, failures in the last 24 hours, this JVM's load, and the\n            warnings that follow, critical first.\n\n            Run health compares a run with its own last successful run, because heartbeats tick only inside\n            the extract stages: a long compare with a silent heartbeat is not stuck. System figures describe\n            the one JVM that answered. A source that could not be read is listed in unavailable, never\n            reported as zero. Rules: darpan.admin.LiveOperationsRules."
             },
             "GetLiveOperationsResult": {
@@ -7428,17 +7495,23 @@
                             },
                             "warnings": {
                                 "type": "array",
-                                "items": {},
+                                "items": {
+                                    
+                                },
                                 "description": "severity (critical | warning), code, title, detail, tenantLabel, runResultId,\n                        automationId, since. Critical first, then oldest first."
                             },
                             "running": {
                                 "type": "array",
-                                "items": {},
+                                "items": {
+                                    
+                                },
                                 "description": "One row per RUNNING run result: kind (audit | automation | run), name, tenant,\n                        currentStage, progressPercent, startedDate, elapsedMs, usualDurationMs, health\n                        (healthy | slow | stuck), healthReason."
                             },
                             "overdue": {
                                 "type": "array",
-                                "items": {},
+                                "items": {
+                                    
+                                },
                                 "description": "Active automations past their fire time by more than one scan tick and not\n                        still running, latest first."
                             },
                             "slots": {
@@ -7455,7 +7528,9 @@
                             },
                             "unavailable": {
                                 "type": "array",
-                                "items": {},
+                                "items": {
+                                    
+                                },
                                 "description": "source and reason for each source that could not be read."
                             }
                         }
@@ -7627,7 +7702,9 @@
             },
             "GetRetentionPeriodsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "The retention periods in force: per table the instance period (days, blank = keep forever, and where it comes from:\n            ROW, PROPERTY or DEFAULT), every tenant's own period (blank = that tenant keeps the table forever), the nightly purge days,\n            the delete batch size, and whether the retention job is paused. A table with no period and no tenant override is kept forever."
             },
             "GetRetentionPeriodsResult": {
@@ -7850,17 +7927,23 @@
                             },
                             "inFlight": {
                                 "type": "array",
-                                "items": {},
+                                "items": {
+                                    
+                                },
                                 "description": "Executions started but not finished, oldest first."
                             },
                             "fires": {
                                 "type": "array",
-                                "items": {},
+                                "items": {
+                                    
+                                },
                                 "description": "Projected submissions across the horizon, earliest first."
                             },
                             "paused": {
                                 "type": "array",
-                                "items": {},
+                                "items": {
+                                    
+                                },
                                 "description": "Inactive automations \u2014 listed for inventory, never projected."
                             }
                         }
@@ -7929,7 +8012,9 @@
             },
             "GetServiceJobsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Every scheduled job: jobName, description, serviceName, cronExpression, paused (Y/N), defaultCronExpression,\n            defaultPaused, minIntervalMinutes (the smallest gap an edited cron may leave), editable (Darpan's own jobs),\n            edited, editedByUserId, editedDate, nextRuns (the next 3), lastRun {startTime, endTime, hasError} from the newest\n            run, resumeNeedsPreview (resuming it deletes data: update#ServiceJob then needs previewedRows) and parameters\n            [{parameterName, value, defaultValue, edited, type}]. Crons run in the server's time zone (what the job runner uses)."
             },
             "GetServiceJobsResult": {
@@ -8028,7 +8113,9 @@
                     },
                     "nextRuns": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "smallestGapMinutes": {
                         "type": "integer"
@@ -8103,7 +8190,9 @@
                     },
                     "parameterNames": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "Parameters to reset; omit to reset everything."
                     },
                     "previewedRows": {
@@ -8284,7 +8373,9 @@
             },
             "GetTwoFactorPoliciesParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Each role the two-factor policy covers (ADMIN, DARPAN_SUPER_ADMIN, DARPAN_ADMIN, DARPAN_TENANT_ADMIN in\n            any tenant, and EVERYONE: any person with a Darpan role or a tenant membership) with its date and who in it is and is not enrolled, plus how many super admins are enrolled (the\n            break-glass rule needs two before super-admin enforcement can be switched on)."
             },
             "GetTwoFactorPoliciesResult": {
@@ -8783,7 +8874,9 @@
             },
             "GetSettingsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Every setting by area then catalog order: key, type, area, unit, description, defaultValue, min, max,\n            maxItems, lessThan, propertyValue, rowValue, effectiveValue, source (ROW, PROPERTY or DEFAULT), note,\n            lastChangedByUserId, lastChangedDate."
             },
             "GetSettingsResult": {
@@ -9028,7 +9121,9 @@
             },
             "ListShopifyAppsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Every Darpan Shopify app, without its client secret."
             },
             "ListShopifyAppsResult": {
@@ -9036,7 +9131,9 @@
                 "properties": {
                     "shopifyApps": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 }
             },
@@ -9543,7 +9640,9 @@
             },
             "GetTenantListParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "All tenants (including deactivated) with member counts, for the admin Tenants board."
             },
             "GetTenantListResult": {
@@ -9935,17 +10034,23 @@
                     },
                     "auditCodes": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "Audits to send, by auditCode."
                     },
                     "savedRunIds": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "Saved runs to send on their own, by savedRunId."
                     },
                     "connectionRefs": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "Connections to send that no picked audit or run\n                reaches, as KIND:id refs from the catalog."
                     },
                     "sourceInstanceLabel": {
@@ -10061,17 +10166,23 @@
                 "properties": {
                     "audits": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{auditId, auditCode, auditName, statementCount, checkCount}]\n                sorted by auditCode."
                     },
                     "runs": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{savedRunId, ruleSetName, auditCodes}]: the tenant's saved runs\n                and the audits whose checks use each."
                     },
                     "connections": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{ref, kind, id, description, granted}]: owned connections\n                and those shared to the tenant (granted: true)."
                     }
                 }
@@ -10365,7 +10476,7 @@
                     "username",
                     "tempPassword"
                 ],
-                "description": "Create a user with a temporary password (change forced at first login) and\n            DARPAN_USER group membership. Credentials are shared out-of-band; there is no email invite."
+                "description": "Create a user with a temporary password (change forced at first login) and\n            DARPAN_USER group membership. The temporary password is kept encrypted for the user's tenant welcome\n            emails (DAR-BE-325, darpan.admin.TempPasswordKeeper) until they set their own or the keep period ends."
             },
             "CreateUserAccountResult": {
                 "type": "object",
@@ -11014,7 +11125,7 @@
                     "userId",
                     "tempPassword"
                 ],
-                "description": "Set a temporary password for a user (change forced at next login) and revoke\n            their live login keys. The temp password is shared out-of-band."
+                "description": "Set a temporary password for a user (change forced at next login) and revoke\n            their live login keys. The temporary password is kept encrypted for their tenant welcome emails\n            (DAR-BE-325), replacing an earlier one."
             },
             "ResetPasswordResult": {
                 "type": "object",
@@ -11375,7 +11486,9 @@
                 "properties": {
                     "tickets": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 }
             },
@@ -11986,12 +12099,16 @@
                     },
                     "messages": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "{messageId, kind (USER or ASSISTANT), text, question}"
                     },
                     "proposals": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "{proposalId, kind, status, statusMessage, provenanceStatus, blockedIds, backtest}"
                     }
                 }
@@ -12058,7 +12175,9 @@
             },
             "GetAgentStatusParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Whether the agent can run for the person now: state (ON, AGENT_OFF, AGENT_UNAVAILABLE or AGENT_REFUSED), grantState\n            (their AI access in this tenant: LIVE, NOT_GRANTED, EXPIRED or PAUSED) and canApprove (true only for someone allowed to\n            save the audit's checks)."
             },
             "GetAgentStatusResult": {
@@ -12177,12 +12296,16 @@
                     },
                     "proposals": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "{proposalId, kind, status, statusMessage, provenanceStatus, blockedIds, backtest}"
                     },
                     "tickets": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "{ticketId, category, duplicate}"
                     },
                     "question": {
@@ -12191,7 +12314,9 @@
                     },
                     "masked": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "The kinds of secret or personal data masked in the text (never the values)."
                     }
                 }
@@ -12258,7 +12383,9 @@
             },
             "GetAppContentParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "The mascot entries an admin has edited, hidden or created: every SEED row with a title, body, alias or\n            hidden edit, and every ADMIN row. Fields that are not set are omitted. version is a stable hash of the entries returned, so it changes on every create, edit, reset, delete or seed retirement that changes what is served (null when nothing is served)."
             },
             "GetAppContentResult": {
@@ -13117,6 +13244,111 @@
                     "result"
                 ]
             },
+            "GetAuditReadReportParams": {
+                "type": "object",
+                "properties": {
+                    "audit": {
+                        "type": "string",
+                        "description": "The audit's code, e.g. month-close."
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "The morning, YYYY-MM-DD; blank is the audit's latest play."
+                    },
+                    "period": {
+                        "type": "string",
+                        "description": "The period, e.g. 2026-11; blank is every period played that morning."
+                    }
+                },
+                "required": [
+                    "audit"
+                ],
+                "description": "What one play of an audit read: its reads grouped by endpoint and connection (reads, records, the\n            checks that read, each read's window, the call tally), the totals, and the flags where a read cost more than it\n            needed (DUPLICATE_READ, WHOLE_PERIOD_READ, LOOKUP_OVER_SHARE, LOOKUP_EVERY_PLAY, THROTTLED, CALLS_GREW; thresholds\n            are the Audit reads settings). Empty when the audit has not played (darpan.audit.AuditReadReport)."
+            },
+            "GetAuditReadReportResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "report": {
+                        "type": "object",
+                        "description": "{reportDate, period, totals, groups, flags}"
+                    }
+                }
+            },
+            "GetAuditReadReportRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditReadReport",
+                "x-darpan-method": "facade.AuditFacadeServices.get#AuditReadReport",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AuditFacadeServices.get#AuditReadReport"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetAuditReadReportParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetAuditReadReportResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AuditFacadeServices.get#AuditReadReport. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetAuditReadReportResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "GetAuditReportParams": {
                 "type": "object",
                 "properties": {
@@ -13320,7 +13552,9 @@
             },
             "GetAuditsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "The active tenant's audits: id (the audit's code), name and the period it reports by."
             },
             "GetAuditsResult": {
@@ -13475,7 +13709,9 @@
                     },
                     "extracts": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{side, fileName, recordCount}] replayed."
                     }
                 }
@@ -13666,7 +13902,9 @@
                     },
                     "statements": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{id: statement code, diffTypes, ruleIds}], at least one\n                (refused in words when empty). DAR-BE-196: no statement counts a cause the run marks expected; check.expectedCodes\n                (when given) sets which of the run's causes those are."
                     }
                 },
@@ -14083,7 +14321,9 @@
             },
             "BeginPasskeyProofParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-BE-270. Request options for the signed-in person's passkeys, for one action that asks for a fresh\n            proof (approve#CliLogin, create#RecoveryCodes, disable#TwoFactor, begin#TwoFactorSetup,\n            begin#PasskeyRegistration, delete#Passkey, and the admin app's /transfer export and handoff, two-factor reset and\n            key rotation). The assertion is single-use and lives 5 minutes. A refusal (not signed in, passkeys unavailable,\n            no passkey) is a JSON-RPC error."
             },
             "BeginPasskeyProofResult": {
@@ -14190,14 +14430,14 @@
                     },
                     "code": {
                         "type": "string",
-                        "description": "Signed in, two-factor on: a current code from the app."
+                        "description": "Signed in, two-factor on: a current code from the app. Leave out within 5 minutes of a two-factor sign-in on this session."
                     },
                     "passkeyAssertion": {
                         "type": "string",
-                        "description": "Signed in, two-factor on: instead of code, a passkey assertion over begin#PasskeyProof's options."
+                        "description": "Signed in, two-factor on: instead of code, a passkey assertion over begin#PasskeyProof's options. Leave out within 5 minutes of a two-factor sign-in on this session."
                     }
                 },
-                "description": "DAR-BE-270. Creation options for a new passkey. Either signed in (no two-factor yet: currentPassword;\n            with two-factor on: a code or a passkey assertion), or with a setup challengeToken from login#Session\n            (twoFactorSetupRequired). Finish within 5 minutes with finish#PasskeyRegistration. Up to 10 passkeys."
+                "description": "DAR-BE-270. Creation options for a new passkey. Either signed in (no two-factor yet: currentPassword;\n            with two-factor on: a code or a passkey assertion), or with a setup challengeToken from login#Session\n            (twoFactorSetupRequired). DAR-UI-132: within 5 minutes of a sign-in that completed two-factor\n            (verify#SignInCode, finish#PasskeyFirstSignIn), on the session it made, the code or passkey assertion may be\n            left out: that sign-in is the proof. For adding a passkey only. Finish within 5 minutes with\n            finish#PasskeyRegistration. Up to 10 passkeys."
             },
             "BeginPasskeyRegistrationResult": {
                 "type": "object",
@@ -16168,7 +16408,9 @@
             },
             "GetPasswordResetStatusParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-BE-028. Whether this environment can send password reset email (a SYSTEM EmailServer with\n            an SMTP host). darpan-ui hides \"Forgot password?\" when it cannot."
             },
             "GetPasswordResetStatusResult": {
@@ -16242,7 +16484,9 @@
             },
             "GetSessionInfoParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Return session metadata for darpan-ui route guards. Moqui resolves the request user from the explicit `login_key` header when present."
             },
             "GetSessionInfoResult": {
@@ -16467,7 +16711,9 @@
             },
             "GetTwoFactorStatusParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-BE-264. The signed-in person's two-factor state, for User Settings. Never the secret."
             },
             "GetTwoFactorStatusResult": {
@@ -16942,7 +17188,9 @@
             },
             "LogoutAllSessionsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Revoke every active UserLoginKey for the authenticated user (sign out on every device)."
             },
             "LogoutAllSessionsResult": {
@@ -17037,7 +17285,9 @@
             },
             "LogoutSessionParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Revoke the login-key token from the current request (header or cookie) and end the caller's own session only.\n            Other active sessions on the same UserAccount \u2014 including other people on a shared login \u2014 are not affected;\n            use logout#AllSessions to revoke every session."
             },
             "LogoutSessionResult": {
@@ -18525,7 +18775,9 @@
             },
             "GetMyCliAccessParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "The signed-in person's CLI state in the active tenant (LIVE, PAUSED, ENDED, NOT_GRANTED or DARPAN_ADMIN), the grant's end, how long a CLI sign-in lasts there, and their latest request."
             },
             "GetMyCliAccessResult": {
@@ -19044,7 +19296,9 @@
             },
             "ListCliSessionsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "The signed-in person's own CLI sessions that still work (not revoked, not expired)."
             },
             "ListCliSessionsResult": {
@@ -19171,7 +19425,9 @@
             },
             "LogoutCliSessionParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Sign the calling CLI out: revokes the CLI session whose key this request carries."
             },
             "LogoutCliSessionResult": {
@@ -20275,11 +20531,15 @@
                     },
                     "messages": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "errors": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "deleted": {
                         "type": "boolean"
@@ -20467,11 +20727,15 @@
                     },
                     "messages": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "errors": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "omsRestSourceConfigs": {
                         "type": "array",
@@ -20507,7 +20771,9 @@
                                 },
                                 "customHeaderNames": {
                                     "type": "array",
-                                    "items": {}
+                                    "items": {
+                                        
+                                    }
                                 },
                                 "connectTimeoutSeconds": {
                                     "type": "integer"
@@ -20782,11 +21048,15 @@
                     },
                     "messages": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "errors": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "savedOmsRestSourceConfig": {
                         "type": "object",
@@ -20820,7 +21090,9 @@
                             },
                             "customHeaderNames": {
                                 "type": "array",
-                                "items": {}
+                                "items": {
+                                    
+                                }
                             },
                             "connectTimeoutSeconds": {
                                 "type": "integer"
@@ -21797,7 +22069,9 @@
                     },
                     "fieldList": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 },
                 "required": [
@@ -22271,7 +22545,9 @@
             },
             "GetNsSuiteQlQueryOptionsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-UI-064. What the SuiteQL query editor offers: templates, date columns, common record types, the\n            fields and operators a match rule may use, and the NetSuite accounts the active tenant may read."
             },
             "GetNsSuiteQlQueryOptionsResult": {
@@ -22448,7 +22724,9 @@
             },
             "ListNsAgentConnectionsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-CLI-003. The NetSuite connections the active tenant may query from an agent: id, description and\n            sign-in kind only. No username, client id, certificate id, account host, key or token."
             },
             "ListNsAgentConnectionsResult": {
@@ -22863,7 +23141,9 @@
                     },
                     "rows": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "rowCount": {
                         "type": "integer"
@@ -23135,6 +23415,736 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/SaveNsSuiteQlSourceQueryResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "DeletePeakPeriodParams": {
+                "type": "object",
+                "properties": {
+                    "peakPeriodId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "peakPeriodId"
+                ],
+                "description": "Delete a peak period and its run times."
+            },
+            "DeletePeakPeriodResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "DeletePeakPeriodRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriod",
+                "x-darpan-method": "facade.PeakPeriodFacadeServices.delete#PeakPeriod",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.PeakPeriodFacadeServices.delete#PeakPeriod"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/DeletePeakPeriodParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "DeletePeakPeriodResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriod. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/DeletePeakPeriodResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "DeletePeakPeriodRunTimeParams": {
+                "type": "object",
+                "properties": {
+                    "runTimeId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "runTimeId"
+                ],
+                "description": "Delete one run-time move of a peak period."
+            },
+            "DeletePeakPeriodRunTimeResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "DeletePeakPeriodRunTimeRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime",
+                "x-darpan-method": "facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/DeletePeakPeriodRunTimeParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "DeletePeakPeriodRunTimeResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/DeletePeakPeriodRunTimeResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "GetPeakPeriodParams": {
+                "type": "object",
+                "properties": {
+                    "peakPeriodId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "peakPeriodId"
+                ],
+                "description": "One peak period with its run-time moves, the runs its peak hours hold, and the runs a move can name."
+            },
+            "GetPeakPeriodResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "peakPeriod": {
+                        "type": "object",
+                        "properties": {
+                            "peakPeriodId": {
+                                "type": "string"
+                            },
+                            "periodName": {
+                                "type": "string"
+                            },
+                            "fromDate": {
+                                "type": "string"
+                            },
+                            "thruDate": {
+                                "type": "string"
+                            },
+                            "peakHoursStart": {
+                                "type": "string"
+                            },
+                            "peakHoursEnd": {
+                                "type": "string"
+                            },
+                            "hotwaxReadSharePct": {
+                                "type": "integer"
+                            },
+                            "netsuiteSerial": {
+                                "type": "string"
+                            },
+                            "isActive": {
+                                "type": "string"
+                            },
+                            "state": {
+                                "type": "string"
+                            },
+                            "timeZone": {
+                                "type": "string"
+                            },
+                            "createdByUserId": {
+                                "type": "string"
+                            },
+                            "lastUpdatedDate": {
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "number"
+                                    }
+                                ],
+                                "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds"
+                            }
+                        }
+                    },
+                    "runTimes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "runTimeId": {
+                                    "type": "string"
+                                },
+                                "automationId": {
+                                    "type": "string"
+                                },
+                                "auditId": {
+                                    "type": "string"
+                                },
+                                "targetLabel": {
+                                    "type": "string"
+                                },
+                                "onDate": {
+                                    "type": "string"
+                                },
+                                "runTime": {
+                                    "type": "string"
+                                },
+                                "normalTime": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "heldRuns": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "targetLabel": {
+                                    "type": "string"
+                                },
+                                "normalTime": {
+                                    "type": "string"
+                                },
+                                "startsAt": {
+                                    "type": "string"
+                                },
+                                "reason": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "automationId": {
+                                    "type": "string"
+                                },
+                                "auditId": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "GetPeakPeriodRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.get#PeakPeriod",
+                "x-darpan-method": "facade.PeakPeriodFacadeServices.get#PeakPeriod",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.PeakPeriodFacadeServices.get#PeakPeriod"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetPeakPeriodParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetPeakPeriodResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.get#PeakPeriod. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetPeakPeriodResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "ListPeakPeriodsParams": {
+                "type": "object",
+                "properties": {
+                    
+                },
+                "description": "List the active tenant's peak periods with their state (upcoming, on, off, ended) in the tenant's local today."
+            },
+            "ListPeakPeriodsResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "peakPeriods": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "peakPeriodId": {
+                                    "type": "string"
+                                },
+                                "periodName": {
+                                    "type": "string"
+                                },
+                                "fromDate": {
+                                    "type": "string"
+                                },
+                                "thruDate": {
+                                    "type": "string"
+                                },
+                                "isActive": {
+                                    "type": "string"
+                                },
+                                "state": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ListPeakPeriodsRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.list#PeakPeriods",
+                "x-darpan-method": "facade.PeakPeriodFacadeServices.list#PeakPeriods",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.PeakPeriodFacadeServices.list#PeakPeriods"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ListPeakPeriodsParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ListPeakPeriodsResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.list#PeakPeriods. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ListPeakPeriodsResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "SavePeakPeriodParams": {
+                "type": "object",
+                "properties": {
+                    "peakPeriodId": {
+                        "type": "string"
+                    },
+                    "periodName": {
+                        "type": "string"
+                    },
+                    "fromDate": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "thruDate": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "peakHoursStart": {
+                        "type": "string"
+                    },
+                    "peakHoursEnd": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    }
+                },
+                "description": "Create or update one peak period for the active tenant. Peak hours are both set or both blank; active periods may not overlap."
+            },
+            "SavePeakPeriodResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "peakPeriodId": {
+                        "type": "string"
+                    }
+                }
+            },
+            "SavePeakPeriodRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.save#PeakPeriod",
+                "x-darpan-method": "facade.PeakPeriodFacadeServices.save#PeakPeriod",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.PeakPeriodFacadeServices.save#PeakPeriod"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/SavePeakPeriodParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "SavePeakPeriodResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.save#PeakPeriod. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/SavePeakPeriodResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "SavePeakPeriodRunTimeParams": {
+                "type": "object",
+                "properties": {
+                    "runTimeId": {
+                        "type": "string"
+                    },
+                    "peakPeriodId": {
+                        "type": "string"
+                    },
+                    "automationId": {
+                        "type": "string"
+                    },
+                    "auditId": {
+                        "type": "string"
+                    },
+                    "onDate": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "runTime": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "peakPeriodId"
+                ],
+                "description": "Create or update one run-time move of a peak period: a run (an automation or an audit) starts at runTime on onDate, or on every day of the period when onDate is blank."
+            },
+            "SavePeakPeriodRunTimeResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "runTimeId": {
+                        "type": "string"
+                    }
+                }
+            },
+            "SavePeakPeriodRunTimeRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime",
+                "x-darpan-method": "facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/SavePeakPeriodRunTimeParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "SavePeakPeriodRunTimeResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/SavePeakPeriodRunTimeResult"
                     }
                 },
                 "required": [
@@ -23564,7 +24574,9 @@
                                         },
                                         "idFieldExpressions": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                
+                                            }
                                         },
                                         "schemaFileName": {
                                             "type": "string"
@@ -23847,7 +24859,9 @@
                     },
                     "file1PrimaryIdExpressions": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "file1DuplicateKeyHandling": {
                         "type": "string",
@@ -23889,7 +24903,9 @@
                     },
                     "file2PrimaryIdExpressions": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "file2DuplicateKeyHandling": {
                         "type": "string",
@@ -24091,7 +25107,9 @@
                                         },
                                         "idFieldExpressions": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                
+                                            }
                                         },
                                         "schemaFileName": {
                                             "type": "string"
@@ -25428,7 +26446,9 @@
             },
             "GetAutomationStreaksParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-BE-107. The active tenant's clean-day streaks: each automation's live and best streak in days,\n            on its own midnight, and the badges it has earned; the tenant streak (the shortest live streak of its active\n            scheduled automations); and the side quests the tenant has found. Read-only: slots not yet stored are folded\n            in memory, so the numbers are current before an automation's next run."
             },
             "GetAutomationStreaksResult": {
@@ -25877,11 +26897,15 @@
                     },
                     "ruleOptions": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "differences": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "pageIndex": {
                         "type": "integer"
@@ -26718,7 +27742,9 @@
             },
             "ImportNetSuiteChecksAsRunsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-UI-048. Turns the active tenant's NetSuite checks that are not yet in a run into runs: one\n            START per population (account, record type, and how the key is built), each check a yes question under\n            it. Safe to repeat. A check that cannot sit under a START is skipped, and messages say why."
             },
             "ImportNetSuiteChecksAsRunsResult": {
@@ -27011,7 +28037,9 @@
             },
             "ListAutomationSourceOptionsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "List active-tenant saved runs, SFTP servers, NetSuite endpoints, system remotes, and enum options needed by automation workflows."
             },
             "ListAutomationSourceOptionsResult": {
@@ -27152,23 +28180,33 @@
                     },
                     "savedRuns": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "sftpServers": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "sourceConfigs": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "nsRestletConfigs": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "systemRemotes": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     }
                 }
             },
@@ -27882,7 +28920,9 @@
                                             },
                                             "idFieldExpressions": {
                                                 "type": "array",
-                                                "items": {}
+                                                "items": {
+                                                    
+                                                }
                                             },
                                             "schemaFileName": {
                                                 "type": "string"
@@ -28056,7 +29096,9 @@
             },
             "ListReconciliationsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-UI-048. The active tenant's runs (flowcharts), archived ones left out."
             },
             "ListReconciliationsResult": {
@@ -28292,7 +29334,9 @@
                                             },
                                             "idFieldExpressions": {
                                                 "type": "array",
-                                                "items": {}
+                                                "items": {
+                                                    
+                                                }
                                             },
                                             "schemaFileName": {
                                                 "type": "string"
@@ -28646,7 +29690,9 @@
                     },
                     "changes": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{side, field, from, to}]; empty when nothing was bare."
                     }
                 }
@@ -29148,7 +30194,9 @@
                     },
                     "extracts": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{side, fileName, recordCount}] replayed."
                     }
                 }
@@ -31858,7 +32906,9 @@
                     },
                     "file1PrimaryIdExpressions": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "file2SystemEnumId": {
                         "type": "string",
@@ -31893,7 +32943,9 @@
                     },
                     "file2PrimaryIdExpressions": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            
+                        }
                     },
                     "rules": {
                         "type": "array",
@@ -32088,7 +33140,9 @@
                                         },
                                         "idFieldExpressions": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                
+                                            }
                                         },
                                         "schemaFileName": {
                                             "type": "string"
@@ -32415,7 +33469,9 @@
                                         },
                                         "idFieldExpressions": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                
+                                            }
                                         },
                                         "schemaFileName": {
                                             "type": "string"
@@ -33006,7 +34062,9 @@
                     },
                     "conclusions": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "The tree; absent keeps it."
                     },
                     "unexplainedOutcome": {
@@ -33015,7 +34073,9 @@
                     },
                     "lookups": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "DAR-BE-174. The run's lookups, replaced when given (an empty\n                list clears them, absent keeps them): [{name, subject FILE_1|FILE_2, idField, systemEnumId, sourceConfigId,\n                keyField, many (every record under the key, as a list), parameters}]. A condition reads one as\n                name.field. Refused in words for a part missing, two of one name, or a system that cannot be asked by\n                id."
                     }
                 },
@@ -33579,7 +34639,9 @@
             },
             "GetNotificationRoutesParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "DAR-UI-123. The active tenant's chat spaces and, for each thing that posts to chat, the one space it\n            posts to: the streaks messages, each audit's run update, each automation (paused ones too, archived ones not)\n            and each deployed script. Notify-me subscriptions and each user's default space are personal and not listed."
             },
             "GetNotificationRoutesResult": {
@@ -33731,7 +34793,9 @@
             },
             "GetTenantSettingsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Get active-tenant settings shared by users in the tenant."
             },
             "GetTenantSettingsResult": {
@@ -33859,7 +34923,9 @@
             },
             "GetUserNotificationDefaultParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Get the caller's default chat space for the active tenant; stale or inactive pointers read as not configured."
             },
             "GetUserNotificationDefaultResult": {
@@ -34568,7 +35634,9 @@
             },
             "ListTenantChatSpacesParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "List active-tenant chat spaces (Google Chat or Slack), including the webhook URL in clear text."
             },
             "ListTenantChatSpacesResult": {
@@ -36908,7 +37976,9 @@
             },
             "BeginSlackInstallParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "Start the Slack app install for the active tenant: mint a single-use state token\n            and return the Slack authorize URL the browser should be sent to. Does not contact Slack."
             },
             "BeginSlackInstallResult": {
@@ -37088,7 +38158,9 @@
             },
             "GetSlackInstallParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "The active tenant's connected Slack workspaces. Returns identity and granted\n            scopes only \u2014 never the bot token."
             },
             "GetSlackInstallResult": {
@@ -37770,7 +38842,9 @@
                 "properties": {
                     "versions": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{id, seq, parentId, hash, bundleVersion, counts, changeSource, createdByName,\n                reason, createdBy, createdDate}]"
                     }
                 }
@@ -38319,7 +39393,9 @@
                     },
                     "deployments": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{tenantScriptDeploymentId, tenantScriptId, scheduleExpr,\n                inputSavedRunId, chatSpaceId, isActive, nextRunDate, lastRunDate, lastRunStatus, lastRunMessage, lastRunUnits}]"
                     },
                     "timeZone": {
@@ -38390,7 +39466,9 @@
             },
             "ListTenantScriptsParams": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    
+                },
                 "description": "The active tenant's scripts by name, plus the d: library and the limits, for the editor."
             },
             "ListTenantScriptsResult": {
@@ -38413,12 +39491,16 @@
                     },
                     "scripts": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{tenantScriptId, scriptName, description, scriptProfile,\n                inputSource, scriptBody, sampleInputJson, isActive, createdByUserId, createdDate, lastUpdatedDate}]"
                     },
                     "library": {
                         "type": "array",
-                        "items": {},
+                        "items": {
+                            
+                        },
                         "description": "[{name, help}]: the d: functions."
                     },
                     "limits": {
@@ -38940,734 +40022,6 @@
                     "jsonrpc",
                     "result"
                 ]
-            },
-            "DeletePeakPeriodParams": {
-                "type": "object",
-                "properties": {
-                    "peakPeriodId": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "peakPeriodId"
-                ],
-                "description": "Delete a peak period and its run times."
-            },
-            "DeletePeakPeriodResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
-            "DeletePeakPeriodRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriod",
-                "x-darpan-method": "facade.PeakPeriodFacadeServices.delete#PeakPeriod",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.PeakPeriodFacadeServices.delete#PeakPeriod"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/DeletePeakPeriodParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "DeletePeakPeriodResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriod. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/DeletePeakPeriodResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "DeletePeakPeriodRunTimeParams": {
-                "type": "object",
-                "properties": {
-                    "runTimeId": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "runTimeId"
-                ],
-                "description": "Delete one run-time move of a peak period."
-            },
-            "DeletePeakPeriodRunTimeResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
-            "DeletePeakPeriodRunTimeRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime",
-                "x-darpan-method": "facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/DeletePeakPeriodRunTimeParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "DeletePeakPeriodRunTimeResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/DeletePeakPeriodRunTimeResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "GetPeakPeriodParams": {
-                "type": "object",
-                "properties": {
-                    "peakPeriodId": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "peakPeriodId"
-                ],
-                "description": "One peak period with its run-time moves, the runs its peak hours hold, and the runs a move can name."
-            },
-            "GetPeakPeriodResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "peakPeriod": {
-                        "type": "object",
-                        "properties": {
-                            "peakPeriodId": {
-                                "type": "string"
-                            },
-                            "periodName": {
-                                "type": "string"
-                            },
-                            "fromDate": {
-                                "type": "string"
-                            },
-                            "thruDate": {
-                                "type": "string"
-                            },
-                            "peakHoursStart": {
-                                "type": "string"
-                            },
-                            "peakHoursEnd": {
-                                "type": "string"
-                            },
-                            "hotwaxReadSharePct": {
-                                "type": "integer"
-                            },
-                            "netsuiteSerial": {
-                                "type": "string"
-                            },
-                            "isActive": {
-                                "type": "string"
-                            },
-                            "state": {
-                                "type": "string"
-                            },
-                            "timeZone": {
-                                "type": "string"
-                            },
-                            "createdByUserId": {
-                                "type": "string"
-                            },
-                            "lastUpdatedDate": {
-                                "oneOf": [
-                                    {
-                                        "type": "string"
-                                    },
-                                    {
-                                        "type": "number"
-                                    }
-                                ],
-                                "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds"
-                            }
-                        }
-                    },
-                    "runTimes": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "runTimeId": {
-                                    "type": "string"
-                                },
-                                "automationId": {
-                                    "type": "string"
-                                },
-                                "auditId": {
-                                    "type": "string"
-                                },
-                                "targetLabel": {
-                                    "type": "string"
-                                },
-                                "onDate": {
-                                    "type": "string"
-                                },
-                                "runTime": {
-                                    "type": "string"
-                                },
-                                "normalTime": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    },
-                    "heldRuns": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "targetLabel": {
-                                    "type": "string"
-                                },
-                                "normalTime": {
-                                    "type": "string"
-                                },
-                                "startsAt": {
-                                    "type": "string"
-                                },
-                                "reason": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    },
-                    "targets": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "automationId": {
-                                    "type": "string"
-                                },
-                                "auditId": {
-                                    "type": "string"
-                                },
-                                "label": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "GetPeakPeriodRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.get#PeakPeriod",
-                "x-darpan-method": "facade.PeakPeriodFacadeServices.get#PeakPeriod",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.PeakPeriodFacadeServices.get#PeakPeriod"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/GetPeakPeriodParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "GetPeakPeriodResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.get#PeakPeriod. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/GetPeakPeriodResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "ListPeakPeriodsParams": {
-                "type": "object",
-                "properties": {},
-                "description": "List the active tenant's peak periods with their state (upcoming, on, off, ended) in the tenant's local today."
-            },
-            "ListPeakPeriodsResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "peakPeriods": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "peakPeriodId": {
-                                    "type": "string"
-                                },
-                                "periodName": {
-                                    "type": "string"
-                                },
-                                "fromDate": {
-                                    "type": "string"
-                                },
-                                "thruDate": {
-                                    "type": "string"
-                                },
-                                "isActive": {
-                                    "type": "string"
-                                },
-                                "state": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "ListPeakPeriodsRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.list#PeakPeriods",
-                "x-darpan-method": "facade.PeakPeriodFacadeServices.list#PeakPeriods",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.PeakPeriodFacadeServices.list#PeakPeriods"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/ListPeakPeriodsParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "ListPeakPeriodsResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.list#PeakPeriods. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/ListPeakPeriodsResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "SavePeakPeriodParams": {
-                "type": "object",
-                "properties": {
-                    "peakPeriodId": {
-                        "type": "string"
-                    },
-                    "periodName": {
-                        "type": "string"
-                    },
-                    "fromDate": {
-                        "type": "string",
-                        "format": "date"
-                    },
-                    "thruDate": {
-                        "type": "string",
-                        "format": "date"
-                    },
-                    "peakHoursStart": {
-                        "type": "string"
-                    },
-                    "peakHoursEnd": {
-                        "type": "string"
-                    },
-                    "isActive": {
-                        "type": "boolean"
-                    }
-                },
-                "description": "Create or update one peak period for the active tenant. Peak hours are both set or both blank; active periods may not overlap."
-            },
-            "SavePeakPeriodResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "peakPeriodId": {
-                        "type": "string"
-                    }
-                }
-            },
-            "SavePeakPeriodRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.save#PeakPeriod",
-                "x-darpan-method": "facade.PeakPeriodFacadeServices.save#PeakPeriod",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.PeakPeriodFacadeServices.save#PeakPeriod"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/SavePeakPeriodParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "SavePeakPeriodResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.save#PeakPeriod. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/SavePeakPeriodResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "SavePeakPeriodRunTimeParams": {
-                "type": "object",
-                "properties": {
-                    "runTimeId": {
-                        "type": "string"
-                    },
-                    "peakPeriodId": {
-                        "type": "string"
-                    },
-                    "automationId": {
-                        "type": "string"
-                    },
-                    "auditId": {
-                        "type": "string"
-                    },
-                    "onDate": {
-                        "type": "string",
-                        "format": "date"
-                    },
-                    "runTime": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "peakPeriodId"
-                ],
-                "description": "Create or update one run-time move of a peak period: a run (an automation or an audit) starts at runTime on onDate, or on every day of the period when onDate is blank."
-            },
-            "SavePeakPeriodRunTimeResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "runTimeId": {
-                        "type": "string"
-                    }
-                }
-            },
-            "SavePeakPeriodRunTimeRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime",
-                "x-darpan-method": "facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/SavePeakPeriodRunTimeParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "SavePeakPeriodRunTimeResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/SavePeakPeriodRunTimeResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
             }
         }
     },
@@ -39783,6 +40137,7 @@
         "facade.AuditFacadeServices.get#AuditFinding": "GetAuditFinding",
         "facade.AuditFacadeServices.get#AuditFindingsByOrder": "GetAuditFindingsByOrder",
         "facade.AuditFacadeServices.get#AuditProgress": "GetAuditProgress",
+        "facade.AuditFacadeServices.get#AuditReadReport": "GetAuditReadReport",
         "facade.AuditFacadeServices.get#AuditReport": "GetAuditReport",
         "facade.AuditFacadeServices.get#AuditSettings": "GetAuditSettings",
         "facade.AuditFacadeServices.get#Audits": "GetAudits",
@@ -39858,6 +40213,12 @@
         "facade.NetSuiteQueryFacadeServices.preview#NsSuiteQlSourceQuery": "PreviewNsSuiteQlSourceQuery",
         "facade.NetSuiteQueryFacadeServices.run#NsSuiteQlAgentQuery": "RunNsSuiteQlAgentQuery",
         "facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery": "SaveNsSuiteQlSourceQuery",
+        "facade.PeakPeriodFacadeServices.delete#PeakPeriod": "DeletePeakPeriod",
+        "facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime": "DeletePeakPeriodRunTime",
+        "facade.PeakPeriodFacadeServices.get#PeakPeriod": "GetPeakPeriod",
+        "facade.PeakPeriodFacadeServices.list#PeakPeriods": "ListPeakPeriods",
+        "facade.PeakPeriodFacadeServices.save#PeakPeriod": "SavePeakPeriod",
+        "facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime": "SavePeakPeriodRunTime",
         "facade.ReconciliationFacadeServices.archive#Automation": "ArchiveAutomation",
         "facade.ReconciliationFacadeServices.archive#SavedRun": "ArchiveSavedRun",
         "facade.ReconciliationFacadeServices.cancel#ReconciliationRun": "CancelReconciliationRun",
@@ -39972,12 +40333,6 @@
         "facade.TenantScriptFacadeServices.run#TenantScript": "RunTenantScript",
         "facade.TenantScriptFacadeServices.run#TenantScriptDeployment": "RunTenantScriptDeployment",
         "facade.TenantScriptFacadeServices.save#TenantScript": "SaveTenantScript",
-        "facade.TenantScriptFacadeServices.save#TenantScriptDeployment": "SaveTenantScriptDeployment",
-        "facade.PeakPeriodFacadeServices.delete#PeakPeriod": "DeletePeakPeriod",
-        "facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime": "DeletePeakPeriodRunTime",
-        "facade.PeakPeriodFacadeServices.get#PeakPeriod": "GetPeakPeriod",
-        "facade.PeakPeriodFacadeServices.list#PeakPeriods": "ListPeakPeriods",
-        "facade.PeakPeriodFacadeServices.save#PeakPeriod": "SavePeakPeriod",
-        "facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime": "SavePeakPeriodRunTime"
+        "facade.TenantScriptFacadeServices.save#TenantScriptDeployment": "SaveTenantScriptDeployment"
     }
 }
