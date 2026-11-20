@@ -90,7 +90,7 @@ function tree(scopeMode = 'COMPARE'): RunConclusions {
       { id: 'CONC_NO_CUSTOMER_NAME', label: 'No customer name' },
     ],
     buckets: ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING'],
-    operators: ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK'],
+    operators: ['IN', 'NOT_IN', 'GT', 'LT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK'],
     presence: ['ANY', 'KEPT', 'EXCLUDED', 'ABSENT'],
     keyScopes: ['FULL', 'FIRST_FIELD'],
     quantifiers: ['ALL', 'ANY'],
@@ -342,6 +342,22 @@ describe('RunConclusionsEditor', () => {
     await save(wrapper)
     expect(savedPayload()[3]!.conditions[0]).toMatchObject({ field: 'returnId', operator: 'WITHIN_HOURS', values: ['24'] })
     expect(wrapper.findAll('[data-testid="run-conclusions-when"]')[3]!.text()).toBe('OMS returnId is within the last 24 hours')
+    wrapper.unmount()
+  })
+
+  it('"is less than" takes one number, saves it as the one value and reads back on its row (DAR-BE-327)', async () => {
+    const wrapper = await mountEditor()
+    await openRow(wrapper, 3)
+    selectsIn(wrapper, 'run-conclusions-operator')[0]!.vm.$emit('update:modelValue', 'LT')
+    await flushPromises()
+    const amount = popup(wrapper).get('[data-testid="run-conclusions-amount"]')
+    expect(amount.attributes('aria-label')).toBe('Less than')
+    expect(popup(wrapper).find('[data-testid="run-conclusions-values"]').exists()).toBe(false)
+    await amount.setValue('1728370800000')
+    saveConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], savedConclusions: null })
+    await save(wrapper)
+    expect(savedPayload()[3]!.conditions[0]).toMatchObject({ field: 'returnId', operator: 'LT', values: ['1728370800000'] })
+    expect(wrapper.findAll('[data-testid="run-conclusions-when"]')[3]!.text()).toBe('OMS returnId is less than 1728370800000')
     wrapper.unmount()
   })
 

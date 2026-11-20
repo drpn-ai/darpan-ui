@@ -217,8 +217,8 @@
                 type="text"
                 inputmode="decimal"
                 name="conditionAmount"
-                :placeholder="condition.operator === 'GT' ? 'number' : 'hours'"
-                :aria-label="condition.operator === 'GT' ? 'More than' : 'Within hours'"
+                :placeholder="condition.operator === 'WITHIN_HOURS' ? 'hours' : 'number'"
+                :aria-label="amountLabel(condition.operator)"
                 :disabled="saving"
                 data-testid="run-conclusions-amount"
               />
@@ -282,6 +282,12 @@ import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import AppSelect from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
+
+const AMOUNT_LABELS: Record<string, string> = { GT: 'More than', LT: 'Less than', WITHIN_HOURS: 'Within hours' }
+
+function amountLabel(operator: string): string {
+  return AMOUNT_LABELS[operator] ?? 'Number'
+}
 
 const PLUS_ICON_PATH =
   'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'

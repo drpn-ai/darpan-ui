@@ -64,11 +64,12 @@ export interface UseRunConclusionsDeps {
 export const MAX_CONCLUSION_DEPTH = 3
 
 const DEFAULT_BUCKETS: ConclusionBucket[] = ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING']
-const DEFAULT_OPERATORS: ConclusionOperator[] = ['IN', 'NOT_IN', 'GT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK']
+const DEFAULT_OPERATORS: ConclusionOperator[] = ['IN', 'NOT_IN', 'GT', 'LT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK']
 const OPERATOR_LABELS: Record<string, string> = {
   IN: 'is one of',
   NOT_IN: 'is not one of',
   GT: 'is more than',
+  LT: 'is less than',
   GT_ZERO: 'is above zero',
   WITHIN_HOURS: 'is within the last hours',
   BLANK: 'is blank',
@@ -88,7 +89,7 @@ export function takesValues(operator: string): boolean {
 }
 
 export function takesOneNumber(operator: string): boolean {
-  return operator === 'GT' || operator === 'WITHIN_HOURS'
+  return operator === 'GT' || operator === 'LT' || operator === 'WITHIN_HOURS'
 }
 
 function vocabulary(listed: string[] | undefined, fallback: string[], labels: Record<string, string>): AppSelectOption[] {
