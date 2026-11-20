@@ -477,6 +477,54 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Ended',
     body: 'peak periods whose last day has passed. Kept for the record; they change nothing now.',
   },
+  // DAR-BE-328: one peak period's page.
+  peakPeriodName: {
+    title: 'Name',
+    body: 'what this peak period is called on the list and in Tenant Settings. It changes nothing about the runs.',
+    byDirectiveOnly: true,
+  },
+  peakDates: {
+    title: 'Dates',
+    body: 'the first and last day of the peak, both included, in the tenant’s time zone. Run times and peak hours apply only on these days.',
+    byDirectiveOnly: true,
+  },
+  peakHours: {
+    title: 'Peak hours',
+    body: 'when the tenant’s systems are busiest each day of the peak. A scheduled run due inside them waits until they end.',
+  },
+  peakRunTimes: {
+    title: 'Run times',
+    body: 'runs moved to another time during the peak, on one day or every day. The window each run reads stays the same.',
+  },
+  peakHeldRuns: {
+    title: 'Waits for peak hours',
+    body: 'scheduled runs that fall inside peak hours, and when they will start instead. Change the peak hours or move a run to clear one.',
+  },
+  peakRunTarget: {
+    title: 'Run',
+    body: 'the automation or audit this time applies to. An audit moves every automation it checks.',
+    byDirectiveOnly: true,
+  },
+  peakRunNormal: {
+    title: 'Normal',
+    body: 'when this run starts outside the peak, from its own schedule.',
+    byDirectiveOnly: true,
+  },
+  peakRunThisPeriod: {
+    title: 'This period',
+    body: 'when this run starts during the peak instead, in the tenant’s time zone.',
+    byDirectiveOnly: true,
+  },
+  peakRunOn: {
+    title: 'On',
+    body: 'the day of the peak this move is for, or every day of it.',
+    byDirectiveOnly: true,
+  },
+  peakRunAt: {
+    title: 'At',
+    body: 'the time the run starts on that day instead, in the tenant’s time zone. Peak hours still hold it if it falls inside them.',
+    byDirectiveOnly: true,
+  },
   configHistory: {
     title: 'Config history',
     body: 'every saved version of this tenant’s setup. Restoring one puts that setup back; runs that already finished keep the results they had.',

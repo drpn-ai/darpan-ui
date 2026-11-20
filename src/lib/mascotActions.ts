@@ -518,6 +518,52 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'asks first. A deleted script stops posting and leaves the Notifications grid; there is no undo.',
   },
 
+  /* ── Peak periods (DAR-BE-328) ──────────────────────────────────────────────── */
+  'open peak periods': {
+    title: 'Peak periods',
+    body: 'this tenant’s busy windows, each with the runs it moves and the hours runs wait for.',
+  },
+  'set up peak periods': {
+    title: 'Set up peak periods',
+    body: 'the list of busy windows, empty for now. Add one to move runs or keep them out of peak hours.',
+  },
+  'add peak period': {
+    title: 'Add peak period',
+    body: 'a new period on its own page. No run changes until it has dates and is saved.',
+  },
+  'back to peak periods': {
+    title: 'Back to peak periods',
+    body: 'the list of this tenant’s peak periods. Unsaved edits here are dropped on the way out.',
+  },
+  'peak period on': {
+    title: 'Peak period on',
+    body: 'whether this period moves and holds runs at all. Off, every run keeps its normal time. Kept with Save.',
+  },
+  'save peak period': {
+    title: 'Save peak period',
+    body: 'keeps the name, dates, peak hours and on/off for the whole tenant. Scheduled runs follow it from then on.',
+  },
+  'delete peak period': {
+    title: 'Delete peak period',
+    body: 'asks first. Its run times go with it and every run goes back to its normal time; there is no undo.',
+  },
+  'move another run': {
+    title: 'Move another run',
+    body: 'opens a new run time: one automation or audit starts at another time on one day of the peak, or every day.',
+  },
+  'save run time': {
+    title: 'Save run time',
+    body: 'keeps this move now, without the page’s Save. A time inside peak hours still waits for them to end.',
+  },
+  'delete run time': {
+    title: 'Delete run time',
+    body: 'removes this move now, without the page’s Save. The run starts at its normal time on those days.',
+  },
+  'clear peak hours': {
+    title: 'Clear peak hours',
+    body: 'empties both times. Saved like that, the period has no peak hours and no run waits for them.',
+  },
+
   /* ── Connections and settings ───────────────────────────────────────────────── */
   'run connection diagnostics': {
     title: 'Run connection diagnostics',
@@ -969,6 +1015,11 @@ export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Obje
   [/^posts to: .+$/, {
     title: 'Posts to',
     body: 'picks the chat space its text goes to, with the time it runs. Kept with Save.',
+  }],
+  // DAR-BE-328: each Peak periods row names its period ("Open peak period <name>").
+  [/^open peak period .+$/, {
+    title: 'Open',
+    body: 'this period’s own page: its dates, peak hours, the runs it moves and the runs that wait.',
   }],
   [/^export .+ extract$/, {
     title: 'Export extract',

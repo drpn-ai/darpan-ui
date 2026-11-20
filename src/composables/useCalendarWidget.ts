@@ -50,13 +50,6 @@ function getDefaultVisibleMonth(): Date {
   return addMonths(startOfMonth(new Date()), -1)
 }
 
-function clampVisibleMonth(date: Date): Date {
-  const monthStart = startOfMonth(date)
-  const latestMonthStart = getDefaultVisibleMonth()
-  if (monthStart.getTime() > latestMonthStart.getTime()) return latestMonthStart
-  return monthStart
-}
-
 export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCalendarWidget {
   const monthsVisible = Math.max(1, options.monthsVisible ?? 2)
   const startDate = ref('')
@@ -67,6 +60,18 @@ export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCa
   const firstPickableTime = () => {
     const first = options.firstPickableDate?.()
     return first ? startOfLocalDay(first).getTime() : Number.NEGATIVE_INFINITY
+  }
+  // The latest month the view may start on: the one before this month, so this month shows last. A latest pickable
+  // day in the future (a peak period still to come, DAR-BE-328) moves it on until that day's month shows last.
+  const latestVisibleMonth = () => {
+    const usual = getDefaultVisibleMonth()
+    const lastPickable = addMonths(startOfMonth(new Date(lastPickableTime())), 1 - monthsVisible)
+    return lastPickable.getTime() > usual.getTime() ? lastPickable : usual
+  }
+  const clampVisibleMonth = (date: Date) => {
+    const monthStart = startOfMonth(date)
+    const latest = latestVisibleMonth()
+    return monthStart.getTime() > latest.getTime() ? latest : monthStart
   }
 
   const startDateValue = computed(() => parseDateInput(startDate.value))
@@ -96,7 +101,7 @@ export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCa
 
   function canShiftMonth(monthCount: number): boolean {
     const nextMonth = addMonths(visibleMonth.value, monthCount)
-    return nextMonth.getTime() <= getDefaultVisibleMonth().getTime()
+    return nextMonth.getTime() <= latestVisibleMonth().getTime()
   }
 
   function shiftMonth(monthCount: number): void {

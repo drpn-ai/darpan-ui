@@ -75,7 +75,7 @@ describe('TenantPeakPeriodsPage', () => {
     listPeakPeriods.mockResolvedValue({ ok: true, errors: [], messages: [], peakPeriods: [period({ peakPeriodId: '77' })] })
     const wrapper = await mountPage()
     const row = wrapper.get('[data-testid="peak-row"]')
-    expect(row.attributes('aria-label')).toBe('Open Black Friday sale')
+    expect(row.attributes('aria-label')).toBe('Open peak period Black Friday sale')
     await row.trigger('click')
     expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-peak-period', params: { peakPeriodId: '77' } })
   })

@@ -9,7 +9,8 @@ function parts(date: string): { y: number; m: number; d: number } {
   return { y, m, d }
 }
 
-function monthDay(date: string): string {
+/** "Nov 28": one date of a period, without its year. */
+export function peakDay(date: string): string {
   const { m, d } = parts(date)
   return `${MONTHS[m - 1] ?? ''} ${d}`
 }
@@ -17,8 +18,8 @@ function monthDay(date: string): string {
 /** "Nov 24 – Dec 1"; the year is added to each end only when the period is not in the current year. */
 export function peakDateRange(fromDate: string, thruDate: string, today: Date = new Date()): string {
   const year = today.getFullYear()
-  const end = (date: string) => (parts(date).y === year ? monthDay(date) : `${monthDay(date)}, ${parts(date).y}`)
-  const start = (date: string) => (parts(fromDate).y === year && parts(thruDate).y === year ? monthDay(date) : `${monthDay(date)}, ${parts(date).y}`)
+  const end = (date: string) => (parts(date).y === year ? peakDay(date) : `${peakDay(date)}, ${parts(date).y}`)
+  const start = (date: string) => (parts(fromDate).y === year && parts(thruDate).y === year ? peakDay(date) : `${peakDay(date)}, ${parts(date).y}`)
   return `${start(fromDate)} – ${end(thruDate)}`
 }
 
@@ -36,7 +37,7 @@ export function peakWhen(period: PeakPeriodSummary, today: Date = new Date()): s
   const days = daysUntil(period.fromDate, today)
   if (days === 1) return 'Starts tomorrow'
   if (days >= 0 && days <= 30) return `Starts in ${days} days`
-  return `Starts ${monthDay(period.fromDate)}`
+  return `Starts ${peakDay(period.fromDate)}`
 }
 
 /** The Tenant Settings value: the period on now, else the soonest upcoming one, else "None". */

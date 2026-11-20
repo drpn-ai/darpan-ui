@@ -54,6 +54,32 @@ describe('useCalendarWidget', () => {
     expect(calendar.calendarMonths.value[0]!.label).toBe('April 2026')
   })
 
+  it('walks forward to the month of a latest pickable day in the future, and no further', () => {
+    // A peak period is picked ahead of time: today May 11, picks allowed through July 20.
+    const calendar = useCalendarWidget({ lastPickableDate: () => new Date(2026, 6, 20) })
+    expect(calendar.canShiftMonth(1)).toBe(true)
+    calendar.shiftMonth(1)
+    calendar.shiftMonth(1)
+    expect(calendar.calendarMonths.value.map((month) => month.label)).toEqual(['June 2026', 'July 2026'])
+    expect(calendar.canShiftMonth(1)).toBe(false)
+
+    calendar.startDate.value = '2026-09-01'
+    calendar.focusVisibleMonthAroundStart()
+    expect(calendar.calendarMonths.value[0]!.label).toBe('June 2026')
+
+    const july = calendar.calendarMonths.value[1]!
+    expect(calendar.isCellDisabled(july.cells.find((cell) => cell.isCurrentMonth && cell.day === 20)!)).toBe(false)
+    expect(calendar.isCellDisabled(july.cells.find((cell) => cell.isCurrentMonth && cell.day === 21)!)).toBe(true)
+  })
+
+  it('keeps the usual view when the latest pickable day is in the past', () => {
+    const calendar = useCalendarWidget({ lastPickableDate: () => new Date(2026, 2, 3) })
+    expect(calendar.canShiftMonth(1)).toBe(false)
+    calendar.startDate.value = '2026-05-02'
+    calendar.focusVisibleMonthAroundStart()
+    expect(calendar.calendarMonths.value[0]!.label).toBe('April 2026')
+  })
+
   it('emits onRangeConfirmed when both dates land', () => {
     const confirmed = vi.fn()
     const calendar = useCalendarWidget({ onRangeConfirmed: confirmed })

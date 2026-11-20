@@ -11,7 +11,7 @@
     <template v-else>
       <ul v-if="current.length" class="peak-rows" data-testid="peak-rows">
         <li v-for="row in current" :key="row.peakPeriodId">
-          <button type="button" class="peak-row" :aria-label="`Open ${row.periodName}`" data-testid="peak-row" @click="open(row.peakPeriodId)">
+          <button type="button" class="peak-row" :aria-label="`Open peak period ${row.periodName}`" data-testid="peak-row" @click="open(row.peakPeriodId)">
             <span class="peak-row__name">{{ row.periodName }}</span>
             <span class="peak-row__dates">{{ row.dates }}</span>
             <span class="peak-row__when">{{ row.when }}</span>
@@ -23,7 +23,7 @@
         <h2 v-explain="'peakPeriodsEnded'" class="static-page-section-heading">Ended</h2>
         <ul class="peak-rows peak-rows--ended" data-testid="peak-rows-ended">
           <li v-for="row in ended" :key="row.peakPeriodId">
-            <button type="button" class="peak-row" :aria-label="`Open ${row.periodName}`" data-testid="peak-row-ended" @click="open(row.peakPeriodId)">
+            <button type="button" class="peak-row" :aria-label="`Open peak period ${row.periodName}`" data-testid="peak-row-ended" @click="open(row.peakPeriodId)">
               <span class="peak-row__name">{{ row.periodName }}</span>
               <span class="peak-row__dates">{{ row.dates }}</span>
               <span class="peak-row__when">{{ row.when }}</span>
