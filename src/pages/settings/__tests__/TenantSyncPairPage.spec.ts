@@ -54,9 +54,9 @@ const got = (over: Partial<GetSyncPairResponse> = {}): GetSyncPairResponse => ({
   ],
   pastOrders: [
     { recordKey: 'O1', orderName: 'M1301877', otherSystemId: '#GOR197004512', sourceCreatedStamp: '2026-11-21T04:20:00Z',
-      waitingMinutes: 400, reportedInRunId: null },
+      waitingMinutes: 400, reportedInRunId: null, reportedInSavedRunId: null },
     { recordKey: 'O2', orderName: 'M1301902', otherSystemId: null, sourceCreatedStamp: '2026-11-21T04:26:00Z',
-      waitingMinutes: 394, reportedInRunId: null },
+      waitingMinutes: 394, reportedInRunId: null, reportedInSavedRunId: null },
   ],
   automations: [
     { automationId: 'A1', label: 'Daily Order Reconciliation',
@@ -108,14 +108,16 @@ describe('TenantSyncPairPage', () => {
     const base = got()
     getSyncPair.mockResolvedValue({
       ...base,
-      pastOrders: [{ ...base.pastOrders![0], reportedInRunId: 'RR9' }, base.pastOrders![1]],
+      pastOrders: [{ ...base.pastOrders![0], reportedInRunId: 'RR9', reportedInSavedRunId: 'RS9' }, base.pastOrders![1]],
     })
     const wrapper = await mountPage()
     const links = wrapper.findAll('[data-testid="sync-pair-past-run"]')
     expect(links).toHaveLength(1)
     expect(links[0]!.text()).toBe('in run RR9')
-    expect(links[0]!.attributes('data-to')).toContain('reconciliation-run-live')
-    expect(links[0]!.attributes('data-to')).toContain('RR9')
+    expect(JSON.parse(links[0]!.attributes('data-to')!)).toMatchObject({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: 'RS9', runResultId: 'RR9' },
+    })
   })
 
   it('shows the label, the switch, the five facts, today’s charts and the orders past the allowance', async () => {

@@ -48,6 +48,8 @@ export interface SyncPastOrder {
   waitingMinutes: number
   /** The newest run of the pair's daily check that started after the order went past allowance; null if none yet. */
   reportedInRunId: string | null
+  /** The saved run (rule set) that run belongs to; set whenever reportedInRunId is. */
+  reportedInSavedRunId: string | null
 }
 
 export interface SyncUpstreamOption {

@@ -39336,6 +39336,9 @@
                                 },
                                 "reportedInRunId": {
                                     "type": "string"
+                                },
+                                "reportedInSavedRunId": {
+                                    "type": "string"
                                 }
                             }
                         }

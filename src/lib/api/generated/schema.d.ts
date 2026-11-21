@@ -13029,6 +13029,7 @@ export interface components {
                 sourceCreatedStamp?: string;
                 waitingMinutes?: number;
                 reportedInRunId?: string;
+                reportedInSavedRunId?: string;
             }[];
             automations?: {
                 automationId?: string;

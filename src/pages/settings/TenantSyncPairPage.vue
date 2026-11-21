@@ -54,10 +54,10 @@
               <span class="sync-pair-row__soft">
                 {{ row.otherSystemId }}
                 <RouterLink
-                  v-if="row.reportedInRunId"
+                  v-if="row.reportedInRunId && row.reportedInSavedRunId"
                   class="sync-pair-row__run"
                   data-testid="sync-pair-past-run"
-                  :to="{ name: 'reconciliation-run-live', params: { savedRunId: saved?.automationId ?? '', runResultId: row.reportedInRunId } }"
+                  :to="{ name: 'reconciliation-run-live', params: { savedRunId: row.reportedInSavedRunId, runResultId: row.reportedInRunId } }"
                 >in run {{ row.reportedInRunId }}</RouterLink>
               </span>
             </div>
@@ -468,6 +468,7 @@ const pastRows = computed(() => pastOrders.value.map((order) => ({
   waiting: durationWords(order.waitingMinutes),
   otherSystemId: order.otherSystemId || '—',
   reportedInRunId: order.reportedInRunId,
+  reportedInSavedRunId: order.reportedInSavedRunId,
 })))
 
 /** The choices, plus the value the pair has today when it is not one of them (a peak period's, say). */
