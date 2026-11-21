@@ -943,16 +943,85 @@ describe('ReconciliationRuleSetManagerPage', () => {
     oneField.unmount()
   })
 
-  it('shows an editor an empty run\'s conclusions as None yet', async () => {
+  it('conclusions section has a pencil that opens the conclusions page', async () => {
+    draftStoreState.workflowOrigin = null
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: conclusionsTree() })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const pencil = wrapper.get('[data-testid="ruleset-manager-edit-conclusions"]')
+    expect(pencil.attributes('aria-label')).toBe('Edit conclusions')
+    expect(pencil.classes()).toEqual(expect.arrayContaining(['app-icon-action', 'ruleset-manager-section-edit']))
+    expect(pencil.find('svg').exists()).toBe(true)
+    expect(pencil.text()).toBe('')
+    expect(wrapper.get('[data-testid="ruleset-manager-conclusions"]').element.contains(pencil.element)).toBe(true)
+
+    await pencil.trigger('click')
+    await flushPromises()
+
+    expect(draftStoreState.setWorkflowOrigin).toHaveBeenCalledWith('Run Details', expect.any(String))
+    expect(draftStoreState.setRuleSetDraft).toHaveBeenCalledWith(expect.objectContaining({ savedRunId: 'RS_ORDER_SYNC' }), 'ruleset-manager')
+    expect(routerPush).toHaveBeenCalledWith({ name: 'reconciliation-conclusions-editor' })
+  })
+
+  it('rows are read-only and end with Unexplained', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockResolvedValue({
+      ok: true, messages: [], errors: [], conclusions: { ...conclusionsTree(), unexplainedOutcome: 'EXPECTED' },
+    })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    const section = wrapper.get('[data-testid="ruleset-manager-conclusions"]')
+    const rows = section.findAll('li.run-conclusion')
+    expect(rows).toHaveLength(3)
+    const last = rows[2]!
+    expect(last.attributes('data-testid')).toBe('run-conclusions-unexplained')
+    expect(last.find('.run-conclusion__name').text()).toBe('Unexplained')
+    expect(last.text()).toContain('when nothing above matches')
+    expect(last.get('[data-testid="run-conclusions-outcome"]').text()).toBe('Expected')
+    expect(last.find('button').exists()).toBe(false)
+    expect(section.find('[data-testid="run-conclusions-list"] button').exists()).toBe(false)
+    expect(section.findAll('[data-testid="run-conclusions-node"]')).toHaveLength(2)
+  })
+
+  it('shows Unexplained as Shown when it is left at its default', async () => {
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: conclusionsTree() })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-conclusions-unexplained"] [data-testid="run-conclusions-outcome"]').text()).toBe('Shown')
+  })
+
+  it('no pencil without edit rights', async () => {
+    permissionState.canEditTenantSettings = false
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: conclusionsTree() })
+
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ruleset-manager-conclusions"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ruleset-manager-edit-conclusions"]').exists()).toBe(false)
+  })
+
+  it('empty run says Set up conclusions and shows only the Unexplained row', async () => {
     draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
     getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: { ...conclusionsTree(), conclusions: [] } })
 
     const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="run-conclusions-empty"]').text()).toBe('None yet.')
-    expect(wrapper.findAll('[data-testid="run-conclusions-node"]')).toHaveLength(0)
-    expect(wrapper.find('[data-testid="run-conclusions-new"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="ruleset-manager-edit-conclusions"]').attributes('aria-label')).toBe('Set up conclusions')
+    const section = wrapper.get('[data-testid="ruleset-manager-conclusions"]')
+    expect(section.findAll('li.run-conclusion')).toHaveLength(1)
+    expect(section.find('[data-testid="run-conclusions-unexplained"]').exists()).toBe(true)
+    expect(section.text()).not.toContain('None yet.')
   })
 
   it('shows the conclusions read-only to someone who cannot edit the run', async () => {

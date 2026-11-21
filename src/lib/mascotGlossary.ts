@@ -434,7 +434,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'what each row of this run is concluded to be. Tried top to bottom, the first that holds names the row.',
   },
   conclusionBucket: {
-    title: 'Applies to',
+    title: 'Explains',
     body: 'the rows it is tried on: missing from one side, a rule differs, every finding, or any finding.',
     byDirectiveOnly: true,
   },

@@ -139,9 +139,23 @@
          order they are tried. -->
     <StaticPageSection v-if="showConclusions" data-testid="ruleset-manager-conclusions">
       <template #header>
-        <div class="ruleset-manager-section-title">
-          <h2 class="static-page-section-heading">Conclusions</h2>
-          <p class="ruleset-manager-section-note" data-testid="ruleset-manager-conclusions-note">First match wins.</p>
+        <div class="ruleset-manager-section-header section-header-row">
+          <div class="ruleset-manager-section-title">
+            <h2 class="static-page-section-heading">Conclusions</h2>
+            <p class="ruleset-manager-section-note" data-testid="ruleset-manager-conclusions-note">First match wins.</p>
+          </div>
+          <button
+            v-if="canEditTenantSettings"
+            type="button"
+            class="app-icon-action ruleset-manager-section-edit"
+            data-testid="ruleset-manager-edit-conclusions"
+            :aria-label="conclusions.list.value.length ? 'Edit conclusions' : 'Set up conclusions'"
+            @click="openConclusionEditWorkflow"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path :d="editIconPath" fill="currentColor" />
+            </svg>
+          </button>
         </div>
       </template>
       <RunConclusionRows />
@@ -391,7 +405,7 @@ const conclusions = useRunConclusions({
 provide(RUN_CONCLUSIONS_KEY, conclusions)
 const isPopupOpen = computed(() => Boolean(authInfoPopup.value))
 // An editor always has the section, even before the conclusions load or when there are none; anyone else sees it once
-// they have loaded. The rows only read here: there is no way to add one on this page yet.
+// they have loaded. The rows only read here; the pencil opens the conclusions page.
 const showConclusions = computed(() => Boolean(draft.value && savedRunId.value)
   && (canEditTenantSettings.value || conclusions.loaded.value))
 const runHistoryRoute = computed(() => buildReconciliationRunHistoryRoute({
@@ -946,6 +960,15 @@ async function openRuleEditWorkflow(): Promise<void> {
   draftStore.setWorkflowOrigin('Run Details', route.fullPath || '/reconciliation/ruleset-manager')
   draftStore.setRuleSetDraft(draft.value, 'ruleset-manager')
   await router.push({ name: 'reconciliation-ruleset-editor' })
+}
+
+async function openConclusionEditWorkflow(): Promise<void> {
+  if (!canEditTenantSettings.value) return
+  if (!draft.value) return
+
+  draftStore.setWorkflowOrigin('Run Details', route.fullPath || '/reconciliation/ruleset-manager')
+  draftStore.setRuleSetDraft(draft.value, 'ruleset-manager')
+  await router.push({ name: 'reconciliation-conclusions-editor' })
 }
 
 async function openRunWorkflow(): Promise<void> {

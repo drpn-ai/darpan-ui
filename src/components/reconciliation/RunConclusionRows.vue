@@ -1,7 +1,7 @@
 <template>
   <!-- DAR-UI-128, DAR-UI-135. The run's conclusions as equal read-only rows in the order they are tried (first match
        wins): its rank, what it is called and which check it explains, its question, when it holds, and what it does to
-       the row. A stored tree reads flattened, as the conclusions page edits it. -->
+       the row. Unexplained ends the list. A stored tree reads flattened, as the conclusions page edits it. -->
   <div class="run-conclusion-rows" data-testid="run-conclusions">
     <p v-if="loading && !loaded" class="section-note" data-testid="run-conclusions-loading">Loading...</p>
 
@@ -42,7 +42,22 @@
           <span v-if="node.suggestsFilter" class="run-conclusion__suggests" data-testid="run-conclusions-suggests">suggests a filter</span>
         </span>
       </li>
-      <li v-if="!list.length" class="run-conclusion run-conclusion--none" data-testid="run-conclusions-empty">None yet.</li>
+      <li class="run-conclusion run-conclusion--unexplained" data-testid="run-conclusions-unexplained">
+        <span class="run-conclusion__number" aria-hidden="true"></span>
+        <span class="run-conclusion__code">
+          <span class="run-conclusion__name">Unexplained</span>
+        </span>
+        <span class="run-conclusion__question"></span>
+        <span class="run-conclusion__when">when nothing above matches</span>
+        <span class="run-conclusion__end">
+          <span
+            v-explain="'conclusionOutcome'"
+            class="run-conclusion__outcome"
+            :class="{ 'run-conclusion__outcome--quiet': unexplained }"
+            data-testid="run-conclusions-outcome"
+          >{{ outcomeLabel(unexplained) }}</span>
+        </span>
+      </li>
     </ul>
   </div>
 </template>
@@ -53,7 +68,7 @@ import { injectRunConclusions, outcomeLabel } from '../../composables/useRunConc
 import { vExplain } from '../../directives/vExplain'
 import { explainsLabel } from '../../lib/conclusionLines'
 
-const { loading, loaded, errors, list, lineContext, conclusionLabel, describeLines } = injectRunConclusions()
+const { loading, loaded, errors, list, unexplained, lineContext, conclusionLabel, describeLines } = injectRunConclusions()
 </script>
 
 <style scoped>
@@ -87,12 +102,6 @@ const { loading, loaded, errors, list, lineContext, conclusionLabel, describeLin
   gap: var(--space-3);
   min-height: 3.6rem;
   padding: var(--space-1-5) var(--space-3);
-}
-
-.run-conclusion--none {
-  display: flex;
-  min-height: 3.4rem;
-  color: var(--text-muted);
 }
 
 .run-conclusion__number {

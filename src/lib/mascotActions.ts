@@ -182,6 +182,14 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'takes it off the list. Once you save, rows it named fall to the conclusions below it, or to Unexplained.',
   },
   // DAR-UI-135: the conclusions edit page.
+  'edit conclusions': {
+    title: 'Edit conclusions',
+    body: 'opens the conclusions page: add, reorder and change what each row is concluded to be. Kept with Save conclusions, and applies from the next run.',
+  },
+  'set up conclusions': {
+    title: 'Set up conclusions',
+    body: 'opens the conclusions page to name what each finding of this run is. Until then every finding shows as Unexplained. Applies from the next run.',
+  },
   'add conclusion': {
     title: 'Add conclusion',
     body: 'a new one at the bottom, tried after those above it. It opens with its first line ready to fill.',
