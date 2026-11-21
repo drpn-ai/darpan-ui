@@ -5,12 +5,14 @@
   <figure class="pulse-chart" data-testid="pulse-oldest-chart">
     <figcaption class="pulse-chart__head">
       <span v-explain="'syncPulseOldestChart'" class="pulse-chart__title">Oldest waiting, hours</span>
-      <span v-if="current" class="pulse-chart__readout" data-testid="pulse-readout">{{ hourReadout(current) }}</span>
+      <span class="pulse-chart__readout" aria-live="polite" data-testid="pulse-readout">{{ current ? hourReadout(current) : '' }}</span>
     </figcaption>
     <!-- Focusable so the arrow keys can move the readout along the hours. -->
     <div
       class="pulse-chart__plot"
       tabindex="0"
+      role="group"
+      aria-label="Oldest waiting by hour. Arrow keys move between hours."
       data-testid="pulse-oldest-plot"
       @keydown="onKey"
       @mouseleave="emit('update:active', null)"
@@ -44,12 +46,23 @@
           :x="CHART.left + 4"
           :y="allowanceY - 6"
         >allowance {{ durationWords(allowanceMinutes) }}</text>
-        <polyline v-if="hours.length" class="pulse-chart__line" data-testid="pulse-oldest-line" :points="points" />
+        <!-- One line per run of consecutive hours: a missing hour breaks it. A lone hour is a small dot. -->
+        <template v-for="(run, runIndex) in runs" :key="runIndex">
+          <polyline v-if="run.length > 1" class="pulse-chart__line" data-testid="pulse-oldest-line" :points="pointsOf(run)" />
+          <circle
+            v-else
+            class="pulse-chart__dot pulse-chart__dot--lone"
+            data-testid="pulse-oldest-lone"
+            :cx="xs[run[0] ?? 0]"
+            :cy="yAt(run[0] ?? 0)"
+            r="3"
+          />
+        </template>
         <circle
           v-if="current"
           class="pulse-chart__dot"
           :cx="xs[currentIndex]"
-          :cy="yFor(current.oldestMinutes / 60, yMaxHours)"
+          :cy="yAt(currentIndex)"
           r="4"
         />
         <g v-for="(hour, index) in hours" :key="hour.hour">
@@ -80,20 +93,23 @@ import { computed } from 'vue'
 import { vExplain } from '../../directives/vExplain'
 import type { SyncSample } from '../../lib/api/pulseTypes'
 import { durationWords } from '../../lib/pulseWords'
-import { activeIndex, CHART, hourReadout, hourXs, pulseHours, slotWidth, steppedIndex, yFor } from './pulseChart'
+import { activeIndex, CHART, consecutiveRuns, hourReadout, hourXs, pulseHours, slotWidth, steppedIndex, yFor } from './pulseChart'
 
 const props = withDefaults(defineProps<{
   samples: readonly SyncSample[]
   allowanceMinutes: number
   /** The hour pointed at on either chart (an index into the drawn hours); null is the latest. */
   active?: number | null
-}>(), { active: null })
+  /** The clock the hours are read on; the display zone (the tenant's, when it has one) by default. */
+  timeZone?: string
+}>(), { active: null, timeZone: undefined })
 
 const emit = defineEmits<{ 'update:active': [index: number | null] }>()
 
-const hours = computed(() => pulseHours(props.samples))
-const xs = computed(() => hourXs(hours.value.length))
-const slot = computed(() => slotWidth(hours.value.length))
+const hours = computed(() => pulseHours(props.samples, props.timeZone))
+const xs = computed(() => hourXs(hours.value))
+const slot = computed(() => slotWidth(hours.value))
+const runs = computed(() => consecutiveRuns(hours.value))
 const currentIndex = computed(() => activeIndex(hours.value.length, props.active))
 const current = computed(() => hours.value[currentIndex.value] ?? null)
 
@@ -107,9 +123,13 @@ const yMaxHours = computed(() => {
 const ticks = computed(() => [0, yMaxHours.value / 2, yMaxHours.value].map((value) => ({ value, y: yFor(value, yMaxHours.value) })))
 const allowanceY = computed(() => yFor(props.allowanceMinutes / 60, yMaxHours.value))
 
-const points = computed(() => hours.value
-  .map((hour, index) => `${(xs.value[index] ?? 0).toFixed(1)},${yFor(hour.oldestMinutes / 60, yMaxHours.value).toFixed(1)}`)
-  .join(' '))
+function yAt(index: number): number {
+  return yFor((hours.value[index]?.oldestMinutes ?? 0) / 60, yMaxHours.value)
+}
+
+function pointsOf(run: number[]): string {
+  return run.map((index) => `${(xs.value[index] ?? 0).toFixed(1)},${yAt(index).toFixed(1)}`).join(' ')
+}
 
 const summary = computed(() => {
   const list = hours.value
@@ -117,7 +137,8 @@ const summary = computed(() => {
   const last = list[list.length - 1]
   if (!first || !last) return 'No pulses today.'
   const highest = list.reduce((top, hour) => (hour.oldestMinutes > top.oldestMinutes ? hour : top), first)
-  const passed = list.find((hour) => hour.oldestMinutes > props.allowanceMinutes)
+  // An order that has waited the whole allowance is past it (the pulse's own rule).
+  const passed = list.find((hour) => hour.oldestMinutes >= props.allowanceMinutes)
   const span = first === last
     ? `${durationWords(first.oldestMinutes)} at ${first.hour}:00`
     : `${durationWords(first.oldestMinutes)} at ${first.hour}:00, ${durationWords(last.oldestMinutes)} at ${last.hour}:00`

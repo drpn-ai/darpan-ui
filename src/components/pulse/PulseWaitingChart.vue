@@ -9,6 +9,8 @@
     <div
       class="pulse-chart__plot"
       tabindex="0"
+      role="group"
+      aria-label="Orders waiting by hour. Arrow keys move between hours."
       data-testid="pulse-waiting-plot"
       @keydown="onKey"
       @mouseleave="emit('update:active', null)"
@@ -73,27 +75,32 @@ const props = withDefaults(defineProps<{
   allowanceMinutes: number
   /** The hour pointed at on either chart (an index into the drawn hours); null is the latest. */
   active?: number | null
-}>(), { active: null })
+  /** The clock the hours are read on; the display zone (the tenant's, when it has one) by default. */
+  timeZone?: string
+}>(), { active: null, timeZone: undefined })
 
 const emit = defineEmits<{ 'update:active': [index: number | null] }>()
 
-const hours = computed(() => pulseHours(props.samples))
-const xs = computed(() => hourXs(hours.value.length))
-const slot = computed(() => slotWidth(hours.value.length))
+const hours = computed(() => pulseHours(props.samples, props.timeZone))
+const xs = computed(() => hourXs(hours.value))
+const slot = computed(() => slotWidth(hours.value))
 const barWidth = computed(() => Math.min(36, slot.value * 0.6))
 const currentIndex = computed(() => activeIndex(hours.value.length, props.active))
 
-/** A round top for the scale: the highest count up to the next half of its order of magnitude (1,610 → 2,000). */
+/**
+ * A round, even top for the scale, so its middle tick is a whole count too: the highest count up to the next half of
+ * its order of magnitude (1,610 → 2,000; 3 → 4; 15 → 20).
+ */
 const yMax = computed(() => {
   const highest = Math.max(0, ...hours.value.map((hour) => hour.waitingCount))
   if (highest <= 0) return 10
-  const half = 10 ** Math.floor(Math.log10(highest)) / 2
-  return Math.max(Math.ceil(highest / half) * half, 2)
+  const step = Math.max(1, 10 ** Math.floor(Math.log10(highest)) / 2)
+  const top = Math.ceil(highest / step) * step
+  return top % 2 ? top + step : top
 })
 
 function count(value: number): string {
-  if (value >= 1000) return `${Number((value / 1000).toFixed(1))}k`
-  return String(Number(value.toFixed(1)))
+  return value >= 1000 ? `${Number((value / 1000).toFixed(1))}k` : String(value)
 }
 
 const ticks = computed(() => [0, yMax.value / 2, yMax.value].map((value) => ({ text: count(value), y: yFor(value, yMax.value) })))

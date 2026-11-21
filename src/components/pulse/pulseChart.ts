@@ -1,12 +1,14 @@
-// DAR-BE-328. What the two Today charts on a sync pair's page share: today's pulses as one reading per hour of the
-// tenant's day, and the x positions both charts draw them at, so an hour sits in the same place on each.
+// DAR-BE-328. What the two Today charts on a sync pair's page share: today's pulses as one reading per clock hour of
+// the tenant's day, and the x positions both charts draw them at, so an hour sits in the same place on each.
 import type { SyncSample } from '../../lib/api/pulseTypes'
 import { durationWords } from '../../lib/pulseWords'
-import { formatClockTime } from '../../lib/utils/date'
+import { getDefaultDisplayTimeZone } from '../../lib/utils/date'
 
 export interface PulseHour {
-  /** "09": the hour of the tenant's day. */
+  /** "09": the hour of the day on the chart's clock. */
   hour: string
+  /** Hours since the first drawn hour: the hour's slot on the x axis, so a missing hour leaves its slot empty. */
+  slot: number
   waitingCount: number
   /** 0 when nothing was waiting. */
   oldestMinutes: number
@@ -17,40 +19,80 @@ export interface PulseHour {
 export const CHART = { width: 840, height: 220, left: 44, right: 824, top: 16, bottom: 184, tickY: 204 } as const
 
 const OK = 'SPS_OK'
+const HOUR_MS = 3_600_000
+
+/** The start of the clock hour an instant falls in, in `timeZone`, and that hour as "HH". Half-hour zones included. */
+function clockHour(at: number, timeZone: string | undefined): { start: number; hour: string } | null {
+  let parts: Intl.DateTimeFormatPart[]
+  try {
+    parts = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone })
+      .formatToParts(new Date(at))
+  } catch {
+    return null
+  }
+  const part = (type: string) => Number(parts.find((item) => item.type === type)?.value ?? NaN)
+  const [hour, minute, second] = [part('hour'), part('minute'), part('second')]
+  if ([hour, minute, second].some(Number.isNaN)) return null
+  return { start: at - (minute * 60 + second) * 1000 - (((at % 1000) + 1000) % 1000), hour: String(hour).padStart(2, '0') }
+}
 
 /**
- * One reading per hour that has one: the hour's last pulse that read the systems. A failed or skipped pulse counted
- * nothing, so an hour with only those is not drawn. The hour is read on the display clock, the tenant's zone.
+ * One reading per clock hour that has one: the hour's last pulse that read the systems. A failed or skipped pulse
+ * counted nothing, so an hour with only those is not drawn and leaves a gap. Hours are read on `timeZone` (the
+ * display zone, which is the tenant's whenever the tenant has one) and kept in time order, so a day that crosses
+ * midnight on that clock still runs left to right.
  */
-export function pulseHours(samples: readonly SyncSample[]): PulseHour[] {
-  const latest = new Map<string, { at: number; sample: SyncSample }>()
+export function pulseHours(samples: readonly SyncSample[], timeZone: string | undefined = getDefaultDisplayTimeZone()): PulseHour[] {
+  const latest = new Map<number, { at: number; hour: string; sample: SyncSample }>()
   for (const sample of samples) {
     if (sample.statusEnumId !== OK) continue
     const at = new Date(sample.sampleStamp).getTime()
-    const hour = formatClockTime(sample.sampleStamp).slice(0, 2)
-    if (!hour || Number.isNaN(at)) continue
-    const kept = latest.get(hour)
-    if (!kept || at >= kept.at) latest.set(hour, { at, sample })
+    if (Number.isNaN(at)) continue
+    const clock = clockHour(at, timeZone)
+    if (!clock) continue
+    const kept = latest.get(clock.start)
+    if (!kept || at >= kept.at) latest.set(clock.start, { at, hour: clock.hour, sample })
   }
-  return [...latest.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([hour, { sample }]) => ({
+  const starts = [...latest.keys()].sort((a, b) => a - b)
+  const first = starts[0] ?? 0
+  return starts.map((start) => {
+    const { hour, sample } = latest.get(start)!
+    return {
       hour,
+      slot: Math.round((start - first) / HOUR_MS),
       waitingCount: sample.waitingCount ?? 0,
       oldestMinutes: sample.oldestWaitingMinutes ?? 0,
       pastAllowanceCount: sample.pastAllowanceCount ?? 0,
-    }))
+    }
+  })
 }
 
-/** The width each hour gets: drawn hours share the plot evenly. */
-export function slotWidth(count: number): number {
-  return (CHART.right - CHART.left) / Math.max(count, 1)
+/** Every clock hour from the first drawn one to the last, drawn or not. */
+export function slotCount(hours: readonly PulseHour[]): number {
+  return (hours[hours.length - 1]?.slot ?? -1) + 1
 }
 
-/** The centre of each hour's slot, the same on both charts. */
-export function hourXs(count: number): number[] {
-  const slot = slotWidth(count)
-  return Array.from({ length: count }, (_, index) => CHART.left + slot * (index + 0.5))
+/** The width each clock hour gets. */
+export function slotWidth(hours: readonly PulseHour[]): number {
+  return (CHART.right - CHART.left) / Math.max(slotCount(hours), 1)
+}
+
+/** The centre of each drawn hour's slot, the same on both charts. */
+export function hourXs(hours: readonly PulseHour[]): number[] {
+  const width = slotWidth(hours)
+  return hours.map((hour) => CHART.left + width * (hour.slot + 0.5))
+}
+
+/** The drawn hours as runs of consecutive clock hours (indexes into `hours`): a line never bridges a missing hour. */
+export function consecutiveRuns(hours: readonly PulseHour[]): number[][] {
+  const runs: number[][] = []
+  hours.forEach((hour, index) => {
+    const run = runs[runs.length - 1]
+    const previous = hours[index - 1]
+    if (run && previous && hour.slot === previous.slot + 1) run.push(index)
+    else runs.push([index])
+  })
+  return runs
 }
 
 /** y for a value on a 0..max scale. */

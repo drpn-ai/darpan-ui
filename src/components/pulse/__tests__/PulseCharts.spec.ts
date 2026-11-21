@@ -22,11 +22,17 @@ describe('PulseOldestChart', () => {
   beforeEach(() => setDefaultDisplayTimeZone('UTC'))
   afterEach(() => setDefaultDisplayTimeZone(undefined))
 
-  it('draws one point per hour with a reading, on the hour ticks, and the dashed allowance line', () => {
+  it('draws each hour with a reading on the hour ticks, breaks the line at a missing hour, and draws the dashed allowance line', () => {
     const wrapper = mount(PulseOldestChart, { props: { samples, allowanceMinutes: 360 } })
-    const points = wrapper.find('[data-testid="pulse-oldest-line"]').attributes('points')!.trim().split(/\s+/)
-    expect(points).toHaveLength(3)
     expect(wrapper.findAll('[data-testid="pulse-hour-tick"]').map((tick) => tick.text())).toEqual(['08', '09', '11'])
+    // 10:00 had only a failed pulse: 08–09 is one line, 11 stands alone, and 10's slot stays empty.
+    const lines = wrapper.findAll('[data-testid="pulse-oldest-line"]')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]!.attributes('points')!.trim().split(/\s+/)).toHaveLength(2)
+    const lone = wrapper.findAll('[data-testid="pulse-oldest-lone"]')
+    expect(lone).toHaveLength(1)
+    const slot = (824 - 44) / 4
+    expect(Number(lone[0]!.attributes('cx'))).toBeCloseTo(44 + slot * 3.5, 1)
 
     // 400 minutes is the highest; with the 6h allowance the scale runs to 8 hours, so the line sits at 6/8 up.
     const allowance = wrapper.find('[data-testid="pulse-allowance-line"]')
@@ -64,6 +70,37 @@ describe('PulseOldestChart', () => {
     )
   })
 
+  it('reads hours on the tenant’s clock in time order, across its midnight and in a half-hour zone', () => {
+    // 07:30Z and 08:10Z are 23:30 and 00:10 in Los Angeles: one evening hour, then the next day's first.
+    const lateNight = [ok('2026-11-21T07:30:00Z', 5, 30), ok('2026-11-21T08:10:00Z', 6, 70)]
+    const la = mount(PulseOldestChart, { props: { samples: lateNight, allowanceMinutes: 360, timeZone: 'America/Los_Angeles' } })
+    expect(la.findAll('[data-testid="pulse-hour-tick"]').map((tick) => tick.text())).toEqual(['23', '00'])
+    const xs = la.find('[data-testid="pulse-oldest-line"]').attributes('points')!.trim().split(/\s+/).map((point) => Number(point.split(',')[0]))
+    expect(xs[0]!).toBeLessThan(xs[1]!)
+    expect(la.find('[data-testid="pulse-readout"]').text()).toBe('00:00 · oldest 1h 10m · 6 waiting · 0 past allowance')
+
+    // 03:20Z and 03:40Z are one UTC hour but 08:50 and 09:10 in Kolkata: two hours there.
+    const kolkata = mount(PulseOldestChart, {
+      props: { samples: [ok('2026-11-21T03:20:00Z', 1, 10), ok('2026-11-21T03:40:00Z', 2, 20)], allowanceMinutes: 360, timeZone: 'Asia/Kolkata' },
+    })
+    expect(kolkata.findAll('[data-testid="pulse-hour-tick"]').map((tick) => tick.text())).toEqual(['08', '09'])
+  })
+
+  it('counts an hour that has waited exactly the allowance as past it', () => {
+    const wrapper = mount(PulseOldestChart, { props: { samples: [ok('2026-11-21T09:00:00Z', 3, 360, 1)], allowanceMinutes: 360 } })
+    expect(wrapper.find('svg').attributes('aria-label')).toBe(
+      'Oldest waiting order by hour today: 6h at 09:00, highest 6h at 09:00. Allowance 6h, passed at 09:00.',
+    )
+  })
+
+  it('names its focusable plot and announces the readout politely', () => {
+    const wrapper = mount(PulseOldestChart, { props: { samples, allowanceMinutes: 360 } })
+    const plot = wrapper.find('[data-testid="pulse-oldest-plot"]')
+    expect(plot.attributes('role')).toBe('group')
+    expect(plot.attributes('aria-label')).toBe('Oldest waiting by hour. Arrow keys move between hours.')
+    expect(wrapper.find('[data-testid="pulse-readout"]').attributes('aria-live')).toBe('polite')
+  })
+
   it('says so when there is no pulse today', () => {
     const wrapper = mount(PulseOldestChart, { props: { samples: [], allowanceMinutes: 360 } })
     expect(wrapper.find('svg').attributes('aria-label')).toBe('No pulses today.')
@@ -81,8 +118,11 @@ describe('PulseWaitingChart', () => {
     expect(bars).toHaveLength(3)
 
     const oldest = mount(PulseOldestChart, { props: { samples, allowanceMinutes: 360 } })
-    const pointXs = oldest.find('[data-testid="pulse-oldest-line"]').attributes('points')!.trim().split(/\s+/)
-      .map((point) => Number(point.split(',')[0]))
+    const pointXs = [
+      ...oldest.find('[data-testid="pulse-oldest-line"]').attributes('points')!.trim().split(/\s+/)
+        .map((point) => Number(point.split(',')[0])),
+      Number(oldest.find('[data-testid="pulse-oldest-lone"]').attributes('cx')),
+    ]
     const barCentres = bars.map((bar) => Number(bar.attributes('x')) + Number(bar.attributes('width')) / 2)
     barCentres.forEach((centre, index) => expect(centre).toBeCloseTo(pointXs[index]!, 1))
 
@@ -99,6 +139,13 @@ describe('PulseWaitingChart', () => {
     expect(wrapper.emitted('update:active')?.at(-1)).toEqual([2])
     await wrapper.find('[data-testid="pulse-waiting-plot"]').trigger('mouseleave')
     expect(wrapper.emitted('update:active')?.at(-1)).toEqual([null])
+  })
+
+  it('marks the scale in whole orders only', () => {
+    const wrapper = mount(PulseWaitingChart, { props: { samples: [ok('2026-11-21T09:00:00Z', 3, 10)], allowanceMinutes: 360 } })
+    const ticks = wrapper.findAll('.pulse-chart__tick').map((tick) => tick.text()).filter((text) => text !== '09')
+    expect(ticks).toEqual(['0', '2', '4'])
+    expect(wrapper.find('[data-testid="pulse-waiting-plot"]').attributes('aria-label')).toBe('Orders waiting by hour. Arrow keys move between hours.')
   })
 
   it('summarises the day for a screen reader', () => {
