@@ -173,6 +173,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Add conclusion code',
     body: 'makes the code now and picks it here. The conclusion itself keeps it only once you save.',
   },
+  'done with this line': {
+    title: 'Done with this line',
+    body: 'closes the edit row and reads the line as a sentence. Nothing is saved until Save conclusions.',
+  },
   'delete conclusion': {
     title: 'Delete conclusion',
     body: 'removes it and every conclusion under it, saved at once. Rows it named are named by the rest from the next run.',
@@ -1047,6 +1051,11 @@ export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Obje
     body: 'picks the chat space that gets a summary card after each run, or None. The same choice as this audit’s row in Notifications.',
   }],
   // DAR-UI-128: each Ruleset manager conclusion row is named "Open conclusion <name>".
+  // DAR-UI-135: each condition reads as a sentence and is named "Change this line: <sentence>".
+  [/^change this line: .+$/, {
+    title: 'Change this line',
+    body: 'turns this one condition into a row: what is checked, the test, the values. Nothing is saved until Save conclusions.',
+  }],
   [/^open conclusion .+$/, {
     title: 'Conclusion',
     body: 'opens its question and the conditions that prove it. Saving there replaces the run’s whole tree, all or nothing; results get named by it from the next run.',

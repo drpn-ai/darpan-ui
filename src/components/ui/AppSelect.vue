@@ -63,9 +63,10 @@
           :ref="setOptionRef"
           type="button"
           class="app-select-option"
-          :class="{ 'app-select-option--selected': option.value === modelValue }"
+          :class="{ 'app-select-option--selected': option.value === modelValue, 'app-select-option--disabled': option.disabled }"
           role="option"
           :aria-selected="option.value === modelValue ? 'true' : 'false'"
+          :aria-disabled="option.disabled ? 'true' : undefined"
           data-testid="app-select-option"
           :data-option-value="option.value"
           @click="selectOption(option.value)"
@@ -291,6 +292,11 @@ async function handleTriggerEnter(): Promise<void> {
   gap: var(--space-00);
   max-height: min(18rem, 48vh);
   overflow: auto;
+}
+
+.app-select-option--disabled {
+  color: color-mix(in oklab, var(--text) 40%, transparent);
+  cursor: not-allowed;
 }
 
 .app-select-empty {

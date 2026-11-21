@@ -40,6 +40,28 @@ describe('AppSelect', () => {
     })
   })
 
+  it('shows a disabled option as aria-disabled and refuses to select it', async () => {
+    const wrapper = mount(AppSelect, {
+      props: {
+        modelValue: 'a',
+        options: [
+          { value: 'a', label: 'Alpha' },
+          { value: 'b', label: 'Beta', disabled: true },
+        ],
+        testId: 's',
+      },
+    })
+    await wrapper.get('[data-testid="s"]').trigger('click')
+    const option = wrapper.get('[data-option-value="b"]')
+    expect(option.attributes('aria-disabled')).toBe('true')
+    await option.trigger('click')
+    await option.trigger('keydown.enter')
+    await option.trigger('keydown.space')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    await wrapper.get('[data-option-value="a"]').trigger('click')
+    expect(wrapper.emitted('update:modelValue')).toEqual([['a']])
+  })
+
   it('renders a stroked chevron icon instead of a filled triangle glyph', () => {
     const wrapper = mount(AppSelect, {
       props: {

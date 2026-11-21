@@ -12,6 +12,8 @@ import { DISMISS_INLINE_MENUS_EVENT, INLINE_MENU_OPEN_EVENT } from './uiEvents'
 export interface InlineSelectOption {
   value: string
   label: string
+  /** Listed but not choosable: rendered aria-disabled, and neither click nor keyboard selects it. */
+  disabled?: boolean
 }
 
 interface UseInlineSelectOptions<Option extends InlineSelectOption> {
@@ -95,7 +97,12 @@ export function useInlineSelect<Option extends InlineSelectOption>({
     focusOption(selectedIndex >= 0 ? selectedIndex : 0)
   }
 
+  function isDisabledOption(value: string): boolean {
+    return options().find((option) => option.value === value)?.disabled === true
+  }
+
   async function selectOption(value: string): Promise<void> {
+    if (isDisabledOption(value)) return
     emitValue(value)
     closeMenu()
     await nextTick()
@@ -103,6 +110,7 @@ export function useInlineSelect<Option extends InlineSelectOption>({
   }
 
   async function selectOptionAndSubmit(value: string): Promise<void> {
+    if (isDisabledOption(value)) return
     emitValue(value)
     closeMenu()
     await nextTick()
