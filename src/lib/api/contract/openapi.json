@@ -39224,10 +39224,7 @@
                         "type": "string"
                     }
                 },
-                "required": [
-                    "syncPairId"
-                ],
-                "description": "One sync pair with today's samples, open orders past allowance, and the pickers."
+                "description": "One sync pair with today's samples, open orders past allowance, and the pickers. Without syncPairId, only the pickers (for a new pair)."
             },
             "GetSyncPairResult": {
                 "type": "object",

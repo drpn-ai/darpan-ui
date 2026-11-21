@@ -1,0 +1,92 @@
+/* DAR-BE-328. The two Today charts on a sync pair's page, themed like the run flowchart's SVG (RunFlowchartBoard.vue):
+   tokens only, the connector's 2px ink, its 7 7 dash, muted tabular labels. */
+.pulse-chart {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 1px solid var(--static-tile-border);
+  border-radius: var(--static-surface-radius);
+  background: var(--static-tile-bg);
+}
+
+.pulse-chart__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  min-height: 1.6rem;
+}
+
+.pulse-chart__title {
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+}
+
+.pulse-chart__readout {
+  margin-left: auto;
+  color: var(--text-soft);
+  font-size: var(--type-note-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-chart__plot {
+  border-radius: var(--radius-sm);
+}
+
+.pulse-chart__plot:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 68%, transparent);
+  outline-offset: 2px;
+}
+
+.pulse-chart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.pulse-chart__base {
+  stroke: var(--static-tile-border);
+  stroke-width: 1;
+}
+
+.pulse-chart__tick,
+.pulse-chart__allowance-text {
+  fill: var(--text-muted);
+  font-size: var(--type-table-head-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-chart__allowance {
+  stroke: color-mix(in oklab, var(--text) 58%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 7 7;
+}
+
+.pulse-chart__line {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.pulse-chart__dot {
+  fill: var(--text);
+  stroke: var(--static-tile-bg);
+  stroke-width: 2;
+}
+
+.pulse-chart__bar {
+  fill: var(--text-dim);
+}
+
+.pulse-chart__bar--active {
+  fill: var(--text);
+}
+
+.pulse-chart__hit {
+  fill: transparent;
+  pointer-events: all;
+}

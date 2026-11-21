@@ -12991,9 +12991,9 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetRunPulseFlagsResult"];
         };
-        /** @description One sync pair with today's samples, open orders past allowance, and the pickers. */
+        /** @description One sync pair with today's samples, open orders past allowance, and the pickers. Without syncPairId, only the pickers (for a new pair). */
         GetSyncPairParams: {
-            syncPairId: string;
+            syncPairId?: string;
         };
         GetSyncPairResult: {
             ok?: boolean;

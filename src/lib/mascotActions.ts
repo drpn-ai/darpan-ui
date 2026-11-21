@@ -609,6 +609,40 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'empties both times. Saved like that, the period has no peak hours and no run waits for them.',
   },
 
+  /* ── Sync pulse (DAR-BE-328) ────────────────────────────────────────────────── */
+  'open sync pulse': {
+    title: 'Sync pulse',
+    body: 'this tenant’s sync pairs, each watching one daily check’s orders for ones that wait too long between systems.',
+  },
+  'set up sync pulse': {
+    title: 'Set up sync pulse',
+    body: 'the list of sync pairs, empty for now. Add one to watch a daily check’s orders between its runs.',
+  },
+  'add sync pair': {
+    title: 'Add sync pair',
+    body: 'a new pair on its own page. Nothing is watched until it has a run, an upstream side and is saved.',
+  },
+  'back to sync pulse': {
+    title: 'Back to sync pulse',
+    body: 'the list of this tenant’s sync pairs. Unsaved edits here are dropped on the way out.',
+  },
+  'sync pulse on': {
+    title: 'Sync pulse on',
+    body: 'whether this pair pulses at all. Off, nothing is read or posted. Kept with Save.',
+  },
+  'save sync pair': {
+    title: 'Save sync pair',
+    body: 'keeps the pulse, the allowance and on/off for this pair. The next pulse follows them.',
+  },
+  'delete sync pair': {
+    title: 'Delete sync pair',
+    body: 'asks first. Its pulses and the orders it was watching go with it; there is no undo.',
+  },
+  'hourly summary': {
+    title: 'Hourly summary',
+    body: 'whether the chat space gets a short card each hour with what is waiting. Kept with Save.',
+  },
+
   /* ── Connections and settings ───────────────────────────────────────────────── */
   'run connection diagnostics': {
     title: 'Run connection diagnostics',
@@ -1065,6 +1099,35 @@ export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Obje
   [/^open peak period .+$/, {
     title: 'Open',
     body: 'this period’s own page: its dates, peak hours, the runs it moves and the runs that wait.',
+  }],
+  // DAR-BE-328: each Sync pulse row names its pair ("Open sync pair <label>"); the pair page's facts name their value.
+  [/^open sync pair .+$/, {
+    title: 'Open',
+    body: 'this pair’s own page: its pulse, its allowance, today’s charts and the orders past the allowance.',
+  }],
+  [/^every: .+$/, {
+    title: 'Every',
+    body: 'sets how often the pulse reads both systems: every 1 to 6 hours, or off. Kept with Save.',
+  }],
+  [/^allowance: .+$/, {
+    title: 'Allowance',
+    body: 'sets how long an order may wait before it counts as late, 15 minutes to 48 hours. Kept with Save.',
+  }],
+  [/^run: .+$/, {
+    title: 'Run',
+    body: 'picks the daily check this pair watches. Its two systems become the pair’s two sides.',
+  }],
+  [/^upstream side: .+$/, {
+    title: 'Upstream side',
+    body: 'picks the system orders reach first. The pulse reads it for orders the other side does not have yet.',
+  }],
+  [/^chat space: .+$/, {
+    title: 'Chat space',
+    body: 'picks where late orders and the hourly summary are posted, or none.',
+  }],
+  [/^hourly summary: .+$/, {
+    title: 'Hourly summary',
+    body: 'turns a short card each hour in the chat space on or off. Kept with Save.',
   }],
   [/^export .+ extract$/, {
     title: 'Export extract',

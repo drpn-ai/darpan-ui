@@ -72,7 +72,8 @@ export interface ListSyncPairsResponse extends PulseEnvelope {
 }
 
 export interface GetSyncPairResponse extends PulseEnvelope {
-  syncPair: SyncPair
+  /** Absent when asked without a syncPairId: then only the pickers (automations, chatSpaces) come back. */
+  syncPair?: SyncPair | null
   samplesToday: SyncSample[]
   pastOrders: SyncPastOrder[]
   automations: SyncAutomationOption[]

@@ -1,7 +1,62 @@
 <template>
-  <StaticPageFrame>
+  <StaticPageFrame :class="{ 'static-page-frame--popup-open': activePopup !== null }">
     <template #hero>
-      <h1 v-explain="'syncPulse'">Sync pair</h1>
+      <StaticRecordTitle
+        v-if="draft"
+        :model-value="title"
+        :editable="false"
+        test-id="sync-pair-name"
+        explain="syncPairName"
+        toggle-label="Sync pulse on"
+        :on="draft.isActive"
+        toggle-test-id="sync-pair-on"
+        :toggle-disabled="!canEdit || busy || periodLocked"
+        @update:on="setActive"
+      >
+        <span v-if="dirty" class="sync-pair-edited-mark" data-testid="sync-pair-edited">• edited</span>
+      </StaticRecordTitle>
+      <h1 v-else v-explain="'syncPulse'">Sync pair</h1>
+    </template>
+
+    <LoadingState v-if="loading" noun="sync pair" />
+    <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="sync-pair-page-error" />
+
+    <template v-if="draft">
+      <StaticFactStrip :facts="facts" test-id="sync-pair-facts" @open="openFact" />
+
+      <template v-if="draft.syncPairId">
+        <StaticPageSection data-testid="sync-pair-today">
+          <template #header>
+            <h2 v-explain="'syncPulseToday'" class="static-page-section-heading">Today</h2>
+          </template>
+          <div v-if="samples.length" class="sync-pair-charts">
+            <PulseOldestChart v-model:active="activeHour" :samples="samples" :allowance-minutes="draft.allowanceMinutes" />
+            <PulseWaitingChart v-model:active="activeHour" :samples="samples" :allowance-minutes="draft.allowanceMinutes" />
+          </div>
+          <p v-else class="section-note" data-testid="sync-pair-today-empty">No pulses today.</p>
+        </StaticPageSection>
+
+        <StaticPageSection>
+          <template #header>
+            <h2 v-explain="'syncPulsePastAllowance'" class="static-page-section-heading">Past allowance</h2>
+          </template>
+          <div v-if="pastRows.length" class="sync-pair-rows" data-testid="sync-pair-past-orders">
+            <div class="sync-pair-row sync-pair-row--head" data-testid="sync-pair-past-head">
+              <span v-explain="'syncPastOrder'" class="sync-pair-row__head-label">Order</span>
+              <span v-explain="'syncPastCreated'" class="sync-pair-row__head-label">Created</span>
+              <span v-explain="'syncPastWaiting'" class="sync-pair-row__head-label">Waiting</span>
+              <span v-explain="'syncPastOtherSystem'" class="sync-pair-row__head-label">{{ otherSystemLabel }}</span>
+            </div>
+            <div v-for="row in pastRows" :key="row.recordKey" class="sync-pair-row" data-testid="sync-pair-past-order">
+              <span>{{ row.order }}</span>
+              <span class="sync-pair-row__soft">{{ row.created }}</span>
+              <span>{{ row.waiting }}</span>
+              <span class="sync-pair-row__soft">{{ row.otherSystemId }}</span>
+            </div>
+          </div>
+          <p v-else class="section-note" data-testid="sync-pair-past-empty">Nothing past the allowance.</p>
+        </StaticPageSection>
+      </template>
     </template>
 
     <template #actions>
@@ -17,14 +72,769 @@
             <path :d="backIconPath" fill="currentColor" />
           </svg>
         </RouterLink>
+        <AppSaveAction
+          v-if="canEdit && draft && (!draft.syncPairId || dirty)"
+          label="Save sync pair"
+          test-id="sync-pair-save"
+          :disabled="busy || !canSave"
+          @click="save"
+        />
+        <button
+          v-if="canEdit && draft?.syncPairId"
+          type="button"
+          class="app-icon-action app-icon-action--large app-icon-action--danger"
+          aria-label="Delete sync pair"
+          data-testid="sync-pair-delete"
+          :disabled="busy"
+          @click="openPopup('delete')"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
+          </svg>
+        </button>
       </div>
     </template>
   </StaticPageFrame>
+
+  <div
+    v-if="activePopup && draft"
+    class="popup-workflow-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="sync-pair-popup-title"
+    @click.self="closePopup"
+  >
+    <section class="popup-workflow-modal workflow-panel">
+      <header class="workflow-panel-header">
+        <h2 id="sync-pair-popup-title" data-testid="sync-pair-popup-title">{{ popupTitle }}</h2>
+      </header>
+
+      <div class="workflow-step-wrapper">
+        <WorkflowStepForm
+          v-if="activePopup === 'every'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="How often should it pulse?"
+          primary-label="Save"
+          primary-action-variant="save"
+          primary-test-id="sync-pair-every-save"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="sync-pair-every-cancel"
+          @cancel="closePopup"
+          @submit="saveEvery"
+        >
+          <label class="wizard-input-shell">
+            <span v-explain="'syncPairEvery'" class="workflow-context-label">Every</span>
+            <AppSelect v-model="everyForm" :options="everyOptions" test-id="sync-pair-every-select" />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup === 'allowance'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="How long may an order wait?"
+          primary-label="Save"
+          primary-action-variant="save"
+          primary-test-id="sync-pair-allowance-save"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="sync-pair-allowance-cancel"
+          @cancel="closePopup"
+          @submit="saveAllowance"
+        >
+          <label class="wizard-input-shell">
+            <span v-explain="'syncPairAllowance'" class="workflow-context-label">Allowance</span>
+            <AppSelect v-model="allowanceForm" :options="allowanceOptions" test-id="sync-pair-allowance-select" />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup === 'run'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="Which daily check does it watch?"
+          primary-label="Save"
+          primary-action-variant="save"
+          primary-test-id="sync-pair-run-save"
+          :submit-disabled="!runForm"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="sync-pair-run-cancel"
+          @cancel="closePopup"
+          @submit="saveRun"
+        >
+          <label class="wizard-input-shell">
+            <span v-explain="'syncPairRun'" class="workflow-context-label">Run</span>
+            <AppSelect
+              v-model="runForm"
+              :options="runOptions"
+              placeholder="Select run"
+              test-id="sync-pair-run-select"
+              searchable
+              search-placeholder="Search runs"
+            />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup === 'upstream'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="Which side do orders reach first?"
+          primary-label="Save"
+          primary-action-variant="save"
+          primary-test-id="sync-pair-upstream-save"
+          :submit-disabled="!upstreamForm"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="sync-pair-upstream-cancel"
+          @cancel="closePopup"
+          @submit="saveUpstream"
+        >
+          <label class="wizard-input-shell">
+            <span v-explain="'syncPairUpstream'" class="workflow-context-label">Upstream side</span>
+            <AppSelect
+              v-model="upstreamForm"
+              :options="upstreamOptions"
+              placeholder="Select side"
+              test-id="sync-pair-upstream-select"
+            />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup === 'chat'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="Where should it post?"
+          primary-label="Save"
+          primary-action-variant="save"
+          primary-test-id="sync-pair-chat-save"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="sync-pair-chat-cancel"
+          @cancel="closePopup"
+          @submit="saveChat"
+        >
+          <label class="wizard-input-shell">
+            <span v-explain="'syncPairChatSpace'" class="workflow-context-label">Chat space</span>
+            <AppSelect
+              v-model="chatForm"
+              :options="chatOptions"
+              test-id="sync-pair-chat-select"
+              searchable
+              search-placeholder="Search chat spaces"
+            />
+          </label>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup === 'hourly'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          question="Post a summary every hour?"
+          primary-label="Save"
+          primary-action-variant="save"
+          primary-test-id="sync-pair-hourly-save"
+          :show-enter-hint="false"
+          show-cancel-action
+          cancel-test-id="sync-pair-hourly-cancel"
+          @cancel="closePopup"
+          @submit="saveHourly"
+        >
+          <div class="sync-pair-popup-toggle">
+            <AppToggleSwitch v-model="hourlyForm" label="Hourly summary" test-id="sync-pair-hourly-toggle" />
+            <span>Hourly summary</span>
+          </div>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
+          v-else-if="activePopup === 'delete'"
+          class="workflow-form--popup-compact"
+          :question="`Delete ${title}?`"
+          :show-primary-action="false"
+        >
+          <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="sync-pair-popup-error" />
+          <p class="section-note">Its pulses and the orders it is watching go with it.</p>
+          <div class="wizard-actions">
+            <button
+              type="button"
+              class="app-icon-action app-icon-action--large app-icon-action--danger"
+              aria-label="Confirm delete"
+              data-testid="sync-pair-delete-confirm"
+              :disabled="popupBusy"
+              @click="deletePair"
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
+              </svg>
+            </button>
+            <AppCancelAction test-id="sync-pair-delete-cancel" :disabled="popupBusy" @click="closePopup" />
+          </div>
+        </WorkflowStepForm>
+      </div>
+    </section>
+  </div>
 </template>
 
 <script setup lang="ts">
-// DAR-BE-328. Placeholder for one sync pair's page; the pulse page (plan 3, Task 8) replaces it.
-import { RouterLink } from 'vue-router'
+// DAR-BE-328. One sync pair on a page of its own: which daily check it watches, how often it pulses, how long an order
+// may wait, and today's pulses as two charts with the orders now past the allowance. The switch and the facts change
+// only this page until Save. While the page is open and untouched, it reads the pair again every minute. On /new the
+// facts also pick the run, its upstream side, the chat space and the hourly summary; the backend validates every save
+// and its sentences show as they come.
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import PulseOldestChart from '../../components/pulse/PulseOldestChart.vue'
+import PulseWaitingChart from '../../components/pulse/PulseWaitingChart.vue'
+import AppCancelAction from '../../components/ui/AppCancelAction.vue'
+import AppSaveAction from '../../components/ui/AppSaveAction.vue'
+import AppSelect from '../../components/ui/AppSelect.vue'
+import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
+import InlineValidation from '../../components/ui/InlineValidation.vue'
+import LoadingState from '../../components/ui/LoadingState.vue'
+import StaticFactStrip, { type StaticFact } from '../../components/ui/StaticFactStrip.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
-import { backIconPath } from '../../lib/iconPaths'
+import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
+import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
+import { pulseFacade } from '../../lib/api/facade'
+import type {
+  GetSyncPairResponse,
+  SyncAutomationOption,
+  SyncChatSpaceOption,
+  SyncPair,
+  SyncPastOrder,
+  SyncSample,
+} from '../../lib/api/pulseTypes'
+import { backIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
+import {
+  ALLOWANCE_CHOICES,
+  allowanceWords,
+  durationWords,
+  PULSE_EVERY_CHOICES,
+  pulseEveryWords,
+} from '../../lib/pulseWords'
+import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
+import { formatClockTime } from '../../lib/utils/date'
+import { usePermissionsStore } from '../../stores/permissions'
+
+interface Draft {
+  syncPairId: string
+  automationId: string
+  /** FILE_1 or FILE_2; '' until chosen on /new. */
+  upstreamSide: string
+  allowanceMinutes: number
+  /** null is off. */
+  pulseEveryMinutes: number | null
+  /** '' is none. */
+  chatSpaceId: string
+  hourlySummary: boolean
+  isActive: boolean
+}
+
+type Popup = 'every' | 'allowance' | 'run' | 'upstream' | 'chat' | 'hourly' | 'delete'
+
+const REFRESH_MS = 60_000
+const OFF = 'off'
+const NONE = 'none'
+// A new pair starts on the mockup's hourly pulse and six-hour allowance.
+const NEW_PULSE_MINUTES = 60
+const NEW_ALLOWANCE_MINUTES = 360
+
+const route = useRoute()
+const router = useRouter()
+const permissionsStore = usePermissionsStore()
+const canEdit = computed(() => permissionsStore.canEditTenantSettings)
+
+const routePairId = computed(() => String(route.params.syncPairId ?? ''))
+
+const saved = ref<SyncPair | null>(null)
+const samples = ref<SyncSample[]>([])
+const pastOrders = ref<SyncPastOrder[]>([])
+const automations = ref<SyncAutomationOption[]>([])
+const chatSpaces = ref<SyncChatSpaceOption[]>([])
+const loading = ref(false)
+const pageError = ref('')
+
+const draft = ref<Draft | null>(null)
+const baseline = ref('')
+const saving = ref(false)
+
+const activePopup = ref<Popup | null>(null)
+const popupBusy = ref(false)
+const popupError = ref('')
+const everyForm = ref(OFF)
+const allowanceForm = ref(String(NEW_ALLOWANCE_MINUTES))
+const runForm = ref('')
+const upstreamForm = ref('')
+const chatForm = ref(NONE)
+const hourlyForm = ref(false)
+
+/** The hour pointed at on either Today chart; null is the latest. */
+const activeHour = ref<number | null>(null)
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+let unmounted = false
+
+const busy = computed(() => saving.value || popupBusy.value)
+const isNew = computed(() => Boolean(draft.value && !draft.value.syncPairId))
+
+function snapshot(): string {
+  return JSON.stringify(draft.value)
+}
+const dirty = computed(() => Boolean(draft.value) && snapshot() !== baseline.value)
+const canSave = computed(() => Boolean(draft.value?.automationId && draft.value.upstreamSide))
+
+/**
+ * A peak period sets today's allowance or pulse, and the pair's read gives only today's values. Saving them from here
+ * would make them the pair's normal ones, so while a period holds them the page leaves both, and the switch, alone.
+ */
+const periodLocked = computed(() => Boolean(saved.value?.periodName))
+
+const chosenAutomation = computed(() => automations.value.find((automation) => automation.automationId === draft.value?.automationId) ?? null)
+
+const title = computed(() => saved.value?.label || chosenAutomation.value?.label || 'New sync pair')
+
+const upstreamLabel = computed(() => chosenAutomation.value?.upstreamOptions
+  .find((option) => option.upstreamSide === draft.value?.upstreamSide)?.label ?? '')
+
+/** The side the orders should reach after the upstream one; it names the past-allowance list's last column. */
+const otherSystemLabel = computed(() => chosenAutomation.value?.upstreamOptions
+  .find((option) => option.upstreamSide !== draft.value?.upstreamSide)?.label || 'Other system')
+
+const chatLabel = computed(() => chatSpaces.value.find((space) => space.chatSpaceId === draft.value?.chatSpaceId)?.label
+  ?? (draft.value?.chatSpaceId ? draft.value.chatSpaceId : 'None'))
+
+/** The last pulse today that read the systems; a failed or skipped one counted nothing. */
+const latestSample = computed(() => {
+  const at = (sample: SyncSample) => new Date(sample.sampleStamp).getTime()
+  return samples.value
+    .filter((sample) => sample.statusEnumId === 'SPS_OK')
+    .reduce<SyncSample | null>((last, sample) => (!last || at(sample) >= at(last) ? sample : last), null)
+})
+
+const oldestMinutes = computed(() => latestSample.value?.oldestWaitingMinutes ?? pastOrders.value[0]?.waitingMinutes ?? null)
+
+const facts = computed<StaticFact[]>(() => {
+  const current = draft.value
+  if (!current) return []
+  const changeable = { interactive: canEdit.value && !periodLocked.value, disabled: busy.value }
+  const every: StaticFact = {
+    key: 'every', label: 'Every', value: pulseEveryWords(current.pulseEveryMinutes),
+    sub: saved.value?.lastPulseStamp ? `last ${formatClockTime(saved.value.lastPulseStamp)}` : '',
+    explain: 'syncPairEvery', testId: 'sync-pair-fact-every', ...changeable,
+  }
+  const allowance: StaticFact = {
+    key: 'allowance', label: 'Allowance', value: allowanceWords(current.allowanceMinutes),
+    sub: saved.value?.periodName || 'normal', explain: 'syncPairAllowance', testId: 'sync-pair-fact-allowance', ...changeable,
+  }
+  if (isNew.value) {
+    const pickable = { interactive: canEdit.value, disabled: busy.value }
+    return [
+      { key: 'run', label: 'Run', value: chosenAutomation.value?.label || 'Not set', explain: 'syncPairRun',
+        testId: 'sync-pair-fact-run', ...pickable },
+      { key: 'upstream', label: 'Upstream side', value: upstreamLabel.value || 'Not set', explain: 'syncPairUpstream',
+        testId: 'sync-pair-fact-upstream', ...pickable, disabled: busy.value || !current.automationId },
+      every,
+      allowance,
+      { key: 'chat', label: 'Chat space', value: chatLabel.value, explain: 'syncPairChatSpace',
+        testId: 'sync-pair-fact-chat', ...pickable },
+      { key: 'hourly', label: 'Hourly summary', value: current.hourlySummary ? 'On' : 'Off', explain: 'syncPairHourlySummary',
+        testId: 'sync-pair-fact-hourly', ...pickable },
+    ]
+  }
+  return [
+    every,
+    allowance,
+    { key: 'waiting', label: 'Waiting', value: (saved.value?.waitingCount ?? 0).toLocaleString('en-US'), sub: 'orders',
+      explain: 'syncPairWaiting', testId: 'sync-pair-fact-waiting' },
+    { key: 'oldest', label: 'Oldest', value: oldestMinutes.value ? durationWords(oldestMinutes.value) : 'None',
+      sub: oldestMinutes.value ? pastOrders.value[0]?.orderName ?? '' : '', explain: 'syncPairOldest',
+      testId: 'sync-pair-fact-oldest' },
+    { key: 'past', label: 'Past allowance', value: (saved.value?.pastAllowanceCount ?? 0).toLocaleString('en-US'),
+      sub: 'findings', explain: 'syncPairPastAllowance', testId: 'sync-pair-fact-past' },
+  ]
+})
+
+const pastRows = computed(() => pastOrders.value.map((order) => ({
+  recordKey: order.recordKey,
+  order: order.orderName || order.recordKey,
+  created: formatClockTime(order.sourceCreatedStamp) || '—',
+  waiting: durationWords(order.waitingMinutes),
+  otherSystemId: order.otherSystemId || '—',
+})))
+
+/** The choices, plus the value the pair has today when it is not one of them (a peak period's, say). */
+function withCurrent(options: { value: string; label: string }[], value: string, label: string) {
+  return options.some((option) => option.value === value) ? options : [...options, { value, label }]
+}
+
+const everyOptions = computed(() => withCurrent(
+  PULSE_EVERY_CHOICES.map((minutes) => ({
+    value: minutes === null ? OFF : String(minutes),
+    label: minutes === null ? 'Off' : minutes === 60 ? '1 hour' : `${minutes / 60} hours`,
+  })),
+  everyForm.value,
+  pulseEveryWords(Number(everyForm.value)),
+))
+
+const allowanceOptions = computed(() => withCurrent(
+  ALLOWANCE_CHOICES.map((minutes) => ({ value: String(minutes), label: allowanceWords(minutes) })),
+  allowanceForm.value,
+  allowanceWords(Number(allowanceForm.value)),
+))
+
+const runOptions = computed(() => automations.value.map((automation) => ({ value: automation.automationId, label: automation.label })))
+
+const upstreamOptions = computed(() => (chosenAutomation.value?.upstreamOptions ?? [])
+  .map((option) => ({ value: option.upstreamSide, label: option.label })))
+
+const chatOptions = computed(() => [
+  { value: NONE, label: 'None' },
+  ...chatSpaces.value.map((space) => ({ value: space.chatSpaceId, label: space.label })),
+])
+
+const popupTitle = computed(() => {
+  switch (activePopup.value) {
+    case 'every': return 'Every'
+    case 'allowance': return 'Allowance'
+    case 'run': return 'Run'
+    case 'upstream': return 'Upstream side'
+    case 'chat': return 'Chat space'
+    case 'hourly': return 'Hourly summary'
+    case 'delete': return 'Delete sync pair'
+    default: return ''
+  }
+})
+
+function messageOf(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
+/** A refusal returned rather than thrown: the server's own sentences. */
+function refusalOf(response: { ok?: boolean; errors?: string[] }, fallback: string): string {
+  if (response.ok !== false) return ''
+  return response.errors?.length ? response.errors.join(' ') : fallback
+}
+
+function resetDraft(): void {
+  const pair = saved.value
+  draft.value = pair
+    ? {
+        syncPairId: pair.syncPairId,
+        automationId: pair.automationId,
+        upstreamSide: pair.upstreamSide ?? '',
+        allowanceMinutes: pair.allowanceMinutes,
+        pulseEveryMinutes: pair.pulseEveryMinutes || null,
+        chatSpaceId: pair.chatSpaceId ?? '',
+        hourlySummary: pair.hourlySummary === 'Y',
+        isActive: pair.isActive !== 'N',
+      }
+    : {
+        syncPairId: '', automationId: '', upstreamSide: '', allowanceMinutes: NEW_ALLOWANCE_MINUTES,
+        pulseEveryMinutes: NEW_PULSE_MINUTES, chatSpaceId: '', hourlySummary: false, isActive: true,
+      }
+  baseline.value = snapshot()
+}
+
+function apply(response: GetSyncPairResponse): void {
+  saved.value = response.syncPair ?? null
+  samples.value = response.samplesToday ?? []
+  pastOrders.value = response.pastOrders ?? []
+  automations.value = response.automations ?? []
+  chatSpaces.value = response.chatSpaces ?? []
+}
+
+/** The pair, or on /new only the pickers (no syncPairId): its daily checks and chat spaces. */
+async function fetchPair(syncPairId: string): Promise<GetSyncPairResponse> {
+  const response = await pulseFacade.getSyncPair(syncPairId ? { syncPairId } : {})
+  const refusal = refusalOf(response, 'Could not load the sync pair.')
+  if (refusal) throw new Error(refusal)
+  return response
+}
+
+async function load(syncPairId: string): Promise<void> {
+  loading.value = true
+  pageError.value = ''
+  draft.value = null
+  saved.value = null
+  samples.value = []
+  pastOrders.value = []
+  activeHour.value = null
+  try {
+    apply(await fetchPair(syncPairId))
+    resetDraft()
+  } catch (error) {
+    pageError.value = messageOf(error, 'Could not load the sync pair.')
+  } finally {
+    loading.value = false
+  }
+}
+
+function stopRefresh(): void {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = null
+}
+
+/**
+ * Every minute while the page is open: the pair read again, unless something on the page is unsaved, a popup is open
+ * or a save is in flight. A timeout chain, not an interval, so the next read waits for this one to answer.
+ */
+function scheduleRefresh(): void {
+  stopRefresh()
+  if (unmounted) return
+  refreshTimer = setTimeout(() => { void refreshTick() }, REFRESH_MS)
+}
+
+function quiet(): boolean {
+  return !dirty.value && !activePopup.value && !busy.value
+}
+
+async function refreshTick(): Promise<void> {
+  refreshTimer = null
+  const syncPairId = draft.value?.syncPairId
+  if (syncPairId && quiet()) {
+    try {
+      const response = await fetchPair(syncPairId)
+      // Something may have changed while the read was out: the page, the pair on show, or the page itself closing.
+      if (!unmounted && quiet() && draft.value?.syncPairId === syncPairId) {
+        apply(response)
+        resetDraft()
+        pageError.value = ''
+      }
+    } catch (error) {
+      if (!unmounted) pageError.value = messageOf(error, 'Could not load the sync pair.')
+    }
+  }
+  scheduleRefresh()
+}
+
+function setActive(on: boolean): void {
+  if (draft.value && !periodLocked.value) draft.value.isActive = on
+}
+
+function openPopup(popup: Popup): void {
+  if (!canEdit.value || busy.value) return
+  popupError.value = ''
+  activePopup.value = popup
+}
+
+function closePopup(): void {
+  if (popupBusy.value) return
+  activePopup.value = null
+  popupError.value = ''
+}
+
+function openFact(key: string): void {
+  const current = draft.value
+  if (!current) return
+  if (key === 'every') {
+    everyForm.value = current.pulseEveryMinutes ? String(current.pulseEveryMinutes) : OFF
+    openPopup('every')
+  } else if (key === 'allowance') {
+    allowanceForm.value = String(current.allowanceMinutes)
+    openPopup('allowance')
+  } else if (key === 'run') {
+    runForm.value = current.automationId
+    openPopup('run')
+  } else if (key === 'upstream') {
+    if (!current.automationId) return
+    upstreamForm.value = current.upstreamSide
+    openPopup('upstream')
+  } else if (key === 'chat') {
+    chatForm.value = current.chatSpaceId || NONE
+    openPopup('chat')
+  } else if (key === 'hourly') {
+    hourlyForm.value = current.hourlySummary
+    openPopup('hourly')
+  }
+}
+
+function saveEvery(): void {
+  if (draft.value) draft.value.pulseEveryMinutes = everyForm.value === OFF ? null : Number(everyForm.value)
+  closePopup()
+}
+
+function saveAllowance(): void {
+  if (draft.value) draft.value.allowanceMinutes = Number(allowanceForm.value)
+  closePopup()
+}
+
+function saveRun(): void {
+  const current = draft.value
+  if (!current || !runForm.value) return
+  // Each run has its own two sides, so a side picked for another run no longer means anything.
+  if (current.automationId !== runForm.value) current.upstreamSide = ''
+  current.automationId = runForm.value
+  closePopup()
+}
+
+function saveUpstream(): void {
+  if (draft.value && upstreamForm.value) draft.value.upstreamSide = upstreamForm.value
+  closePopup()
+}
+
+function saveChat(): void {
+  if (draft.value) draft.value.chatSpaceId = chatForm.value === NONE ? '' : chatForm.value
+  closePopup()
+}
+
+function saveHourly(): void {
+  if (draft.value) draft.value.hourlySummary = hourlyForm.value
+  closePopup()
+}
+
+async function deletePair(): Promise<void> {
+  const syncPairId = draft.value?.syncPairId
+  if (!syncPairId || popupBusy.value) return
+  popupBusy.value = true
+  popupError.value = ''
+  try {
+    const out = await pulseFacade.deleteSyncPair({ syncPairId })
+    const refusal = refusalOf(out, 'Could not delete the sync pair.')
+    if (refusal) {
+      popupError.value = refusal
+      return
+    }
+    popupBusy.value = false
+    closePopup()
+    void router.push({ name: 'settings-tenant-sync-pairs' })
+  } catch (error) {
+    popupError.value = messageOf(error, 'Could not delete the sync pair.')
+  } finally {
+    popupBusy.value = false
+  }
+}
+
+/** One Save: every fact and the switch together. A new pair then moves to its own address; either way it is read again. */
+async function save(): Promise<void> {
+  const current = draft.value
+  if (!current || busy.value || !canEdit.value || !canSave.value) return
+  saving.value = true
+  pageError.value = ''
+  try {
+    const out = await pulseFacade.saveSyncPair({
+      ...(current.syncPairId ? { syncPairId: current.syncPairId } : {}),
+      automationId: current.automationId,
+      upstreamSide: current.upstreamSide,
+      allowanceMinutes: current.allowanceMinutes,
+      // null is off, as none is no chat space: both are sent, so a save never keeps an old value by leaving it out.
+      pulseEveryMinutes: current.pulseEveryMinutes,
+      chatSpaceId: current.chatSpaceId || null,
+      hourlySummary: current.hourlySummary,
+      isActive: current.isActive,
+    })
+    const refusal = refusalOf(out, 'Could not save the sync pair.')
+    if (refusal) {
+      pageError.value = refusal
+      return
+    }
+    const wasNew = !current.syncPairId
+    current.syncPairId = out.syncPairId
+    if (wasNew) void router.replace({ name: 'settings-tenant-sync-pair', params: { syncPairId: out.syncPairId } })
+    try {
+      apply(await fetchPair(out.syncPairId))
+      resetDraft()
+    } catch (error) {
+      // Saved all the same: what is on the page is what was saved.
+      baseline.value = snapshot()
+      pageError.value = messageOf(error, 'Could not load the sync pair.')
+    }
+  } catch (error) {
+    pageError.value = messageOf(error, 'Could not save the sync pair.')
+  } finally {
+    saving.value = false
+  }
+}
+
+// A first Save on /new moves the URL to the pair's own; that is this page already, so it does not reload.
+watch(routePairId, (id) => {
+  if (id && id === draft.value?.syncPairId) return
+  void load(id)
+})
+
+// Esc closes a popup; the delete popup has no cancel of WorkflowStepForm's own to catch it.
+function handleCancelRequest(event: Event): void {
+  if (!activePopup.value || popupBusy.value) return
+  event.preventDefault()
+  closePopup()
+}
+
+onMounted(() => {
+  document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest)
+  void load(routePairId.value)
+  scheduleRefresh()
+})
+
+onBeforeUnmount(() => {
+  unmounted = true
+  stopRefresh()
+  document.removeEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest)
+})
 </script>
+
+<style scoped>
+.sync-pair-edited-mark {
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+}
+
+.sync-pair-charts {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* The orders past the allowance as a bordered list of even rows, like a peak period's run times. */
+.sync-pair-rows {
+  display: grid;
+  border: 1px solid var(--static-tile-border);
+  border-radius: var(--static-surface-radius);
+  background: var(--static-tile-bg);
+  overflow: hidden;
+  font-size: var(--static-tile-text-size);
+}
+
+.sync-pair-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3rem;
+  padding: var(--space-1) var(--space-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-pair-row + .sync-pair-row {
+  border-top: 1px solid var(--static-tile-border);
+}
+
+.sync-pair-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sync-pair-row--head {
+  min-height: 2.4rem;
+}
+
+.sync-pair-row__head-label {
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+}
+
+.sync-pair-row__soft {
+  color: var(--text-soft);
+}
+
+.sync-pair-popup-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-soft);
+}
+
+@media (max-width: 768px) {
+  .sync-pair-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+}
+</style>

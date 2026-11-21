@@ -906,7 +906,8 @@ export const pulseFacade = {
   listSyncPairs(signal?: AbortSignal): Promise<ListSyncPairsResponse> {
     return callService<ListSyncPairsResponse>(PULSE.listSyncPairs, {}, signal)
   },
-  getSyncPair(payload: { syncPairId: string }, signal?: AbortSignal): Promise<GetSyncPairResponse> {
+  /** Without a syncPairId, only the pickers (automations, chatSpaces) for a new pair. */
+  getSyncPair(payload: { syncPairId?: string }, signal?: AbortSignal): Promise<GetSyncPairResponse> {
     return callService<GetSyncPairResponse>(PULSE.getSyncPair, payload, signal)
   },
   saveSyncPair(payload: SaveSyncPairPayload, signal?: AbortSignal): Promise<SaveSyncPairResponse> {

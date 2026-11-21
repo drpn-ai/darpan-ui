@@ -462,6 +462,97 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Sync pulse',
     body: 'watches orders that reached HotWax but not the other system yet, and tells you which ones waited longer than the allowance. Open a pair to see today.',
   },
+  // DAR-BE-328: one sync pair's page (its title, facts, Today charts and past-allowance list).
+  syncPairName: {
+    title: 'Sync pair',
+    body: 'named for the daily check it watches. Its upstream side is where orders arrive first; the pulse looks for ones not yet in the other system.',
+    byDirectiveOnly: true,
+  },
+  syncPairEvery: {
+    title: 'Every',
+    body: 'how often the pulse reads both systems for waiting orders. Off keeps the pair and its allowance but stops the pulse.',
+    byDirectiveOnly: true,
+  },
+  syncPairAllowance: {
+    title: 'Allowance',
+    body: 'how long an order may wait for the other system before it counts as late. The daily check also starts this long after its window ends.',
+    byDirectiveOnly: true,
+  },
+  syncPairWaiting: {
+    title: 'Waiting',
+    body: 'orders in the upstream system that the other system did not have at the last pulse, late or not.',
+    byDirectiveOnly: true,
+  },
+  syncPairOldest: {
+    title: 'Oldest',
+    body: 'how long the longest-waiting order had waited at the last pulse, with its order name when it is past the allowance.',
+    byDirectiveOnly: true,
+  },
+  syncPairPastAllowance: {
+    title: 'Past allowance',
+    body: 'waiting orders older than the allowance: the pulse’s findings. One closes when the other system has it.',
+    byDirectiveOnly: true,
+  },
+  syncPairRun: {
+    title: 'Run',
+    body: 'the daily check whose two systems the pulse watches. One pair per run; only a check that reads one day can have one.',
+    byDirectiveOnly: true,
+  },
+  syncPairUpstream: {
+    title: 'Upstream side',
+    body: 'the system orders reach first, which the pulse reads for orders still missing on the other side. It must be HotWax.',
+    byDirectiveOnly: true,
+  },
+  syncPairChatSpace: {
+    title: 'Chat space',
+    body: 'where the pulse posts orders that went past the allowance, and the hourly summary when it is on. None posts nothing.',
+    byDirectiveOnly: true,
+  },
+  syncPairHourlySummary: {
+    title: 'Hourly summary',
+    body: 'a short card in the chat space each hour with what is waiting, the oldest and what is past the allowance.',
+    byDirectiveOnly: true,
+  },
+  syncPulseToday: {
+    title: 'Today',
+    body: 'each hour’s last pulse so far today, on the tenant’s clock. Point at an hour on either chart to read it above.',
+    byDirectiveOnly: true,
+  },
+  syncPulseOldestChart: {
+    title: 'Oldest waiting',
+    body: 'how long the longest-waiting order had waited at each hour, in hours. The dashed line is the allowance.',
+    byDirectiveOnly: true,
+  },
+  syncPulseWaitingChart: {
+    title: 'Waiting',
+    body: 'how many orders were waiting for the other system at each hour. The darker bar is the hour the readout names.',
+    byDirectiveOnly: true,
+  },
+  syncPulsePastAllowance: {
+    title: 'Past allowance',
+    body: 'orders still missing in the other system after the allowance, oldest first. One drops off once the other system has it.',
+    byDirectiveOnly: true,
+  },
+  syncPastOrder: {
+    title: 'Order',
+    body: 'the order’s name in the upstream system.',
+    byDirectiveOnly: true,
+  },
+  syncPastCreated: {
+    title: 'Created',
+    body: 'when the order was created upstream, on the tenant’s clock. Its wait counts from here.',
+    byDirectiveOnly: true,
+  },
+  syncPastWaiting: {
+    title: 'Waiting',
+    body: 'how long the order had waited at the last pulse.',
+    byDirectiveOnly: true,
+  },
+  syncPastOtherSystem: {
+    title: 'Other system',
+    body: 'the id the other system knows the order by, when the pulse could read one. A dash means none yet.',
+    byDirectiveOnly: true,
+  },
   // DAR-BE-328: one peak period's page.
   peakPeriodName: {
     title: 'Name',
