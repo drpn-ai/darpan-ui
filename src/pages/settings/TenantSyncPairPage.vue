@@ -51,7 +51,15 @@
               <span>{{ row.order }}</span>
               <span class="sync-pair-row__soft">{{ row.created }}</span>
               <span>{{ row.waiting }}</span>
-              <span class="sync-pair-row__soft">{{ row.otherSystemId }}</span>
+              <span class="sync-pair-row__soft">
+                {{ row.otherSystemId }}
+                <RouterLink
+                  v-if="row.reportedInRunId"
+                  class="sync-pair-row__run"
+                  data-testid="sync-pair-past-run"
+                  :to="{ name: 'reconciliation-run-live', params: { savedRunId: saved?.automationId ?? '', runResultId: row.reportedInRunId } }"
+                >in run {{ row.reportedInRunId }}</RouterLink>
+              </span>
             </div>
           </div>
           <p v-else class="section-note" data-testid="sync-pair-past-empty">Nothing past the allowance.</p>
@@ -459,6 +467,7 @@ const pastRows = computed(() => pastOrders.value.map((order) => ({
   created: formatClockTime(order.sourceCreatedStamp) || '—',
   waiting: durationWords(order.waitingMinutes),
   otherSystemId: order.otherSystemId || '—',
+  reportedInRunId: order.reportedInRunId,
 })))
 
 /** The choices, plus the value the pair has today when it is not one of them (a peak period's, say). */
@@ -815,6 +824,12 @@ onBeforeUnmount(() => {
 }
 
 .sync-pair-row__head-label {
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+}
+
+.sync-pair-row__run {
+  display: block;
   color: var(--text-muted);
   font-size: var(--type-note-size);
 }

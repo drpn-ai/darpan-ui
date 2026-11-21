@@ -104,6 +104,20 @@ describe('TenantSyncPairPage', () => {
     setDefaultDisplayTimeZone(undefined)
   })
 
+  it('a past order the daily check has reported links to that run', async () => {
+    const base = got()
+    getSyncPair.mockResolvedValue({
+      ...base,
+      pastOrders: [{ ...base.pastOrders![0], reportedInRunId: 'RR9' }, base.pastOrders![1]],
+    })
+    const wrapper = await mountPage()
+    const links = wrapper.findAll('[data-testid="sync-pair-past-run"]')
+    expect(links).toHaveLength(1)
+    expect(links[0]!.text()).toBe('in run RR9')
+    expect(links[0]!.attributes('data-to')).toContain('reconciliation-run-live')
+    expect(links[0]!.attributes('data-to')).toContain('RR9')
+  })
+
   it('shows the label, the switch, the five facts, today’s charts and the orders past the allowance', async () => {
     const wrapper = await mountPage()
     expect(getSyncPair).toHaveBeenCalledWith({ syncPairId: 'SP1' })

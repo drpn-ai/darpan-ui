@@ -402,6 +402,12 @@
                   class="run-result-record-cell__brief"
                   data-testid="diff-details-brief"
                 >{{ row.contradictionBrief }}</span>
+                <RouterLink
+                  v-if="pulseFlagFor(row.recordId)"
+                  class="run-result-record-cell__brief run-result-record-cell__pulse"
+                  data-testid="diff-details-pulse-flag"
+                  :to="{ name: 'settings-tenant-sync-pair', params: { syncPairId: pulseSyncPairId } }"
+                >flagged by sync pulse {{ pulseFlagFor(row.recordId) }}</RouterLink>
               </div>
             </template>
 
@@ -588,7 +594,7 @@ import { ApiCallError, isOtherTenantRecordError } from '../../lib/api/client'
 // Imported rather than relied on from main.ts's global registration: this page's own
 // tests mount it standalone, where a globally registered directive does not exist.
 import { vExplain } from '../../directives/vExplain'
-import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
+import { pulseFacade, reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
 import { runResultFirstPage } from '../../lib/api/queries'
 import type {
@@ -621,7 +627,7 @@ import {
 } from '../../lib/reconciliationRoutes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { backIconPath, downloadIconPath, listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
-import { formatSavedResultDateTime } from '../../lib/utils/date'
+import { formatClockTime, formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { countLabel } from '../../lib/utils/strings'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -770,6 +776,27 @@ const timelineRunResultId = computed(() =>
   liveRunResultId.value ||
   normalizeDisplayText(runResultsStore.getByFileName(outputFileName.value)?.reconciliationRunResultId),
 )
+// Sync pulse (DAR-BE-328): the orders the pulse had already flagged when this run started, read once per run.
+// A failure or a run with no pair shows nothing.
+const pulseFlags = ref<Record<string, string>>({})
+const pulseSyncPairId = ref('')
+watch(timelineRunResultId, async (runId) => {
+  pulseFlags.value = {}
+  pulseSyncPairId.value = ''
+  if (!runId) return
+  try {
+    const response = await pulseFacade.getRunPulseFlags({ reconciliationRunResultId: runId })
+    if (timelineRunResultId.value !== runId || response?.ok === false || !response?.syncPairId) return
+    pulseFlags.value = response.flags ?? {}
+    pulseSyncPairId.value = response.syncPairId
+  } catch {
+    // no flags: the rows read as before
+  }
+}, { immediate: true })
+function pulseFlagFor(recordId: unknown): string {
+  const stamp = typeof recordId === 'string' ? pulseFlags.value[recordId] : undefined
+  return stamp ? formatClockTime(stamp) : ''
+}
 const runStatus = computed(() =>
   timelineRunResultId.value ? runResultsStore.getRunStatus(timelineRunResultId.value) : null,
 )
@@ -1881,6 +1908,16 @@ watch([savedRunId, outputFileName], () => {
   color: var(--text-muted);
   font-size: var(--type-note-size);
   line-height: 1.3;
+}
+
+.run-result-record-cell__pulse {
+  text-decoration: none;
+}
+
+.run-result-record-cell__pulse:hover,
+.run-result-record-cell__pulse:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
 }
 
 .reconciliation-diff-details__toolbar {

@@ -28,6 +28,7 @@ const unsubscribeRunNotification = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
 const saveUserNotificationDefault = vi.hoisted(() => vi.fn())
 const cancelReconciliationRun = vi.hoisted(() => vi.fn())
+const getRunPulseFlags = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const routerReplace = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
@@ -73,6 +74,7 @@ vi.mock('../../../lib/api/facade', () => ({
     unsubscribeRunNotification,
     cancelReconciliationRun,
   },
+  pulseFacade: { getRunPulseFlags },
   settingsFacade: {
     listTenantChatSpaces,
     saveUserNotificationDefault,
@@ -602,6 +604,8 @@ describe('ReconciliationRunResultPage', () => {
     subscribeRunNotification.mockReset()
     unsubscribeRunNotification.mockReset()
     cancelReconciliationRun.mockReset()
+    getRunPulseFlags.mockReset()
+    getRunPulseFlags.mockResolvedValue({ ok: true, syncPairId: null, flags: {} })
     listTenantChatSpaces.mockReset()
     saveUserNotificationDefault.mockReset()
     getGeneratedOutput.mockReset()
@@ -1471,6 +1475,55 @@ describe('ReconciliationRunResultPage', () => {
     expect(source).not.toContain('padding-left: clamp')
     expect(source).not.toContain('padding-left: 4rem')
     expect(source).not.toContain('class="reconciliation-diff-table"')
+  })
+
+  describe('sync pulse flags (DAR-BE-328)', () => {
+    function withRunId(): void {
+      listGeneratedOutputs.mockResolvedValue({
+        ok: true, messages: [], errors: [],
+        pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+        generatedOutputs: [{
+          fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+          reconciliationRunResultId: 'RR_PULSE',
+          sourceFormat: 'json', availableFormats: ['json'], savedRunId: 'RS_ORDER_CSV',
+          statusEnumId: 'AUT_STAT_SUCCESS', resultAvailable: true, createdDate: new Date().toISOString(),
+        }],
+      })
+    }
+
+    it('a flagged row says when the pulse flagged it, in the tenant zone, and links to the pair', async () => {
+      setDefaultDisplayTimeZone('America/New_York')
+      withRunId()
+      getRunPulseFlags.mockResolvedValue({ ok: true, syncPairId: 'SP1', flags: { '1001': '2026-03-31T12:05:00Z' } })
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(getRunPulseFlags).toHaveBeenCalledTimes(1)
+      expect(getRunPulseFlags).toHaveBeenCalledWith({ reconciliationRunResultId: 'RR_PULSE' })
+      const flags = wrapper.findAll('[data-testid="diff-details-pulse-flag"]')
+      expect(flags).toHaveLength(1)
+      expect(flags[0]!.text()).toBe('flagged by sync pulse 08:05')
+      expect(flags[0]!.attributes('data-to')).toContain('settings-tenant-sync-pair')
+      expect(flags[0]!.attributes('data-to')).toContain('SP1')
+      setDefaultDisplayTimeZone(undefined)
+    })
+
+    it('rows the pulse did not flag read as before', async () => {
+      withRunId()
+      getRunPulseFlags.mockResolvedValue({ ok: true, syncPairId: 'SP1', flags: { NOT_A_ROW: '2026-03-31T12:05:00Z' } })
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid="diff-details-row"]').length).toBeGreaterThan(0)
+      expect(wrapper.find('[data-testid="diff-details-pulse-flag"]').exists()).toBe(false)
+    })
+
+    it('a failed flags call shows nothing and no error', async () => {
+      withRunId()
+      getRunPulseFlags.mockRejectedValue(new Error('boom'))
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(wrapper.find('[data-testid="diff-details-pulse-flag"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('boom')
+    })
   })
 
   it('renders the step timeline for a run with recorded steps', async () => {
