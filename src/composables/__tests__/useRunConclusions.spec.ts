@@ -46,6 +46,7 @@ function tree(overrides: Partial<RunConclusions> = {}): RunConclusions {
       {
         key: '40', parent: null, conclusion: 'CONC_SCREENED', label: 'Screened out', bucket: 'FINDING',
         question: null, outcome: 'EXPECTED', conditions: [SCREENED_LINE],
+        suggestedFilterJson: '{"fieldExpression":"returnId","operator":"EXCLUDE_IN","values":["R1"]}',
       },
     ],
     catalog: [
@@ -112,6 +113,7 @@ describe('useRunConclusions', () => {
     expect(state.conclusionLabel(state.list.value[0]!)).toBe('Return names no order')
     expect(state.describeLines(state.list.value[0]!))
       .toBe('OMS statusId is one of RETURN_COMPLETED, RETURN_RECEIVED and OMS orderExternalId is empty')
+    expect(state.list.value.map((node) => node.suggestsFilter)).toEqual([false, false, true])
     expect(state.unexplained.value).toBe('')
     expect(state.dirty.value).toBe(false)
     expect(state.incomplete.value).toBe(false)
@@ -130,6 +132,9 @@ describe('useRunConclusions', () => {
     expect(payload.map((node) => [node.key, node.parent])).toEqual([['20', null], ['10', null], ['40', null]])
     expect(payload[0]!.conditions).toEqual([STATUS_LINE, NO_ORDER_LINE])
     expect(payload[2]!.conditions).toEqual([SCREENED_LINE])
+    // The filter suggestion is read only: never sent.
+    expect(payload[2]).not.toHaveProperty('suggestedFilterJson')
+    expect(payload[2]).not.toHaveProperty('suggestsFilter')
     expect(payload[0]).toMatchObject({ bucket: 'MISSING_FROM_FILE_2', outcome: 'HIDE', question: null })
     expect(payload[1]).toMatchObject({ bucket: 'MISSING_FROM_FILE_2', outcome: null, question: 'Is the return done?', fix: 'Fulfil it in NetSuite.' })
     expect(state.dirty.value).toBe(false)
@@ -239,5 +244,93 @@ describe('useRunConclusions', () => {
     expect(state.list.value[0]!.question).toBe('Still open?')
     expect(state.dirty.value).toBe(true)
     expect(state.saving.value).toBe(false)
+  })
+
+  it('after a save that returns the stored list, the list and its snapshot come from the response', async () => {
+    const state = await setup()
+    state.move(state.list.value[2]!.uid, -1)
+    const stored = tree({
+      conclusions: [
+        { key: '10', parent: null, conclusion: 'CONC_RETURN_NO_ORDER', bucket: 'MISSING_FROM_FILE_2', question: null, outcome: 'HIDE', conditions: [STATUS_LINE, NO_ORDER_LINE] },
+        { key: '20', parent: null, conclusion: 'CONC_SCREENED', bucket: 'FINDING', question: null, outcome: 'EXPECTED', conditions: [SCREENED_LINE] },
+        { key: '30', parent: null, conclusion: 'CONC_RETURN_NOT_IN_NETSUITE', bucket: 'MISSING_FROM_FILE_2', question: 'Is the return done?', outcome: null, conditions: [STATUS_LINE] },
+      ],
+      unexplainedOutcome: 'EXPECTED',
+    })
+    saveConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], savedConclusions: stored })
+
+    await expect(state.save()).resolves.toBe(true)
+
+    expect(state.list.value.map((node) => [node.key, node.conclusion])).toEqual([
+      ['10', 'CONC_RETURN_NO_ORDER'], ['20', 'CONC_SCREENED'], ['30', 'CONC_RETURN_NOT_IN_NETSUITE'],
+    ])
+    expect(state.unexplained.value).toBe('EXPECTED')
+    expect(state.dirty.value).toBe(false)
+    state.cancel()
+    expect(state.list.value.map((node) => node.key)).toEqual(['10', '20', '30'])
+  })
+
+  it('a one-system run offers no missing-from-the-second-side check', async () => {
+    const state = await setup(tree({
+      scopeMode: 'EVALUATE',
+      conclusions: [{ key: '10', parent: null, conclusion: 'CONC_SCREENED', bucket: 'FINDING', question: null, outcome: null, conditions: [STATUS_LINE] }],
+    }))
+
+    expect(state.isEvaluate.value).toBe(true)
+    expect(state.bucketOptions.value).toEqual([
+      { value: '', label: 'any check' },
+      { value: 'MISSING_FROM_FILE_1', label: 'In OMS' },
+      { value: 'RULE', label: 'the rules hold' },
+      { value: 'FINDING', label: 'every finding' },
+    ])
+  })
+
+  it('createCode adds the new code to the catalog and returns its id; a refusal keeps the service\'s words', async () => {
+    const state = await setup()
+    createCode.mockResolvedValueOnce({ ok: true, messages: [], errors: [], conclusionCode: { id: 'CONC_OWN_1', label: 'Late refund', own: true } })
+
+    await expect(state.createCode('  Late refund ')).resolves.toBe('CONC_OWN_1')
+    expect(createCode).toHaveBeenCalledWith('Late refund')
+    expect(state.catalogOptions.value).toContainEqual({ value: 'CONC_OWN_1', label: 'Late refund' })
+    expect(state.newCodeErrors.value).toEqual([])
+
+    createCode.mockRejectedValueOnce(new ApiCallError('Refused.', 400, { result: { errors: ['Your catalog already has Late refund.'] } }))
+    await expect(state.createCode('Late refund')).resolves.toBeNull()
+    expect(state.newCodeErrors.value).toEqual(['Your catalog already has Late refund.'])
+    expect(state.creating.value).toBe(false)
+  })
+
+  it('a new or changed line is normalised on save; an untouched one is not', async () => {
+    const state = await setup()
+    const node = state.list.value[0]!
+    const [untouched, changed] = node.lines
+    state.updateLine(node.uid, changed!.uid, { ...changed!.condition, field: '  statusId ', operator: 'IN', values: ['A, B', 'A', ' C ', ''] })
+    const gt = state.addLine(node.uid)
+    state.updateLine(node.uid, gt, { subject: 'FILE_1', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL', field: 'qty', operator: 'GT', values: ['5', '6'], checkLabel: '' })
+    const blank = state.addLine(node.uid)
+    state.updateLine(node.uid, blank, { subject: 'FILE_1', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL', field: 'note ', operator: 'BLANK', values: ['x'], checkLabel: '' })
+    savedOk()
+
+    await expect(state.save()).resolves.toBe(true)
+
+    const [first, second, third, fourth] = sent()[0]!.conditions
+    expect(first).toEqual(untouched!.loaded)
+    expect(second).toMatchObject({ field: 'statusId', values: ['A', 'B', 'C'], checkLabel: 'OMS statusId is one of A, B, C' })
+    expect(third).toMatchObject({ field: 'qty', values: ['5'], checkLabel: 'OMS qty is more than 5' })
+    expect(fourth).toMatchObject({ field: 'note', values: [], checkLabel: 'OMS note is empty' })
+  })
+
+  it('a conclusion with no name blocks save', async () => {
+    const state = await setup()
+    const uid = state.addConclusion()
+    const line = state.list.value.find((entry) => entry.uid === uid)!.lines[0]!
+    state.updateLine(uid, line.uid, { ...line.condition, field: 'statusId', values: ['X'] })
+
+    expect(state.incomplete.value).toBe(true)
+    await expect(state.save()).resolves.toBe(false)
+    expect(saveConclusions).not.toHaveBeenCalled()
+
+    state.updateConclusion(uid, { conclusion: 'CONC_SCREENED' })
+    expect(state.incomplete.value).toBe(false)
   })
 })

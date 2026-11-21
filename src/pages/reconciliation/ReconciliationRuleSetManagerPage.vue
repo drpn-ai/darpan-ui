@@ -390,7 +390,8 @@ const conclusions = useRunConclusions({
 })
 provide(RUN_CONCLUSIONS_KEY, conclusions)
 const isPopupOpen = computed(() => Boolean(authInfoPopup.value))
-// An editor always has the section (to add the first conclusion); anyone else sees it once the tree has loaded.
+// An editor always has the section, even before the conclusions load or when there are none; anyone else sees it once
+// they have loaded. The rows only read here: there is no way to add one on this page yet.
 const showConclusions = computed(() => Boolean(draft.value && savedRunId.value)
   && (canEditTenantSettings.value || conclusions.loaded.value))
 const runHistoryRoute = computed(() => buildReconciliationRunHistoryRoute({

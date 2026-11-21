@@ -364,7 +364,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
       conclusions: [
         {
           key: '10', parent: null, conclusion: 'CONC_CANCELLED', label: 'Cancelled in the OMS', bucket: 'MISSING_FROM_FILE_1',
-          question: 'Was it cancelled?', outcome: null,
+          question: 'Was it cancelled?', outcome: null, suggestedFilterJson: '{"fieldExpression":"statusId","operator":"EXCLUDE_IN","values":["X"]}',
           conditions: [{ subject: 'FILE_2', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL', field: 'statusId', operator: 'IN', values: ['ORDER_CANCELLED'], checkLabel: 'Cancelled' }],
         },
         {
@@ -905,6 +905,8 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(rows[1]!.get('[data-testid="run-conclusions-when"]').text()).toBe('OMS statusId is one of ORDER_CANCELLED')
     expect(rows.map((row) => row.get('[data-testid="run-conclusions-outcome"]').text())).toEqual(['Hidden', 'Shown'])
     expect(rows[1]!.get('.run-conclusion__question').text()).toBe('Was it cancelled?')
+    expect(rows.map((row) => row.find('[data-testid="run-conclusions-suggests"]').exists())).toEqual([false, true])
+    expect(rows[1]!.get('[data-testid="run-conclusions-suggests"]').text()).toBe('suggests a filter')
     expect(fact(wrapper, 'checks').sub).toBe('2 conclusions')
     // Read only, even to an editor: no buttons, no create tile, no popup.
     expect(section.find('[data-testid="run-conclusions-list"] button').exists()).toBe(false)
@@ -938,6 +940,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
     const oneField = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
     expect(oneField.get('[data-testid="run-conclusions-when"]').text()).toBe('the OMS record is missing')
+    oneField.unmount()
   })
 
   it('shows an editor an empty run\'s conclusions as None yet', async () => {

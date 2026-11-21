@@ -32,12 +32,15 @@
         </span>
         <span class="run-conclusion__question">{{ node.question || '—' }}</span>
         <span class="run-conclusion__when" data-testid="run-conclusions-when">{{ describeLines(node) }}</span>
-        <span
-          v-explain="'conclusionOutcome'"
-          class="run-conclusion__outcome"
-          :class="{ 'run-conclusion__outcome--quiet': node.outcome }"
-          data-testid="run-conclusions-outcome"
-        >{{ outcomeLabel(node.outcome) }}</span>
+        <span class="run-conclusion__end">
+          <span
+            v-explain="'conclusionOutcome'"
+            class="run-conclusion__outcome"
+            :class="{ 'run-conclusion__outcome--quiet': node.outcome }"
+            data-testid="run-conclusions-outcome"
+          >{{ outcomeLabel(node.outcome) }}</span>
+          <span v-if="node.suggestsFilter" class="run-conclusion__suggests" data-testid="run-conclusions-suggests">suggests a filter</span>
+        </span>
       </li>
       <li v-if="!list.length" class="run-conclusion run-conclusion--none" data-testid="run-conclusions-empty">None yet.</li>
     </ul>
@@ -103,14 +106,21 @@ const { loading, loaded, errors, list, lineContext, conclusionLabel, describeLin
 }
 
 .run-conclusion__when,
-.run-conclusion__explains {
+.run-conclusion__explains,
+.run-conclusion__suggests {
   color: var(--text-muted);
   font-size: var(--type-note-size);
 }
 
+.run-conclusion__end {
+  display: grid;
+  gap: var(--space-00);
+  justify-items: end;
+  min-width: 0;
+}
+
 /* Shown is the default and reads solid; Hidden and Expected change what the row does, so they read dashed. */
 .run-conclusion__outcome {
-  justify-self: end;
   padding: 0 var(--space-1-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
@@ -122,6 +132,10 @@ const { loading, loaded, errors, list, lineContext, conclusionLabel, describeLin
 .run-conclusion__outcome--quiet {
   border-style: dashed;
   color: var(--text-muted);
+}
+
+.run-conclusion__suggests {
+  white-space: nowrap;
 }
 
 .run-conclusion__name,
@@ -147,7 +161,7 @@ const { loading, loaded, errors, list, lineContext, conclusionLabel, describeLin
     grid-column: 2 / -1;
   }
 
-  .run-conclusion__outcome {
+  .run-conclusion__end {
     grid-column: 3;
     grid-row: 1;
   }

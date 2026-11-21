@@ -11,6 +11,7 @@ import type {
 } from '../lib/api/authoringTypes'
 import type { AppSelectOption } from '../components/ui/AppSelect.vue'
 import {
+  conditionChanged,
   conditionIncomplete,
   describeCondition,
   explainsLabel,
@@ -42,6 +43,8 @@ export interface ConclusionDraft {
   fix: string | null
   /** '' shows the row, HIDE hides it, EXPECTED marks it expected. */
   outcome: '' | 'HIDE' | 'EXPECTED'
+  /** Read only: a filter the brain suggests for these rows. Not sent; the service keeps it with its rule. */
+  suggestsFilter: boolean
   lines: DraftLine[]
 }
 
@@ -95,32 +98,37 @@ function toOutcome(value: string | null | undefined): ConclusionDraft['outcome']
   return value === 'HIDE' || value === 'EXPECTED' ? value : ''
 }
 
-/** What a condition means, for telling edits apart; the check label is derived, so it does not count. */
-function comparableCondition(condition: RunConclusionCondition) {
-  return [
-    condition.subject,
-    condition.presence || 'ANY',
-    condition.keyScope || 'FULL',
-    condition.quantifier || 'ALL',
-    (condition.field ?? '').trim(),
-    condition.operator ?? '',
-    (condition.values ?? []).map((value) => value.trim()),
-  ]
+/** Same order, fields and line meanings; a line's checkLabel is derived and the filter suggestion read only. */
+function sameList(left: ConclusionDraft[], right: ConclusionDraft[]): boolean {
+  return left.length === right.length && left.every((node, index) => {
+    const other = right[index]!
+    return node.key === other.key
+      && node.conclusion === other.conclusion
+      && node.bucket === other.bucket
+      && node.question.trim() === other.question.trim()
+      && node.fix === other.fix
+      && node.outcome === other.outcome
+      && node.lines.length === other.lines.length
+      && node.lines.every((line, lineIndex) => !conditionChanged(other.lines[lineIndex]!.condition, line.condition))
+  })
 }
 
-function comparable(list: ConclusionDraft[], unexplained: string): string {
-  return JSON.stringify({
-    unexplained,
-    list: list.map((node) => [
-      node.key,
-      node.conclusion,
-      node.bucket,
-      node.question.trim(),
-      node.fix,
-      node.outcome,
-      node.lines.map((line) => comparableCondition(line.condition)),
-    ]),
-  })
+const NO_VALUE_OPERATORS = new Set(['', 'BLANK', 'NOT_BLANK', 'GT_ZERO'])
+const ONE_VALUE_OPERATORS = new Set(['GT', 'LT', 'WITHIN_HOURS'])
+
+/** A new or changed line as the service should store it: trimmed field, comma-split unique values, as many as its test takes. */
+function normalizedCondition(condition: RunConclusionCondition): RunConclusionCondition {
+  const operator = condition.operator ?? ''
+  const values: string[] = []
+  for (const part of (condition.values ?? []).flatMap((value) => value.split(','))) {
+    const value = part.trim()
+    if (value && !values.includes(value)) values.push(value)
+  }
+  return {
+    ...condition,
+    field: (condition.field ?? '').trim() || null,
+    values: NO_VALUE_OPERATORS.has(operator) ? [] : ONE_VALUE_OPERATORS.has(operator) ? values.slice(0, 1) : values,
+  }
 }
 
 export function useRunConclusions(deps: UseRunConclusionsDeps) {
@@ -151,9 +159,11 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
   }))
 
   const dirty = computed(() => loaded.value
-    && comparable(list.value, unexplained.value) !== comparable(snapshot.value.list, snapshot.value.unexplained))
+    && (unexplained.value !== snapshot.value.unexplained || !sameList(list.value, snapshot.value.list)))
 
-  const incomplete = computed(() => list.value.some((node) => node.lines.some((line) => conditionIncomplete(line.condition))))
+  /** A conclusion with no name, or a line missing its field or values, cannot be saved. */
+  const incomplete = computed(() => list.value.some((node) => !node.conclusion
+    || node.lines.some((line) => conditionIncomplete(line.condition))))
 
   const catalogOptions = computed<AppSelectOption[]>(() => {
     const options = (meta.value?.catalog ?? []).map((entry) => ({ value: entry.id, label: entry.label || entry.id }))
@@ -215,6 +225,7 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
       question: node.question ?? '',
       fix: node.fix ?? null,
       outcome: toOutcome(node.outcome),
+      suggestsFilter: Boolean(node.suggestedFilterJson?.trim()),
       lines: (node.conditions ?? []).map((condition) => ({
         uid: nextUid('l'),
         condition: cloneCondition(condition),
@@ -242,8 +253,9 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     return list.value.find((node) => node.uid === uid)
   }
 
-  /** A blank conclusion at the end of the list; returns its uid. */
+  /** A blank conclusion at the end of the list; returns its uid, or '' while a save is under way. */
   function addConclusion(): string {
+    if (saving.value) return ''
     const node: ConclusionDraft = {
       uid: nextUid('c'),
       key: '',
@@ -252,6 +264,7 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
       question: '',
       fix: null,
       outcome: '',
+      suggestsFilter: false,
       lines: [{ uid: nextUid('l'), condition: blankCondition(), loaded: null }],
     }
     list.value.push(node)
@@ -259,11 +272,13 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
   }
 
   function removeConclusion(uid: string): void {
+    if (saving.value) return
     list.value = list.value.filter((node) => node.uid !== uid)
   }
 
   /** Swaps the conclusion with its neighbour above (-1) or below (1); at either end it stays put. */
   function move(uid: string, direction: -1 | 1): void {
+    if (saving.value) return
     const from = list.value.findIndex((node) => node.uid === uid)
     const to = from + direction
     if (from < 0 || to < 0 || to >= list.value.length) return
@@ -274,13 +289,15 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     list.value = next
   }
 
-  function updateConclusion(uid: string, patch: Partial<Omit<ConclusionDraft, 'uid' | 'lines'>>): void {
+  function updateConclusion(uid: string, patch: Partial<Omit<ConclusionDraft, 'uid' | 'lines' | 'suggestsFilter'>>): void {
+    if (saving.value) return
     const node = find(uid)
     if (node) Object.assign(node, patch)
   }
 
-  /** A blank line at the end of the conclusion; returns its uid, or '' when there is no such conclusion. */
+  /** A blank line at the end of the conclusion; returns its uid, or '' when there is no such conclusion or a save is under way. */
   function addLine(uid: string): string {
+    if (saving.value) return ''
     const node = find(uid)
     if (!node) return ''
     const line: DraftLine = { uid: nextUid('l'), condition: blankCondition(), loaded: null }
@@ -289,11 +306,13 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
   }
 
   function updateLine(uid: string, lineUid: string, condition: RunConclusionCondition): void {
+    if (saving.value) return
     const line = find(uid)?.lines.find((entry) => entry.uid === lineUid)
     if (line) line.condition = cloneCondition(condition)
   }
 
   function removeLine(uid: string, lineUid: string): void {
+    if (saving.value) return
     const node = find(uid)
     if (node) node.lines = node.lines.filter((line) => line.uid !== lineUid)
   }
@@ -317,21 +336,25 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
         question: node.question.trim() || null,
         fix: node.fix,
         outcome: (node.outcome || null) as ConclusionOutcome | null,
-        conditions: node.lines.map((line) => withCheckLabel(line.condition, line.loaded, ctx)),
+        // An untouched line goes back exactly as loaded; a new or changed one is normalised before it is labelled.
+        conditions: node.lines.map((line) => line.loaded && !conditionChanged(line.loaded, line.condition)
+          ? withCheckLabel(line.condition, line.loaded, ctx)
+          : withCheckLabel(normalizedCondition(line.condition), line.loaded, ctx)),
       }
     })
   }
 
   /** Sends the whole list once. A refusal keeps the draft and shows the service's words. */
   async function save(): Promise<boolean> {
-    if (saving.value || !meta.value || incomplete.value) return false
+    if (saving.value || !loaded.value || !meta.value || incomplete.value) return false
     saving.value = true
     errors.value = []
     controller?.abort()
     controller = new AbortController()
     const signal = controller.signal
-    const drafts = list.value
-    const payload = buildPayload(drafts)
+    // What is sent, held apart from the live list: an edit made during the await cannot shift what is adopted.
+    const sent = list.value.map((node) => ({ node, lines: [...node.lines] }))
+    const payload = buildPayload(list.value)
     const nextUnexplained = unexplained.value
     const options = nextUnexplained !== snapshot.value.unexplained
       ? { unexplainedOutcome: nextUnexplained === 'EXPECTED' ? 'EXPECTED' as const : 'COUNTS' as const }
@@ -344,16 +367,20 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
         applyLoaded(response.savedConclusions)
       } else {
         // Adopt what was sent: keys assigned, each line's label as saved.
-        drafts.forEach((node, index) => {
-          const sentNode = payload[index]!
+        payload.forEach((sentNode, index) => {
+          const { node, lines } = sent[index]!
           node.key = sentNode.key
-          node.lines.forEach((line, lineIndex) => {
-            line.condition = cloneCondition(sentNode.conditions[lineIndex]!)
-            line.loaded = cloneCondition(sentNode.conditions[lineIndex]!)
+          sentNode.conditions.forEach((condition, lineIndex) => {
+            const line = lines[lineIndex]!
+            line.condition = cloneCondition(condition)
+            line.loaded = cloneCondition(condition)
           })
         })
         meta.value = { ...meta.value, conclusions: payload, unexplainedOutcome: nextUnexplained === 'EXPECTED' ? 'EXPECTED' : null }
-        snapshot.value = { list: cloneList(drafts), unexplained: nextUnexplained }
+        snapshot.value = {
+          list: cloneList(sent.map(({ node, lines }) => ({ ...node, lines }))),
+          unexplained: nextUnexplained,
+        }
       }
       return true
     } catch (error) {
