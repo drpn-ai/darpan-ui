@@ -39,6 +39,7 @@
             class="concl__row"
             :aria-expanded="open === index ? 'true' : 'false'"
             :aria-label="`Open conclusion ${rowName(node)}`"
+            :disabled="saving"
             data-testid="conclusions-editor-toggle"
             @click="toggle(index)"
           >
@@ -125,6 +126,7 @@
                 class="app-icon-action concl-part__done"
                 aria-label="Done with this line"
                 title="Done with this line"
+                :disabled="saving"
                 @click="done"
               >
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
@@ -164,6 +166,7 @@
                 class="app-icon-action concl-part__done"
                 aria-label="Done with this line"
                 title="Done with this line"
+                :disabled="saving"
                 @click="done"
               >
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
@@ -243,6 +246,7 @@
                 class="app-icon-action concl-part__done"
                 aria-label="Done with this line"
                 title="Done with this line"
+                :disabled="saving"
                 @click="done"
               >
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
@@ -284,6 +288,7 @@
                 class="app-icon-action concl-part__done"
                 aria-label="Done with this line"
                 title="Done with this line"
+                :disabled="saving"
                 @click="done"
               >
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
@@ -327,6 +332,7 @@
                 class="app-icon-action concl-part__done"
                 aria-label="Done with this line"
                 title="Done with this line"
+                :disabled="saving"
                 @click="done"
               >
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
@@ -404,6 +410,7 @@
             class="concl__row"
             :aria-expanded="open === UNEXPLAINED ? 'true' : 'false'"
             aria-label="Open conclusion Unexplained"
+            :disabled="saving"
             data-testid="conclusions-editor-toggle"
             @click="toggle(UNEXPLAINED)"
           >
@@ -435,6 +442,7 @@
                 class="app-icon-action concl-part__done"
                 aria-label="Done with this line"
                 title="Done with this line"
+                :disabled="saving"
                 @click="done"
               >
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
@@ -482,7 +490,7 @@
             label="Save conclusions"
             test-id="conclusions-editor-save"
             :dirty="dirty"
-            :disabled="saving || incomplete || !loaded"
+            :disabled="saveDisabled"
             @click="void saveAndReturn()"
           />
         </span>
@@ -539,6 +547,8 @@ import {
   reconciliationSystemTitle,
   type ReconciliationRuleSetDraft,
 } from '../../lib/reconciliationRuleSetDraft'
+import { hintsFor } from '../../lib/mascotHints'
+import { useMascotStore } from '../../stores/mascot'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 
 type Part = 'name' | 'bucket' | 'question' | 'outcome' | 'fix'
@@ -546,6 +556,7 @@ type Part = 'name' | 'bucket' | 'question' | 'outcome' | 'fix'
  *  that returns the stored list gives every row a new one. */
 type Editing = { part: Part } | { part: 'line'; index: number } | null
 
+const ROUTE_NAME = 'reconciliation-conclusions-editor'
 const UNEXPLAINED = 'unexplained' as const
 const FIX_PLACEHOLDER = 'how you fix it (only you write this)'
 const OUTCOME_OPTIONS: AppSelectOption[] = [
@@ -557,6 +568,7 @@ const UNEXPLAINED_OPTIONS: AppSelectOption[] = OUTCOME_OPTIONS.filter((option) =
 
 const router = useRouter()
 const draftStore = useReconciliationDraftStore()
+const mascot = useMascotStore()
 
 const draft = computed<ReconciliationRuleSetDraft | null>(() => draftStore.ruleSetDraftState?.draft ?? null)
 const savedRunId = computed(() => draft.value?.savedRunId?.trim() ?? '')
@@ -607,6 +619,10 @@ const newCodeOpen = ref(false)
 const newCodeLabel = ref('')
 
 let fieldsController: AbortController | null = null
+
+// Off while a conclusion is unfinished, except while a part is open: a value typed there but not yet entered is
+// only committed by the save press itself (its blur), so that press must reach saveAndReturn.
+const saveDisabled = computed(() => saving.value || !loaded.value || (incomplete.value && editing.value === null))
 
 function rowName(node: ConclusionDraft): string {
   return conclusionLabel(node) || 'new'
@@ -735,7 +751,12 @@ async function saveAndReturn(): Promise<void> {
   const active = document.activeElement
   if (active instanceof HTMLElement && root.value?.contains(active)) active.blur()
   await nextTick()
-  if (incomplete.value) return
+  if (incomplete.value) {
+    // Still unfinished after the flush: the mascot says why (the save-blocked hint leads while it applies).
+    const [why] = hintsFor(ROUTE_NAME, document)
+    if (why) mascot.offerTip(why)
+    return
+  }
   if (await conclusions.save()) await returnToRun()
 }
 

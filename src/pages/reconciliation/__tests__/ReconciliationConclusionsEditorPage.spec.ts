@@ -40,6 +40,7 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 }))
 
 import { ApiCallError } from '../../../lib/api/client'
+import { useMascotStore } from '../../../stores/mascot'
 import ReconciliationConclusionsEditorPage from '../ReconciliationConclusionsEditorPage.vue'
 
 function draftState(): ReconciliationRuleSetDraftState {
@@ -118,6 +119,12 @@ async function mountPage(): Promise<VueWrapper> {
   mounted.push(wrapper)
   await flushPromises()
   return wrapper
+}
+
+async function pickName(wrapper: VueWrapper, id: string): Promise<void> {
+  await wrapper.get('[data-testid="conclusions-editor-open"] [data-testid="conclusions-editor-field-name"]').trigger('click')
+  await wrapper.get('[data-testid="conclusions-editor-name-select"]').trigger('click')
+  await wrapper.get(`[data-testid="app-select-option"][data-option-value="${id}"]`).trigger('click')
 }
 
 function rows(wrapper: VueWrapper) {
@@ -245,8 +252,54 @@ describe('ReconciliationConclusionsEditorPage', () => {
     expect(rows(wrapper)).toHaveLength(3)
     expect(rows(wrapper)[2]!.find('[data-testid="conclusions-editor-open"]').exists()).toBe(true)
     expect(rows(wrapper)[2]!.find('[data-testid="conclusion-line-edit"]').exists()).toBe(true)
+
+    // Named, nothing open: the unfinished line is the only reason save is off.
+    await pickName(wrapper, 'SHIPPED_NOT_BILLED')
+    await wrapper.get('[data-testid="conclusions-editor-edit-name"] [aria-label="Done with this line"]').trigger('click')
+    expect(wrapper.find('[data-testid="conclusion-line-edit"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="conclusions-editor-save"]').attributes('disabled')).toBeDefined()
     expect(wrapper.find('[data-testid="conclusions-save-blocked"]').exists()).toBe(true)
+  })
+
+  it('saves a new conclusion whose only value is typed, not entered, on one press', async () => {
+    saveRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [] })
+    const wrapper = await mountPage()
+    await wrapper.get('[data-testid="conclusions-editor-add"]').trigger('click')
+    await pickName(wrapper, 'BACKORDERED')
+    await rows(wrapper)[2]!.get('[data-testid="conclusion-line"]').trigger('click')
+    await wrapper.get('[data-testid="conclusion-line-subject"]').trigger('click')
+    await wrapper.get('[data-testid="app-select-option"][data-option-value="__path__"]').trigger('click')
+    await wrapper.get('[data-testid="conclusion-line-path-input"]').setValue('billing_status')
+
+    const input = wrapper.get<HTMLInputElement>('[data-testid="conclusion-line-tag-input"]')
+    input.element.focus()
+    await input.setValue('Pending Fulfillment')
+    // A part is open, so save takes the press even though the line has no entered value yet.
+    expect(wrapper.get('[data-testid="conclusions-editor-save"]').attributes('disabled')).toBeUndefined()
+    await wrapper.get('[data-testid="conclusions-editor-save"]').trigger('click')
+    await flushPromises()
+
+    expect(saveRunConclusions).toHaveBeenCalledTimes(1)
+    const [, payload] = saveRunConclusions.mock.calls[0] as [string, Array<{ conclusion: string, conditions: Array<{ field: string, values: string[] }> }>]
+    expect(payload).toHaveLength(3)
+    expect(payload[2]!.conclusion).toBe('BACKORDERED')
+    expect(payload[2]!.conditions[0]!.field).toBe('billing_status')
+    expect(payload[2]!.conditions[0]!.values).toEqual(['Pending Fulfillment'])
+    expect(routerPush).toHaveBeenCalledWith({ path: '/reconciliation/ruleset-manager?run=RS_SHIP_BILL' })
+  })
+
+  it('a press that leaves a line unfinished does not save and the mascot says why', async () => {
+    const wrapper = await mountPage()
+    await wrapper.get('[data-testid="conclusions-editor-add"]').trigger('click')
+    await pickName(wrapper, 'BACKORDERED')
+    await rows(wrapper)[2]!.get('[data-testid="conclusion-line"]').trigger('click')
+
+    await wrapper.get('[data-testid="conclusions-editor-save"]').trigger('click')
+    await flushPromises()
+
+    expect(saveRunConclusions).not.toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(useMascotStore().tipText).toBe('Save waits until every conclusion has a name and every line is finished.')
   })
 
   it('back with unsaved changes asks first', async () => {
