@@ -1954,7 +1954,7 @@ export interface components {
             tenantUserGroupId?: string;
             /**
              * @description Optional preview of the instance periods in days (or forever) by table key
-             *                     (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG), used instead of the stored ones.
+             *                     (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG, SYNC_PULSE_SAMPLE), used instead of the stored ones.
              */
             periodDays?: Record<string, never>;
             /**
@@ -2032,11 +2032,12 @@ export interface components {
         };
         /**
          * @description Sets, for the instance or for one tenant, how long each table keeps its rows. periods maps a table key
-         *                 (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG) to a whole number of days from 1 to 3650, to forever, or (a
+         *                 (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG, SYNC_PULSE_SAMPLE) to a whole number of days from 1 to 3650, to forever, or (a
          *                 tenant only) to inherit (drop the tenant's own period and follow the instance's). A tenant's own period, including forever,
          *                 wins over the instance period for that tenant's rows only. Refused as a whole, with the reason and nothing saved: an
          *                 unknown table, a value that is not one of those, inherit at instance level, an unknown tenant, forever at instance level
-         *                 while a JVM property pins the period. A table whose period does not change is skipped. While the retention job is running
+         *                 while a JVM property pins the period, forever at instance level for a table whose period has a default
+         *                 (SYNC_PULSE_SAMPLE: removing the setting brings back its 30 days; a tenant's own period may still be forever). A table whose period does not change is skipped. While the retention job is running
          *                 (not paused), a change that keeps rows for less time (a shorter period, or forever to days) needs previewedRows, the total
          *                 dryRun#Retention showed for the same change: the preview is run again and the change is refused when today's count is more
          *                 than 100 rows or 5% above it. Lengthening, and any change while the job is paused, needs no preview. Instance periods go
@@ -7817,7 +7818,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SaveNsSuiteQlSourceQueryResult"];
         };
-        /** @description Delete a peak period and its run times. */
+        /** @description Delete a peak period, its run times and its sync overrides. */
         DeletePeakPeriodParams: {
             peakPeriodId: string;
         };
@@ -7873,7 +7874,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["DeletePeakPeriodRunTimeResult"];
         };
-        /** @description Remove a sync pair's override for a peak period. */
+        /** @description Remove one sync pair's override for a peak period; a missing override is fine. */
         DeletePeakPeriodSyncParams: {
             peakPeriodId: string;
             syncPairId: string;
@@ -7902,7 +7903,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["DeletePeakPeriodSyncResult"];
         };
-        /** @description One peak period with its run-time moves, the runs its peak hours hold, and the runs a move can name. */
+        /** @description One peak period with its run-time moves, the runs its peak hours or a sync lag allowance hold, and the runs a move can name. */
         GetPeakPeriodParams: {
             peakPeriodId: string;
         };
@@ -8008,7 +8009,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListPeakPeriodsResult"];
         };
-        /** @description Create or update one peak period for the active tenant. Peak hours are both set or both blank; active periods may not overlap. */
+        /** @description Create or update one peak period for the active tenant. Peak hours are both set or both blank; active periods may not overlap. An omitted hotwaxReadSharePct clears the share, as omitted peak hours clear the hours; an omitted netsuiteSerial keeps the stored value. */
         SavePeakPeriodParams: {
             peakPeriodId?: string;
             periodName?: string;
@@ -8082,7 +8083,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["SavePeakPeriodRunTimeResult"];
         };
-        /** @description Set a sync pair's allowance and pulse interval for a peak period. */
+        /** @description Replace one sync pair's override for a peak period. Allowance (15 minutes to 48 hours) and pulse (0, 60, 120, 180, 240 or 360 minutes; 0 is off for the period) are each null for normal; an omitted value clears that field. */
         SavePeakPeriodSyncParams: {
             peakPeriodId: string;
             syncPairId: string;
@@ -12931,7 +12932,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["StoreSourceConfigEndpointAccessResult"];
         };
-        /** @description Delete a sync pair with its samples and open orders. */
+        /** @description Delete a sync pair with its peak-period overrides, samples and tracked orders. */
         DeleteSyncPairParams: {
             syncPairId: string;
         };
@@ -12959,7 +12960,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["DeleteSyncPairResult"];
         };
-        /** @description Orders the sync pulse flagged past allowance before a run started, keyed by record key. */
+        /** @description The records of one daily-check run that the sync pulse had already flagged past allowance before the run started and that were still open then: recordKey to the ISO time the pulse first flagged it. syncPairId is the run's sync pair; null with no flags when the run's check has no pair. */
         GetRunPulseFlagsParams: {
             reconciliationRunResultId: string;
         };
@@ -12968,9 +12969,7 @@ export interface components {
             messages?: string[];
             errors?: string[];
             syncPairId?: string;
-            flags?: {
-                [key: string]: string;
-            };
+            flags?: Record<string, never>;
         };
         /** @description JSON-RPC request envelope for facade.SyncPulseFacadeServices.get#RunPulseFlags */
         GetRunPulseFlagsRequest: {
@@ -12991,7 +12990,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetRunPulseFlagsResult"];
         };
-        /** @description One sync pair with today's samples, open orders past allowance, and the pickers. Without syncPairId, only the pickers (for a new pair). */
+        /** @description One sync pair of the active tenant: its effective allowance and cadence today (and the pair's own values), today's samples and the open past-allowance orders, oldest first. Always returns the daily checks and chat spaces the pair form picks from; with no syncPairId that is all it returns. */
         GetSyncPairParams: {
             syncPairId?: string;
         };
@@ -13004,22 +13003,25 @@ export interface components {
                 label?: string;
                 automationId?: string;
                 automationName?: string;
-                allowanceMinutes?: number;
-                pulseEveryMinutes?: number;
-                isActive?: string;
-                lastPulseStamp?: string;
-                waitingCount?: number;
-                pastAllowanceCount?: number;
-                periodName?: string;
                 upstreamSide?: string;
+                allowanceMinutes?: string;
+                pulseEveryMinutes?: string;
+                normalAllowanceMinutes?: string;
+                normalPulseEveryMinutes?: string;
+                periodName?: string;
                 chatSpaceId?: string;
                 hourlySummary?: string;
+                isActive?: string;
+                lastPulseStamp?: string;
+                lastPulseStatusEnumId?: string;
+                waitingCount?: string;
+                pastAllowanceCount?: string;
             };
             samplesToday?: {
                 sampleStamp?: string;
-                waitingCount?: number;
-                oldestWaitingMinutes?: number;
-                pastAllowanceCount?: number;
+                waitingCount?: string;
+                oldestWaitingMinutes?: string;
+                pastAllowanceCount?: string;
                 statusEnumId?: string;
             }[];
             pastOrders?: {
@@ -13027,7 +13029,7 @@ export interface components {
                 orderName?: string;
                 otherSystemId?: string;
                 sourceCreatedStamp?: string;
-                waitingMinutes?: number;
+                waitingMinutes?: string;
                 reportedInRunId?: string;
                 reportedInSavedRunId?: string;
             }[];
@@ -13063,7 +13065,7 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["GetSyncPairResult"];
         };
-        /** @description List the active tenant's sync pairs with their waiting and past-allowance counts. */
+        /** @description List the active tenant's sync pairs with the waiting and past-allowance counts from the latest sample and the open orders. */
         ListSyncPairsParams: Record<string, never>;
         ListSyncPairsResult: {
             ok?: boolean;
@@ -13074,12 +13076,12 @@ export interface components {
                 label?: string;
                 automationId?: string;
                 automationName?: string;
-                allowanceMinutes?: number;
-                pulseEveryMinutes?: number;
+                allowanceMinutes?: string;
+                pulseEveryMinutes?: string;
                 isActive?: string;
                 lastPulseStamp?: string;
-                waitingCount?: number;
-                pastAllowanceCount?: number;
+                waitingCount?: string;
+                pastAllowanceCount?: string;
             }[];
         };
         /** @description JSON-RPC request envelope for facade.SyncPulseFacadeServices.list#SyncPairs */
@@ -13101,12 +13103,12 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListSyncPairsResult"];
         };
-        /** @description Create or update a sync pair. No syncPairId creates. */
+        /** @description Create or update one sync pair of the active tenant. A blank pulseEveryMinutes is pulse off and a blank chatSpaceId is no chat space (both stored null, never the old value); isActive and hourlySummary keep the stored value when omitted. One pair per automation; a pulse needs HotWax orders upstream. */
         SaveSyncPairParams: {
             syncPairId?: string;
-            automationId: string;
-            upstreamSide: string;
-            allowanceMinutes: number;
+            automationId?: string;
+            upstreamSide?: string;
+            allowanceMinutes?: number;
             pulseEveryMinutes?: number;
             chatSpaceId?: string;
             hourlySummary?: boolean;

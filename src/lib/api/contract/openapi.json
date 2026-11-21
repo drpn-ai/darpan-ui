@@ -7655,7 +7655,7 @@
                     },
                     "periodDays": {
                         "type": "object",
-                        "description": "Optional preview of the instance periods in days (or forever) by table key\n                (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG), used instead of the stored ones."
+                        "description": "Optional preview of the instance periods in days (or forever) by table key\n                (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG, SYNC_PULSE_SAMPLE), used instead of the stored ones."
                     },
                     "tenantPeriodDays": {
                         "type": "object",
@@ -7847,7 +7847,7 @@
                 "required": [
                     "periods"
                 ],
-                "description": "Sets, for the instance or for one tenant, how long each table keeps its rows. periods maps a table key\n            (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG) to a whole number of days from 1 to 3650, to forever, or (a\n            tenant only) to inherit (drop the tenant's own period and follow the instance's). A tenant's own period, including forever,\n            wins over the instance period for that tenant's rows only. Refused as a whole, with the reason and nothing saved: an\n            unknown table, a value that is not one of those, inherit at instance level, an unknown tenant, forever at instance level\n            while a JVM property pins the period. A table whose period does not change is skipped. While the retention job is running\n            (not paused), a change that keeps rows for less time (a shorter period, or forever to days) needs previewedRows, the total\n            dryRun#Retention showed for the same change: the preview is run again and the change is refused when today's count is more\n            than 100 rows or 5% above it. Lengthening, and any change while the job is paused, needs no preview. Instance periods go\n            through the settings store (one AdminAuditLog row per table, `key: old -> new (note)`); a tenant's go to its own\n            TenantRetentionPeriod rows (one AdminAuditLog row for the call: `TABLE: before -> after`)."
+                "description": "Sets, for the instance or for one tenant, how long each table keeps its rows. periods maps a table key\n            (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG, SYNC_PULSE_SAMPLE) to a whole number of days from 1 to 3650, to forever, or (a\n            tenant only) to inherit (drop the tenant's own period and follow the instance's). A tenant's own period, including forever,\n            wins over the instance period for that tenant's rows only. Refused as a whole, with the reason and nothing saved: an\n            unknown table, a value that is not one of those, inherit at instance level, an unknown tenant, forever at instance level\n            while a JVM property pins the period, forever at instance level for a table whose period has a default\n            (SYNC_PULSE_SAMPLE: removing the setting brings back its 30 days; a tenant's own period may still be forever). A table whose period does not change is skipped. While the retention job is running\n            (not paused), a change that keeps rows for less time (a shorter period, or forever to days) needs previewedRows, the total\n            dryRun#Retention showed for the same change: the preview is run again and the change is refused when today's count is more\n            than 100 rows or 5% above it. Lengthening, and any change while the job is paused, needs no preview. Instance periods go\n            through the settings store (one AdminAuditLog row per table, `key: old -> new (note)`); a tenant's go to its own\n            TenantRetentionPeriod rows (one AdminAuditLog row for the call: `TABLE: before -> after`)."
             },
             "UpdateRetentionPeriodsResult": {
                 "type": "object",
@@ -23481,7 +23481,7 @@
                 "required": [
                     "peakPeriodId"
                 ],
-                "description": "Delete a peak period and its run times."
+                "description": "Delete a peak period, its run times and its sync overrides."
             },
             "DeletePeakPeriodResult": {
                 "type": "object",
@@ -23669,7 +23669,7 @@
                     "peakPeriodId",
                     "syncPairId"
                 ],
-                "description": "Remove a sync pair's override for a peak period."
+                "description": "Remove one sync pair's override for a peak period; a missing override is fine."
             },
             "DeletePeakPeriodSyncResult": {
                 "type": "object",
@@ -23694,6 +23694,7 @@
             "DeletePeakPeriodSyncRequest": {
                 "type": "object",
                 "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.delete#PeakPeriodSync",
+                "x-darpan-method": "facade.PeakPeriodFacadeServices.delete#PeakPeriodSync",
                 "properties": {
                     "jsonrpc": {
                         "type": "string",
@@ -23717,7 +23718,6 @@
                         "$ref": "#/components/schemas/DeletePeakPeriodSyncParams"
                     }
                 },
-                "x-darpan-method": "facade.PeakPeriodFacadeServices.delete#PeakPeriodSync",
                 "required": [
                     "jsonrpc",
                     "id",
@@ -23761,7 +23761,7 @@
                 "required": [
                     "peakPeriodId"
                 ],
-                "description": "One peak period with its run-time moves, the runs its peak hours hold, and the runs a move can name."
+                "description": "One peak period with its run-time moves, the runs its peak hours or a sync lag allowance hold, and the runs a move can name."
             },
             "GetPeakPeriodResult": {
                 "type": "object",
@@ -23911,16 +23911,16 @@
                                     "type": "string"
                                 },
                                 "normalAllowanceMinutes": {
-                                    "type": "number"
+                                    "type": "integer"
                                 },
                                 "periodAllowanceMinutes": {
-                                    "type": "number"
+                                    "type": "integer"
                                 },
                                 "normalPulseMinutes": {
-                                    "type": "number"
+                                    "type": "integer"
                                 },
                                 "periodPulseMinutes": {
-                                    "type": "number"
+                                    "type": "integer"
                                 }
                             }
                         }
@@ -24133,7 +24133,7 @@
                         "type": "boolean"
                     }
                 },
-                "description": "Create or update one peak period for the active tenant. Peak hours are both set or both blank; active periods may not overlap."
+                "description": "Create or update one peak period for the active tenant. Peak hours are both set or both blank; active periods may not overlap. An omitted hotwaxReadSharePct clears the share, as omitted peak hours clear the hours; an omitted netsuiteSerial keeps the stored value."
             },
             "SavePeakPeriodResult": {
                 "type": "object",
@@ -24339,17 +24339,17 @@
                         "type": "string"
                     },
                     "allowanceMinutes": {
-                        "type": "number"
+                        "type": "integer"
                     },
                     "pulseEveryMinutes": {
-                        "type": "number"
+                        "type": "integer"
                     }
                 },
                 "required": [
                     "peakPeriodId",
                     "syncPairId"
                 ],
-                "description": "Set a sync pair's allowance and pulse interval for a peak period."
+                "description": "Replace one sync pair's override for a peak period. Allowance (15 minutes to 48 hours) and pulse (0, 60, 120, 180, 240 or 360 minutes; 0 is off for the period) are each null for normal; an omitted value clears that field."
             },
             "SavePeakPeriodSyncResult": {
                 "type": "object",
@@ -24374,6 +24374,7 @@
             "SavePeakPeriodSyncRequest": {
                 "type": "object",
                 "description": "JSON-RPC request envelope for facade.PeakPeriodFacadeServices.save#PeakPeriodSync",
+                "x-darpan-method": "facade.PeakPeriodFacadeServices.save#PeakPeriodSync",
                 "properties": {
                     "jsonrpc": {
                         "type": "string",
@@ -24397,7 +24398,6 @@
                         "$ref": "#/components/schemas/SavePeakPeriodSyncParams"
                     }
                 },
-                "x-darpan-method": "facade.PeakPeriodFacadeServices.save#PeakPeriodSync",
                 "required": [
                     "jsonrpc",
                     "id",
@@ -39034,7 +39034,7 @@
                 "required": [
                     "syncPairId"
                 ],
-                "description": "Delete a sync pair with its samples and open orders."
+                "description": "Delete a sync pair with its peak-period overrides, samples and tracked orders."
             },
             "DeleteSyncPairResult": {
                 "type": "object",
@@ -39059,6 +39059,7 @@
             "DeleteSyncPairRequest": {
                 "type": "object",
                 "description": "JSON-RPC request envelope for facade.SyncPulseFacadeServices.delete#SyncPair",
+                "x-darpan-method": "facade.SyncPulseFacadeServices.delete#SyncPair",
                 "properties": {
                     "jsonrpc": {
                         "type": "string",
@@ -39082,7 +39083,6 @@
                         "$ref": "#/components/schemas/DeleteSyncPairParams"
                     }
                 },
-                "x-darpan-method": "facade.SyncPulseFacadeServices.delete#SyncPair",
                 "required": [
                     "jsonrpc",
                     "id",
@@ -39126,7 +39126,7 @@
                 "required": [
                     "reconciliationRunResultId"
                 ],
-                "description": "Orders the sync pulse flagged past allowance before a run started, keyed by record key."
+                "description": "The records of one daily-check run that the sync pulse had already flagged past allowance before the run started and that were still open then: recordKey to the ISO time the pulse first flagged it. syncPairId is the run's sync pair; null with no flags when the run's check has no pair."
             },
             "GetRunPulseFlagsResult": {
                 "type": "object",
@@ -39150,16 +39150,14 @@
                         "type": "string"
                     },
                     "flags": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        }
+                        "type": "object"
                     }
                 }
             },
             "GetRunPulseFlagsRequest": {
                 "type": "object",
                 "description": "JSON-RPC request envelope for facade.SyncPulseFacadeServices.get#RunPulseFlags",
+                "x-darpan-method": "facade.SyncPulseFacadeServices.get#RunPulseFlags",
                 "properties": {
                     "jsonrpc": {
                         "type": "string",
@@ -39183,7 +39181,6 @@
                         "$ref": "#/components/schemas/GetRunPulseFlagsParams"
                     }
                 },
-                "x-darpan-method": "facade.SyncPulseFacadeServices.get#RunPulseFlags",
                 "required": [
                     "jsonrpc",
                     "id",
@@ -39224,7 +39221,7 @@
                         "type": "string"
                     }
                 },
-                "description": "One sync pair with today's samples, open orders past allowance, and the pickers. Without syncPairId, only the pickers (for a new pair)."
+                "description": "One sync pair of the active tenant: its effective allowance and cadence today (and the pair's own values), today's samples and the open past-allowance orders, oldest first. Always returns the daily checks and chat spaces the pair form picks from; with no syncPairId that is all it returns."
             },
             "GetSyncPairResult": {
                 "type": "object",
@@ -39259,11 +39256,29 @@
                             "automationName": {
                                 "type": "string"
                             },
+                            "upstreamSide": {
+                                "type": "string"
+                            },
                             "allowanceMinutes": {
-                                "type": "number"
+                                "type": "string"
                             },
                             "pulseEveryMinutes": {
-                                "type": "number"
+                                "type": "string"
+                            },
+                            "normalAllowanceMinutes": {
+                                "type": "string"
+                            },
+                            "normalPulseEveryMinutes": {
+                                "type": "string"
+                            },
+                            "periodName": {
+                                "type": "string"
+                            },
+                            "chatSpaceId": {
+                                "type": "string"
+                            },
+                            "hourlySummary": {
+                                "type": "string"
                             },
                             "isActive": {
                                 "type": "string"
@@ -39271,22 +39286,13 @@
                             "lastPulseStamp": {
                                 "type": "string"
                             },
+                            "lastPulseStatusEnumId": {
+                                "type": "string"
+                            },
                             "waitingCount": {
-                                "type": "number"
+                                "type": "string"
                             },
                             "pastAllowanceCount": {
-                                "type": "number"
-                            },
-                            "periodName": {
-                                "type": "string"
-                            },
-                            "upstreamSide": {
-                                "type": "string"
-                            },
-                            "chatSpaceId": {
-                                "type": "string"
-                            },
-                            "hourlySummary": {
                                 "type": "string"
                             }
                         }
@@ -39300,13 +39306,13 @@
                                     "type": "string"
                                 },
                                 "waitingCount": {
-                                    "type": "number"
+                                    "type": "string"
                                 },
                                 "oldestWaitingMinutes": {
-                                    "type": "number"
+                                    "type": "string"
                                 },
                                 "pastAllowanceCount": {
-                                    "type": "number"
+                                    "type": "string"
                                 },
                                 "statusEnumId": {
                                     "type": "string"
@@ -39332,7 +39338,7 @@
                                     "type": "string"
                                 },
                                 "waitingMinutes": {
-                                    "type": "number"
+                                    "type": "string"
                                 },
                                 "reportedInRunId": {
                                     "type": "string"
@@ -39390,6 +39396,7 @@
             "GetSyncPairRequest": {
                 "type": "object",
                 "description": "JSON-RPC request envelope for facade.SyncPulseFacadeServices.get#SyncPair",
+                "x-darpan-method": "facade.SyncPulseFacadeServices.get#SyncPair",
                 "properties": {
                     "jsonrpc": {
                         "type": "string",
@@ -39413,7 +39420,6 @@
                         "$ref": "#/components/schemas/GetSyncPairParams"
                     }
                 },
-                "x-darpan-method": "facade.SyncPulseFacadeServices.get#SyncPair",
                 "required": [
                     "jsonrpc",
                     "id",
@@ -39449,8 +39455,10 @@
             },
             "ListSyncPairsParams": {
                 "type": "object",
-                "properties": {},
-                "description": "List the active tenant's sync pairs with their waiting and past-allowance counts."
+                "properties": {
+                    
+                },
+                "description": "List the active tenant's sync pairs with the waiting and past-allowance counts from the latest sample and the open orders."
             },
             "ListSyncPairsResult": {
                 "type": "object",
@@ -39488,10 +39496,10 @@
                                     "type": "string"
                                 },
                                 "allowanceMinutes": {
-                                    "type": "number"
+                                    "type": "string"
                                 },
                                 "pulseEveryMinutes": {
-                                    "type": "number"
+                                    "type": "string"
                                 },
                                 "isActive": {
                                     "type": "string"
@@ -39500,10 +39508,10 @@
                                     "type": "string"
                                 },
                                 "waitingCount": {
-                                    "type": "number"
+                                    "type": "string"
                                 },
                                 "pastAllowanceCount": {
-                                    "type": "number"
+                                    "type": "string"
                                 }
                             }
                         }
@@ -39513,6 +39521,7 @@
             "ListSyncPairsRequest": {
                 "type": "object",
                 "description": "JSON-RPC request envelope for facade.SyncPulseFacadeServices.list#SyncPairs",
+                "x-darpan-method": "facade.SyncPulseFacadeServices.list#SyncPairs",
                 "properties": {
                     "jsonrpc": {
                         "type": "string",
@@ -39536,7 +39545,6 @@
                         "$ref": "#/components/schemas/ListSyncPairsParams"
                     }
                 },
-                "x-darpan-method": "facade.SyncPulseFacadeServices.list#SyncPairs",
                 "required": [
                     "jsonrpc",
                     "id",
@@ -39583,10 +39591,10 @@
                         "type": "string"
                     },
                     "allowanceMinutes": {
-                        "type": "number"
+                        "type": "integer"
                     },
                     "pulseEveryMinutes": {
-                        "type": "number"
+                        "type": "integer"
                     },
                     "chatSpaceId": {
                         "type": "string"
@@ -39598,12 +39606,7 @@
                         "type": "boolean"
                     }
                 },
-                "required": [
-                    "automationId",
-                    "upstreamSide",
-                    "allowanceMinutes"
-                ],
-                "description": "Create or update a sync pair. No syncPairId creates."
+                "description": "Create or update one sync pair of the active tenant. A blank pulseEveryMinutes is pulse off and a blank chatSpaceId is no chat space (both stored null, never the old value); isActive and hourlySummary keep the stored value when omitted. One pair per automation; a pulse needs HotWax orders upstream."
             },
             "SaveSyncPairResult": {
                 "type": "object",
@@ -39631,6 +39634,7 @@
             "SaveSyncPairRequest": {
                 "type": "object",
                 "description": "JSON-RPC request envelope for facade.SyncPulseFacadeServices.save#SyncPair",
+                "x-darpan-method": "facade.SyncPulseFacadeServices.save#SyncPair",
                 "properties": {
                     "jsonrpc": {
                         "type": "string",
@@ -39654,7 +39658,6 @@
                         "$ref": "#/components/schemas/SaveSyncPairParams"
                     }
                 },
-                "x-darpan-method": "facade.SyncPulseFacadeServices.save#SyncPair",
                 "required": [
                     "jsonrpc",
                     "id",
