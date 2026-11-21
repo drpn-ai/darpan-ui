@@ -820,8 +820,24 @@ onBeforeUnmount(() => {
   border: 1px solid var(--static-tile-border);
   border-radius: var(--static-surface-radius);
   background: var(--static-tile-bg);
-  overflow: hidden;
   font-size: var(--static-tile-text-size);
+}
+
+/* No overflow clip on the list (it would cut opened menus); round the end rows instead. */
+.concl:first-child,
+.concl:first-child .concl__row {
+  border-top-left-radius: var(--static-surface-radius);
+  border-top-right-radius: var(--static-surface-radius);
+}
+
+.concl:last-child {
+  border-bottom-left-radius: var(--static-surface-radius);
+  border-bottom-right-radius: var(--static-surface-radius);
+}
+
+.concl:last-child:not(.concl--open) .concl__row {
+  border-bottom-left-radius: var(--static-surface-radius);
+  border-bottom-right-radius: var(--static-surface-radius);
 }
 
 .concl + .concl {
