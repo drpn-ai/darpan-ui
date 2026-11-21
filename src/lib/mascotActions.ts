@@ -179,7 +179,40 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'delete conclusion': {
     title: 'Delete conclusion',
-    body: 'removes it and every conclusion under it, saved at once. Rows it named are named by the rest from the next run.',
+    body: 'takes it off the list. Once you save, rows it named fall to the conclusions below it, or to Unexplained.',
+  },
+  // DAR-UI-135: the conclusions edit page.
+  'add conclusion': {
+    title: 'Add conclusion',
+    body: 'a new one at the bottom, tried after those above it. It opens with its first line ready to fill.',
+  },
+  'add a line': {
+    title: 'Add a line',
+    body: 'one more condition for this conclusion. Every line must hold before it names a row.',
+  },
+  'move conclusion up': {
+    title: 'Move up',
+    body: 'tries this conclusion one place sooner. First match wins, so it can take rows from the one above. Kept with Save conclusions.',
+  },
+  'move conclusion down': {
+    title: 'Move down',
+    body: 'tries this conclusion one place later, so the one below gets the first chance at rows both fit. Kept with Save conclusions.',
+  },
+  'open conclusion unexplained': {
+    title: 'Unexplained',
+    body: 'what a finding no conclusion names shows as: Shown, or Expected. It always comes last and cannot be moved or deleted.',
+  },
+  'save conclusions': {
+    title: 'Save conclusions',
+    body: 'sends the whole list at once: every conclusion, its place and Unexplained. One refusal and nothing changes. Applies from the next run.',
+  },
+  'cancel changes': {
+    title: 'Cancel changes',
+    body: 'puts the list back as it was last saved. You stay here; nothing saved is touched.',
+  },
+  'back to the run': {
+    title: 'Back to the run',
+    body: 'returns to the run page. With changes waiting it asks first, and leaving drops them.',
   },
   'add child conclusion': {
     title: 'Add child conclusion',
@@ -1058,7 +1091,28 @@ export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Obje
   }],
   [/^open conclusion .+$/, {
     title: 'Conclusion',
-    body: 'opens its question and the conditions that prove it. Saving there replaces the run’s whole tree, all or nothing; results get named by it from the next run.',
+    body: 'opens it in place: its name, what it explains, its lines, its question, how it shows and your fix. Nothing is saved until Save conclusions.',
+  }],
+  // DAR-UI-135: each part of an open conclusion reads plain and is named "Change <part>: <what it says>".
+  [/^change name: .+$/, {
+    title: 'Name',
+    body: 'picks this conclusion’s name from your list, or the plus makes a new one. Several runs can share a name, so it is picked, not retyped.',
+  }],
+  [/^change what it explains: .+$/, {
+    title: 'Explains',
+    body: 'the failed check this conclusion is tried on. It never names a row that failed some other check.',
+  }],
+  [/^change the question: .+$/, {
+    title: 'Asks',
+    body: 'the one question this conclusion answers, shown with each finding it names. Nothing is saved until Save conclusions.',
+  }],
+  [/^change how it shows: .+$/, {
+    title: 'Shows as',
+    body: 'what a row it names becomes: Shown stays a finding, Expected counts as expected, Hidden is left out of counts. Applies from the next run.',
+  }],
+  [/^change the fix: .+$/, {
+    title: 'Fix',
+    body: 'your own words on how to put it right; Darpan never writes them. Every finding this conclusion names carries them.',
   }],
   // DAR-UI-125: each earlier row on Config history is named "Restore version <n>".
   [/^restore version .+$/, {

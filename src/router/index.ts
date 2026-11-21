@@ -171,6 +171,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
+    // DAR-UI-135: a run's conclusions get their own edit page, opened from the run page like Filters and Rules.
+    path: '/reconciliation/ruleset-manager/conclusions',
+    name: 'reconciliation-conclusions-editor',
+    component: () => import('../pages/reconciliation/ReconciliationConclusionsEditorPage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+  },
+  {
     path: '/reconciliation/run-history/:savedRunId',
     name: 'reconciliation-run-history',
     component: () => import('../pages/reconciliation/ReconciliationRunHistoryPage.vue'),
