@@ -54,6 +54,12 @@ describe('describeCondition', () => {
       "any NetSuite data's x is one of a",
     )
   })
+  it('reads a stored any on a list path the catalogue does not know', () => {
+    expect(describeCondition(
+      cond({ subject: 'FILE_1', field: 'items.statusId', quantifier: 'ANY', values: ['ITEM_CANCELLED'] }),
+      { ...ctx, listPaths: new Set() },
+    )).toBe("any HotWax item's statusId is one of ITEM_CANCELLED")
+  })
   it('gives a non-list dotted path no quantifier word', () => {
     expect(describeCondition(cond({ field: 'orderInNetsuite.tranId', values: ['A'] }), ctx)).toBe(
       'NetSuite orderInNetsuite.tranId is one of A',
@@ -111,6 +117,16 @@ describe('withCheckLabel', () => {
     expect(conditionChanged({ ...a, field: null }, { ...a, field: '' })).toBe(false)
     expect(conditionChanged({ ...a, values: ['a', 'b'] }, { ...a, values: ['b', 'a'] })).toBe(true)
     expect(conditionChanged({ ...a, values: [' a '] }, { ...a, values: ['a'] })).toBe(false)
+  })
+  it('caps a generated label at the column by shortening the value list', () => {
+    const values = Array.from({ length: 30 }, (_, i) => `A long billing status value number ${i}`)
+    const label = withCheckLabel(cond({ values }), null, ctx).checkLabel
+    expect(label.length).toBeLessThanOrEqual(255)
+    expect(label.startsWith('NetSuite billing_status is one of A long billing status value number 0, ')).toBe(true)
+    expect(label.endsWith(', …')).toBe(true)
+    // A kept loaded label is never touched, however long.
+    const loaded = cond({ values, checkLabel: 'x'.repeat(300) })
+    expect(withCheckLabel({ ...loaded }, loaded, ctx).checkLabel).toBe('x'.repeat(300))
   })
   it('round-trips untouched conditions', () => {
     const cs = [

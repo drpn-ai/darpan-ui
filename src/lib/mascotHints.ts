@@ -51,9 +51,9 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { id: 'every-source-can-filter', text: 'Not every source can filter at the pull — a side that cannot will say so.' },
     { id: 'ruleset-editor-board-2', text: 'Enter on a field, then Enter on its partner, pairs them without the drag.', when: control('ruleset-editor-board') },
   ]),
-  // DAR-UI-135: the conclusions edit page. Save is off while a conclusion has no name or a line is unfinished.
+  // DAR-UI-135: the conclusions edit page. Save is off while a conclusion has no name, no line, or an unfinished line.
   'reconciliation-conclusions-editor': Object.freeze([
-    { id: 'conclusions-save-blocked', text: 'Save waits until every conclusion has a name and every line is finished.', when: control('conclusions-save-blocked') },
+    { id: 'conclusions-save-blocked', text: 'Save waits until every conclusion has a name and a line, and every line is finished.', when: control('conclusions-save-blocked') },
     { id: 'conclusions-editor-row', text: 'Open a conclusion, then click any part of it to change just that part.', when: control('conclusions-editor-row') },
     { id: 'first-match-wins', text: 'Conclusions are tried top to bottom; the first that holds names the row.' },
   ]),

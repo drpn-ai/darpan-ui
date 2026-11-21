@@ -35,6 +35,7 @@ describe('loadConclusionFields', () => {
     const result = await loadConclusionFields(draftOf({ file1JsonSchemaId: 'S1' }), signal, labels)
     expect(flatten).toHaveBeenCalledWith({ jsonSchemaId: 'S1' }, signal)
     expect(result.listPaths).toEqual(new Set(['lines', 'tags']))
+    expect(result.nonListPaths).toEqual(new Set(['status', 'customer']))
     expect(result.fields).toEqual([
       { value: 'FILE_1:status', label: 'Shopify › status', subject: 'FILE_1', field: 'status', list: false },
       { value: 'FILE_1:customer.email', label: 'Shopify › customer.email', subject: 'FILE_1', field: 'customer.email', list: false },
@@ -74,5 +75,6 @@ describe('lookupFields', () => {
       { value: 'FILE_2:returns', label: 'OMS › returns', subject: 'FILE_2', field: 'returns', list: true },
     ])
     expect(result.listPaths).toEqual(new Set(['returns']))
+    expect(result.nonListPaths).toEqual(new Set(['orderInNetsuite']))
   })
 })

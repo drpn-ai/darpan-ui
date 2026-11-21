@@ -333,4 +333,38 @@ describe('useRunConclusions', () => {
     state.updateConclusion(uid, { conclusion: 'CONC_SCREENED' })
     expect(state.incomplete.value).toBe(false)
   })
+
+  it('removing the last line makes the conclusion incomplete', async () => {
+    const state = await setup()
+    const node = state.list.value[2]!
+    state.removeLine(node.uid, node.lines[0]!.uid)
+
+    expect(node.lines).toHaveLength(0)
+    expect(state.describeLines(node)).toBe('')
+    expect(state.incomplete.value).toBe(true)
+    await expect(state.save()).resolves.toBe(false)
+    expect(saveConclusions).not.toHaveBeenCalled()
+  })
+
+  it('a compare run offers every finding only when a loaded row already uses it', async () => {
+    const without = await setup(tree({ conclusions: [tree().conclusions[0]!] }))
+    expect(without.bucketOptions.value.map((option) => option.value)).toEqual(['', 'MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE'])
+
+    const kept = await setup()
+    expect(kept.bucketOptions.value).toContainEqual({ value: 'FINDING', label: 'every finding (single-sided only)' })
+  })
+
+  it('the run\'s many lookups word their lines as lists', async () => {
+    const state = await setup(tree({
+      lookups: [{ name: 'returns', subject: 'FILE_2', many: true }, { name: 'orderInNetsuite', subject: 'FILE_2' }],
+      conclusions: [{
+        key: '10', parent: null, conclusion: 'CONC_SCREENED', bucket: null, question: null, outcome: null,
+        conditions: [{ ...STATUS_LINE, subject: 'FILE_2', field: 'returns.statusId', values: ['DONE'] }],
+      }],
+    }))
+
+    expect(state.lineContext.value.listPaths.has('returns')).toBe(true)
+    expect(state.lineContext.value.nonListPaths?.has('orderInNetsuite')).toBe(true)
+    expect(state.describeLines(state.list.value[0]!)).toBe("every NetSuite return's statusId is one of DONE")
+  })
 })

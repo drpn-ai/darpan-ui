@@ -158,6 +158,23 @@ describe('ConclusionLine', () => {
     expect(none.get('[data-testid="conclusion-line-quantifier"]').text()).toContain('no')
   })
 
+  it('a stored any on a list path the catalogue does not know reads and edits as a list', () => {
+    const line = statusLine({ subject: 'FILE_2', field: 'items.statusId', quantifier: 'ANY', values: ['ITEM_CANCELLED'] })
+    const bare = { ...context, listPaths: new Set<string>() }
+    const read = mount(ConclusionLine, { props: { condition: line, context: bare, fields, connector: 'when', editing: false } })
+    expect(read.text()).toContain("any HotWax item's statusId is one of ITEM_CANCELLED")
+    const edit = mount(ConclusionLine, { props: { condition: line, context: bare, fields, connector: 'when', editing: true }, attachTo: document.body })
+    expect(edit.find('[data-testid="conclusion-line-quantifier"]').exists()).toBe(true)
+    // An unknown dotted path offers the picker; one whose first segment is a known non-list (a plain lookup) does not.
+    const every = { ...line, quantifier: 'ALL' }
+    expect(mount(ConclusionLine, { props: { condition: every, context: bare, fields, connector: 'when', editing: true } })
+      .find('[data-testid="conclusion-line-quantifier"]').exists()).toBe(true)
+    const known = { ...bare, nonListPaths: new Set(['items']) }
+    expect(mount(ConclusionLine, { props: { condition: every, context: known, fields, connector: 'when', editing: true } })
+      .find('[data-testid="conclusion-line-quantifier"]').exists()).toBe(false)
+    edit.unmount()
+  })
+
   it('offers "no" only over a list test', async () => {
     const wrapper = mountLine(statusLine({ subject: 'FILE_2', field: 'lines.status', operator: 'GT', values: ['3'] }), true)
     await wrapper.get('[data-testid="conclusion-line-quantifier"]').trigger('click')

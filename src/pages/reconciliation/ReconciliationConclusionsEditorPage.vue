@@ -50,7 +50,7 @@
                 :class="{ 'concl__name--blank': !node.conclusion }"
                 data-testid="conclusions-editor-name"
               >{{ conclusionLabel(node) || 'New conclusion' }}</span>
-              <span class="concl__when" data-testid="conclusions-editor-when">when {{ describeLines(node) }}</span>
+              <span v-if="node.lines.length" class="concl__when" data-testid="conclusions-editor-when">when {{ describeLines(node) }}</span>
             </span>
             <span class="concl__explains" data-testid="conclusions-editor-explains">explains {{ explainsLabel(node.bucket, lineContext) }}</span>
             <span class="concl__outcome" data-testid="conclusions-editor-outcome">{{ outcomeLabel(node.outcome) }}</span>
@@ -205,7 +205,6 @@
                   @update="updateLine(node.uid, line.uid, $event)"
                   @remove="removeLineAt(node, lineIndex)"
                 />
-                <p v-if="!node.lines.length" class="concl-part__always">always</p>
                 <div>
                   <button
                     type="button"
@@ -529,8 +528,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watchEffect } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { RouterLink, onBeforeRouteLeave, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -581,10 +580,12 @@ const firstKeyField = computed(() => {
   return keyFields.length >= 2 ? formatReconciliationFieldKey(keyFields[0]) : null
 })
 
-const schemaCatalog = shallowRef<CatalogResult>({ fields: [], listPaths: new Set() })
-const listPaths = shallowRef<ReadonlySet<string>>(new Set())
+const schemaCatalog = shallowRef<CatalogResult>({ fields: [], listPaths: new Set(), nonListPaths: new Set() })
+// The schemas' list and non-list paths; the composable adds the run's lookups to both.
+const listPaths = computed<ReadonlySet<string>>(() => schemaCatalog.value.listPaths)
+const nonListPaths = computed<ReadonlySet<string>>(() => schemaCatalog.value.nonListPaths)
 
-const conclusions = useRunConclusions({ savedRunId, file1Label, file2Label, firstKeyField, listPaths })
+const conclusions = useRunConclusions({ savedRunId, file1Label, file2Label, firstKeyField, listPaths, nonListPaths })
 const {
   loading,
   loaded,
@@ -605,12 +606,9 @@ const {
   updateLine,
 } = conclusions
 
-// The fields a line can check: both schemas, then the run's lookups; list paths from both.
+// The fields a line can check: both schemas, then the run's lookups.
 const lookupCatalog = computed(() => lookupFields(conclusions.lookups.value, { file1: file1Label.value, file2: file2Label.value }))
 const fields = computed(() => [...schemaCatalog.value.fields, ...lookupCatalog.value.fields])
-watchEffect(() => {
-  listPaths.value = new Set([...schemaCatalog.value.listPaths, ...lookupCatalog.value.listPaths])
-})
 
 const root = ref<HTMLElement | null>(null)
 const open = ref<number | typeof UNEXPLAINED | null>(null)
@@ -620,9 +618,11 @@ const newCodeLabel = ref('')
 
 let fieldsController: AbortController | null = null
 
-// Off while a conclusion is unfinished, except while a part is open: a value typed there but not yet entered is
-// only committed by the save press itself (its blur), so that press must reach saveAndReturn.
-const saveDisabled = computed(() => saving.value || !loaded.value || (incomplete.value && editing.value === null))
+// Off while a conclusion is unfinished or nothing changed (a save would flatten a stored tree for nothing), except while
+// a part is open: a value typed there but not yet entered is only committed by the save press itself (its blur), so
+// that press must reach saveAndReturn.
+const saveDisabled = computed(() => saving.value || !loaded.value
+  || (editing.value === null && (incomplete.value || !dirty.value)))
 
 function rowName(node: ConclusionDraft): string {
   return conclusionLabel(node) || 'new'
@@ -757,13 +757,21 @@ async function saveAndReturn(): Promise<void> {
     if (why) mascot.offerTip(why)
     return
   }
+  // The open part held nothing new: close it rather than resend the list unchanged.
+  if (!dirty.value) {
+    done()
+    return
+  }
   if (await conclusions.save()) await returnToRun()
 }
 
+/** The leave guard asks while changes wait. */
 async function back(): Promise<void> {
-  if (dirty.value && !window.confirm('Discard unsaved conclusion changes?')) return
   await returnToRun()
 }
+
+// Any way out (back, the sidebar, the browser) asks before unsaved changes are dropped; a save leaves nothing to ask about.
+onBeforeRouteLeave(() => !dirty.value || window.confirm('Discard unsaved conclusion changes?'))
 
 onMounted(() => {
   const current = draft.value
@@ -962,14 +970,8 @@ button.concl-part:disabled {
 }
 
 .concl-part__value--blank,
-.concl-part__gloss,
-.concl-part__always {
+.concl-part__gloss {
   color: var(--text-muted);
-}
-
-.concl-part__always {
-  margin: 0;
-  padding: var(--space-1-5) var(--space-2);
 }
 
 .concl-part__control {

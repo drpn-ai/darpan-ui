@@ -290,7 +290,13 @@ const firstSegment = computed(() => {
   const dot = field.indexOf('.')
   return dot > 0 ? field.slice(0, dot) : ''
 })
-const showQuantifier = computed(() => !isRecord.value && firstSegment.value !== '' && props.context.listPaths.has(firstSegment.value))
+// Any dotted path may be a list unless the catalogue knows it is not (an API side has no schema to say); a stored
+// "any" or a known list always shows the picker.
+const showQuantifier = computed(() => {
+  const seg = firstSegment.value
+  if (isRecord.value || !seg) return false
+  return props.context.listPaths.has(seg) || props.condition.quantifier === 'ANY' || !props.context.nonListPaths?.has(seg)
+})
 const quantifierValue = computed(() => {
   const c = props.condition
   if (c.quantifier === 'ANY') return 'ANY'

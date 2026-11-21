@@ -54,8 +54,10 @@ export interface UseRunConclusionsDeps {
   file2Label: Ref<string> | ComputedRef<string>
   /** The run's first compare key field when its key has two or more fields, else null. */
   firstKeyField: Ref<string | null> | ComputedRef<string | null>
-  /** First path segments known to be lists. */
+  /** First path segments known to be lists (the schemas'); the run's `many` lookups are added here. */
   listPaths: Ref<ReadonlySet<string>> | ComputedRef<ReadonlySet<string>>
+  /** First path segments known not to be lists (the schemas'); the run's other lookups are added here. */
+  nonListPaths?: Ref<ReadonlySet<string>> | ComputedRef<ReadonlySet<string>>
 }
 
 interface Snapshot {
@@ -150,19 +152,30 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
 
   const isEvaluate = computed(() => (meta.value?.scopeMode ?? '').toUpperCase() === 'EVALUATE')
 
-  const lineContext = computed<LineContext>(() => ({
-    file1: deps.file1Label.value,
-    file2: deps.file2Label.value,
-    evaluate: isEvaluate.value,
-    firstKeyField: deps.firstKeyField.value,
-    listPaths: deps.listPaths.value,
-  }))
+  // The run's lookups are known here, so both pages word a lookup path the same way.
+  const lineContext = computed<LineContext>(() => {
+    const listPaths = new Set(deps.listPaths.value)
+    const nonListPaths = new Set(deps.nonListPaths?.value ?? [])
+    for (const lookup of lookups.value) {
+      if (lookup.many) listPaths.add(lookup.name)
+      else nonListPaths.add(lookup.name)
+    }
+    return {
+      file1: deps.file1Label.value,
+      file2: deps.file2Label.value,
+      evaluate: isEvaluate.value,
+      firstKeyField: deps.firstKeyField.value,
+      listPaths,
+      nonListPaths,
+    }
+  })
 
   const dirty = computed(() => loaded.value
     && (unexplained.value !== snapshot.value.unexplained || !sameList(list.value, snapshot.value.list)))
 
-  /** A conclusion with no name, or a line missing its field or values, cannot be saved. */
+  /** A conclusion with no name or no line, or a line missing its field or values, cannot be saved (the service needs a line). */
   const incomplete = computed(() => list.value.some((node) => !node.conclusion
+    || !node.lines.length
     || node.lines.some((line) => conditionIncomplete(line.condition))))
 
   const catalogOptions = computed<AppSelectOption[]>(() => {
@@ -178,12 +191,16 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     return options
   })
 
-  // A one-system run has no second side to be missing from; a stored conclusion that says so still shows what it says.
+  // A one-system run has no second side to be missing from, and FINDING never fires on a compare run; a stored
+  // conclusion that says either still shows what it says.
+  const offersBucket = (bucket: string): boolean => {
+    if (isEvaluate.value ? bucket !== 'MISSING_FROM_FILE_2' : bucket !== 'FINDING') return true
+    return list.value.some((node) => node.bucket === bucket)
+  }
   const bucketOptions = computed<AppSelectOption[]>(() => [
     { value: '', label: explainsLabel('', lineContext.value) },
     ...(meta.value?.buckets?.length ? meta.value.buckets : DEFAULT_BUCKETS)
-      .filter((bucket) => !isEvaluate.value || bucket !== 'MISSING_FROM_FILE_2'
-        || list.value.some((node) => node.bucket === bucket))
+      .filter(offersBucket)
       .map((bucket) => ({ value: bucket, label: explainsLabel(bucket, lineContext.value) })),
   ])
 
@@ -192,9 +209,8 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     return catalogOptions.value.find((option) => option.value === node.conclusion)?.label || node.conclusion
   }
 
-  /** The row's "when": every line, all of which must hold. */
+  /** The row's "when": every line, all of which must hold. No line reads nothing; it cannot be saved. */
   function describeLines(node: ConclusionDraft): string {
-    if (!node.lines.length) return 'always'
     return node.lines.map((line) => describeCondition(line.condition, lineContext.value)).join(' and ')
   }
 

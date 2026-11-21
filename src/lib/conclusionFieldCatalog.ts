@@ -17,6 +17,8 @@ export interface CatalogField {
 export interface CatalogResult {
   fields: CatalogField[]
   listPaths: Set<string>
+  /** First path segments known not to be lists: top-level schema objects and fields, lookups that are not `many`. */
+  nonListPaths: Set<string>
 }
 
 export interface SideLabels {
@@ -42,7 +44,7 @@ async function sideFields(
   signal: AbortSignal,
   labels: SideLabels,
 ): Promise<CatalogResult> {
-  const empty: CatalogResult = { fields: [], listPaths: new Set() }
+  const empty: CatalogResult = { fields: [], listPaths: new Set(), nonListPaths: new Set() }
   const isOne = side === 'file1'
   const sourceType = isOne ? draft.file1SourceTypeEnumId : draft.file2SourceTypeEnumId
   if (sourceType === SOURCE_TYPE_API) return empty
@@ -64,6 +66,8 @@ async function sideFields(
   const arrayPaths = entries.filter((f) => f.type === 'array').map((f) => f.path)
   // Only top-level arrays go in listPaths (first-segment contract); nested ones still mark their leaves.
   const listPaths = new Set(arrayPaths.filter((p) => !p.includes('.')))
+  // `lines.[0]` normalises to `lines`, so an array's item entry must not mark it a non-list.
+  const nonListPaths = new Set(entries.map((f) => f.path).filter((p) => !p.includes('.') && !listPaths.has(p)))
   const seen = new Set<string>()
   const fields: CatalogField[] = []
   for (const f of entries) {
@@ -72,7 +76,7 @@ async function sideFields(
     const list = arrayPaths.some((a) => f.path === a || f.path.startsWith(`${a}.`))
     fields.push(entry(subject, f.path, labels, list))
   }
-  return { fields, listPaths }
+  return { fields, listPaths, nonListPaths }
 }
 
 /** Never throws: a side that cannot be read contributes nothing (typed paths still work). */
@@ -81,12 +85,13 @@ export async function loadConclusionFields(
   signal: AbortSignal,
   labels: SideLabels,
 ): Promise<CatalogResult> {
-  const result: CatalogResult = { fields: [], listPaths: new Set() }
+  const result: CatalogResult = { fields: [], listPaths: new Set(), nonListPaths: new Set() }
   for (const side of ['file1', 'file2'] as const) {
     try {
       const part = await sideFields(draft, side, signal, labels)
       result.fields.push(...part.fields)
       part.listPaths.forEach((p) => result.listPaths.add(p))
+      part.nonListPaths.forEach((p) => result.nonListPaths.add(p))
     } catch {
       // empty for this side
     }
@@ -97,9 +102,11 @@ export async function loadConclusionFields(
 /** One entry per lookup; the user types `<lookup>.<field>` after it. `many` lookups are lists. */
 export function lookupFields(lookups: RunConclusionLookup[], labels: SideLabels): CatalogResult {
   const listPaths = new Set<string>()
+  const nonListPaths = new Set<string>()
   const fields = lookups.map((lookup) => {
     if (lookup.many) listPaths.add(lookup.name)
+    else nonListPaths.add(lookup.name)
     return entry(lookup.subject, lookup.name, labels, Boolean(lookup.many))
   })
-  return { fields, listPaths }
+  return { fields, listPaths, nonListPaths }
 }

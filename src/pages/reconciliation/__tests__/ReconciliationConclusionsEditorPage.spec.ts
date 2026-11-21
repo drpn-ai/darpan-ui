@@ -10,6 +10,9 @@ const createCode = vi.hoisted(() => vi.fn())
 const getJsonSchema = vi.hoisted(() => vi.fn())
 const flattenJsonSchema = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
+// The page's leave guards, run by routerPush as the real router would; `landed` holds the navigations they let through.
+const leaveGuards = vi.hoisted(() => [] as Array<() => unknown>)
+const landed = vi.hoisted(() => [] as unknown[])
 
 vi.mock('vue-router', () => ({
   RouterLink: {
@@ -18,6 +21,7 @@ vi.mock('vue-router', () => ({
     template: '<a :data-to="typeof to === \'string\' ? to : JSON.stringify(to)" v-bind="$attrs"><slot /></a>',
   },
   useRouter: () => ({ push: routerPush }),
+  onBeforeRouteLeave: (guard: () => unknown) => { leaveGuards.push(guard) },
 }))
 
 vi.mock('../../../lib/api/facade', () => ({
@@ -106,7 +110,16 @@ function loadedConclusions(): RunConclusions {
         question: '',
         fix: null,
         outcome: 'HIDE',
-        conditions: [],
+        conditions: [{
+          subject: 'FILE_2',
+          presence: 'ABSENT',
+          keyScope: 'FULL',
+          quantifier: 'ALL',
+          field: null,
+          operator: null,
+          values: [],
+          checkLabel: 'Not in HotWax',
+        }],
       },
     ],
   } as RunConclusions
@@ -139,6 +152,12 @@ describe('ReconciliationConclusionsEditorPage', () => {
     getJsonSchema.mockReset()
     flattenJsonSchema.mockReset()
     routerPush.mockReset()
+    leaveGuards.length = 0
+    landed.length = 0
+    routerPush.mockImplementation(async (to: unknown) => {
+      for (const guard of leaveGuards) if ((await guard()) === false) return
+      landed.push(to)
+    })
     draftStoreState.workflowOrigin = { label: 'Run Details', path: '/reconciliation/ruleset-manager?run=RS_SHIP_BILL' }
     draftStoreState.ruleSetDraftState = draftState()
     getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: loadedConclusions() })
@@ -162,7 +181,7 @@ describe('ReconciliationConclusionsEditorPage', () => {
     expect(first!.get('[data-testid="conclusions-editor-when"]').text()).toBe('when NetSuite billing_status is one of Pending Billing')
     expect(first!.get('[data-testid="conclusions-editor-explains"]').text()).toBe('explains the rules hold')
     expect(first!.get('[data-testid="conclusions-editor-outcome"]').text()).toBe('Shown')
-    expect(second!.get('[data-testid="conclusions-editor-when"]').text()).toBe('when always')
+    expect(second!.get('[data-testid="conclusions-editor-when"]').text()).toBe('when the HotWax record is missing')
     expect(second!.get('[data-testid="conclusions-editor-explains"]').text()).toBe('explains In HotWax')
     expect(second!.get('[data-testid="conclusions-editor-outcome"]').text()).toBe('Hidden')
 
@@ -241,9 +260,18 @@ describe('ReconciliationConclusionsEditorPage', () => {
     expect(saveRunConclusions).toHaveBeenCalledWith('RS_SHIP_BILL', expect.any(Array), expect.anything(), { unexplainedOutcome: 'EXPECTED' })
   })
 
+  it('save is off with nothing changed', async () => {
+    const wrapper = await mountPage()
+    expect(wrapper.get('[data-testid="conclusions-editor-save"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="conclusions-save-blocked"]').exists()).toBe(false)
+
+    await rows(wrapper)[0]!.get('[data-testid="conclusions-editor-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="conclusions-editor-move-down"]').trigger('click')
+    expect(wrapper.get('[data-testid="conclusions-editor-save"]').attributes('disabled')).toBeUndefined()
+  })
+
   it('save is off while a line is incomplete', async () => {
     const wrapper = await mountPage()
-    expect(wrapper.get('[data-testid="conclusions-editor-save"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.find('[data-testid="conclusions-save-blocked"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="conclusions-editor-add"]').trigger('click')
@@ -299,30 +327,68 @@ describe('ReconciliationConclusionsEditorPage', () => {
 
     expect(saveRunConclusions).not.toHaveBeenCalled()
     expect(routerPush).not.toHaveBeenCalled()
-    expect(useMascotStore().tipText).toBe('Save waits until every conclusion has a name and every line is finished.')
+    expect(useMascotStore().tipText).toBe('Save waits until every conclusion has a name and a line, and every line is finished.')
   })
 
-  it('back with unsaved changes asks first', async () => {
+  it('back with unsaved changes asks first, once', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const wrapper = await mountPage()
+    const run = { path: '/reconciliation/ruleset-manager?run=RS_SHIP_BILL' }
 
     // Nothing changed: back goes straight to the run page.
     await wrapper.get('[data-testid="conclusions-editor-back"]').trigger('click')
+    await flushPromises()
     expect(confirm).not.toHaveBeenCalled()
-    expect(routerPush).toHaveBeenLastCalledWith({ path: '/reconciliation/ruleset-manager?run=RS_SHIP_BILL' })
-    routerPush.mockReset()
+    expect(landed).toEqual([run])
+    landed.length = 0
 
     await rows(wrapper)[0]!.get('[data-testid="conclusions-editor-toggle"]').trigger('click')
     await wrapper.get('[data-testid="conclusions-editor-move-down"]').trigger('click')
 
     await wrapper.get('[data-testid="conclusions-editor-back"]').trigger('click')
+    await flushPromises()
     expect(confirm).toHaveBeenCalledTimes(1)
-    expect(routerPush).not.toHaveBeenCalled()
+    expect(landed).toEqual([])
 
     confirm.mockReturnValue(true)
     await wrapper.get('[data-testid="conclusions-editor-back"]').trigger('click')
-    expect(routerPush).toHaveBeenCalledWith({ path: '/reconciliation/ruleset-manager?run=RS_SHIP_BILL' })
+    await flushPromises()
+    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(landed).toEqual([run])
     expect(saveRunConclusions).not.toHaveBeenCalled()
+  })
+
+  it('leaving any other way asks while changes wait; after a save it does not', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    saveRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [] })
+    const wrapper = await mountPage()
+    expect(leaveGuards).toHaveLength(1)
+    const leave = leaveGuards[0]!
+
+    await rows(wrapper)[0]!.get('[data-testid="conclusions-editor-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="conclusions-editor-move-down"]').trigger('click')
+    // The sidebar or the browser back runs the same guard: it asks, and a "no" stays.
+    expect(leave()).toBe(false)
+    expect(confirm).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-testid="conclusions-editor-save"]').trigger('click')
+    await flushPromises()
+    expect(saveRunConclusions).toHaveBeenCalledTimes(1)
+    expect(landed).toEqual([{ path: '/reconciliation/ruleset-manager?run=RS_SHIP_BILL' }])
+    expect(confirm).toHaveBeenCalledTimes(1)
+    expect(leave()).toBe(true)
+  })
+
+  it('a conclusion left with no line blocks save and reads no when', async () => {
+    const wrapper = await mountPage()
+    await rows(wrapper)[1]!.get('[data-testid="conclusions-editor-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="conclusion-line"]').trigger('click')
+    await wrapper.get('[aria-label="Remove this line"]').trigger('click')
+
+    expect(rows(wrapper)[1]!.find('[data-testid="conclusions-editor-when"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('always')
+    expect(wrapper.get('[data-testid="conclusions-editor-save"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="conclusions-save-blocked"]').exists()).toBe(true)
   })
 
   it('save flushes typed value text', async () => {

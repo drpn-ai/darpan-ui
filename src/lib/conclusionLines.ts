@@ -8,6 +8,8 @@ export interface LineContext {
   firstKeyField: string | null
   /** First path segments known to be lists (schema arrays, `many` lookups). */
   listPaths: ReadonlySet<string>
+  /** First path segments known not to be lists (schema objects and plain fields, lookups that are not `many`). */
+  nonListPaths?: ReadonlySet<string>
 }
 
 export const OUTCOME_GLOSS: Record<string, string> = {
@@ -59,7 +61,8 @@ function fieldClause(c: RunConclusionCondition, ctx: LineContext, owner: string)
   const dot = field.indexOf('.')
   const seg = dot > 0 ? field.slice(0, dot) : ''
   const rest = dot > 0 ? field.slice(dot + 1) : ''
-  if (seg && ctx.listPaths.has(seg)) {
+  // A stored "any" says the path is a list even when the catalogue does not know it (an API side has no schema).
+  if (seg && (ctx.listPaths.has(seg) || c.quantifier === 'ANY')) {
     const quantifier = c.quantifier ?? 'ALL'
     const negated = quantifier === 'ALL' && c.operator === 'NOT_IN'
     const word = quantifier === 'ANY' ? 'any' : negated ? 'no' : 'every'
@@ -141,13 +144,26 @@ export function conditionChanged(before: RunConclusionCondition, after: RunConcl
   )
 }
 
+/** The checkLabel column is text-medium (VARCHAR 255). */
+export const CHECK_LABEL_MAX = 255
+
+/** The line's sentence as a label, its value list shortened with "…" until it fits the column. */
+function generatedLabel(c: RunConclusionCondition, ctx: LineContext): string {
+  let label = describeCondition(c, ctx)
+  const values = c.values.map((v) => v.trim()).filter((v) => v)
+  for (let keep = values.length - 1; label.length > CHECK_LABEL_MAX && keep >= 0; keep -= 1) {
+    label = describeCondition({ ...c, values: [...values.slice(0, keep), ELLIPSIS] }, ctx)
+  }
+  return label.length > CHECK_LABEL_MAX ? `${label.slice(0, CHECK_LABEL_MAX - 1)}${ELLIPSIS}` : label
+}
+
 export function withCheckLabel(
   c: RunConclusionCondition,
   loaded: RunConclusionCondition | null,
   ctx: LineContext,
 ): RunConclusionCondition {
   if (loaded && !conditionChanged(c, loaded)) return { ...c, checkLabel: loaded.checkLabel }
-  return { ...c, checkLabel: describeCondition(c, ctx) }
+  return { ...c, checkLabel: generatedLabel(c, ctx) }
 }
 
 export function conditionIncomplete(c: RunConclusionCondition): boolean {
