@@ -54,7 +54,6 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
   'reconciliation-ruleset-manager': Object.freeze([
     { id: 'ruleset-manager-edit-rules', text: 'Filters or rules change with the pencil beside each — finished runs keep whatever they already compared.', when: control('ruleset-manager-edit-rules') },
     { id: 'ruleset-manager-filters', text: 'Filters are per source — each side can leave out different records as it pulls.', when: control('ruleset-manager-filters') },
-    { id: 'run-conclusions-new', text: 'Open a conclusion row to change its question or conditions; New conclusion adds one after the rest.', when: control('run-conclusions-new') },
     { id: 'ruleset-manager-run-ruleset', text: 'Run this rule set from here; its history is one step further on.', when: control('ruleset-manager-run-ruleset') },
   ]),
   'reconciliation-automations': Object.freeze([

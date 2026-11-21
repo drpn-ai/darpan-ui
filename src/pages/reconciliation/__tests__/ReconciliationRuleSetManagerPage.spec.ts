@@ -884,7 +884,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(draftStoreState.setRuleSetDraft).not.toHaveBeenCalled()
   })
 
-  it('shows the conclusions as numbered rows with what each applies to and its outcome; a row opens its popup outside the frame', async () => {
+  it('shows the conclusions as flat read-only rows in the order they are tried, a child above its parent', async () => {
     draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
     getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: conclusionsTree() })
 
@@ -896,47 +896,60 @@ describe('ReconciliationRuleSetManagerPage', () => {
     expect(section.get('.static-page-section-heading').text()).toBe('Conclusions')
     expect(section.get('[data-testid="ruleset-manager-conclusions-note"]').text()).toBe('First match wins.')
     const rows = section.findAll('[data-testid="run-conclusions-node"]')
-    expect(rows.map((row) => row.attributes('data-depth'))).toEqual(['1', '2'])
-    expect(section.findAll('[data-testid="run-conclusions-number"]').map((number) => number.text())).toEqual(['1', '1.1'])
-    expect(rows[0]!.get('[data-testid="run-conclusions-applies"]').text()).toBe('Missing from SHOPIFY')
-    expect(rows[1]!.find('[data-testid="run-conclusions-applies"]').exists()).toBe(false)
-    expect(rows[1]!.find('.run-conclusion__arrow').exists()).toBe(true)
-    expect(rows[1]!.get('[data-testid="run-conclusions-outcome"]').text()).toBe('Hidden')
-    expect(rows[0]!.get('[data-testid="run-conclusions-when"]').text()).toBe('OMS statusId is one of ORDER_CANCELLED')
+    // Flattened: the child ranks first, carries its parent's line, and explains its root's check.
+    expect(rows.map((row) => row.attributes('data-key'))).toEqual(['20', '10'])
+    expect(section.findAll('[data-testid="run-conclusions-number"]').map((number) => number.text())).toEqual(['1', '2'])
+    expect(rows.map((row) => row.get('[data-testid="run-conclusions-explains"]').text())).toEqual(['explains In SHOPIFY', 'explains In SHOPIFY'])
+    expect(rows[0]!.get('[data-testid="run-conclusions-when"]').text())
+      .toBe('OMS statusId is one of ORDER_CANCELLED and OMS orderDate is within 24 hours')
+    expect(rows[1]!.get('[data-testid="run-conclusions-when"]').text()).toBe('OMS statusId is one of ORDER_CANCELLED')
+    expect(rows.map((row) => row.get('[data-testid="run-conclusions-outcome"]').text())).toEqual(['Hidden', 'Shown'])
+    expect(rows[1]!.get('.run-conclusion__question').text()).toBe('Was it cancelled?')
     expect(fact(wrapper, 'checks').sub).toBe('2 conclusions')
-
-    await rows[0]!.get('[data-testid="run-conclusions-open"]').trigger('click')
-    const dialog = wrapper.get('[data-testid="run-conclusion-popup"]')
-    expect(dialog.element.closest('.static-page-frame')).toBeNull()
-    expect(wrapper.get('.static-page-frame').classes()).toContain('static-page-frame--popup-open')
-
-    await dialog.get('[data-testid="run-conclusions-question"]').setValue('Cancelled in the OMS?')
-    saveRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], savedConclusions: null })
-    await dialog.get('[data-testid="run-conclusions-save"]').trigger('click')
-    await flushPromises()
-
-    expect(saveRunConclusions).toHaveBeenCalledWith('RS_ORDER_SYNC', expect.any(Array), expect.any(AbortSignal))
-    expect(saveRunConclusions.mock.calls[0]![1][0]).toMatchObject({ key: '10', question: 'Cancelled in the OMS?', outcome: null })
-    expect(saveRunConclusions.mock.calls[0]![1][1]).toMatchObject({ key: '20', parent: '10', outcome: 'HIDE' })
+    // Read only, even to an editor: no buttons, no create tile, no popup.
+    expect(section.find('[data-testid="run-conclusions-list"] button').exists()).toBe(false)
+    expect(section.find('[data-testid="run-conclusions-new"]').exists()).toBe(false)
+    await rows[0]!.trigger('click')
     expect(wrapper.find('[data-testid="run-conclusion-popup"]').exists()).toBe(false)
     expect(wrapper.get('.static-page-frame').classes()).not.toContain('static-page-frame--popup-open')
+    expect(saveRunConclusions).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 
-  it('adds a conclusion from the New conclusion tile', async () => {
+  it('names the first key field on a first-key-field line only when the key has two or more fields', async () => {
+    const firstFieldTree = (): RunConclusions => ({
+      ...conclusionsTree(),
+      conclusions: [{
+        key: '10', parent: null, conclusion: 'CONC_CANCELLED', bucket: null, question: null, outcome: null,
+        conditions: [{ subject: 'FILE_2', presence: 'ABSENT', keyScope: 'FIRST_FIELD', quantifier: 'ALL', field: null, operator: null, values: [], checkLabel: 'Gone' }],
+      }],
+    })
+    const twoFieldState = createSavedRunReopenDraftState()
+    twoFieldState.draft.file1PrimaryIdExpression = ['$.orders[*].name', '$.orders[*].lineItems[*].id']
+    draftStoreState.ruleSetDraftState = twoFieldState
+    getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: firstFieldTree() })
+
+    const twoField = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+    expect(twoField.get('[data-testid="run-conclusions-when"]').text()).toBe('the OMS name record is missing')
+    twoField.unmount()
+
+    draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
+    const oneField = mount(ReconciliationRuleSetManagerPage)
+    await flushPromises()
+    expect(oneField.get('[data-testid="run-conclusions-when"]').text()).toBe('the OMS record is missing')
+  })
+
+  it('shows an editor an empty run\'s conclusions as None yet', async () => {
     draftStoreState.ruleSetDraftState = createSavedRunReopenDraftState()
     getRunConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: { ...conclusionsTree(), conclusions: [] } })
 
-    const wrapper = mount(ReconciliationRuleSetManagerPage, { attachTo: document.body })
+    const wrapper = mount(ReconciliationRuleSetManagerPage)
     await flushPromises()
 
     expect(wrapper.get('[data-testid="run-conclusions-empty"]').text()).toBe('None yet.')
-    await wrapper.get('[data-testid="run-conclusions-new"]').trigger('click')
-    expect(wrapper.get('#run-conclusion-popup-title').text()).toBe('New conclusion')
-    expect(wrapper.findAll('[data-testid="run-conclusions-node"]')).toHaveLength(1)
-    await wrapper.get('[data-testid="run-conclusions-cancel"]').trigger('click')
     expect(wrapper.findAll('[data-testid="run-conclusions-node"]')).toHaveLength(0)
-    wrapper.unmount()
+    expect(wrapper.find('[data-testid="run-conclusions-new"]').exists()).toBe(false)
   })
 
   it('shows the conclusions read-only to someone who cannot edit the run', async () => {

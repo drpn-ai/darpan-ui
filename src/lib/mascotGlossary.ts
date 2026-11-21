@@ -431,36 +431,16 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   // DAR-UI-128: the Ruleset manager.
   runConclusions: {
     title: 'Conclusions',
-    body: 'what each row of this run is concluded to be. Tried top to bottom, the first that holds names the row; a child refines its parent.',
-  },
-  runConclusion: {
-    title: 'Conclusion',
-    body: 'the answer a finding gets when this holds, picked from the shared codes and your own. The plus beside it names a new one.',
-    byDirectiveOnly: true,
-  },
-  conclusionOrder: {
-    title: 'Order',
-    body: 'conclusions are tried in this order and the first whose conditions all hold names the row. Its children move with it.',
-    byDirectiveOnly: true,
+    body: 'what each row of this run is concluded to be. Tried top to bottom, the first that holds names the row.',
   },
   conclusionBucket: {
     title: 'Applies to',
-    body: 'the rows it is tried on: missing from one side, a rule differs, every finding, or any finding. Children apply where their parent holds.',
+    body: 'the rows it is tried on: missing from one side, a rule differs, every finding, or any finding.',
     byDirectiveOnly: true,
   },
   conclusionOutcome: {
     title: 'Outcome',
     body: 'what it does to a row it names: Shown stays a finding, Hidden takes it off the result and its counts, Expected keeps it but no statement counts it.',
-    byDirectiveOnly: true,
-  },
-  conclusionQuestion: {
-    title: 'Question',
-    body: 'what someone checking the finding asks first, in plain words. It shows with the conclusion on the run’s result.',
-    byDirectiveOnly: true,
-  },
-  conclusionConditions: {
-    title: 'Conditions',
-    body: 'every one must hold for the conclusion to name a row. Say what each checks in words: that line is a finding’s proof.',
     byDirectiveOnly: true,
   },
   ruleSetChecks: {

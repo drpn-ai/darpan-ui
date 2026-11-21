@@ -1,0 +1,243 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { computed, defineComponent, h, ref } from 'vue'
+import type { RunConclusionCondition, RunConclusionNode, RunConclusions } from '../../lib/api/authoringTypes'
+
+const getConclusions = vi.hoisted(() => vi.fn())
+const saveConclusions = vi.hoisted(() => vi.fn())
+const createCode = vi.hoisted(() => vi.fn())
+
+vi.mock('../../lib/api/authoringFacade', () => ({
+  runConclusionFacade: { get: getConclusions, save: saveConclusions, createCode },
+}))
+
+import { ApiCallError } from '../../lib/api/client'
+import { useRunConclusions, type RunConclusionsState } from '../useRunConclusions'
+
+const STATUS_LINE: RunConclusionCondition = {
+  subject: 'FILE_1', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL',
+  field: 'statusId', operator: 'IN', values: ['RETURN_COMPLETED', 'RETURN_RECEIVED'],
+  checkLabel: 'The return is completed or received in the OMS',
+}
+const NO_ORDER_LINE: RunConclusionCondition = {
+  subject: 'FILE_1', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL',
+  field: 'orderExternalId', operator: 'BLANK', values: [], checkLabel: 'The return names no order',
+}
+// A hand-written label on a first-key-field line: saving untouched must not rewrite it.
+const SCREENED_LINE: RunConclusionCondition = {
+  subject: 'FILE_2', presence: 'EXCLUDED', keyScope: 'FIRST_FIELD', quantifier: 'ALL',
+  field: null, operator: null, values: [], checkLabel: 'Screened out of NetSuite',
+}
+
+function tree(overrides: Partial<RunConclusions> = {}): RunConclusions {
+  return {
+    savedRunId: 'RS_RETURNS',
+    scopeMode: 'COMPARE',
+    conclusions: [
+      {
+        key: '10', parent: null, conclusion: 'CONC_RETURN_NOT_IN_NETSUITE', label: 'Return not in NetSuite',
+        bucket: 'MISSING_FROM_FILE_2', question: 'Is the return done?', fix: 'Fulfil it in NetSuite.', outcome: null,
+        conditions: [STATUS_LINE],
+      },
+      {
+        key: '20', parent: '10', conclusion: 'CONC_RETURN_NO_ORDER', label: 'Return names no order',
+        bucket: null, question: null, outcome: 'HIDE', conditions: [NO_ORDER_LINE],
+      },
+      {
+        key: '40', parent: null, conclusion: 'CONC_SCREENED', label: 'Screened out', bucket: 'FINDING',
+        question: null, outcome: 'EXPECTED', conditions: [SCREENED_LINE],
+      },
+    ],
+    catalog: [
+      { id: 'CONC_RETURN_NOT_IN_NETSUITE', label: 'Return not in NetSuite' },
+      { id: 'CONC_RETURN_NO_ORDER', label: 'Return names no order' },
+      { id: 'CONC_SCREENED', label: 'Screened out' },
+    ],
+    buckets: ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING'],
+    operators: ['IN', 'NOT_IN', 'GT', 'LT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK'],
+    presence: ['ANY', 'KEPT', 'EXCLUDED', 'ABSENT'],
+    keyScopes: ['FULL', 'FIRST_FIELD'],
+    quantifiers: ['ALL', 'ANY'],
+    lookups: [],
+    unexplainedOutcome: null,
+    ...overrides,
+  }
+}
+
+async function setup(stored: RunConclusions = tree()): Promise<RunConclusionsState> {
+  getConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], conclusions: stored })
+  let state: RunConclusionsState | null = null
+  mount(defineComponent({
+    setup() {
+      state = useRunConclusions({
+        savedRunId: ref('RS_RETURNS'),
+        file1Label: computed(() => 'OMS'),
+        file2Label: computed(() => 'NetSuite'),
+        firstKeyField: ref('order_name'),
+        listPaths: ref(new Set<string>()),
+      })
+      return () => h('div')
+    },
+  }))
+  await flushPromises()
+  return state!
+}
+
+function sent(): RunConclusionNode[] {
+  return saveConclusions.mock.calls.at(-1)?.[1] as RunConclusionNode[]
+}
+
+function savedOk() {
+  saveConclusions.mockResolvedValue({ ok: true, messages: [], errors: [], savedConclusions: null })
+}
+
+describe('useRunConclusions', () => {
+  beforeEach(() => {
+    getConclusions.mockReset()
+    saveConclusions.mockReset()
+    createCode.mockReset()
+  })
+
+  it('loads a tree with children as flat rows and is not dirty', async () => {
+    const state = await setup()
+
+    expect(getConclusions).toHaveBeenCalledWith('RS_RETURNS', expect.any(AbortSignal))
+    expect(state.loaded.value).toBe(true)
+    // The child ranks above its parent, carries its parent's line first, and explains its root's check.
+    expect(state.list.value.map((node) => node.key)).toEqual(['20', '10', '40'])
+    expect(state.list.value[0]!.bucket).toBe('MISSING_FROM_FILE_2')
+    expect(state.list.value[0]!.lines.map((line) => line.condition)).toEqual([STATUS_LINE, NO_ORDER_LINE])
+    expect(state.list.value[0]!.outcome).toBe('HIDE')
+    expect(state.list.value[1]!.fix).toBe('Fulfil it in NetSuite.')
+    expect(state.conclusionLabel(state.list.value[0]!)).toBe('Return names no order')
+    expect(state.describeLines(state.list.value[0]!))
+      .toBe('OMS statusId is one of RETURN_COMPLETED, RETURN_RECEIVED and OMS orderExternalId is empty')
+    expect(state.unexplained.value).toBe('')
+    expect(state.dirty.value).toBe(false)
+    expect(state.incomplete.value).toBe(false)
+  })
+
+  it('save without edits sends untouched conditions unchanged', async () => {
+    const state = await setup()
+    savedOk()
+
+    await expect(state.save()).resolves.toBe(true)
+
+    expect(saveConclusions).toHaveBeenCalledTimes(1)
+    expect(saveConclusions.mock.calls[0]![0]).toBe('RS_RETURNS')
+    expect(saveConclusions.mock.calls[0]![3]).toBeUndefined()
+    const payload = sent()
+    expect(payload.map((node) => [node.key, node.parent])).toEqual([['20', null], ['10', null], ['40', null]])
+    expect(payload[0]!.conditions).toEqual([STATUS_LINE, NO_ORDER_LINE])
+    expect(payload[2]!.conditions).toEqual([SCREENED_LINE])
+    expect(payload[0]).toMatchObject({ bucket: 'MISSING_FROM_FILE_2', outcome: 'HIDE', question: null })
+    expect(payload[1]).toMatchObject({ bucket: 'MISSING_FROM_FILE_2', outcome: null, question: 'Is the return done?', fix: 'Fulfil it in NetSuite.' })
+    expect(state.dirty.value).toBe(false)
+  })
+
+  it('move swaps neighbours and marks dirty', async () => {
+    const state = await setup()
+    const uid = state.list.value[1]!.uid
+
+    state.move(uid, -1)
+    expect(state.list.value.map((node) => node.key)).toEqual(['10', '20', '40'])
+    expect(state.dirty.value).toBe(true)
+
+    state.move(uid, 1)
+    expect(state.list.value.map((node) => node.key)).toEqual(['20', '10', '40'])
+    expect(state.dirty.value).toBe(false)
+
+    // At either end it stays put.
+    state.move(state.list.value[2]!.uid, 1)
+    expect(state.list.value.map((node) => node.key)).toEqual(['20', '10', '40'])
+  })
+
+  it('cancel restores the loaded list', async () => {
+    const state = await setup()
+    state.updateConclusion(state.list.value[0]!.uid, { question: 'Changed?' })
+    state.removeConclusion(state.list.value[2]!.uid)
+    state.addConclusion()
+    state.unexplained.value = 'EXPECTED'
+    expect(state.dirty.value).toBe(true)
+
+    state.cancel()
+
+    expect(state.list.value.map((node) => node.key)).toEqual(['20', '10', '40'])
+    expect(state.list.value[0]!.question).toBe('')
+    expect(state.unexplained.value).toBe('')
+    expect(state.dirty.value).toBe(false)
+  })
+
+  it('changing a line regenerates only that line\'s checkLabel', async () => {
+    const state = await setup()
+    const node = state.list.value[0]!
+    const changed = node.lines[1]!
+    state.updateLine(node.uid, changed.uid, { ...changed.condition, operator: 'NOT_BLANK' })
+    const added = state.addLine(state.list.value[1]!.uid)
+    state.updateLine(state.list.value[1]!.uid, added, {
+      subject: 'FILE_2', presence: 'ANY', keyScope: 'FULL', quantifier: 'ALL',
+      field: 'status', operator: 'IN', values: ['Open'], checkLabel: '',
+    })
+    savedOk()
+
+    await expect(state.save()).resolves.toBe(true)
+
+    const payload = sent()
+    expect(payload[0]!.conditions.map((condition) => condition.checkLabel))
+      .toEqual(['The return is completed or received in the OMS', 'OMS orderExternalId is not empty'])
+    expect(payload[1]!.conditions.map((condition) => condition.checkLabel))
+      .toEqual(['The return is completed or received in the OMS', 'NetSuite status is one of Open'])
+    expect(payload[2]!.conditions[0]!.checkLabel).toBe('Screened out of NetSuite')
+  })
+
+  it('incomplete blocks save', async () => {
+    const state = await setup()
+    const uid = state.addConclusion()
+    const node = state.list.value.find((entry) => entry.uid === uid)!
+    expect(node).toMatchObject({ conclusion: '', bucket: '', outcome: '' })
+    expect(node.lines).toHaveLength(1)
+    state.updateConclusion(uid, { conclusion: 'CONC_SCREENED' })
+    state.updateLine(uid, node.lines[0]!.uid, { ...node.lines[0]!.condition, field: 'statusId', operator: 'IN', values: [] })
+
+    expect(state.incomplete.value).toBe(true)
+    await expect(state.save()).resolves.toBe(false)
+    expect(saveConclusions).not.toHaveBeenCalled()
+
+    state.updateLine(uid, node.lines[0]!.uid, { ...node.lines[0]!.condition, field: 'statusId', operator: 'IN', values: ['X'] })
+    expect(state.incomplete.value).toBe(false)
+    savedOk()
+    await expect(state.save()).resolves.toBe(true)
+    // A new row's key is its place; no two rows share one.
+    const keys = sent().map((entry) => entry.key)
+    expect(keys).toEqual(['20', '10', '40', 'n3'])
+  })
+
+  it('unexplained Expected→Shown sends COUNTS; unchanged sends nothing', async () => {
+    const state = await setup(tree({ unexplainedOutcome: 'EXPECTED' }))
+    expect(state.unexplained.value).toBe('EXPECTED')
+    expect(state.dirty.value).toBe(false)
+
+    state.unexplained.value = ''
+    expect(state.dirty.value).toBe(true)
+    savedOk()
+    await expect(state.save()).resolves.toBe(true)
+    expect(saveConclusions.mock.calls[0]![3]).toEqual({ unexplainedOutcome: 'COUNTS' })
+    expect(state.dirty.value).toBe(false)
+
+    await expect(state.save()).resolves.toBe(true)
+    expect(saveConclusions.mock.calls[1]![3]).toBeUndefined()
+  })
+
+  it('a refused save keeps the draft and shows the service errors', async () => {
+    const state = await setup()
+    state.updateConclusion(state.list.value[0]!.uid, { question: 'Still open?' })
+    saveConclusions.mockRejectedValue(new ApiCallError('Refused.', 400, { result: { errors: ['A conclusion may hold at most 8 lines.'] } }))
+
+    await expect(state.save()).resolves.toBe(false)
+
+    expect(state.errors.value).toEqual(['A conclusion may hold at most 8 lines.'])
+    expect(state.list.value[0]!.question).toBe('Still open?')
+    expect(state.dirty.value).toBe(true)
+    expect(state.saving.value).toBe(false)
+  })
+})

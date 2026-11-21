@@ -135,8 +135,8 @@
       </template>
     </StaticPageSection>
 
-    <!-- DAR-UI-064 (S3), DAR-UI-128: what each row of this run is concluded to be. An editor opens a row in its popup;
-         anyone else whose read is allowed sees the rows only. -->
+    <!-- DAR-UI-064 (S3), DAR-UI-128, DAR-UI-135: what each row of this run is concluded to be, read only, flat in the
+         order they are tried. -->
     <StaticPageSection v-if="showConclusions" data-testid="ruleset-manager-conclusions">
       <template #header>
         <div class="ruleset-manager-section-title">
@@ -144,7 +144,7 @@
           <p class="ruleset-manager-section-note" data-testid="ruleset-manager-conclusions-note">First match wins.</p>
         </div>
       </template>
-      <RunConclusionRows :editable="canEditTenantSettings" />
+      <RunConclusionRows />
     </StaticPageSection>
 
     <template #actions>
@@ -200,9 +200,6 @@
       </div>
     </template>
   </StaticPageFrame>
-
-  <!-- Outside the frame, which blurs while a popup is open; a popup inside it would blur too. -->
-  <RunConclusionsEditor />
 
   <div
     v-if="authInfoPopup"
@@ -273,7 +270,6 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import RunConclusionRows from '../../components/reconciliation/RunConclusionRows.vue'
-import RunConclusionsEditor from '../../components/reconciliation/RunConclusionsEditor.vue'
 import { RUN_CONCLUSIONS_KEY, useRunConclusions } from '../../composables/useRunConclusions'
 import { useRunResultName } from '../../composables/useRunResultName'
 import { ApiCallError } from '../../lib/api/client'
@@ -380,9 +376,20 @@ const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunA
 const canViewRunHistory = computed(() => Boolean(savedRunId.value))
 const sourceConfigOptions = ref<AutomationSourceConfigOption[]>([])
 const authInfoPopup = ref<AuthInfoPopupState | null>(null)
-const conclusions = useRunConclusions({ savedRunId, file1Label: file1Title, file2Label: file2Title })
+// FIRST_FIELD lines name the parent record only when the key has two or more fields (an order behind order + line).
+const firstKeyField = computed(() => {
+  const keyFields = draft.value?.file1PrimaryIdExpression ?? []
+  return keyFields.length >= 2 ? formatReconciliationFieldKey(keyFields[0]) : null
+})
+const conclusions = useRunConclusions({
+  savedRunId,
+  file1Label: file1Title,
+  file2Label: file2Title,
+  firstKeyField,
+  listPaths: ref<ReadonlySet<string>>(new Set()),
+})
 provide(RUN_CONCLUSIONS_KEY, conclusions)
-const isPopupOpen = computed(() => Boolean(authInfoPopup.value) || Boolean(conclusions.editingNode.value))
+const isPopupOpen = computed(() => Boolean(authInfoPopup.value))
 // An editor always has the section (to add the first conclusion); anyone else sees it once the tree has loaded.
 const showConclusions = computed(() => Boolean(draft.value && savedRunId.value)
   && (canEditTenantSettings.value || conclusions.loaded.value))
@@ -511,7 +518,7 @@ const facts = computed<StaticFact[]>(() => {
   const pairing: StaticFact = isSingleSided.value
     ? { key: 'pairs', label: 'Primary ID', value: file1PrimaryId.value, explain: 'primaryId' }
     : { key: 'pairs', label: 'Pairs rows on', value: `${file1PrimaryId.value} = ${file2PrimaryId.value}`, explain: 'primaryId' }
-  const conclusionCount = conclusions.loaded.value ? conclusions.rows.value.length : null
+  const conclusionCount = conclusions.loaded.value ? conclusions.list.value.length : null
   return [
     systemFact('file1'),
     ...(isSingleSided.value ? [] : [systemFact('file2')]),

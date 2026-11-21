@@ -3,106 +3,68 @@ import { ApiCallError, isAbortError } from '../lib/api/client'
 import { runConclusionFacade } from '../lib/api/authoringFacade'
 import type {
   ConclusionBucket,
-  ConclusionOperator,
   ConclusionOutcome,
   RunConclusionCondition,
+  RunConclusionLookup,
   RunConclusionNode,
   RunConclusions,
 } from '../lib/api/authoringTypes'
 import type { AppSelectOption } from '../components/ui/AppSelect.vue'
+import {
+  conditionIncomplete,
+  describeCondition,
+  explainsLabel,
+  flattenConclusionTree,
+  withCheckLabel,
+  type LineContext,
+} from '../lib/conclusionLines'
 
-// DAR-UI-064 (S3), DAR-UI-128. One run's conclusion tree: an ordered list where the first root whose bucket and
-// conditions hold names the row, and its children (to three levels) refine it. The page lists the tree as rows; a row
-// opens one node in a popup. Every popup save, delete or added child sends the whole tree, all or nothing, through
-// save#RunConclusions, and the service's refusals are shown as it words them.
+// DAR-UI-064 (S3), DAR-UI-128, DAR-UI-135. One run's conclusions as a flat ranked list: the first whose check and
+// lines hold names the row. A stored tree is flattened on load (each child above its parent, carrying its ancestors'
+// lines and its root's check), so the list reads the same before and after the first save. The page holds a draft and
+// saves it once, all or nothing, through save#RunConclusions; the service's refusals are shown as it words them.
 
-export interface DraftCondition {
+export interface DraftLine {
   uid: string
-  subject: 'FILE_1' | 'FILE_2'
-  presence: string
-  keyScope: string
-  quantifier: string
-  field: string
-  operator: string
-  valuesText: string
-  checkLabel: string
+  condition: RunConclusionCondition
+  /** The line as loaded or last saved; an untouched line keeps its checkLabel. Null for a new line. */
+  loaded: RunConclusionCondition | null
 }
 
-export interface DraftNode {
+export interface ConclusionDraft {
   uid: string
+  /** The stored key; blank for a new conclusion until it is saved. */
   key: string
-  parentUid: string | null
   conclusion: string
   bucket: string
   question: string
-  /** Kept as loaded: save replaces the whole tree, so a fix the editor dropped would be erased (DAR-BE-124). */
+  /** Kept as loaded: save replaces every conclusion, so a fix the page dropped would be erased (DAR-BE-124). */
   fix: string | null
   /** '' shows the row, HIDE hides it, EXPECTED marks it expected. */
-  outcome: string
-  /** Read only: a filter the brain suggests for these rows. Not sent; the service keeps it with its rule. */
-  suggestsFilter: boolean
-  conditions: DraftCondition[]
-}
-
-export interface ConclusionRow {
-  node: DraftNode
-  depth: number
-  /** Its place in the order: "2" for the second root, "2.1" for that root's first child. */
-  number: string
-  /** Its index among its siblings. */
-  position: number
-  first: boolean
-  last: boolean
+  outcome: '' | 'HIDE' | 'EXPECTED'
+  lines: DraftLine[]
 }
 
 export interface UseRunConclusionsDeps {
   savedRunId: Ref<string> | ComputedRef<string>
   file1Label: Ref<string> | ComputedRef<string>
   file2Label: Ref<string> | ComputedRef<string>
+  /** The run's first compare key field when its key has two or more fields, else null. */
+  firstKeyField: Ref<string | null> | ComputedRef<string | null>
+  /** First path segments known to be lists. */
+  listPaths: Ref<ReadonlySet<string>> | ComputedRef<ReadonlySet<string>>
 }
 
-export const MAX_CONCLUSION_DEPTH = 3
+interface Snapshot {
+  list: ConclusionDraft[]
+  unexplained: '' | 'EXPECTED'
+}
 
 const DEFAULT_BUCKETS: ConclusionBucket[] = ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING']
-const DEFAULT_OPERATORS: ConclusionOperator[] = ['IN', 'NOT_IN', 'GT', 'LT', 'GT_ZERO', 'WITHIN_HOURS', 'BLANK', 'NOT_BLANK']
-const OPERATOR_LABELS: Record<string, string> = {
-  IN: 'is one of',
-  NOT_IN: 'is not one of',
-  GT: 'is more than',
-  LT: 'is less than',
-  GT_ZERO: 'is above zero',
-  WITHIN_HOURS: 'is within the last hours',
-  BLANK: 'is blank',
-  NOT_BLANK: 'has a value',
-}
-const PRESENCE_LABELS: Record<string, string> = { ANY: 'any', KEPT: 'kept', EXCLUDED: 'excluded', ABSENT: 'absent' }
-const KEY_SCOPE_LABELS: Record<string, string> = { FULL: 'full key', FIRST_FIELD: 'first key field' }
-const QUANTIFIER_LABELS: Record<string, string> = { ALL: 'all values', ANY: 'any value' }
 const OUTCOME_LABELS: Record<string, string> = { '': 'Shown', HIDE: 'Hidden', EXPECTED: 'Expected' }
 
 export function outcomeLabel(outcome: string): string {
   return OUTCOME_LABELS[outcome] ?? outcome
-}
-
-export function takesValues(operator: string): boolean {
-  return operator === 'IN' || operator === 'NOT_IN'
-}
-
-export function takesOneNumber(operator: string): boolean {
-  return operator === 'GT' || operator === 'LT' || operator === 'WITHIN_HOURS'
-}
-
-function vocabulary(listed: string[] | undefined, fallback: string[], labels: Record<string, string>): AppSelectOption[] {
-  return (listed?.length ? listed : fallback).map((value) => ({ value, label: labels[value] ?? value }))
-}
-
-function splitValues(text: string): string[] {
-  const values: string[] = []
-  for (const part of text.split(',')) {
-    const value = part.trim()
-    if (value && !values.includes(value)) values.push(value)
-  }
-  return values
 }
 
 function serviceErrors(error: unknown, fallback: string): string[] {
@@ -114,67 +76,84 @@ function serviceErrors(error: unknown, fallback: string): string[] {
   return [fallback]
 }
 
-function cloneNodes(list: DraftNode[]): DraftNode[] {
-  return list.map((node) => ({ ...node, conditions: node.conditions.map((condition) => ({ ...condition })) }))
+function cloneCondition(condition: RunConclusionCondition): RunConclusionCondition {
+  return { ...condition, values: [...(condition.values ?? [])] }
 }
 
-/** Depth-first, siblings in list order: the order the service reads, parents always above their children. */
-function rowsOf(list: DraftNode[]): ConclusionRow[] {
-  const out: ConclusionRow[] = []
-  const walk = (parentUid: string | null, depth: number, prefix: string): void => {
-    const siblings = list.filter((node) => node.parentUid === parentUid)
-    siblings.forEach((node, index) => {
-      const number = `${prefix}${index + 1}`
-      out.push({ node, depth, number, position: index, first: index === 0, last: index === siblings.length - 1 })
-      walk(node.uid, depth + 1, `${number}.`)
-    })
-  }
-  walk(null, 1, '')
-  return out
+function cloneList(list: ConclusionDraft[]): ConclusionDraft[] {
+  return list.map((node) => ({
+    ...node,
+    lines: node.lines.map((line) => ({
+      uid: line.uid,
+      condition: cloneCondition(line.condition),
+      loaded: line.loaded ? cloneCondition(line.loaded) : null,
+    })),
+  }))
 }
 
-/** The node and everything under it. */
-function withoutSubtree(list: DraftNode[], uid: string): DraftNode[] {
-  const doomed = new Set<string>([uid])
-  let grew = true
-  while (grew) {
-    grew = false
-    for (const node of list) {
-      if (node.parentUid && doomed.has(node.parentUid) && !doomed.has(node.uid)) {
-        doomed.add(node.uid)
-        grew = true
-      }
-    }
-  }
-  return list.filter((node) => !doomed.has(node.uid))
+function toOutcome(value: string | null | undefined): ConclusionDraft['outcome'] {
+  return value === 'HIDE' || value === 'EXPECTED' ? value : ''
+}
+
+/** What a condition means, for telling edits apart; the check label is derived, so it does not count. */
+function comparableCondition(condition: RunConclusionCondition) {
+  return [
+    condition.subject,
+    condition.presence || 'ANY',
+    condition.keyScope || 'FULL',
+    condition.quantifier || 'ALL',
+    (condition.field ?? '').trim(),
+    condition.operator ?? '',
+    (condition.values ?? []).map((value) => value.trim()),
+  ]
+}
+
+function comparable(list: ConclusionDraft[], unexplained: string): string {
+  return JSON.stringify({
+    unexplained,
+    list: list.map((node) => [
+      node.key,
+      node.conclusion,
+      node.bucket,
+      node.question.trim(),
+      node.fix,
+      node.outcome,
+      node.lines.map((line) => comparableCondition(line.condition)),
+    ]),
+  })
 }
 
 export function useRunConclusions(deps: UseRunConclusionsDeps) {
   const loading = ref(false)
   const saving = ref(false)
   const loaded = ref(false)
-  /** What stopped the tree loading; a refused save is said in its popup instead. */
+  /** What stopped the conclusions loading, or the service's words for a refused save. */
   const errors = ref<string[]>([])
   const meta = ref<RunConclusions | null>(null)
-  const nodes = ref<DraftNode[]>([])
-  const snapshot = ref<RunConclusionNode[]>([])
-
-  // One node open in its popup at a time. `before` is the tree as it stood when the popup opened, so Cancel puts it
-  // back, children added from the popup included.
-  const editingUid = ref<string | null>(null)
-  const before = ref<DraftNode[] | null>(null)
-  const popupErrors = ref<string[]>([])
-  const newCodeOpen = ref(false)
-  const newCodeLabel = ref('')
+  const list = ref<ConclusionDraft[]>([])
+  const unexplained = ref<'' | 'EXPECTED'>('')
+  const lookups = ref<RunConclusionLookup[]>([])
+  const snapshot = ref<Snapshot>({ list: [], unexplained: '' })
   const newCodeErrors = ref<string[]>([])
   const creating = ref(false)
 
   let uidCounter = 0
-  let newKeyCounter = 0
   let controller: AbortController | null = null
 
   const isEvaluate = computed(() => (meta.value?.scopeMode ?? '').toUpperCase() === 'EVALUATE')
-  const rows = computed(() => rowsOf(nodes.value))
+
+  const lineContext = computed<LineContext>(() => ({
+    file1: deps.file1Label.value,
+    file2: deps.file2Label.value,
+    evaluate: isEvaluate.value,
+    firstKeyField: deps.firstKeyField.value,
+    listPaths: deps.listPaths.value,
+  }))
+
+  const dirty = computed(() => loaded.value
+    && comparable(list.value, unexplained.value) !== comparable(snapshot.value.list, snapshot.value.unexplained))
+
+  const incomplete = computed(() => list.value.some((node) => node.lines.some((line) => conditionIncomplete(line.condition))))
 
   const catalogOptions = computed<AppSelectOption[]>(() => {
     const options = (meta.value?.catalog ?? []).map((entry) => ({ value: entry.id, label: entry.label || entry.id }))
@@ -189,362 +168,232 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     return options
   })
 
-  // A one-system run has no second side to be missing from; a stored node that says so still shows what it says.
+  // A one-system run has no second side to be missing from; a stored conclusion that says so still shows what it says.
   const bucketOptions = computed<AppSelectOption[]>(() => [
-    { value: '', label: bucketLabel('') },
+    { value: '', label: explainsLabel('', lineContext.value) },
     ...(meta.value?.buckets?.length ? meta.value.buckets : DEFAULT_BUCKETS)
       .filter((bucket) => !isEvaluate.value || bucket !== 'MISSING_FROM_FILE_2'
-        || nodes.value.some((node) => node.bucket === bucket))
-      .map((bucket) => ({ value: bucket, label: bucketLabel(bucket) })),
-  ])
-  const subjectOptions = computed<AppSelectOption[]>(() => [
-    { value: 'FILE_1', label: deps.file1Label.value },
-    { value: 'FILE_2', label: deps.file2Label.value },
-  ])
-  const presenceOptions = computed(() => vocabulary(meta.value?.presence, ['ANY', 'KEPT', 'EXCLUDED', 'ABSENT'], PRESENCE_LABELS))
-  const keyScopeOptions = computed(() => vocabulary(meta.value?.keyScopes, ['FULL', 'FIRST_FIELD'], KEY_SCOPE_LABELS))
-  const quantifierOptions = computed(() => vocabulary(meta.value?.quantifiers, ['ALL', 'ANY'], QUANTIFIER_LABELS))
-  const outcomeOptions = computed<AppSelectOption[]>(() =>
-    ['', 'HIDE', 'EXPECTED'].map((value) => ({ value, label: outcomeLabel(value) })))
-  const operatorOptions = computed<AppSelectOption[]>(() => [
-    { value: '', label: 'presence only' },
-    ...vocabulary(meta.value?.operators, DEFAULT_OPERATORS, OPERATOR_LABELS),
+        || list.value.some((node) => node.bucket === bucket))
+      .map((bucket) => ({ value: bucket, label: explainsLabel(bucket, lineContext.value) })),
   ])
 
-  const editingRow = computed(() => rows.value.find((row) => row.node.uid === editingUid.value) ?? null)
-  const editingNode = computed(() => editingRow.value?.node ?? null)
-  /** Not in the tree as last saved: Cancel or Delete drops it without a call. */
-  const editingIsNew = computed(() => {
-    const node = editingNode.value
-    return Boolean(node) && !snapshot.value.some((saved) => saved.key === node?.key)
-  })
-
-  /** What a root applies to, in words; blank is any finding. */
-  function bucketLabel(bucket: string): string {
-    if (bucket === 'MISSING_FROM_FILE_1') return `Missing from ${deps.file1Label.value}`
-    if (bucket === 'MISSING_FROM_FILE_2') return `Missing from ${deps.file2Label.value}`
-    if (bucket === 'RULE') return 'A rule differs'
-    if (bucket === 'FINDING') return 'Every finding'
-    return bucket || 'Any finding'
-  }
-
-  /** A root's "applies to" line; a child says nothing there, it applies wherever its parent holds. */
-  function appliesTo(row: ConclusionRow): string {
-    return row.depth === 1 ? bucketLabel(row.node.bucket) : ''
-  }
-
-  /** The open node's place among its siblings, as numbers to pick from. */
-  const orderOptions = computed<AppSelectOption[]>(() => {
-    const row = editingRow.value
-    if (!row) return []
-    const prefix = row.number.includes('.') ? row.number.slice(0, row.number.lastIndexOf('.') + 1) : ''
-    return nodes.value
-      .filter((node) => node.parentUid === row.node.parentUid)
-      .map((_, index) => ({ value: String(index), label: `${prefix}${index + 1}` }))
-  })
-  const editingPosition = computed(() => String(editingRow.value?.position ?? 0))
-
-  function conclusionLabel(node: DraftNode): string {
+  function conclusionLabel(node: ConclusionDraft): string {
     if (!node.conclusion) return ''
     return catalogOptions.value.find((option) => option.value === node.conclusion)?.label || node.conclusion
   }
 
-  /** One condition as a sentence: "OMS statusId is one of RETURN_COMPLETED, RETURN_RECEIVED". */
-  function describeCondition(condition: DraftCondition): string {
-    const parts: string[] = []
-    if (!isEvaluate.value) parts.push(condition.subject === 'FILE_2' ? deps.file2Label.value : deps.file1Label.value)
-    if (condition.presence && condition.presence !== 'ANY') {
-      parts.push(PRESENCE_LABELS[condition.presence] ?? condition.presence.toLowerCase())
-      if (condition.keyScope === 'FIRST_FIELD') parts.push('on its first key field')
-    }
-    const field = condition.field.trim()
-    if (field) {
-      parts.push(condition.quantifier === 'ANY' ? `any ${field}` : field)
-      const operator = condition.operator
-      if (operator === 'WITHIN_HOURS') parts.push(`is within the last ${condition.valuesText.trim() || '?'} hours`)
-      else if (operator) {
-        parts.push(OPERATOR_LABELS[operator] ?? operator)
-        if (takesOneNumber(operator)) parts.push(condition.valuesText.trim() || '?')
-        else if (takesValues(operator)) parts.push(splitValues(condition.valuesText).join(', ') || '?')
-      }
-    }
-    return parts.join(' ')
+  /** The row's "when": every line, all of which must hold. */
+  function describeLines(node: ConclusionDraft): string {
+    if (!node.lines.length) return 'always'
+    return node.lines.map((line) => describeCondition(line.condition, lineContext.value)).join(' and ')
   }
 
-  /** The row's "when": every condition, all of which must hold. */
-  function describeNode(row: ConclusionRow): string {
-    return row.node.conditions.map(describeCondition).filter(Boolean).join(' and ')
-  }
-
-  function nextUid(): string {
+  function nextUid(prefix: string): string {
     uidCounter += 1
-    return `c${uidCounter}`
+    return `${prefix}${uidCounter}`
   }
 
-  function blankCondition(): DraftCondition {
+  function blankCondition(): RunConclusionCondition {
     return {
-      uid: nextUid(),
       subject: 'FILE_1',
       presence: 'ANY',
       keyScope: 'FULL',
       quantifier: 'ALL',
-      field: '',
+      field: null,
       operator: 'IN',
-      valuesText: '',
+      values: [],
       checkLabel: '',
     }
   }
 
-  function toDraftCondition(condition: RunConclusionCondition): DraftCondition {
+  function toDraft(node: RunConclusionNode): ConclusionDraft {
     return {
-      uid: nextUid(),
-      subject: condition.subject === 'FILE_2' ? 'FILE_2' : 'FILE_1',
-      presence: condition.presence || 'ANY',
-      keyScope: condition.keyScope || 'FULL',
-      quantifier: condition.quantifier || 'ALL',
-      field: condition.field ?? '',
-      operator: condition.operator ?? '',
-      valuesText: (condition.values ?? []).join(', '),
-      checkLabel: condition.checkLabel ?? '',
-    }
-  }
-
-  function toDraftNodes(source: RunConclusionNode[]): DraftNode[] {
-    const uidByKey = new Map<string, string>()
-    const drafts = source.map((node) => {
-      const uid = nextUid()
-      uidByKey.set(String(node.key), uid)
-      return { node, uid }
-    })
-    return drafts.map(({ node, uid }) => ({
-      uid,
+      uid: nextUid('c'),
       key: String(node.key),
-      parentUid: node.parent ? (uidByKey.get(String(node.parent)) ?? null) : null,
       conclusion: node.conclusion ?? '',
       bucket: node.bucket ?? '',
       question: node.question ?? '',
       fix: node.fix ?? null,
-      outcome: node.outcome ?? '',
-      suggestsFilter: Boolean(node.suggestedFilterJson?.trim()),
-      conditions: (node.conditions ?? []).map(toDraftCondition),
-    }))
-  }
-
-  function buildCondition(condition: DraftCondition): RunConclusionCondition {
-    const field = condition.field.trim()
-    const operator = condition.operator as ConclusionOperator | ''
-    return {
-      subject: isEvaluate.value ? 'FILE_1' : condition.subject,
-      presence: condition.presence,
-      keyScope: condition.keyScope,
-      quantifier: condition.quantifier,
-      field: field || null,
-      operator: operator || null,
-      values: takesOneNumber(operator) ? [condition.valuesText.trim()].filter(Boolean) : takesValues(operator) ? splitValues(condition.valuesText) : [],
-      checkLabel: condition.checkLabel.trim(),
+      outcome: toOutcome(node.outcome),
+      lines: (node.conditions ?? []).map((condition) => ({
+        uid: nextUid('l'),
+        condition: cloneCondition(condition),
+        loaded: cloneCondition(condition),
+      })),
     }
-  }
-
-  function buildPayload(list: DraftNode[]): RunConclusionNode[] {
-    const keyByUid = new Map(list.map((node) => [node.uid, node.key]))
-    return rowsOf(list).map(({ node, depth }) => ({
-      key: node.key,
-      parent: node.parentUid ? (keyByUid.get(node.parentUid) ?? null) : null,
-      conclusion: node.conclusion,
-      bucket: depth === 1 && node.bucket ? (node.bucket as ConclusionBucket) : null,
-      question: node.question.trim() || null,
-      fix: node.fix,
-      outcome: (node.outcome || null) as ConclusionOutcome | null,
-      conditions: node.conditions.map(buildCondition),
-    }))
-  }
-
-  function matchesSaved(list: DraftNode[]): boolean {
-    return JSON.stringify(buildPayload(list)) === JSON.stringify(snapshot.value)
   }
 
   function applyLoaded(next: RunConclusions): void {
     meta.value = next
-    nodes.value = toDraftNodes(next.conclusions ?? [])
-    snapshot.value = buildPayload(nodes.value)
+    // Keys and parents compared as strings, as the service may read them back as numbers.
+    const nodes = (next.conclusions ?? []).map((node) => ({
+      ...node,
+      key: String(node.key),
+      parent: node.parent ? String(node.parent) : null,
+    }))
+    list.value = flattenConclusionTree(nodes).map(toDraft)
+    unexplained.value = next.unexplainedOutcome === 'EXPECTED' ? 'EXPECTED' : ''
+    lookups.value = next.lookups ?? []
+    snapshot.value = { list: cloneList(list.value), unexplained: unexplained.value }
     loaded.value = true
   }
 
-  function newKey(): string {
-    const taken = new Set(nodes.value.map((node) => node.key))
-    let key = ''
-    do {
-      newKeyCounter += 1
-      key = `new-${newKeyCounter}`
-    } while (taken.has(key))
-    return key
+  function find(uid: string): ConclusionDraft | undefined {
+    return list.value.find((node) => node.uid === uid)
   }
 
-  function newNode(parentUid: string | null): DraftNode {
-    return {
-      uid: nextUid(),
-      key: newKey(),
-      parentUid,
+  /** A blank conclusion at the end of the list; returns its uid. */
+  function addConclusion(): string {
+    const node: ConclusionDraft = {
+      uid: nextUid('c'),
+      key: '',
       conclusion: '',
       bucket: '',
       question: '',
       fix: null,
       outcome: '',
-      suggestsFilter: false,
-      conditions: [blankCondition()],
+      lines: [{ uid: nextUid('l'), condition: blankCondition(), loaded: null }],
     }
+    list.value.push(node)
+    return node.uid
   }
 
-  function resetNewCode(): void {
-    newCodeOpen.value = false
-    newCodeLabel.value = ''
-    newCodeErrors.value = []
+  function removeConclusion(uid: string): void {
+    list.value = list.value.filter((node) => node.uid !== uid)
   }
 
-  function beginEditing(uid: string): void {
-    editingUid.value = uid
-    popupErrors.value = []
-    resetNewCode()
+  /** Swaps the conclusion with its neighbour above (-1) or below (1); at either end it stays put. */
+  function move(uid: string, direction: -1 | 1): void {
+    const from = list.value.findIndex((node) => node.uid === uid)
+    const to = from + direction
+    if (from < 0 || to < 0 || to >= list.value.length) return
+    const next = [...list.value]
+    const moving = next[from]!
+    next[from] = next[to]!
+    next[to] = moving
+    list.value = next
   }
 
-  function openNode(uid: string): void {
-    if (saving.value || editingUid.value) return
-    before.value = cloneNodes(nodes.value)
-    beginEditing(uid)
+  function updateConclusion(uid: string, patch: Partial<Omit<ConclusionDraft, 'uid' | 'lines'>>): void {
+    const node = find(uid)
+    if (node) Object.assign(node, patch)
   }
 
-  /** The create tile: a new root, last in the list, open in the popup. */
-  function openNew(): void {
-    if (saving.value || editingUid.value || !meta.value) return
-    before.value = cloneNodes(nodes.value)
-    const node = newNode(null)
-    nodes.value.push(node)
-    beginEditing(node.uid)
+  /** A blank line at the end of the conclusion; returns its uid, or '' when there is no such conclusion. */
+  function addLine(uid: string): string {
+    const node = find(uid)
+    if (!node) return ''
+    const line: DraftLine = { uid: nextUid('l'), condition: blankCondition(), loaded: null }
+    node.lines.push(line)
+    return line.uid
   }
 
-  function closeEditing(): void {
-    editingUid.value = null
-    before.value = null
-    popupErrors.value = []
-    resetNewCode()
+  function updateLine(uid: string, lineUid: string, condition: RunConclusionCondition): void {
+    const line = find(uid)?.lines.find((entry) => entry.uid === lineUid)
+    if (line) line.condition = cloneCondition(condition)
   }
 
-  function cancelEditing(): void {
-    if (saving.value) return
-    if (before.value) nodes.value = before.value
-    closeEditing()
+  function removeLine(uid: string, lineUid: string): void {
+    const node = find(uid)
+    if (node) node.lines = node.lines.filter((line) => line.uid !== lineUid)
   }
 
-  /** The popup moves to a new child of the node it holds; Save keeps both, Cancel drops both. */
-  function addChild(): void {
-    const row = editingRow.value
-    if (!row || saving.value || row.depth >= MAX_CONCLUSION_DEPTH) return
-    const child = newNode(row.node.uid)
-    nodes.value.push(child)
-    beginEditing(child.uid)
+  /** The list as roots in rank order; a new conclusion's key is its place, kept unique among the loaded keys. */
+  function buildPayload(drafts: ConclusionDraft[]): RunConclusionNode[] {
+    const taken = new Set(drafts.map((node) => node.key).filter(Boolean))
+    const ctx = lineContext.value
+    return drafts.map((node, index) => {
+      let key = node.key
+      if (!key) {
+        key = `n${index}`
+        for (let suffix = 1; taken.has(key); suffix += 1) key = `n${index}-${suffix}`
+        taken.add(key)
+      }
+      return {
+        key,
+        parent: null,
+        conclusion: node.conclusion,
+        bucket: (node.bucket || null) as ConclusionBucket | null,
+        question: node.question.trim() || null,
+        fix: node.fix,
+        outcome: (node.outcome || null) as ConclusionOutcome | null,
+        conditions: node.lines.map((line) => withCheckLabel(line.condition, line.loaded, ctx)),
+      }
+    })
   }
 
-  /**
-   * Puts the open node at this place among its siblings. Its children travel with it, since they hang off its uid; the
-   * save numbers the tree in the order it is sent, so the new order is what is tried first.
-   */
-  function setEditingPosition(value: string): void {
-    const target = editingNode.value
-    const position = Number(value)
-    if (!target || saving.value || !Number.isInteger(position)) return
-    const rest = nodes.value.filter((node) => node.uid !== target.uid)
-    const siblings = rest.filter((node) => node.parentUid === target.parentUid)
-    const anchor = siblings[position]
-    const at = anchor ? rest.indexOf(anchor) : rest.length
-    nodes.value = [...rest.slice(0, at), target, ...rest.slice(at)]
-  }
-
-  function addCondition(): void {
-    editingNode.value?.conditions.push(blankCondition())
-  }
-
-  function removeCondition(condition: DraftCondition): void {
-    const node = editingNode.value
-    if (!node || node.conditions.length < 2) return
-    node.conditions = node.conditions.filter((entry) => entry.uid !== condition.uid)
-  }
-
-  /** Sends this tree as the run's whole tree. A refusal stays in the popup, with the edits kept. */
-  async function persist(list: DraftNode[]): Promise<boolean> {
-    if (saving.value || !meta.value) return false
+  /** Sends the whole list once. A refusal keeps the draft and shows the service's words. */
+  async function save(): Promise<boolean> {
+    if (saving.value || !meta.value || incomplete.value) return false
     saving.value = true
-    popupErrors.value = []
+    errors.value = []
     controller?.abort()
     controller = new AbortController()
     const signal = controller.signal
+    const drafts = list.value
+    const payload = buildPayload(drafts)
+    const nextUnexplained = unexplained.value
+    const options = nextUnexplained !== snapshot.value.unexplained
+      ? { unexplainedOutcome: nextUnexplained === 'EXPECTED' ? 'EXPECTED' as const : 'COUNTS' as const }
+      : undefined
     try {
-      const response = await runConclusionFacade.save(deps.savedRunId.value, buildPayload(list), signal)
-      if (response.savedConclusions) applyLoaded(response.savedConclusions)
-      else {
-        nodes.value = list
-        snapshot.value = buildPayload(list)
+      const response = options
+        ? await runConclusionFacade.save(deps.savedRunId.value, payload, signal, options)
+        : await runConclusionFacade.save(deps.savedRunId.value, payload, signal)
+      if (response.savedConclusions) {
+        applyLoaded(response.savedConclusions)
+      } else {
+        // Adopt what was sent: keys assigned, each line's label as saved.
+        drafts.forEach((node, index) => {
+          const sentNode = payload[index]!
+          node.key = sentNode.key
+          node.lines.forEach((line, lineIndex) => {
+            line.condition = cloneCondition(sentNode.conditions[lineIndex]!)
+            line.loaded = cloneCondition(sentNode.conditions[lineIndex]!)
+          })
+        })
+        meta.value = { ...meta.value, conclusions: payload, unexplainedOutcome: nextUnexplained === 'EXPECTED' ? 'EXPECTED' : null }
+        snapshot.value = { list: cloneList(drafts), unexplained: nextUnexplained }
       }
       return true
     } catch (error) {
       if (isAbortError(error)) return false
-      popupErrors.value = serviceErrors(error, 'The conclusions are still undecided. Not saved.')
+      errors.value = serviceErrors(error, 'The conclusions are still undecided. Not saved.')
       return false
     } finally {
       saving.value = false
     }
   }
 
-  async function saveEditing(): Promise<void> {
-    if (!editingNode.value || saving.value || creating.value) return
-    if (matchesSaved(nodes.value)) {
-      closeEditing()
-      return
-    }
-    if (await persist(nodes.value)) closeEditing()
+  /** Puts back the list as last loaded or saved. */
+  function cancel(): void {
+    if (saving.value) return
+    list.value = cloneList(snapshot.value.list)
+    unexplained.value = snapshot.value.unexplained
+    errors.value = []
   }
 
-  /** The open node and everything under it, saved at once. */
-  async function deleteEditing(): Promise<void> {
-    const node = editingNode.value
-    if (!node || saving.value) return
-    const remaining = withoutSubtree(nodes.value, node.uid)
-    if (matchesSaved(remaining)) {
-      nodes.value = remaining
-      closeEditing()
-      return
-    }
-    if (await persist(remaining)) closeEditing()
-  }
-
-  function toggleNewCode(): void {
-    const open = !newCodeOpen.value
-    resetNewCode()
-    newCodeOpen.value = open
-  }
-
-  /** Makes a tenant-own conclusion code, adds it to the catalog and picks it on the open node. */
-  async function createCode(): Promise<void> {
-    const node = editingNode.value
-    const label = newCodeLabel.value.trim()
-    if (!node || !label || creating.value || !meta.value) return
+  /** Makes a tenant-own conclusion code and adds it to the catalog; returns its id, or null when refused. */
+  async function createCode(label: string): Promise<string | null> {
+    const trimmed = label.trim()
+    if (!trimmed || creating.value || !meta.value) return null
     creating.value = true
     newCodeErrors.value = []
     try {
-      const response = await runConclusionFacade.createCode(label)
+      const response = await runConclusionFacade.createCode(trimmed)
       const code = response.conclusionCode
       if (!code?.id) {
         newCodeErrors.value = ['The conclusion would not join the party. Not added.']
-        return
+        return null
       }
       const catalog = meta.value.catalog ?? []
       if (!catalog.some((entry) => entry.id === code.id)) {
         meta.value.catalog = [...catalog, { id: code.id, label: code.label || code.id, own: true }]
       }
-      node.conclusion = code.id
-      resetNewCode()
+      return code.id
     } catch (error) {
-      if (isAbortError(error)) return
-      newCodeErrors.value = serviceErrors(error, 'The conclusion would not join the party. Not added.')
+      if (!isAbortError(error)) newCodeErrors.value = serviceErrors(error, 'The conclusion would not join the party. Not added.')
+      return null
     } finally {
       creating.value = false
     }
@@ -575,7 +424,6 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
   }
 
   watch(() => deps.savedRunId.value, () => {
-    closeEditing()
     void load()
   }, { immediate: true })
 
@@ -589,40 +437,29 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     saving,
     errors,
     isEvaluate,
-    rows,
+    list,
+    unexplained,
+    lookups,
+    dirty,
+    incomplete,
+    lineContext,
     catalogOptions,
     bucketOptions,
-    subjectOptions,
-    presenceOptions,
-    keyScopeOptions,
-    quantifierOptions,
-    operatorOptions,
-    outcomeOptions,
-    orderOptions,
-    editingPosition,
     conclusionLabel,
-    appliesTo,
-    describeNode,
-    editingRow,
-    editingNode,
-    editingIsNew,
-    popupErrors,
-    newCodeOpen,
-    newCodeLabel,
-    newCodeErrors,
-    creating,
-    openNode,
-    openNew,
-    cancelEditing,
-    addChild,
-    setEditingPosition,
-    addCondition,
-    removeCondition,
-    saveEditing,
-    deleteEditing,
-    toggleNewCode,
-    createCode,
+    describeLines,
+    addConclusion,
+    removeConclusion,
+    move,
+    updateConclusion,
+    addLine,
+    updateLine,
+    removeLine,
+    save,
+    cancel,
     load,
+    createCode,
+    creating,
+    newCodeErrors,
   }
 }
 
@@ -630,7 +467,7 @@ export type RunConclusionsState = ReturnType<typeof useRunConclusions>
 
 export const RUN_CONCLUSIONS_KEY: InjectionKey<RunConclusionsState> = Symbol('runConclusions')
 
-/** The tree the page holds; the rows and the popup both read it, so the popup can sit outside the blurred frame. */
+/** The conclusions the page holds, read by its rows. */
 export function injectRunConclusions(): RunConclusionsState {
   const state = inject(RUN_CONCLUSIONS_KEY, null)
   if (!state) throw new Error('Run conclusions are not provided.')
