@@ -125,6 +125,14 @@ export interface RunConclusionNode {
   conditions: RunConclusionCondition[]
 }
 
+/** A named lookup the run's rules can read; extra backend fields pass through. */
+export interface RunConclusionLookup {
+  name: string
+  subject: 'FILE_1' | 'FILE_2'
+  many?: boolean
+  [key: string]: unknown
+}
+
 export interface RunConclusions {
   savedRunId: string
   scopeMode: string
@@ -136,6 +144,9 @@ export interface RunConclusions {
   presence: string[]
   keyScopes: string[]
   quantifiers: string[]
+  lookups?: RunConclusionLookup[]
+  /** The run's Unexplained outcome: EXPECTED, or null when it counts. */
+  unexplainedOutcome?: 'EXPECTED' | null
 }
 
 export interface GetRunConclusionsResponse extends ApiEnvelope {

@@ -51,8 +51,16 @@ export const runConclusionFacade = {
     return callService<GetRunConclusionsResponse>(RUN_CONCLUSION.get, { savedRunId }, signal)
   },
   /** Replaces the run's whole tree; an empty list clears it. */
-  save(savedRunId: string, conclusions: RunConclusionNode[], signal?: AbortSignal): Promise<SaveRunConclusionsResponse> {
-    return callService<SaveRunConclusionsResponse>(RUN_CONCLUSION.save, { savedRunId, conclusions }, signal)
+  save(
+    savedRunId: string,
+    conclusions: RunConclusionNode[],
+    signal?: AbortSignal,
+    options?: { unexplainedOutcome?: 'EXPECTED' | 'COUNTS' },
+  ): Promise<SaveRunConclusionsResponse> {
+    // Absent unexplainedOutcome keeps the run's value.
+    const payload: Record<string, unknown> = { savedRunId, conclusions }
+    if (options?.unexplainedOutcome) payload.unexplainedOutcome = options.unexplainedOutcome
+    return callService<SaveRunConclusionsResponse>(RUN_CONCLUSION.save, payload, signal)
   },
   /** A conclusion code of the active tenant's own; refused when its catalog already has the label. */
   createCode(label: string, signal?: AbortSignal): Promise<CreateRunConclusionCodeResponse> {
