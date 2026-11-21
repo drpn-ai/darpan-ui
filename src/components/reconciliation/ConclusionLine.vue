@@ -28,7 +28,7 @@
         v-if="showQuantifier"
         class="conclusion-line-edit__small"
         :model-value="quantifierValue"
-        :options="QUANTIFIER_OPTIONS"
+        :options="quantifierOptions"
         :disabled="disabled"
         test-id="conclusion-line-quantifier"
         @update:model-value="chooseQuantifier"
@@ -242,6 +242,9 @@ const parts = computed(() => {
 const typingPath = ref(false)
 const pathDraft = ref(props.condition.field ?? '')
 const draft = ref('')
+watch(() => props.condition.field, (field) => {
+  if ((field ?? '') !== pathDraft.value) pathDraft.value = field ?? ''
+})
 watch(() => props.editing, (now) => {
   if (now) return
   typingPath.value = false
@@ -293,14 +296,21 @@ const quantifierValue = computed(() => {
   if (c.quantifier === 'ANY') return 'ANY'
   return c.operator === 'NOT_IN' ? 'NONE' : 'ALL'
 })
+const inNone = computed(() => showQuantifier.value && quantifierValue.value === 'NONE')
+// "no" only makes sense over a list test (is one of / is not one of).
+const quantifierOptions = computed(() => {
+  const listTest = props.condition.operator === 'IN' || props.condition.operator === 'NOT_IN'
+  return listTest ? QUANTIFIER_OPTIONS : QUANTIFIER_OPTIONS.filter((o) => o.value !== 'NONE')
+})
 const showPresence = computed(() => !isRecord.value && (props.condition.presence ?? 'ANY') !== 'ANY')
 
-const testOptions = computed(() => (isRecord.value ? RECORD_TESTS : FIELD_TESTS))
+// Inside "no" the only test is "is one of"; the quantifier alone says "no".
+const testOptions = computed(() => (isRecord.value ? RECORD_TESTS : inNone.value ? FIELD_TESTS.filter((o) => o.value === 'IN') : FIELD_TESTS))
 const testValue = computed(() => {
   const c = props.condition
-  if (isRecord.value) return c.presence && c.presence !== 'ANY' ? c.presence : 'KEPT'
+  if (isRecord.value) return c.presence && c.presence !== 'ANY' ? c.presence : ''
   // "no line's status is one of X" is stored as every + NOT_IN and reads "is one of".
-  if (showQuantifier.value && quantifierValue.value === 'NONE') return 'IN'
+  if (inNone.value) return 'IN'
   return c.operator ?? ''
 })
 
@@ -369,9 +379,12 @@ function choosePresence(value: string): void {
 
 function chooseQuantifier(value: string): void {
   const c = props.condition
-  if (value === 'NONE') change({ quantifier: 'ALL', operator: 'NOT_IN' })
-  else if (value === 'ALL') change({ quantifier: 'ALL', operator: c.operator === 'NOT_IN' ? 'IN' : c.operator })
-  else change({ quantifier: 'ANY' })
+  const leavingNone = inNone.value
+  if (value === 'NONE') {
+    if (c.operator === 'IN' || c.operator === 'NOT_IN') change({ quantifier: 'ALL', operator: 'NOT_IN' })
+    return
+  }
+  change({ quantifier: value === 'ANY' ? 'ANY' : 'ALL', ...(leavingNone ? { operator: 'IN' as const } : {}) })
 }
 
 function chooseTest(value: string): void {
@@ -380,6 +393,7 @@ function chooseTest(value: string): void {
     change({ presence: value, field: null, operator: null })
     return
   }
+  if (inNone.value) return
   const operator = value as ConclusionOperator
   const keep = kindOf(operator) === kindOf(c.operator) && (operator === 'WITHIN_HOURS') === (c.operator === 'WITHIN_HOURS')
   change({ operator, values: keep ? c.values : [] })

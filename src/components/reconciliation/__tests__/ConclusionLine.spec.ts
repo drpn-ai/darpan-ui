@@ -158,6 +158,43 @@ describe('ConclusionLine', () => {
     expect(none.get('[data-testid="conclusion-line-quantifier"]').text()).toContain('no')
   })
 
+  it('offers "no" only over a list test', async () => {
+    const wrapper = mountLine(statusLine({ subject: 'FILE_2', field: 'lines.status', operator: 'GT', values: ['3'] }), true)
+    await wrapper.get('[data-testid="conclusion-line-quantifier"]').trigger('click')
+    const offered = wrapper.findAll('[data-option-value]').map((o) => o.attributes('data-option-value'))
+    expect(offered).toEqual(['ANY', 'ALL'])
+  })
+
+  it('moves between any, no and every without changing the test unasked', async () => {
+    const list = { subject: 'FILE_2' as const, field: 'lines.status', operator: 'IN' as const, values: ['A'], quantifier: 'ALL' }
+    const wrapper = mountLine(statusLine(list), true)
+    await pick(wrapper, 'conclusion-line-quantifier', 'NONE')
+    expect(last(wrapper)).toMatchObject({ quantifier: 'ALL', operator: 'NOT_IN', values: ['A'] })
+
+    const none = mountLine(statusLine({ ...list, operator: 'NOT_IN' }), true)
+    await pick(none, 'conclusion-line-quantifier', 'ANY')
+    expect(last(none)).toMatchObject({ quantifier: 'ANY', operator: 'IN', values: ['A'] })
+
+    const anyNot = mountLine(statusLine({ ...list, quantifier: 'ANY', operator: 'NOT_IN' }), true)
+    await pick(anyNot, 'conclusion-line-quantifier', 'ALL')
+    expect(last(anyNot)).toMatchObject({ quantifier: 'ALL', operator: 'NOT_IN', values: ['A'] })
+  })
+
+  it('inside "no" the test select offers only "is one of"', async () => {
+    const wrapper = mountLine(statusLine({ subject: 'FILE_2', field: 'lines.status', operator: 'NOT_IN', quantifier: 'ALL' }), true)
+    expect(wrapper.get('[data-testid="conclusion-line-test"]').text()).toContain('is one of')
+    await wrapper.get('[data-testid="conclusion-line-test"]').trigger('click')
+    const offered = wrapper.findAll('[data-testid="conclusion-line-test"] ~ .app-select-menu [data-option-value]').map((o) => o.attributes('data-option-value'))
+    expect(offered).toEqual(['IN'])
+    await wrapper.get('[data-option-value="IN"]').trigger('click')
+    expect(wrapper.emitted('update')).toBeUndefined()
+  })
+
+  it('a record line with presence ANY shows the test placeholder', () => {
+    const wrapper = mountLine({ subject: 'FILE_1', presence: 'ANY', keyScope: 'FULL', field: null, operator: null, values: [], checkLabel: '' }, true)
+    expect(wrapper.get('[data-testid="conclusion-line-test"]').classes()).toContain('empty')
+  })
+
   it('type a path keeps the typed field', async () => {
     const wrapper = mountLine(statusLine(), true)
     await pick(wrapper, 'conclusion-line-subject', '__path__')
