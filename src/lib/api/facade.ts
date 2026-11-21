@@ -47,6 +47,7 @@ import type {
 } from './scriptTypes'
 import type {
   DeletePeakPeriodResponse,
+  DeletePeakSyncResponse,
   DeletePeakRunTimeResponse,
   GetPeakPeriodResponse,
   ListPeakPeriodsResponse,
@@ -54,7 +55,17 @@ import type {
   SavePeakPeriodResponse,
   SavePeakRunTimePayload,
   SavePeakRunTimeResponse,
+  SavePeakSyncPayload,
+  SavePeakSyncResponse,
 } from './peakTypes'
+import type {
+  DeleteSyncPairResponse,
+  GetRunPulseFlagsResponse,
+  GetSyncPairResponse,
+  ListSyncPairsResponse,
+  SaveSyncPairPayload,
+  SaveSyncPairResponse,
+} from './pulseTypes'
 
 // Cache-reset coordinator. The actual reset implementation is wired up in
 // main.ts after Pinia is installed, so this module stays free of store
@@ -851,6 +862,8 @@ const PEAK = {
   deletePeakPeriod: 'facade.PeakPeriodFacadeServices.delete#PeakPeriod',
   savePeakRunTime: 'facade.PeakPeriodFacadeServices.save#PeakPeriodRunTime',
   deletePeakRunTime: 'facade.PeakPeriodFacadeServices.delete#PeakPeriodRunTime',
+  savePeakSync: 'facade.PeakPeriodFacadeServices.save#PeakPeriodSync',
+  deletePeakSync: 'facade.PeakPeriodFacadeServices.delete#PeakPeriodSync',
 } as const
 
 export const peakFacade = {
@@ -871,6 +884,39 @@ export const peakFacade = {
   },
   deletePeakRunTime(payload: { runTimeId: string }, signal?: AbortSignal): Promise<DeletePeakRunTimeResponse> {
     return callService<DeletePeakRunTimeResponse>(PEAK.deletePeakRunTime, payload, signal)
+  },
+  savePeakSync(payload: SavePeakSyncPayload, signal?: AbortSignal): Promise<SavePeakSyncResponse> {
+    return callService<SavePeakSyncResponse>(PEAK.savePeakSync, payload, signal)
+  },
+  deletePeakSync(payload: { peakPeriodId: string; syncPairId: string }, signal?: AbortSignal): Promise<DeletePeakSyncResponse> {
+    return callService<DeletePeakSyncResponse>(PEAK.deletePeakSync, payload, signal)
+  },
+}
+
+// DAR-BE-328. Sync pulse: the active tenant's sync pairs (a daily check whose upstream orders are watched).
+const PULSE = {
+  listSyncPairs: 'facade.SyncPulseFacadeServices.list#SyncPairs',
+  getSyncPair: 'facade.SyncPulseFacadeServices.get#SyncPair',
+  saveSyncPair: 'facade.SyncPulseFacadeServices.save#SyncPair',
+  deleteSyncPair: 'facade.SyncPulseFacadeServices.delete#SyncPair',
+  getRunPulseFlags: 'facade.SyncPulseFacadeServices.get#RunPulseFlags',
+} as const
+
+export const pulseFacade = {
+  listSyncPairs(signal?: AbortSignal): Promise<ListSyncPairsResponse> {
+    return callService<ListSyncPairsResponse>(PULSE.listSyncPairs, {}, signal)
+  },
+  getSyncPair(payload: { syncPairId: string }, signal?: AbortSignal): Promise<GetSyncPairResponse> {
+    return callService<GetSyncPairResponse>(PULSE.getSyncPair, payload, signal)
+  },
+  saveSyncPair(payload: SaveSyncPairPayload, signal?: AbortSignal): Promise<SaveSyncPairResponse> {
+    return callService<SaveSyncPairResponse>(PULSE.saveSyncPair, payload, signal)
+  },
+  deleteSyncPair(payload: { syncPairId: string }, signal?: AbortSignal): Promise<DeleteSyncPairResponse> {
+    return callService<DeleteSyncPairResponse>(PULSE.deleteSyncPair, payload, signal)
+  },
+  getRunPulseFlags(payload: { reconciliationRunResultId: string }, signal?: AbortSignal): Promise<GetRunPulseFlagsResponse> {
+    return callService<GetRunPulseFlagsResponse>(PULSE.getRunPulseFlags, payload, signal)
   },
 }
 

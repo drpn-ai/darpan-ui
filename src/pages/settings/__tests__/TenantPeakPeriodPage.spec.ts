@@ -58,6 +58,7 @@ const got = (over: Partial<GetPeakPeriodResponse> = {}): GetPeakPeriodResponse =
     { auditId: 'AU1', label: 'Month close audit' },
     { automationId: '100520', label: 'Daily Returns - NetSuite' },
   ],
+  syncRows: [],
   ...over,
 })
 

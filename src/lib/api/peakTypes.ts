@@ -37,6 +37,16 @@ export interface PeakRunTime {
   normalTime: string | null
 }
 
+/** A sync pair's allowance and pulse, normal and during this period. A null period value means no override. */
+export interface PeakSyncRow {
+  syncPairId: string
+  label: string
+  normalAllowanceMinutes: number
+  periodAllowanceMinutes: number | null
+  normalPulseMinutes: number | null
+  periodPulseMinutes: number | null
+}
+
 /** A scheduled run that falls inside peak hours and so starts later. */
 export interface PeakHeldRun {
   targetLabel: string
@@ -67,6 +77,8 @@ export interface GetPeakPeriodResponse extends PeakEnvelope {
   runTimes: PeakRunTime[]
   heldRuns: PeakHeldRun[]
   targets: PeakTarget[]
+  /** One row for every active sync pair of the tenant. */
+  syncRows: PeakSyncRow[]
 }
 
 /** No peakPeriodId creates. isActive left out keeps the stored value. */
@@ -104,3 +116,14 @@ export interface SavePeakRunTimeResponse extends PeakEnvelope {
 }
 
 export type DeletePeakRunTimeResponse = PeakEnvelope
+
+/** Sets the pair's override for the period; a blank value clears that part. */
+export interface SavePeakSyncPayload {
+  peakPeriodId: string
+  syncPairId: string
+  allowanceMinutes?: number | null
+  pulseEveryMinutes?: number | null
+}
+
+export type SavePeakSyncResponse = PeakEnvelope
+export type DeletePeakSyncResponse = PeakEnvelope

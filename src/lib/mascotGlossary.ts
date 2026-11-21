@@ -457,6 +457,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Ended',
     body: 'peak periods whose last day has passed. Kept for the record; they change nothing now.',
   },
+  // DAR-BE-328: the Sync pulse list, its Tenant Settings row and the pair page's title.
+  syncPulse: {
+    title: 'Sync pulse',
+    body: 'watches orders that reached HotWax but not the other system yet, and tells you which ones waited longer than the allowance. Open a pair to see today.',
+  },
   // DAR-BE-328: one peak period's page.
   peakPeriodName: {
     title: 'Name',

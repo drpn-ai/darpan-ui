@@ -99,6 +99,22 @@
             </button>
           </span>
         </li>
+        <!-- DAR-BE-328. Orders waiting to reach the other system, watched on a pulse. -->
+        <li class="tenant-settings-row">
+          <span class="tenant-settings-row__label">Sync pulse</span>
+          <span class="tenant-settings-row__value" :class="{ 'tenant-settings-row__dim': !syncPairs.length }" data-testid="tenant-sync-value">{{ syncValue }}</span>
+          <span class="tenant-settings-row__actions">
+            <button
+              type="button"
+              :aria-label="syncPairs.length ? 'Open sync pulse' : 'Set up sync pulse'"
+              data-testid="tenant-module-sync-pulse"
+              @click="router.push({ name: 'settings-tenant-sync-pairs' })"
+            >
+              <template v-if="syncPairs.length">Open <span aria-hidden="true">→</span></template>
+              <template v-else>Set up</template>
+            </button>
+          </span>
+        </li>
       </ul>
     </StaticPageSection>
 
@@ -367,9 +383,11 @@ import WorkflowSelect, { type WorkflowSelectOption } from '../../components/work
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
-import { peakFacade, settingsFacade } from '../../lib/api/facade'
+import { peakFacade, pulseFacade, settingsFacade } from '../../lib/api/facade'
+import type { SyncPairSummary } from '../../lib/api/pulseTypes'
 import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
 import { peakSettingsValue } from '../../lib/peakPeriodWords'
+import { pulseSettingsValue } from '../../lib/pulseWords'
 import type { LlmSettings, TenantChatSpace, TenantSettings } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -909,12 +927,26 @@ watch(
   { immediate: true },
 )
 
+const syncPairs = ref<SyncPairSummary[]>([])
+const syncValue = computed(() => pulseSettingsValue(syncPairs.value))
+
+// Same as the peak row: "None" until the list arrives, and after a failed load.
+async function loadSyncPairs(): Promise<void> {
+  try {
+    const response = await pulseFacade.listSyncPairs(pageAbortController.signal)
+    syncPairs.value = response.syncPairs ?? []
+  } catch {
+    syncPairs.value = []
+  }
+}
+
 onMounted(() => {
   // Reference data is prefetched at login; ensureLoaded() returns the
   // in-flight promise (or resolves immediately if hydration already finished).
   void referenceDataStore.ensureLoaded()
   void loadChatSpaces()
   void loadPeakPeriods()
+  void loadSyncPairs()
 })
 </script>
 

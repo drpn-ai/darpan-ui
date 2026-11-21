@@ -13,6 +13,7 @@ const listNsRestletConfigs = vi.hoisted(() => vi.fn())
 const listShopifyAuthConfigs = vi.hoisted(() => vi.fn())
 const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
 const listPeakPeriods = vi.hoisted(() => vi.fn())
+const listSyncPairs = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
 const route = vi.hoisted(() => ({
@@ -45,6 +46,7 @@ vi.mock('vue-router', () => ({
 
 vi.mock('../../../lib/api/facade', () => ({
   peakFacade: { listPeakPeriods },
+  pulseFacade: { listSyncPairs },
   settingsFacade: {
     getLlmSettings,
     saveLlmSettings,
@@ -146,6 +148,8 @@ describe('TenantSettingsPage', () => {
     listOmsRestSourceConfigs.mockReset()
     listPeakPeriods.mockReset()
     listPeakPeriods.mockResolvedValue({ ok: true, errors: [], messages: [], peakPeriods: [] })
+    listSyncPairs.mockReset()
+    listSyncPairs.mockResolvedValue({ ok: true, errors: [], messages: [], syncPairs: [] })
 
     getLlmSettings.mockImplementation(async (payload?: { llmProvider?: string }) => ({
       ok: true,
@@ -322,7 +326,7 @@ describe('TenantSettingsPage', () => {
     expect(sections.map((section) => section.get('h2').text())).toEqual(['Chat', 'Time', 'Audit', 'AI'])
     for (const section of sections) expect(section.findAll('.tenant-settings-rows')).toHaveLength(1)
     expect(wrapper.findAll('.tenant-settings-row__label').map((label) => label.text())).toEqual([
-      'Notifications', 'Timezone', 'Config history', 'Scripts', 'Peak periods', 'Provider',
+      'Notifications', 'Timezone', 'Config history', 'Scripts', 'Peak periods', 'Sync pulse', 'Provider',
     ])
   })
 
@@ -366,6 +370,27 @@ describe('TenantSettingsPage', () => {
 
     expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('Black Friday sale · Nov 24 – Dec 1')
     expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').text()).toBe('Open →')
+  })
+
+  // DAR-BE-328. The Sync pulse row: None + Set up, else the first pair, its cadence and how many more + Open.
+  it('shows None and Set up when there are no sync pairs', async () => {
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    expect(rowValue(wrapper, 'tenant-module-sync-pulse')).toBe('None')
+    expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').text()).toBe('Set up')
+    await wrapper.get('[data-testid="tenant-module-sync-pulse"]').trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-sync-pairs' })
+  })
+
+  it('shows the first sync pair with its cadence, the rest as a count, and Open', async () => {
+    const pair = (over: Record<string, unknown>) => ({ syncPairId: '1', label: 'Approved orders', pulseEveryMinutes: 120, ...over })
+    listSyncPairs.mockResolvedValue({ ok: true, errors: [], messages: [], syncPairs: [pair({}), pair({ syncPairId: '2', label: 'Returns' }), pair({ syncPairId: '3', label: 'Exchanges' })] })
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    expect(rowValue(wrapper, 'tenant-module-sync-pulse')).toBe('Approved orders · every 2h · 2 more')
+    expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').text()).toBe('Open →')
   })
 
   // DAR-UI-123. The spaces, streaks among the things that post, moved to Notifications; one row opens it.

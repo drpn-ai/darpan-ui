@@ -302,6 +302,25 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak period' },
   },
   {
+    // DAR-BE-328. The active tenant's sync pairs: daily checks whose upstream orders are watched on a pulse.
+    path: '/settings/tenant/sync-pulse',
+    name: 'settings-tenant-sync-pairs',
+    component: () => import('../pages/settings/TenantSyncPairsPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Sync pulse' },
+  },
+  {
+    path: '/settings/tenant/sync-pulse/new',
+    name: 'settings-tenant-sync-pair-new',
+    component: () => import('../pages/settings/TenantSyncPairPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Sync pair' },
+  },
+  {
+    path: '/settings/tenant/sync-pulse/:syncPairId',
+    name: 'settings-tenant-sync-pair',
+    component: () => import('../pages/settings/TenantSyncPairPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Sync pair' },
+  },
+  {
     path: '/settings/ai',
     name: 'settings-ai',
     redirect: { name: 'settings-tenant' },
