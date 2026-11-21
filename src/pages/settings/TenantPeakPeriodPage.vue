@@ -26,6 +26,64 @@
     <template v-if="draft">
       <StaticFactStrip :facts="facts" test-id="peak-facts" @open="openFact" />
 
+      <StaticPageSection v-if="syncRows.length">
+        <template #header>
+          <h2 v-explain="'peakSyncLag'" class="static-page-section-heading">Sync lag allowance</h2>
+        </template>
+        <div class="peak-rows" data-testid="peak-sync-lag">
+          <div class="peak-row peak-row--head">
+            <span v-explain="'peakSyncPair'" class="peak-row__head-label">Pair</span>
+            <span v-explain="'peakRunNormal'" class="peak-row__head-label">Normal</span>
+            <span v-explain="'peakRunThisPeriod'" class="peak-row__head-label">This period</span>
+          </div>
+          <component
+            :is="canEdit ? 'button' : 'div'"
+            v-for="row in syncRows"
+            :key="row.syncPairId"
+            :type="canEdit ? 'button' : undefined"
+            class="peak-row"
+            :class="{ 'peak-row--button': canEdit }"
+            :aria-label="canEdit ? `${row.label}: ${row.periodAllowanceMinutes === null ? 'Normal' : allowanceWords(row.periodAllowanceMinutes)}` : undefined"
+            :disabled="canEdit && busy ? true : undefined"
+            data-testid="peak-sync-lag-row"
+            @click="canEdit && openSync('allowance', row)"
+          >
+            <span>{{ row.label }}</span>
+            <span class="peak-row__soft">{{ allowanceWords(row.normalAllowanceMinutes) }}</span>
+            <span>{{ row.periodAllowanceMinutes === null ? 'Normal' : allowanceWords(row.periodAllowanceMinutes) }}</span>
+          </component>
+        </div>
+      </StaticPageSection>
+
+      <StaticPageSection v-if="syncRows.length">
+        <template #header>
+          <h2 v-explain="'peakSyncPulse'" class="static-page-section-heading">Sync pulse</h2>
+        </template>
+        <div class="peak-rows" data-testid="peak-sync-pulse">
+          <div class="peak-row peak-row--head">
+            <span v-explain="'peakSyncPair'" class="peak-row__head-label">Pair</span>
+            <span v-explain="'peakRunNormal'" class="peak-row__head-label">Normal</span>
+            <span v-explain="'peakRunThisPeriod'" class="peak-row__head-label">This period</span>
+          </div>
+          <component
+            :is="canEdit ? 'button' : 'div'"
+            v-for="row in syncRows"
+            :key="row.syncPairId"
+            :type="canEdit ? 'button' : undefined"
+            class="peak-row"
+            :class="{ 'peak-row--button': canEdit }"
+            :aria-label="canEdit ? `${row.label}: ${row.periodPulseMinutes === null ? 'Normal' : pulseCadence(row.periodPulseMinutes)}` : undefined"
+            :disabled="canEdit && busy ? true : undefined"
+            data-testid="peak-sync-pulse-row"
+            @click="canEdit && openSync('pulse', row)"
+          >
+            <span>{{ row.label }}</span>
+            <span class="peak-row__soft">{{ pulseCadence(row.normalPulseMinutes) }}</span>
+            <span>{{ row.periodPulseMinutes === null ? 'Normal' : pulseCadence(row.periodPulseMinutes) }}</span>
+          </component>
+        </div>
+      </StaticPageSection>
+
       <StaticPageSection>
         <template #header>
           <div class="peak-section-head">
@@ -289,6 +347,27 @@
         </WorkflowStepForm>
 
         <WorkflowStepForm
+          v-else-if="activePopup === 'sync'"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          :question="syncForm.kind === 'allowance' ? 'How long can an order wait in this period?' : 'How often should the pulse check in this period?'"
+          :show-primary-action="false"
+        >
+          <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="peak-popup-error" />
+          <label class="wizard-input-shell">
+            <span v-explain="syncForm.kind === 'allowance' ? 'peakSyncLag' : 'peakSyncPulse'" class="workflow-context-label">{{ syncForm.label }}</span>
+            <AppSelect
+              v-model="syncForm.value"
+              :options="syncForm.kind === 'allowance' ? SYNC_ALLOWANCE_OPTIONS : SYNC_PULSE_OPTIONS"
+              test-id="peak-sync-select"
+            />
+          </label>
+          <div class="wizard-actions">
+            <AppSaveAction label="Save" test-id="peak-sync-save" :disabled="popupBusy" @click="saveSync" />
+            <AppCancelAction test-id="peak-sync-cancel" :disabled="popupBusy" @click="closePopup" />
+          </div>
+        </WorkflowStepForm>
+
+        <WorkflowStepForm
           v-else-if="activePopup === 'delete'"
           class="workflow-form--popup-compact"
           :question="`Delete ${draft.periodName}?`"
@@ -338,9 +417,10 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import { useCalendarWidget } from '../../composables/useCalendarWidget'
 import { peakFacade } from '../../lib/api/facade'
-import type { GetPeakPeriodResponse, PeakHeldRun, PeakPeriod, PeakRunTime, PeakTarget } from '../../lib/api/peakTypes'
+import type { GetPeakPeriodResponse, PeakHeldRun, PeakPeriod, PeakRunTime, PeakSyncRow, PeakTarget } from '../../lib/api/peakTypes'
 import { backIconPath, plusIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { peakDateRange, peakDay } from '../../lib/peakPeriodWords'
+import { ALLOWANCE_CHOICES, PULSE_EVERY_CHOICES, allowanceWords, pulseCadence } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import { addDays, startOfLocalDay, startOfMonth } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -359,12 +439,24 @@ interface Draft {
   isActive: boolean
 }
 
-type Popup = 'dates' | 'hours' | 'hotwax' | 'netsuite' | 'runTime' | 'delete'
+type Popup = 'dates' | 'hours' | 'hotwax' | 'netsuite' | 'runTime' | 'sync' | 'delete'
 
 const NORMAL = 'normal'
 const HOTWAX_OPTIONS = [
   { value: NORMAL, label: 'Normal' },
   ...[10, 25, 50, 75].map((pct) => ({ value: String(pct), label: `${pct}%` })),
+]
+const SYNC_ALLOWANCE_OPTIONS = [
+  { value: NORMAL, label: 'Normal' },
+  ...ALLOWANCE_CHOICES.map((minutes) => ({ value: String(minutes), label: allowanceWords(minutes) })),
+]
+// Off is an override of its own (0 minutes); only Normal means no override.
+const SYNC_PULSE_OPTIONS = [
+  { value: NORMAL, label: 'Normal' },
+  ...PULSE_EVERY_CHOICES.map((minutes) => ({
+    value: String(minutes ?? 0),
+    label: minutes ? `Every ${minutes / 60} ${minutes === 60 ? 'hour' : 'hours'}` : 'Off',
+  })),
 ]
 const PARALLEL = 'parallel'
 const SERIAL = 'serial'
@@ -388,6 +480,7 @@ const saved = ref<PeakPeriod | null>(null)
 const runTimes = ref<PeakRunTime[]>([])
 const heldRuns = ref<PeakHeldRun[]>([])
 const targets = ref<PeakTarget[]>([])
+const syncRows = ref<PeakSyncRow[]>([])
 const loading = ref(false)
 const pageError = ref('')
 
@@ -401,6 +494,9 @@ const popupError = ref('')
 const hoursForm = ref({ start: '', end: '' })
 const hotwaxForm = ref(NORMAL)
 const netsuiteForm = ref(PARALLEL)
+const syncForm = ref<{ kind: 'allowance' | 'pulse'; syncPairId: string; label: string; value: string }>({
+  kind: 'allowance', syncPairId: '', label: '', value: NORMAL,
+})
 const runForm = ref({ runTimeId: '', target: '', onDate: EVERY_DAY, runTime: '' })
 
 const calendar = useCalendarWidget({ lastPickableDate: () => addDays(startOfLocalDay(new Date()), PICKABLE_DAYS_AHEAD) })
@@ -510,6 +606,7 @@ const popupTitle = computed(() => {
     case 'hotwax': return 'HotWax reads'
     case 'netsuite': return 'NetSuite reads'
     case 'runTime': return 'Run time'
+    case 'sync': return syncForm.value.kind === 'allowance' ? 'Sync lag allowance' : 'Sync pulse'
     case 'delete': return 'Delete peak period'
     default: return ''
   }
@@ -548,6 +645,7 @@ function apply(response: GetPeakPeriodResponse): void {
   runTimes.value = response.runTimes ?? []
   heldRuns.value = response.heldRuns ?? []
   targets.value = response.targets ?? []
+  syncRows.value = response.syncRows ?? []
 }
 
 /** Reads the period again. The draft starts over from it only when asked; a run-time change keeps unsaved edits. */
@@ -567,6 +665,7 @@ async function load(peakPeriodId: string): Promise<void> {
   runTimes.value = []
   heldRuns.value = []
   targets.value = []
+  syncRows.value = []
   try {
     if (peakPeriodId) await read(peakPeriodId, true)
     else resetDraft()
@@ -670,6 +769,48 @@ function openRunTime(runTime: PeakRunTime | null): void {
     ? { runTimeId: runTime.runTimeId, target: targetKey(runTime), onDate: runTime.onDate ?? EVERY_DAY, runTime: runTime.runTime }
     : { runTimeId: '', target: '', onDate: EVERY_DAY, runTime: '' }
   openPopup('runTime')
+}
+
+function openSync(kind: 'allowance' | 'pulse', row: PeakSyncRow): void {
+  if (!draft.value?.peakPeriodId) return
+  const current = kind === 'allowance' ? row.periodAllowanceMinutes : row.periodPulseMinutes
+  syncForm.value = { kind, syncPairId: row.syncPairId, label: row.label, value: current === null ? NORMAL : String(current) }
+  openPopup('sync')
+}
+
+/** A pair's override is one record: both values Normal removes it, anything else saves both as they now stand. */
+async function saveSync(): Promise<void> {
+  const peakPeriodId = draft.value?.peakPeriodId
+  const form = syncForm.value
+  const row = syncRows.value.find((candidate) => candidate.syncPairId === form.syncPairId)
+  if (!peakPeriodId || !row || popupBusy.value) return
+  const chosen = form.value === NORMAL ? null : Number(form.value)
+  const allowance = form.kind === 'allowance' ? chosen : row.periodAllowanceMinutes
+  const pulse = form.kind === 'pulse' ? chosen : row.periodPulseMinutes
+  popupBusy.value = true
+  popupError.value = ''
+  try {
+    const out = allowance === null && pulse === null
+      ? await peakFacade.deletePeakSync({ peakPeriodId, syncPairId: form.syncPairId })
+      : await peakFacade.savePeakSync({
+          peakPeriodId,
+          syncPairId: form.syncPairId,
+          ...(allowance !== null || form.kind === 'allowance' ? { allowanceMinutes: allowance } : {}),
+          ...(pulse !== null || form.kind === 'pulse' ? { pulseEveryMinutes: pulse } : {}),
+        })
+    const refusal = refusalOf(out, 'Could not save the sync setting.')
+    if (refusal) {
+      popupError.value = refusal
+      return
+    }
+    popupBusy.value = false
+    closePopup()
+    await refresh(peakPeriodId)
+  } catch (error) {
+    popupError.value = messageOf(error, 'Could not save the sync setting.')
+  } finally {
+    popupBusy.value = false
+  }
 }
 
 async function saveRunTime(): Promise<void> {

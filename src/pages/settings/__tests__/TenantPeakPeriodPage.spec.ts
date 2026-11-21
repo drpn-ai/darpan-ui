@@ -10,13 +10,15 @@ const savePeakPeriod = vi.hoisted(() => vi.fn())
 const deletePeakPeriod = vi.hoisted(() => vi.fn())
 const savePeakRunTime = vi.hoisted(() => vi.fn())
 const deletePeakRunTime = vi.hoisted(() => vi.fn())
+const savePeakSync = vi.hoisted(() => vi.fn())
+const deletePeakSync = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
 const route = vi.hoisted(() => ({ params: { peakPeriodId: 'PP1' } as Record<string, string> }))
 const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 
 vi.mock('../../../lib/api/facade', () => ({
-  peakFacade: { getPeakPeriod, savePeakPeriod, deletePeakPeriod, savePeakRunTime, deletePeakRunTime },
+  peakFacade: { getPeakPeriod, savePeakPeriod, deletePeakPeriod, savePeakRunTime, deletePeakRunTime, savePeakSync, deletePeakSync },
 }))
 vi.mock('../../../stores/permissions', () => ({
   usePermissionsStore: () => permissions,
@@ -94,6 +96,8 @@ describe('TenantPeakPeriodPage', () => {
     deletePeakPeriod.mockResolvedValue({ ok: true, messages: [], errors: [] })
     savePeakRunTime.mockResolvedValue({ ok: true, messages: [], errors: [], runTimeId: 'RT9' })
     deletePeakRunTime.mockResolvedValue({ ok: true, messages: [], errors: [] })
+    savePeakSync.mockResolvedValue({ ok: true, messages: [], errors: [] })
+    deletePeakSync.mockResolvedValue({ ok: true, messages: [], errors: [] })
   })
 
   afterEach(() => {
@@ -451,5 +455,101 @@ describe('TenantPeakPeriodPage', () => {
     expect(wrapper.find('[data-testid="peak-run-time"]').element.tagName).toBe('DIV')
     expect(wrapper.find('[data-testid="peak-on"]').attributes('disabled')).toBeDefined()
     expect(wrapper.find('[data-testid="peak-back"]').attributes('data-to')).toBe(JSON.stringify({ name: 'settings-tenant-peak-periods' }))
+  })
+
+  describe('sync lag and pulse', () => {
+    const syncRows = (over: Record<string, unknown> = {}) => [{
+      syncPairId: 'SP1', label: 'Approved orders', normalAllowanceMinutes: 120, periodAllowanceMinutes: null,
+      normalPulseMinutes: 120, periodPulseMinutes: null, ...over,
+    }]
+
+    it('hides both groups when the tenant has no sync pairs', async () => {
+      const wrapper = await mountPage()
+      expect(wrapper.find('[data-testid="peak-sync-lag"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Sync pulse')
+    })
+
+    it('shows a row per pair, normal then this period, before Run times', async () => {
+      getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows({ periodAllowanceMinutes: 360, periodPulseMinutes: 0 }) }))
+      const wrapper = await mountPage()
+      expect(text(wrapper, 'peak-sync-lag')).toMatch(/Pair\s*Normal\s*This period\s*Approved orders\s*2 hours\s*6 hours/)
+      expect(text(wrapper, 'peak-sync-pulse')).toMatch(/Approved orders\s*Every 2h\s*Off/)
+      expect(wrapper.text().indexOf('Sync lag allowance')).toBeLessThan(wrapper.text().indexOf('Run times'))
+      getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows() }))
+      const plain = await mountPage()
+      expect(plain.find('[data-testid="peak-sync-lag"] [data-testid="peak-sync-lag-row"]').text()).toContain('Normal')
+    })
+
+    it('choosing 6 hours saves the lag for that pair and reads the period again', async () => {
+      getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows() }))
+      const wrapper = await mountPage()
+      await wrapper.find('[data-testid="peak-sync-lag-row"]').trigger('click')
+      await wrapper.find('[data-testid="peak-sync-select"]').trigger('click')
+      expect(wrapper.findAll('[data-testid="app-select-option"]').map((option) => option.text()))
+        .toEqual(['Normal', '15 min', '30 min', '1 hour', '2 hours', '3 hours', '4 hours', '6 hours', '8 hours', '12 hours', '24 hours', '48 hours'])
+      await wrapper.find('[data-testid="app-select-option"][data-option-value="360"]').trigger('click')
+      await wrapper.find('[data-testid="peak-sync-save"]').trigger('click')
+      await flushPromises()
+      expect(savePeakSync).toHaveBeenCalledWith({ peakPeriodId: 'PP1', syncPairId: 'SP1', allowanceMinutes: 360 })
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+      expect(getPeakPeriod).toHaveBeenCalledTimes(2)
+    })
+
+    it('pulse choices include Off, which saves as 0, and keep the lag override', async () => {
+      getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows({ periodAllowanceMinutes: 360 }) }))
+      const wrapper = await mountPage()
+      await wrapper.find('[data-testid="peak-sync-pulse-row"]').trigger('click')
+      await wrapper.find('[data-testid="peak-sync-select"]').trigger('click')
+      expect(wrapper.findAll('[data-testid="app-select-option"]').map((option) => option.text()))
+        .toEqual(['Normal', 'Off', 'Every 1 hour', 'Every 2 hours', 'Every 3 hours', 'Every 4 hours', 'Every 6 hours'])
+      await wrapper.find('[data-testid="app-select-option"][data-option-value="0"]').trigger('click')
+      await wrapper.find('[data-testid="peak-sync-save"]').trigger('click')
+      await flushPromises()
+      expect(savePeakSync).toHaveBeenCalledWith({ peakPeriodId: 'PP1', syncPairId: 'SP1', allowanceMinutes: 360, pulseEveryMinutes: 0 })
+    })
+
+    it('Normal on both removes the pair override', async () => {
+      getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows({ periodAllowanceMinutes: 360 }) }))
+      const wrapper = await mountPage()
+      await wrapper.find('[data-testid="peak-sync-lag-row"]').trigger('click')
+      await choose(wrapper, 'peak-sync-select', 'normal')
+      await wrapper.find('[data-testid="peak-sync-save"]').trigger('click')
+      await flushPromises()
+      expect(deletePeakSync).toHaveBeenCalledWith({ peakPeriodId: 'PP1', syncPairId: 'SP1' })
+      expect(savePeakSync).not.toHaveBeenCalled()
+    })
+
+    it('Normal on one while the other is set saves the other', async () => {
+      getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows({ periodAllowanceMinutes: 360, periodPulseMinutes: 240 }) }))
+      const wrapper = await mountPage()
+      await wrapper.find('[data-testid="peak-sync-lag-row"]').trigger('click')
+      await choose(wrapper, 'peak-sync-select', 'normal')
+      await wrapper.find('[data-testid="peak-sync-save"]').trigger('click')
+      await flushPromises()
+      expect(savePeakSync).toHaveBeenCalledWith({ peakPeriodId: 'PP1', syncPairId: 'SP1', allowanceMinutes: null, pulseEveryMinutes: 240 })
+    })
+
+    it('shows a server refusal in the popup, word for word', async () => {
+      getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows() }))
+      savePeakSync.mockRejectedValueOnce(new ApiCallError('Allowance must be 15 minutes to 48 hours.'))
+      const wrapper = await mountPage()
+      await wrapper.find('[data-testid="peak-sync-lag-row"]').trigger('click')
+      await choose(wrapper, 'peak-sync-select', '15')
+      await wrapper.find('[data-testid="peak-sync-save"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+      expect(text(wrapper, 'peak-popup-error')).toBe('Allowance must be 15 minutes to 48 hours.')
+    })
+
+    it('rows are plain without edit rights, and wait on a new unsaved period', async () => {
+      getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows() }))
+      permissions.canEditTenantSettings = false
+      const readOnly = await mountPage()
+      expect(readOnly.find('[data-testid="peak-sync-lag-row"]').element.tagName).toBe('DIV')
+      permissions.canEditTenantSettings = true
+      route.params = {}
+      const fresh = await mountPage()
+      expect(fresh.find('[data-testid="peak-sync-lag"]').exists()).toBe(false)
+    })
   })
 })

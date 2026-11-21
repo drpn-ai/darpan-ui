@@ -580,6 +580,19 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Run times',
     body: 'runs moved to another time during the peak, on one day or every day. The window each run reads stays the same.',
   },
+  peakSyncLag: {
+    title: 'Sync lag allowance',
+    body: 'how long an order may wait between two systems before Darpan counts it as late. A period can allow more, so a busy stretch does not raise false alarms.',
+  },
+  peakSyncPulse: {
+    title: 'Sync pulse',
+    body: 'how often Darpan checks what is still waiting between two systems. A period can check less often, or switch the pulse off.',
+  },
+  peakSyncPair: {
+    title: 'Pair',
+    body: 'the two systems whose orders are kept in step.',
+    byDirectiveOnly: true,
+  },
   peakHeldRuns: {
     title: 'Waits for peak hours',
     body: 'scheduled runs that fall inside peak hours, and when they will start instead. Change the peak hours or move a run to clear one.',
