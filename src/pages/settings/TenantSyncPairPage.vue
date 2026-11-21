@@ -390,10 +390,6 @@ function snapshot(): string {
 const dirty = computed(() => Boolean(draft.value) && snapshot() !== baseline.value)
 const canSave = computed(() => Boolean(draft.value?.automationId && draft.value.upstreamSide))
 
-/**
- * A peak period sets today's allowance or pulse, and the pair's read gives only today's values. Saving them from here
- * would make them the pair's normal ones, so while a period holds them the page leaves both, and the switch, alone.
- */
 // A peak period overrides the pair today; the drafts hold the pair's own (normal) values, and the facts show today's
 // effective ones, with the period named, until the draft is changed.
 const periodName = computed(() => saved.value?.periodName || '')
