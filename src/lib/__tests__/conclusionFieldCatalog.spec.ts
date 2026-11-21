@@ -23,16 +23,24 @@ describe('loadConclusionFields', () => {
         { fieldPath: 'customer', type: 'object', required: false },
         { fieldPath: 'customer.email', type: 'string', required: false },
         { fieldPath: 'lines', type: 'array', required: false },
-        { fieldPath: 'lines[].status', type: 'string', required: false },
+        { fieldPath: 'lines.[0]', type: 'object', required: false },
+        { fieldPath: 'lines.[0].status', type: 'string', required: false },
+        { fieldPath: 'tags', type: 'array', required: false },
+        { fieldPath: 'tags.[0]', type: 'string', required: false },
+        { fieldPath: 'customer.items', type: 'array', required: false },
+        { fieldPath: 'customer.items.[0]', type: 'object', required: false },
+        { fieldPath: 'customer.items.[0].sku', type: 'string', required: false },
       ],
     })
     const result = await loadConclusionFields(draftOf({ file1JsonSchemaId: 'S1' }), signal, labels)
     expect(flatten).toHaveBeenCalledWith({ jsonSchemaId: 'S1' }, signal)
-    expect(result.listPaths).toEqual(new Set(['lines']))
+    expect(result.listPaths).toEqual(new Set(['lines', 'tags']))
     expect(result.fields).toEqual([
       { value: 'FILE_1:status', label: 'Shopify › status', subject: 'FILE_1', field: 'status', list: false },
       { value: 'FILE_1:customer.email', label: 'Shopify › customer.email', subject: 'FILE_1', field: 'customer.email', list: false },
       { value: 'FILE_1:lines.status', label: 'Shopify › lines.status', subject: 'FILE_1', field: 'lines.status', list: true },
+      { value: 'FILE_1:tags', label: 'Shopify › tags', subject: 'FILE_1', field: 'tags', list: true },
+      { value: 'FILE_1:customer.items.sku', label: 'Shopify › customer.items.sku', subject: 'FILE_1', field: 'customer.items.sku', list: true },
     ])
   })
 

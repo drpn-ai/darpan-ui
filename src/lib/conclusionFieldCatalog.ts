@@ -62,10 +62,16 @@ async function sideFields(
     .map((f) => ({ path: normalisePath(f.fieldPath), type: f.type }))
     .filter((f) => f.path)
   const arrayPaths = entries.filter((f) => f.type === 'array').map((f) => f.path)
-  const listPaths = new Set(arrayPaths.map((p) => p.split('.')[0] ?? p))
-  const fields = entries
-    .filter((f) => f.type !== 'array' && f.type !== 'object')
-    .map((f) => entry(subject, f.path, labels, arrayPaths.some((a) => f.path.startsWith(`${a}.`))))
+  // Only top-level arrays go in listPaths (first-segment contract); nested ones still mark their leaves.
+  const listPaths = new Set(arrayPaths.filter((p) => !p.includes('.')))
+  const seen = new Set<string>()
+  const fields: CatalogField[] = []
+  for (const f of entries) {
+    if (f.type === 'array' || f.type === 'object' || seen.has(f.path)) continue
+    seen.add(f.path)
+    const list = arrayPaths.some((a) => f.path === a || f.path.startsWith(`${a}.`))
+    fields.push(entry(subject, f.path, labels, list))
+  }
   return { fields, listPaths }
 }
 
