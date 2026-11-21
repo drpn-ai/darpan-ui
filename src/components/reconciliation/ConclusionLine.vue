@@ -79,6 +79,7 @@
     </div>
 
     <AppSelect
+      class="conclusion-line-edit__test"
       :model-value="testValue"
       :options="testOptions"
       :disabled="disabled"
@@ -135,29 +136,31 @@
       <span v-else class="conclusion-line-none">–</span>
     </div>
 
-    <button
-      type="button"
-      class="app-icon-action conclusion-line-edit__action"
-      aria-label="Done with this line"
-      title="Done with this line"
-      @click="emit('done')"
-    >
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-        <path d="M4 10l4 4 8-8" />
-      </svg>
-    </button>
-    <button
-      type="button"
-      class="app-icon-action conclusion-line-edit__action"
-      aria-label="Remove this line"
-      title="Remove this line"
-      :disabled="disabled"
-      @click="emit('remove')"
-    >
-      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-        <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-      </svg>
-    </button>
+    <div class="conclusion-line-edit__actions">
+      <button
+        type="button"
+        class="app-icon-action conclusion-line-edit__action"
+        aria-label="Done with this line"
+        title="Done with this line"
+        @click="emit('done')"
+      >
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
+          <path d="M4 10l4 4 8-8" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="app-icon-action conclusion-line-edit__action"
+        aria-label="Remove this line"
+        title="Remove this line"
+        :disabled="disabled"
+        @click="emit('remove')"
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -479,13 +482,39 @@ function emitNumber(event: Event): void {
 
 .conclusion-line-edit {
   display: grid;
-  grid-template-columns: 2.6rem minmax(0, 17rem) 10.5rem minmax(0, 1fr) 2rem 2rem;
+  grid-template-columns: 2.6rem minmax(0, 1fr) 11rem;
+  grid-template-areas:
+    'conn subject test'
+    '. against actions';
   gap: var(--space-2);
   align-items: start;
   padding: var(--space-1-5) var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
+}
+
+.conclusion-line__conn--edit {
+  grid-area: conn;
+}
+
+.conclusion-line-edit__subject {
+  grid-area: subject;
+}
+
+.conclusion-line-edit__test {
+  grid-area: test;
+}
+
+.conclusion-line-edit__against {
+  grid-area: against;
+}
+
+.conclusion-line-edit__actions {
+  display: flex;
+  grid-area: actions;
+  gap: var(--space-1);
+  justify-content: flex-end;
 }
 
 .conclusion-line__conn--edit {
@@ -502,13 +531,14 @@ function emitNumber(event: Event): void {
 }
 
 .conclusion-line-edit__grow {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 14rem;
+  min-width: 14rem;
 }
 
 .conclusion-line-edit__small {
   flex: none;
-  width: 6rem;
+  width: max-content;
+  min-width: 7rem;
 }
 
 .conclusion-line-edit__input {
@@ -523,7 +553,7 @@ function emitNumber(event: Event): void {
 }
 
 .conclusion-line-edit__against {
-  min-width: 0;
+  min-width: min(16rem, 100%);
   border-bottom: 1px solid transparent;
 }
 
@@ -594,24 +624,28 @@ function emitNumber(event: Event): void {
   min-height: 2.55rem;
 }
 
-.conclusion-line-edit__action {
-  margin-top: var(--space-1);
-}
 
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .conclusion-line-edit {
-    grid-template-columns: 1fr 2rem 2rem;
-  }
-
-  .conclusion-line__conn--edit,
-  .conclusion-line-edit__subject,
-  .conclusion-line-edit > :nth-child(3),
-  .conclusion-line-edit__against {
-    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'conn'
+      'subject'
+      'test'
+      'against'
+      'actions';
   }
 
   .conclusion-line__conn--edit {
     padding-top: 0;
+  }
+
+  .conclusion-line-edit__subject {
+    flex-wrap: wrap;
+  }
+
+  .conclusion-line-edit__grow {
+    min-width: 0;
   }
 }
 </style>
