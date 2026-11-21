@@ -229,14 +229,30 @@ describe('TenantSyncPairPage', () => {
     expect(wrapper.find('[data-testid="sync-pair-facts"]').exists()).toBe(false)
   })
 
-  it('names the peak period that sets today’s allowance and leaves its values to that period', async () => {
-    getSyncPair.mockResolvedValue(got({ syncPair: pair({ allowanceMinutes: 720, periodName: 'Black Friday sale' }) }))
+  it('names the peak period in the facts but edits the pair normal values, switch included', async () => {
+    getSyncPair.mockResolvedValue(got({ syncPair: pair({
+      allowanceMinutes: 720, periodName: 'Black Friday sale', normalAllowanceMinutes: 360, normalPulseEveryMinutes: 60,
+    }) }))
     const wrapper = await mountPage()
     expect(text(wrapper, 'sync-pair-fact-allowance')).toMatch(/Allowance\s*12 hours\s*Black Friday sale/)
-    // Today's values are the period's; saving them here would make them the pair's normal ones.
-    expect(wrapper.find('[data-testid="sync-pair-fact-allowance"]').element.tagName).toBe('DIV')
-    expect(wrapper.find('[data-testid="sync-pair-fact-every"]').element.tagName).toBe('DIV')
-    expect(wrapper.find('[data-testid="sync-pair-on"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="sync-pair-fact-allowance"]').element.tagName).toBe('BUTTON')
+    expect(wrapper.find('[data-testid="sync-pair-fact-every"]').element.tagName).toBe('BUTTON')
+    expect(wrapper.find('[data-testid="sync-pair-on"]').attributes('disabled')).toBeUndefined()
+    await wrapper.find('[data-testid="sync-pair-on"]').trigger('click')
+    expect(wrapper.find('[data-testid="sync-pair-edited"]').exists()).toBe(true)
+    await wrapper.find('[data-testid="sync-pair-save"]').trigger('click')
+    await flushPromises()
+    expect(saveSyncPair).toHaveBeenCalledWith(expect.objectContaining({
+      allowanceMinutes: 360, pulseEveryMinutes: 60, isActive: false,
+    }))
+  })
+
+  it('shows a failed last pulse as the Every sub and keeps the last OK sample in Waiting', async () => {
+    getSyncPair.mockResolvedValue(got({ syncPair: pair({ lastPulseStatusEnumId: 'SPS_FAILED' }) }))
+    const wrapper = await mountPage()
+    expect(text(wrapper, 'sync-pair-fact-every')).toMatch(/last pulse failed \d{1,2}:\d{2}/)
+    expect(text(wrapper, 'sync-pair-fact-waiting')).toContain('1,240')
+    expect(text(wrapper, 'sync-pair-fact-oldest')).toContain('6h 40m')
   })
 
   it('deletes the pair after asking, then goes back to the list', async () => {

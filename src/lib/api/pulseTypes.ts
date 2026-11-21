@@ -26,6 +26,11 @@ export interface SyncPairSummary {
 export interface SyncPair extends SyncPairSummary {
   /** The peak period that overrides allowance or pulse today, when one does. */
   periodName?: string | null
+  /** The pair's own allowance and pulse, whatever a peak period overrides today; what the page edits. */
+  normalAllowanceMinutes?: number | null
+  normalPulseEveryMinutes?: number | null
+  /** SPS_OK or SPS_FAILED: how the last pulse ended. */
+  lastPulseStatusEnumId?: string | null
   upstreamSide?: string | null
   chatSpaceId?: string | null
   /** 'Y' or 'N'. */

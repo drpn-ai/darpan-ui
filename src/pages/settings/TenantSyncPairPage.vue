@@ -10,7 +10,7 @@
         toggle-label="Sync pulse on"
         :on="draft.isActive"
         toggle-test-id="sync-pair-on"
-        :toggle-disabled="!canEdit || busy || periodLocked"
+        :toggle-disabled="!canEdit || busy"
         @update:on="setActive"
       >
         <span v-if="dirty" class="sync-pair-edited-mark" data-testid="sync-pair-edited">• edited</span>
@@ -30,8 +30,8 @@
             <h2 v-explain="'syncPulseToday'" class="static-page-section-heading">Today</h2>
           </template>
           <div v-if="samples.length" class="sync-pair-charts">
-            <PulseOldestChart v-model:active="activeHour" :samples="samples" :allowance-minutes="draft.allowanceMinutes" />
-            <PulseWaitingChart v-model:active="activeHour" :samples="samples" :allowance-minutes="draft.allowanceMinutes" />
+            <PulseOldestChart v-model:active="activeHour" :samples="samples" :allowance-minutes="shownAllowance" />
+            <PulseWaitingChart v-model:active="activeHour" :samples="samples" :allowance-minutes="shownAllowance" />
           </div>
           <p v-else class="section-note" data-testid="sync-pair-today-empty">No pulses today.</p>
         </StaticPageSection>
@@ -394,7 +394,15 @@ const canSave = computed(() => Boolean(draft.value?.automationId && draft.value.
  * A peak period sets today's allowance or pulse, and the pair's read gives only today's values. Saving them from here
  * would make them the pair's normal ones, so while a period holds them the page leaves both, and the switch, alone.
  */
-const periodLocked = computed(() => Boolean(saved.value?.periodName))
+// A peak period overrides the pair today; the drafts hold the pair's own (normal) values, and the facts show today's
+// effective ones, with the period named, until the draft is changed.
+const periodName = computed(() => saved.value?.periodName || '')
+const normalAllowance = computed(() => saved.value?.normalAllowanceMinutes ?? saved.value?.allowanceMinutes ?? 0)
+const normalPulseEvery = computed(() => saved.value?.normalPulseEveryMinutes ?? saved.value?.pulseEveryMinutes ?? null)
+const allowanceOverridden = computed(() => Boolean(periodName.value && draft.value?.allowanceMinutes === normalAllowance.value))
+const everyOverridden = computed(() => Boolean(periodName.value && (draft.value?.pulseEveryMinutes ?? null) === (normalPulseEvery.value || null)))
+const shownAllowance = computed(() => (allowanceOverridden.value ? saved.value?.allowanceMinutes : draft.value?.allowanceMinutes) ?? 0)
+const lastPulseFailed = computed(() => saved.value?.lastPulseStatusEnumId === 'SPS_FAILED')
 
 const chosenAutomation = computed(() => automations.value.find((automation) => automation.automationId === draft.value?.automationId) ?? null)
 
@@ -423,15 +431,20 @@ const oldestMinutes = computed(() => latestSample.value?.oldestWaitingMinutes ??
 const facts = computed<StaticFact[]>(() => {
   const current = draft.value
   if (!current) return []
-  const changeable = { interactive: canEdit.value && !periodLocked.value, disabled: busy.value }
+  const changeable = { interactive: canEdit.value, disabled: busy.value }
   const every: StaticFact = {
-    key: 'every', label: 'Every', value: pulseEveryWords(current.pulseEveryMinutes),
-    sub: saved.value?.lastPulseStamp ? `last ${formatClockTime(saved.value.lastPulseStamp)}` : '',
+    key: 'every', label: 'Every',
+    value: pulseEveryWords(everyOverridden.value ? saved.value?.pulseEveryMinutes ?? null : current.pulseEveryMinutes),
+    sub: lastPulseFailed.value && saved.value?.lastPulseStamp
+      ? `last pulse failed ${formatClockTime(saved.value.lastPulseStamp)}`
+      : everyOverridden.value && saved.value?.pulseEveryMinutes !== normalPulseEvery.value
+        ? periodName.value
+        : saved.value?.lastPulseStamp ? `last ${formatClockTime(saved.value.lastPulseStamp)}` : '',
     explain: 'syncPairEvery', testId: 'sync-pair-fact-every', ...changeable,
   }
   const allowance: StaticFact = {
-    key: 'allowance', label: 'Allowance', value: allowanceWords(current.allowanceMinutes),
-    sub: saved.value?.periodName || 'normal', explain: 'syncPairAllowance', testId: 'sync-pair-fact-allowance', ...changeable,
+    key: 'allowance', label: 'Allowance', value: allowanceWords(shownAllowance.value),
+    sub: allowanceOverridden.value ? periodName.value : 'normal', explain: 'syncPairAllowance', testId: 'sync-pair-fact-allowance', ...changeable,
   }
   if (isNew.value) {
     const pickable = { interactive: canEdit.value, disabled: busy.value }
@@ -531,8 +544,8 @@ function resetDraft(): void {
         syncPairId: pair.syncPairId,
         automationId: pair.automationId,
         upstreamSide: pair.upstreamSide ?? '',
-        allowanceMinutes: pair.allowanceMinutes,
-        pulseEveryMinutes: pair.pulseEveryMinutes || null,
+        allowanceMinutes: pair.normalAllowanceMinutes ?? pair.allowanceMinutes,
+        pulseEveryMinutes: (pair.normalPulseEveryMinutes ?? pair.pulseEveryMinutes) || null,
         chatSpaceId: pair.chatSpaceId ?? '',
         hourlySummary: pair.hourlySummary === 'Y',
         isActive: pair.isActive !== 'N',
@@ -617,7 +630,7 @@ async function refreshTick(): Promise<void> {
 }
 
 function setActive(on: boolean): void {
-  if (draft.value && !periodLocked.value) draft.value.isActive = on
+  if (draft.value) draft.value.isActive = on
 }
 
 function openPopup(popup: Popup): void {
