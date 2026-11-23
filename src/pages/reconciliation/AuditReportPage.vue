@@ -834,7 +834,7 @@ watch([findingId, report, selectedStatement], async () => {
   font: inherit;
   font-size: var(--type-label-size);
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
 }
 
 .audit-filter--empty {

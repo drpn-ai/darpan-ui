@@ -700,7 +700,7 @@ onMounted(async () => {
   background: transparent;
   color: var(--text-dim);
   opacity: 0;
-  transition: opacity 160ms ease;
+  transition: opacity var(--motion-base) var(--ease-out);
 }
 .lifecycle-spine-ghost {
   align-self: flex-start;
@@ -712,7 +712,7 @@ onMounted(async () => {
   font-size: var(--type-muted-size);
   line-height: 1.6;
   opacity: 0;
-  transition: opacity 160ms ease;
+  transition: opacity var(--motion-base) var(--ease-out);
 }
 /* Progressive disclosure: a part's next action shows when you approach it, and always where hover does not exist. */
 .lifecycle-spine-group:hover .lifecycle-spine-ghost,

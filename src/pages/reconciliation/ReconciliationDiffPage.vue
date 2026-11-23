@@ -1022,13 +1022,11 @@ onMounted(() => {
   color: inherit;
   text-decoration: none;
   transition:
-    border-color 160ms ease,
-    transform 160ms ease,
-    background 160ms ease;
+    border-color var(--motion-base) var(--ease-out),
+    background var(--motion-base) var(--ease-out);
 }
 
 .reconciliation-run-history-card--link:hover {
-  transform: translateY(-1px);
   border-color: color-mix(in oklab, var(--border-soft) 70%, var(--accent));
   background: color-mix(in oklab, var(--surface-2) 78%, var(--accent));
 }

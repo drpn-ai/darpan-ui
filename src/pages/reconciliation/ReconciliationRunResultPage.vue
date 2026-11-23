@@ -297,7 +297,7 @@
               <div
                 v-else
                 :data-testid="bucket.testId"
-                class="reconciliation-diff-bucket reconciliation-diff-bucket--active reconciliation-diff-bucket--static"
+                class="reconciliation-diff-bucket reconciliation-diff-bucket--active"
               >
                 <span class="reconciliation-diff-bucket__label">{{ bucket.label }}</span>
                 <strong>{{ bucket.count }}</strong>
@@ -1828,17 +1828,8 @@ watch([savedRunId, outputFileName], () => {
   border: 1px solid var(--border-soft);
   background: color-mix(in oklab, var(--surface-2) 95%, white);
   transition:
-    border-color 160ms ease,
-    transform 160ms ease,
-    background 160ms ease;
-}
-
-.reconciliation-diff-bucket:hover {
-  transform: translateY(-1px);
-}
-
-.reconciliation-diff-bucket--static:hover {
-  transform: none;
+    border-color var(--motion-base) var(--ease-out),
+    background var(--motion-base) var(--ease-out);
 }
 
 .reconciliation-diff-bucket--active {
@@ -1878,7 +1869,7 @@ watch([savedRunId, outputFileName], () => {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: border-color var(--motion-base) var(--ease-out), background var(--motion-base) var(--ease-out);
 }
 
 .run-result-expand:hover,

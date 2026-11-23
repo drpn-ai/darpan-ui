@@ -193,7 +193,7 @@ function stateText(system: RunConclusionSystem): string {
   color: var(--text-muted);
   font-size: var(--type-meta-size);
   font-weight: 400;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: border-color var(--motion-base) var(--ease-out), background var(--motion-base) var(--ease-out);
 }
 
 .conclusion-evidence__button:hover {

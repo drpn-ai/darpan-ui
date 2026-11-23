@@ -454,7 +454,6 @@ describe('NetSuiteAuthWorkflowPage', () => {
     })
     expect(pageSource.match(/workflow-choice-option--filter/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
     expect(source).toContain('.workflow-choice-option--filter {')
-    expect(source).toContain('.workflow-choice-option--filter:hover {')
     expect(source).toContain('.workflow-choice-option--filter.workflow-choice-option--active {')
     expect(source).toContain('max-width: min(100%, 14rem);')
     // Now on the spacing scale (0.6/0.8rem -> --space-1-5/--space-2). What this test guards is that
@@ -466,7 +465,7 @@ describe('NetSuiteAuthWorkflowPage', () => {
     expect(source).toContain('height: 1rem;')
     expect(source).toContain('border: 1px solid var(--border-soft);')
     expect(source).toContain('background: color-mix(in oklab, var(--surface-2) 95%, white);')
-    expect(source).toContain('transform: translateY(-1px);')
+    expect(source).not.toContain('.workflow-choice-option--filter:hover {')
     expect(runResultSource).toContain('.reconciliation-diff-bucket {')
     expect(runResultSource).toContain('border: 1px solid var(--border-soft);')
     expect(runResultSource).toContain('background: color-mix(in oklab, var(--surface-2) 95%, white);')

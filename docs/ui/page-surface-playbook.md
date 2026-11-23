@@ -48,9 +48,12 @@ Motion confirms, it never decorates. It may carry border, background, opacity, a
 - **On-screen moves** (a reserve opening, a column resizing) ease in-out (`--ease-in-out`).
 - **Popovers and help plates** scale from the side of their trigger (`transform-origin` toward it). Edit popups are modals and stay centred.
 - **Press feedback** is `scale(var(--motion-press-scale))` on `:active` for `app-icon-action--large` only, over `--motion-press`.
+- **Success pulses once.** A success message scales to `--motion-pulse-scale` (1.03) and back over `--motion-pulse` as it appears; `.success-copy` carries it (`@keyframes motion-pulse`). One pulse, never a loop.
+- **Icon swaps crossfade.** When one icon replaces another (a tick appearing, copy → check), the incoming icon starts at opacity 0, `--motion-enter-scale` and `blur(var(--motion-swap-blur))` and settles over `--motion-fast`; the outgoing one runs the reverse. The table checkbox tick (`.app-table__checkbox::after`) is the reference.
 - **Held means no tween.** While something is dragged or held, its transition is `none`; it follows the pointer exactly.
 - **Always instant:** the Cmd+K palette, text-input focus, keyboard-triggered actions, and select menus.
-- **No bounce, stretch, arcs, stagger, or rubber-banding.** The mascot is the one exception, the way `--mascot-rust` is the one hue.
+- **No bounce, stretch, arcs, stagger, rubber-banding, or hover lifts** (`translateY` on hover). The mascot is the one exception, the way `--mascot-rust` is the one hue.
+- **Tokens only.** No literal duration or curve (`160ms ease`) in any `transition` or `animation`; `src/__tests__/motionUsesTokens.spec.ts` sweeps `src/**/*.{css,vue}` and lists its few exceptions with reasons.
 - `prefers-reduced-motion` collapses all of it (global rule at the end of `src/style.css`).
 
 ## Migration rules

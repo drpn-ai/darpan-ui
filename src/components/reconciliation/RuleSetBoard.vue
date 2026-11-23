@@ -1692,7 +1692,7 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
   text-decoration: underline dotted var(--text-muted);
   text-underline-offset: 3px;
-  transition: color 120ms ease, text-decoration-color 120ms ease;
+  transition: color var(--motion-fast) var(--ease-out), text-decoration-color var(--motion-fast) var(--ease-out);
 }
 
 .ruleset-term:hover,
@@ -1812,7 +1812,7 @@ onBeforeUnmount(() => {
   stroke: color-mix(in oklab, var(--text) 58%, transparent);
   stroke-width: 2;
   stroke-linecap: round;
-  transition: filter 120ms ease, stroke 120ms ease, stroke-width 120ms ease;
+  transition: filter var(--motion-fast) var(--ease-out), stroke var(--motion-fast) var(--ease-out), stroke-width var(--motion-fast) var(--ease-out);
 }
 
 .ruleset-editor-line--active {
@@ -1904,7 +1904,7 @@ onBeforeUnmount(() => {
   text-align: center;
   cursor: var(--ruleset-pen-cursor) !important;
   user-select: none;
-  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  transition: border-color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
 
 .ruleset-field-item *,
@@ -2038,7 +2038,7 @@ onBeforeUnmount(() => {
   background: var(--surface);
   color: var(--text);
   transform: translate(-50%, -50%);
-  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out);
 }
 
 .ruleset-operator-box--active {

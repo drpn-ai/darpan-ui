@@ -72,7 +72,7 @@ function flip(): void {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: transparent;
-  transition: background-color 160ms ease, border-color 160ms ease;
+  transition: background-color var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
 }
 
 .app-toggle-switch--on {
@@ -101,7 +101,7 @@ function flip(): void {
   font-size: var(--type-muted-size);
   line-height: 1;
   opacity: 0;
-  transition: opacity 160ms ease;
+  transition: opacity var(--motion-base) var(--ease-out);
 }
 
 .app-toggle-switch-glyph--on {
@@ -129,7 +129,7 @@ function flip(): void {
   border-radius: var(--radius-pill);
   background: var(--text-soft);
   transform: translateY(-50%);
-  transition: transform 160ms ease, background-color 160ms ease;
+  transition: transform var(--motion-base) var(--ease-in-out), background-color var(--motion-base) var(--ease-out);
 }
 
 .app-toggle-switch--on .app-toggle-switch-knob {

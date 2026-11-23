@@ -198,6 +198,11 @@
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --motion-enter-scale: 0.97;
   --motion-press-scale: 0.97;
+  /* DAR-UI-136. A success message pulses once to confirm (scale to 1.03 and back, the 3% cap);
+     an icon swap crossfades through this blur. */
+  --motion-pulse: 280ms;
+  --motion-pulse-scale: 1.03;
+  --motion-swap-blur: 2px;
 }
 
 :root[data-theme='light'] {
@@ -300,7 +305,6 @@ b {
   color: var(--text);
   text-decoration: none;
   transform: translateY(calc(-100% - var(--space-2)));
-  transition: transform 160ms ease;
 }
 
 .skip-link:focus-visible {
@@ -396,7 +400,7 @@ button {
   padding: var(--space-1-5) var(--space-2);
   background: var(--surface-2);
   touch-action: manipulation;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition: border-color var(--motion-base) var(--ease-out), background-color var(--motion-base) var(--ease-out);
 }
 
 button:hover {
@@ -1068,7 +1072,7 @@ button:disabled {
 
 .workflow-step-wrapper {
   width: min(var(--workflow-question-width), 100%);
-  transition: opacity 160ms ease;
+  transition: opacity var(--motion-base) var(--ease-out);
 }
 
 .workflow-step-shell {
@@ -1222,7 +1226,7 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-2);
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition: border-color var(--motion-base) var(--ease-out), background-color var(--motion-base) var(--ease-out);
 }
 
 .workflow-choice-option:hover {
@@ -1251,13 +1255,8 @@ button:disabled {
   border: 1px solid var(--border-soft);
   background: color-mix(in oklab, var(--surface-2) 95%, white);
   transition:
-    border-color 160ms ease,
-    transform 160ms ease,
-    background 160ms ease;
-}
-
-.workflow-choice-option--filter:hover {
-  transform: translateY(-1px);
+    border-color var(--motion-base) var(--ease-out),
+    background var(--motion-base) var(--ease-out);
 }
 
 .workflow-choice-option--filter input[type='checkbox']:not(.app-table__checkbox) {
@@ -1453,6 +1452,10 @@ label > span {
 .success-copy {
   margin: 0;
   color: var(--success);
+  /* Pulse to confirm (playbook: Motion). Every success-copy is mounted by v-if, so it plays once
+     per success; it grows from its text's start so the line does not shift sideways. */
+  transform-origin: left center;
+  animation: motion-pulse var(--motion-pulse) var(--ease-in-out);
 }
 
 .status-badge {
@@ -1635,8 +1638,8 @@ label > span {
   /* Press feedback (playbook: Motion). Restates the global button border/background tween,
      because a transition shorthand replaces the whole list rather than adding to it. */
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
+    border-color var(--motion-base) var(--ease-out),
+    background-color var(--motion-base) var(--ease-out),
     transform var(--motion-press) var(--ease-out);
 }
 
@@ -1721,7 +1724,7 @@ label > span {
   display: inline-grid;
   place-content: center;
   cursor: pointer;
-  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--motion-base) var(--ease-out), background-color var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out);
 }
 
 .app-table__checkbox:hover {
@@ -1741,9 +1744,15 @@ label > span {
   height: 0.82rem;
   border-right: 0.12rem solid transparent;
   border-bottom: 0.12rem solid transparent;
+  /* An icon swap (playbook: Motion): the tick crossfades in from the enter scale through a blur. */
   opacity: 0;
-  transform: rotate(45deg) scale(0.8);
-  transition: transform 160ms ease, opacity 160ms ease, border-color 160ms ease;
+  filter: blur(var(--motion-swap-blur));
+  transform: rotate(45deg) scale(var(--motion-enter-scale));
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    opacity var(--motion-fast) var(--ease-out),
+    filter var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out);
 }
 
 .app-table__checkbox:checked {
@@ -1755,6 +1764,7 @@ label > span {
   border-right-color: var(--surface);
   border-bottom-color: var(--surface);
   opacity: 1;
+  filter: none;
   transform: rotate(45deg) scale(1);
 }
 
@@ -1908,7 +1918,7 @@ label > span {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: border-color var(--motion-base) var(--ease-out), background var(--motion-base) var(--ease-out);
 }
 
 .mascot-warning-action:hover {
@@ -2203,7 +2213,7 @@ label > span {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition: border-color var(--motion-base) var(--ease-out), background-color var(--motion-base) var(--ease-out);
 }
 
 .command-panel--keyboard .command-item:hover:not(.command-item--active) {
@@ -2254,6 +2264,21 @@ label > span {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes motion-pulse {
+  from {
+    opacity: 0;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(var(--motion-pulse-scale));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -2456,7 +2481,6 @@ label > span {
   align-items: center;
   justify-content: center;
   color: color-mix(in oklab, var(--text) 58%, transparent);
-  transition: transform 140ms ease;
 }
 
 .app-select-trigger-icon svg,

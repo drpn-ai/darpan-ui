@@ -1464,7 +1464,7 @@ describe('ReconciliationRunResultPage', () => {
     expect(source).toContain('run-result-rule-selector__panel')
     expect(source).toContain('run-result-rule-selector__option-count')
     expect(source).toContain('diff-bucket-total-results')
-    expect(source).toContain('reconciliation-diff-bucket--static')
+    expect(source).not.toContain('translateY(-1px)')
     expect(source).not.toContain('run-result-rule-selector__header')
     expect(source).not.toContain('<strong>{{ option.count }}</strong>')
     expect(source).not.toContain('<strong>{{ diffDetailRows.length }}</strong>')

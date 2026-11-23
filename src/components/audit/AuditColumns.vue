@@ -969,7 +969,7 @@ function statementText(id: string): string {
   font-size: var(--type-label-size);
   text-align: left;
   cursor: pointer;
-  transition: background 160ms ease;
+  transition: background var(--motion-base) var(--ease-out);
 }
 
 .audit-row:hover {
