@@ -55,7 +55,8 @@ describe('QueryDataPopup', () => {
     expect(keep(wrapper, 'recordKey').attributes('aria-pressed')).toBe('true')
     expect(keep(wrapper, 'statement').attributes('aria-pressed')).toBe('false')
     await wrapper.find('[data-testid="query-data-save"]').trigger('click')
-    expect(saved(wrapper)).toEqual(findings)
+    // Same keys in the same order: an unchanged save leaves the page's JSON (and its edited mark) alone.
+    expect(JSON.stringify(saved(wrapper))).toBe(JSON.stringify(findings))
   })
 
   it('chooses another kind and source, keeps fields, and drops what belonged to the old source', async () => {

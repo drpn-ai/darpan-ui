@@ -411,7 +411,8 @@ function save(): void {
   const out: ReadInput = { ...(original ?? {}) }
   out.name = name.value
   out.source = kind.value
-  for (const key of Object.values(SOURCE_ID_KEY)) delete out[key]
+  // Only the other kinds' id keys go; this kind's is set in place, so an unchanged save keeps the key order (and the page clean).
+  for (const [other, key] of Object.entries(SOURCE_ID_KEY)) if (other !== kind.value) delete out[key]
   out[SOURCE_ID_KEY[kind.value]] = sourceId.value
   if (kind.value === 'auditFindings' && includeClosed.value) out.includeClosed = true
   else delete out.includeClosed
