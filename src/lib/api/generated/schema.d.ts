@@ -3765,6 +3765,10 @@ export interface components {
             /** @description Continue this query conversation; empty starts one. */
             conversationId?: string;
             text: string;
+            /** @description The read on the page now, so the agent builds on the person's edits. */
+            readSpecJson?: string;
+            /** @description The script on the page now. */
+            scriptBody?: string;
         };
         SendAgentQueryTurnResult: {
             conversationId?: string;
@@ -13036,6 +13040,7 @@ export interface components {
                 normalAllowanceMinutes?: string;
                 normalPulseEveryMinutes?: string;
                 periodName?: string;
+                periodThruDate?: string;
                 chatSpaceId?: string;
                 hourlySummary?: string;
                 isActive?: string;
