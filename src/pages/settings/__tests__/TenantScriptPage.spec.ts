@@ -12,6 +12,7 @@ const runTenantQuerySchedule = vi.hoisted(() => vi.fn())
 const sendAgentQueryTurn = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
 const getAgentStatus = vi.hoisted(() => vi.fn())
+const getTenantQueryCatalog = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
 const route = vi.hoisted(() => ({ params: { tenantScriptId: '100' } as Record<string, string> }))
@@ -21,7 +22,7 @@ const auth = vi.hoisted(() => ({ userId: 'U1' }))
 vi.mock('../../../lib/api/facade', () => ({
   scriptFacade: {
     listTenantQueries, saveTenantQuery, deleteTenantQuery, runTenantQuery,
-    listTenantQuerySchedules, saveTenantQuerySchedule, runTenantQuerySchedule, sendAgentQueryTurn,
+    listTenantQuerySchedules, saveTenantQuerySchedule, runTenantQuerySchedule, sendAgentQueryTurn, getTenantQueryCatalog,
   },
   settingsFacade: { listTenantChatSpaces },
   agentFacade: { getAgentStatus },
@@ -49,6 +50,13 @@ vi.mock('vue-router', async () => {
 import TenantScriptPage from '../TenantScriptPage.vue'
 
 const READ = '{"inputs":[{"name":"orders","source":"dataset","datasetId":"DS_ORDERS","fields":["id","status"]}]}'
+
+const CATALOG = {
+  audits: [{ auditId: '100510', auditCode: 'MC', auditName: 'Month-close audit', fields: ['statement', 'recordKey', 'headline'] }],
+  savedRuns: [],
+  datasets: [{ datasetId: 'DS_ORDERS', system: 'HotWax', idField: 'id', windowField: 'orderDate', recordCount: 3,
+    fields: ['id', 'status', 'qty'], wholeRecords: false }],
+}
 
 const query = (over: Partial<TenantQuery> = {}): TenantQuery => ({
   tenantQueryId: '100', queryName: 'Open backorders', description: null, readSpecJson: READ,
@@ -100,19 +108,100 @@ describe('TenantScriptPage (query)', () => {
     ] })
     runTenantQuery.mockResolvedValue({ result: run() })
     getAgentStatus.mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: true })
+    getTenantQueryCatalog.mockResolvedValue(CATALOG)
     saveTenantQuery.mockImplementation(async (payload: Partial<TenantQuery>) => ({ query: query({ ...payload, tenantQueryId: payload.tenantQueryId ?? '900' }) }))
     saveTenantQuerySchedule.mockImplementation(async (payload: Record<string, unknown>) => ({ schedule: schedule({ ...payload } as Partial<TenantQuerySchedule>) }))
   })
 
-  it('shows the name, the read in words, and the schedule facts', async () => {
+  it('shows the name, the read by name, and the schedule facts with who it sends as', async () => {
     const wrapper = await mountPage()
     expect(text(wrapper, 'script-name')).toBe('Open backorders')
-    expect(text(wrapper, 'script-read-text')).toBe('Reads dataset DS_ORDERS, 2 fields')
+    expect(getTenantQueryCatalog).toHaveBeenCalledTimes(1)
+    const row = wrapper.find('[data-testid="script-read-input"]')
+    expect(row.find('.query-read__name').text()).toBe('orders')
+    expect(row.find('[data-testid="script-read-sentence"]').text().replace(/\s+/g, ' ')).toBe('Records of HotWax DS_ORDERS. Keeps id status')
     expect(text(wrapper, 'script-fact-schedule')).toContain('Daily at 7:00 AM')
     expect(text(wrapper, 'script-fact-sends-to')).toContain('2 addresses · #ops-daily')
     expect(text(wrapper, 'script-fact-last-run')).toMatch(/· sent$/)
-    expect(text(wrapper, 'script-owner')).toBe('Sends as Aditi Patel, who saved the schedule.')
+    expect(text(wrapper, 'script-fact-sends-as')).toBe('Sends asAditi Patelsaved the schedule')
     expect(listTenantQuerySchedules).toHaveBeenCalledWith({ tenantQueryId: '100' })
+  })
+
+  it('reads top to bottom: facts, then 1 Data, 2 Script, 3 Result, with no tabs', async () => {
+    const wrapper = await mountPage()
+    const order = ['script-facts', 'script-ask', 'query-step-data', 'query-step-script', 'query-step-result']
+      .map((id) => wrapper.find(`[data-testid="${id}"]`).element)
+    order.slice(1).forEach((element, index) => {
+      expect(order[index]!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+    expect(wrapper.findAll('[data-testid="query-step-data"] h2 span').map((span) => span.text())).toEqual(['1', 'Data'])
+    expect(wrapper.findAll('[data-testid="query-step-script"] h2 span').map((span) => span.text())).toEqual(['2', 'Script'])
+    expect(wrapper.findAll('[data-testid="query-step-result"] h2 span').map((span) => span.text())).toEqual(['3', 'Result'])
+    expect(wrapper.find('[role="tab"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="query-step-result"] [data-testid="script-run"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="query-step-result"] [data-testid="script-preview"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="query-step-script"] [data-testid="script-functions-link"]').exists()).toBe(true)
+  })
+
+  it('a part of the sentence opens the Data popup, and its save changes the read and marks it edited', async () => {
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(false)
+    await wrapper.findAll('[data-testid="script-read-part"]')[0]!.trigger('click')
+    expect(wrapper.find('[data-testid="query-data-popup"]').exists()).toBe(true)
+    expect(wrapper.find('.static-page-frame--popup-open').exists()).toBe(true)
+    await wrapper.findAll('[data-testid="query-data-keep"]').find((chip) => chip.text() === 'qty')!.trigger('click')
+    await wrapper.find('[data-testid="query-data-window"]').setValue('7')
+    await wrapper.find('[data-testid="query-data-save"]').trigger('click')
+    expect(wrapper.find('[data-testid="query-data-popup"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(true)
+    expect(text(wrapper, 'script-read-sentence').replace(/\s+/g, ' ')).toBe('Records of HotWax DS_ORDERS, orderDate in the last 7 days. Keeps id status qty')
+
+    await wrapper.find('[data-testid="script-run"]').trigger('click')
+    await flushPromises()
+    const sent = JSON.parse(runTenantQuery.mock.calls[0]![0].readSpecJson)
+    expect(sent).toEqual({ inputs: [{ name: 'orders', source: 'dataset', datasetId: 'DS_ORDERS', fields: ['id', 'status', 'qty'],
+      window: { field: 'orderDate', lastDays: 7 } }] })
+  })
+
+  it('adds an input with the plus, and removes one with its trash', async () => {
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="script-read-add"]').trigger('click')
+    await wrapper.find('[data-testid="query-data-source"]').trigger('click')
+    await wrapper.find('[data-testid="app-select-option"][data-option-value="100510"]').trigger('click')
+    await wrapper.find('[data-testid="query-data-save"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="script-read-input"]')).toHaveLength(2)
+    expect(wrapper.findAll('[data-testid="script-read-sentence"]')[1]!.text()).toContain('Open findings of Month-close audit')
+
+    await wrapper.findAll('[data-testid="script-read-remove"]')[1]!.trigger('click')
+    await wrapper.findAll('[data-testid="script-read-remove"]')[0]!.trigger('click')
+    expect(text(wrapper, 'script-read-empty')).toBe('Reads nothing: script only')
+    await wrapper.find('[data-testid="script-save"]').trigger('click')
+    await flushPromises()
+    expect(saveTenantQuery).toHaveBeenCalledWith(expect.objectContaining({ readSpecJson: '' }))
+  })
+
+  it('an input the popup cannot change reads as plain words and points to the JSON', async () => {
+    const grouped = '{"inputs":[{"name":"byStatus","source":"dataset","datasetId":"DS_ORDERS","groupBy":["status"],"measures":[{"fn":"count","as":"n"}]}]}'
+    listTenantQueries.mockResolvedValue({ queries: [query({ readSpecJson: grouped })], library: [], limits: {} })
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="script-read-part"]').exists()).toBe(false)
+    expect(text(wrapper, 'script-read-limits')).toBe('Change it in the JSON: it has groups, measures.')
+  })
+
+  it('without the catalog the read shows ids and the popup says why', async () => {
+    getTenantQueryCatalog.mockRejectedValue(new Error('Catalog unavailable.'))
+    const wrapper = await mountPage()
+    expect(text(wrapper, 'script-read-sentence').replace(/\s+/g, ' ')).toBe('Records of DS_ORDERS. Keeps id status')
+    await wrapper.findAll('[data-testid="script-read-part"]')[0]!.trigger('click')
+    expect(text(wrapper, 'query-data-catalog-error')).toContain('Catalog unavailable.')
+  })
+
+  it('a read that is not JSON says so and shows the JSON to fix', async () => {
+    listTenantQueries.mockResolvedValue({ queries: [query({ readSpecJson: '{"inputs": [' })], library: [], limits: {} })
+    const wrapper = await mountPage()
+    expect(text(wrapper, 'script-read-invalid')).toMatch(/^The read is not valid JSON/)
+    expect(wrapper.find('[data-testid="script-read"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="script-read-add"]').attributes('disabled')).toBeDefined()
   })
 
   it('runs the draft and shows each file with its row count and a preview', async () => {
@@ -145,10 +234,19 @@ describe('TenantScriptPage (query)', () => {
     expect(wrapper.find('.script-code__line--error').text()).toBe('1')
   })
 
-  it('edits the read on its own tab', async () => {
+  it('the code icon shows the read as JSON, and typing there changes the sentence', async () => {
     const wrapper = await mountPage()
-    await wrapper.find('[data-testid="script-tab-read"]').trigger('click')
-    expect((wrapper.find('[data-testid="script-read"]').element as HTMLTextAreaElement).value).toBe(READ)
+    expect(wrapper.find('[data-testid="script-read"]').exists()).toBe(false)
+    const toggle = wrapper.find('[data-testid="script-read-json-toggle"]')
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-pressed')).toBe('true')
+    const json = wrapper.find('[data-testid="script-read"]')
+    expect((json.element as HTMLTextAreaElement).value).toBe(READ)
+    await json.setValue(READ.replace('"status"', '"qty"'))
+    expect(text(wrapper, 'script-read-sentence').replace(/\s+/g, ' ')).toBe('Records of HotWax DS_ORDERS. Keeps id qty')
+    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(true)
+    await toggle.trigger('click')
+    expect(wrapper.find('[data-testid="script-read"]').exists()).toBe(false)
   })
 
   it('asks the agent, and its proposal fills the read and script and shows how it ran', async () => {
@@ -180,7 +278,7 @@ describe('TenantScriptPage (query)', () => {
   it('shows where the schedule sends, in full, to everyone who can see the query', async () => {
     permissions.canScheduleQueries = false
     const wrapper = await mountPage()
-    expect(text(wrapper, 'script-recipients')).toBe('Email to ops@krewe.example, cfo@krewe.example · chat #ops-daily')
+    expect(text(wrapper, 'script-fact-sends-to')).toBe('Sends to2 addresses · #ops-dailyops@krewe.example, cfo@krewe.example')
   })
 
   it('the schedule popup keeps email recipients and a chat space, and Save sends them', async () => {

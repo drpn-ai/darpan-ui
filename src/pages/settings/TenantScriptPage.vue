@@ -1,5 +1,5 @@
 <template>
-  <StaticPageFrame :class="{ 'static-page-frame--popup-open': activePopup !== null }">
+  <StaticPageFrame :class="{ 'static-page-frame--popup-open': activePopup !== null || dataEdit !== null }">
     <template #hero>
       <StaticRecordTitle
         v-if="draft"
@@ -25,10 +25,6 @@
 
     <template v-if="draft">
       <StaticFactStrip :facts="facts" test-id="script-facts" @open="openFact" />
-      <p v-if="savedSchedule?.ownerName" class="section-note" data-testid="script-owner">
-        Sends as {{ savedSchedule.ownerName }}, who saved the schedule.
-      </p>
-      <p v-if="recipientsText" class="section-note script-recipients" data-testid="script-recipients">{{ recipientsText }}</p>
 
       <form v-if="canEdit && agentReady" class="script-ask" @submit.prevent="ask">
         <label class="script-ask__field">
@@ -70,95 +66,167 @@
         Put back my version
       </button>
 
-      <div class="script-bench">
-        <section class="script-column">
-          <div class="script-column__head">
-            <span class="script-tabs" role="tablist" aria-label="Query parts">
+      <!-- DAR-UI-138. The query as a notebook: what it reads, the script over it, what it made. -->
+      <StaticPageSection class="query-step" data-testid="query-step-data">
+        <template #header>
+          <div class="query-step__head">
+            <h2 class="static-page-section-heading">
+              <span class="query-step__n">1</span>
+              <span v-explain="'scriptInputRun'">Data</span>
+            </h2>
+            <span class="query-step__actions">
               <button
                 type="button"
-                role="tab"
-                class="script-tab"
-                :aria-selected="tab === 'script' ? 'true' : 'false'"
-                data-testid="script-tab-script"
-                @click="tab = 'script'"
+                class="app-icon-action"
+                :aria-pressed="showReadJson ? 'true' : 'false'"
+                aria-label="Read as JSON"
+                title="Read as JSON"
+                data-testid="script-read-json-toggle"
+                @click="showReadJson = !showReadJson"
               >
-                <span v-explain="'scriptBody'">Script</span>
+                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <path :d="CODE_ICON_PATH" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
               </button>
               <button
+                v-if="canEdit"
                 type="button"
-                role="tab"
-                class="script-tab"
-                :aria-selected="tab === 'read' ? 'true' : 'false'"
-                data-testid="script-tab-read"
-                @click="tab = 'read'"
+                class="app-icon-action"
+                aria-label="Add data"
+                title="Add data"
+                data-testid="script-read-add"
+                :disabled="busy || !readParse.ok || readInputs.length >= MAX_INPUTS"
+                @click="openData(null)"
               >
-                <span v-explain="'scriptInputRun'">Read</span>
+                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <path :d="plusIconPath" fill="currentColor" />
+                </svg>
               </button>
             </span>
-            <span class="script-column__hint">⌘↵ runs</span>
           </div>
-          <p class="script-read-text" data-testid="script-read-text">{{ readText }}</p>
-          <div v-show="tab === 'script'" class="script-code" :class="{ 'script-code--disabled': !canEdit }">
-            <ol class="script-code__gutter" aria-hidden="true">
-              <li
-                v-for="line in lineCount"
-                :key="line"
-                :class="{ 'script-code__line--error': line === errorLine }"
-                data-testid="script-gutter-line"
-              >
-                {{ line }}
-              </li>
-            </ol>
-            <textarea
-              v-model="draft.scriptBody"
-              class="script-code__text"
-              :rows="lineCount"
-              spellcheck="false"
-              autocomplete="off"
-              aria-label="Script"
-              data-testid="script-body"
-              :disabled="!canEdit || saving"
-              @keydown.enter.meta.prevent="runDraft"
-              @keydown.enter.ctrl.prevent="runDraft"
-            />
+        </template>
+
+        <InlineValidation v-if="!readParse.ok" tone="error" :message="readParse.error" data-testid="script-read-invalid" />
+        <ul v-else class="query-reads">
+          <li v-for="(row, index) in readRows" :key="index" class="query-read" data-testid="script-read-input">
+            <span class="workflow-select-chip query-read__name">{{ row.name || '—' }}</span>
+            <p class="query-read__sentence" data-testid="script-read-sentence">
+              <template v-for="(part, partIndex) in row.parts" :key="partIndex">
+                <span v-if="part.role === 'text' || !row.editable">{{ part.text }}</span>
+                <button
+                  v-else
+                  type="button"
+                  class="query-read__part"
+                  :class="{ 'workflow-select-chip query-read__part--field': part.role === 'field' }"
+                  data-testid="script-read-part"
+                  :disabled="busy"
+                  @click="openData(index)"
+                >
+                  {{ part.text }}
+                </button>
+              </template>
+              <span v-if="row.limits.length" class="query-read__limits" data-testid="script-read-limits">
+                Change it in the JSON: it has {{ row.limits.join(', ') }}.
+              </span>
+            </p>
+            <button
+              v-if="canEdit"
+              type="button"
+              class="app-icon-action query-read__remove"
+              :aria-label="`Remove input ${row.name}`"
+              :title="`Remove input ${row.name}`"
+              data-testid="script-read-remove"
+              :disabled="busy"
+              @click="removeInput(index)"
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
+              </svg>
+            </button>
+          </li>
+          <li v-if="!readRows.length" class="query-read query-read--empty" data-testid="script-read-empty">Reads nothing: script only</li>
+        </ul>
+        <textarea
+          v-if="showReadJson || !readParse.ok"
+          v-model="draft.readSpecJson"
+          class="wizard-answer-control workflow-form-textarea script-sample"
+          rows="12"
+          spellcheck="false"
+          aria-label="Read (JSON)"
+          data-testid="script-read"
+          :disabled="!canEdit || saving"
+          @keydown.enter.meta.prevent="runDraft"
+          @keydown.enter.ctrl.prevent="runDraft"
+        />
+      </StaticPageSection>
+
+      <StaticPageSection class="query-step" data-testid="query-step-script">
+        <template #header>
+          <div class="query-step__head">
+            <h2 class="static-page-section-heading">
+              <span class="query-step__n">2</span>
+              <span v-explain="'scriptBody'">Script</span>
+            </h2>
+            <span class="query-step__hint">
+              ⌘↵ runs ·
+              <a
+                class="script-docs-link"
+                :href="FUNCTIONS_DOCS_URL"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="script-functions-link"
+              >fn: functions <span aria-hidden="true">↗</span></a>
+            </span>
           </div>
+        </template>
+        <div class="script-code" :class="{ 'script-code--disabled': !canEdit }">
+          <ol class="script-code__gutter" aria-hidden="true">
+            <li
+              v-for="line in lineCount"
+              :key="line"
+              :class="{ 'script-code__line--error': line === errorLine }"
+              data-testid="script-gutter-line"
+            >
+              {{ line }}
+            </li>
+          </ol>
           <textarea
-            v-show="tab === 'read'"
-            v-model="draft.readSpecJson"
-            class="wizard-answer-control workflow-form-textarea script-sample"
-            rows="12"
+            v-model="draft.scriptBody"
+            class="script-code__text"
+            :rows="lineCount"
             spellcheck="false"
-            aria-label="Read (JSON)"
-            data-testid="script-read"
+            autocomplete="off"
+            aria-label="Script"
+            data-testid="script-body"
             :disabled="!canEdit || saving"
             @keydown.enter.meta.prevent="runDraft"
             @keydown.enter.ctrl.prevent="runDraft"
           />
-          <p class="section-note">
-            Functions you can call:
-            <a
-              class="script-docs-link"
-              :href="FUNCTIONS_DOCS_URL"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="script-functions-link"
-            >fn: functions <span aria-hidden="true">↗</span></a>
-          </p>
-        </section>
+        </div>
+      </StaticPageSection>
 
-        <section class="script-column">
-          <div class="script-column__head">
-            <h2 v-explain="'scriptRuns'" class="static-page-section-heading">Runs</h2>
-            <span class="script-column__actions">
+      <StaticPageSection class="query-step" data-testid="query-step-result">
+        <template #header>
+          <div class="query-step__head">
+            <h2 class="static-page-section-heading">
+              <span class="query-step__n">3</span>
+              <span v-explain="'scriptRuns'">Result</span>
+            </h2>
+            <span class="query-step__actions">
               <button
                 v-if="savedSchedule && canSchedule"
                 type="button"
-                class="user-settings-control"
+                class="app-icon-action"
+                aria-label="Preview send"
+                title="Preview send"
                 data-testid="script-preview"
                 :disabled="busy"
                 @click="openPreview"
               >
-                Preview send
+                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <path :d="EYE_ICON_PATH" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <circle cx="10" cy="10" r="2.25" fill="currentColor" />
+                </svg>
               </button>
               <button
                 type="button"
@@ -176,63 +244,63 @@
               </button>
             </span>
           </div>
+        </template>
 
-          <InlineValidation v-if="runError" tone="error" :message="runError" data-testid="script-run-error-message" />
+        <InlineValidation v-if="runError" tone="error" :message="runError" data-testid="script-run-error-message" />
 
-          <ol class="script-runs">
-            <li
-              v-for="(cell, index) in runs"
-              :key="cell.n"
-              class="script-run"
-              :class="{ 'script-run--failed': Boolean(cell.run.error), 'script-run--latest': index === 0 }"
-              data-testid="script-run-cell"
-            >
-              <span class="script-run__head">
-                <span>{{ cell.label }}<template v-if="index === 0"> · latest</template></span>
-                <span>{{ cell.time }}</span>
-              </span>
-              <pre v-if="cell.run.error" class="script-run__out" data-testid="script-run-error">{{ errorText(cell.run.error) }}</pre>
-              <template v-else>
-                <p v-if="cell.run.summary" class="script-run__summary" data-testid="script-run-summary">{{ cell.run.summary }}</p>
-                <p v-if="cell.run.nothing" class="script-run__summary">Nothing to send.</p>
-                <p v-if="cell.run.invalid" class="script-run__summary">{{ cell.run.invalid }}</p>
-                <div v-for="file in cell.run.files" :key="file.name" class="script-run__file" data-testid="script-run-file">
-                  <span class="script-run__file-name">{{ file.name }} · {{ rowsWords(file.rowCount) }}</span>
-                  <div class="script-run__table-wrap">
-                    <table class="script-run__table">
-                      <thead>
-                        <tr><th v-for="column in file.columns" :key="column" scope="col">{{ column }}</th></tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(row, rowIndex) in file.previewRows" :key="rowIndex" data-testid="script-run-preview-row">
-                          <td v-for="(value, valueIndex) in row" :key="valueIndex">{{ cellText(value) }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+        <ol class="script-runs">
+          <li
+            v-for="(cell, index) in runs"
+            :key="cell.n"
+            class="script-run"
+            :class="{ 'script-run--failed': Boolean(cell.run.error), 'script-run--latest': index === 0 }"
+            data-testid="script-run-cell"
+          >
+            <span class="script-run__head">
+              <span>{{ cell.label }}<template v-if="index === 0"> · latest</template></span>
+              <span>{{ cell.time }}</span>
+            </span>
+            <pre v-if="cell.run.error" class="script-run__out" data-testid="script-run-error">{{ errorText(cell.run.error) }}</pre>
+            <template v-else>
+              <p v-if="cell.run.summary" class="script-run__summary" data-testid="script-run-summary">{{ cell.run.summary }}</p>
+              <p v-if="cell.run.nothing" class="script-run__summary">Nothing to send.</p>
+              <p v-if="cell.run.invalid" class="script-run__summary">{{ cell.run.invalid }}</p>
+              <div v-for="file in cell.run.files" :key="file.name" class="script-run__file" data-testid="script-run-file">
+                <span class="script-run__file-name">{{ file.name }} · {{ rowsWords(file.rowCount) }}</span>
+                <div class="script-run__table-wrap">
+                  <table class="script-run__table">
+                    <thead>
+                      <tr><th v-for="column in file.columns" :key="column" scope="col">{{ column }}</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(row, rowIndex) in file.previewRows" :key="rowIndex" data-testid="script-run-preview-row">
+                        <td v-for="(value, valueIndex) in row" :key="valueIndex">{{ cellText(value) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-              </template>
-              <ul v-if="cell.run.logs?.length" class="script-run__logs" data-testid="script-run-logs">
-                <li v-for="(line, lineIndex) in cell.run.logs" :key="lineIndex">{{ line }}</li>
-              </ul>
-              <span class="script-run__meta" data-testid="script-run-meta">{{ cell.meta }}</span>
-            </li>
-            <li
-              v-if="savedSchedule?.lastRunDate"
-              class="script-run script-run--scheduled"
-              :class="{ 'script-run--failed': lastRunFailed }"
-              data-testid="script-scheduled-cell"
-            >
-              <span class="script-run__head">
-                <span>Scheduled run</span>
-                <span>{{ formatDateTime(savedSchedule.lastRunDate, { timeZone }) }}</span>
-              </span>
-              <pre class="script-run__out">{{ savedSchedule.lastRunMessage || statusWords(savedSchedule.lastRunStatus) }}</pre>
-            </li>
-            <li v-if="!runs.length && !savedSchedule?.lastRunDate" class="script-run script-run--empty">No runs yet.</li>
-          </ol>
-        </section>
-      </div>
+              </div>
+            </template>
+            <ul v-if="cell.run.logs?.length" class="script-run__logs" data-testid="script-run-logs">
+              <li v-for="(line, lineIndex) in cell.run.logs" :key="lineIndex">{{ line }}</li>
+            </ul>
+            <span class="script-run__meta" data-testid="script-run-meta">{{ cell.meta }}</span>
+          </li>
+          <li
+            v-if="savedSchedule?.lastRunDate"
+            class="script-run script-run--scheduled"
+            :class="{ 'script-run--failed': lastRunFailed }"
+            data-testid="script-scheduled-cell"
+          >
+            <span class="script-run__head">
+              <span>Scheduled run</span>
+              <span>{{ formatDateTime(savedSchedule.lastRunDate, { timeZone }) }}</span>
+            </span>
+            <pre class="script-run__out">{{ savedSchedule.lastRunMessage || statusWords(savedSchedule.lastRunStatus) }}</pre>
+          </li>
+          <li v-if="!runs.length && !savedSchedule?.lastRunDate" class="script-run script-run--empty">No runs yet.</li>
+        </ol>
+      </StaticPageSection>
     </template>
 
     <template #actions>
@@ -391,17 +459,29 @@
       </div>
     </section>
   </div>
+
+  <QueryDataPopup
+    v-if="dataEdit && draft"
+    :input="dataEdit.input"
+    :catalog="catalog"
+    :catalog-error="catalogError"
+    :taken-names="dataEdit.takenNames"
+    @save="saveData"
+    @cancel="dataEdit = null"
+  />
 </template>
 
 <script setup lang="ts">
-// DAR-BE-334 (was DAR-UI-124's script page). One tenant query on a page of its own: its name, its read (in words, and
-// as JSON on its own tab), its script, this visit's runs (summary, each file with a 20-row preview), and its schedule
-// (when, email recipients, a chat space). The ask box hands the question to the queries agent, whose proposal has
+// DAR-BE-334 (was DAR-UI-124's script page), DAR-UI-138. One tenant query on a page of its own, read top to bottom as a
+// notebook: its name and schedule facts, the ask box, then 1 Data (each input as a sentence by name; a part opens the
+// Data popup; the raw read JSON one icon away), 2 Script, 3 Result (this visit's runs, each file with a 20-row preview).
+// The read JSON stays the one source of truth: the popup's changes are written into it. The ask box hands the question to the queries agent, whose proposal has
 // already run; it fills this page and saves nothing. One Save keeps the query and its schedule together; the popups
 // and the toggle only change this page until then. Scheduling needs tenant admin (it sends the tenant's data out), and
 // only the schedule's owner can send it by hand.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import QueryDataPopup from '../../components/settings/QueryDataPopup.vue'
 import AppCancelAction from '../../components/ui/AppCancelAction.vue'
 import AppSaveAction from '../../components/ui/AppSaveAction.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
@@ -410,13 +490,24 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticFactStrip, { type StaticFact } from '../../components/ui/StaticFactStrip.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
+import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import { agentFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
 import type { QueryError, QueryRun, QueryScheduleOutcome, TenantQuery, TenantQuerySchedule } from '../../lib/api/scriptTypes'
 import type { TenantChatSpace } from '../../lib/api/types'
-import { backIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
+import { backIconPath, playIconPath, playIconTransform, plusIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
+import {
+  MAX_INPUTS,
+  describeInput,
+  editLimits,
+  inputName,
+  parseRead,
+  serializeRead,
+  type QueryCatalog,
+  type ReadInput,
+} from '../../lib/queryRead'
 import {
   badRecipient,
   cronFromTime,
@@ -460,9 +551,18 @@ interface RunCell {
 }
 
 type Popup = 'schedule' | 'preview' | 'delete'
-type Tab = 'script' | 'read'
+
+/** The Data popup: the input it changes (null adds one) at its place in the read. */
+interface DataEdit {
+  index: number | null
+  input: ReadInput | null
+  takenNames: string[]
+}
 
 const FUNCTIONS_DOCS_URL = 'https://developers.drpn.ai/tenant-queries/functions'
+// Stroked on the 20-unit viewBox: angle brackets (the read as JSON) and an eye (preview what it would send).
+const CODE_ICON_PATH = 'M7.5 5.5 3 10l4.5 4.5M12.5 5.5 17 10l-4.5 4.5'
+const EYE_ICON_PATH = 'M2.5 10s2.75-5 7.5-5 7.5 5 7.5 5-2.75 5-7.5 5-7.5-5-7.5-5Z'
 const MAX_RUNS = 3
 const NEW_NAME = 'New query'
 const STARTER_READ = `{
@@ -495,7 +595,12 @@ const pageError = ref('')
 const draft = ref<Draft | null>(null)
 const schedule = ref<Schedule | null>(null)
 const baseline = ref('')
-const tab = ref<Tab>('script')
+/** The read as raw JSON, for inputs the popup cannot change and for those who would rather type it. */
+const showReadJson = ref(false)
+/** What a query may read, by name (audits, saved runs, datasets); without it the read shows ids. */
+const catalog = ref<QueryCatalog | null>(null)
+const catalogError = ref('')
+const dataEdit = ref<DataEdit | null>(null)
 
 const saving = ref(false)
 const running = ref(false)
@@ -525,16 +630,11 @@ const toggleLabel = computed(() => {
   if (!schedule.value) return 'On schedule: set up a schedule first'
   return 'On schedule'
 })
-/** Where the schedule sends, in full, for everyone who can see the query (not only those who can change it). */
-const recipientsText = computed(() => {
+/** The addresses in full, under Sends to, for everyone who can see the query (not only those who can change it). */
+const addressesText = computed(() => {
   const current = schedule.value
   if (!current) return ''
-  const parts = [
-    ...(current.emailTo ? [`Email to ${current.emailTo}`] : []),
-    ...(current.emailCc ? [`cc ${current.emailCc}`] : []),
-    ...(current.chatSpaceId ? [`chat ${spaceName(current.chatSpaceId)}`] : []),
-  ]
-  return parts.join(' · ')
+  return [current.emailTo, ...(current.emailCc ? [`cc ${current.emailCc}`] : [])].filter(Boolean).join(' · ')
 })
 const isOwner = computed(() => Boolean(savedSchedule.value?.ownerUserId) && savedSchedule.value?.ownerUserId === authStore.userId)
 
@@ -554,12 +654,13 @@ function spaceName(chatSpaceId: string): string {
   return chatSpaces.value.find((space) => space.chatSpaceId === chatSpaceId)?.spaceName ?? chatSpaceId
 }
 
-/** The read in words: the last run's (it saw the draft), else the saved query's, else none. */
-const readText = computed(() => {
-  if (!draft.value?.readSpecJson.trim()) return 'Reads nothing: script only'
-  return runs.value[0]?.run.readText || (draft.value.readSpecJson === (saved.value?.readSpecJson ?? '') ? saved.value?.readText : null)
-    || 'Run it to see the read in words.'
-})
+const readParse = computed(() => parseRead(draft.value?.readSpecJson))
+const readInputs = computed(() => (readParse.value.ok ? readParse.value.read.inputs : []))
+/** Each input as a sentence of parts; one the popup cannot change in full shows as plain words and says why. */
+const readRows = computed(() => readInputs.value.map((input) => {
+  const limits = editLimits(input)
+  return { name: inputName(input), parts: describeInput(input, catalog.value), limits, editable: canEdit.value && !limits.length }
+}))
 
 const scheduleText = computed(() => {
   if (!schedule.value) return 'Not scheduled'
@@ -576,12 +677,16 @@ const lastRunText = computed(() => {
   return `${when} · ${statusWords(current.lastRunStatus).toLowerCase()}`
 })
 
-// The header strip (DAR-UI-126): the two that change open the schedule popup (tenant admins only); Last run only reads.
+// The header strip (DAR-UI-126): the two that change open the schedule popup (tenant admins only); Sends as (the
+// schedule's owner) and Last run only read.
 const facts = computed<StaticFact[]>(() => {
   const changeable = { interactive: canEdit.value && canSchedule.value, disabled: busy.value }
+  const owner = savedSchedule.value?.ownerName
   return [
     { key: 'schedule', label: 'Schedule', value: scheduleText.value, explain: 'scriptSchedule', testId: 'script-fact-schedule', ...changeable },
-    { key: 'sendsTo', label: 'Sends to', value: sendsToText.value, explain: 'scriptPostTo', testId: 'script-fact-sends-to', ...changeable },
+    { key: 'sendsTo', label: 'Sends to', value: sendsToText.value, sub: addressesText.value || undefined, explain: 'scriptPostTo',
+      testId: 'script-fact-sends-to', ...changeable },
+    ...(owner ? [{ key: 'sendsAs', label: 'Sends as', value: owner, sub: 'saved the schedule', testId: 'script-fact-sends-as' }] : []),
     { key: 'lastRun', label: 'Last run', value: lastRunText.value, explain: 'scriptLastRun', testId: 'script-fact-last-run' },
   ]
 })
@@ -663,6 +768,7 @@ async function load(tenantQueryId: string): Promise<void> {
   runs.value = []
   runCount = 0
   draft.value = null
+  dataEdit.value = null
   try {
     const [listed, scheduled] = await Promise.all([
       tenantQueryId ? scriptFacade.listTenantQueries() : Promise.resolve(null),
@@ -692,9 +798,48 @@ async function load(tenantQueryId: string): Promise<void> {
 
 // Names and choices only: the page still reads without them, as ids.
 async function loadChoices(): Promise<void> {
-  const [spaces, agent] = await Promise.allSettled([settingsFacade.listTenantChatSpaces(), agentFacade.getAgentStatus()])
+  const [spaces, agent, reads] = await Promise.allSettled([settingsFacade.listTenantChatSpaces(), agentFacade.getAgentStatus(),
+    scriptFacade.getTenantQueryCatalog()])
   chatSpaces.value = spaces.status === 'fulfilled' ? spaces.value.chatSpaces ?? [] : []
   agentReady.value = agent.status === 'fulfilled' && agent.value.state === 'ON' && agent.value.grantState === 'LIVE'
+  catalog.value = reads.status === 'fulfilled' ? reads.value : null
+  catalogError.value = reads.status === 'fulfilled' ? '' : messageOf(reads.reason, 'Could not read what queries can read; sources show as ids.')
+}
+
+/** Open the Data popup on one input of the read, or on a new one (index null). */
+function openData(index: number | null): void {
+  if (!canEdit.value || busy.value || !readParse.value.ok) return
+  const inputs = readInputs.value
+  const input = index == null ? null : inputs[index] ?? null
+  if (index != null && (!input || editLimits(input).length)) return
+  dataEdit.value = {
+    index,
+    input,
+    takenNames: inputs.filter((_, at) => at !== index).map(inputName).filter(Boolean),
+  }
+}
+
+/** Write the read back with these inputs; the draft's JSON is what Save and Run send. */
+function writeInputs(inputs: ReadInput[]): void {
+  const current = draft.value
+  const parsed = readParse.value
+  if (!current || !parsed.ok) return
+  current.readSpecJson = serializeRead(parsed.read, inputs)
+}
+
+function saveData(input: ReadInput): void {
+  const edit = dataEdit.value
+  if (!edit) return
+  const inputs = [...readInputs.value]
+  if (edit.index == null) inputs.push(input)
+  else inputs.splice(edit.index, 1, input)
+  writeInputs(inputs)
+  dataEdit.value = null
+}
+
+function removeInput(index: number): void {
+  if (!canEdit.value || busy.value) return
+  writeInputs(readInputs.value.filter((_, at) => at !== index))
 }
 
 function renameDraft(name: string): void {
@@ -964,34 +1109,6 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* Script and Read: the same pill tabs as the audit detail column. */
-.script-tabs {
-  display: flex;
-  gap: var(--space-1-5);
-}
-
-.script-tab {
-  min-height: 2.25rem;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--type-label-size);
-  cursor: pointer;
-}
-
-.script-tab[aria-selected='true'] {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-.script-recipients {
-  overflow-wrap: anywhere;
-}
-
 .script-ask-options {
   display: flex;
   flex-wrap: wrap;
@@ -1001,47 +1118,124 @@ onBeforeUnmount(() => {
   list-style: none;
 }
 
-.script-read-text {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: var(--type-note-size);
-  overflow-wrap: anywhere;
+/* DAR-UI-138. The three numbered steps: a head with its number, title and its own actions on the right. */
+.query-step {
+  --surface-section-body-gap: var(--space-2);
 }
 
-.script-bench {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: start;
-}
-
-.script-column {
-  display: grid;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.script-column__head {
+.query-step__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   min-height: 2.8rem;
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border-soft);
 }
 
-.script-column__head h2 {
-  margin: 0;
+.query-step__head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
 }
 
-.script-column__hint {
+.query-step__n {
+  color: var(--text-dim);
+  font-size: var(--type-note-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.query-step__hint {
   color: var(--text-dim);
   font-size: var(--type-note-size);
 }
 
-.script-column__actions {
+.query-step__actions {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+}
+
+/* One bordered row per input: its name, the sentence, the remove. */
+.query-reads {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.query-read {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--static-tile-border);
+  border-radius: var(--static-surface-radius);
+  background: var(--static-tile-bg);
+}
+
+.query-read--empty {
+  display: block;
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+}
+
+.query-read__name {
+  justify-self: start;
+}
+
+.query-read__sentence {
+  margin: 0;
+  line-height: 2;
+  overflow-wrap: anywhere;
+}
+
+/* A part of the sentence the Data popup changes: a dashed underline, a tint on hover. */
+.query-read__part {
+  margin: 0;
+  padding: 0 var(--space-00);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline dashed;
+  text-decoration-color: var(--text-dim);
+  text-underline-offset: 0.3em;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+
+.query-read__part:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--static-tile-bg) 88%, var(--accent));
+}
+
+.query-read__part:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 68%, transparent);
+  outline-offset: 1px;
+}
+
+.query-read__part:disabled {
+  cursor: default;
+}
+
+.query-read__part--field {
+  padding: 0 var(--space-1-5);
+  border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  line-height: 1.6;
+}
+
+.query-read__limits {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+  line-height: 1.4;
 }
 
 /* The code with a line-number gutter. Both sides share one line height and the textarea is as tall as its lines,
@@ -1255,15 +1449,24 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 860px) {
-  .script-bench {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 560px) {
   .script-popup-pair {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* An input's row stacks: its name and remove on top, the sentence under them. */
+  .query-read {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-1);
+  }
+
+  .query-read__sentence {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .query-step__head {
+    flex-wrap: wrap;
   }
 }
 </style>
