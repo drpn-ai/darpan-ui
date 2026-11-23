@@ -103,15 +103,6 @@ export function sendsToWords(recipientCount: number | null | undefined, chatSpac
   return parts.join(' · ') || 'nowhere'
 }
 
-/** The state dot on a query's row: on schedule, off, or its last scheduled run failed. */
-export type ScheduleState = 'on' | 'off' | 'failed' | 'none'
-
 export function isOn(value: boolean | string | null | undefined): boolean {
   return value === true || value === 'Y'
-}
-
-export function scheduleState(schedule: { isActive: boolean | string; lastRunStatus: string | null } | null | undefined): ScheduleState {
-  if (!schedule) return 'none'
-  if (isFailedStatus(schedule.lastRunStatus)) return 'failed'
-  return isOn(schedule.isActive) ? 'on' : 'off'
 }

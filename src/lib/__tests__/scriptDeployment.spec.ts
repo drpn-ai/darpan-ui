@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { badRecipient, cronFromTime, formatRecipients, isFailedStatus, parseRecipients, scheduleState, scheduleWords, statusWords, timeFromCron } from '../scriptDeployment'
+import { badRecipient, cronFromTime, formatRecipients, isFailedStatus, parseRecipients, scheduleWords, statusWords, timeFromCron } from '../scriptDeployment'
 
 describe('scriptDeployment', () => {
   it('maps a daily time to a Quartz cron and back', () => {
@@ -31,13 +31,9 @@ describe('scriptDeployment (DAR-UI-124)', () => {
     expect(scheduleWords('0 0 9 ? * MON')).toBe('Cron 0 0 9 ? * MON')
   })
 
-  it('names a failed last run before on or off', () => {
-    expect(scheduleState(null)).toBe('none')
-    expect(scheduleState({ isActive: true, lastRunStatus: 'OK' })).toBe('on')
-    expect(scheduleState({ isActive: 'Y', lastRunStatus: 'OK' })).toBe('on')
-    expect(scheduleState({ isActive: false, lastRunStatus: null })).toBe('off')
-    expect(scheduleState({ isActive: true, lastRunStatus: 'DELIVERY_FAILED' })).toBe('failed')
-    expect(scheduleState({ isActive: 'N', lastRunStatus: 'OWNER_LOST' })).toBe('failed')
+  it('counts a delivery or owner failure as failed, nothing to send as not', () => {
+    expect(isFailedStatus('DELIVERY_FAILED')).toBe(true)
+    expect(isFailedStatus('OWNER_LOST')).toBe(true)
     expect(isFailedStatus('NOTHING_TO_SEND')).toBe(false)
   })
 
