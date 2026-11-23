@@ -88,7 +88,7 @@ describe('TenantScriptsPage (/queries)', () => {
     expect(tileNames(wrapper, 'query-group-script-only')).toEqual(['Refund total', 'Broken read'])
     // Unmatched orders is the only run-result query and it is pinned.
     expect(wrapper.find('[data-testid="query-group-run-results"]').exists()).toBe(false)
-    expect(sectionTitles(wrapper)).toEqual(['Pinned Queries', 'Audit findings', 'Kept records', 'Script only'])
+    expect(sectionTitles(wrapper)).toEqual(['Pinned Queries', 'Audit findings · 1', 'Kept records · 1', 'Script only · 2'])
   })
 
   it('links each tile to its query', async () => {

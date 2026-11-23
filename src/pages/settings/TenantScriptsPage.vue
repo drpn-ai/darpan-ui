@@ -133,7 +133,8 @@ const queryGroups = computed(() => {
     .map((group) => {
       const cards = byKey.get(group.key)!
       const visible = expandedGroupKeys.value.has(group.key) ? cards : cards.slice(0, GROUP_TILE_LIMIT)
-      return { key: group.key, title: group.title, visible, hidden: cards.length - visible.length }
+      // The count rides in the heading, as on the Dashboard.
+      return { key: group.key, title: `${group.title} · ${cards.length}`, visible, hidden: cards.length - visible.length }
     })
 })
 
