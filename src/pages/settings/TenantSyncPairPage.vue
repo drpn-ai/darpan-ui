@@ -135,6 +135,7 @@
             <span v-explain="'syncPairEvery'" class="workflow-context-label">Every</span>
             <AppSelect v-model="everyForm" :options="everyOptions" test-id="sync-pair-every-select" />
           </label>
+          <p v-if="everyNote" class="section-note" data-testid="sync-pair-every-period-note">{{ everyNote }}</p>
         </WorkflowStepForm>
 
         <WorkflowStepForm
@@ -154,6 +155,7 @@
             <span v-explain="'syncPairAllowance'" class="workflow-context-label">Allowance</span>
             <AppSelect v-model="allowanceForm" :options="allowanceOptions" test-id="sync-pair-allowance-select" />
           </label>
+          <p v-if="allowanceNote" class="section-note" data-testid="sync-pair-allowance-period-note">{{ allowanceNote }}</p>
         </WorkflowStepForm>
 
         <WorkflowStepForm
@@ -320,7 +322,7 @@ import {
   pulseEveryWords,
 } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
-import { formatClockTime } from '../../lib/utils/date'
+import { formatClockTime, formatShortDate } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -395,9 +397,21 @@ const canSave = computed(() => Boolean(draft.value?.automationId && draft.value.
 const periodName = computed(() => saved.value?.periodName || '')
 const normalAllowance = computed(() => saved.value?.normalAllowanceMinutes ?? saved.value?.allowanceMinutes ?? 0)
 const normalPulseEvery = computed(() => saved.value?.normalPulseEveryMinutes ?? saved.value?.pulseEveryMinutes ?? null)
-const allowanceOverridden = computed(() => Boolean(periodName.value && draft.value?.allowanceMinutes === normalAllowance.value))
-const everyOverridden = computed(() => Boolean(periodName.value && (draft.value?.pulseEveryMinutes ?? null) === (normalPulseEvery.value || null)))
-const shownAllowance = computed(() => (allowanceOverridden.value ? saved.value?.allowanceMinutes : draft.value?.allowanceMinutes) ?? 0)
+// A period overrides a value when today's effective one differs from the pair's own; the fact then keeps the
+// effective value even after the draft changes (the sub says what the normal one became).
+const allowancePeriodActive = computed(() => Boolean(periodName.value && saved.value?.allowanceMinutes !== normalAllowance.value))
+const everyPeriodActive = computed(() => Boolean(periodName.value && (saved.value?.pulseEveryMinutes ?? null) !== (normalPulseEvery.value ?? null)))
+const allowanceDraftIsNormal = computed(() => draft.value?.allowanceMinutes === normalAllowance.value)
+const everyDraftIsNormal = computed(() => (draft.value?.pulseEveryMinutes ?? null) === (normalPulseEvery.value || null))
+const shownAllowance = computed(() => (allowancePeriodActive.value ? saved.value?.allowanceMinutes : draft.value?.allowanceMinutes) ?? 0)
+// The period's last day, named in the popup note when the backend returns it (get#SyncPair does not yet).
+const periodThru = computed(() => (saved.value as { periodThruDate?: string | null } | null)?.periodThruDate ?? '')
+const periodUntil = computed(() => (periodThru.value ? ` until ${formatShortDate(periodThru.value)}` : ''))
+/** The popup's one-line cue that a peak period overrides the value it edits. */
+const allowanceNote = computed(() => (allowancePeriodActive.value
+  ? `Normal days. ${periodName.value} uses ${allowanceWords(saved.value?.allowanceMinutes ?? 0)}${periodUntil.value}.` : ''))
+const everyNote = computed(() => (everyPeriodActive.value
+  ? `Normal days. ${periodName.value} uses ${pulseEveryWords(saved.value?.pulseEveryMinutes ?? null)}${periodUntil.value}.` : ''))
 const lastPulseFailed = computed(() => saved.value?.lastPulseStatusEnumId === 'SPS_FAILED')
 
 const chosenAutomation = computed(() => automations.value.find((automation) => automation.automationId === draft.value?.automationId) ?? null)
@@ -430,17 +444,19 @@ const facts = computed<StaticFact[]>(() => {
   const changeable = { interactive: canEdit.value, disabled: busy.value }
   const every: StaticFact = {
     key: 'every', label: 'Every',
-    value: pulseEveryWords(everyOverridden.value ? saved.value?.pulseEveryMinutes ?? null : current.pulseEveryMinutes),
+    value: pulseEveryWords(everyPeriodActive.value ? saved.value?.pulseEveryMinutes ?? null : current.pulseEveryMinutes),
     sub: lastPulseFailed.value && saved.value?.lastPulseStamp
       ? `last pulse failed ${formatClockTime(saved.value.lastPulseStamp)}`
-      : everyOverridden.value && saved.value?.pulseEveryMinutes !== normalPulseEvery.value
-        ? periodName.value
+      : everyPeriodActive.value
+        ? (everyDraftIsNormal.value ? periodName.value : `normal: ${pulseEveryWords(current.pulseEveryMinutes)}`)
         : saved.value?.lastPulseStamp ? `last ${formatClockTime(saved.value.lastPulseStamp)}` : '',
     explain: 'syncPairEvery', testId: 'sync-pair-fact-every', ...changeable,
   }
   const allowance: StaticFact = {
     key: 'allowance', label: 'Allowance', value: allowanceWords(shownAllowance.value),
-    sub: allowanceOverridden.value ? periodName.value : 'normal', explain: 'syncPairAllowance', testId: 'sync-pair-fact-allowance', ...changeable,
+    sub: allowancePeriodActive.value
+      ? (allowanceDraftIsNormal.value ? periodName.value : `normal: ${allowanceWords(current.allowanceMinutes)}`)
+      : 'normal', explain: 'syncPairAllowance', testId: 'sync-pair-fact-allowance', ...changeable,
   }
   if (isNew.value) {
     const pickable = { interactive: canEdit.value, disabled: busy.value }

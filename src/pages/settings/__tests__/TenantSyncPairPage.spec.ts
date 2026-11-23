@@ -247,6 +247,28 @@ describe('TenantSyncPairPage', () => {
     }))
   })
 
+  it('notes the period in the allowance popup and keeps the period value after a draft change', async () => {
+    getSyncPair.mockResolvedValue(got({ syncPair: pair({
+      allowanceMinutes: 720, periodName: 'Black Friday sale', normalAllowanceMinutes: 360, normalPulseEveryMinutes: 60,
+    }) }))
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="sync-pair-fact-allowance"]').trigger('click')
+    expect(text(wrapper, 'sync-pair-allowance-period-note')).toBe('Normal days. Black Friday sale uses 12 hours.')
+    expect(wrapper.find('[data-testid="sync-pair-every-period-note"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="sync-pair-allowance-select"]').trigger('click')
+    // Pick the 3-hour choice through the select's model.
+    ;(wrapper.findComponent({ name: 'AppSelect' }) as { vm: { $emit: (e: string, v: string) => void } }).vm.$emit('update:modelValue', '180')
+    await wrapper.find('[data-testid="sync-pair-allowance-save"]').trigger('click')
+    await flushPromises()
+    expect(text(wrapper, 'sync-pair-fact-allowance')).toMatch(/Allowance\s*12 hours\s*normal: 3 hours/)
+  })
+
+  it('shows no period note when no period overrides the allowance', async () => {
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="sync-pair-fact-allowance"]').trigger('click')
+    expect(wrapper.find('[data-testid="sync-pair-allowance-period-note"]').exists()).toBe(false)
+  })
+
   it('shows a failed last pulse as the Every sub and keeps the last OK sample in Waiting', async () => {
     getSyncPair.mockResolvedValue(got({ syncPair: pair({ lastPulseStatusEnumId: 'SPS_FAILED' }) }))
     const wrapper = await mountPage()
