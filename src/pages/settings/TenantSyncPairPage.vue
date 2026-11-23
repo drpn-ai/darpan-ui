@@ -404,8 +404,7 @@ const everyPeriodActive = computed(() => Boolean(periodName.value && (saved.valu
 const allowanceDraftIsNormal = computed(() => draft.value?.allowanceMinutes === normalAllowance.value)
 const everyDraftIsNormal = computed(() => (draft.value?.pulseEveryMinutes ?? null) === (normalPulseEvery.value || null))
 const shownAllowance = computed(() => (allowancePeriodActive.value ? saved.value?.allowanceMinutes : draft.value?.allowanceMinutes) ?? 0)
-// The period's last day, named in the popup note when the backend returns it (get#SyncPair does not yet).
-const periodThru = computed(() => (saved.value as { periodThruDate?: string | null } | null)?.periodThruDate ?? '')
+const periodThru = computed(() => saved.value?.periodThruDate ?? '')
 const periodUntil = computed(() => (periodThru.value ? ` until ${formatShortDate(periodThru.value)}` : ''))
 /** The popup's one-line cue that a peak period overrides the value it edits. */
 const allowanceNote = computed(() => (allowancePeriodActive.value

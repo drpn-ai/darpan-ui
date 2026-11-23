@@ -13009,6 +13009,7 @@ export interface components {
                 normalAllowanceMinutes?: string;
                 normalPulseEveryMinutes?: string;
                 periodName?: string;
+                periodThruDate?: string;
                 chatSpaceId?: string;
                 hourlySummary?: string;
                 isActive?: string;

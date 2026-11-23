@@ -249,11 +249,11 @@ describe('TenantSyncPairPage', () => {
 
   it('notes the period in the allowance popup and keeps the period value after a draft change', async () => {
     getSyncPair.mockResolvedValue(got({ syncPair: pair({
-      allowanceMinutes: 720, periodName: 'Black Friday sale', normalAllowanceMinutes: 360, normalPulseEveryMinutes: 60,
+      allowanceMinutes: 720, periodName: 'Black Friday sale', normalAllowanceMinutes: 360, normalPulseEveryMinutes: 60, periodThruDate: '2026-12-01',
     }) }))
     const wrapper = await mountPage()
     await wrapper.find('[data-testid="sync-pair-fact-allowance"]').trigger('click')
-    expect(text(wrapper, 'sync-pair-allowance-period-note')).toBe('Normal days. Black Friday sale uses 12 hours.')
+    expect(text(wrapper, 'sync-pair-allowance-period-note')).toBe('Normal days. Black Friday sale uses 12 hours until 1 Dec.')
     expect(wrapper.find('[data-testid="sync-pair-every-period-note"]').exists()).toBe(false)
     await wrapper.find('[data-testid="sync-pair-allowance-select"]').trigger('click')
     // Pick the 3-hour choice through the select's model.

@@ -26,6 +26,8 @@ export interface SyncPairSummary {
 export interface SyncPair extends SyncPairSummary {
   /** The peak period that overrides allowance or pulse today, when one does. */
   periodName?: string | null
+  /** The period's last day, tenant-local ISO date; null without an override. */
+  periodThruDate?: string | null
   /** The pair's own allowance and pulse, whatever a peak period overrides today; what the page edits. */
   normalAllowanceMinutes?: number | null
   normalPulseEveryMinutes?: number | null
