@@ -35,6 +35,7 @@ import type {
   SnapshotTenantConfigResponse,
 } from './configTypes'
 import type {
+  GetTenantQueryCatalogResponse,
   ListTenantQueriesResponse,
   ListTenantQuerySchedulesResponse,
   RunTenantQueryPayload,
@@ -44,6 +45,7 @@ import type {
   SaveTenantQueryResponse,
   SaveTenantQuerySchedulePayload,
   SaveTenantQueryScheduleResponse,
+  SaveTenantQueryPinsResponse,
   SendAgentQueryTurnResponse,
 } from './scriptTypes'
 import type {
@@ -825,6 +827,8 @@ const SCRIPT = {
   deleteTenantQuerySchedule: 'facade.TenantScriptFacadeServices.delete#TenantQuerySchedule',
   runTenantQuerySchedule: 'facade.TenantScriptFacadeServices.run#TenantQuerySchedule',
   sendAgentQueryTurn: 'facade.AgentTurnFacadeServices.send#AgentQueryTurn',
+  getTenantQueryCatalog: 'facade.TenantScriptFacadeServices.get#TenantQueryCatalog',
+  saveTenantQueryPins: 'facade.TenantScriptFacadeServices.save#TenantQueryPins',
 } as const
 
 export const scriptFacade = {
@@ -857,6 +861,14 @@ export const scriptFacade = {
   /** The queries page's agent: one message; it proposes a query that has already run (queryProposal), never saves. */
   sendAgentQueryTurn(payload: { conversationId?: string; text: string; readSpecJson?: string; scriptBody?: string }, signal?: AbortSignal): Promise<SendAgentQueryTurnResponse> {
     return callService<SendAgentQueryTurnResponse>(SCRIPT.sendAgentQueryTurn, payload, signal)
+  },
+  /** DAR-UI-138. What a query may read, by name: the tenant's kept datasets, saved runs and audits, with their fields. */
+  getTenantQueryCatalog(signal?: AbortSignal): Promise<GetTenantQueryCatalogResponse> {
+    return callService<GetTenantQueryCatalogResponse>(SCRIPT.getTenantQueryCatalog, {}, signal)
+  },
+  /** DAR-UI-138. The signed-in user's pinned queries for the active tenant, in order; unknown ids are dropped. */
+  saveTenantQueryPins(payload: { pinnedQueryIds: string[] }, signal?: AbortSignal): Promise<SaveTenantQueryPinsResponse> {
+    return callService<SaveTenantQueryPinsResponse>(SCRIPT.saveTenantQueryPins, payload, signal)
   },
 }
 

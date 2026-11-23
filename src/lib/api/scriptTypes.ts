@@ -31,6 +31,46 @@ export interface ListTenantQueriesResponse {
   queries: TenantQuery[]
   library: ScriptLibraryFunction[]
   limits: QueryLimits
+  /** DAR-UI-138. The signed-in user's pinned queries for this tenant, in pin order. */
+  pinnedQueryIds?: string[]
+}
+
+export interface SaveTenantQueryPinsResponse {
+  pinnedQueryIds: string[]
+}
+
+// DAR-UI-138. get#TenantQueryCatalog (QueryCatalog.catalog): what a query may read, by name.
+export interface QueryCatalogDataset {
+  datasetId: string
+  /** the system's name, e.g. "HotWax" */
+  system: string
+  idField: string | null
+  /** the date field a window ("last N days") applies to */
+  windowField: string | null
+  recordCount: number | null
+  /** the kept fields; null when the dataset keeps whole records */
+  fields: string[] | null
+  wholeRecords: boolean
+}
+
+export interface QueryCatalogSavedRun {
+  savedRunId: string
+  runName: string
+  fields: string[]
+  note?: string
+}
+
+export interface QueryCatalogAudit {
+  auditId: string
+  auditCode: string | null
+  auditName: string | null
+  fields: string[]
+}
+
+export interface GetTenantQueryCatalogResponse {
+  datasets: QueryCatalogDataset[]
+  savedRuns: QueryCatalogSavedRun[]
+  audits: QueryCatalogAudit[]
 }
 
 export interface SaveTenantQueryPayload {
