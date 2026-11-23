@@ -25,6 +25,7 @@ vi.mock('../../stores/runResults', () => ({ useRunResultsStore: () => ({ hydrate
 import LoginPage from '../LoginPage.vue'
 import { ApiCallError, clearAuthToken, getAuthToken } from '../../lib/api/client'
 import { installLocalStorageStub } from '../../test/localStorage'
+import { keepAccount } from '../../lib/passkeyHint'
 
 const CHALLENGE = 'challenge-xyz'
 const CODES = Array.from({ length: 10 }, (_, i) => `abcd-efgh-jkmn-pq${String(i).padStart(2, '0')}`)
@@ -92,6 +93,40 @@ describe('LoginPage two-factor', () => {
     expect(verifySignInCode).toHaveBeenCalledWith({ challengeToken: CHALLENGE, code: '123456' })
     expect(getAuthToken()).toBe('key-1')
     expect(replace).toHaveBeenCalledWith('/')
+  })
+
+  // A session that ends mid-use lands here with ?redirect=<where they were>; the code step must not drop it.
+  it('after the session ends, the app code returns to the page the person was on', async () => {
+    route.query = { redirect: '/runs/RS_1?tab=diffs' }
+    loginSession.mockResolvedValue(challengeReply('code'))
+    verifySignInCode.mockResolvedValue(signedIn('key-1'))
+    const wrapper = mount(LoginPage)
+
+    await signIn(wrapper)
+    await typeCode(wrapper, 'login-two-factor-code', '123456')
+
+    expect(getAuthToken()).toBe('key-1')
+    expect(replace).toHaveBeenLastCalledWith('/runs/RS_1?tab=diffs')
+  })
+
+  it('after the session ends, the Welcome back row, password and app code return to the page', async () => {
+    keepAccount('ada', 'password')
+    route.query = { redirect: '/automations/100000' }
+    loginSession.mockResolvedValue(challengeReply('code'))
+    verifySignInCode.mockResolvedValue(signedIn('key-1'))
+    const wrapper = mount(LoginPage)
+
+    await wrapper.get('[data-testid="login-welcome-row"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('#login-password').setValue('right-password')
+    await wrapper.get('[data-testid="login-current-password-next"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Enter the code from your app.')
+
+    await typeCode(wrapper, 'login-two-factor-code', '123456')
+
+    expect(verifySignInCode).toHaveBeenCalledWith({ challengeToken: CHALLENGE, code: '123456' })
+    expect(replace).toHaveBeenLastCalledWith('/automations/100000')
   })
 
   it('a wrong code stays on the code step with the one refusal message', async () => {
