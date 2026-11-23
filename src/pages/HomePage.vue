@@ -78,12 +78,16 @@
       Showing {{ savedRuns.length }} of {{ totalRunCount }} runs. Group counts cover what is shown.
     </p>
 
-    <div v-if="hasOtherRuns" class="action-row">
-      <RouterLink class="static-page-action-tile" data-testid="dashboard-create-action" :to="createFlowRoute" @click="setDashboardOrigin">
+    <!-- DAR-UI-138. Queries sit beside Create Run; with no other runs, Create Run lives in Other Runs instead. -->
+    <div class="action-row">
+      <RouterLink v-if="hasOtherRuns" class="static-page-action-tile" data-testid="dashboard-create-action" :to="createFlowRoute" @click="setDashboardOrigin">
         Create Run
       </RouterLink>
+      <RouterLink class="static-page-action-tile" data-testid="dashboard-queries-action" :to="{ name: 'settings-tenant-scripts' }">
+        Queries
+      </RouterLink>
       <button
-        v-if="canImportNetSuiteChecks"
+        v-if="hasOtherRuns && canImportNetSuiteChecks"
         type="button"
         class="static-page-action-tile"
         data-testid="dashboard-import-netsuite-checks"

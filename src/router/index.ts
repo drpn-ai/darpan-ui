@@ -19,6 +19,29 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Dashboard' },
   },
   {
+    // DAR-UI-138 (DAR-BE-334, was DAR-BE-164's scripts). The active tenant's queries, a top-level page: a read over
+    // what its audits keep and a JEXL script, run here or on a schedule by email and chat. The route names keep
+    // their old settings-tenant-script* form because the mascot hints are keyed on them.
+    path: '/queries',
+    name: 'settings-tenant-scripts',
+    component: () => import('../pages/settings/TenantScriptsPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Queries' },
+  },
+  {
+    // DAR-UI-124, DAR-BE-334, DAR-UI-138. One query on a page of its own: its read, its script, its schedule and
+    // this visit's runs. /new stays before the param route.
+    path: '/queries/new',
+    name: 'settings-tenant-script-new',
+    component: () => import('../pages/settings/TenantScriptPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
+  },
+  {
+    path: '/queries/:tenantScriptId',
+    name: 'settings-tenant-script',
+    component: () => import('../pages/settings/TenantScriptPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
+  },
+  {
     path: '/roadmap/reconciliation',
     name: 'roadmap-reconciliation',
     component: () => import('../pages/ReconciliationPlaceholderPage.vue'),
@@ -263,25 +286,25 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Config history' },
   },
   {
-    // DAR-BE-334 (was DAR-BE-164's scripts). The active tenant's queries: a read over what its audits keep and a JEXL
-    // script, run here or on a schedule by email and chat. The paths keep their old name.
+    // DAR-UI-138. Queries moved out of Tenant Settings to /queries; old links land on the same query.
     path: '/settings/tenant/scripts',
-    name: 'settings-tenant-scripts',
-    component: () => import('../pages/settings/TenantScriptsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Queries' },
+    name: 'settings-tenant-scripts-legacy',
+    redirect: (to) => ({ name: 'settings-tenant-scripts', query: to.query, hash: to.hash }),
   },
   {
-    // DAR-UI-124, DAR-BE-334. One query on a page of its own: its read, its script, its schedule and this visit's runs.
     path: '/settings/tenant/scripts/new',
-    name: 'settings-tenant-script-new',
-    component: () => import('../pages/settings/TenantScriptPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
+    name: 'settings-tenant-script-new-legacy',
+    redirect: (to) => ({ name: 'settings-tenant-script-new', query: to.query, hash: to.hash }),
   },
   {
     path: '/settings/tenant/scripts/:tenantScriptId',
-    name: 'settings-tenant-script',
-    component: () => import('../pages/settings/TenantScriptPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
+    name: 'settings-tenant-script-legacy',
+    redirect: (to) => ({
+      name: 'settings-tenant-script',
+      params: { tenantScriptId: to.params.tenantScriptId },
+      query: to.query,
+      hash: to.hash,
+    }),
   },
   {
     // DAR-BE-328. The active tenant's peak periods: busy windows that move runs out of the way.

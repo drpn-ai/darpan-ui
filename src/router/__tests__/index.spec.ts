@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { RouteLocationNormalized } from 'vue-router'
-import router from '../index'
+import { createMemoryHistory, createRouter, type RouteLocationNormalized } from 'vue-router'
+import router, { routes } from '../index'
 
 describe('router release scope', () => {
   const expectedRoutes = [
@@ -51,6 +51,13 @@ describe('router release scope', () => {
     { name: 'audit-report', path: '/audits/:audit', surfaceMode: 'static', staticPageLabel: 'Audit' },
     { name: 'audit-run-start', path: '/audits/:audit/run', surfaceMode: 'workflow' },
     { name: 'audit-settings', path: '/audits/:audit/settings', surfaceMode: 'static', staticPageLabel: 'Audit settings' },
+    // DAR-UI-138. Queries are top level; the names stay (the mascot hints are keyed on them).
+    { name: 'settings-tenant-scripts', path: '/queries', surfaceMode: 'static', staticPageLabel: 'Queries' },
+    { name: 'settings-tenant-script-new', path: '/queries/new', surfaceMode: 'static', staticPageLabel: 'Query' },
+    { name: 'settings-tenant-script', path: '/queries/:tenantScriptId', surfaceMode: 'static', staticPageLabel: 'Query' },
+    { name: 'settings-tenant-scripts-legacy', path: '/settings/tenant/scripts', redirect: true },
+    { name: 'settings-tenant-script-new-legacy', path: '/settings/tenant/scripts/new', redirect: true },
+    { name: 'settings-tenant-script-legacy', path: '/settings/tenant/scripts/:tenantScriptId', redirect: true },
   ]
 
   it.each(expectedRoutes)('registers $name at $path', ({ name, path, surfaceMode, staticPageLabel, redirect }) => {
@@ -71,6 +78,27 @@ describe('router release scope', () => {
     })
     expect(redirect(router.resolve('/settings') as RouteLocationNormalized)).toEqual({ name: 'settings-tenant' })
     expect(router.getRoutes().find((record) => record.name === 'connections-notifications')?.redirect).toEqual({ name: 'settings-notifications' })
+  })
+
+  // DAR-UI-138. /queries/new is a new query, not one with the id "new".
+  it('resolves /queries/new before the query id route', () => {
+    expect(router.resolve('/queries/new').name).toBe('settings-tenant-script-new')
+    const one = router.resolve('/queries/100')
+    expect(one.name).toBe('settings-tenant-script')
+    expect(one.params.tenantScriptId).toBe('100')
+  })
+
+  // DAR-UI-138. Old Tenant Settings links land on the same query under /queries, with their query string.
+  it.each([
+    ['/settings/tenant/scripts?tab=runs#top', '/queries?tab=runs#top', 'settings-tenant-scripts'],
+    ['/settings/tenant/scripts/new?from=chat', '/queries/new?from=chat', 'settings-tenant-script-new'],
+    ['/settings/tenant/scripts/100?run=7', '/queries/100?run=7', 'settings-tenant-script'],
+  ])('redirects %s to %s', async (from, to, name) => {
+    const testRouter = createRouter({ history: createMemoryHistory(), routes })
+    await testRouter.push(from)
+    expect(testRouter.currentRoute.value.fullPath).toBe(to)
+    expect(testRouter.currentRoute.value.name).toBe(name)
+    expect(testRouter.currentRoute.value.redirectedFrom?.fullPath).toBe(from)
   })
 
   // DAR-UI-074. The audit board takes the whole screen; its settings and run pages keep the static width.

@@ -318,6 +318,15 @@ const staticCommandActions: CommandAction[] = [
     aliases: ['new run', 'new flowchart', 'new chart'],
   },
   {
+    // DAR-UI-138. Queries are a top-level page, open to everyone who can open the app (as the page itself is).
+    id: 'navigate-queries',
+    label: 'Queries',
+    description: 'Ask your data a question and send the answer.',
+    group: 'Navigate',
+    to: '/queries',
+    aliases: ['queries', 'query', 'scripts', 'script', 'jexl', 'scheduled query', 'new query'],
+  },
+  {
     id: 'navigate-run-reconciliation',
     label: 'Run Reconciliation',
     description: 'Compare two files or datasets and review the result.',

@@ -365,6 +365,21 @@ describe('HomePage', () => {
       name: 'run-create',
     })
     expect(wrapper.findAll('[data-testid="other-runs"] .static-page-tile')).toHaveLength(0)
+    // DAR-UI-138. Queries stay reachable with no runs, and Create Run is not doubled.
+    expect(wrapper.get('[data-testid="dashboard-queries-action"]').text()).toBe('Queries')
+    expect(wrapper.findAll('.static-page-action-tile').map((tile) => tile.text())).toEqual(['Create Run', 'Queries'])
+  })
+
+  // DAR-UI-138. Queries are their own page, opened from the Dashboard beside Create Run.
+  it('puts Queries beside Create Run when there are other runs', async () => {
+    const wrapper = mount(HomePage)
+    await flushPromises()
+
+    const row = wrapper.get('.action-row')
+    expect(row.findAll('.static-page-action-tile').map((tile) => tile.text())).toEqual(['Create Run', 'Queries'])
+    expect(JSON.parse(wrapper.get('[data-testid="dashboard-queries-action"]').attributes('data-to') ?? '{}')).toEqual({
+      name: 'settings-tenant-scripts',
+    })
   })
   // DAR-UI-058. An audit is a run too: one tile per audit, in its type's section. DAR-UI-082: that section comes first.
   it('lists the tenant\'s audits as their own section, first after the pins', async () => {

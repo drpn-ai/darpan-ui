@@ -68,21 +68,6 @@
             </button>
           </span>
         </li>
-        <!-- DAR-BE-334 (was DAR-BE-164's scripts). This tenant's queries. -->
-        <li class="tenant-settings-row">
-          <span class="tenant-settings-row__label">Queries</span>
-          <span class="tenant-settings-row__value tenant-settings-row__dim">Your data, answered and sent</span>
-          <span class="tenant-settings-row__actions">
-            <button
-              type="button"
-              aria-label="Open queries"
-              data-testid="tenant-module-scripts"
-              @click="router.push({ name: 'settings-tenant-scripts' })"
-            >
-              Open <span aria-hidden="true">→</span>
-            </button>
-          </span>
-        </li>
         <!-- DAR-BE-328. Busy windows that move runs out of the way. -->
         <li class="tenant-settings-row">
           <span class="tenant-settings-row__label">Peak periods</span>

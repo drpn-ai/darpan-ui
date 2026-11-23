@@ -326,8 +326,10 @@ describe('TenantSettingsPage', () => {
     expect(sections.map((section) => section.get('h2').text())).toEqual(['Chat', 'Time', 'Audit', 'AI'])
     for (const section of sections) expect(section.findAll('.tenant-settings-rows')).toHaveLength(1)
     expect(wrapper.findAll('.tenant-settings-row__label').map((label) => label.text())).toEqual([
-      'Notifications', 'Timezone', 'Config history', 'Queries', 'Peak periods', 'Sync pulse', 'Provider',
+      'Notifications', 'Timezone', 'Config history', 'Peak periods', 'Sync pulse', 'Provider',
     ])
+    // DAR-UI-138: Queries are a page of their own (/queries), not a setting.
+    expect(wrapper.find('[data-testid="tenant-module-scripts"]').exists()).toBe(false)
   })
 
   it('names popups with a verb and pages with Open', async () => {
@@ -342,9 +344,7 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').attributes('aria-label')).toBe('Edit AI provider')
     expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').text()).toBe('')
     expect(wrapper.get('[data-testid="tenant-module-config-history"]').text()).toBe('Open →')
-    expect(wrapper.get('[data-testid="tenant-module-scripts"]').text()).toBe('Open →')
     expect(rowValue(wrapper, 'tenant-module-config-history')).toBe('Versions and restores')
-    expect(rowValue(wrapper, 'tenant-module-scripts')).toBe('Your data, answered and sent')
   })
 
   // DAR-BE-328. The Peak periods row: None + Set up, else the current or next period + Open.
@@ -425,14 +425,12 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.get('[role="dialog"]').text()).toContain('Set the tenant timezone.')
   })
 
-  it('opens the config history and scripts pages from their rows', async () => {
+  it('opens the config history page from its row', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
     await wrapper.get('[data-testid="tenant-module-config-history"]').trigger('click')
     expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-config-history' })
-    await wrapper.get('[data-testid="tenant-module-scripts"]').trigger('click')
-    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-scripts' })
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 

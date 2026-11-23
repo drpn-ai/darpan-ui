@@ -721,6 +721,21 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(wrapper.find('[data-testid="command-action-navigate-oms"]').text()).toBe('Open HotWax Settings')
   })
 
+  // DAR-UI-138. Queries are a top-level page; Cmd+K finds them by their old name too.
+  it('lists Queries in Ask Darpan, found by queries or scripts, and opens /queries', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    const palette = await openLauncher(wrapper)
+    const queries = launcherAction(palette, 'navigate-queries') as LauncherAction & { aliases?: string[] }
+    expect(queries?.label).toBe('Queries')
+    expect(queries?.aliases).toEqual(expect.arrayContaining(['queries', 'scripts']))
+
+    palette.vm.$emit('execute', queries)
+    await flushPromises()
+    expect(push).toHaveBeenCalledWith('/queries')
+  })
+
   it('uses a reduced gap between the floating quick actions and Ask Darpan bubble', () => {
     const source = readFileSync('src/style.css', 'utf8')
 
