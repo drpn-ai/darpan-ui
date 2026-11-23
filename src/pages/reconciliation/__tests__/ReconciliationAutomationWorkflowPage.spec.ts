@@ -1405,9 +1405,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       // above them already names the condition, so the body no longer repeats it.
       expect(raised?.prompt).toBe('Sync this automation with its run?')
       expect(raised?.body).toContain('runs the setup it was built with')
-      expect(raised?.body).toContain('replaces this automation’s source setup with the run’s current one')
-      // DAR-BE-318 3b-2c: filters are the run's, read by every scheduled run; Sync never touches them
-      expect(raised?.body).not.toContain('filters')
+      expect(raised?.body).toContain('replaces this automation’s source setup and filters')
       // RAISED, NOT OPENED. Drift found on load announces itself through the burst and the held
       // posture; the bubble waits to be hovered or clicked. Only the Sync BUTTON opens it, because
       // there the operator asked a question and is owed the answer — see the in-sync test below.

@@ -3451,7 +3451,8 @@ export interface components {
             result: components["schemas"]["UpdateUserAccountResult"];
         };
         /**
-         * @description A person applies a planned proposal. Refused without write access and for a BLOCKED proposal. When the config changed since
+         * @description A person applies a planned proposal. Refused without write access, for a BLOCKED proposal, and (an
+         *                 exclusion) when an automation's filters differ from its run's (AUTOMATION_DRIFT). When the config changed since
          *                 the plan the proposal turns STALE and nothing is written.
          */
         ApplyAuditChangeParams: {
@@ -10434,6 +10435,20 @@ export interface components {
                 sourceConfigId?: string;
                 shopifyAuthConfigId?: string;
                 omsRestSourceConfigId?: string;
+                /**
+                 * @description Record-exclusion rules for this source's fileSide, mirroring the rule
+                 *                             set's own filters. Omitted means leave the previously-saved rows unchanged (or, on
+                 *                             a first save, seed from the rule set); an explicit list (including an empty one)
+                 *                             replaces them. See save#Automation's source-recreate comment for why omission
+                 *                             cannot mean "no-op" here the way it does elsewhere.
+                 */
+                excludeFilters?: {
+                    excludeFilter?: {
+                        fieldExpression?: string;
+                        operator?: string;
+                        values?: string[];
+                    };
+                }[];
             }[];
         };
         SaveAutomationResult: {
@@ -11218,16 +11233,16 @@ export interface components {
         };
         /**
          * @description Re-derive an automation's snapshot from its saved run. Overwrites the compare
-         *                 scope, input mode and both source definitions; preserves the name,
+         *                 scope, input mode, both source definitions and the exclusion filters; preserves the name,
          *                 schedule, window, chat space, active status, and the SFTP server, path and pattern the run
          *                 cannot supply. Never re-points the automation at a different run.
          *
          *                 Writes nothing directly: it derives, merges the result over the stored source rows, and
-         *                 delegates to save#Automation, which already deletes and recreates every source row on each
-         *                 save. That inherits the whole save path (validateSources, validateApiSource,
+         *                 delegates to save#Automation, which already deletes and recreates every source and filter
+         *                 row on each save. That inherits the whole save path (validateSources, validateApiSource,
          *                 applyApiSourceMetadataDefaults, tenant stamping, the response builder) rather than growing
-         *                 a second writer that would drift from it. Filters are never copied: an automation's runs
-         *                 read its run's compare scope filters.
+         *                 a second writer that would drift from it. An automation runs on this copy (DAR-BE-338): an
+         *                 edit to its run reaches its scheduled runs only through this sync.
          */
         SyncAutomationParams: {
             automationId: string;
