@@ -203,18 +203,58 @@ describe('LoginPage passkeys', () => {
     await settle()
   }
 
-  describe('add a passkey on this device, after a code from the app (DAR-UI-132)', () => {
+  /** Signs in by password; the passkey sheet (no passkey on this device) is closed, then a recovery code answers. */
+  async function signInWithRecoveryCode(wrapper: ReturnType<typeof mount>): Promise<void> {
+    webauthn?.get.mockRejectedValueOnce(notAllowed())
+    await signIn(wrapper)
+    await click(wrapper, 'login-two-factor-use-recovery')
+    await wrapper.get('[data-testid="login-two-factor-recovery-input"]').setValue('abcd-efgh-jkmn-pq01')
+    await click(wrapper, 'login-two-factor-recovery-next')
+  }
+
+  describe('an account with the authenticator app is never offered a passkey at sign-in (DAR-UI-137)', () => {
+    beforeEach(() => {
+      loginSession.mockResolvedValue(codeChallenge(['app', 'passkey']))
+    })
+
+    it('a code from the app signs straight in', async () => {
+      verifySignInCode.mockResolvedValue(signedIn('key-app'))
+      const wrapper = mount(LoginPage)
+      await signInWithAppCode(wrapper)
+
+      expect(getAuthToken()).toBe('key-app')
+      expect(beginPasskeyRegistration).not.toHaveBeenCalled()
+      expect(wrapper.text()).not.toContain('Add a passkey on this device?')
+      expect(replace).toHaveBeenCalledWith('/')
+      expect(keptAccount()).toEqual({ username: 'ada', method: 'password' })
+    })
+
+    it('a recovery code signs straight in too', async () => {
+      verifySignInCode.mockResolvedValue(signedIn('key-rec', { recoveryCodesLeft: 8 }))
+      const wrapper = mount(LoginPage)
+      await signIn(wrapper)
+      await click(wrapper, 'login-two-factor-use-recovery')
+      await wrapper.get('[data-testid="login-two-factor-recovery-input"]').setValue('abcd-efgh-jkmn-pq01')
+      await click(wrapper, 'login-two-factor-recovery-next')
+
+      expect(getAuthToken()).toBe('key-rec')
+      expect(beginPasskeyRegistration).not.toHaveBeenCalled()
+      expect(replace).toHaveBeenCalledWith('/')
+    })
+  })
+
+  describe('add a passkey on this device, for an account without the app (DAR-UI-132)', () => {
     const added = { ok: true, messages: [], errors: [], passkeyId: 'P9', challengeEnded: false }
 
     beforeEach(() => {
-      loginSession.mockResolvedValue(codeChallenge(['app', 'passkey']))
+      loginSession.mockResolvedValue(codeChallenge(['passkey']))
       verifySignInCode.mockResolvedValue(signedIn('key-app'))
       finishPasskeyRegistration.mockResolvedValue(added)
     })
 
     it('asks last, with no proof; Add opens the create sheet from the click and the note flips to passkey', async () => {
       const wrapper = mount(LoginPage)
-      await signInWithAppCode(wrapper)
+      await signInWithRecoveryCode(wrapper)
 
       expect(getAuthToken()).toBe('key-app')
       expect(keptAccount()).toEqual({ username: 'ada', method: 'password' })
@@ -248,7 +288,7 @@ describe('LoginPage passkeys', () => {
 
     it('Not now signs in and leaves the note on the password, so the next password sign-in asks again', async () => {
       const wrapper = mount(LoginPage)
-      await signInWithAppCode(wrapper)
+      await signInWithRecoveryCode(wrapper)
       await click(wrapper, 'login-passkey-not-now')
 
       expect(replace).toHaveBeenCalledWith('/')
@@ -259,7 +299,7 @@ describe('LoginPage passkeys', () => {
     it('a refused begin (the five minutes passed, passkeys off) skips the question silently and signs in', async () => {
       beginPasskeyRegistration.mockResolvedValue({ ...refusal(false, 'Confirm it is you first.'), publicKeyOptions: undefined, reason: 'PROOF_NEEDED' })
       const wrapper = mount(LoginPage)
-      await signInWithAppCode(wrapper)
+      await signInWithRecoveryCode(wrapper)
 
       expect(beginPasskeyRegistration).toHaveBeenCalledTimes(1)
       expect(wrapper.text()).not.toContain('Add a passkey on this device?')
@@ -267,13 +307,10 @@ describe('LoginPage passkeys', () => {
       expect(replace).toHaveBeenCalledWith('/')
     })
 
-    it('a recovery code counts as not a passkey too, and its few-left notice comes first', async () => {
+    it('its few-left recovery-code notice comes first', async () => {
       verifySignInCode.mockResolvedValue(signedIn('key-rec', { recoveryCodesLeft: 2 }))
       const wrapper = mount(LoginPage)
-      await signIn(wrapper)
-      await click(wrapper, 'login-two-factor-use-recovery')
-      await wrapper.get('[data-testid="login-two-factor-recovery-input"]').setValue('abcd-efgh-jkmn-pq01')
-      await click(wrapper, 'login-two-factor-recovery-next')
+      await signInWithRecoveryCode(wrapper)
 
       expect(wrapper.text()).toContain('2 recovery codes left.')
       expect(beginPasskeyRegistration).not.toHaveBeenCalled()
@@ -286,7 +323,7 @@ describe('LoginPage passkeys', () => {
         sessionInfo: { userId: 'U1', username: 'ada', twoFactorEnabled: true, recoveryEmailMissing: true },
       }))
       const wrapper = mount(LoginPage)
-      await signInWithAppCode(wrapper)
+      await signInWithRecoveryCode(wrapper)
 
       expect(wrapper.text()).toContain('Where should password reset codes go?')
       expect(beginPasskeyRegistration).not.toHaveBeenCalled()
@@ -298,7 +335,10 @@ describe('LoginPage passkeys', () => {
       webauthn?.restore()
       webauthn = null
       const wrapper = mount(LoginPage)
-      await signInWithAppCode(wrapper)
+      // No WebAuthn: the passkey-only account's step opens on the recovery code.
+      await signIn(wrapper)
+      await wrapper.get('[data-testid="login-two-factor-recovery-input"]').setValue('abcd-efgh-jkmn-pq01')
+      await click(wrapper, 'login-two-factor-recovery-next')
 
       expect(beginPasskeyRegistration).not.toHaveBeenCalled()
       expect(replace).toHaveBeenCalledWith('/')

@@ -446,9 +446,12 @@ const isAskingTwoFactorDue = ref(false)
 // sign-in without a challenge does not say). Null while the prompt is showing.
 const gracePasskeysAvailable = ref<boolean | null>(null)
 const isStartingGraceSetup = ref(false)
-// DAR-UI-132: set by a sign-in whose second factor was a code from the app or a recovery code, on a passkey browser;
-// leaveSignIn then offers a passkey for this device last, after every other after-sign-in step.
+// DAR-UI-132: set by a sign-in whose second factor was a recovery code, on a passkey browser, for an account with no
+// authenticator app (DAR-UI-137: the app is enough, so it is never asked a passkey); leaveSignIn then offers a passkey
+// for this device last, after every other after-sign-in step.
 let offerPasskeyAfterSignIn = false
+// Whether the code step's account has the authenticator app, read when the step opens: signing in clears the challenge.
+let hasAuthenticatorApp = false
 // The begun registration's options while "Add a passkey on this device?" shows, and whether one was added.
 const passkeyOffer = ref<string | null>(null)
 const passkeyAdded = ref(false)
@@ -902,6 +905,7 @@ async function signIn(who: string, typedPassword: string, refusedText: string): 
   }
   if (authStore.twoFactorChallengePurpose) {
     holdSignInPassword(typedPassword)
+    hasAuthenticatorApp = authStore.twoFactorMethods.includes('app')
     twoFactorMode.value = authStore.twoFactorChallengePurpose
     return
   }
@@ -1049,9 +1053,10 @@ function endTwoFactorStep(message: string): void {
 
 async function finishTwoFactorSignIn(codesLeft: number | null, byPasskey: boolean): Promise<void> {
   // DAR-UI-120/132: a passkey that answered the second step can be the whole sign-in on this browser next time. A code
-  // from the app or a recovery code leaves it on the password, and asks (last) whether to add a passkey here.
+  // from the app or a recovery code leaves it on the password; only an account without the app is asked (last) whether
+  // to add a passkey here (DAR-UI-137).
   keepAccount(signedInName(), byPasskey ? 'passkey' : 'password')
-  offerPasskeyAfterSignIn = !byPasskey && passkeysOffered
+  offerPasskeyAfterSignIn = !byPasskey && !hasAuthenticatorApp && passkeysOffered
   await afterTwoFactor(codesLeft)
 }
 
