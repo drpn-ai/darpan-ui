@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
-import type { TenantQuery, TenantQuerySchedule } from '../../../lib/api/scriptTypes'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import type { TenantQuery } from '../../../lib/api/scriptTypes'
 
 const listTenantQueries = vi.hoisted(() => vi.fn())
-const listTenantQuerySchedules = vi.hoisted(() => vi.fn())
-const listTenantChatSpaces = vi.hoisted(() => vi.fn())
-const push = vi.hoisted(() => vi.fn())
+const saveTenantQueryPins = vi.hoisted(() => vi.fn())
 const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 
 vi.mock('../../../lib/api/facade', () => ({
-  scriptFacade: { listTenantQueries, listTenantQuerySchedules },
-  settingsFacade: { listTenantChatSpaces },
+  scriptFacade: { listTenantQueries, saveTenantQueryPins },
 }))
 vi.mock('../../../stores/permissions', () => ({
   usePermissionsStore: () => permissions,
@@ -18,7 +15,6 @@ vi.mock('../../../stores/permissions', () => ({
 vi.mock('vue-router', async () => {
   const { defineComponent, h } = await import('vue')
   return {
-    useRouter: () => ({ push }),
     RouterLink: defineComponent({
       props: { to: { type: [String, Object], required: true } },
       setup(props, { slots }) {
@@ -30,18 +26,21 @@ vi.mock('vue-router', async () => {
 
 import TenantScriptsPage from '../TenantScriptsPage.vue'
 
-const query = (over: Partial<TenantQuery> = {}): TenantQuery => ({
-  tenantQueryId: '100', queryName: 'Open backorders', description: null, readSpecJson: '{"inputs":[]}',
-  readText: 'Reads dataset DS_ORDERS, last 30 days, status = B, 2 fields', scriptBody: "'x'", sampleInputJson: null,
-  isActive: true, ownerUserId: 'U1', ...over,
+const read = (source: string) => JSON.stringify({ inputs: [{ name: 'rows', source }] })
+
+const query = (tenantQueryId: string, queryName: string, readSpecJson: string | null): TenantQuery => ({
+  tenantQueryId, queryName, description: null, readSpecJson, readText: null, scriptBody: "'x'", sampleInputJson: null,
+  isActive: true, ownerUserId: 'U1',
 })
 
-const schedule = (over: Partial<TenantQuerySchedule> = {}): TenantQuerySchedule => ({
-  scheduleId: 'S100', tenantQueryId: '100', cronExpression: '0 0 7 * * ?', timeZone: 'UTC', isActive: 'Y',
-  ownerUserId: 'U1', ownerName: 'Aditi', emailTo: 'ops@krewe.example, cfo@krewe.example', emailCc: null, chatSpaceId: 'C1',
-  recipientCount: 2, nextRunDate: null, lastRunDate: '2026-11-18T07:00:00Z', lastRunStatus: 'OK', lastRunMessage: null,
-  deliveries: [], ...over,
-})
+const QUERIES = [
+  query('100', 'Open findings', read('auditFindings')),
+  query('200', 'Unmatched orders', read('runResult')),
+  query('300', 'Open backorders', read('dataset')),
+  query('400', 'Refund total', null),
+  query('500', 'Broken read', '{not json'),
+  query('600', 'Late payments', read('dataset')),
+]
 
 async function mountPage() {
   const wrapper = mount(TenantScriptsPage, { attachTo: document.body })
@@ -49,88 +48,108 @@ async function mountPage() {
   return wrapper
 }
 
-describe('TenantScriptsPage (queries)', () => {
+const tileNames = (wrapper: VueWrapper, testid: string) =>
+  wrapper.find(`[data-testid="${testid}"]`).findAll('.static-page-tile').map((tile) => tile.text())
+
+const sectionTitles = (wrapper: VueWrapper) => wrapper.findAll('.static-page-section-heading').map((title) => title.text())
+
+async function drop(wrapper: VueWrapper, testid: string, tenantQueryId: string) {
+  const dataTransfer = { getData: () => tenantQueryId }
+  await wrapper.find(`[data-testid="${testid}"]`).trigger('drop', { dataTransfer })
+  await flushPromises()
+}
+
+describe('TenantScriptsPage (/queries)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     permissions.canEditTenantSettings = true
     document.body.replaceChildren()
-    listTenantQueries.mockResolvedValue({
-      queries: [
-        query(),
-        query({ tenantQueryId: '200', queryName: 'Refund total', readSpecJson: null, readText: null }),
-        query({ tenantQueryId: '300', queryName: 'Late payments' }),
-        query({ tenantQueryId: '400', queryName: 'Owner left' }),
-      ],
-      library: [],
-      limits: {},
-    })
-    listTenantQuerySchedules.mockResolvedValue({
-      timeZone: 'UTC',
-      schedules: [
-        schedule(),
-        schedule({ scheduleId: 'S200', tenantQueryId: '200', isActive: 'N', lastRunDate: null, lastRunStatus: null, emailTo: null,
-          recipientCount: 0 }),
-        schedule({ scheduleId: 'S400', tenantQueryId: '400', isActive: 'N', lastRunStatus: 'OWNER_LOST' }),
-      ],
-    })
-    listTenantChatSpaces.mockResolvedValue({ chatSpaces: [{ chatSpaceId: 'C1', spaceName: '#ops-daily', chatProviderLabel: 'Slack', isActive: 'Y' }] })
+    listTenantQueries.mockResolvedValue({ queries: QUERIES, library: [], limits: {}, pinnedQueryIds: ['600', '200'] })
+    saveTenantQueryPins.mockImplementation(async ({ pinnedQueryIds }: { pinnedQueryIds: string[] }) => ({ pinnedQueryIds }))
   })
 
-  it('lists each query with its read in words', async () => {
+  it('shows the pins in pin order, name only', async () => {
     const wrapper = await mountPage()
     expect(wrapper.find('h1').text()).toBe('Queries')
-    expect(listTenantQuerySchedules).toHaveBeenCalledWith()
-    const rows = wrapper.findAll('[data-testid="script-row"]')
-    expect(rows).toHaveLength(4)
-    expect(rows[0]!.text()).toContain('Open backorders')
-    expect(rows[0]!.find('[data-testid="script-row-reads"]').text()).toBe('Reads dataset DS_ORDERS, last 30 days, status = B, 2 fields')
-    expect(rows[1]!.find('[data-testid="script-row-reads"]').text()).toBe('Reads nothing: script only')
+    expect(tileNames(wrapper, 'pinned-queries')).toEqual(['Late payments', 'Unmatched orders'])
+    expect(wrapper.find('[data-testid="pinned-empty-state"]').exists()).toBe(false)
   })
 
-  it('says when each sends, to how many, and how its last scheduled run went', async () => {
+  it('offers the drop hint when nothing is pinned, and drops pins of deleted queries', async () => {
+    listTenantQueries.mockResolvedValue({ queries: QUERIES, library: [], limits: {}, pinnedQueryIds: ['999'] })
     const wrapper = await mountPage()
-    const schedules = wrapper.findAll('[data-testid="script-row-schedule"]')
-    const lastRuns = wrapper.findAll('[data-testid="script-row-last-run"]')
-    const dots = wrapper.findAll('.script-row__dot')
-
-    expect(schedules[0]!.text()).toBe('Daily at 7:00 AM → 2 addresses · #ops-daily')
-    expect(dots[0]!.attributes('data-state')).toBe('on')
-    expect(lastRuns[0]!.text()).toMatch(/^Last run .+ · sent$/)
-
-    expect(schedules[1]!.text()).toBe('Off · sends to #ops-daily')
-    expect(dots[1]!.attributes('data-state')).toBe('off')
-    expect(lastRuns[1]!.text()).toBe('Never run on a schedule')
-
-    expect(schedules[2]!.text()).toBe('Not scheduled')
-    expect(dots[2]!.attributes('data-state')).toBe('none')
-
-    expect(dots[3]!.attributes('data-state')).toBe('failed')
-    expect(lastRuns[3]!.text()).toMatch(/^Last run .+ · owner can no longer send it$/)
+    expect(wrapper.find('[data-testid="pinned-empty-state"]').text()).toBe('drag and drop queries to pin')
   })
 
-  it('opens a query on its own page', async () => {
+  it('groups the rest by what they read, script only last, and hides an empty group', async () => {
     const wrapper = await mountPage()
-    const open = wrapper.findAll('[data-testid="script-row-open"]')[0]!
-    expect(open.attributes('aria-label')).toBe('Open query Open backorders')
-    await open.trigger('click')
-    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-script', params: { tenantScriptId: '100' } })
+    expect(tileNames(wrapper, 'query-group-audit-findings')).toEqual(['Open findings'])
+    expect(tileNames(wrapper, 'query-group-kept-records')).toEqual(['Open backorders'])
+    expect(tileNames(wrapper, 'query-group-script-only')).toEqual(['Refund total', 'Broken read'])
+    // Unmatched orders is the only run-result query and it is pinned.
+    expect(wrapper.find('[data-testid="query-group-run-results"]').exists()).toBe(false)
+    expect(sectionTitles(wrapper)).toEqual(['Pinned Queries', 'Audit findings', 'Kept records', 'Script only'])
   })
 
-  it('offers New query under the list, to editors only', async () => {
+  it('links each tile to its query', async () => {
     const wrapper = await mountPage()
-    const create = wrapper.find('[data-testid="script-new"]')
-    expect(create.text()).toBe('New query')
+    const tile = wrapper.find('[data-query-id="100"]')
+    expect(JSON.parse(tile.attributes('data-to')!)).toEqual({ name: 'settings-tenant-script', params: { tenantScriptId: '100' } })
+    expect(tile.attributes('draggable')).toBe('true')
+  })
+
+  it('pins a query dropped on Pinned Queries at the end, and unpins one dropped on a group', async () => {
+    const wrapper = await mountPage()
+    await drop(wrapper, 'pinned-queries', '100')
+    expect(saveTenantQueryPins).toHaveBeenLastCalledWith({ pinnedQueryIds: ['600', '200', '100'] })
+    expect(tileNames(wrapper, 'pinned-queries')).toEqual(['Late payments', 'Unmatched orders', 'Open findings'])
+    expect(wrapper.find('[data-testid="query-group-audit-findings"]').exists()).toBe(false)
+
+    await drop(wrapper, 'query-group-kept-records', '600')
+    expect(saveTenantQueryPins).toHaveBeenLastCalledWith({ pinnedQueryIds: ['200', '100'] })
+    expect(tileNames(wrapper, 'query-group-kept-records')).toEqual(['Open backorders', 'Late payments'])
+  })
+
+  it('ignores a drop that is not one of the queries', async () => {
+    const wrapper = await mountPage()
+    await drop(wrapper, 'pinned-queries', 'saved-run:100')
+    expect(saveTenantQueryPins).not.toHaveBeenCalled()
+  })
+
+  it('puts the pins back when the save fails', async () => {
+    saveTenantQueryPins.mockRejectedValue(new Error('down'))
+    const wrapper = await mountPage()
+    await drop(wrapper, 'pinned-queries', '100')
+    expect(saveTenantQueryPins).toHaveBeenCalledWith({ pinnedQueryIds: ['600', '200', '100'] })
+    expect(tileNames(wrapper, 'pinned-queries')).toEqual(['Late payments', 'Unmatched orders'])
+    expect(tileNames(wrapper, 'query-group-audit-findings')).toEqual(['Open findings'])
+  })
+
+  it('offers New Query to editors only; viewers still pin', async () => {
+    const wrapper = await mountPage()
+    const create = wrapper.find('[data-testid="query-new"]')
+    expect(create.text()).toBe('New Query')
     expect(JSON.parse(create.attributes('data-to')!)).toEqual({ name: 'settings-tenant-script-new' })
 
     permissions.canEditTenantSettings = false
     const viewer = await mountPage()
-    expect(viewer.find('[data-testid="script-new"]').exists()).toBe(false)
-    expect(viewer.findAll('[data-testid="script-row"]')).toHaveLength(4)
+    expect(viewer.find('[data-testid="query-new"]').exists()).toBe(false)
+    await drop(viewer, 'pinned-queries', '100')
+    expect(saveTenantQueryPins).toHaveBeenLastCalledWith({ pinnedQueryIds: ['600', '200', '100'] })
   })
 
-  it('still lists the queries when space names cannot be read', async () => {
-    listTenantChatSpaces.mockRejectedValue(new Error('down'))
+  it('says so when there are no queries', async () => {
+    listTenantQueries.mockResolvedValue({ queries: [], library: [], limits: {} })
     const wrapper = await mountPage()
-    expect(wrapper.findAll('[data-testid="script-row-schedule"]')[0]!.text()).toBe('Daily at 7:00 AM → 2 addresses · C1')
+    expect(wrapper.find('[data-testid="queries-empty"]').text()).toBe('No queries yet.')
+    expect(wrapper.find('[data-testid="pinned-queries"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="query-new"]').exists()).toBe(true)
+  })
+
+  it('shows the load error', async () => {
+    listTenantQueries.mockRejectedValue(new Error('Not allowed'))
+    const wrapper = await mountPage()
+    expect(wrapper.text()).toContain('Not allowed')
+    expect(wrapper.find('[data-testid="pinned-queries"]').exists()).toBe(false)
   })
 })

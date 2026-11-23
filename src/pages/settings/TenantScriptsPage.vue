@@ -2,102 +2,164 @@
   <StaticPageFrame>
     <template #hero>
       <h1>Queries</h1>
-      <p class="section-note">Questions about your own data, answered from what your audits keep, sent when you want.</p>
     </template>
 
     <LoadingState v-if="loading" noun="queries" />
     <InlineValidation v-else-if="pageError" tone="error" :message="pageError" />
-    <p v-else-if="queries.length === 0" class="section-note">No queries yet.</p>
+    <p v-else-if="queries.length === 0" class="section-note" data-testid="queries-empty">No queries yet.</p>
 
-    <ul v-if="rows.length" class="script-rows" data-testid="script-rows">
-      <li v-for="row in rows" :key="row.tenantQueryId" class="script-row" data-testid="script-row">
-        <span class="script-row__main">
-          <span class="script-row__name">{{ row.queryName }}</span>
-          <span class="script-row__dim" data-testid="script-row-reads">{{ row.reads }}</span>
-        </span>
-        <span class="script-row__main">
-          <span class="script-row__schedule" data-testid="script-row-schedule">
-            <span class="script-row__dot" :data-state="row.state" aria-hidden="true" />{{ row.schedule }}
-          </span>
-          <span class="script-row__dim" data-testid="script-row-last-run">{{ row.lastRun }}</span>
-        </span>
-        <span class="script-row__actions">
-          <button
-            type="button"
-            :aria-label="`Open query ${row.queryName}`"
-            data-testid="script-row-open"
-            @click="openQuery(row.tenantQueryId)"
-          >
-            Open <span aria-hidden="true">→</span>
-          </button>
-        </span>
-      </li>
-    </ul>
+    <template v-if="queries.length > 0">
+      <StaticPageSection title="Pinned Queries">
+        <div class="static-page-drop-zone" data-testid="pinned-queries" @dragover.prevent @drop="handleDrop('pinned', $event)">
+          <div v-if="pinnedQueries.length > 0" class="static-page-tile-grid">
+            <RouterLink
+              v-for="query in pinnedQueries"
+              :key="query.tenantQueryId"
+              class="static-page-tile"
+              :data-query-id="query.tenantQueryId"
+              :to="queryRoute(query.tenantQueryId)"
+              draggable="true"
+              @dragstart="handleDragStart(query.tenantQueryId, $event)"
+            >
+              <span class="static-page-tile-title">{{ query.queryName }}</span>
+            </RouterLink>
+          </div>
+          <div v-else class="static-page-drop-hint" data-testid="pinned-empty-state">drag and drop queries to pin</div>
+        </div>
+      </StaticPageSection>
 
-    <RouterLink
-      v-if="canEdit"
-      :to="{ name: 'settings-tenant-script-new' }"
-      class="static-page-action-tile static-page-create-action"
-      data-testid="script-new"
-    >
-      New query
-    </RouterLink>
+      <StaticPageSection v-for="group in queryGroups" :key="group.key" :title="group.title">
+        <div class="static-page-drop-zone" :data-testid="`query-group-${group.key}`" @dragover.prevent @drop="handleDrop('other', $event)">
+          <div class="static-page-tile-grid">
+            <RouterLink
+              v-for="query in group.visible"
+              :key="query.tenantQueryId"
+              class="static-page-tile"
+              :data-query-id="query.tenantQueryId"
+              :to="queryRoute(query.tenantQueryId)"
+              draggable="true"
+              @dragstart="handleDragStart(query.tenantQueryId, $event)"
+            >
+              <span class="static-page-tile-title">{{ query.queryName }}</span>
+            </RouterLink>
+            <button
+              v-if="group.hidden > 0"
+              type="button"
+              class="static-page-control-tile"
+              :data-testid="`query-group-${group.key}-more`"
+              @click="expandedGroupKeys.add(group.key)"
+            >
+              {{ group.hidden }} more
+            </button>
+          </div>
+        </div>
+      </StaticPageSection>
+    </template>
+
+    <div v-if="canEdit" class="action-row">
+      <RouterLink class="static-page-action-tile" data-testid="query-new" :to="{ name: 'settings-tenant-script-new' }">
+        New Query
+      </RouterLink>
+    </div>
   </StaticPageFrame>
 </template>
 
 <script setup lang="ts">
-// DAR-BE-334 (was DAR-BE-164 / DAR-UI-124's scripts). The active tenant's queries as one list of rows: what each reads,
-// when it sends and where, and how its last scheduled run went. Each opens its own page (TenantScriptPage).
+// DAR-UI-138. /queries laid out like the Dashboard (HomePage): the user's Pinned Queries as a drop zone, then the rest as
+// name-only tiles grouped by what they read. Pins are per user and per tenant; dragging saves them, reverting on failure.
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
-import { scriptFacade, settingsFacade } from '../../lib/api/facade'
-import type { TenantQuery, TenantQuerySchedule } from '../../lib/api/scriptTypes'
-import type { TenantChatSpace } from '../../lib/api/types'
-import { isOn, scheduleState, scheduleWords, sendsToWords, statusWords } from '../../lib/scriptDeployment'
-import { formatDateTime } from '../../lib/utils/date'
+import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import { scriptFacade } from '../../lib/api/facade'
+import type { TenantQuery } from '../../lib/api/scriptTypes'
 import { usePermissionsStore } from '../../stores/permissions'
 
-const router = useRouter()
 const permissionsStore = usePermissionsStore()
 const canEdit = computed(() => permissionsStore.canEditTenantSettings)
 
 const queries = ref<TenantQuery[]>([])
-const schedules = ref<TenantQuerySchedule[]>([])
-const chatSpaces = ref<TenantChatSpace[]>([])
-const timeZone = ref('')
+const pinnedQueryIds = ref<string[]>([])
+const expandedGroupKeys = ref<Set<string>>(new Set())
 const loading = ref(false)
 const pageError = ref('')
 
-function spaceName(chatSpaceId: string): string {
-  return chatSpaces.value.find((space) => space.chatSpaceId === chatSpaceId)?.spaceName ?? chatSpaceId
+// In page order. A query lands by its first input's source; no read, or one this page does not know, is script only.
+const READ_GROUPS = [
+  { key: 'audit-findings', source: 'auditFindings', title: 'Audit findings' },
+  { key: 'run-results', source: 'runResult', title: 'Run results' },
+  { key: 'kept-records', source: 'dataset', title: 'Kept records' },
+  { key: 'script-only', source: null, title: 'Script only' },
+] as const
+const SCRIPT_ONLY = READ_GROUPS[3]
+
+const GROUP_TILE_LIMIT = 6
+
+function readSource(readSpecJson: string | null): string | null {
+  if (!readSpecJson) return null
+  try {
+    const source = (JSON.parse(readSpecJson) as { inputs?: Array<{ source?: unknown }> } | null)?.inputs?.[0]?.source
+    return typeof source === 'string' ? source : null
+  } catch {
+    return null
+  }
 }
 
-const rows = computed(() => queries.value.map((query) => {
-  // One schedule per query on this page; the backend allows more.
-  const schedule = schedules.value.find((item) => item.tenantQueryId === query.tenantQueryId) ?? null
-  const sendsTo = schedule ? sendsToWords(schedule.recipientCount, schedule.chatSpaceId ? spaceName(schedule.chatSpaceId) : null) : ''
-  let scheduleText = 'Not scheduled'
-  if (schedule) {
-    scheduleText = isOn(schedule.isActive) ? `${scheduleWords(schedule.cronExpression)} → ${sendsTo}` : `Off · sends to ${sendsTo}`
-  }
-  const lastRun = schedule?.lastRunDate
-    ? `Last run ${formatDateTime(schedule.lastRunDate, { timeZone: timeZone.value })} · ${statusWords(schedule.lastRunStatus).toLowerCase()}`
-    : 'Never run on a schedule'
-  return {
-    tenantQueryId: query.tenantQueryId,
-    queryName: query.queryName,
-    reads: query.readText || 'Reads nothing: script only',
-    schedule: scheduleText,
-    state: scheduleState(schedule),
-    lastRun,
-  }
-}))
+function queryRoute(tenantQueryId: string): RouteLocationRaw {
+  return { name: 'settings-tenant-script', params: { tenantScriptId: tenantQueryId } }
+}
 
-function openQuery(tenantQueryId: string): void {
-  void router.push({ name: 'settings-tenant-script', params: { tenantScriptId: tenantQueryId } })
+const pinnedQueries = computed<TenantQuery[]>(() => {
+  const byId = new Map(queries.value.map((query) => [query.tenantQueryId, query]))
+  return pinnedQueryIds.value
+    .map((tenantQueryId) => byId.get(tenantQueryId) ?? null)
+    .filter((query): query is TenantQuery => query !== null)
+})
+
+const queryGroups = computed(() => {
+  const pinned = new Set(pinnedQueryIds.value)
+  const byKey = new Map<string, TenantQuery[]>()
+  queries.value
+    .filter((query) => !pinned.has(query.tenantQueryId))
+    .forEach((query) => {
+      const source = readSource(query.readSpecJson)
+      const key = (READ_GROUPS.find((group) => group.source !== null && group.source === source) ?? SCRIPT_ONLY).key
+      byKey.set(key, [...(byKey.get(key) ?? []), query])
+    })
+  return READ_GROUPS
+    .filter((group) => byKey.has(group.key))
+    .map((group) => {
+      const cards = byKey.get(group.key)!
+      const visible = expandedGroupKeys.value.has(group.key) ? cards : cards.slice(0, GROUP_TILE_LIMIT)
+      return { key: group.key, title: group.title, visible, hidden: cards.length - visible.length }
+    })
+})
+
+function handleDragStart(tenantQueryId: string, event: DragEvent): void {
+  if (!event.dataTransfer) return
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', tenantQueryId)
+}
+
+async function savePins(nextPinnedQueryIds: string[], previousPinnedQueryIds: string[]): Promise<void> {
+  pinnedQueryIds.value = nextPinnedQueryIds
+  try {
+    const response = await scriptFacade.saveTenantQueryPins({ pinnedQueryIds: nextPinnedQueryIds })
+    pinnedQueryIds.value = response.pinnedQueryIds ?? nextPinnedQueryIds
+  } catch {
+    pinnedQueryIds.value = previousPinnedQueryIds
+  }
+}
+
+async function handleDrop(target: 'pinned' | 'other', event: DragEvent): Promise<void> {
+  const droppedId = event.dataTransfer?.getData('text/plain')?.trim()
+  if (!droppedId || !queries.value.some((query) => query.tenantQueryId === droppedId)) return
+
+  const previousPinnedQueryIds = [...pinnedQueryIds.value]
+  const rest = pinnedQueryIds.value.filter((tenantQueryId) => tenantQueryId !== droppedId)
+  await savePins(target === 'pinned' ? [...rest, droppedId] : rest, previousPinnedQueryIds)
 }
 
 function messageOf(error: unknown, fallback: string): string {
@@ -108,13 +170,9 @@ async function load(): Promise<void> {
   loading.value = true
   pageError.value = ''
   try {
-    const [listed, scheduled] = await Promise.all([
-      scriptFacade.listTenantQueries(),
-      scriptFacade.listTenantQuerySchedules(),
-    ])
+    const listed = await scriptFacade.listTenantQueries()
     queries.value = listed.queries ?? []
-    schedules.value = scheduled.schedules ?? []
-    timeZone.value = scheduled.timeZone ?? ''
+    pinnedQueryIds.value = listed.pinnedQueryIds ?? []
   } catch (error) {
     pageError.value = messageOf(error, 'Could not load the queries.')
   } finally {
@@ -122,111 +180,7 @@ async function load(): Promise<void> {
   }
 }
 
-// Names only: a row still reads without them, as the space id.
-async function loadNames(): Promise<void> {
-  try {
-    chatSpaces.value = (await settingsFacade.listTenantChatSpaces()).chatSpaces ?? []
-  } catch {
-    chatSpaces.value = []
-  }
-}
-
 onMounted(() => {
   void load()
-  void loadNames()
 })
 </script>
-
-<style scoped>
-/* DAR-UI-122's row list (Tenant Settings): one bordered list, every row the same minimum height. */
-.script-rows {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--static-tile-border);
-  border-radius: var(--static-surface-radius);
-  background: var(--static-tile-bg);
-}
-
-.script-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 4rem;
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--static-tile-text-size);
-}
-
-.script-row + .script-row {
-  border-top: 1px solid var(--static-tile-border);
-}
-
-.script-row__main {
-  display: grid;
-  min-width: 0;
-}
-
-.script-row__name {
-  overflow-wrap: anywhere;
-}
-
-.script-row__dim {
-  color: var(--text-dim);
-  font-size: var(--type-note-size);
-  overflow-wrap: anywhere;
-}
-
-.script-row__schedule {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-/* The state dot: filled on schedule, hollow off, dashed when the last scheduled run failed. */
-.script-row__dot {
-  flex: none;
-  width: 0.5rem;
-  height: 0.5rem;
-  border: 1px solid var(--text-dim);
-  border-radius: var(--radius-pill);
-}
-
-.script-row__dot[data-state='on'] {
-  border-color: var(--text);
-  background: var(--text);
-}
-
-.script-row__dot[data-state='failed'] {
-  border-style: dashed;
-  border-color: var(--text);
-}
-
-.script-row__actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.script-row__actions button {
-  min-height: 2.2rem;
-  padding: var(--space-0) var(--space-2);
-  font-size: var(--type-label-size);
-  white-space: nowrap;
-}
-
-@media (max-width: 768px) {
-  .script-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-1) var(--space-2);
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .script-row > .script-row__main:nth-child(2) {
-    grid-row: 2;
-    grid-column: 1 / -1;
-  }
-}
-</style>
