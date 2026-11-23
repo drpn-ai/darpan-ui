@@ -11,6 +11,7 @@ const saveTenantQuerySchedule = vi.hoisted(() => vi.fn())
 const runTenantQuerySchedule = vi.hoisted(() => vi.fn())
 const sendAgentQueryTurn = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
+const getAgentStatus = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
 const route = vi.hoisted(() => ({ params: { tenantScriptId: '100' } as Record<string, string> }))
@@ -23,6 +24,7 @@ vi.mock('../../../lib/api/facade', () => ({
     listTenantQuerySchedules, saveTenantQuerySchedule, runTenantQuerySchedule, sendAgentQueryTurn,
   },
   settingsFacade: { listTenantChatSpaces },
+  agentFacade: { getAgentStatus },
 }))
 vi.mock('../../../stores/permissions', () => ({
   usePermissionsStore: () => permissions,
@@ -97,6 +99,7 @@ describe('TenantScriptPage (query)', () => {
       { chatSpaceId: 'C2', spaceName: '#finance', chatProviderLabel: 'Slack', isActive: 'Y' },
     ] })
     runTenantQuery.mockResolvedValue({ result: run() })
+    getAgentStatus.mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: true })
     saveTenantQuery.mockImplementation(async (payload: Partial<TenantQuery>) => ({ query: query({ ...payload, tenantQueryId: payload.tenantQueryId ?? '900' }) }))
     saveTenantQuerySchedule.mockImplementation(async (payload: Record<string, unknown>) => ({ schedule: schedule({ ...payload } as Partial<TenantQuerySchedule>) }))
   })
@@ -157,12 +160,27 @@ describe('TenantScriptPage (query)', () => {
     await wrapper.find('[data-testid="script-ask"]').setValue('Which orders are backordered?')
     await wrapper.find('[data-testid="script-ask-send"]').trigger('click')
     await flushPromises()
-    expect(sendAgentQueryTurn).toHaveBeenCalledWith({ text: 'Which orders are backordered?' })
+    expect(sendAgentQueryTurn).toHaveBeenCalledWith({ text: 'Which orders are backordered?', readSpecJson: READ, scriptBody: "{'summary': 'x'}" })
     expect(text(wrapper, 'script-ask-reply')).toBe('It lists open backorders.')
     expect((wrapper.find('[data-testid="script-body"]').element as HTMLTextAreaElement).value).toBe("{'summary': 'new'}")
     expect(text(wrapper, 'script-run-summary')).toBe('from the agent')
     expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(true)
     expect(saveTenantQuery).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-testid="script-ask-undo"]').trigger('click')
+    expect((wrapper.find('[data-testid="script-body"]').element as HTMLTextAreaElement).value).toBe("{'summary': 'x'}")
+  })
+
+  it('hides the ask box when the agent is off or the person has no AI access', async () => {
+    getAgentStatus.mockResolvedValue({ state: 'ON', grantState: 'NOT_GRANTED', canApprove: false })
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="script-ask"]').exists()).toBe(false)
+  })
+
+  it('shows where the schedule sends, in full, to everyone who can see the query', async () => {
+    permissions.canScheduleQueries = false
+    const wrapper = await mountPage()
+    expect(text(wrapper, 'script-recipients')).toBe('Email to ops@krewe.example, cfo@krewe.example · chat #ops-daily')
   })
 
   it('the schedule popup keeps email recipients and a chat space, and Save sends them', async () => {

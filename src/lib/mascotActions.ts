@@ -570,6 +570,14 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'On schedule',
     body: 'whether the query runs by itself at its time and sends. It is kept with Save; with no schedule set up it stays off.',
   },
+  'on schedule: set up a schedule first': {
+    title: 'On schedule',
+    body: 'there is no schedule yet to turn on. Open Schedule to set the time and where it sends, then turn it on.',
+  },
+  'put back my version': {
+    title: 'Put back my version',
+    body: 'returns the read and script to what you had before the agent’s proposal. The agent’s run stays under Runs.',
+  },
   'on schedule: scheduling needs tenant admin': {
     title: 'On schedule',
     body: 'a schedule sends the tenant’s data out, so only a tenant admin can turn one on or change it. You can still run and save the query.',

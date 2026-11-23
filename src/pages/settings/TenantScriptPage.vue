@@ -8,7 +8,7 @@
         aria-label="Query name"
         test-id="script-name"
         explain="scriptName"
-        :toggle-label="canSchedule ? 'On schedule' : 'On schedule: scheduling needs tenant admin'"
+        :toggle-label="toggleLabel"
         :on="schedule?.isActive ?? false"
         toggle-test-id="script-on-schedule"
         :toggle-disabled="!schedule || !canSchedule || busy"
@@ -28,8 +28,9 @@
       <p v-if="savedSchedule?.ownerName" class="section-note" data-testid="script-owner">
         Sends as {{ savedSchedule.ownerName }}, who saved the schedule.
       </p>
+      <p v-if="recipientsText" class="section-note script-recipients" data-testid="script-recipients">{{ recipientsText }}</p>
 
-      <form v-if="canEdit" class="script-ask" @submit.prevent="ask">
+      <form v-if="canEdit && agentReady" class="script-ask" @submit.prevent="ask">
         <label class="script-ask__field">
           <span v-explain="'scriptAsk'" class="workflow-context-label">Ask</span>
           <input
@@ -53,6 +54,21 @@
         </button>
       </form>
       <p v-if="askReply" class="section-note" data-testid="script-ask-reply">{{ askReply }}</p>
+      <ul v-if="askOptions.length" class="script-ask-options" data-testid="script-ask-options">
+        <li v-for="option in askOptions" :key="option">
+          <button type="button" class="user-settings-control" :disabled="busy" @click="answer(option)">{{ option }}</button>
+        </li>
+      </ul>
+      <button
+        v-if="previousDraft"
+        type="button"
+        class="user-settings-control"
+        data-testid="script-ask-undo"
+        :disabled="busy"
+        @click="putBackDraft"
+      >
+        Put back my version
+      </button>
 
       <div class="script-bench">
         <section class="script-column">
@@ -397,7 +413,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
-import { scriptFacade, settingsFacade } from '../../lib/api/facade'
+import { agentFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
 import type { QueryError, QueryRun, QueryScheduleOutcome, TenantQuery, TenantQuerySchedule } from '../../lib/api/scriptTypes'
 import type { TenantChatSpace } from '../../lib/api/types'
 import { backIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
@@ -490,6 +506,11 @@ let runCount = 0
 
 const askText = ref('')
 const askReply = ref('')
+const askOptions = ref<string[]>([])
+/** The read and script the agent's last proposal replaced, so the person can put them back. */
+const previousDraft = ref<{ readSpecJson: string; scriptBody: string } | null>(null)
+/** The ask box shows only when the agent is on and this person has live AI access here. */
+const agentReady = ref(false)
 let conversationId: string | undefined
 
 const activePopup = ref<Popup | null>(null)
@@ -499,6 +520,22 @@ const scheduleForm = ref({ time: '', emailTo: '', emailCc: '', chatSpaceId: '', 
 const preview = ref<QueryScheduleOutcome | null>(null)
 
 const busy = computed(() => saving.value || running.value || asking.value || popupBusy.value)
+const toggleLabel = computed(() => {
+  if (!canSchedule.value) return 'On schedule: scheduling needs tenant admin'
+  if (!schedule.value) return 'On schedule: set up a schedule first'
+  return 'On schedule'
+})
+/** Where the schedule sends, in full, for everyone who can see the query (not only those who can change it). */
+const recipientsText = computed(() => {
+  const current = schedule.value
+  if (!current) return ''
+  const parts = [
+    ...(current.emailTo ? [`Email to ${current.emailTo}`] : []),
+    ...(current.emailCc ? [`cc ${current.emailCc}`] : []),
+    ...(current.chatSpaceId ? [`chat ${spaceName(current.chatSpaceId)}`] : []),
+  ]
+  return parts.join(' · ')
+})
 const isOwner = computed(() => Boolean(savedSchedule.value?.ownerUserId) && savedSchedule.value?.ownerUserId === authStore.userId)
 
 function snapshot(): string {
@@ -554,10 +591,7 @@ function openFact(): void {
 }
 
 const lineCount = computed(() => Math.max((draft.value?.scriptBody ?? '').split('\n').length, 12))
-const errorLine = computed(() => {
-  const error = runs.value[0]?.run.error
-  return error && error.kind === 'SCRIPT_ERROR' ? error.line ?? null : error?.line ?? null
-})
+const errorLine = computed(() => runs.value[0]?.run.error?.line ?? null)
 
 const popupTitle = computed(() => {
   switch (activePopup.value) {
@@ -658,11 +692,9 @@ async function load(tenantQueryId: string): Promise<void> {
 
 // Names and choices only: the page still reads without them, as ids.
 async function loadChoices(): Promise<void> {
-  try {
-    chatSpaces.value = (await settingsFacade.listTenantChatSpaces()).chatSpaces ?? []
-  } catch {
-    chatSpaces.value = []
-  }
+  const [spaces, agent] = await Promise.allSettled([settingsFacade.listTenantChatSpaces(), agentFacade.getAgentStatus()])
+  chatSpaces.value = spaces.status === 'fulfilled' ? spaces.value.chatSpaces ?? [] : []
+  agentReady.value = agent.status === 'fulfilled' && agent.value.state === 'ON' && agent.value.grantState === 'LIVE'
 }
 
 function renameDraft(name: string): void {
@@ -793,13 +825,17 @@ async function ask(): Promise<void> {
   if (!current || busy.value || !text) return
   asking.value = true
   askReply.value = ''
+  askOptions.value = []
   runError.value = ''
   try {
-    const out = await scriptFacade.sendAgentQueryTurn(conversationId ? { conversationId, text } : { text })
+    const draftNow = { readSpecJson: current.readSpecJson, scriptBody: current.scriptBody }
+    const out = await scriptFacade.sendAgentQueryTurn({ ...(conversationId ? { conversationId } : {}), text, ...draftNow })
     conversationId = out.conversationId ?? conversationId
     askReply.value = out.question?.text || out.reply || ''
+    askOptions.value = out.question?.options ?? []
     const proposed = out.queryProposal
     if (proposed) {
+      previousDraft.value = draftNow
       current.readSpecJson = proposed.proposal.readSpecJson ?? ''
       current.scriptBody = proposed.proposal.scriptBody
       if (current.queryName === NEW_NAME && proposed.proposal.queryName) current.queryName = proposed.proposal.queryName
@@ -808,10 +844,27 @@ async function ask(): Promise<void> {
       askText.value = ''
     }
   } catch (error) {
+    // A conversation from another tenant or an earlier visit is not found: start a new one next time.
+    if (messageOf(error, '').includes('was not found')) conversationId = undefined
     runError.value = messageOf(error, 'Could not ask the agent.')
   } finally {
     asking.value = false
   }
+}
+
+/** A choice the agent offered: sent as the person's answer. */
+function answer(option: string): void {
+  askText.value = option
+  void ask()
+}
+
+function putBackDraft(): void {
+  const current = draft.value
+  const before = previousDraft.value
+  if (!current || !before) return
+  current.readSpecJson = before.readSpecJson
+  current.scriptBody = before.scriptBody
+  previousDraft.value = null
 }
 
 /** One Save: the query, then its schedule when there is one and it changed. */
@@ -820,6 +873,8 @@ async function save(): Promise<void> {
   if (!current || busy.value || !canEdit.value || !current.queryName.trim()) return
   saving.value = true
   pageError.value = ''
+  const wasNew = !current.tenantQueryId
+  let savedId = ''
   try {
     const out = await scriptFacade.saveTenantQuery({
       tenantQueryId: current.tenantQueryId || undefined,
@@ -828,8 +883,8 @@ async function save(): Promise<void> {
       readSpecJson: current.readSpecJson,
       scriptBody: current.scriptBody,
     })
-    const wasNew = !current.tenantQueryId
     saved.value = out.query
+    savedId = out.query.tenantQueryId
     current.tenantQueryId = out.query.tenantQueryId
     current.queryName = out.query.queryName
 
@@ -848,14 +903,19 @@ async function save(): Promise<void> {
       })
       savedSchedule.value = saveOut.schedule
       schedule.value = toSchedule(saveOut.schedule)
+    } else if (savedSchedule.value) {
+      // Changing the script of a schedule makes the saver its owner: read it back so the owner line is right.
+      const listed = await scriptFacade.listTenantQuerySchedules({ tenantQueryId: out.query.tenantQueryId })
+      savedSchedule.value = (listed.schedules ?? [])[0] ?? savedSchedule.value
     }
     baseline.value = snapshot()
-    // Last: /new and /:id are two routes, so the move mounts the page afresh and it reads what was just saved.
-    if (wasNew) void router.replace({ name: 'settings-tenant-script', params: { tenantScriptId: out.query.tenantQueryId } })
   } catch (error) {
     pageError.value = messageOf(error, 'Could not save the query.')
   } finally {
     saving.value = false
+    // Last, even when the schedule failed: /new and /:id are two routes, so the move mounts the page afresh and it
+    // reads what was saved (a retry from /new would otherwise create the query again).
+    if (wasNew && savedId) void router.replace({ name: 'settings-tenant-script', params: { tenantScriptId: savedId } })
   }
 }
 
@@ -926,6 +986,19 @@ onBeforeUnmount(() => {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-ink);
+}
+
+.script-recipients {
+  overflow-wrap: anywhere;
+}
+
+.script-ask-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .script-read-text {

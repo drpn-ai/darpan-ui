@@ -855,7 +855,7 @@ export const scriptFacade = {
     return callService<RunTenantQueryScheduleResponse>(SCRIPT.runTenantQuerySchedule, payload, signal)
   },
   /** The queries page's agent: one message; it proposes a query that has already run (queryProposal), never saves. */
-  sendAgentQueryTurn(payload: { conversationId?: string; text: string }, signal?: AbortSignal): Promise<SendAgentQueryTurnResponse> {
+  sendAgentQueryTurn(payload: { conversationId?: string; text: string; readSpecJson?: string; scriptBody?: string }, signal?: AbortSignal): Promise<SendAgentQueryTurnResponse> {
     return callService<SendAgentQueryTurnResponse>(SCRIPT.sendAgentQueryTurn, payload, signal)
   },
 }

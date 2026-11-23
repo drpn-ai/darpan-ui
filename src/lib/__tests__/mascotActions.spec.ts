@@ -136,6 +136,9 @@ describe('every button in the app has an answer', () => {
     'components/ui/JsonCollapseNode.vue': 'toggleLabel builds "Expand <name> object" — the expand/collapse pattern answers it',
     'components/ui/AppSelect.vue': 'the trigger shows the selected value and each option IS a value, not vocabulary',
     'components/ui/StaticRecordTitle.vue': 'toggleLabel prop; each caller\'s toggle-label is swept with the wrappers below',
+    // DAR-BE-334: the agent's offered answers are its own words; the title toggle's three labels are each entered
+    // ('on schedule', 'on schedule: scheduling needs tenant admin', 'on schedule: set up a schedule first').
+    'pages/settings/TenantScriptPage.vue': 'agent answer choices (data) and toggleLabel (three entered labels)',
     'components/ui/EmptyState.vue': 'the caller supplies action.label; the caller is where the entry belongs',
     'components/ui/ErrorState.vue': 'the caller supplies action.label; the caller is where the entry belongs',
     'components/shell/CommandPalette.vue': 'rows are named by the command list, and are navigation rather than an action on data',
