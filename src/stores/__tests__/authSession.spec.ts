@@ -457,6 +457,7 @@ describe('auth state', () => {
       canManageConnections: false,
       canManageGlobalSettings: false,
       canManageConfigSharing: false,
+      canScheduleQueries: false,
     })
 
     expect(buildUiPermissionPolicy({
@@ -473,6 +474,7 @@ describe('auth state', () => {
       canManageConnections: true,
       canManageGlobalSettings: false,
       canManageConfigSharing: false,
+      canScheduleQueries: false,
     })
 
     expect(buildUiPermissionPolicy({

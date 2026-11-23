@@ -326,7 +326,7 @@ describe('TenantSettingsPage', () => {
     expect(sections.map((section) => section.get('h2').text())).toEqual(['Chat', 'Time', 'Audit', 'AI'])
     for (const section of sections) expect(section.findAll('.tenant-settings-rows')).toHaveLength(1)
     expect(wrapper.findAll('.tenant-settings-row__label').map((label) => label.text())).toEqual([
-      'Notifications', 'Timezone', 'Config history', 'Scripts', 'Peak periods', 'Sync pulse', 'Provider',
+      'Notifications', 'Timezone', 'Config history', 'Queries', 'Peak periods', 'Sync pulse', 'Provider',
     ])
   })
 
@@ -344,7 +344,7 @@ describe('TenantSettingsPage', () => {
     expect(wrapper.get('[data-testid="tenant-module-config-history"]').text()).toBe('Open →')
     expect(wrapper.get('[data-testid="tenant-module-scripts"]').text()).toBe('Open →')
     expect(rowValue(wrapper, 'tenant-module-config-history')).toBe('Versions and restores')
-    expect(rowValue(wrapper, 'tenant-module-scripts')).toBe('JEXL used by checks')
+    expect(rowValue(wrapper, 'tenant-module-scripts')).toBe('Your data, answered and sent')
   })
 
   // DAR-BE-328. The Peak periods row: None + Set up, else the current or next period + Open.

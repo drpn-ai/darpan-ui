@@ -778,7 +778,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   notificationNowhere: {
     title: 'Nowhere',
-    body: 'posts nothing to chat; the thing still runs. A deployed script has no Nowhere: turn its schedule off on Scripts instead.',
+    body: 'posts nothing to chat; the thing still runs. A query schedule has no Nowhere: switch it off on its query instead.',
     byDirectiveOnly: true,
   },
   notificationPaused: {
@@ -880,42 +880,42 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'whether the Darpan CLI may act for you in this tenant. It is set per tenant, and a Darpan admin turns it on, pauses or ends it.',
     byDirectiveOnly: true,
   },
+  // DAR-BE-334: the queries pages (were scripts).
   scriptName: {
     title: 'Name',
-    body: 'must be unique in this tenant. A second script with the same name is refused when you save.',
+    body: 'must be unique in this tenant. A second query with the same name is refused when you save.',
     byDirectiveOnly: true,
   },
-  scriptProfile: {
-    title: 'Profile',
-    body: 'how much a script may do: an Expression is one line with no loops and gets 250 ms; a Script allows both and gets 2 s. A body that does not fit is refused on save.',
+  scriptAsk: {
+    title: 'Ask',
+    body: 'say what you want to know; the agent writes a query from what your audits keep and runs it before you see it. Nothing is saved until you save.',
     byDirectiveOnly: true,
   },
   scriptBody: {
     title: 'Script',
-    body: 'the JEXL that reads its input and returns the text to post. Return nothing and nothing is sent; pass the time limit and the run stops.',
+    body: 'the JEXL that turns what the read returned into a summary and up to five CSV files. Return nothing and nothing is sent; pass the time limit and the run stops.',
   },
   scriptSchedule: {
     title: 'Schedule',
-    body: 'when this script runs by itself, read in the tenant’s timezone, not your own. A teammate in another zone sees a different clock time for the same post.',
+    body: 'when this query runs by itself, read in the tenant’s timezone, not your own. Only a tenant admin can schedule one, and it sends as whoever saved the schedule.',
     byDirectiveOnly: true,
   },
   scriptPostTo: {
-    title: 'Posts to',
-    body: 'the chat space this script’s text goes to. If the space is deleted, switched off or has no webhook, the run reads Not delivered.',
+    title: 'Sends to',
+    body: 'where the answer goes: email addresses get the summary and the files, a chat space gets the summary. If the owner leaves the tenant, the schedule switches off.',
+  },
+  scriptEmailTo: {
+    title: 'Email to',
+    body: 'any addresses, inside or outside your company, separated by commas. Every file sent is logged with who it went to.',
+    byDirectiveOnly: true,
   },
   scriptInputRun: {
-    title: 'Reads',
-    body: 'what Run and the schedule both feed the script: a saved run’s newest finished result, or the sample JSON. With no finished result yet, nothing is sent.',
-  },
-  // DAR-UI-124: the script page.
-  scriptSample: {
-    title: 'Sample JSON',
-    body: 'the input a script reads when it reads a sample: `input` is this JSON. Kept with the script, so the schedule reads it too.',
-    byDirectiveOnly: true,
+    title: 'Read',
+    body: 'what the query reads, only from what your audits already keep: a dataset’s kept fields, a saved run’s newest result, or an audit’s findings. A field no audit keeps cannot be read.',
   },
   scriptLastRun: {
     title: 'Last run',
-    body: 'how the last scheduled run went, in the tenant’s zone. Runs from this page are not counted; they never post.',
+    body: 'how the last scheduled run went, in the tenant’s zone. Runs from this page are not counted; they never send.',
     byDirectiveOnly: true,
   },
   scriptRuns: {

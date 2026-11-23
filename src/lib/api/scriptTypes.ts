@@ -1,22 +1,18 @@
-// DAR-BE-164. A tenant's scripts (facade.TenantScriptFacadeServices): JEXL written and run in Darpan as data, with no
-// code change. EXPRESSION is one expression with no loops; SCRIPT allows statements, loops and lambdas. Both read only
-// `input` and the d: library.
+// DAR-BE-334. The active tenant's queries (facade.TenantScriptFacadeServices) on moqui-jexl: a read over what its audits
+// already keep (kept datasets, saved runs' newest differences, audit findings) and a JEXL script over it that returns a
+// summary and up to five CSV files. A schedule sends the answer by email and/or chat; whoever saves it owns it.
 
-export type ScriptProfile = 'EXPRESSION' | 'SCRIPT'
-export type ScriptInputSource = 'SAMPLE' | 'RUN_RESULT'
-
-export interface TenantScript {
-  tenantScriptId: string
-  scriptName: string
+export interface TenantQuery {
+  tenantQueryId: string
+  queryName: string
   description: string | null
-  scriptProfile: ScriptProfile
-  inputSource: ScriptInputSource
+  readSpecJson: string | null
+  /** The read in words ("Reads dataset D1, last 30 days, status = B, 2 fields"); null when there is no read. */
+  readText: string | null
   scriptBody: string
   sampleInputJson: string | null
   isActive: boolean
-  createdByUserId: string | null
-  createdDate: string | number | null
-  lastUpdatedDate: string | number | null
+  ownerUserId: string | null
 }
 
 export interface ScriptLibraryFunction {
@@ -24,121 +20,151 @@ export interface ScriptLibraryFunction {
   help: string
 }
 
-export interface ScriptProfileLimits {
-  maxSourceChars: number
-  unitLimit: number
-  timeoutMs: number
+export interface QueryLimits {
+  maxReadRows?: number
+  units?: number
+  timeoutMs?: number
+  [limit: string]: number | undefined
 }
 
-export interface ScriptError {
+export interface ListTenantQueriesResponse {
+  queries: TenantQuery[]
+  library: ScriptLibraryFunction[]
+  limits: QueryLimits
+}
+
+export interface SaveTenantQueryPayload {
+  tenantQueryId?: string
+  queryName: string
+  description?: string
+  readSpecJson?: string
+  scriptBody: string
+  sampleInputJson?: string
+  isActive?: boolean
+}
+
+export interface SaveTenantQueryResponse {
+  query: TenantQuery
+  notes?: string[]
+}
+
+export interface QueryError {
   kind: string
   message: string
   line?: number
   column?: number
 }
 
-export interface ScriptRun {
+export interface QueryFile {
+  name: string
+  columns: string[]
+  rowCount: number
+  /** The first 20 rows. */
+  previewRows: unknown[][]
+}
+
+export interface QueryRun {
   ok: boolean
-  profile: ScriptProfile | null
-  result: unknown
-  units: number
-  elapsedMs: number
-  logs: string[]
-  error: ScriptError | null
+  summary: string | null
+  files: QueryFile[]
+  data: unknown
+  /** The script returned nothing: nothing would be sent. */
+  nothing: boolean
+  /** Why the result is not a summary/files result, when it is not. */
+  invalid: string | null
+  readCounts: Record<string, number> | null
+  units: number | null
+  elapsedMs: number | null
+  logs: string[] | null
+  error: QueryError | null
+  readText: string | null
 }
 
-export interface ScriptInputSummary {
-  source: ScriptInputSource
-  characters?: number
-  fileName?: string
-  records?: number
-  totalDifferences?: number
-  truncated?: boolean
-}
-
-export interface ListTenantScriptsResponse {
-  scripts: TenantScript[]
-  library: ScriptLibraryFunction[]
-  limits: Partial<Record<ScriptProfile, ScriptProfileLimits>>
-}
-
-export interface SaveTenantScriptPayload {
-  tenantScriptId?: string
-  scriptName: string
-  description?: string
-  scriptProfile: ScriptProfile
-  inputSource: ScriptInputSource
-  scriptBody: string
-  sampleInputJson?: string
-  isActive?: boolean
-}
-
-export interface SaveTenantScriptResponse {
-  script: TenantScript
-}
-
-export interface RunTenantScriptPayload {
-  tenantScriptId?: string
+export interface RunTenantQueryPayload {
+  tenantQueryId?: string
+  readSpecJson?: string
   scriptBody?: string
-  scriptProfile?: ScriptProfile
-  inputSource?: ScriptInputSource
-  inputJson?: string
-  fileName?: string
 }
 
-export interface RunTenantScriptResponse {
-  run: ScriptRun
-  inputSummary: ScriptInputSummary
+export interface RunTenantQueryResponse {
+  result: QueryRun
 }
 
-// DAR-BE-167. A deployment: a saved script run on a schedule (Quartz cron in the tenant's zone), reading the newest
-// result of a saved run (or its sample), its returned text posted to a chat space.
+/** moqui-jexl's run statuses ("Contract as built"). */
+export type QueryRunStatus =
+  | 'OK' | 'NOTHING_TO_SEND' | 'PREVIEW' | 'HELD' | 'DISABLED' | 'OWNER_LOST' | 'READ_ERROR' | 'READ_NOT_ALLOWED'
+  | 'READ_TOO_LARGE' | 'SCRIPT_ERROR' | 'RESULT_INVALID' | 'DELIVERY_PARTIAL' | 'DELIVERY_FAILED' | 'STUCK'
+  | 'SCRIPT_MISSING' | 'NO_INPUT' | 'WAITING' | 'EXPIRED'
 
-export type ScriptDeploymentStatus =
-  | 'PREVIEW' | 'SENT' | 'NOTHING_TO_SEND' | 'SCRIPT_ERROR' | 'NO_INPUT' | 'NOT_DELIVERED' | 'SCRIPT_MISSING'
+export interface QueryDeliveryOutcome {
+  kind: 'email' | 'chat'
+  lastOutcome: string | null
+  lastMessage: string | null
+}
 
-export interface TenantScriptDeployment {
-  tenantScriptDeploymentId: string
-  tenantScriptId: string
-  scheduleExpr: string
-  inputSavedRunId: string | null
-  chatSpaceId: string
-  isActive: boolean
+export interface TenantQuerySchedule {
+  scheduleId: string
+  tenantQueryId: string
+  cronExpression: string
+  timeZone: string | null
+  isActive: boolean | 'Y' | 'N'
+  ownerUserId: string | null
+  ownerName: string | null
+  /** Comma-separated addresses. */
+  emailTo: string | null
+  emailCc: string | null
+  chatSpaceId: string | null
+  recipientCount: number
   nextRunDate: string | number | null
   lastRunDate: string | number | null
-  lastRunStatus: ScriptDeploymentStatus | null
+  lastRunStatus: QueryRunStatus | string | null
   lastRunMessage: string | null
-  lastRunUnits: number | null
+  deliveries: QueryDeliveryOutcome[]
 }
 
-export interface ListTenantScriptDeploymentsResponse {
-  deployments: TenantScriptDeployment[]
+export interface ListTenantQuerySchedulesResponse {
+  schedules: TenantQuerySchedule[]
   timeZone: string
 }
 
-export interface SaveTenantScriptDeploymentPayload {
-  tenantScriptDeploymentId?: string
-  tenantScriptId: string
-  scheduleExpr: string
-  inputSavedRunId?: string
-  chatSpaceId: string
+export interface SaveTenantQuerySchedulePayload {
+  scheduleId?: string
+  tenantQueryId: string
+  dailyAt?: string
+  cronExpression?: string
   isActive: boolean
+  emailTo?: string
+  emailCc?: string
+  chatSpaceId?: string
 }
 
-export interface SaveTenantScriptDeploymentResponse {
-  deployment: TenantScriptDeployment
+export interface SaveTenantQueryScheduleResponse {
+  schedule: TenantQuerySchedule
 }
 
-export interface ScriptDeploymentOutcome {
-  status: ScriptDeploymentStatus
-  message: string
-  text?: string
-  run?: ScriptRun
-  inputSummary?: ScriptInputSummary
-  fileName?: string | null
+export interface QueryScheduleOutcome {
+  status: QueryRunStatus | string
+  message: string | null
+  result?: { summary?: string | null; files?: { name: string; rows?: unknown[][] }[] } | null
+  readCounts?: Record<string, number> | null
 }
 
-export interface RunTenantScriptDeploymentResponse {
-  outcome: ScriptDeploymentOutcome
-  deployment: TenantScriptDeployment
+export interface RunTenantQueryScheduleResponse {
+  outcome: QueryScheduleOutcome
+}
+
+// The queries page's agent (send#AgentQueryTurn): it proposes one query that has already run; nothing is saved.
+
+export interface QueryProposal {
+  proposal: { queryName: string; description: string | null; readSpecJson: string | null; scriptBody: string; readText: string | null }
+  preview: QueryRun
+}
+
+export interface SendAgentQueryTurnResponse {
+  conversationId: string | null
+  outcome: string
+  reply: string | null
+  queryProposal: QueryProposal | null
+  question: { text: string; options?: string[]; from?: string } | null
+  masked: string[] | null
 }

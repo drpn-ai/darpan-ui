@@ -521,46 +521,66 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'downloads this day’s whole audit as JSON: every statement, check and finding. The page shows a slice of it.',
   },
 
-  /* ── Scripts (DAR-BE-164, DAR-BE-167, DAR-UI-124) ───────────────────────────── */
-  'preview message': {
-    title: 'Preview message',
-    body: 'runs the saved script and schedule against the newest result and shows the text it would post. Nothing reaches the chat space, and unsaved edits are left out.',
+  /* ── Queries (DAR-BE-334; were DAR-BE-164/167 scripts, DAR-UI-124's pages) ─────────── */
+  'preview send': {
+    title: 'Preview send',
+    body: 'runs the saved query and schedule now and shows what it would send. No email or chat message goes out, and unsaved edits are left out.',
   },
   'send now': {
     title: 'Send now',
-    body: 'posts this text to the chat space once, now. The schedule is unchanged, and there is no unsend.',
+    body: 'delivers this answer to its addresses and chat space once, now. Only the schedule’s owner can; the schedule is unchanged, and there is no unsend.',
   },
   'confirm delete': {
     title: 'Confirm delete',
     body: 'removes it for good. There is no undo and no copy kept.',
   },
-  'new script': {
-    title: 'New script',
-    body: 'a fresh script on its own page, starting from a sample. Nothing is kept until you press Save.',
+  'new query': {
+    title: 'New query',
+    body: 'a fresh query on its own page, starting from a read of an audit’s findings. Nothing is kept until you press Save.',
   },
   run: {
     title: 'Run',
-    body: 'runs the code as written, unsaved edits included, on what the schedule reads, and adds the result under Runs. Nothing is saved or posted.',
+    body: 'runs the read and script as written, unsaved edits included, on your data now, and adds the result under Runs. Nothing is saved or sent.',
   },
   'running…': {
     title: 'Running',
     body: 'it is already going. The page shows what came back when it finishes; pressing again does nothing.',
   },
-  'open scripts': {
-    title: 'Scripts',
-    body: 'this tenant’s scripts: each reads a run’s newest result or a sample, and can post what it returns to a chat space on a schedule.',
+  script: {
+    title: 'Script',
+    body: 'shows the JEXL that turns what the read returned into a summary and files. The line a run failed on is marked.',
+  },
+  read: {
+    title: 'Read',
+    body: 'shows the query’s read as JSON: which source, which fields, and the filters and window. Its words are above the tabs.',
+  },
+  ask: {
+    title: 'Ask',
+    body: 'hands your question to the agent. It writes a query from what your audits keep, runs it, and puts it on this page for you to check and save.',
+  },
+  'ask for a query': {
+    title: 'Ask',
+    body: 'say what you want to know about your data, in your own words. A field no audit keeps cannot be read, and the agent says so.',
+  },
+  'open queries': {
+    title: 'Queries',
+    body: 'this tenant’s queries: each reads what your audits keep and can send its answer by email or chat on a schedule.',
   },
   'on schedule': {
     title: 'On schedule',
-    body: 'whether the script runs by itself at its time and posts. It is kept with Save; with no schedule set up it stays off.',
+    body: 'whether the query runs by itself at its time and sends. It is kept with Save; with no schedule set up it stays off.',
   },
-  'back to scripts': {
-    title: 'Back to Scripts',
-    body: 'the list of this tenant’s scripts. Unsaved edits here are dropped on the way out.',
+  'on schedule: scheduling needs tenant admin': {
+    title: 'On schedule',
+    body: 'a schedule sends the tenant’s data out, so only a tenant admin can turn one on or change it. You can still run and save the query.',
   },
-  'delete script': {
-    title: 'Delete script',
-    body: 'asks first. A deleted script stops posting and leaves the Notifications grid; there is no undo.',
+  'back to queries': {
+    title: 'Back to Queries',
+    body: 'the list of this tenant’s queries. Unsaved edits here are dropped on the way out.',
+  },
+  'delete query': {
+    title: 'Delete query',
+    body: 'asks first. A deleted query stops its schedule and leaves the Notifications grid; there is no undo.',
   },
 
   /* ── Peak periods (DAR-BE-328) ──────────────────────────────────────────────── */
@@ -966,9 +986,9 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'After each run',
     body: 'whether the email to everyone with access, plus the extra addresses, and the chat space’s card go out when each audit run finishes. It takes effect on save.',
   },
-  'save script': {
-    title: 'Save script',
-    body: 'checks the code and keeps it, with what it reads and its schedule, for the whole tenant. The schedule runs the saved version; an unsaved edit never runs on schedule.',
+  'save query': {
+    title: 'Save query',
+    body: 'checks the read and script and keeps them, with the schedule, for the whole tenant. The schedule runs the saved version; an unsaved edit never runs on schedule.',
   },
 
   /* ── The audit's agent (DAR-UI-104/105) ─────────────────────────────────────── */
@@ -1078,22 +1098,18 @@ export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Obje
     title: 'Retry not run',
     body: 'goes again for each check that did not run, one after another, from what its last read already fetched. Checks that ran are left alone.',
   }],
-  // DAR-UI-124: each Scripts row names its script ("Open script <name>"); the script page's facts name their value.
-  [/^open script .+$/, {
+  // DAR-UI-124, DAR-BE-334: each Queries row names its query ("Open query <name>"); the query page's facts name their value.
+  [/^open query .+$/, {
     title: 'Open',
-    body: 'this script’s own page: what it reads, its schedule, its code and its runs.',
-  }],
-  [/^reads: .+$/, {
-    title: 'Reads',
-    body: 'picks what Run and the schedule both feed the script: a saved run’s newest finished result, or the sample JSON.',
+    body: 'this query’s own page: what it reads, its script, its schedule and its runs.',
   }],
   [/^schedule: .+$/, {
     title: 'Schedule',
-    body: 'sets the time it runs each day, in the tenant’s zone, and the space it posts to. Kept with Save.',
+    body: 'sets the time it runs each day, in the tenant’s zone, and where it sends. Only a tenant admin can change it. Kept with Save.',
   }],
-  [/^posts to: .+$/, {
-    title: 'Posts to',
-    body: 'picks the chat space its text goes to, with the time it runs. Kept with Save.',
+  [/^sends to: .+$/, {
+    title: 'Sends to',
+    body: 'picks the email addresses and chat space its answer goes to, with the time it runs. Kept with Save.',
   }],
   // DAR-BE-328: each Peak periods row names its period ("Open peak period <name>").
   [/^open peak period .+$/, {

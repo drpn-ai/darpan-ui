@@ -263,24 +263,25 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Config history' },
   },
   {
-    // DAR-BE-164. The active tenant's JEXL scripts: write, run against sample input or a run's differences, save.
+    // DAR-BE-334 (was DAR-BE-164's scripts). The active tenant's queries: a read over what its audits keep and a JEXL
+    // script, run here or on a schedule by email and chat. The paths keep their old name.
     path: '/settings/tenant/scripts',
     name: 'settings-tenant-scripts',
     component: () => import('../pages/settings/TenantScriptsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Scripts' },
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Queries' },
   },
   {
-    // DAR-UI-124. One script on a page of its own: what it reads, its schedule, its code and this visit's runs.
+    // DAR-UI-124, DAR-BE-334. One query on a page of its own: its read, its script, its schedule and this visit's runs.
     path: '/settings/tenant/scripts/new',
     name: 'settings-tenant-script-new',
     component: () => import('../pages/settings/TenantScriptPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Script' },
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
   },
   {
     path: '/settings/tenant/scripts/:tenantScriptId',
     name: 'settings-tenant-script',
     component: () => import('../pages/settings/TenantScriptPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Script' },
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
   },
   {
     // DAR-BE-328. The active tenant's peak periods: busy windows that move runs out of the way.

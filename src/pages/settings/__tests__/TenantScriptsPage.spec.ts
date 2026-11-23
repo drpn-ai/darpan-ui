@@ -1,17 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import type { TenantScript, TenantScriptDeployment } from '../../../lib/api/scriptTypes'
+import type { TenantQuery, TenantQuerySchedule } from '../../../lib/api/scriptTypes'
 
-const listTenantScripts = vi.hoisted(() => vi.fn())
-const listTenantScriptDeployments = vi.hoisted(() => vi.fn())
-const listGeneratedOutputs = vi.hoisted(() => vi.fn())
+const listTenantQueries = vi.hoisted(() => vi.fn())
+const listTenantQuerySchedules = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 
 vi.mock('../../../lib/api/facade', () => ({
-  scriptFacade: { listTenantScripts, listTenantScriptDeployments },
-  reconciliationFacade: { listGeneratedOutputs },
+  scriptFacade: { listTenantQueries, listTenantQuerySchedules },
   settingsFacade: { listTenantChatSpaces },
 }))
 vi.mock('../../../stores/permissions', () => ({
@@ -32,15 +30,17 @@ vi.mock('vue-router', async () => {
 
 import TenantScriptsPage from '../TenantScriptsPage.vue'
 
-const script = (over: Partial<TenantScript> = {}): TenantScript => ({
-  tenantScriptId: '100', scriptName: 'Orders only in OMS', description: null, scriptProfile: 'SCRIPT', inputSource: 'RUN_RESULT',
-  scriptBody: "'x'", sampleInputJson: null, isActive: true, createdByUserId: 'U1', createdDate: null, lastUpdatedDate: null, ...over,
+const query = (over: Partial<TenantQuery> = {}): TenantQuery => ({
+  tenantQueryId: '100', queryName: 'Open backorders', description: null, readSpecJson: '{"inputs":[]}',
+  readText: 'Reads dataset DS_ORDERS, last 30 days, status = B, 2 fields', scriptBody: "'x'", sampleInputJson: null,
+  isActive: true, ownerUserId: 'U1', ...over,
 })
 
-const deployment = (over: Partial<TenantScriptDeployment> = {}): TenantScriptDeployment => ({
-  tenantScriptDeploymentId: 'D1', tenantScriptId: '100', scheduleExpr: '0 0 7 * * ?', inputSavedRunId: 'RS_SALES',
-  chatSpaceId: 'S1', isActive: true, nextRunDate: null, lastRunDate: '2026-11-18T07:00:00Z', lastRunStatus: 'SENT',
-  lastRunMessage: null, lastRunUnits: null, ...over,
+const schedule = (over: Partial<TenantQuerySchedule> = {}): TenantQuerySchedule => ({
+  scheduleId: 'S100', tenantQueryId: '100', cronExpression: '0 0 7 * * ?', timeZone: 'UTC', isActive: 'Y',
+  ownerUserId: 'U1', ownerName: 'Aditi', emailTo: 'ops@krewe.example, cfo@krewe.example', emailCc: null, chatSpaceId: 'C1',
+  recipientCount: 2, nextRunDate: null, lastRunDate: '2026-11-18T07:00:00Z', lastRunStatus: 'OK', lastRunMessage: null,
+  deliveries: [], ...over,
 })
 
 async function mountPage() {
@@ -49,56 +49,55 @@ async function mountPage() {
   return wrapper
 }
 
-describe('TenantScriptsPage', () => {
+describe('TenantScriptsPage (queries)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     permissions.canEditTenantSettings = true
     document.body.replaceChildren()
-    listTenantScripts.mockResolvedValue({
-      scripts: [
-        script(),
-        script({ tenantScriptId: '200', scriptName: 'Refund total', scriptProfile: 'EXPRESSION' }),
-        script({ tenantScriptId: '300', scriptName: 'Tender mix', inputSource: 'SAMPLE' }),
-        script({ tenantScriptId: '400', scriptName: 'Late payments' }),
+    listTenantQueries.mockResolvedValue({
+      queries: [
+        query(),
+        query({ tenantQueryId: '200', queryName: 'Refund total', readSpecJson: null, readText: null }),
+        query({ tenantQueryId: '300', queryName: 'Late payments' }),
+        query({ tenantQueryId: '400', queryName: 'Owner left' }),
       ],
-      library: [{ name: 'dec(x)', help: 'x as a decimal number' }],
+      library: [],
       limits: {},
     })
-    listTenantScriptDeployments.mockResolvedValue({
+    listTenantQuerySchedules.mockResolvedValue({
       timeZone: 'UTC',
-      deployments: [
-        deployment(),
-        deployment({ tenantScriptDeploymentId: 'D2', tenantScriptId: '200', isActive: false, lastRunDate: null, lastRunStatus: null }),
-        deployment({ tenantScriptDeploymentId: 'D4', tenantScriptId: '400', lastRunStatus: 'NOT_DELIVERED' }),
+      schedules: [
+        schedule(),
+        schedule({ scheduleId: 'S200', tenantQueryId: '200', isActive: 'N', lastRunDate: null, lastRunStatus: null, emailTo: null,
+          recipientCount: 0 }),
+        schedule({ scheduleId: 'S400', tenantQueryId: '400', isActive: 'N', lastRunStatus: 'OWNER_LOST' }),
       ],
     })
-    listGeneratedOutputs.mockResolvedValue({ generatedOutputs: [{ fileName: 'r1.json', savedRunId: 'RS_SALES', savedRunName: 'Sales Orders' }] })
-    listTenantChatSpaces.mockResolvedValue({ chatSpaces: [{ chatSpaceId: 'S1', spaceName: '#ops-daily', chatProviderLabel: 'Slack', isActive: 'Y' }] })
+    listTenantChatSpaces.mockResolvedValue({ chatSpaces: [{ chatSpaceId: 'C1', spaceName: '#ops-daily', chatProviderLabel: 'Slack', isActive: 'Y' }] })
   })
 
-  it('reads every deployment in one call and shows one row per script', async () => {
+  it('lists each query with its read in words', async () => {
     const wrapper = await mountPage()
-    expect(listTenantScriptDeployments).toHaveBeenCalledWith()
+    expect(wrapper.find('h1').text()).toBe('Queries')
+    expect(listTenantQuerySchedules).toHaveBeenCalledWith()
     const rows = wrapper.findAll('[data-testid="script-row"]')
     expect(rows).toHaveLength(4)
-    expect(rows[0]!.text()).toContain('Orders only in OMS')
-    expect(rows[0]!.text()).toContain('Script · reads Sales Orders')
-    expect(rows[1]!.text()).toContain('Expression · reads Sales Orders')
-    expect(rows[2]!.text()).toContain('Script · reads Sample JSON')
-    expect(wrapper.text()).not.toContain('d:dec')
+    expect(rows[0]!.text()).toContain('Open backorders')
+    expect(rows[0]!.find('[data-testid="script-row-reads"]').text()).toBe('Reads dataset DS_ORDERS, last 30 days, status = B, 2 fields')
+    expect(rows[1]!.find('[data-testid="script-row-reads"]').text()).toBe('Reads nothing: script only')
   })
 
-  it('says when each posts, where, and how its last scheduled run went', async () => {
+  it('says when each sends, to how many, and how its last scheduled run went', async () => {
     const wrapper = await mountPage()
     const schedules = wrapper.findAll('[data-testid="script-row-schedule"]')
     const lastRuns = wrapper.findAll('[data-testid="script-row-last-run"]')
     const dots = wrapper.findAll('.script-row__dot')
 
-    expect(schedules[0]!.text()).toBe('Daily at 7:00 AM → #ops-daily')
+    expect(schedules[0]!.text()).toBe('Daily at 7:00 AM → 2 addresses · #ops-daily')
     expect(dots[0]!.attributes('data-state')).toBe('on')
     expect(lastRuns[0]!.text()).toMatch(/^Last run .+ · sent$/)
 
-    expect(schedules[1]!.text()).toBe('Off · posts to #ops-daily')
+    expect(schedules[1]!.text()).toBe('Off · sends to #ops-daily')
     expect(dots[1]!.attributes('data-state')).toBe('off')
     expect(lastRuns[1]!.text()).toBe('Never run on a schedule')
 
@@ -106,22 +105,21 @@ describe('TenantScriptsPage', () => {
     expect(dots[2]!.attributes('data-state')).toBe('none')
 
     expect(dots[3]!.attributes('data-state')).toBe('failed')
-    expect(lastRuns[3]!.text()).toMatch(/^Last run .+ · failed$/)
+    expect(lastRuns[3]!.text()).toMatch(/^Last run .+ · owner can no longer send it$/)
   })
 
-  it('opens a script on its own page', async () => {
+  it('opens a query on its own page', async () => {
     const wrapper = await mountPage()
     const open = wrapper.findAll('[data-testid="script-row-open"]')[0]!
-    expect(open.text()).toBe('Open →')
-    expect(open.attributes('aria-label')).toBe('Open script Orders only in OMS')
+    expect(open.attributes('aria-label')).toBe('Open query Open backorders')
     await open.trigger('click')
     expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-script', params: { tenantScriptId: '100' } })
   })
 
-  it('offers New script under the list, to editors only', async () => {
+  it('offers New query under the list, to editors only', async () => {
     const wrapper = await mountPage()
     const create = wrapper.find('[data-testid="script-new"]')
-    expect(create.text()).toBe('New script')
+    expect(create.text()).toBe('New query')
     expect(JSON.parse(create.attributes('data-to')!)).toEqual({ name: 'settings-tenant-script-new' })
 
     permissions.canEditTenantSettings = false
@@ -130,11 +128,9 @@ describe('TenantScriptsPage', () => {
     expect(viewer.findAll('[data-testid="script-row"]')).toHaveLength(4)
   })
 
-  it('still lists the scripts when names cannot be read', async () => {
-    listGeneratedOutputs.mockRejectedValue(new Error('down'))
+  it('still lists the queries when space names cannot be read', async () => {
     listTenantChatSpaces.mockRejectedValue(new Error('down'))
     const wrapper = await mountPage()
-    expect(wrapper.findAll('[data-testid="script-row-schedule"]')[0]!.text()).toBe('Daily at 7:00 AM → S1')
-    expect(wrapper.findAll('[data-testid="script-row"]')[0]!.text()).toContain('reads RS_SALES')
+    expect(wrapper.findAll('[data-testid="script-row-schedule"]')[0]!.text()).toBe('Daily at 7:00 AM → 2 addresses · C1')
   })
 })

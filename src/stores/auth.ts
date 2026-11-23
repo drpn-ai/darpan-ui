@@ -93,6 +93,8 @@ export interface UiPermissionPolicy {
   canManageConnections: boolean
   canManageGlobalSettings: boolean
   canManageConfigSharing: boolean
+  /** DAR-BE-334: schedule a query (it sends the tenant's data out): tenant admin, as on the backend. */
+  canScheduleQueries: boolean
 }
 
 const authBypass = !import.meta.env.PROD
@@ -189,6 +191,7 @@ export function buildUiPermissionPolicy(sessionInfo: SessionInfo | null | undefi
     canManageConnections: canRunActiveTenantReconciliation,
     canManageGlobalSettings: canManageDarpanCore,
     canManageConfigSharing: isAuthenticated && (isTenantAdmin || isSuperAdmin),
+    canScheduleQueries: isAuthenticated && (isTenantAdmin || isSuperAdmin),
   }
 }
 

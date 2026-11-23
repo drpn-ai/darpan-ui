@@ -270,10 +270,9 @@ describe('every button in the app has an answer', () => {
 
   // DAR-UI-126. A StaticFactStrip cell is named in script ("Label: value"), out of the template sweep's reach.
   it('answers the settings-page facts by the names their pages give them', () => {
-    expect(lookupAction('reads: sales orders')?.title).toBe('Reads')
     expect(lookupAction('schedule: daily at 7:00 am')?.title).toBe('Schedule')
-    expect(lookupAction('posts to: #ops-daily')?.title).toBe('Posts to')
-    // DAR-UI-127: Audit settings names its own, so a script's answer never reads over an audit's.
+    expect(lookupAction('sends to: 2 addresses · #ops-daily')?.title).toBe('Sends to')
+    // DAR-UI-127: Audit settings names its own, so a query's answer never reads over an audit's.
     expect(lookupAction('audit schedule: daily at 6:00 am')?.body).toContain('every check of this audit')
     expect(lookupAction('after each run: email to 4 people + 1 more')?.title).toBe('After each run')
     expect(lookupAction('audit posts to: gorjana ops')?.body).toContain('summary card')

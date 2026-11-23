@@ -1,19 +1,19 @@
 <template>
   <StaticPageFrame>
     <template #hero>
-      <h1>Scripts</h1>
-      <p class="section-note">Small programs that read a run's results and post a message.</p>
+      <h1>Queries</h1>
+      <p class="section-note">Questions about your own data, answered from what your audits keep, sent when you want.</p>
     </template>
 
-    <LoadingState v-if="loading" noun="scripts" />
+    <LoadingState v-if="loading" noun="queries" />
     <InlineValidation v-else-if="pageError" tone="error" :message="pageError" />
-    <p v-else-if="scripts.length === 0" class="section-note">No scripts yet.</p>
+    <p v-else-if="queries.length === 0" class="section-note">No queries yet.</p>
 
     <ul v-if="rows.length" class="script-rows" data-testid="script-rows">
-      <li v-for="row in rows" :key="row.tenantScriptId" class="script-row" data-testid="script-row">
+      <li v-for="row in rows" :key="row.tenantQueryId" class="script-row" data-testid="script-row">
         <span class="script-row__main">
-          <span class="script-row__name">{{ row.scriptName }}</span>
-          <span class="script-row__dim"><span v-explain="'scriptProfile'">{{ row.profile }}</span> · reads {{ row.reads }}</span>
+          <span class="script-row__name">{{ row.queryName }}</span>
+          <span class="script-row__dim" data-testid="script-row-reads">{{ row.reads }}</span>
         </span>
         <span class="script-row__main">
           <span class="script-row__schedule" data-testid="script-row-schedule">
@@ -24,9 +24,9 @@
         <span class="script-row__actions">
           <button
             type="button"
-            :aria-label="`Open script ${row.scriptName}`"
+            :aria-label="`Open query ${row.queryName}`"
             data-testid="script-row-open"
-            @click="openScript(row.tenantScriptId)"
+            @click="openQuery(row.tenantQueryId)"
           >
             Open <span aria-hidden="true">→</span>
           </button>
@@ -40,23 +40,23 @@
       class="static-page-action-tile static-page-create-action"
       data-testid="script-new"
     >
-      New script
+      New query
     </RouterLink>
   </StaticPageFrame>
 </template>
 
 <script setup lang="ts">
-// DAR-BE-164 / DAR-UI-124. The active tenant's scripts as one list of rows: what each reads, when it posts and
-// where, and how its last scheduled run went. Each opens its own page (TenantScriptPage).
+// DAR-BE-334 (was DAR-BE-164 / DAR-UI-124's scripts). The active tenant's queries as one list of rows: what each reads,
+// when it sends and where, and how its last scheduled run went. Each opens its own page (TenantScriptPage).
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
-import { reconciliationFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
-import type { TenantScript, TenantScriptDeployment } from '../../lib/api/scriptTypes'
-import type { GeneratedOutput, TenantChatSpace } from '../../lib/api/types'
-import { isFailedStatus, scheduleState, scheduleWords, statusWords } from '../../lib/scriptDeployment'
+import { scriptFacade, settingsFacade } from '../../lib/api/facade'
+import type { TenantQuery, TenantQuerySchedule } from '../../lib/api/scriptTypes'
+import type { TenantChatSpace } from '../../lib/api/types'
+import { isOn, scheduleState, scheduleWords, sendsToWords, statusWords } from '../../lib/scriptDeployment'
 import { formatDateTime } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'
 
@@ -64,56 +64,40 @@ const router = useRouter()
 const permissionsStore = usePermissionsStore()
 const canEdit = computed(() => permissionsStore.canEditTenantSettings)
 
-const scripts = ref<TenantScript[]>([])
-const deployments = ref<TenantScriptDeployment[]>([])
+const queries = ref<TenantQuery[]>([])
+const schedules = ref<TenantQuerySchedule[]>([])
 const chatSpaces = ref<TenantChatSpace[]>([])
-const runResults = ref<GeneratedOutput[]>([])
 const timeZone = ref('')
 const loading = ref(false)
 const pageError = ref('')
-
-const savedRunNames = computed(() => {
-  const names = new Map<string, string>()
-  for (const out of runResults.value) {
-    if (out.savedRunId && !names.has(out.savedRunId)) names.set(out.savedRunId, out.savedRunName || out.savedRunId)
-  }
-  return names
-})
 
 function spaceName(chatSpaceId: string): string {
   return chatSpaces.value.find((space) => space.chatSpaceId === chatSpaceId)?.spaceName ?? chatSpaceId
 }
 
-const rows = computed(() => scripts.value.map((script) => {
-  // One deployment per script on this page; the backend allows more.
-  const deployment = deployments.value.find((item) => item.tenantScriptId === script.tenantScriptId) ?? null
-  const savedRunId = deployment?.inputSavedRunId ?? ''
-  const reads = script.inputSource === 'SAMPLE'
-    ? 'Sample JSON'
-    : (savedRunId && (savedRunNames.value.get(savedRunId) ?? savedRunId)) || 'a saved run'
-  let schedule = 'Not scheduled'
-  if (deployment) {
-    schedule = deployment.isActive
-      ? `${scheduleWords(deployment.scheduleExpr)} → ${spaceName(deployment.chatSpaceId)}`
-      : `Off · posts to ${spaceName(deployment.chatSpaceId)}`
+const rows = computed(() => queries.value.map((query) => {
+  // One schedule per query on this page; the backend allows more.
+  const schedule = schedules.value.find((item) => item.tenantQueryId === query.tenantQueryId) ?? null
+  const sendsTo = schedule ? sendsToWords(schedule.recipientCount, schedule.chatSpaceId ? spaceName(schedule.chatSpaceId) : null) : ''
+  let scheduleText = 'Not scheduled'
+  if (schedule) {
+    scheduleText = isOn(schedule.isActive) ? `${scheduleWords(schedule.cronExpression)} → ${sendsTo}` : `Off · sends to ${sendsTo}`
   }
-  const lastRun = deployment?.lastRunDate
-    ? `Last run ${formatDateTime(deployment.lastRunDate, { timeZone: timeZone.value })} · ${
-      isFailedStatus(deployment.lastRunStatus) ? 'failed' : statusWords(deployment.lastRunStatus).toLowerCase()}`
+  const lastRun = schedule?.lastRunDate
+    ? `Last run ${formatDateTime(schedule.lastRunDate, { timeZone: timeZone.value })} · ${statusWords(schedule.lastRunStatus).toLowerCase()}`
     : 'Never run on a schedule'
   return {
-    tenantScriptId: script.tenantScriptId,
-    scriptName: script.scriptName,
-    profile: script.scriptProfile === 'EXPRESSION' ? 'Expression' : 'Script',
-    reads,
-    schedule,
-    state: scheduleState(deployment),
+    tenantQueryId: query.tenantQueryId,
+    queryName: query.queryName,
+    reads: query.readText || 'Reads nothing: script only',
+    schedule: scheduleText,
+    state: scheduleState(schedule),
     lastRun,
   }
 }))
 
-function openScript(tenantScriptId: string): void {
-  void router.push({ name: 'settings-tenant-script', params: { tenantScriptId } })
+function openQuery(tenantQueryId: string): void {
+  void router.push({ name: 'settings-tenant-script', params: { tenantScriptId: tenantQueryId } })
 }
 
 function messageOf(error: unknown, fallback: string): string {
@@ -124,28 +108,27 @@ async function load(): Promise<void> {
   loading.value = true
   pageError.value = ''
   try {
-    const [listed, deployed] = await Promise.all([
-      scriptFacade.listTenantScripts(),
-      scriptFacade.listTenantScriptDeployments(),
+    const [listed, scheduled] = await Promise.all([
+      scriptFacade.listTenantQueries(),
+      scriptFacade.listTenantQuerySchedules(),
     ])
-    scripts.value = listed.scripts ?? []
-    deployments.value = deployed.deployments ?? []
-    timeZone.value = deployed.timeZone ?? ''
+    queries.value = listed.queries ?? []
+    schedules.value = scheduled.schedules ?? []
+    timeZone.value = scheduled.timeZone ?? ''
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not load the scripts.')
+    pageError.value = messageOf(error, 'Could not load the queries.')
   } finally {
     loading.value = false
   }
 }
 
-// Names only: a row still reads without them, as the space or saved run id.
+// Names only: a row still reads without them, as the space id.
 async function loadNames(): Promise<void> {
-  const [spaces, outputs] = await Promise.allSettled([
-    settingsFacade.listTenantChatSpaces(),
-    reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 200 }),
-  ])
-  if (spaces.status === 'fulfilled') chatSpaces.value = spaces.value.chatSpaces ?? []
-  if (outputs.status === 'fulfilled') runResults.value = outputs.value.generatedOutputs ?? []
+  try {
+    chatSpaces.value = (await settingsFacade.listTenantChatSpaces()).chatSpaces ?? []
+  } catch {
+    chatSpaces.value = []
+  }
 }
 
 onMounted(() => {

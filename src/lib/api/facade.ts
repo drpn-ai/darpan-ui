@@ -35,15 +35,16 @@ import type {
   SnapshotTenantConfigResponse,
 } from './configTypes'
 import type {
-  ListTenantScriptDeploymentsResponse,
-  ListTenantScriptsResponse,
-  RunTenantScriptDeploymentResponse,
-  RunTenantScriptPayload,
-  RunTenantScriptResponse,
-  SaveTenantScriptPayload,
-  SaveTenantScriptDeploymentPayload,
-  SaveTenantScriptDeploymentResponse,
-  SaveTenantScriptResponse,
+  ListTenantQueriesResponse,
+  ListTenantQuerySchedulesResponse,
+  RunTenantQueryPayload,
+  RunTenantQueryResponse,
+  RunTenantQueryScheduleResponse,
+  SaveTenantQueryPayload,
+  SaveTenantQueryResponse,
+  SaveTenantQuerySchedulePayload,
+  SaveTenantQueryScheduleResponse,
+  SendAgentQueryTurnResponse,
 } from './scriptTypes'
 import type {
   DeletePeakPeriodResponse,
@@ -813,44 +814,49 @@ export const configFacade = {
   },
 }
 
-// DAR-BE-164. The active tenant's scripts: list, save, delete, and run (a saved script or an unsaved draft).
+// DAR-BE-334. The active tenant's queries and their schedules (moqui-jexl), the read catalog, and a checked proposal.
 const SCRIPT = {
-  listTenantScripts: 'facade.TenantScriptFacadeServices.list#TenantScripts',
-  saveTenantScript: 'facade.TenantScriptFacadeServices.save#TenantScript',
-  deleteTenantScript: 'facade.TenantScriptFacadeServices.delete#TenantScript',
-  runTenantScript: 'facade.TenantScriptFacadeServices.run#TenantScript',
-  listTenantScriptDeployments: 'facade.TenantScriptFacadeServices.list#TenantScriptDeployments',
-  saveTenantScriptDeployment: 'facade.TenantScriptFacadeServices.save#TenantScriptDeployment',
-  deleteTenantScriptDeployment: 'facade.TenantScriptFacadeServices.delete#TenantScriptDeployment',
-  runTenantScriptDeployment: 'facade.TenantScriptFacadeServices.run#TenantScriptDeployment',
+  listTenantQueries: 'facade.TenantScriptFacadeServices.list#TenantQueries',
+  saveTenantQuery: 'facade.TenantScriptFacadeServices.save#TenantQuery',
+  deleteTenantQuery: 'facade.TenantScriptFacadeServices.delete#TenantQuery',
+  runTenantQuery: 'facade.TenantScriptFacadeServices.run#TenantQuery',
+  listTenantQuerySchedules: 'facade.TenantScriptFacadeServices.list#TenantQuerySchedules',
+  saveTenantQuerySchedule: 'facade.TenantScriptFacadeServices.save#TenantQuerySchedule',
+  deleteTenantQuerySchedule: 'facade.TenantScriptFacadeServices.delete#TenantQuerySchedule',
+  runTenantQuerySchedule: 'facade.TenantScriptFacadeServices.run#TenantQuerySchedule',
+  sendAgentQueryTurn: 'facade.AgentTurnFacadeServices.send#AgentQueryTurn',
 } as const
 
 export const scriptFacade = {
-  listTenantScripts(payload: Record<string, never> = {}, signal?: AbortSignal): Promise<ListTenantScriptsResponse> {
-    return callService<ListTenantScriptsResponse>(SCRIPT.listTenantScripts, payload, signal)
+  listTenantQueries(payload: Record<string, never> = {}, signal?: AbortSignal): Promise<ListTenantQueriesResponse> {
+    return callService<ListTenantQueriesResponse>(SCRIPT.listTenantQueries, payload, signal)
   },
-  saveTenantScript(payload: SaveTenantScriptPayload, signal?: AbortSignal): Promise<SaveTenantScriptResponse> {
-    return callService<SaveTenantScriptResponse>(SCRIPT.saveTenantScript, payload, signal)
+  saveTenantQuery(payload: SaveTenantQueryPayload, signal?: AbortSignal): Promise<SaveTenantQueryResponse> {
+    return callService<SaveTenantQueryResponse>(SCRIPT.saveTenantQuery, payload, signal)
   },
-  deleteTenantScript(payload: { tenantScriptId: string }, signal?: AbortSignal): Promise<Record<string, unknown>> {
-    return callService<Record<string, unknown>>(SCRIPT.deleteTenantScript, payload, signal)
+  deleteTenantQuery(payload: { tenantQueryId: string }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    return callService<Record<string, unknown>>(SCRIPT.deleteTenantQuery, payload, signal)
   },
-  runTenantScript(payload: RunTenantScriptPayload, signal?: AbortSignal): Promise<RunTenantScriptResponse> {
-    return callService<RunTenantScriptResponse>(SCRIPT.runTenantScript, payload, signal)
+  /** A saved query, or the read and script given, on the tenant's data now; nothing is sent. */
+  runTenantQuery(payload: RunTenantQueryPayload, signal?: AbortSignal): Promise<RunTenantQueryResponse> {
+    return callService<RunTenantQueryResponse>(SCRIPT.runTenantQuery, payload, signal)
   },
-  // DAR-BE-167. Deployments: a saved script on a schedule, its text posted to a chat space.
-  listTenantScriptDeployments(payload: { tenantScriptId?: string } = {}, signal?: AbortSignal): Promise<ListTenantScriptDeploymentsResponse> {
-    return callService<ListTenantScriptDeploymentsResponse>(SCRIPT.listTenantScriptDeployments, payload, signal)
+  listTenantQuerySchedules(payload: { tenantQueryId?: string } = {}, signal?: AbortSignal): Promise<ListTenantQuerySchedulesResponse> {
+    return callService<ListTenantQuerySchedulesResponse>(SCRIPT.listTenantQuerySchedules, payload, signal)
   },
-  saveTenantScriptDeployment(payload: SaveTenantScriptDeploymentPayload, signal?: AbortSignal): Promise<SaveTenantScriptDeploymentResponse> {
-    return callService<SaveTenantScriptDeploymentResponse>(SCRIPT.saveTenantScriptDeployment, payload, signal)
+  saveTenantQuerySchedule(payload: SaveTenantQuerySchedulePayload, signal?: AbortSignal): Promise<SaveTenantQueryScheduleResponse> {
+    return callService<SaveTenantQueryScheduleResponse>(SCRIPT.saveTenantQuerySchedule, payload, signal)
   },
-  deleteTenantScriptDeployment(payload: { tenantScriptDeploymentId: string }, signal?: AbortSignal): Promise<Record<string, unknown>> {
-    return callService<Record<string, unknown>>(SCRIPT.deleteTenantScriptDeployment, payload, signal)
+  deleteTenantQuerySchedule(payload: { scheduleId: string }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    return callService<Record<string, unknown>>(SCRIPT.deleteTenantQuerySchedule, payload, signal)
   },
-  /** send=false (default) previews the message; send=true posts it and records the run. */
-  runTenantScriptDeployment(payload: { tenantScriptDeploymentId: string; send?: boolean }, signal?: AbortSignal): Promise<RunTenantScriptDeploymentResponse> {
-    return callService<RunTenantScriptDeploymentResponse>(SCRIPT.runTenantScriptDeployment, payload, signal)
+  /** send=false (default) previews; send=true delivers it now (its owner only) and records the run. */
+  runTenantQuerySchedule(payload: { scheduleId: string; send?: boolean }, signal?: AbortSignal): Promise<RunTenantQueryScheduleResponse> {
+    return callService<RunTenantQueryScheduleResponse>(SCRIPT.runTenantQuerySchedule, payload, signal)
+  },
+  /** The queries page's agent: one message; it proposes a query that has already run (queryProposal), never saves. */
+  sendAgentQueryTurn(payload: { conversationId?: string; text: string }, signal?: AbortSignal): Promise<SendAgentQueryTurnResponse> {
+    return callService<SendAgentQueryTurnResponse>(SCRIPT.sendAgentQueryTurn, payload, signal)
   },
 }
 

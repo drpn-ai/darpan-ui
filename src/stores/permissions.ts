@@ -13,6 +13,7 @@ export const usePermissionsStore = defineStore('permissions', () => {
   const canManageConnections = computed(() => policy.value.canManageConnections)
   const canManageGlobalSettings = computed(() => policy.value.canManageGlobalSettings)
   const canManageConfigSharing = computed(() => policy.value.canManageConfigSharing)
+  const canScheduleQueries = computed(() => policy.value.canScheduleQueries)
 
   return {
     canViewTenantSettings,
@@ -21,5 +22,6 @@ export const usePermissionsStore = defineStore('permissions', () => {
     canManageConnections,
     canManageGlobalSettings,
     canManageConfigSharing,
+    canScheduleQueries,
   }
 })

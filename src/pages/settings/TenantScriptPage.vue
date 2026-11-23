@@ -3,36 +3,86 @@
     <template #hero>
       <StaticRecordTitle
         v-if="draft"
-        :model-value="draft.scriptName"
+        :model-value="draft.queryName"
         :editable="canEdit"
-        aria-label="Script name"
+        aria-label="Query name"
         test-id="script-name"
         explain="scriptName"
-        toggle-label="On schedule"
+        :toggle-label="canSchedule ? 'On schedule' : 'On schedule: scheduling needs tenant admin'"
         :on="schedule?.isActive ?? false"
         toggle-test-id="script-on-schedule"
-        :toggle-disabled="!schedule || !canEdit || busy"
+        :toggle-disabled="!schedule || !canSchedule || busy"
         @update:model-value="renameDraft"
         @update:on="setOnSchedule"
       >
         <span v-if="dirty" class="script-edited-mark" data-testid="script-edited">• edited</span>
       </StaticRecordTitle>
-      <h1 v-else>Script</h1>
+      <h1 v-else>Query</h1>
     </template>
 
-    <LoadingState v-if="loading" noun="script" />
+    <LoadingState v-if="loading" noun="query" />
     <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="script-page-error" />
 
     <template v-if="draft">
       <StaticFactStrip :facts="facts" test-id="script-facts" @open="openFact" />
+      <p v-if="savedSchedule?.ownerName" class="section-note" data-testid="script-owner">
+        Sends as {{ savedSchedule.ownerName }}, who saved the schedule.
+      </p>
+
+      <form v-if="canEdit" class="script-ask" @submit.prevent="ask">
+        <label class="script-ask__field">
+          <span v-explain="'scriptAsk'" class="workflow-context-label">Ask</span>
+          <input
+            v-model="askText"
+            class="wizard-answer-control"
+            type="text"
+            placeholder="Which orders have been backordered for more than 3 days?"
+            aria-label="Ask for a query"
+            data-testid="script-ask"
+            :disabled="busy"
+          >
+        </label>
+        <button
+          type="submit"
+          class="user-settings-control"
+          data-testid="script-ask-send"
+          :aria-busy="asking ? 'true' : undefined"
+          :disabled="busy || !askText.trim()"
+        >
+          Ask
+        </button>
+      </form>
+      <p v-if="askReply" class="section-note" data-testid="script-ask-reply">{{ askReply }}</p>
 
       <div class="script-bench">
         <section class="script-column">
           <div class="script-column__head">
-            <h2 v-explain="'scriptBody'" class="static-page-section-heading">Code</h2>
+            <span class="script-tabs" role="tablist" aria-label="Query parts">
+              <button
+                type="button"
+                role="tab"
+                class="script-tab"
+                :aria-selected="tab === 'script' ? 'true' : 'false'"
+                data-testid="script-tab-script"
+                @click="tab = 'script'"
+              >
+                <span v-explain="'scriptBody'">Script</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                class="script-tab"
+                :aria-selected="tab === 'read' ? 'true' : 'false'"
+                data-testid="script-tab-read"
+                @click="tab = 'read'"
+              >
+                <span v-explain="'scriptInputRun'">Read</span>
+              </button>
+            </span>
             <span class="script-column__hint">⌘↵ runs</span>
           </div>
-          <div class="script-code" :class="{ 'script-code--disabled': !canEdit }">
+          <p class="script-read-text" data-testid="script-read-text">{{ readText }}</p>
+          <div v-show="tab === 'script'" class="script-code" :class="{ 'script-code--disabled': !canEdit }">
             <ol class="script-code__gutter" aria-hidden="true">
               <li
                 v-for="line in lineCount"
@@ -56,6 +106,18 @@
               @keydown.enter.ctrl.prevent="runDraft"
             />
           </div>
+          <textarea
+            v-show="tab === 'read'"
+            v-model="draft.readSpecJson"
+            class="wizard-answer-control workflow-form-textarea script-sample"
+            rows="12"
+            spellcheck="false"
+            aria-label="Read (JSON)"
+            data-testid="script-read"
+            :disabled="!canEdit || saving"
+            @keydown.enter.meta.prevent="runDraft"
+            @keydown.enter.ctrl.prevent="runDraft"
+          />
           <p class="section-note">
             Functions you can call:
             <a
@@ -64,7 +126,7 @@
               target="_blank"
               rel="noopener noreferrer"
               data-testid="script-functions-link"
-            >d: functions <span aria-hidden="true">↗</span></a>
+            >fn: functions <span aria-hidden="true">↗</span></a>
           </p>
         </section>
 
@@ -73,14 +135,14 @@
             <h2 v-explain="'scriptRuns'" class="static-page-section-heading">Runs</h2>
             <span class="script-column__actions">
               <button
-                v-if="deployment && canEdit"
+                v-if="savedSchedule && canSchedule"
                 type="button"
                 class="user-settings-control"
                 data-testid="script-preview"
                 :disabled="busy"
                 @click="openPreview"
               >
-                Preview message
+                Preview send
               </button>
               <button
                 type="button"
@@ -110,29 +172,48 @@
               data-testid="script-run-cell"
             >
               <span class="script-run__head">
-                <span>Run {{ cell.n }}<template v-if="index === 0"> · latest</template></span>
+                <span>{{ cell.label }}<template v-if="index === 0"> · latest</template></span>
                 <span>{{ cell.time }}</span>
               </span>
               <pre v-if="cell.run.error" class="script-run__out" data-testid="script-run-error">{{ errorText(cell.run.error) }}</pre>
-              <pre v-else class="script-run__out" data-testid="script-run-result">{{ resultText(cell.run.result) }}</pre>
-              <ul v-if="cell.run.logs.length" class="script-run__logs" data-testid="script-run-logs">
+              <template v-else>
+                <p v-if="cell.run.summary" class="script-run__summary" data-testid="script-run-summary">{{ cell.run.summary }}</p>
+                <p v-if="cell.run.nothing" class="script-run__summary">Nothing to send.</p>
+                <p v-if="cell.run.invalid" class="script-run__summary">{{ cell.run.invalid }}</p>
+                <div v-for="file in cell.run.files" :key="file.name" class="script-run__file" data-testid="script-run-file">
+                  <span class="script-run__file-name">{{ file.name }} · {{ rowsWords(file.rowCount) }}</span>
+                  <div class="script-run__table-wrap">
+                    <table class="script-run__table">
+                      <thead>
+                        <tr><th v-for="column in file.columns" :key="column" scope="col">{{ column }}</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(row, rowIndex) in file.previewRows" :key="rowIndex" data-testid="script-run-preview-row">
+                          <td v-for="(value, valueIndex) in row" :key="valueIndex">{{ cellText(value) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </template>
+              <ul v-if="cell.run.logs?.length" class="script-run__logs" data-testid="script-run-logs">
                 <li v-for="(line, lineIndex) in cell.run.logs" :key="lineIndex">{{ line }}</li>
               </ul>
               <span class="script-run__meta" data-testid="script-run-meta">{{ cell.meta }}</span>
             </li>
             <li
-              v-if="deployment?.lastRunDate"
+              v-if="savedSchedule?.lastRunDate"
               class="script-run script-run--scheduled"
               :class="{ 'script-run--failed': lastRunFailed }"
               data-testid="script-scheduled-cell"
             >
               <span class="script-run__head">
                 <span>Scheduled run</span>
-                <span>{{ formatDateTime(deployment.lastRunDate, { timeZone }) }}</span>
+                <span>{{ formatDateTime(savedSchedule.lastRunDate, { timeZone }) }}</span>
               </span>
-              <pre class="script-run__out">{{ deployment.lastRunMessage || statusWords(deployment.lastRunStatus) }}</pre>
+              <pre class="script-run__out">{{ savedSchedule.lastRunMessage || statusWords(savedSchedule.lastRunStatus) }}</pre>
             </li>
-            <li v-if="!runs.length && !deployment?.lastRunDate" class="script-run script-run--empty">No runs yet.</li>
+            <li v-if="!runs.length && !savedSchedule?.lastRunDate" class="script-run script-run--empty">No runs yet.</li>
           </ol>
         </section>
       </div>
@@ -143,8 +224,8 @@
         <RouterLink
           :to="{ name: 'settings-tenant-scripts' }"
           class="app-icon-action app-icon-action--large"
-          aria-label="Back to scripts"
-          title="Back to scripts"
+          aria-label="Back to queries"
+          title="Back to queries"
           data-testid="script-back"
         >
           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -153,16 +234,16 @@
         </RouterLink>
         <AppSaveAction
           v-if="canEdit && draft"
-          label="Save script"
+          label="Save query"
           test-id="script-save"
-          :disabled="busy || !draft.scriptName.trim()"
+          :disabled="busy || !draft.queryName.trim()"
           @click="save"
         />
         <button
-          v-if="canEdit && draft?.tenantScriptId"
+          v-if="canEdit && draft?.tenantQueryId"
           type="button"
           class="app-icon-action app-icon-action--large app-icon-action--danger"
-          aria-label="Delete script"
+          aria-label="Delete query"
           data-testid="script-delete"
           :disabled="busy"
           @click="openPopup('delete')"
@@ -190,71 +271,49 @@
 
       <div class="workflow-step-wrapper">
         <WorkflowStepForm
-          v-if="activePopup === 'reads'"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
-          question="What should it read?"
-          primary-label="Save"
-          primary-action-variant="save"
-          primary-test-id="script-reads-save"
-          :submit-disabled="!readsForm.choice"
-          :show-enter-hint="false"
-          show-cancel-action
-          cancel-test-id="script-reads-cancel"
-          @cancel="closePopup"
-          @submit="saveReads"
-        >
-          <label class="wizard-input-shell">
-            <span v-explain="'scriptInputRun'" class="workflow-context-label">Reads</span>
-            <AppSelect
-              v-model="readsForm.choice"
-              :options="readsOptions"
-              placeholder="Select saved run"
-              test-id="script-reads-select"
-              searchable
-              search-placeholder="Search saved runs"
-            />
-          </label>
-          <label v-if="readsForm.choice === SAMPLE_CHOICE" class="wizard-input-shell">
-            <span v-explain="'scriptSample'" class="workflow-context-label">Sample JSON</span>
-            <textarea
-              v-model="readsForm.sample"
-              class="wizard-answer-control workflow-form-textarea script-sample"
-              rows="8"
-              spellcheck="false"
-              data-testid="script-sample"
-            />
-          </label>
-        </WorkflowStepForm>
-
-        <WorkflowStepForm
-          v-else-if="activePopup === 'schedule'"
+          v-if="activePopup === 'schedule'"
           class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
           :question="schedule ? 'Change the schedule.' : 'Set up the schedule.'"
           primary-label="Save"
           primary-action-variant="save"
           primary-test-id="script-schedule-save"
-          :submit-disabled="!scheduleForm.chatSpaceId || (!scheduleForm.time && !schedule)"
+          :submit-disabled="!scheduleForm.time && !schedule"
           :show-enter-hint="false"
           show-cancel-action
           cancel-test-id="script-schedule-cancel"
           @cancel="closePopup"
           @submit="saveSchedule"
         >
+          <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="script-schedule-error" />
           <div class="script-popup-pair">
             <label class="wizard-input-shell">
               <span v-explain="'scriptSchedule'" class="workflow-context-label">Daily at · {{ timeZone || 'tenant zone' }}</span>
               <WorkflowTimeSelect v-model="scheduleForm.time" test-id="script-schedule-time" aria-label="Daily at" />
             </label>
             <label class="wizard-input-shell">
-              <span v-explain="'scriptPostTo'" class="workflow-context-label">Posts to</span>
+              <span v-explain="'scriptPostTo'" class="workflow-context-label">Chat space</span>
               <AppSelect
                 v-model="scheduleForm.chatSpaceId"
                 :options="chatSpaceOptions"
-                placeholder="Select chat space"
+                placeholder="No chat"
                 test-id="script-schedule-space"
               />
             </label>
           </div>
+          <label class="wizard-input-shell">
+            <span v-explain="'scriptEmailTo'" class="workflow-context-label">Email to</span>
+            <input
+              v-model="scheduleForm.emailTo"
+              class="wizard-answer-control"
+              type="text"
+              placeholder="ops@example.com, finance@example.com"
+              data-testid="script-schedule-email-to"
+            >
+          </label>
+          <label class="wizard-input-shell">
+            <span class="workflow-context-label">Cc</span>
+            <input v-model="scheduleForm.emailCc" class="wizard-answer-control" type="text" data-testid="script-schedule-email-cc">
+          </label>
           <div class="script-popup-toggle">
             <AppToggleSwitch v-model="scheduleForm.isActive" label="On schedule" test-id="script-schedule-active" />
             <span>On schedule</span>
@@ -264,9 +323,10 @@
         <WorkflowStepForm
           v-else-if="activePopup === 'preview'"
           class="workflow-form--popup-compact"
-          question="What it would post."
+          question="What it would send."
           primary-label="Send now"
           primary-test-id="script-send-now"
+          :show-primary-action="isOwner"
           :submit-disabled="popupBusy || !preview"
           :show-enter-hint="false"
           show-cancel-action
@@ -276,21 +336,26 @@
           @submit="sendNow"
         >
           <InlineValidation v-if="popupError" tone="error" :message="popupError" />
-          <LoadingState v-if="popupBusy && !preview" noun="message" />
+          <LoadingState v-if="popupBusy && !preview" noun="preview" />
           <template v-if="preview">
-            <p class="section-note" data-testid="script-preview-message">{{ preview.message }}</p>
-            <pre v-if="preview.text" class="script-preview-text" data-testid="script-preview-text">{{ preview.text }}</pre>
+            <p class="section-note" data-testid="script-preview-message">
+              {{ preview.message || statusWords(preview.status) }}
+            </p>
+            <pre v-if="preview.result?.summary" class="script-preview-text" data-testid="script-preview-text">{{ preview.result.summary }}</pre>
           </template>
+          <p v-if="!isOwner" class="section-note" data-testid="script-preview-owner-note">
+            Only {{ savedSchedule?.ownerName || 'its owner' }} can send it now.
+          </p>
         </WorkflowStepForm>
 
         <WorkflowStepForm
           v-else-if="activePopup === 'delete'"
           class="workflow-form--popup-compact"
-          :question="`Delete ${draft.scriptName}?`"
+          :question="`Delete ${draft.queryName}?`"
           :show-primary-action="false"
         >
           <InlineValidation v-if="popupError" tone="error" :message="popupError" />
-          <p class="section-note">Its schedule stops and it leaves the Notifications grid.</p>
+          <p class="section-note">Its schedule stops with it.</p>
           <div class="wizard-actions">
             <button
               type="button"
@@ -298,7 +363,7 @@
               aria-label="Confirm delete"
               data-testid="script-delete-confirm"
               :disabled="popupBusy"
-              @click="deleteScript"
+              @click="deleteQuery"
             >
               <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                 <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
@@ -313,10 +378,12 @@
 </template>
 
 <script setup lang="ts">
-// DAR-UI-124. One tenant script on a page of its own: its name, what it reads, when it posts and where, its code, and
-// this visit's runs. Run reads exactly what the schedule reads. One Save keeps the script and its schedule together;
-// the popups and the toggle only change this page until then. The backend validates every save and runs every script
-// in its sandbox (DAR-BE-164, DAR-BE-167).
+// DAR-BE-334 (was DAR-UI-124's script page). One tenant query on a page of its own: its name, its read (in words, and
+// as JSON on its own tab), its script, this visit's runs (summary, each file with a 20-row preview), and its schedule
+// (when, email recipients, a chat space). The ask box hands the question to the queries agent, whose proposal has
+// already run; it fills this page and saves nothing. One Save keeps the query and its schedule together; the popups
+// and the toggle only change this page until then. Scheduling needs tenant admin (it sends the tenant's data out), and
+// only the schedule's owner can send it by hand.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppCancelAction from '../../components/ui/AppCancelAction.vue'
@@ -330,181 +397,173 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
-import { reconciliationFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
-import type {
-  ScriptDeploymentOutcome,
-  ScriptError,
-  ScriptInputSource,
-  ScriptProfile,
-  ScriptRun,
-  TenantScript,
-  TenantScriptDeployment,
-} from '../../lib/api/scriptTypes'
-import type { GeneratedOutput, TenantChatSpace } from '../../lib/api/types'
+import { scriptFacade, settingsFacade } from '../../lib/api/facade'
+import type { QueryError, QueryRun, QueryScheduleOutcome, TenantQuery, TenantQuerySchedule } from '../../lib/api/scriptTypes'
+import type { TenantChatSpace } from '../../lib/api/types'
 import { backIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
+  badRecipient,
   cronFromTime,
+  formatRecipients,
   isFailedStatus,
-  newestResultFileName,
+  isOn,
+  parseRecipients,
   scheduleWords,
+  sendsToWords,
   statusWords,
   timeFromCron,
 } from '../../lib/scriptDeployment'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import { formatDateTime } from '../../lib/utils/date'
+import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
-  tenantScriptId: string
-  scriptName: string
-  scriptProfile: ScriptProfile
-  inputSource: ScriptInputSource
+  tenantQueryId: string
+  queryName: string
+  description: string
+  readSpecJson: string
   scriptBody: string
-  sampleInputJson: string
 }
 
-/** The deployment as this page holds it until Save. */
+/** The schedule as this page holds it until Save. */
 interface Schedule {
-  scheduleExpr: string
-  chatSpaceId: string
+  cronExpression: string
   isActive: boolean
+  emailTo: string
+  emailCc: string
+  chatSpaceId: string
 }
 
 interface RunCell {
   n: number
+  label: string
   time: string
-  body: string
-  run: ScriptRun
+  run: QueryRun
   meta: string
 }
 
-type Popup = 'reads' | 'schedule' | 'preview' | 'delete'
+type Popup = 'schedule' | 'preview' | 'delete'
+type Tab = 'script' | 'read'
 
-const FUNCTIONS_DOCS_URL = 'https://developers.drpn.ai/tenant-scripts/functions'
-const SAMPLE_CHOICE = '__sample__'
+const FUNCTIONS_DOCS_URL = 'https://developers.drpn.ai/tenant-queries/functions'
 const MAX_RUNS = 3
-
-const STARTER_BODY = `// input is the sample. Sum each order's payments by tender.
-var byTender = {:};
-for (var p : input.payments) {
-  byTender[p.tender] = d:dec(byTender[p.tender] ?? 0) + d:dec(p.amount);
-}
-{ 'orderId': input.orderId, 'paid': d:sum(input.payments, 'amount'), 'byTender': byTender }`
-const STARTER_SAMPLE = `{
-  "orderId": "1001",
-  "payments": [
-    { "tender": "CARD", "amount": "40.00" },
-    { "tender": "GIFT_CARD", "amount": "10.00" }
+const NEW_NAME = 'New query'
+const STARTER_READ = `{
+  "inputs": [
+    { "name": "findings", "source": "auditFindings", "auditId": "", "fields": ["recordKey", "headline", "firstFoundDate"] }
   ]
 }`
-const RUN_RESULT_STARTER = `// input.differences holds up to 2,000 of the run's differences.
-{ 'total': input.totalDifferences, 'read': size(input.differences) }`
+const STARTER_BODY = `// input.findings is the read's rows. Return a summary and files.
+var rows = [...];
+for (var f : input.findings) { fn:push(rows, [f.recordKey, f.headline, f.firstFoundDate]); }
+{ 'summary': fn:str(size(rows)) + ' open findings',
+  'files': [{ 'name': 'findings.csv', 'columns': ['record', 'headline', 'first found'], 'rows': rows }] }`
 
 const route = useRoute()
 const router = useRouter()
 const permissionsStore = usePermissionsStore()
+const authStore = useAuthStore()
 const canEdit = computed(() => permissionsStore.canEditTenantSettings)
+const canSchedule = computed(() => permissionsStore.canScheduleQueries)
 
-const routeScriptId = computed(() => String(route.params.tenantScriptId ?? ''))
+const routeQueryId = computed(() => String(route.params.tenantScriptId ?? ''))
 
-const saved = ref<TenantScript | null>(null)
-const deployment = ref<TenantScriptDeployment | null>(null)
+const saved = ref<TenantQuery | null>(null)
+const savedSchedule = ref<TenantQuerySchedule | null>(null)
 const timeZone = ref('')
 const chatSpaces = ref<TenantChatSpace[]>([])
-const runResults = ref<GeneratedOutput[]>([])
 const loading = ref(false)
 const pageError = ref('')
 
 const draft = ref<Draft | null>(null)
-const readsSavedRunId = ref('')
 const schedule = ref<Schedule | null>(null)
 const baseline = ref('')
+const tab = ref<Tab>('script')
 
 const saving = ref(false)
 const running = ref(false)
+const asking = ref(false)
 const runError = ref('')
 const runs = ref<RunCell[]>([])
 let runCount = 0
 
+const askText = ref('')
+const askReply = ref('')
+let conversationId: string | undefined
+
 const activePopup = ref<Popup | null>(null)
 const popupBusy = ref(false)
 const popupError = ref('')
-const readsForm = ref({ choice: '', sample: '' })
-const scheduleForm = ref({ time: '', chatSpaceId: '', isActive: false })
-const preview = ref<ScriptDeploymentOutcome | null>(null)
+const scheduleForm = ref({ time: '', emailTo: '', emailCc: '', chatSpaceId: '', isActive: false })
+const preview = ref<QueryScheduleOutcome | null>(null)
 
-const busy = computed(() => saving.value || running.value || popupBusy.value)
+const busy = computed(() => saving.value || running.value || asking.value || popupBusy.value)
+const isOwner = computed(() => Boolean(savedSchedule.value?.ownerUserId) && savedSchedule.value?.ownerUserId === authStore.userId)
 
 function snapshot(): string {
-  return JSON.stringify({ draft: draft.value, readsSavedRunId: readsSavedRunId.value, schedule: schedule.value })
+  return JSON.stringify({ draft: draft.value, schedule: schedule.value })
 }
 const dirty = computed(() => Boolean(draft.value) && snapshot() !== baseline.value)
 
-const savedRunOptions = computed(() => {
-  const seen = new Map<string, string>()
-  for (const out of runResults.value) {
-    if (out.savedRunId && !seen.has(out.savedRunId)) seen.set(out.savedRunId, out.savedRunName || out.savedRunId)
-  }
-  return [...seen].map(([value, label]) => ({ value, label }))
-})
-const readsOptions = computed(() => [...savedRunOptions.value, { value: SAMPLE_CHOICE, label: 'Sample JSON' }])
-const chatSpaceOptions = computed(() =>
-  chatSpaces.value
+const chatSpaceOptions = computed(() => [
+  { value: '', label: 'No chat' },
+  ...chatSpaces.value
     .filter((space) => space.isActive !== 'N')
-    .map((space) => ({ value: space.chatSpaceId, label: `${space.spaceName} · ${space.chatProviderLabel}` })))
-
-function savedRunName(savedRunId: string): string {
-  return savedRunOptions.value.find((option) => option.value === savedRunId)?.label ?? savedRunId
-}
+    .map((space) => ({ value: space.chatSpaceId, label: `${space.spaceName} · ${space.chatProviderLabel}` })),
+])
 
 function spaceName(chatSpaceId: string): string {
   return chatSpaces.value.find((space) => space.chatSpaceId === chatSpaceId)?.spaceName ?? chatSpaceId
 }
 
-const readsText = computed(() => {
-  if (draft.value?.inputSource === 'SAMPLE') return 'Sample JSON'
-  return readsSavedRunId.value ? savedRunName(readsSavedRunId.value) : '—'
-})
-const readsSubText = computed(() => (draft.value?.inputSource === 'RUN_RESULT' && readsSavedRunId.value ? 'newest result' : ''))
-const scheduleText = computed(() => {
-  if (!schedule.value) return 'Not scheduled'
-  return schedule.value.isActive ? scheduleWords(schedule.value.scheduleExpr) : 'Off'
-})
-const postsToText = computed(() => (schedule.value ? spaceName(schedule.value.chatSpaceId) : '—'))
-const lastRunFailed = computed(() => isFailedStatus(deployment.value?.lastRunStatus))
-const lastRunText = computed(() => {
-  const current = deployment.value
-  if (!current?.lastRunDate) return 'Never'
-  const when = formatDateTime(current.lastRunDate, { timeZone: timeZone.value })
-  return lastRunFailed.value ? `Failed · ${when}` : `${when} · ${statusWords(current.lastRunStatus).toLowerCase()}`
+/** The read in words: the last run's (it saw the draft), else the saved query's, else none. */
+const readText = computed(() => {
+  if (!draft.value?.readSpecJson.trim()) return 'Reads nothing: script only'
+  return runs.value[0]?.run.readText || (draft.value.readSpecJson === (saved.value?.readSpecJson ?? '') ? saved.value?.readText : null)
+    || 'Run it to see the read in words.'
 })
 
-// The header strip (DAR-UI-126): the three that change open their popup; Last run only reads.
+const scheduleText = computed(() => {
+  if (!schedule.value) return 'Not scheduled'
+  return schedule.value.isActive ? scheduleWords(schedule.value.cronExpression) : 'Off'
+})
+const sendsToText = computed(() => (schedule.value
+  ? sendsToWords(parseRecipients(schedule.value.emailTo).length, schedule.value.chatSpaceId ? spaceName(schedule.value.chatSpaceId) : null)
+  : '—'))
+const lastRunFailed = computed(() => isFailedStatus(savedSchedule.value?.lastRunStatus))
+const lastRunText = computed(() => {
+  const current = savedSchedule.value
+  if (!current?.lastRunDate) return 'Never'
+  const when = formatDateTime(current.lastRunDate, { timeZone: timeZone.value })
+  return `${when} · ${statusWords(current.lastRunStatus).toLowerCase()}`
+})
+
+// The header strip (DAR-UI-126): the two that change open the schedule popup (tenant admins only); Last run only reads.
 const facts = computed<StaticFact[]>(() => {
-  const changeable = { interactive: canEdit.value, disabled: busy.value }
+  const changeable = { interactive: canEdit.value && canSchedule.value, disabled: busy.value }
   return [
-    { key: 'reads', label: 'Reads', value: readsText.value, sub: readsSubText.value, explain: 'scriptInputRun',
-      testId: 'script-fact-reads', ...changeable },
     { key: 'schedule', label: 'Schedule', value: scheduleText.value, explain: 'scriptSchedule', testId: 'script-fact-schedule', ...changeable },
-    { key: 'postsTo', label: 'Posts to', value: postsToText.value, explain: 'scriptPostTo', testId: 'script-fact-posts-to', ...changeable },
+    { key: 'sendsTo', label: 'Sends to', value: sendsToText.value, explain: 'scriptPostTo', testId: 'script-fact-sends-to', ...changeable },
     { key: 'lastRun', label: 'Last run', value: lastRunText.value, explain: 'scriptLastRun', testId: 'script-fact-last-run' },
   ]
 })
 
-function openFact(key: string): void {
-  if (key === 'reads') openReads()
-  else openSchedule()
+function openFact(): void {
+  openSchedule()
 }
 
 const lineCount = computed(() => Math.max((draft.value?.scriptBody ?? '').split('\n').length, 12))
-const errorLine = computed(() => runs.value[0]?.run.error?.line ?? null)
+const errorLine = computed(() => {
+  const error = runs.value[0]?.run.error
+  return error && error.kind === 'SCRIPT_ERROR' ? error.line ?? null : error?.line ?? null
+})
 
 const popupTitle = computed(() => {
   switch (activePopup.value) {
-    case 'reads': return 'Reads'
     case 'schedule': return 'Schedule'
-    case 'preview': return 'Preview message'
-    case 'delete': return 'Delete script'
+    case 'preview': return 'Preview send'
+    case 'delete': return 'Delete query'
     default: return ''
   }
 })
@@ -513,36 +572,57 @@ function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
-function errorText(error: ScriptError): string {
+const READ_KINDS = new Set(['READ_ERROR', 'READ_NOT_ALLOWED', 'READ_TOO_LARGE'])
+
+function errorText(error: QueryError): string {
+  if (READ_KINDS.has(error.kind)) return `${statusWords(error.kind)}: ${error.message}`
   return `${error.line ? `Line ${error.line}: ` : ''}${error.message}`
 }
 
-function resultText(result: unknown): string {
-  return JSON.stringify(result ?? null, null, 2)
+function rowsWords(count: number): string {
+  return `${count.toLocaleString()} row${count === 1 ? '' : 's'}`
+}
+
+function cellText(value: unknown): string {
+  if (value == null) return ''
+  return typeof value === 'object' ? JSON.stringify(value) : String(value)
+}
+
+function runMeta(run: QueryRun): string {
+  const reads = Object.entries(run.readCounts ?? {}).map(([name, count]) => `read ${name} ${count.toLocaleString()}`)
+  return [
+    ...(run.units != null ? [`${run.units.toLocaleString()} units`] : []),
+    ...(run.elapsedMs != null ? [`${run.elapsedMs} ms`] : []),
+    ...reads,
+  ].join(' · ')
+}
+
+function addRun(label: string, run: QueryRun): void {
+  runCount += 1
+  runs.value = [
+    { n: runCount, label, time: new Date().toLocaleTimeString(), run, meta: runMeta(run) },
+    ...runs.value,
+  ].slice(0, MAX_RUNS)
+}
+
+function toSchedule(current: TenantQuerySchedule | null): Schedule | null {
+  return current
+    ? { cronExpression: current.cronExpression, isActive: isOn(current.isActive), emailTo: current.emailTo ?? '',
+        emailCc: current.emailCc ?? '', chatSpaceId: current.chatSpaceId ?? '' }
+    : null
 }
 
 function resetDraft(): void {
-  const script = saved.value
-  draft.value = script
-    ? {
-        tenantScriptId: script.tenantScriptId,
-        scriptName: script.scriptName,
-        scriptProfile: script.scriptProfile,
-        inputSource: script.inputSource,
-        scriptBody: script.scriptBody,
-        sampleInputJson: script.sampleInputJson ?? '',
-      }
-    : { tenantScriptId: '', scriptName: 'New script', scriptProfile: 'SCRIPT', inputSource: 'SAMPLE',
-        scriptBody: STARTER_BODY, sampleInputJson: STARTER_SAMPLE }
-  const current = deployment.value
-  readsSavedRunId.value = current?.inputSavedRunId ?? ''
-  schedule.value = current
-    ? { scheduleExpr: current.scheduleExpr, chatSpaceId: current.chatSpaceId, isActive: current.isActive }
-    : null
+  const query = saved.value
+  draft.value = query
+    ? { tenantQueryId: query.tenantQueryId, queryName: query.queryName, description: query.description ?? '',
+        readSpecJson: query.readSpecJson ?? '', scriptBody: query.scriptBody }
+    : { tenantQueryId: '', queryName: NEW_NAME, description: '', readSpecJson: STARTER_READ, scriptBody: STARTER_BODY }
+  schedule.value = toSchedule(savedSchedule.value)
   baseline.value = snapshot()
 }
 
-async function load(tenantScriptId: string): Promise<void> {
+async function load(tenantQueryId: string): Promise<void> {
   loading.value = true
   pageError.value = ''
   runError.value = ''
@@ -550,27 +630,27 @@ async function load(tenantScriptId: string): Promise<void> {
   runCount = 0
   draft.value = null
   try {
-    const [listed, deployed] = await Promise.all([
-      tenantScriptId ? scriptFacade.listTenantScripts() : Promise.resolve(null),
-      scriptFacade.listTenantScriptDeployments(tenantScriptId ? { tenantScriptId } : {}),
+    const [listed, scheduled] = await Promise.all([
+      tenantQueryId ? scriptFacade.listTenantQueries() : Promise.resolve(null),
+      scriptFacade.listTenantQuerySchedules(tenantQueryId ? { tenantQueryId } : {}),
     ])
-    timeZone.value = deployed.timeZone ?? ''
-    if (tenantScriptId) {
-      const script = (listed?.scripts ?? []).find((item) => item.tenantScriptId === tenantScriptId) ?? null
-      if (!script) {
-        pageError.value = 'No such script in this tenant.'
+    timeZone.value = scheduled.timeZone ?? ''
+    if (tenantQueryId) {
+      const query = (listed?.queries ?? []).find((item) => item.tenantQueryId === tenantQueryId) ?? null
+      if (!query) {
+        pageError.value = 'No such query in this tenant.'
         return
       }
-      saved.value = script
-      // One deployment per script on this page; the backend allows more.
-      deployment.value = (deployed.deployments ?? [])[0] ?? null
+      saved.value = query
+      // One schedule per query on this page; the backend allows more.
+      savedSchedule.value = (scheduled.schedules ?? [])[0] ?? null
     } else {
       saved.value = null
-      deployment.value = null
+      savedSchedule.value = null
     }
     resetDraft()
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not load the script.')
+    pageError.value = messageOf(error, 'Could not load the query.')
   } finally {
     loading.value = false
   }
@@ -578,22 +658,19 @@ async function load(tenantScriptId: string): Promise<void> {
 
 // Names and choices only: the page still reads without them, as ids.
 async function loadChoices(): Promise<void> {
-  const [spaces, outputs] = await Promise.allSettled([
-    settingsFacade.listTenantChatSpaces(),
-    reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 200 }),
-  ])
-  if (spaces.status === 'fulfilled') chatSpaces.value = spaces.value.chatSpaces ?? []
-  if (outputs.status === 'fulfilled') {
-    runResults.value = (outputs.value.generatedOutputs ?? []).filter((item) => item.fileName && item.resultAvailable !== false)
+  try {
+    chatSpaces.value = (await settingsFacade.listTenantChatSpaces()).chatSpaces ?? []
+  } catch {
+    chatSpaces.value = []
   }
 }
 
 function renameDraft(name: string): void {
-  if (draft.value) draft.value.scriptName = name
+  if (draft.value) draft.value.queryName = name
 }
 
 function setOnSchedule(on: boolean): void {
-  if (schedule.value) schedule.value.isActive = on
+  if (schedule.value && canSchedule.value) schedule.value.isActive = on
 }
 
 function openPopup(popup: Popup): void {
@@ -609,57 +686,46 @@ function closePopup(): void {
   preview.value = null
 }
 
-function openReads(): void {
-  const current = draft.value
-  if (!current) return
-  readsForm.value = {
-    choice: current.inputSource === 'SAMPLE' ? SAMPLE_CHOICE : readsSavedRunId.value,
-    sample: current.sampleInputJson,
-  }
-  openPopup('reads')
-}
-
-function saveReads(): void {
-  const current = draft.value
-  const choice = readsForm.value.choice
-  if (!current || !choice) return
-  if (choice === SAMPLE_CHOICE) {
-    current.inputSource = 'SAMPLE'
-    current.sampleInputJson = readsForm.value.sample
-  } else {
-    current.inputSource = 'RUN_RESULT'
-    readsSavedRunId.value = choice
-  }
-  closePopup()
-}
-
 function openSchedule(): void {
+  if (!canSchedule.value) return
   const current = schedule.value
   scheduleForm.value = current
-    ? { time: timeFromCron(current.scheduleExpr) ?? '', chatSpaceId: current.chatSpaceId, isActive: current.isActive }
-    : { time: '09:00', chatSpaceId: '', isActive: false }
+    ? { time: timeFromCron(current.cronExpression) ?? '', emailTo: current.emailTo, emailCc: current.emailCc,
+        chatSpaceId: current.chatSpaceId, isActive: current.isActive }
+    : { time: '09:00', emailTo: '', emailCc: '', chatSpaceId: '', isActive: false }
   openPopup('schedule')
 }
 
 function saveSchedule(): void {
   const form = scheduleForm.value
+  const to = parseRecipients(form.emailTo)
+  const cc = parseRecipients(form.emailCc)
+  const bad = badRecipient([...to, ...cc])
+  if (bad) {
+    popupError.value = `${bad} is not an email address.`
+    return
+  }
+  if (!to.length && !form.chatSpaceId) {
+    popupError.value = 'Send it somewhere: an email address or a chat space.'
+    return
+  }
   // A cron that is not once a day shows no time; left untouched, it is kept as it is.
-  const scheduleExpr = form.time ? cronFromTime(form.time) : schedule.value?.scheduleExpr ?? null
-  if (!scheduleExpr || !form.chatSpaceId) return
-  schedule.value = { scheduleExpr, chatSpaceId: form.chatSpaceId, isActive: form.isActive }
+  const cronExpression = form.time ? cronFromTime(form.time) : schedule.value?.cronExpression ?? null
+  if (!cronExpression) return
+  schedule.value = { cronExpression, isActive: form.isActive, emailTo: formatRecipients(to), emailCc: formatRecipients(cc),
+    chatSpaceId: form.chatSpaceId }
   closePopup()
 }
 
 async function openPreview(): Promise<void> {
-  const current = deployment.value
+  const current = savedSchedule.value
   if (!current) return
   openPopup('preview')
   if (activePopup.value !== 'preview') return
   popupBusy.value = true
   preview.value = null
   try {
-    const out = await scriptFacade.runTenantScriptDeployment({ tenantScriptDeploymentId: current.tenantScriptDeploymentId, send: false })
-    preview.value = out.outcome
+    preview.value = (await scriptFacade.runTenantQuerySchedule({ scheduleId: current.scheduleId, send: false })).outcome
   } catch (error) {
     popupError.value = messageOf(error, 'Could not preview.')
   } finally {
@@ -668,14 +734,14 @@ async function openPreview(): Promise<void> {
 }
 
 async function sendNow(): Promise<void> {
-  const current = deployment.value
-  if (!current || popupBusy.value) return
+  const current = savedSchedule.value
+  if (!current || popupBusy.value || !isOwner.value) return
   popupBusy.value = true
   popupError.value = ''
   try {
-    const out = await scriptFacade.runTenantScriptDeployment({ tenantScriptDeploymentId: current.tenantScriptDeploymentId, send: true })
-    preview.value = out.outcome
-    if (out.deployment) deployment.value = out.deployment
+    preview.value = (await scriptFacade.runTenantQuerySchedule({ scheduleId: current.scheduleId, send: true })).outcome
+    const listed = await scriptFacade.listTenantQuerySchedules({ tenantQueryId: current.tenantQueryId })
+    savedSchedule.value = (listed.schedules ?? [])[0] ?? savedSchedule.value
   } catch (error) {
     popupError.value = messageOf(error, 'Could not send.')
   } finally {
@@ -683,131 +749,119 @@ async function sendNow(): Promise<void> {
   }
 }
 
-async function deleteScript(): Promise<void> {
-  const id = draft.value?.tenantScriptId
+async function deleteQuery(): Promise<void> {
+  const id = draft.value?.tenantQueryId
   if (!id || popupBusy.value) return
   popupBusy.value = true
   popupError.value = ''
   try {
-    await scriptFacade.deleteTenantScript({ tenantScriptId: id })
+    await scriptFacade.deleteTenantQuery({ tenantQueryId: id })
     popupBusy.value = false
     closePopup()
     void router.push({ name: 'settings-tenant-scripts' })
   } catch (error) {
-    popupError.value = messageOf(error, 'Could not delete the script.')
+    popupError.value = messageOf(error, 'Could not delete the query.')
   } finally {
     popupBusy.value = false
   }
 }
 
-/** Run reads what the schedule reads: the saved run's newest finished result, or the sample. */
+/** Run the draft (read and script as they are on this page) on the tenant's data; nothing is sent. */
 async function runDraft(): Promise<void> {
   const current = draft.value
   if (!current || busy.value || !canEdit.value || !current.scriptBody.trim()) return
   runError.value = ''
-  const body = current.scriptBody
-  const reads = readsText.value
   running.value = true
   try {
-    let fileName: string | undefined
-    if (current.inputSource === 'RUN_RESULT') {
-      const savedRunId = readsSavedRunId.value
-      if (!savedRunId) {
-        runError.value = 'Choose what it reads.'
-        return
-      }
-      const outputs = await reconciliationFacade.listGeneratedOutputs({ savedRunId, pageIndex: 0, pageSize: 20 })
-      fileName = newestResultFileName(outputs.generatedOutputs ?? [], savedRunId) ?? undefined
-      if (!fileName) {
-        runError.value = `${reads} has no finished result yet.`
-        return
-      }
-    }
-    const out = await scriptFacade.runTenantScript({
-      tenantScriptId: current.tenantScriptId || undefined,
-      scriptBody: body,
-      scriptProfile: current.scriptProfile,
-      inputSource: current.inputSource,
-      inputJson: current.inputSource === 'SAMPLE' ? current.sampleInputJson : undefined,
-      fileName,
+    const out = await scriptFacade.runTenantQuery({
+      tenantQueryId: current.tenantQueryId || undefined,
+      readSpecJson: current.readSpecJson,
+      scriptBody: current.scriptBody,
     })
-    const previousBody = runs.value[0]?.body ?? saved.value?.scriptBody ?? body
-    runCount += 1
-    const meta = [
-      `${out.run.units.toLocaleString()} units`,
-      `${out.run.elapsedMs} ms`,
-      `on ${reads}`,
-      ...(previousBody !== body ? ['after an edit'] : []),
-    ].join(' · ')
-    runs.value = [
-      { n: runCount, time: new Date().toLocaleTimeString(), body, run: out.run, meta },
-      ...runs.value,
-    ].slice(0, MAX_RUNS)
+    addRun(`Run ${runCount + 1}`, out.result)
   } catch (error) {
-    runError.value = messageOf(error, 'Could not run the script.')
+    runError.value = messageOf(error, 'Could not run the query.')
   } finally {
     running.value = false
   }
 }
 
-/** One Save: the script, then its schedule when there is one and it changed. */
+/** The queries agent: its proposal has already run on the tenant's data; it fills the draft, nothing is saved. */
+async function ask(): Promise<void> {
+  const current = draft.value
+  const text = askText.value.trim()
+  if (!current || busy.value || !text) return
+  asking.value = true
+  askReply.value = ''
+  runError.value = ''
+  try {
+    const out = await scriptFacade.sendAgentQueryTurn(conversationId ? { conversationId, text } : { text })
+    conversationId = out.conversationId ?? conversationId
+    askReply.value = out.question?.text || out.reply || ''
+    const proposed = out.queryProposal
+    if (proposed) {
+      current.readSpecJson = proposed.proposal.readSpecJson ?? ''
+      current.scriptBody = proposed.proposal.scriptBody
+      if (current.queryName === NEW_NAME && proposed.proposal.queryName) current.queryName = proposed.proposal.queryName
+      if (!current.description && proposed.proposal.description) current.description = proposed.proposal.description
+      addRun("Agent's run", proposed.preview)
+      askText.value = ''
+    }
+  } catch (error) {
+    runError.value = messageOf(error, 'Could not ask the agent.')
+  } finally {
+    asking.value = false
+  }
+}
+
+/** One Save: the query, then its schedule when there is one and it changed. */
 async function save(): Promise<void> {
   const current = draft.value
-  if (!current || busy.value || !canEdit.value || !current.scriptName.trim()) return
+  if (!current || busy.value || !canEdit.value || !current.queryName.trim()) return
   saving.value = true
   pageError.value = ''
   try {
-    const out = await scriptFacade.saveTenantScript({
-      tenantScriptId: current.tenantScriptId || undefined,
-      scriptName: current.scriptName.trim(),
-      scriptProfile: current.scriptProfile,
-      inputSource: current.inputSource,
+    const out = await scriptFacade.saveTenantQuery({
+      tenantQueryId: current.tenantQueryId || undefined,
+      queryName: current.queryName.trim(),
+      description: current.description || undefined,
+      readSpecJson: current.readSpecJson,
       scriptBody: current.scriptBody,
-      sampleInputJson: current.sampleInputJson,
     })
-    const wasNew = !current.tenantScriptId
-    saved.value = out.script
-    current.tenantScriptId = out.script.tenantScriptId
-    current.scriptName = out.script.scriptName
-    if (wasNew) void router.replace({ name: 'settings-tenant-script', params: { tenantScriptId: out.script.tenantScriptId } })
+    const wasNew = !current.tenantQueryId
+    saved.value = out.query
+    current.tenantQueryId = out.query.tenantQueryId
+    current.queryName = out.query.queryName
 
     const staged = schedule.value
-    const before = deployment.value
-    // A sample script's schedule reads no saved run.
-    const inputSavedRunId = current.inputSource === 'RUN_RESULT' ? readsSavedRunId.value : ''
-    const scheduleChanged = staged && (!before || before.scheduleExpr !== staged.scheduleExpr
-      || before.chatSpaceId !== staged.chatSpaceId || before.isActive !== staged.isActive
-      || (before.inputSavedRunId ?? '') !== inputSavedRunId)
-    if (staged && scheduleChanged) {
-      const saveOut = await scriptFacade.saveTenantScriptDeployment({
-        tenantScriptDeploymentId: before?.tenantScriptDeploymentId,
-        tenantScriptId: out.script.tenantScriptId,
-        scheduleExpr: staged.scheduleExpr,
-        inputSavedRunId: inputSavedRunId || undefined,
-        chatSpaceId: staged.chatSpaceId,
+    const before = toSchedule(savedSchedule.value)
+    if (staged && canSchedule.value && JSON.stringify(staged) !== JSON.stringify(before)) {
+      const time = timeFromCron(staged.cronExpression)
+      const saveOut = await scriptFacade.saveTenantQuerySchedule({
+        scheduleId: savedSchedule.value?.scheduleId,
+        tenantQueryId: out.query.tenantQueryId,
+        ...(time ? { dailyAt: time } : { cronExpression: staged.cronExpression }),
         isActive: staged.isActive,
+        emailTo: staged.emailTo || undefined,
+        emailCc: staged.emailCc || undefined,
+        chatSpaceId: staged.chatSpaceId || undefined,
       })
-      deployment.value = saveOut.deployment
+      savedSchedule.value = saveOut.schedule
+      schedule.value = toSchedule(saveOut.schedule)
     }
     baseline.value = snapshot()
+    // Last: /new and /:id are two routes, so the move mounts the page afresh and it reads what was just saved.
+    if (wasNew) void router.replace({ name: 'settings-tenant-script', params: { tenantScriptId: out.query.tenantQueryId } })
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not save the script.')
+    pageError.value = messageOf(error, 'Could not save the query.')
   } finally {
     saving.value = false
   }
 }
 
-// An untouched starter follows the input choice, so a new run-result script starts from one that reads differences.
-watch(() => draft.value?.inputSource, (source) => {
-  const current = draft.value
-  if (!current) return
-  if (source === 'RUN_RESULT' && current.scriptBody === STARTER_BODY) current.scriptBody = RUN_RESULT_STARTER
-  if (source === 'SAMPLE' && current.scriptBody === RUN_RESULT_STARTER) current.scriptBody = STARTER_BODY
-})
-
-// A first Save on /new moves the URL to the script's own; that is this page already, so it does not reload.
-watch(routeScriptId, (id) => {
-  if (id && id === draft.value?.tenantScriptId) return
+// Another query's URL on this same page (its own route record) loads that query.
+watch(routeQueryId, (id) => {
+  if (id && id === draft.value?.tenantQueryId) return
   void load(id)
 })
 
@@ -820,7 +874,7 @@ function handleCancelRequest(event: Event): void {
 
 onMounted(() => {
   document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest)
-  void load(routeScriptId.value)
+  void load(routeQueryId.value)
   void loadChoices()
 })
 
@@ -833,6 +887,52 @@ onBeforeUnmount(() => {
 .script-edited-mark {
   color: var(--text-muted);
   font-size: var(--type-note-size);
+}
+
+/* The ask box: one line to the queries agent, its Ask beside it. */
+.script-ask {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.script-ask__field {
+  display: grid;
+  flex: 1;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+/* Script and Read: the same pill tabs as the audit detail column. */
+.script-tabs {
+  display: flex;
+  gap: var(--space-1-5);
+}
+
+.script-tab {
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-label-size);
+  cursor: pointer;
+}
+
+.script-tab[aria-selected='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.script-read-text {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: var(--type-note-size);
+  overflow-wrap: anywhere;
 }
 
 .script-bench {
@@ -990,6 +1090,55 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: var(--type-mono-copy-size);
+}
+
+.script-run__summary {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.script-run__file {
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.script-run__file-name {
+  color: var(--text-soft);
+  font-size: var(--type-note-size);
+}
+
+/* A file's first 20 rows: the app table's header and rules, small and scrolling sideways. */
+.script-run__table-wrap {
+  max-height: 16rem;
+  overflow: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+
+.script-run__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-mono-copy-size);
+}
+
+.script-run__table th,
+.script-run__table td {
+  padding: var(--space-00) var(--space-1);
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.script-run__table th {
+  position: sticky;
+  top: 0;
+  color: var(--text-muted);
+  font-size: var(--type-table-head-size);
+  font-weight: inherit;
+  letter-spacing: var(--type-table-head-tracking);
+  text-transform: uppercase;
+  background: var(--surface-2);
 }
 
 .script-run__logs {

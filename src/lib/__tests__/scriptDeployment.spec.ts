@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cronFromTime, isFailedStatus, newestResultFileName, scheduleState, scheduleWords, statusWords, timeFromCron } from '../scriptDeployment'
+import { badRecipient, cronFromTime, formatRecipients, isFailedStatus, parseRecipients, scheduleState, scheduleWords, statusWords, timeFromCron } from '../scriptDeployment'
 
 describe('scriptDeployment', () => {
   it('maps a daily time to a Quartz cron and back', () => {
@@ -18,7 +18,7 @@ describe('scriptDeployment', () => {
 
   it('names outcomes in words', () => {
     expect(statusWords('NOTHING_TO_SEND')).toBe('Nothing to send')
-    expect(statusWords('SENT')).toBe('Sent')
+    expect(statusWords('OK')).toBe('Sent')
     expect(statusWords(null)).toBe('')
   })
 })
@@ -33,20 +33,32 @@ describe('scriptDeployment (DAR-UI-124)', () => {
 
   it('names a failed last run before on or off', () => {
     expect(scheduleState(null)).toBe('none')
-    expect(scheduleState({ isActive: true, lastRunStatus: 'SENT' })).toBe('on')
+    expect(scheduleState({ isActive: true, lastRunStatus: 'OK' })).toBe('on')
+    expect(scheduleState({ isActive: 'Y', lastRunStatus: 'OK' })).toBe('on')
     expect(scheduleState({ isActive: false, lastRunStatus: null })).toBe('off')
-    expect(scheduleState({ isActive: true, lastRunStatus: 'NOT_DELIVERED' })).toBe('failed')
+    expect(scheduleState({ isActive: true, lastRunStatus: 'DELIVERY_FAILED' })).toBe('failed')
+    expect(scheduleState({ isActive: 'N', lastRunStatus: 'OWNER_LOST' })).toBe('failed')
     expect(isFailedStatus('NOTHING_TO_SEND')).toBe(false)
   })
 
-  it('picks the newest finished result of that saved run', () => {
-    const outputs = [
-      { fileName: 'a.json', savedRunId: 'OTHER' },
-      { fileName: 'b.json', savedRunId: 'RS', resultAvailable: false },
-      { fileName: 'c.json', savedRunId: 'RS' },
-      { fileName: 'd.json', savedRunId: 'RS' },
-    ]
-    expect(newestResultFileName(outputs, 'RS')).toBe('c.json')
-    expect(newestResultFileName(outputs, 'NONE')).toBeNull()
+  it('labels every status moqui-jexl reports', () => {
+    const statuses = ['OK', 'NOTHING_TO_SEND', 'PREVIEW', 'HELD', 'DISABLED', 'OWNER_LOST', 'READ_ERROR', 'READ_NOT_ALLOWED',
+      'READ_TOO_LARGE', 'SCRIPT_ERROR', 'RESULT_INVALID', 'DELIVERY_PARTIAL', 'DELIVERY_FAILED', 'STUCK', 'SCRIPT_MISSING',
+      'NO_INPUT', 'WAITING', 'EXPIRED']
+    for (const status of statuses) expect(statusWords(status)).not.toBe(status)
+    expect(new Set(statuses.map(statusWords)).size).toBe(statuses.length)
+  })
+})
+
+describe('scriptDeployment recipients (DAR-BE-334)', () => {
+  it('reads any separator and writes one comma list without duplicates', () => {
+    expect(parseRecipients(' a@x.com; b@y.com,\n c@z.com ')).toEqual(['a@x.com', 'b@y.com', 'c@z.com'])
+    expect(parseRecipients(null)).toEqual([])
+    expect(formatRecipients(['a@x.com', 'A@X.com', 'b@y.com'])).toBe('a@x.com, b@y.com')
+  })
+
+  it('names the first address that is not one', () => {
+    expect(badRecipient(['a@x.com', 'ops'])).toBe('ops')
+    expect(badRecipient(['a@x.com'])).toBeNull()
   })
 })

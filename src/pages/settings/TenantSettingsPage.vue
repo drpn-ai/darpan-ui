@@ -68,14 +68,14 @@
             </button>
           </span>
         </li>
-        <!-- DAR-BE-164. This tenant's JEXL scripts. -->
+        <!-- DAR-BE-334 (was DAR-BE-164's scripts). This tenant's queries. -->
         <li class="tenant-settings-row">
-          <span class="tenant-settings-row__label">Scripts</span>
-          <span class="tenant-settings-row__value tenant-settings-row__dim">JEXL used by checks</span>
+          <span class="tenant-settings-row__label">Queries</span>
+          <span class="tenant-settings-row__value tenant-settings-row__dim">Your data, answered and sent</span>
           <span class="tenant-settings-row__actions">
             <button
               type="button"
-              aria-label="Open scripts"
+              aria-label="Open queries"
               data-testid="tenant-module-scripts"
               @click="router.push({ name: 'settings-tenant-scripts' })"
             >
