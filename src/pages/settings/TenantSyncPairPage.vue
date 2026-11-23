@@ -322,7 +322,7 @@ import {
   pulseEveryWords,
 } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
-import { formatClockTime, formatShortDate } from '../../lib/utils/date'
+import { formatClockTime } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -400,12 +400,18 @@ const normalPulseEvery = computed(() => saved.value?.normalPulseEveryMinutes ?? 
 // A period overrides a value when today's effective one differs from the pair's own; the fact then keeps the
 // effective value even after the draft changes (the sub says what the normal one became).
 const allowancePeriodActive = computed(() => Boolean(periodName.value && saved.value?.allowanceMinutes !== normalAllowance.value))
-const everyPeriodActive = computed(() => Boolean(periodName.value && (saved.value?.pulseEveryMinutes ?? null) !== (normalPulseEvery.value ?? null)))
+const everyPeriodActive = computed(() => Boolean(periodName.value && (saved.value?.pulseEveryMinutes || null) !== (normalPulseEvery.value || null)))
 const allowanceDraftIsNormal = computed(() => draft.value?.allowanceMinutes === normalAllowance.value)
-const everyDraftIsNormal = computed(() => (draft.value?.pulseEveryMinutes ?? null) === (normalPulseEvery.value || null))
+const everyDraftIsNormal = computed(() => (draft.value?.pulseEveryMinutes || null) === (normalPulseEvery.value || null))
 const shownAllowance = computed(() => (allowancePeriodActive.value ? saved.value?.allowanceMinutes : draft.value?.allowanceMinutes) ?? 0)
 const periodThru = computed(() => saved.value?.periodThruDate ?? '')
-const periodUntil = computed(() => (periodThru.value ? ` until ${formatShortDate(periodThru.value)}` : ''))
+/** A yyyy-MM-dd calendar day as "1 Dec", the same in every zone (it is a date, not an instant). */
+function calendarDay(isoDate: string): string {
+  const [year, month, day] = isoDate.slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return ''
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)))
+}
+const periodUntil = computed(() => (periodThru.value ? ` until ${calendarDay(periodThru.value)}` : ''))
 /** The popup's one-line cue that a peak period overrides the value it edits. */
 const allowanceNote = computed(() => (allowancePeriodActive.value
   ? `Normal days. ${periodName.value} uses ${allowanceWords(saved.value?.allowanceMinutes ?? 0)}${periodUntil.value}.` : ''))
