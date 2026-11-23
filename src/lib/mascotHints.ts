@@ -232,7 +232,7 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { id: 'automation-window-select', text: 'How far back each run reaches. How often it runs is the schedule, and the two are set separately.', when: control('automation-window-select') },
   ]),
   'reconciliation-automation-edit': Object.freeze([
-    { id: 'automation-edit-sync', text: 'Sync replaces this automation’s source setup and filters with the run’s current ones.', when: control('automation-edit-sync') },
+    { id: 'automation-edit-sync', text: 'Sync replaces this automation’s source setup with the run’s current one.', when: control('automation-edit-sync') },
     { id: 'automation-edit-window-fields', text: 'Widening the window makes each run reach further back. It does not make runs happen more often.', when: control('automation-edit-window-fields') },
     { id: 'automation-edit-chat-space-fields', text: 'This is where this automation’s own notice goes, whichever space the tenant defaults to.', when: control('automation-edit-chat-space-fields') },
   ]),
