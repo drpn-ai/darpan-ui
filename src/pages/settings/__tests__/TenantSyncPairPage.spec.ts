@@ -253,7 +253,7 @@ describe('TenantSyncPairPage', () => {
     }) }))
     const wrapper = await mountPage()
     await wrapper.find('[data-testid="sync-pair-fact-allowance"]').trigger('click')
-    expect(text(wrapper, 'sync-pair-allowance-period-note')).toBe('Normal days. Black Friday sale uses 12 hours until 1 Dec.')
+    expect(text(wrapper, 'sync-pair-allowance-period-note')).toBe('Normal days. Black Friday sale uses 12 hours through 1 Dec.')
     expect(wrapper.find('[data-testid="sync-pair-every-period-note"]').exists()).toBe(false)
     await wrapper.find('[data-testid="sync-pair-allowance-select"]').trigger('click')
     // Pick the 3-hour choice through the select's model.
@@ -271,7 +271,7 @@ describe('TenantSyncPairPage', () => {
       }) }))
       const wrapper = await mountPage()
       await wrapper.find('[data-testid="sync-pair-fact-allowance"]').trigger('click')
-      expect(text(wrapper, 'sync-pair-allowance-period-note')).toContain('until 1 Dec.')
+      expect(text(wrapper, 'sync-pair-allowance-period-note')).toContain('through 1 Dec.')
     } finally {
       setDefaultDisplayTimeZone(undefined)
     }
@@ -284,11 +284,25 @@ describe('TenantSyncPairPage', () => {
     const wrapper = await mountPage()
     expect(text(wrapper, 'sync-pair-fact-every')).toContain('Black Friday sale')
     await wrapper.find('[data-testid="sync-pair-fact-every"]').trigger('click')
-    expect(text(wrapper, 'sync-pair-every-period-note')).toBe('Normal days. Black Friday sale uses 2 hours.')
+    expect(text(wrapper, 'sync-pair-every-period-note')).toBe('Normal days. Black Friday sale pulses every 2 hours.')
     ;(wrapper.findComponent({ name: 'AppSelect' }) as { vm: { $emit: (e: string, v: string) => void } }).vm.$emit('update:modelValue', '240')
     await wrapper.find('[data-testid="sync-pair-every-save"]').trigger('click')
     await flushPromises()
     expect(text(wrapper, 'sync-pair-fact-every')).toMatch(/Every\s*2 hours\s*normal: 4 hours/)
+  })
+
+  it.each([
+    [60, 120, 'pulses every hour'],
+    [120, 60, 'pulses every 2 hours'],
+    [0, 60, 'turns the pulse off'],
+  ])('words a period cadence of %i minutes in the Every note', async (minutes, normal, words) => {
+    getSyncPair.mockResolvedValue(got({ syncPair: pair({
+      pulseEveryMinutes: minutes, periodName: 'Black Friday sale', normalAllowanceMinutes: 360,
+      normalPulseEveryMinutes: normal, periodThruDate: '2026-12-01',
+    }) }))
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="sync-pair-fact-every"]').trigger('click')
+    expect(text(wrapper, 'sync-pair-every-period-note')).toBe(`Normal days. Black Friday sale ${words} through 1 Dec.`)
   })
 
   it('shows no period note when no period overrides the allowance', async () => {

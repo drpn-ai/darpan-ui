@@ -411,12 +411,18 @@ function calendarDay(isoDate: string): string {
   if (!year || !month || !day) return ''
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)))
 }
-const periodUntil = computed(() => (periodThru.value ? ` until ${calendarDay(periodThru.value)}` : ''))
+/** What the period does to the pulse, as a verb phrase: "pulses every hour", "turns the pulse off". */
+function periodPulseWords(minutes: number | null | undefined): string {
+  if (!minutes) return 'turns the pulse off'
+  if (minutes === 60) return 'pulses every hour'
+  return minutes % 60 === 0 ? `pulses every ${minutes / 60} hours` : `pulses every ${minutes} min`
+}
+const periodUntil = computed(() => (periodThru.value ? ` through ${calendarDay(periodThru.value)}` : ''))
 /** The popup's one-line cue that a peak period overrides the value it edits. */
 const allowanceNote = computed(() => (allowancePeriodActive.value
   ? `Normal days. ${periodName.value} uses ${allowanceWords(saved.value?.allowanceMinutes ?? 0)}${periodUntil.value}.` : ''))
 const everyNote = computed(() => (everyPeriodActive.value
-  ? `Normal days. ${periodName.value} uses ${pulseEveryWords(saved.value?.pulseEveryMinutes ?? null)}${periodUntil.value}.` : ''))
+  ? `Normal days. ${periodName.value} ${periodPulseWords(saved.value?.pulseEveryMinutes)}${periodUntil.value}.` : ''))
 const lastPulseFailed = computed(() => saved.value?.lastPulseStatusEnumId === 'SPS_FAILED')
 
 const chosenAutomation = computed(() => automations.value.find((automation) => automation.automationId === draft.value?.automationId) ?? null)
