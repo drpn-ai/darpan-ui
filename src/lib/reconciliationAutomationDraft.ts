@@ -1,6 +1,5 @@
 import type { SavedRunSummary, SavedRunSystemOption } from './api/types'
 import type { AutomationSourcePayload, SaveAutomationPayload } from './api/facadeTypes'
-import { normalizeExcludeFilters, type SourceExcludeFilter } from './sourceExcludeFilters'
 import { removeEmpty } from './utils/objects'
 
 export const AUTOMATION_INPUT_MODE_API_RANGE = 'AUT_IN_API_RANGE'
@@ -53,7 +52,6 @@ export interface ReconciliationAutomationSourceDraft {
   safeMetadataJson?: string
   optionKey?: string
   omsRestSourceConfigId?: string
-  excludeFilters?: SourceExcludeFilter[]
 }
 
 export type ReconciliationAutomationChatSpaceChoice = '' | 'default' | 'existing' | 'none'
@@ -118,9 +116,6 @@ function buildSourcePayload(
   const sourceTypeEnumId = draft.inputModeEnumId === AUTOMATION_INPUT_MODE_SFTP_FILES
     ? AUTOMATION_SOURCE_TYPE_SFTP
     : AUTOMATION_SOURCE_TYPE_API
-  // Explicitly typed: AutomationSourcePayload now declares excludeFilters, so a value-shape mistake
-  // on it is a compile error here instead of being swallowed by the `as` casts below (which exist
-  // only to re-widen removeEmpty's Partial<>, not to paper over undeclared keys).
   const basePayload: Partial<AutomationSourcePayload> = removeEmpty({
     fileSide,
     sourceTypeEnumId,
@@ -128,11 +123,6 @@ function buildSourcePayload(
     fileTypeEnumId: savedRunSide?.fileTypeEnumId,
     schemaFileName: savedRunSide?.schemaFileName,
     primaryIdExpression: savedRunSide?.idFieldExpression,
-    // Only stamp excludeFilters when the draft has an opinion -- omitting the key entirely
-    // preserves the "leave existing rules untouched" contract (see sourceExcludeFilters.ts).
-    ...(sourceDraft.excludeFilters !== undefined
-      ? { excludeFilters: normalizeExcludeFilters(sourceDraft.excludeFilters) }
-      : {}),
   })
 
   if (sourceTypeEnumId === AUTOMATION_SOURCE_TYPE_SFTP) {

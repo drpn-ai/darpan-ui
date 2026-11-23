@@ -165,6 +165,22 @@ describe('reconciliationAutomationDraft', () => {
     })
   })
 
+  it('the source payload never carries excludeFilters', () => {
+    // DAR-BE-318 3b-2c: an automation reads its run's filters, so a draft carried over from an older screen sends none.
+    const legacySource = {
+      sourceTypeEnumId: 'AUT_SRC_API',
+      systemMessageRemoteId: 'OMS_ORDER_EXPORT',
+      excludeFilters: [{ fieldExpression: 'status', operator: 'EXCLUDE_IN', values: ['VOID'] }],
+    } as unknown as NonNullable<ReconciliationAutomationDraft['sources']>['FILE_1']
+    const payload = buildSaveAutomationPayload(createDraft({
+      intent: 'existing-run',
+      inputModeEnumId: 'AUT_IN_API_RANGE',
+      sources: { FILE_1: legacySource, FILE_2: legacySource },
+    }), savedRun)
+    expect(payload.sources).toHaveLength(2)
+    expect((payload.sources ?? []).every((source) => !('excludeFilters' in source))).toBe(true)
+  })
+
   it('sends the selected chat space id on the save payload', () => {
     expect(buildSaveAutomationPayload(createDraft({ chatSpaceChoice: 'existing', chatSpaceId: 'CS1' }), savedRun)).toMatchObject({
       chatSpaceId: 'CS1',
