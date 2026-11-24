@@ -590,6 +590,29 @@ describe('AuditReportPage', () => {
     expect(steps[2]?.get('[data-testid="audit-chain-held"]').text()).toContain('Return M247105')
   })
 
+  // DAR-UI-139 (Aditi: "all finding have the basix details row. and then based on type the detaisl are displayed
+  // slightly differently"). Four even cells under the lead on every finding, then the rest of the record under its kind.
+  it('opens every finding on its basics, then the record under what it is', async () => {
+    f.getAuditFinding.mockResolvedValue({ ok: true, finding: { ...findingDocument, finding: { ...findingDocument.finding,
+      records: { OMS: { order: [{ id: '#931462', internalId: '118451', status: 'Approved', customer: 'Ada Lovelace', orderDate: '2026-11-16',
+        salesChannel: 'Web', orderTotal: { amount: '486.53', currency: 'USD' } }] } } } } } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+
+    // The check compared NetSuite (the report's statement R2); the finding holds no NetSuite record, so its cell says None.
+    const cells = w.get('[data-testid="audit-finding-basics"]').findAll('.static-fact')
+    expect(cells.map((cell) => cell.text())).toEqual(['NetSuiteNone', 'HotWaxApproved', 'Order total486.53 USD', 'OrderedNov 16'])
+    expect(w.get('[data-testid="audit-record-kind"]').text()).toBe('Order')
+    // Said once: the total and day sit in the basics, not again under the order.
+    expect(w.findAll('[data-testid="audit-record-detail"]').map((row) => row.text())).toEqual(['CustomerAda Lovelace', 'Sales channelWeb'])
+    const html = w.get('[data-testid="audit-columns"]').html()
+    const at = (id: string) => html.indexOf(`data-testid="${id}"`)
+    expect(at('audit-finding-headline')).toBeLessThan(at('audit-finding-basics'))
+    expect(at('audit-finding-basics')).toBeLessThan(at('audit-record-kind'))
+    expect(at('audit-record-kind')).toBeLessThan(at('audit-finding-verdict'))
+  })
+
   it('shows the evidence only for a finding no cause explains', async () => {
     f.getAuditFinding.mockResolvedValue({ ok: true, finding: { ...findingDocument,
       finding: { ...findingDocument.finding, diagnosis: { conclusion: null, explanation: null } } } } as never)

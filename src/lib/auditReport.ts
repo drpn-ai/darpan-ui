@@ -1,4 +1,5 @@
 import type { AuditCheckStatus, AuditFindingState, AuditMoney, AuditRecords, AuditSourceRead } from './api/auditTypes'
+import type { StaticFact } from '../components/ui/StaticFactStrip.vue'
 
 // DAR-UI-058. What the audit view derives from the report JSON: words and tones for its codes, rows for its keyed
 // objects. Pure, so the page carries no logic of its own.
@@ -202,6 +203,52 @@ export function recordDetails(rows: RecordRow[]): RecordFact[] {
 /** DAR-UI-081 (Aditi: "maintain some consistency"): every finding lists its order, then its return, then deposits. */
 const DETAIL_ORDER = ['Customer', 'Order date', 'Sales channel', 'Ship method', 'Order total',
   'Return date', 'Channel', 'Warranty ID', 'Return total', 'Deposit']
+
+/**
+ * DAR-UI-139 (Aditi: "all finding have the basix details row"). The same four cells on every finding: each of the two
+ * systems the check compared (report keys, in read order) and its record's status, "None" when that system holds no
+ * record of it; the amount (a return's total, else its order's); the day (a return's, else its order's). A check that has
+ * not run names no systems, so the records' own systems stand in. A fact nobody read is a dash, so every row is even.
+ */
+export function basicFacts(rows: RecordRow[], compared: string[]): StaticFact[] {
+  const systems = [...new Set([...compared.map(systemLabel), ...rows.map((row) => row.system)])].slice(0, 2)
+  const side = (index: number): StaticFact => {
+    const system = systems[index]
+    if (!system) return { key: `system${index}`, label: 'Other system', value: '—' }
+    const row = rows.find((candidate) => candidate.system === system)
+    const status = row ? (row.recordType === 'orderItem' ? row.orderStatus || row.status : row.status) : ''
+    return { key: `system${index}`, label: system, value: row ? status || '—' : 'None' }
+  }
+  const returned = rows.find((row) => row.returnTotal || row.returnDate)
+  const total = rows.find((row) => row.returnTotal)?.returnTotal
+  const orderTotal = rows.find((row) => row.orderTotal)?.orderTotal
+  const ordered = rows.find((row) => row.orderDate)?.orderDate
+  return [
+    side(0),
+    side(1),
+    total ? { key: 'amount', label: 'Return total', value: total }
+      : orderTotal ? { key: 'amount', label: 'Order total', value: orderTotal } : { key: 'amount', label: 'Total', value: '—' },
+    returned?.returnDate ? { key: 'day', label: 'Returned', value: shortDate(returned.returnDate) }
+      : ordered ? { key: 'day', label: 'Ordered', value: shortDate(ordered) } : { key: 'day', label: 'Day', value: '—' },
+  ]
+}
+
+/** DAR-UI-139. What the finding is about, from its category (report enum code), else its records. */
+export type RecordKind = 'Order' | 'Return' | 'Exchange'
+export function recordKind(category: string, rows: RecordRow[]): RecordKind {
+  if (category === 'orders') return 'Order'
+  if (category === 'returns') return 'Return'
+  if (category === 'exchangesAndWarranty') return 'Exchange'
+  if (rows.some((row) => row.exchange)) return 'Exchange'
+  if (rows.some((row) => ['return', 'rma', 'creditMemo'].includes(row.recordType))) return 'Return'
+  return 'Order'
+}
+
+/** DAR-UI-139. The record's facts under its kind, less what the basics already say (its total and day). */
+const BASIC_LABELS = ['Order date', 'Return date', 'Order total', 'Return total']
+export function typeDetails(rows: RecordRow[]): RecordFact[] {
+  return recordDetails(rows).filter((fact) => !BASIC_LABELS.includes(fact.label))
+}
 
 export interface ChainStep {
   key: string

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkStatusBadge, eventLabel, findingStateBadge, heldChain, orderNameOf, periodOptions, recordDetails, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemCards, systemLabel } from '../auditReport'
+import { basicFacts, checkStatusBadge, eventLabel, findingStateBadge, heldChain, orderNameOf, periodOptions, recordDetails, recordKind, typeDetails, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemCards, systemLabel } from '../auditReport'
 
 // DAR-UI-058. The audit view's words for the report JSON's codes, and rows for its keyed objects.
 describe('auditReport', () => {
@@ -185,6 +185,51 @@ describe('auditReport', () => {
       subject: 'Return 630208', rest: 'Completed return with no order, never synced',
     })
     expect(splitHeadline('Invoice INV1 has no Etail id')).toEqual({ subject: 'Invoice INV1 has no Etail id', rest: '' })
+  })
+
+  // DAR-UI-139 (Aditi: "all finding have the basix details row. and then based on type the detaisl are displayed slightly
+  // differently"). Four cells on every finding: each system the check compared and its record's status (None when that
+  // system holds no record), the amount, the day.
+  it('reads every finding as the same four basics: each compared system, the amount, the day', () => {
+    const order = recordRows({
+      OMS: { order: [{ id: '#931462', internalId: '118451', status: 'Approved', orderTotal: { amount: '486.53', currency: 'USD' }, orderDate: '2026-11-16' }] },
+    })
+    expect(basicFacts(order, ['OMS', 'NetSuite']).map((f) => [f.label, f.value])).toEqual([
+      ['HotWax', 'Approved'], ['NetSuite', 'None'], ['Order total', '486.53 USD'], ['Ordered', 'Nov 16'],
+    ])
+    // An item's card reads its order's status; a return's total and day win over its order's.
+    const ret = recordRows({
+      Shopify: { return: [{ id: '40112', internalId: null, status: 'Completed', returnTotal: { amount: '128.00', currency: 'USD' }, returnDate: '2026-11-18',
+        orderTotal: { amount: '236.00', currency: 'USD' }, orderDate: '2026-11-02' }] },
+      NetSuite: { salesOrderLine: [{ id: 'SO1', internalId: null, status: 'Pending Billing' }] },
+    })
+    expect(basicFacts(ret, ['Shopify', 'NetSuite']).map((f) => [f.label, f.value])).toEqual([
+      ['Shopify', 'Completed'], ['NetSuite', 'Pending Billing'], ['Return total', '128.00 USD'], ['Returned', 'Nov 18'],
+    ])
+    // A check that has not run names no systems: the records' own, and a fact nobody read is a dash.
+    const bare = recordRows({ OMS: { orderItem: [{ id: 'M1/01', internalId: null, status: 'Completed', orderStatus: 'Completed' }] } })
+    expect(basicFacts(bare, []).map((f) => [f.label, f.value])).toEqual([
+      ['HotWax', 'Completed'], ['Other system', '—'], ['Total', '—'], ['Day', '—'],
+    ])
+  })
+
+  // DAR-UI-139. What kind of record the finding is about, from its category, else its records.
+  it('tells an order, a return and an exchange apart', () => {
+    const rows = (records: Parameters<typeof recordRows>[0]) => recordRows(records)
+    expect(recordKind('orders', rows({ OMS: { return: [{ id: 'R1', internalId: null, status: null }] } }))).toBe('Order')
+    expect(recordKind('returns', [])).toBe('Return')
+    expect(recordKind('exchangesAndWarranty', [])).toBe('Exchange')
+    expect(recordKind('', rows({ NetSuite: { rma: [{ id: 'RMA1', internalId: null, status: null }] } }))).toBe('Return')
+    expect(recordKind('', rows({ OMS: { order: [{ id: 'O1', internalId: null, status: null }] } }))).toBe('Order')
+  })
+
+  // DAR-UI-139. Under the record kind: the facts the basics did not already say, each once.
+  it('leaves the basics out of the record facts', () => {
+    const rows = recordRows({
+      OMS: { order: [{ id: 'O1', internalId: null, status: 'Approved', customer: 'Ada Lovelace', orderDate: '2026-11-16', salesChannel: 'Web',
+        orderTotal: { amount: '486.53', currency: 'USD' } }] },
+    })
+    expect(typeDetails(rows).map((f) => [f.label, f.value])).toEqual([['Customer', 'Ada Lovelace'], ['Sales channel', 'Web']])
   })
 
   it('says a history code in words', () => {

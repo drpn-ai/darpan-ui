@@ -297,12 +297,19 @@
                 <p v-if="eyebrow" class="micro-label audit-eyebrow" data-testid="audit-finding-eyebrow">{{ eyebrow }}</p>
                 <p class="audit-lead" data-testid="audit-finding-headline">{{ lead }}</p>
 
+                <!-- DAR-UI-139 (Aditi: "all finding have the basix details row"). The same four cells on every finding: each
+                   system the check compared and its status, the amount, the day. -->
+                <StaticFactStrip :facts="basics" test-id="audit-finding-basics" />
+
                 <dl v-if="money.length" class="audit-facts">
                   <template v-for="item in money" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></template>
                 </dl>
 
                 <!-- DAR-UI-092 (Aditi: "not logically ordered"). The record the finding is about, under its title: then the verdict,
                    then the records it sits among. -->
+                <!-- DAR-UI-139 ("based on type the detaisl are displayed slightly differently"): the rest of the record's
+                   facts under what it is, an order, a return or an exchange. -->
+                <h3 v-if="details.length" class="micro-label" data-testid="audit-record-kind">{{ kind }}</h3>
                 <dl v-if="details.length" class="audit-facts audit-records">
                   <div v-for="fact in details" :key="fact.key" data-testid="audit-record-detail">
                     <dt>{{ fact.label }}</dt>
@@ -503,6 +510,7 @@
 import { computed, ref } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
+import StaticFactStrip from '../ui/StaticFactStrip.vue'
 import { downloadIconPath, resolveIconPath } from '../../lib/iconPaths'
 import type {
   AuditFindingDocument,
@@ -515,13 +523,14 @@ import type {
   AuditWaitingFinding,
 } from '../../lib/api/auditTypes'
 import {
+  basicFacts,
   checkStatusBadge,
   eventLabel,
   FIX_WHERE_LABELS,
   findingStateBadge,
   heldChain,
   orderNameOf,
-  recordDetails,
+  recordKind,
   recordRows,
   shortDate,
   shortRange,
@@ -529,6 +538,7 @@ import {
   splitHeadline,
   systemCards,
   systemLabel,
+  typeDetails,
 } from '../../lib/auditReport'
 import {
   HEALTH,
@@ -776,7 +786,16 @@ const lead = computed(() => {
 })
 const cards = computed(() => systemCards(records.value, fixWhere.value))
 const chain = computed(() => heldChain(records.value))
-const details = computed(() => recordDetails(records.value))
+const details = computed(() => typeDetails(records.value))
+// DAR-UI-139. The systems the finding's check compared this morning (the report's keys, in read order), so a system that
+// holds no record of it still has its cell.
+const comparedSystems = computed(() => {
+  const checkId = props.findingDoc?.finding.check.id
+  const check = statementDoc.value?.checks?.find((item) => item.id === checkId)
+  return Object.keys(check?.compared ?? {})
+})
+const basics = computed(() => basicFacts(records.value, comparedSystems.value))
+const kind = computed(() => recordKind(props.findingDoc?.finding.category.id ?? '', records.value))
 // DAR-UI-081 (Aditi: "add location ID to the line box", "with location ID, show the location name"). An order line's
 // location, from its HotWax item: "Chicago · 58".
 function lineLocation(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
