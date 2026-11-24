@@ -38,6 +38,10 @@ function operatorText(c: RunConclusionCondition, negatedByQuantifier: boolean): 
       return `is one of ${list}`
     case 'NOT_IN':
       return negatedByQuantifier ? `is one of ${list}` : `is not one of ${list}`
+    case 'STARTS_WITH_ANY':
+      return `starts with ${list}`
+    case 'NOT_STARTS_WITH_ANY':
+      return `does not start with ${list}`
     case 'GT':
       return `is more than ${num}`
     case 'LT':
@@ -166,11 +170,16 @@ export function withCheckLabel(
   return { ...c, checkLabel: generatedLabel(c, ctx) }
 }
 
+/** Tests that take a list of values: is (not) one of, starts (does not start) with. */
+export function isListOperator(operator: RunConclusionCondition['operator']): boolean {
+  return operator === 'IN' || operator === 'NOT_IN' || operator === 'STARTS_WITH_ANY' || operator === 'NOT_STARTS_WITH_ANY'
+}
+
 export function conditionIncomplete(c: RunConclusionCondition): boolean {
   if (!c.operator) return false
   if (!(c.field ?? '').trim()) return true
   const values = c.values.map((v) => v.trim()).filter((v) => v)
-  if (c.operator === 'IN' || c.operator === 'NOT_IN') return values.length === 0
+  if (isListOperator(c.operator)) return values.length === 0
   if (c.operator === 'GT' || c.operator === 'LT' || c.operator === 'WITHIN_HOURS') {
     return values[0] === undefined || !Number.isFinite(Number(values[0]))
   }

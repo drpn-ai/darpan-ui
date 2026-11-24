@@ -40,6 +40,16 @@ describe('describeCondition', () => {
       'HotWax shipped_date is within 24 hours',
     )
   })
+  // DAR-BE-345: an exchange order's lines carry only its name (EXC-#1032413-1), so R4 tells them apart by prefix.
+  it('reads the prefix operators, and a prefix test with no prefix is incomplete', () => {
+    const name = { subject: 'FILE_1' as const, field: 'omsOrderName', values: ['EXC-', 'REPL-'] }
+    expect(describeCondition(cond({ ...name, operator: 'STARTS_WITH_ANY' }), ctx)).toBe('HotWax omsOrderName starts with EXC-, REPL-')
+    expect(describeCondition(cond({ ...name, operator: 'NOT_STARTS_WITH_ANY' }), ctx)).toBe(
+      'HotWax omsOrderName does not start with EXC-, REPL-',
+    )
+    expect(conditionIncomplete(cond({ ...name, operator: 'STARTS_WITH_ANY', values: [' '] }))).toBe(true)
+    expect(conditionIncomplete(cond({ ...name, operator: 'NOT_STARTS_WITH_ANY' }))).toBe(false)
+  })
   it('omits the side when evaluating', () => {
     expect(describeCondition(cond({}), { ...ctx, evaluate: true })).toBe('billing_status is one of Pending Billing')
   })

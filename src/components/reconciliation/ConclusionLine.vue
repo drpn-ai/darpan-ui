@@ -169,7 +169,7 @@ import { computed, ref, watch } from 'vue'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import type { ConclusionOperator, RunConclusionCondition } from '../../lib/api/authoringTypes'
 import type { CatalogField } from '../../lib/conclusionFieldCatalog'
-import { conditionIncomplete, describeCondition, type LineContext } from '../../lib/conclusionLines'
+import { conditionIncomplete, describeCondition, isListOperator, type LineContext } from '../../lib/conclusionLines'
 import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 
 const props = defineProps<{
@@ -213,6 +213,8 @@ const RECORD_TESTS: AppSelectOption[] = [
 const FIELD_TESTS: AppSelectOption[] = [
   { value: 'IN', label: 'is one of' },
   { value: 'NOT_IN', label: 'is not one of' },
+  { value: 'STARTS_WITH_ANY', label: 'starts with' },
+  { value: 'NOT_STARTS_WITH_ANY', label: 'does not start with' },
   { value: 'GT', label: 'is more than' },
   { value: 'LT', label: 'is less than' },
   { value: 'GT_ZERO', label: 'is more than 0' },
@@ -324,7 +326,7 @@ const testValue = computed(() => {
 })
 
 function kindOf(operator: ConclusionOperator | null | undefined): ValueKind {
-  if (operator === 'IN' || operator === 'NOT_IN') return 'list'
+  if (isListOperator(operator)) return 'list'
   if (operator === 'GT' || operator === 'LT' || operator === 'WITHIN_HOURS') return 'number'
   return 'none'
 }

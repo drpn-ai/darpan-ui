@@ -87,7 +87,17 @@ export type SourceExtractOptions = Record<string, boolean | string>
 // S3 — a run's conclusion tree (facade.RunConclusionFacadeServices).
 export type ConclusionBucket = 'MISSING_FROM_FILE_1' | 'MISSING_FROM_FILE_2' | 'RULE' | 'FINDING'
 export type ConclusionOutcome = 'HIDE' | 'EXPECTED'
-export type ConclusionOperator = 'IN' | 'NOT_IN' | 'GT' | 'LT' | 'GT_ZERO' | 'WITHIN_HOURS' | 'BLANK' | 'NOT_BLANK'
+export type ConclusionOperator =
+  | 'IN'
+  | 'NOT_IN'
+  | 'STARTS_WITH_ANY'
+  | 'NOT_STARTS_WITH_ANY'
+  | 'GT'
+  | 'LT'
+  | 'GT_ZERO'
+  | 'WITHIN_HOURS'
+  | 'BLANK'
+  | 'NOT_BLANK'
 
 export interface RunConclusionCondition {
   subject: 'FILE_1' | 'FILE_2'
