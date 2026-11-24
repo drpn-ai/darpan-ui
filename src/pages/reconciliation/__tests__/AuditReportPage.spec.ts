@@ -1372,21 +1372,22 @@ describe('AuditReportPage', () => {
       expect(w.get('[data-testid="audit-statement-empty-R2"]').text()).toBe('Nothing found')
       expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('0')
 
-      // A finding open: the rail is the marks and their counts.
+      // A finding open: the rail is the levels and their counts, and column 1's head keeps no switch.
       liveRoute.query = { by: 'priority', category: 'P1', statement: 'R2', finding: 'F-1' }
       await flushPromises()
       const rail = w.get('[data-testid="audit-category-P1"]')
-      expect(rail.get('[data-testid="audit-mark"]').text()).toBe('P1')
+      expect(rail.get('.audit-rail-label').text()).toBe('P1')
+      expect(w.find('[data-testid="audit-by-priority"]').exists()).toBe(false)
       expect(rail.attributes('aria-label')).toContain('P1')
       expect(rail.text()).toContain('2')
       w.unmount()
     })
 
-    it('lands on the most urgent level with findings when switched to Priority, the open finding dropped', async () => {
+    it('lands on the most urgent level with findings when switched to Priority', async () => {
       const doc = priorityReport()
       doc.summary.byPriority = byLevel(0, 2, 0, 1)
       f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
-      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      liveRoute.query = { category: 'orders', statement: 'R2' }
       const w = mount(AuditReportPage)
       await flushPromises()
       await w.get('[data-testid="audit-by-priority"]').trigger('click')
@@ -1405,13 +1406,18 @@ describe('AuditReportPage', () => {
       w.unmount()
     })
 
-    it('marks statement rows and reason groups by record type, and no statement row by priority', async () => {
+    // Aditi (look follow-up): no level mark on any row; priority shows only as column 1 in the Priority view.
+    it('puts no level on statement rows or reason groups in either view', async () => {
+      const level = /\b(P[0-2]|Known)\b/
       liveRoute.query = { category: 'orders', statement: 'R2' }
       const w = mount(AuditReportPage)
       await flushPromises()
-      expect(w.findAll('[data-testid="audit-statement-row-orders"]').map((row) => row.find('[data-testid="audit-mark"]').text())).toEqual(['P1', 'P2'])
+      const statementRows = w.findAll('[data-testid="audit-statement-row-orders"]')
+      expect(statementRows).toHaveLength(2)
+      for (const row of statementRows) expect(row.text()).not.toMatch(level)
       const groups = w.findAll('[data-testid="audit-findings-group"]')
-      expect(groups.map((g) => g.find('[data-testid="audit-mark"]').text())).toEqual(['P1', 'Known'])
+      expect(groups).toHaveLength(2)
+      for (const group of groups) expect(group.text()).not.toMatch(level)
       expect(groups[1]!.text()).toContain('Fraud cancel')
       // Record type's rail says how many sit at the most urgent level.
       expect(w.get('[data-testid="audit-category-orders"]').text()).toContain('2 at P1')
@@ -1420,7 +1426,8 @@ describe('AuditReportPage', () => {
       await flushPromises()
       const rows = w.findAll('[data-testid="audit-statement-row-P1"]')
       expect(rows).toHaveLength(1)
-      expect(rows[0]!.find('[data-testid="audit-mark"]').exists()).toBe(false)
+      expect(rows[0]!.text()).not.toMatch(level)
+      expect(w.get('[data-testid="audit-category-P1"]').text()).toContain('P1 this week')
       w.unmount()
     })
 
@@ -1429,12 +1436,12 @@ describe('AuditReportPage', () => {
       const w = mount(AuditReportPage)
       await flushPromises()
       expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-9' }, expect.anything())
-      expect(w.get('[data-testid="audit-finding-eyebrow"] [data-testid="audit-mark"]').text()).toBe('Known')
+      expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).not.toContain('Known')
       expect(w.get('[data-testid="audit-finding-level"]').text()).toBe('Known set on "Fraud cancel"')
 
       liveRoute.query = { category: 'returns', statement: 'R11', finding: 'F-11' }
       await flushPromises()
-      expect(w.get('[data-testid="audit-finding-eyebrow"] [data-testid="audit-mark"]').text()).toBe('P0')
+      expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).not.toContain('P0')
       expect(w.get('[data-testid="audit-finding-level"]').text()).toBe('P0 from R11')
       w.unmount()
     })
@@ -1444,7 +1451,6 @@ describe('AuditReportPage', () => {
       liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
       const w = mount(AuditReportPage)
       await flushPromises()
-      expect(w.find('[data-testid="audit-mark"]').exists()).toBe(false)
       expect(w.find('[data-testid="audit-finding-level"]').exists()).toBe(false)
       expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).toBe('R2')
       expect(w.get('[data-testid="audit-category-orders"]').attributes('aria-label')).toBe('Orders, 2 open')
@@ -1518,7 +1524,7 @@ describe('AuditReportPage', () => {
 
     it('reads an old link naming a record type with no ?by= as Record type, whatever is remembered', async () => {
       window.localStorage.setItem('darpan.audit.by', 'priority')
-      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      liveRoute.query = { category: 'orders', statement: 'R2' }
       const w = mount(AuditReportPage)
       await flushPromises()
       expect(w.get('[data-testid="audit-by-type"]').attributes('aria-pressed')).toBe('true')
@@ -1561,7 +1567,7 @@ describe('AuditReportPage', () => {
       w.unmount()
     })
 
-    it('marks each finding waiting on an order with its own level, and keeps the eyebrow\'s words apart', async () => {
+    it('puts no level on a finding waiting on an order', async () => {
       const doc = priorityReport()
       const m9 = doc.categories.orders!.statements.R2!.findings[2]!
       m9.waiting = [{ statement: 'R4', id: 'F-40', headline: 'Order M9: line 2 not billed', cause: 'Not billed', item: 'SKU-2', priority: 'P0' }]
@@ -1570,8 +1576,9 @@ describe('AuditReportPage', () => {
       const w = mount(AuditReportPage)
       await flushPromises()
       const waiting = w.get('[data-testid="audit-waiting"]')
-      expect(waiting.get('[data-testid="audit-mark"]').text()).toBe('P0')
-      expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).toMatch(/^Known R2/)
+      expect(waiting.text()).toContain('SKU-2')
+      expect(waiting.text()).not.toContain('P0')
+      expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).toMatch(/^R2/)
       w.unmount()
     })
   })

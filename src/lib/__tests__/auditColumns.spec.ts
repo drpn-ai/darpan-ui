@@ -38,7 +38,6 @@ import {
   topLevel,
   priorityItems,
   statementItemsByPriority,
-  groupLevel,
 } from '../auditColumns'
 
 function counts(open = 0) {
@@ -530,14 +529,7 @@ describe('audit priorities (DAR-UI-140)', () => {
     expect(findingRows(items).map((r) => r.item.id)).toEqual(['a', 'b', 'c', 'd'])
   })
 
-  it('groupLevelOfAHeading', () => {
-    const rows = findingRows([unit('a', 'P0', 'X'), unit('b', 'P1', 'X'), unit('c', undefined, 'Y')])
-    expect(groupLevel(rows, 0)).toBe('P0')
-    expect(groupLevel(rows, 2)).toBe('P2')
-    expect(groupLevel(rows, 9)).toBeNull()
-  })
-
-  // Final review: an order sits under the cause of the line that sets its level, so its heading carries that level.
+  // Final review: an order sits under the cause of the line that sets its level.
   it('groupsAnOrderUnderItsLevelLinesCause', () => {
     const line = (id: string, cause: string, priority: AuditFindingListItem['priority']) =>
       ({ id, headline: id, state: 'open', cause, held: false, priority }) as unknown as NonNullable<AuditFindingListItem['lines']>[number]
@@ -548,9 +540,6 @@ describe('audit priorities (DAR-UI-140)', () => {
     const rows = findingRows([unit('a', 'KNOWN', 'X'), order])
     expect(rows.map((r) => [r.item.id, r.cause])).toEqual([['a', 'X'], ['M1', 'Y']])
     expect(rows.find((r) => r.item.id === 'M1')!.also).toEqual([{ cause: 'X', lines: 3 }])
-    // Heading X is marked by its own unit (Known), heading Y by the order (P0).
-    expect(groupLevel(rows, 0)).toBe('KNOWN')
-    expect(groupLevel(rows, 1)).toBe('P0')
     // The toolbar's picked cause still wins.
     expect(findingRows([order], 'X')[0]!.cause).toBe('X')
   })

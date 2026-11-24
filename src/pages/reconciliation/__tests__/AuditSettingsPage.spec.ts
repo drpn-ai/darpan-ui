@@ -605,9 +605,9 @@ describe('AuditSettingsPage priorities', () => {
   beforeEach(() => {
     f.getAuditSettings.mockResolvedValue({ ok: true, settings: prioritySettings() } as never)
   })
-  // The mark and its word, read as the eye reads them (the gap between them is CSS).
+  // A level reads as plain words ("P0 today"); Aditi: no marks.
   function parts(node: Element) {
-    return [...node.querySelectorAll('[data-testid="audit-mark"], .audit-level__word')].map((part) => part.textContent?.trim()).join(' ')
+    return [...node.querySelectorAll('.audit-level__word')].map((part) => part.textContent?.trim()).join(' ')
   }
   function levelText(w: W, testId: string) { return parts(get(w, testId).element) }
   function options(w: W) { return w.findAll('[role="radio"]').map((option) => parts(option.element)) }
@@ -616,7 +616,6 @@ describe('AuditSettingsPage priorities', () => {
     const w = await mountPage()
     const cell = get(w, 'audit-settings-priority-R11')
     expect(cell.element.tagName).toBe('BUTTON')
-    expect(cell.find('[data-testid="audit-mark"]').text()).toBe('P0')
     expect(levelText(w, 'audit-settings-priority-R11')).toBe('P0 today')
     expect(cell.text()).not.toMatch(/Change|Edit/)
 
@@ -671,7 +670,7 @@ describe('AuditSettingsPage priorities', () => {
     expect(all.text()).toContain('Order cancelled in Shopify')
     expect(all.text()).toContain('Closes')
     expect(all.find('button').exists()).toBe(false)
-    expect(all.find('[data-testid="audit-mark"]').exists()).toBe(false)
+    expect(all.find('.audit-level__word').exists()).toBe(false)
 
     const some = get(w, 'audit-settings-reason-CONC_SOME')
     expect(some.text()).toContain('Order on hold for fraud')

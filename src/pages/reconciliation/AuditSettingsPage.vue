@@ -61,8 +61,7 @@
               :disabled="saving"
               @click="openPriority(statement)"
             >
-              <AuditPriorityMark :level="levelOf(statement)" />
-              <span class="audit-level__word">{{ LEVEL_WORD[levelOf(statement)] }}</span>
+              <span class="audit-level__word">{{ levelWords(levelOf(statement)) }}</span>
             </button>
             <AppToggleSwitch
               class="audit-statement__toggle"
@@ -323,11 +322,7 @@
                     :disabled="saving"
                     @click="openReasonPriority(reason)"
                   >
-                    <template v-if="reason.priority">
-                      <AuditPriorityMark :level="reason.priority" />
-                      <span class="audit-level__word">{{ LEVEL_WORD[reason.priority] }}</span>
-                    </template>
-                    <span v-else class="audit-level__word">{{ sameAs(editingStatement) }}</span>
+                    <span class="audit-level__word">{{ reason.priority ? levelWords(reason.priority) : sameAs(editingStatement) }}</span>
                   </button>
                 </span>
               </li>
@@ -363,11 +358,7 @@
                 :disabled="saving"
                 @click="levelDraft = option.level"
               >
-                <template v-if="option.level">
-                  <AuditPriorityMark :level="option.level" />
-                  <span class="audit-level__word">{{ LEVEL_WORD[option.level] }}</span>
-                </template>
-                <span v-else class="audit-level__word">{{ sameAs(editingStatement) }}</span>
+                <span class="audit-level__word">{{ option.level ? levelWords(option.level) : sameAs(editingStatement) }}</span>
               </button>
             </li>
           </ul>
@@ -435,7 +426,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AuditCheckEditor from '../../components/audit/AuditCheckEditor.vue'
-import AuditPriorityMark from '../../components/audit/AuditPriorityMark.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -1021,7 +1011,7 @@ onBeforeUnmount(() => {
   margin-right: var(--space-3);
 }
 
-/* DAR-UI-140. A level: its mark, then its word. As a button it is the whole cell, tinted on hover like a fact. */
+/* DAR-UI-140. A level as plain words ("P0 today"; Aditi: no marks). As a button it is the whole cell, tinted on hover like a fact. */
 .audit-level {
   display: inline-flex;
   align-items: center;
@@ -1052,11 +1042,10 @@ onBeforeUnmount(() => {
 }
 
 .audit-level__word {
-  color: var(--text-muted);
   font-size: var(--type-note-size);
 }
 
-/* One width for every row's cell, so the marks line up down the list. */
+/* One width for every row's cell, so the levels line up down the list. */
 .audit-statement__priority {
   width: 8rem;
   height: 100%;

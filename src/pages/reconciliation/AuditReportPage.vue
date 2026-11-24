@@ -84,21 +84,6 @@
             <span class="audit-filter-count">{{ pill.count.toLocaleString('en-US') }}</span> <span>{{ pill.label }}</span>
           </button>
         </div>
-        <!-- DAR-UI-140. The board by record type (today's rail) or by priority; ?by= wins, else the person's last pick. -->
-        <div class="audit-filters" role="group" aria-label="By" data-testid="audit-by">
-          <button
-            v-for="choice in BY_CHOICES"
-            :key="choice.id"
-            type="button"
-            class="audit-filter"
-            :class="{ 'audit-filter--on': choice.id === by }"
-            :aria-pressed="choice.id === by ? 'true' : 'false'"
-            :data-testid="`audit-by-${choice.id}`"
-            @click="chooseBy(choice.id)"
-          >
-            {{ choice.label }}
-          </button>
-        </div>
         <!-- DAR-UI-073. Search, cause and age narrow the whole board; the period's findings load on first use. -->
         <div class="audit-find" role="group" aria-label="Find" @focusin="void loadPeriodFindings()">
           <input
@@ -152,6 +137,7 @@
         :agent-open="agentOpen"
         :drafts="drafts"
         @navigate="navigate"
+        @by="chooseBy"
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
         @extract="(check, system) => void exportExtract(check, system)"
         @verify="verifyFinding"
@@ -273,11 +259,11 @@ const filter = computed<AuditFilter>(() => {
   if (value === 'pending') return 'open'
   return isAuditFilter(value) ? value : 'all'
 })
-// DAR-UI-140. Record type (today's rail) or priority. ?by= wins and is not remembered (a shared link must not change the
-// reader's own default); the switch remembers the person's pick. In priority mode ?category= holds the level.
+// DAR-UI-140. Record type (today's rail) or priority, picked in column 1's head. ?by= wins and is not remembered (a shared
+// link must not change the reader's own default); the switch remembers the person's pick. In priority mode ?category=
+// holds the level.
 type AuditBy = 'type' | 'priority'
 const BY_STORAGE_KEY = 'darpan.audit.by'
-const BY_CHOICES: { id: AuditBy; label: string }[] = [{ id: 'type', label: 'Record type' }, { id: 'priority', label: 'Priority' }]
 const isAuditBy = (value: unknown): value is AuditBy => value === 'type' || value === 'priority'
 function readStoredBy(): AuditBy {
   try {
@@ -878,7 +864,7 @@ async function lookUpOrders(): Promise<void> {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 /* DAR-UI-073. Search, cause and age beside the pills; the search box takes AppSelect's trigger look so the three read as
@@ -957,7 +943,8 @@ async function lookUpOrders(): Promise<void> {
   display: inline-flex;
   align-items: baseline;
   gap: var(--space-1-5);
-  min-height: 2.75rem;
+  /* The search box's and AppSelect's height, so the row reads as one line. */
+  min-height: 2.55rem;
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);

@@ -568,12 +568,6 @@ export function findingRows<T extends AuditFindingSummary>(items: T[], picked = 
   return [...groups.values()].flat()
 }
 
-/** DAR-UI-140. The level of the cause group that starts at `index` (its first unit's), for the heading's mark. */
-export function groupLevel(rows: FindingRow[], index: number): AuditLevel | null {
-  const row = rows[index]
-  return row ? (row.item.priority ?? 'P2') : null
-}
-
 // DAR-UI-098. What an order's row says under its heading: its other causes only (Aditi: "the 3 of 4 is also confusing").
 export function rowAlsoLabel(row: FindingRow): string {
   return row.also.map(({ cause, lines }) => `Also ${cause} · ${lines} ${lines === 1 ? 'line' : 'lines'}`).join('; ')
