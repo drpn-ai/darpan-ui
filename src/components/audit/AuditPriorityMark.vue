@@ -12,10 +12,10 @@ defineProps<{ level: AuditLevel }>()
 <style scoped>
 .audit-mark {
   display: inline-block;
-  padding: 0 0.5em;
+  padding: 0 var(--space-1);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.72rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-eyebrow-size);
   font-weight: 400;
   line-height: 1.5;
   white-space: nowrap;
