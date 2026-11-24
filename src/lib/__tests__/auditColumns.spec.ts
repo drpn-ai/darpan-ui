@@ -35,6 +35,10 @@ import {
   statementFindings,
   sourceItems,
   statementItems,
+  topLevel,
+  priorityItems,
+  statementItemsByPriority,
+  groupLevel,
 } from '../auditColumns'
 
 function counts(open = 0) {
@@ -457,5 +461,72 @@ describe('order lines with no finding', () => {
     expect(otherLineWhy(lines[1]!)).toBe('Approved · 2 units')
     expect(otherLineWhy(lines[2]!)).toBe('Cancelled')
     expect(otherLineWhy(lines[4]!)).toBe('NetSuite · Payment · -89.30')
+  })
+})
+
+describe('audit priorities (DAR-UI-140)', () => {
+  const by = (P0 = 0, P1 = 0, P2 = 0, KNOWN = 0) => ({ P0, P1, P2, KNOWN })
+  const withPriority = (): AuditReport => {
+    const r = report()
+    r.summary = { ...r.summary, byPriority: by(10, 2, 7, 4) }
+    r.categories.orders!.counts = { ...counts(12), byPriority: by(10, 2, 0, 0) }
+    r.categories.refunds!.counts = { ...counts(9), byPriority: by(0, 0, 5, 4) }
+    const r5 = r.categories.refunds!.statements.R5!
+    r5.status = 'ran'
+    r5.counts = { ...counts(9), byPriority: by(0, 0, 5, 4) }
+    const r4 = r.categories.refunds!.statements.R4!
+    r4.counts = { ...counts(0), byPriority: by(0, 0, 0, 0) }
+    r.categories.orders!.statements.R1!.counts = { ...counts(7), byPriority: by(7, 0, 0, 0) }
+    r.categories.orders!.statements.R2!.counts = { ...counts(5), byPriority: by(3, 2, 0, 0) }
+    return r
+  }
+
+  it('categorySubSaysTheMostUrgentLevel', () => {
+    const items = categoryItems(withPriority())
+    expect(items.find((i) => i.id === 'orders')!.sub).toBe('10 at P0')
+    expect(items.find((i) => i.id === 'refunds')!.sub).toBe('5 at P2')
+    // No byPriority: today's text.
+    expect(categoryItems(report()).find((i) => i.id === 'orders')!.sub).toBe('1 open')
+    expect(topLevel(undefined)).toBeNull()
+    expect(topLevel({ ...counts(1), byPriority: by(0, 0, 0, 3) })).toEqual({ level: 'KNOWN', count: 3 })
+  })
+
+  it('priorityRailCountsEachLevel', () => {
+    const items = priorityItems(withPriority())
+    expect(items.map((i) => i.id)).toEqual([HEALTH, 'P0', 'P1', 'P2', 'KNOWN'])
+    expect(items.slice(1).map((i) => [i.label, i.sub, i.count, i.attention])).toEqual([
+      ['P0', 'today', 10, true], ['P1', 'this week', 2, true], ['P2', 'later', 7, false], ['Known', 'owned', 4, false]])
+    expect(items[4]!.open).toBe(4)
+    const old = priorityItems(report())
+    expect(old.slice(1).map((i) => [i.count, i.attention])).toEqual([[0, false], [0, false], [0, false], [0, false]])
+  })
+
+  it('statementUnderTwoLevels', () => {
+    const r = withPriority()
+    const p2 = statementItemsByPriority(r, 'P2', 'open')
+    const known = statementItemsByPriority(r, 'KNOWN', 'open')
+    expect(p2.map((s) => [s.id, s.open, s.badge])).toEqual([['R5', 5, '5']])
+    expect(known.map((s) => [s.id, s.open])).toEqual([['R5', 4]])
+    const p0 = statementItemsByPriority(r, 'P0', 'open')
+    expect(p0.map((s) => [s.id, s.open])).toEqual([['R1', 7], ['R2', 3]])
+    expect(statementItemsByPriority(r, 'P1', 'all').map((s) => s.id)).toEqual(['R2', 'R1', 'R12', 'R19', 'R4', 'R5'])
+    expect(statementItemsByPriority(report(), 'P0', 'open')).toEqual([])
+  })
+
+  const unit = (id: string, priority?: AuditFindingListItem['priority'], cause: string | null = 'C') =>
+    ({ id, headline: `Return ${id}: x`, cause, priority }) as AuditFindingListItem
+
+  it('findingRowsKeepOneLevel', () => {
+    const items = [unit('a', 'P0'), unit('b', 'P1'), unit('c'), unit('d', 'P2')]
+    expect(findingRows(items, '', 'P0').map((r) => r.item.id)).toEqual(['a'])
+    expect(findingRows(items, '', 'P2').map((r) => r.item.id)).toEqual(['c', 'd'])
+    expect(findingRows(items).map((r) => r.item.id)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('groupLevelOfAHeading', () => {
+    const rows = findingRows([unit('a', 'P0', 'X'), unit('b', 'P1', 'X'), unit('c', undefined, 'Y')])
+    expect(groupLevel(rows, 0)).toBe('P0')
+    expect(groupLevel(rows, 2)).toBe('P2')
+    expect(groupLevel(rows, 9)).toBeNull()
   })
 })

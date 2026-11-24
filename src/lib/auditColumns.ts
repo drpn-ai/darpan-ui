@@ -4,6 +4,7 @@ import type {
   AuditFindingCounts,
   AuditFindingListItem,
   AuditFindingSummary,
+  AuditLevel,
   AuditOrderLine,
   AuditProgress,
   AuditProgressRun,
@@ -12,6 +13,7 @@ import type {
   AuditStatement,
   AuditStatementCheck,
 } from './api/auditTypes'
+import { AUDIT_LEVELS, LEVEL_LABEL, LEVEL_WORD } from './api/auditTypes'
 import { splitHeadline, systemLabel } from './auditReport'
 import { formatRunStepDuration, reconciliationStageLabel } from './reconciliationDisplay'
 
@@ -103,7 +105,16 @@ function anyUnhealthy(progress: AuditProgress): boolean {
   return progress.active.some((run) => run.health === 'stuck' || run.health === 'slow')
 }
 
-export function categoryItems(report: AuditReport, progress?: AuditProgress | null): CategoryItem[] {
+/** DAR-UI-140. The most urgent level with an open finding, and how many sit there; null when none (or a report before priorities). */
+export function topLevel(counts: AuditFindingCounts | null | undefined): { level: AuditLevel; count: number } | null {
+  for (const level of AUDIT_LEVELS) {
+    const count = counts?.byPriority?.[level] ?? 0
+    if (count > 0) return { level, count }
+  }
+  return null
+}
+
+function healthItem(report: AuditReport, progress?: AuditProgress | null): CategoryItem {
   // DAR-UI-085. While checks are in flight the report still reads them as not run (their ledger rows land when each
   // window ends), so Run health says what is happening instead, and only a slow or stuck run asks for attention.
   const playing = isPlaying(progress)
@@ -122,18 +133,41 @@ export function categoryItems(report: AuditReport, progress?: AuditProgress | nu
     attention: playing ? anyUnhealthy(progress) : !report.health.complete,
     running: playing,
   }
+  return health
+}
+
+export function categoryItems(report: AuditReport, progress?: AuditProgress | null): CategoryItem[] {
+  const health = healthItem(report, progress)
   return [health, ...Object.entries(report.categories ?? {}).map(([id, category]) => {
     const unchecked = notCheckedCount(category)
     // DAR-UI-087. Nothing found is said only of a category something checked.
     const found = unchecked && unchecked === statementsOf(category).length && !countFor(category.counts) ? '' : countsLine(category.counts)
+    const top = topLevel(category.counts)
     return {
       id,
       label: category.label,
       short: category.label.split(' ')[0] ?? category.label,
-      sub: [found, unchecked ? `${unchecked} not checked` : ''].filter(Boolean).join(' · '),
+      sub: top ? `${top.count} at ${LEVEL_LABEL[top.level]}` : [found, unchecked ? `${unchecked} not checked` : ''].filter(Boolean).join(' · '),
       open: category.counts?.open ?? 0,
       count: countFor(category.counts),
       attention: (category.counts?.open ?? 0) > 0,
+      running: false,
+    }
+  })]
+}
+
+/** DAR-UI-140. Column 1 in priority mode: Run health, then one item per level, counted from the report's summary. */
+export function priorityItems(report: AuditReport, progress?: AuditProgress | null): CategoryItem[] {
+  return [healthItem(report, progress), ...AUDIT_LEVELS.map((level) => {
+    const count = report.summary.byPriority?.[level] ?? 0
+    return {
+      id: level,
+      label: LEVEL_LABEL[level],
+      short: LEVEL_LABEL[level],
+      sub: LEVEL_WORD[level],
+      open: count,
+      count,
+      attention: count > 0 && (level === 'P0' || level === 'P1'),
       running: false,
     }
   })]
@@ -158,6 +192,28 @@ export function statementItems(category: AuditCategory | null | undefined, filte
       tone: notChecked ? 'notChecked' : open ? 'open' : 'clean',
     }
   })
+}
+
+/** DAR-UI-140. Column 2 in priority mode: statements across categories, each counted at the level. A statement with
+ *  findings at two levels is listed under both. 'open' keeps those with findings there; 'all' keeps every statement. */
+export function statementItemsByPriority(report: AuditReport, level: AuditLevel, filter: AuditFilter): StatementItem[] {
+  return Object.values(report.categories ?? {}).flatMap(statementsOf).map((statement) => {
+    const open = statement.counts?.byPriority?.[level] ?? 0
+    const notChecked = statement.status === 'notRun'
+    return {
+      statement,
+      item: {
+        id: statement.id,
+        text: statement.text,
+        open,
+        badge: notChecked ? '–' : String(open),
+        tone: notChecked ? 'notChecked' : open ? 'open' : 'clean',
+      } satisfies StatementItem,
+    }
+  }).filter(({ statement, item }) => filter === 'all'
+    || (filter === 'open' ? item.open > 0 : statement.status === 'notRun' && (statement.priority ?? 'P2') === level))
+    .sort((a, b) => b.item.open - a.item.open || (a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0))
+    .map(({ item }) => item)
 }
 
 /** The numbers on the filter pills: findings for open and all, statements for not checked. */
@@ -496,15 +552,22 @@ export function orderCauses(item: AuditFindingSummary): { cause: string; lines: 
 // DAR-UI-098. The findings column as rows under cause headings: causes in the order their first finding came, findings in
 // their own order within a cause. 2026-11-04 (Aditi: "the numbers dont add up here"): each finding once, under its heading
 // cause, or under the toolbar's picked cause when it has that one, so the headings sum to the column's count.
-export function findingRows<T extends AuditFindingSummary>(items: T[], picked = ''): FindingRow<T>[] {
+export function findingRows<T extends AuditFindingSummary>(items: T[], picked = '', level?: AuditLevel): FindingRow<T>[] {
   const groups = new Map<string, FindingRow<T>[]>()
-  items.forEach((item) => {
+  // DAR-UI-140. A level keeps the units at it: an order's own level, never its lines'; no priority reads P2.
+  items.filter((item) => !level || (item.priority ?? 'P2') === level).forEach((item) => {
     const causes = orderCauses(item)
     const head = causes.find((c) => c.cause === picked) ?? causes[0]!
     const row = { item, cause: head.cause, also: item.kind === 'order' ? causes.filter((c) => c !== head) : [], key: item.id }
     groups.set(head.cause, [...(groups.get(head.cause) ?? []), row])
   })
   return [...groups.values()].flat()
+}
+
+/** DAR-UI-140. The level of the cause group that starts at `index` (its first unit's), for the heading's mark. */
+export function groupLevel(rows: FindingRow[], index: number): AuditLevel | null {
+  const row = rows[index]
+  return row ? (row.item.priority ?? 'P2') : null
 }
 
 // DAR-UI-098. What an order's row says under its heading: its other causes only (Aditi: "the 3 of 4 is also confusing").
