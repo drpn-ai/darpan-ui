@@ -1058,7 +1058,7 @@ export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Obje
   // DAR-UI-140: Audit settings priority cells, named "<statement code> priority: <level>" and "<reason> priority: <level or Same as code>".
   [/^r\d+ priority: .+$/, {
     title: 'Statement priority',
-    body: 'sets how urgent this statement\u2019s broken findings are: it decides where they sit on the board\u2019s Priority view, and P0 and P1 open on their own hints. Its reasons follow unless they set their own.',
+    body: 'decides where this statement\u2019s findings sit on the board\u2019s Priority view; P0 and P1 open on their own hints. Its reasons follow unless they set their own.',
   }],
   [/^.+ priority: .+$/, {
     title: 'Reason priority',
