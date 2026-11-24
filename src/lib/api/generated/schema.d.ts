@@ -4252,7 +4252,7 @@ export interface components {
         };
         /**
          * @description An audit's settings: its name, its daily schedule (the audit's own, DAR-BE-199: every check runs on
-         *                 it), and each statement with its checks and the run each check reads.
+         *                 it), and each statement with its priority, its checks, the run each check reads, and its reasons.
          */
         GetAuditSettingsParams: {
             /** @description The audit's code. */
@@ -4266,7 +4266,11 @@ export interface components {
              * @description {audit: {id, name, period}, peakHoursUntil: ISO instant (only while now is inside the tenant's peak hours; DAR-BE-328), playableFrom: YYYY-MM-DD (the earliest
              *                     day play can record today), schedule: {active, time HH:mm,
              *                     timeZone, mixed (some check's automation is off the audit's schedule; saving puts it on), automations,
-             *                     checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label, savedRunId, runName}]}],
+             *                     checksWithoutRun}, statements: [{id, code, text, active, priority (P0, P1, P2 or KNOWN; a statement with no level
+             *                     reads P2), checks: [{id, label, savedRunId, runName}], reasons (DAR-BE-348: the conclusions its checks' runs can
+             *                     reach, hidden ones left out, and any it holds a level for): [{conclusion (enumId), label, priority (its own level,
+             *                     or null: the statement's), closes (all: expected on every check that reaches it, so it closes every finding and
+             *                     takes no level; some; none), closesOn, checks (how many of the statement's checks reach it)}]}],
              *                     runEmail: {active, alsoSendTo: [address], members (how many accounts receive it by default: current tenant
              *                     members and Darpan admins), admins (how many of those are Darpan admins), chatSpaceId or null, canEdit (the caller
              *                     is a tenant admin; others see it read-only)} (DAR-BE-207:
@@ -4460,7 +4464,7 @@ export interface components {
             result: components["schemas"]["SaveAuditCheckResult"];
         };
         /**
-         * @description Changes an audit's name, statements (text, on/off) and its daily schedule, which is the audit's own and
+         * @description Changes an audit's name, statements (text, on/off, priority), reasons' priorities and its daily schedule, which is the audit's own and
          *                 is written to the automation of every check it runs (DAR-BE-199). A check whose run has no automation gets one,
          *                 on that schedule, when the schedule is saved. Answers the settings as saved.
          */
@@ -4469,8 +4473,17 @@ export interface components {
             audit: string;
             /** @description New name; blank keeps it. */
             name?: string;
-            /** @description [{id, text, active}], only those that changed. */
+            /**
+             * @description [{id, text, active, priority}], only those that changed, a field
+             *                     left out keeps its value. priority: P0, P1, P2 or KNOWN; null clears it (reads P2).
+             */
             statements?: string[];
+            /**
+             * @description DAR-BE-348. [{statement (its id), conclusion (enumId), priority}]: a
+             *                     reason's own level, P0, P1, P2 or KNOWN; null deletes it, and the reason takes the statement's. A reason that
+             *                     closes on every check of its statement takes no level: the save is refused.
+             */
+            reasons?: string[];
             /**
              * @description {active, time HH:mm, timeZone}; absent keeps it, a field left out
              *                     keeps its value.
@@ -4492,8 +4505,8 @@ export interface components {
             /**
              * @description {audit: {id, name, period}, peakHoursUntil: ISO instant (only while now is inside the tenant's peak hours; DAR-BE-328), playableFrom: YYYY-MM-DD (the earliest
              *                     day play can record today), schedule: {active, time HH:mm,
-             *                     timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, checks: [{id, label,
-             *                     savedRunId, runName}]}], runEmail: {active, alsoSendTo, members, admins, chatSpaceId, canEdit}}
+             *                     timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, priority, checks: [{id, label,
+             *                     savedRunId, runName}], reasons: [{conclusion, label, priority, closes, closesOn, checks}]}], runEmail: {active, alsoSendTo, members, admins, chatSpaceId, canEdit}}
              */
             settings?: Record<string, never>;
         };

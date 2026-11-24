@@ -49,10 +49,18 @@ export interface AuditRecord {
 }
 export type AuditRecords = Record<string, Record<string, AuditRecord[]>>
 
+// DAR-UI-140 (DAR-BE-348). How soon a broken statement must be fixed, in urgency order; KNOWN is owned, not urgent.
+export type AuditLevel = 'P0' | 'P1' | 'P2' | 'KNOWN'
+export const AUDIT_LEVELS: readonly AuditLevel[] = ['P0', 'P1', 'P2', 'KNOWN']
+export const LEVEL_LABEL: Record<AuditLevel, string> = { P0: 'P0', P1: 'P1', P2: 'P2', KNOWN: 'Known' }
+export const LEVEL_WORD: Record<AuditLevel, string> = { P0: 'today', P1: 'this week', P2: 'later', KNOWN: 'owned' }
+
 export interface AuditFindingCounts {
   open: number
   newToday: number
   fixedToday: number
+  /** DAR-BE-348. Open findings by level; absent on reports before it. */
+  byPriority?: Record<AuditLevel, number>
 }
 
 export interface AuditRef {
@@ -110,6 +118,12 @@ export interface AuditFindingSummary {
   /** DAR-BE-250. Earliest step wins: the later steps' findings on the same order, listed here and not counted there.
    *  Absent when nothing waits. */
   waiting?: AuditWaitingFinding[]
+  /** DAR-BE-348. The unit's level, where it came from (its statement or its cause) and the cause's name when
+   *  prioritySource is 'reason'. priorityLine: an order unit's level line. All absent on reports before it. */
+  priority?: AuditLevel
+  prioritySource?: 'statement' | 'reason'
+  priorityReason?: string | null
+  priorityLine?: string
 }
 
 /**
@@ -122,6 +136,8 @@ export interface AuditWaitingFinding {
   headline: string
   cause: string | null
   item?: string | null
+  /** DAR-BE-348. Its own level. */
+  priority?: AuditLevel
 }
 
 /** DAR-UI-099. One line of an order finding's order. */
@@ -166,6 +182,8 @@ export interface AuditStatement {
   step?: number | null
   /** DAR-BE-250. Its findings on orders an earlier step already reports: listed under that finding, not counted here. */
   waiting?: number
+  /** DAR-BE-348. The statement's level; absent on reports before it. */
+  priority?: AuditLevel
 }
 
 export interface AuditCategory {
@@ -205,6 +223,8 @@ export interface AuditFindingDocument {
   finding: {
     id: string
     headline: string
+    /** DAR-BE-348. */
+    priority?: { level: AuditLevel; source: 'statement' | 'reason'; reason: string | null }
     audit: AuditRef
     period: string
     category: { id: string; label: string }
@@ -298,12 +318,24 @@ export interface AuditSettingsCheck {
   runName: string | null
 }
 
+/** DAR-BE-348. A cause under a statement: its own level (null: the statement's), and whether fixing it closes the finding. */
+export interface AuditSettingsReason {
+  conclusion: string
+  label: string
+  priority: AuditLevel | null
+  closes: 'all' | 'some' | 'none'
+  closesOn: number
+  checks: number
+}
+
 export interface AuditSettingsStatement {
   id: string
   code: string
   text: string
   active: boolean
   checks: AuditSettingsCheck[]
+  priority?: AuditLevel
+  reasons?: AuditSettingsReason[]
 }
 
 export interface AuditSchedule {
@@ -410,7 +442,9 @@ export interface RetryAuditCheckResponse extends AuditEnvelope {
 export interface SaveAuditSettingsPayload {
   audit: string
   name?: string
-  statements?: Array<{ id: string; text?: string; active?: boolean }>
+  statements?: Array<{ id: string; text?: string; active?: boolean; priority?: AuditLevel | null }>
+  /** DAR-BE-348. A reason's own level; null clears it back to the statement's. */
+  reasons?: Array<{ statement: string; conclusion: string; priority: AuditLevel | null }>
   schedule?: { active: boolean; time: string; timeZone: string }
   /** Omitted: no change. */
   runEmail?: Omit<RunEmailSettings, 'members' | 'admins' | 'canEdit'>

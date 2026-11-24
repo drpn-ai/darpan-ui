@@ -27,6 +27,7 @@ import type {
   AddAuditStatementPayload,
   AddAuditStatementResponse,
   VerifyAuditFindingResponse,
+  AuditLevel,
 } from './auditTypes'
 import type {
   GetTenantConfigVersionsResponse,
@@ -754,7 +755,7 @@ export const auditFacade = {
     return callService<GetAuditFindingResponse>(AUDIT.getAuditFinding, payload, signal)
   },
   getAuditFindingsByOrder(
-    payload: { audit: string; statement?: string; state?: 'open'; period?: string },
+    payload: { audit: string; statement?: string; state?: 'open'; period?: string; priority?: AuditLevel },
     signal?: AbortSignal,
   ): Promise<GetAuditFindingsByOrderResponse> {
     return callService<GetAuditFindingsByOrderResponse>(AUDIT.getAuditFindingsByOrder, payload, signal)

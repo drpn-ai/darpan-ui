@@ -527,7 +527,8 @@ function applyLocally(change: Omit<SaveAuditSettingsPayload, 'audit'>) {
   if (!was) return
   const statements = was.statements.map((statement) => {
     const edit = change.statements?.find((candidate) => candidate.id === statement.id)
-    return edit ? { ...statement, ...edit } : statement
+    // DAR-UI-140: a null priority in the payload clears a saved level; the page keeps the statement's own until the reload.
+    return edit ? { ...statement, ...edit, priority: edit.priority ?? statement.priority } : statement
   })
   show({
     ...was,
