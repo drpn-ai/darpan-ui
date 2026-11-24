@@ -349,6 +349,36 @@ describe('TenantScriptPage (query)', () => {
     expect(order).toEqual(['schedule', 'move'])
   })
 
+  it('a new query runs as it opens: its read starts on the first audit, not a blank one, and is not marked edited', async () => {
+    route.params = {}
+    listTenantQuerySchedules.mockResolvedValue({ schedules: [], timeZone: 'UTC' })
+    // The catalog lands after the draft is built: the untouched starter still picks up the audit.
+    let landCatalog: (value: typeof CATALOG) => void = () => {}
+    getTenantQueryCatalog.mockReturnValue(new Promise((resolve) => { landCatalog = resolve }))
+    const wrapper = await mountPage()
+    landCatalog(CATALOG)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="script-run"]').trigger('click')
+    await flushPromises()
+    const sent = runTenantQuery.mock.calls[0]?.[0] as { readSpecJson: string; scriptBody: string }
+    expect(JSON.parse(sent.readSpecJson).inputs[0]).toMatchObject({ source: 'auditFindings', auditId: '100510' })
+    expect(sent.scriptBody).toContain('input.findings')
+  })
+
+  it('a new query opened after the catalog loads also starts on the first audit', async () => {
+    route.params = {}
+    let landSchedules: (value: unknown) => void = () => {}
+    listTenantQuerySchedules.mockReturnValue(new Promise((resolve) => { landSchedules = resolve }))
+    const wrapper = await mountPage()
+    landSchedules({ schedules: [], timeZone: 'UTC' })
+    await flushPromises()
+    await wrapper.find('[data-testid="script-run"]').trigger('click')
+    await flushPromises()
+    const sent = runTenantQuery.mock.calls[0]?.[0] as { readSpecJson: string }
+    expect(JSON.parse(sent.readSpecJson).inputs[0].auditId).toBe('100510')
+  })
+
   it('a new query saves and moves to its own page', async () => {
     route.params = {}
     listTenantQuerySchedules.mockResolvedValue({ schedules: [], timeZone: 'UTC' })

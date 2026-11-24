@@ -565,11 +565,14 @@ const CODE_ICON_PATH = 'M7.5 5.5 3 10l4.5 4.5M12.5 5.5 17 10l-4.5 4.5'
 const EYE_ICON_PATH = 'M2.5 10s2.75-5 7.5-5 7.5 5 7.5 5-2.75 5-7.5 5-7.5-5-7.5-5Z'
 const MAX_RUNS = 3
 const NEW_NAME = 'New query'
-const STARTER_READ = `{
+/** A new query reads the tenant's first audit, so the example runs as it opens; blank only when the tenant has none. */
+function starterRead(auditId = ''): string {
+  return `{
   "inputs": [
-    { "name": "findings", "source": "auditFindings", "auditId": "", "fields": ["recordKey", "headline", "firstFoundDate"] }
+    { "name": "findings", "source": "auditFindings", "auditId": ${JSON.stringify(auditId)}, "fields": ["recordKey", "headline", "firstFoundDate"] }
   ]
 }`
+}
 const STARTER_BODY = `// input.findings is the read's rows. Return a summary and files.
 var rows = [...];
 for (var f : input.findings) { fn:push(rows, [f.recordKey, f.headline, f.firstFoundDate]); }
@@ -756,9 +759,22 @@ function resetDraft(): void {
   draft.value = query
     ? { tenantQueryId: query.tenantQueryId, queryName: query.queryName, description: query.description ?? '',
         readSpecJson: query.readSpecJson ?? '', scriptBody: query.scriptBody }
-    : { tenantQueryId: '', queryName: NEW_NAME, description: '', readSpecJson: STARTER_READ, scriptBody: STARTER_BODY }
+    : { tenantQueryId: '', queryName: NEW_NAME, description: '', readSpecJson: starterRead(firstAuditId()), scriptBody: STARTER_BODY }
   schedule.value = toSchedule(savedSchedule.value)
   baseline.value = snapshot()
+}
+
+function firstAuditId(): string {
+  return catalog.value?.audits?.[0]?.auditId ?? ''
+}
+
+/** The catalog can land after a new query's draft: an untouched starter read takes the audit then, still unedited. */
+function fillStarterAudit(): void {
+  const current = draft.value
+  if (!current || current.tenantQueryId || current.readSpecJson !== starterRead() || !firstAuditId()) return
+  const wasClean = !dirty.value
+  current.readSpecJson = starterRead(firstAuditId())
+  if (wasClean) baseline.value = snapshot()
 }
 
 async function load(tenantQueryId: string): Promise<void> {
@@ -804,6 +820,7 @@ async function loadChoices(): Promise<void> {
   agentReady.value = agent.status === 'fulfilled' && agent.value.state === 'ON' && agent.value.grantState === 'LIVE'
   catalog.value = reads.status === 'fulfilled' ? reads.value : null
   catalogError.value = reads.status === 'fulfilled' ? '' : messageOf(reads.reason, 'Could not read what queries can read; sources show as ids.')
+  fillStarterAudit()
 }
 
 /** Open the Data popup on one input of the read, or on a new one (index null). */
