@@ -200,6 +200,13 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { id: 'tenant-module-timezone', text: 'This zone is what schedules and windows are read in. Your own preference only changes how times display.', when: control('tenant-module-timezone') },
     { id: 'tenant-module-notifications', text: 'Spaces, and what posts to each, are on Notifications now: one grid, one dot per row.', when: control('tenant-module-notifications') },
   ]),
+  // DAR-UI-138: a query saves only with a name. Save stays pressable; pressing it nameless makes the mascot say this.
+  'settings-tenant-script-new': Object.freeze([
+    { id: 'query-save-blocked', text: 'A query needs a name before it saves. Type one in the title at the top.', when: control('script-save-blocked') },
+  ]),
+  'settings-tenant-script': Object.freeze([
+    { id: 'query-save-blocked', text: 'A query needs a name before it saves. Type one in the title at the top.', when: control('script-save-blocked') },
+  ]),
   'settings-notifications': Object.freeze([
     { id: 'notifications-grid', text: 'One dot per row: a thing posts to one space, or nowhere. A click moves it at once, with no Save.', when: control('notifications-grid') },
     { id: 'notifications-send-test', text: 'Send test posts one short line to that space, so you can see it lands before anything real does.', when: control('notifications-send-test') },

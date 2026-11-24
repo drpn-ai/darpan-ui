@@ -153,6 +153,23 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     body: 'asks which days, then runs every check of this audit over them. Findings land as each check finishes; nothing waits for the morning run.',
   },
   // DAR-UI-064. The audit authoring editors.
+  // DAR-UI-138: the query page's Data step and its popup.
+  'add data': {
+    title: 'Add data',
+    body: 'opens Data to add one more read. The script gets it as another input, and nothing is saved until you save.',
+  },
+  'read as json': {
+    title: 'Read as JSON',
+    body: 'shows the read as the JSON it is saved as. An edit there changes the same read the sentence above shows.',
+  },
+  'add a condition': {
+    title: 'Add a condition',
+    body: 'adds one more line under Only. Every line must hold, so each one leaves fewer rows for the script.',
+  },
+  'closed findings too': {
+    title: 'Closed findings too',
+    body: 'reads findings already closed as well as open ones. Off, the read keeps only the findings still open.',
+  },
   'add statement': {
     title: 'Add statement',
     body: 'links this check to one more statement. One run often proves several: returns against credit memos covers R4, R7 and R8 at once.',

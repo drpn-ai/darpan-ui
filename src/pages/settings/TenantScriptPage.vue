@@ -3,7 +3,9 @@
     <template #hero>
       <StaticRecordTitle
         v-if="draft"
+        ref="titleRef"
         :model-value="draft.queryName"
+        :placeholder="NEW_NAME"
         :editable="canEdit"
         aria-label="Query name"
         test-id="script-name"
@@ -316,13 +318,10 @@
             <path :d="backIconPath" fill="currentColor" />
           </svg>
         </RouterLink>
-        <AppSaveAction
-          v-if="canEdit && draft"
-          label="Save query"
-          test-id="script-save"
-          :disabled="busy || !draft.queryName.trim()"
-          @click="save"
-        />
+        <!-- Pressable without a name, so pressing it can say what is missing (the mascot reads this anchor). -->
+        <span v-if="canEdit && draft" class="script-save" :data-testid="nameMissing ? 'script-save-blocked' : undefined">
+          <AppSaveAction label="Save query" test-id="script-save" :disabled="busy" @click="save" />
+        </span>
         <button
           v-if="canEdit && draft?.tenantQueryId"
           type="button"
@@ -522,7 +521,9 @@ import {
 } from '../../lib/scriptDeployment'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import { formatDateTime } from '../../lib/utils/date'
+import { hintsFor } from '../../lib/mascotHints'
 import { useAuthStore } from '../../stores/auth'
+import { useMascotStore } from '../../stores/mascot'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -564,6 +565,7 @@ const FUNCTIONS_DOCS_URL = 'https://developers.drpn.ai/tenant-queries/functions'
 const CODE_ICON_PATH = 'M7.5 5.5 3 10l4.5 4.5M12.5 5.5 17 10l-4.5 4.5'
 const EYE_ICON_PATH = 'M2.5 10s2.75-5 7.5-5 7.5 5 7.5 5-2.75 5-7.5 5-7.5-5-7.5-5Z'
 const MAX_RUNS = 3
+/** A new query's name starts blank and shows this, muted, as its placeholder: it still has to be given. */
 const NEW_NAME = 'New query'
 /** A new query reads the tenant's first audit, so the example runs as it opens; blank only when the tenant has none. */
 function starterRead(auditId = ''): string {
@@ -580,6 +582,8 @@ for (var f : input.findings) { fn:push(rows, [f.recordKey, f.headline, f.firstFo
   'files': [{ 'name': 'findings.csv', 'columns': ['record', 'headline', 'first found'], 'rows': rows }] }`
 
 const route = useRoute()
+const mascot = useMascotStore()
+const titleRef = ref<InstanceType<typeof StaticRecordTitle> | null>(null)
 const router = useRouter()
 const permissionsStore = usePermissionsStore()
 const authStore = useAuthStore()
@@ -644,6 +648,7 @@ const isOwner = computed(() => Boolean(savedSchedule.value?.ownerUserId) && save
 function snapshot(): string {
   return JSON.stringify({ draft: draft.value, schedule: schedule.value })
 }
+const nameMissing = computed(() => draft.value !== null && !draft.value.queryName.trim())
 const dirty = computed(() => Boolean(draft.value) && snapshot() !== baseline.value)
 
 const chatSpaceOptions = computed(() => [
@@ -759,7 +764,7 @@ function resetDraft(): void {
   draft.value = query
     ? { tenantQueryId: query.tenantQueryId, queryName: query.queryName, description: query.description ?? '',
         readSpecJson: query.readSpecJson ?? '', scriptBody: query.scriptBody }
-    : { tenantQueryId: '', queryName: NEW_NAME, description: '', readSpecJson: starterRead(firstAuditId()), scriptBody: STARTER_BODY }
+    : { tenantQueryId: '', queryName: '', description: '', readSpecJson: starterRead(firstAuditId()), scriptBody: STARTER_BODY }
   schedule.value = toSchedule(savedSchedule.value)
   baseline.value = snapshot()
 }
@@ -1000,7 +1005,7 @@ async function ask(): Promise<void> {
       previousDraft.value = draftNow
       current.readSpecJson = proposed.proposal.readSpecJson ?? ''
       current.scriptBody = proposed.proposal.scriptBody
-      if (current.queryName === NEW_NAME && proposed.proposal.queryName) current.queryName = proposed.proposal.queryName
+      if (!current.queryName.trim() && proposed.proposal.queryName) current.queryName = proposed.proposal.queryName
       if (!current.description && proposed.proposal.description) current.description = proposed.proposal.description
       addRun("Agent's run", proposed.preview)
       askText.value = ''
@@ -1032,7 +1037,14 @@ function putBackDraft(): void {
 /** One Save: the query, then its schedule when there is one and it changed. */
 async function save(): Promise<void> {
   const current = draft.value
-  if (!current || busy.value || !canEdit.value || !current.queryName.trim()) return
+  if (!current || busy.value || !canEdit.value) return
+  if (!current.queryName.trim()) {
+    // Not saved: the mascot says what is missing (its words are data) and the caret goes where the name is typed.
+    const [why] = hintsFor(String(route.name ?? ''), document)
+    if (why) mascot.nudge(why)
+    titleRef.value?.focus()
+    return
+  }
   saving.value = true
   pageError.value = ''
   const wasNew = !current.tenantQueryId
@@ -1106,6 +1118,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* Only an anchor for the mascot's save-blocked line: it must not add a box to the action row. */
+.script-save {
+  display: contents;
+}
+
 .script-edited-mark {
   color: var(--text-muted);
   font-size: var(--type-note-size);

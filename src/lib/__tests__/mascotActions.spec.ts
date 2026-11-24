@@ -138,6 +138,7 @@ describe('every button in the app has an answer', () => {
     'components/ui/StaticRecordTitle.vue': 'toggleLabel prop; each caller\'s toggle-label is swept with the wrappers below',
     // DAR-BE-334: the agent's offered answers are its own words; the title toggle's three labels are each entered
     // ('on schedule', 'on schedule: scheduling needs tenant admin', 'on schedule: set up a schedule first').
+    'components/settings/QueryDataPopup.vue': 'each Keep chip is named by the field it keeps (data)',
     'pages/settings/TenantScriptPage.vue': 'agent answer choices (data) and toggleLabel (three entered labels)',
     'components/ui/EmptyState.vue': 'the caller supplies action.label; the caller is where the entry belongs',
     'components/ui/ErrorState.vue': 'the caller supplies action.label; the caller is where the entry belongs',

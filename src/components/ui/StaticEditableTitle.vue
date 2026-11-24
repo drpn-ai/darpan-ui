@@ -3,6 +3,8 @@
     :is="tag"
     ref="titleElement"
     class="static-page-inline-edit-title"
+    :class="{ 'static-page-inline-edit-title--empty': editable && placeholder && !displayValue }"
+    :data-placeholder="editable && placeholder ? placeholder : undefined"
     :contenteditable="editable ? 'plaintext-only' : 'false'"
     :aria-label="editable ? ariaLabel : undefined"
     :spellcheck="false"
@@ -26,12 +28,15 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string
   testId?: string
   fallback?: string
+  /** Shown in a muted colour while the title is blank, so it reads as something still to fill in, not a name. */
+  placeholder?: string
 }>(), {
   editable: true,
   tag: 'h1',
   ariaLabel: 'Title',
   testId: undefined,
   fallback: '',
+  placeholder: '',
 })
 
 const emit = defineEmits<{
@@ -167,6 +172,12 @@ onMounted(() => {
 
 .static-page-inline-edit-title[contenteditable='false'] {
   cursor: inherit;
+}
+
+.static-page-inline-edit-title--empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-dim);
+  pointer-events: none;
 }
 
 .static-page-inline-edit-title:focus,

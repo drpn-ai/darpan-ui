@@ -913,6 +913,32 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Read',
     body: 'what the query reads, only from what your audits already keep: a dataset’s kept fields, a saved run’s newest result, or an audit’s findings. A field no audit keeps cannot be read.',
   },
+  // DAR-UI-138: the query's Data popup. Generic words, so each is reached only through its v-explain.
+  queryData: {
+    title: 'Data',
+    body: 'one thing the query reads: an audit’s findings, a saved run’s newest result, or a dataset. The script sees it under the name at the bottom.',
+    byDirectiveOnly: true,
+  },
+  queryDataWindow: {
+    title: 'Last days',
+    body: 'keeps only rows from this many days before each run. Left empty, the read takes every row however old.',
+    byDirectiveOnly: true,
+  },
+  queryDataOnly: {
+    title: 'Only',
+    body: 'conditions a row must meet to be read. Every one must hold, so each line leaves fewer rows for the script.',
+    byDirectiveOnly: true,
+  },
+  queryDataKeep: {
+    title: 'Keep',
+    body: 'the fields each row carries into the script. A field left off here is not there for the script to use.',
+    byDirectiveOnly: true,
+  },
+  queryDataName: {
+    title: 'The script calls it',
+    body: 'the name the script reads this data by, as input.<name>. Rename it and any line still using the old name breaks.',
+    byDirectiveOnly: true,
+  },
   scriptLastRun: {
     title: 'Last run',
     body: 'how the last scheduled run went, in the tenant’s zone. Runs from this page are not counted; they never send.',

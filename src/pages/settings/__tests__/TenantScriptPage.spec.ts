@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import type { QueryRun, TenantQuery, TenantQuerySchedule } from '../../../lib/api/scriptTypes'
 
 const listTenantQueries = vi.hoisted(() => vi.fn())
@@ -15,7 +16,7 @@ const getAgentStatus = vi.hoisted(() => vi.fn())
 const getTenantQueryCatalog = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
-const route = vi.hoisted(() => ({ params: { tenantScriptId: '100' } as Record<string, string> }))
+const route = vi.hoisted(() => ({ name: 'settings-tenant-script', params: { tenantScriptId: '100' } as Record<string, string> }))
 const permissions = vi.hoisted(() => ({ canEditTenantSettings: true, canScheduleQueries: true }))
 const auth = vi.hoisted(() => ({ userId: 'U1' }))
 
@@ -48,6 +49,7 @@ vi.mock('vue-router', async () => {
 })
 
 import TenantScriptPage from '../TenantScriptPage.vue'
+import { useMascotStore } from '../../../stores/mascot'
 
 const READ = '{"inputs":[{"name":"orders","source":"dataset","datasetId":"DS_ORDERS","fields":["id","status"]}]}'
 
@@ -95,6 +97,8 @@ async function choose(wrapper: VueWrapper, selectTestId: string, value: string):
 describe('TenantScriptPage (query)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
+    route.name = 'settings-tenant-script'
     permissions.canEditTenantSettings = true
     permissions.canScheduleQueries = true
     auth.userId = 'U1'
@@ -341,6 +345,9 @@ describe('TenantScriptPage (query)', () => {
     })
     replace.mockImplementation(() => { order.push('move') })
     const wrapper = await mountPage()
+    const title = wrapper.find('[data-testid="script-name"]')
+    title.element.textContent = 'Daily findings'
+    await title.trigger('input')
     await wrapper.find('[data-testid="script-fact-schedule"]').trigger('click')
     await wrapper.find('[data-testid="script-schedule-email-to"]').setValue('ops@krewe.example')
     await wrapper.find('[data-testid="script-schedule-save"]').trigger('click')
@@ -379,14 +386,32 @@ describe('TenantScriptPage (query)', () => {
     expect(JSON.parse(sent.readSpecJson).inputs[0].auditId).toBe('100510')
   })
 
-  it('a new query saves and moves to its own page', async () => {
+  it('a new query starts nameless; Save without a name has the mascot say so, then a named one saves and moves', async () => {
+    route.name = 'settings-tenant-script-new'
     route.params = {}
     listTenantQuerySchedules.mockResolvedValue({ schedules: [], timeZone: 'UTC' })
     const wrapper = await mountPage()
-    expect(text(wrapper, 'script-name')).toBe('New query')
-    await wrapper.find('[data-testid="script-save"]').trigger('click')
+    const title = wrapper.find('[data-testid="script-name"]')
+    // Blank, with "New query" only as the muted placeholder: it reads as something still to fill in.
+    expect(title.text()).toBe('')
+    expect(title.attributes('data-placeholder')).toBe('New query')
+    expect(title.classes()).toContain('static-page-inline-edit-title--empty')
+
+    const save = wrapper.find('[data-testid="script-save"]')
+    expect(save.attributes('disabled')).toBeUndefined()
+    await save.trigger('click')
     await flushPromises()
-    expect(saveTenantQuery).toHaveBeenCalledWith(expect.objectContaining({ queryName: 'New query' }))
+    expect(saveTenantQuery).not.toHaveBeenCalled()
+    expect(useMascotStore().nudgeText).toBe('A query needs a name before it saves. Type one in the title at the top.')
+    expect(document.activeElement).toBe(title.element)
+
+    title.element.textContent = 'Open findings'
+    await title.trigger('input')
+    expect(title.classes()).not.toContain('static-page-inline-edit-title--empty')
+    expect(wrapper.find('[data-testid="script-save-blocked"]').exists()).toBe(false)
+    await save.trigger('click')
+    await flushPromises()
+    expect(saveTenantQuery).toHaveBeenCalledWith(expect.objectContaining({ queryName: 'Open findings' }))
     expect(replace).toHaveBeenCalledWith({ name: 'settings-tenant-script', params: { tenantScriptId: '900' } })
     expect(saveTenantQuerySchedule).not.toHaveBeenCalled()
   })

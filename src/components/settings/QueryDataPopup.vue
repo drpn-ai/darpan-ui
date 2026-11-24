@@ -9,7 +9,7 @@
   >
     <section class="popup-workflow-modal workflow-panel query-data-popup">
       <header class="workflow-panel-header">
-        <h2 id="query-data-title">Data</h2>
+        <h2 id="query-data-title" v-explain="'queryData'">Data</h2>
       </header>
 
       <div class="workflow-step-wrapper">
@@ -48,7 +48,7 @@
               />
             </label>
             <label v-if="windowField" class="wizard-input-shell">
-              <span class="workflow-context-label">{{ windowLabel }} · last days</span>
+              <span v-explain="'queryDataWindow'" class="workflow-context-label">{{ windowLabel }} · last days</span>
               <input
                 v-model="lastDays"
                 class="wizard-answer-control"
@@ -63,7 +63,7 @@
           </div>
 
           <div class="query-data-block">
-            <span class="workflow-context-label">Only</span>
+            <span v-explain="'queryDataOnly'" class="workflow-context-label">Only</span>
             <div v-for="row in rows" :key="row.key" class="query-data-condition" data-testid="query-data-condition">
               <AppSelect
                 v-model="row.field"
@@ -117,7 +117,7 @@
           </div>
 
           <div class="query-data-block">
-            <span class="workflow-context-label">Keep</span>
+            <span v-explain="'queryDataKeep'" class="workflow-context-label">Keep</span>
             <div v-if="toggleFields.length" class="workflow-select-chip-row query-data-keep">
               <button
                 v-for="field in toggleFields"
@@ -144,7 +144,7 @@
           </div>
 
           <label class="wizard-input-shell query-data-name">
-            <span class="workflow-context-label">The script calls it</span>
+            <span v-explain="'queryDataName'" class="workflow-context-label">The script calls it</span>
             <span class="query-data-name__row">
               <span class="query-data-name__prefix">input.</span>
               <input
@@ -181,6 +181,7 @@ import WorkflowChipTextInput from '../workflow/WorkflowChipTextInput.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
 import { plusIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
+import { vExplain } from '../../directives/vExplain'
 import {
   CONDITION_OPS,
   FIELD_NAME,

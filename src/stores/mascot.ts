@@ -48,6 +48,9 @@ export interface MascotWarning {
   actions: MascotWarningAction[]
 }
 
+/** How long a nudge stays up unless it is clicked away (Aditi 2026-11-24, DAR-UI-138). */
+export const NUDGE_MS = 10_000
+
 export const useMascotStore = defineStore('mascot', () => {
   const mode = ref<MascotMode>('idle')
   const term = ref<string | null>(null)
@@ -146,6 +149,26 @@ export const useMascotStore = defineStore('mascot', () => {
     popupOpen.value = false
   }
 
+  /* ── Nudges ────────────────────────────────────────────────────────────────────
+     One line about something the person just tried that needs more from them ("Name the query first").
+     Not a tip: it answers an action, so it does not wait for an explanation to finish, and hover help
+     coming and going (clear()) must not wipe it, or it would vanish the moment the pointer leaves the
+     button that raised it. It holds the bubble for NUDGE_MS, or until a click anywhere puts it away. */
+  const nudgeText = ref<string | null>(null)
+  let nudgeTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearNudge(): void {
+    if (nudgeTimer) clearTimeout(nudgeTimer)
+    nudgeTimer = null
+    nudgeText.value = null
+  }
+
+  function nudge(text: string, forMs: number = NUDGE_MS): void {
+    clearNudge()
+    nudgeText.value = text
+    nudgeTimer = setTimeout(clearNudge, forMs)
+  }
+
   /** The unprompted offer. Never interrupts an answer already on screen. */
   const tipText = ref<string | null>(null)
 
@@ -228,6 +251,9 @@ export const useMascotStore = defineStore('mascot', () => {
     detail,
     tipText,
     offerTip,
+    nudgeText,
+    nudge,
+    clearNudge,
     clearTip,
     listening,
     releasing,

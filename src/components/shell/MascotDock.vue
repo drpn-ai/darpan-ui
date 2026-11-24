@@ -20,7 +20,11 @@
     <p
       v-if="bubbleText"
       class="mascot-say"
-      :class="{ 'mascot-say--going': mascot.releasing, 'mascot-say--hint': mascot.mode === 'hint' }"
+      :class="{
+        'mascot-say--going': !mascot.nudgeText && mascot.releasing,
+        'mascot-say--hint': !mascot.nudgeText && mascot.mode === 'hint',
+      }"
+      :data-testid="mascot.nudgeText ? 'mascot-nudge' : undefined"
       role="status"
       @pointerenter="onBubbleEnter"
       @pointerleave="onBubbleLeave"
@@ -29,7 +33,9 @@
            for labels and explanations, and a condition you must act on is neither — sharing the
            surface made the two look identical. What a warning gets here is ONE LINE naming it,
            which is exactly what this bubble is sized and styled for. -->
-      <template v-if="mascot.mode === 'hint'">
+      <!-- A nudge answers something just tried, so it holds the bubble until it times out or is clicked away. -->
+      <template v-if="mascot.nudgeText">{{ mascot.nudgeText }}</template>
+      <template v-else-if="mascot.mode === 'hint'">
         <template v-if="warningHintLine">{{ warningHintLine }}</template>
         <template v-else>Click me, or <span class="mascot-key">&#8984;K</span> if you’re in a hurry.</template>
       </template>
@@ -64,9 +70,9 @@
       <DarpanMascot
         :detail="3"
         :listening="mascot.listening"
-        :speaking="mascot.isSpeaking"
+        :speaking="mascot.isSpeaking || Boolean(mascot.nudgeText)"
         :alerting="bursting"
-        :alerted="mascot.hasWarnings"
+        :alerted="mascot.hasWarnings || Boolean(mascot.nudgeText)"
         :tenant-label="tenantLabel"
         :held="dragging"
       />
@@ -260,7 +266,7 @@ const warningHintLine = computed(() =>
 
 /* The bubble is only ever a label or an explanation now, so it follows `mode` alone. A standing
    warning shows nothing here until hovered — the burst and the held posture are its announcement. */
-const bubbleText = computed(() => mascot.mode !== 'idle')
+const bubbleText = computed(() => mascot.mode !== 'idle' || Boolean(mascot.nudgeText))
 
 const leadText = computed(() => (mascot.isStumped ? 'Drawing a blank' : (mascot.entry?.title ?? '')))
 const bodyText = computed(() =>
@@ -309,6 +315,7 @@ function onEscape(event: KeyboardEvent): void {
   // The popup outranks the bubble and owns its own Escape — it closes without acknowledging,
   // which the dock cannot express. Leave it alone entirely rather than racing it.
   if (mascot.popupOpen) return
+  mascot.clearNudge()
   if (mascot.mode !== 'idle') mascot.clear()
 }
 
@@ -389,7 +396,9 @@ const idle = createIdleHintController({
   onExpire: () => { mascot.clearTip() },
 })
 
-function noteActivity(): void {
+function noteActivity(event?: Event): void {
+  // A click anywhere puts a nudge away; typing does not (it is often the very fix the nudge asked for).
+  if (event?.type === 'pointerdown') mascot.clearNudge()
   // Nothing here reads the event any more: an outside click is handled by the popup's own
   // backdrop, which CLOSES without acknowledging. Dismissing here would have cleared a warning
   // nobody acted on, turning "I looked away" into "done".
@@ -400,6 +409,7 @@ function noteActivity(): void {
 
 watch(() => props.routeKey, () => {
   mascot.clearTip()
+  mascot.clearNudge()
   // Per-visit lifetime, for free: the page raises again on its next mount, so nothing
   // anywhere has to remember that this was dismissed.
   mascot.dismiss()
@@ -432,5 +442,6 @@ onBeforeUnmount(() => {
   idle.stop()
   stopWatching()
   mascot.clear()
+  mascot.clearNudge()
 })
 </script>
