@@ -32,9 +32,10 @@ export const RUN_STAGE_SEQUENCE: readonly string[] = [
   // opens it; like VERIFY it drops out of the synthesized remainder once a later stage arrives.
   'RECHECK',
   'COMPARE',
+  // DAR-BE-346: the free returns grading runs before the paid missing-diff lookup (VERIFY_RETURNS = 6).
+  'VERIFY_RETURNS',
   'VERIFY_MISSING',
   'VERIFY_EXCHANGE',
-  'VERIFY_RETURNS',
   // DAR-UI-044: paired with RunObservability.STAGE_SEQUENCE (CONCLUDE = 9). Only runs whose scope has
   // conclusion rules open it; like VERIFY it drops out of the synthesized remainder otherwise.
   'CONCLUDE',
