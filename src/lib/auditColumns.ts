@@ -279,13 +279,13 @@ export function progressSteps(run: AuditProgressRun, asOf?: string | number | nu
   })
 }
 
-/** DAR-BE-350. A running read proves it moves: its count against yesterday's, when its last page landed, its rate. */
+/** DAR-BE-350. A running read proves it moves: its count against its last run, when its last page landed, its rate. */
 function movingLine(step: AuditProgressStep, asOf?: string | number | null): string {
   const records = step.records ?? null
   const expected = step.expectedRecords ?? null
   const count = records == null ? ''
     : expected == null ? STEP_COUNT.format(records)
-      : records > expected ? `${STEP_COUNT.format(records)} · yesterday ${STEP_COUNT.format(expected)}`
+      : records > expected ? `${STEP_COUNT.format(records)} · last run ${STEP_COUNT.format(expected)}`
         : `${STEP_COUNT.format(records)} of ~${STEP_COUNT.format(expected)}`
   const now = timeOf(asOf)
   const moved = timeOf(step.movedDate)

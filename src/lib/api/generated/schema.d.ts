@@ -4099,6 +4099,11 @@ export interface components {
              *                     lists the open ones whatever the value (DAR-BE-206).
              */
             state?: string;
+            /**
+             * @description DAR-BE-348. Only the findings at this level: P0, P1, P2 or KNOWN; blank is every
+             *                     level. An order is at its most urgent open line's level. Any other value is an error.
+             */
+            priority?: string;
         };
         GetAuditFindingsByOrderResult: {
             ok?: boolean;
@@ -4144,8 +4149,9 @@ export interface components {
              *                     checks: [check codes], state: running | queued, attempt, retryAt, stage, progressPercent, elapsedMs,
              *                     usualDurationMs (a past successful run over a window as long; absent when none), health: healthy | slow |
              *                     stuck, healthReason, steps: [{stage, status: running | done | failed, records (so far while running),
-             *                     startedDate, completedDate, movedDate (last write: a read's last page), system (extract steps: the system that
-             *                     side reads), expectedRecords (extract steps: the raw count of the same read on the last successful run)}] in run
+             *                     startedDate, completedDate, movedDate (a read's last page heartbeat; absent for reads that never heartbeat), system (extract steps: the system
+             *                     that side reads), expectedRecords (extract steps: the page count the same read heartbeated on this automation's
+             *                     last successful run, metricsJson.readCount)}] in run
              *                     order (DAR-BE-173), limits ({hotwaxSharePct, netsuiteSerial} while a peak period limits the tenant's reads;
              *                     DAR-BE-350)}]}
              */

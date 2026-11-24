@@ -382,9 +382,9 @@ export interface AuditProgressStep {
   completedDate?: string | number | null
   /** An extract's system, as its source is labelled; absent on other stages. */
   system?: string | null
-  /** DAR-BE-350. The step row's last write: for a running read, when its last page landed (server time). */
+  /** DAR-BE-350. A read's last page heartbeat (server time); absent for a read that never heartbeats. */
   movedDate?: string | number | null
-  /** DAR-BE-350. A read's raw count on the same run's last success (pages read, not records kept); absent without one. */
+  /** DAR-BE-350. The page count the same read heartbeated on its automation's last success; absent without one. */
   expectedRecords?: number | null
 }
 
