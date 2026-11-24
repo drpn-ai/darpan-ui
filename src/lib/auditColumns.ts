@@ -195,7 +195,8 @@ export function statementItems(category: AuditCategory | null | undefined, filte
 }
 
 /** DAR-UI-140. Column 2 in priority mode: statements across categories, each counted at the level. A statement with
- *  findings at two levels is listed under both. 'open' keeps those with findings there; 'all' keeps every statement. */
+ *  findings at two levels is listed under both. 'open' and 'all' keep only those with findings there (a level lists what
+ *  is at it); 'notChecked' keeps the not-run statements whose own level it is. */
 export function statementItemsByPriority(report: AuditReport, level: AuditLevel, filter: AuditFilter): StatementItem[] {
   return Object.values(report.categories ?? {}).flatMap(statementsOf).map((statement) => {
     const open = statement.counts?.byPriority?.[level] ?? 0
@@ -210,8 +211,9 @@ export function statementItemsByPriority(report: AuditReport, level: AuditLevel,
         tone: notChecked ? 'notChecked' : open ? 'open' : 'clean',
       } satisfies StatementItem,
     }
-  }).filter(({ statement, item }) => filter === 'all'
-    || (filter === 'open' ? item.open > 0 : statement.status === 'notRun' && (statement.priority ?? 'P2') === level))
+  }).filter(({ statement, item }) => filter === 'notChecked'
+    ? statement.status === 'notRun' && (statement.priority ?? 'P2') === level
+    : item.open > 0)
     .sort((a, b) => b.item.open - a.item.open || (a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0))
     .map(({ item }) => item)
 }

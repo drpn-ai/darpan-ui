@@ -1338,13 +1338,11 @@ describe('AuditReportPage', () => {
       expect(w.get('[data-testid="audit-category-P0"]').text()).toContain('3')
       expect(w.get('[data-testid="audit-category-P1"]').text()).toContain('2')
       expect(w.get('[data-testid="audit-category-KNOWN"]').text()).toContain('1')
-      // The most urgent level with findings is picked; its statements across record types, the one with findings there
-      // first and picked (the all pill keeps the rest, counted at the level).
+      // The most urgent level with findings is picked; its statements across record types, R11 alone at P0.
       expect(w.get('[data-testid="audit-category-P0"]').attributes('aria-current')).toBe('true')
       const atP0 = w.findAll('[data-testid="audit-statement-row-P0"]')
-      expect(atP0[0]!.text()).toContain('R11')
+      expect(atP0.map((row) => row.text())).toEqual([expect.stringContaining('R11')])
       expect(atP0[0]!.attributes('aria-current')).toBe('true')
-      expect(atP0.slice(1).map((row) => row.get('.audit-count').text())).toEqual(['0', '0'])
       // The rest are read at the level only.
       expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R11', period: '2026-10', priority: 'P0' }, expect.anything())
       await openCauses(w)
@@ -1354,13 +1352,12 @@ describe('AuditReportPage', () => {
       // P1: R2, and only its P1 findings (not its Known order).
       await w.get('[data-testid="audit-category-P1"]').trigger('click')
       expect(push).toHaveBeenLastCalledWith({ query: { by: 'priority', category: 'P1', statement: undefined, finding: undefined, source: undefined } })
-      // The open pill: only the statements with findings at the level.
-      liveRoute.query = { by: 'priority', category: 'P1', show: 'open' }
+      liveRoute.query = { by: 'priority', category: 'P1' }
       await flushPromises()
       const rows = w.findAll('[data-testid="audit-statement-row-P1"]')
       expect(rows.map((row) => row.text())).toEqual([expect.stringContaining('R2')])
       await rows[0]!.trigger('click')
-      expect(push).toHaveBeenLastCalledWith({ query: { by: 'priority', category: 'P1', show: 'open', statement: 'R2', finding: undefined } })
+      expect(push).toHaveBeenLastCalledWith({ query: { by: 'priority', category: 'P1', statement: 'R2', finding: undefined } })
       liveRoute.query = { by: 'priority', category: 'P1', statement: 'R2' }
       await flushPromises()
       await openCauses(w)
@@ -1422,8 +1419,8 @@ describe('AuditReportPage', () => {
       liveRoute.query = { by: 'priority', category: 'P1' }
       await flushPromises()
       const rows = w.findAll('[data-testid="audit-statement-row-P1"]')
-      expect(rows).toHaveLength(3)
-      expect(rows.some((row) => row.find('[data-testid="audit-mark"]').exists())).toBe(false)
+      expect(rows).toHaveLength(1)
+      expect(rows[0]!.find('[data-testid="audit-mark"]').exists()).toBe(false)
       w.unmount()
     })
 
@@ -1458,7 +1455,7 @@ describe('AuditReportPage', () => {
         expect(w.get(`[data-testid="audit-category-${level}"]`).text()).toContain('nothing found')
       }
       expect(w.get('[data-testid="audit-category-P0"]').attributes('aria-current')).toBe('true')
-      expect(w.findAll('[data-testid="audit-statement-row-P0"]').map((row) => row.get('.audit-count').text())).toEqual(['0', '0'])
+      expect(w.findAll('[data-testid="audit-statement-row-P0"]')).toHaveLength(0)
       w.unmount()
     })
   })

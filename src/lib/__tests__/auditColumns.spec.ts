@@ -509,7 +509,10 @@ describe('audit priorities (DAR-UI-140)', () => {
     expect(known.map((s) => [s.id, s.open])).toEqual([['R5', 4]])
     const p0 = statementItemsByPriority(r, 'P0', 'open')
     expect(p0.map((s) => [s.id, s.open])).toEqual([['R1', 7], ['R2', 3]])
-    expect(statementItemsByPriority(r, 'P1', 'all').map((s) => s.id)).toEqual(['R2', 'R1', 'R12', 'R19', 'R4', 'R5'])
+    // 'all' lists what is at the level too: no statement at 0 (controller ruling, Task 3 review).
+    expect(statementItemsByPriority(r, 'P1', 'all').map((s) => s.id)).toEqual(statementItemsByPriority(r, 'P1', 'open').map((s) => s.id))
+    expect(statementItemsByPriority(r, 'P1', 'all').map((s) => [s.id, s.open])).toEqual([['R2', 2]])
+    expect(statementItemsByPriority(r, 'P0', 'all').map((s) => s.id)).toEqual(['R1', 'R2'])
     expect(statementItemsByPriority(report(), 'P0', 'open')).toEqual([])
   })
 
