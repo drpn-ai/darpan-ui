@@ -75,6 +75,8 @@ const REGEX_SAMPLES: Record<string, string> = {
   '^.+ is a finding$': 'orders is a finding',
   '^check statement .+$': 'check statement 2',
   '^open rules for .+$': 'open rules for shopify',
+  '^r\\d+ priority: .+$': 'r11 priority: p0 today',
+  '^.+ priority: .+$': 'orders missing priority: same as r11',
   '^stop showing .+$': 'stop showing tips',
   '^edit chat space( .+)?$': 'edit chat space ops',
   '^send test to( .+)?$': 'send test to ops',
