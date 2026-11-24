@@ -31,6 +31,7 @@ import { useRoute } from 'vue-router'
 import { WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
 import { agentFacade, auditFacade, reconciliationFacade } from '../../../lib/api/facade'
 import { ApiCallError } from '../../../lib/api/client'
+import { installLocalStorageStub } from '../../../test/localStorage'
 import AuditReportPage from '../AuditReportPage.vue'
 import AuditAgentPanel from '../../../components/audit/AuditAgentPanel.vue'
 import AuditColumns from '../../../components/audit/AuditColumns.vue'
@@ -116,6 +117,7 @@ beforeEach(() => {
   replace.mockReset()
   push.mockReset()
   liveRoute.query = {}
+  installLocalStorageStub()
   f.getAuditReport.mockResolvedValue({ ok: true, report: report() } as never)
   f.getAuditFinding.mockResolvedValue({ ok: true, finding: findingDocument } as never)
   f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 0, active: [] } } as never)
@@ -1252,5 +1254,212 @@ describe('AuditReportPage', () => {
     await flushPromises()
     expect(w.get('[data-testid="audit-page-error"]').text()).toContain('Audit month-close was not found')
     expect(w.find('[data-testid="audit-columns"]').exists()).toBe(false)
+  })
+  // DAR-UI-140 (DAR-BE-348). The board cut by priority as well as by record type, every level marked.
+  describe('priorities', () => {
+    const byLevel = (P0 = 0, P1 = 0, P2 = 0, KNOWN = 0) => ({ P0, P1, P2, KNOWN })
+    const unit = (id: string, priority: 'P0' | 'P1' | 'P2' | 'KNOWN', extra: Record<string, unknown> = {}) => ({
+      id, headline: `Invoice ${id} has no Etail id`, state: 'open' as const, firstFound: '2026-10-02', ageDays: 6, records: {},
+      difference: null, next: '', priority, prioritySource: 'statement' as const, priorityReason: null, ...extra })
+    // R2 at P1 with a Known order (its reason sets it), R3 at P2 with nothing, R11 at P0 with more than the report lists.
+    function priorityReport(): AuditReport {
+      const doc = report()
+      const orders = doc.categories.orders!
+      orders.counts = { ...counts(3), byPriority: byLevel(0, 2, 0, 1) }
+      Object.assign(orders.statements.R2!, {
+        priority: 'P1', counts: { ...counts(3), byPriority: byLevel(0, 2, 0, 1) },
+        findings: [unit('F-1', 'P1', { cause: 'No Etail id' }), unit('F-2', 'P1', { cause: 'No Etail id' }), {
+          ...unit('M9', 'KNOWN', { prioritySource: 'reason', priorityReason: 'Fraud cancel', priorityLine: 'F-9' }),
+          kind: 'order', order: 'M9', headline: 'Order M9 was cancelled for fraud', cause: 'Fraud cancel', stuck: ['F-9'],
+          lines: [{ ...unit('F-9', 'KNOWN'), cause: 'Fraud cancel', held: false }],
+        }],
+      })
+      Object.assign(orders.statements.R3!, { priority: 'P2', counts: { ...counts(), byPriority: byLevel() } })
+      doc.categories.returns = { label: 'Returns', counts: { ...counts(3), byPriority: byLevel(3) }, statements: {
+        R11: { id: 'R11', text: 'Every return reaches NetSuite.', weight: 'firm', status: 'ran', reason: null, checks: [],
+          counts: { ...counts(3), byPriority: byLevel(3) }, findings: [unit('F-11', 'P0')], findingsOmitted: 2, priority: 'P0' },
+      } }
+      doc.summary = { ...doc.summary, ...counts(6), byPriority: byLevel(3, 2, 0, 1) }
+      return doc
+    }
+
+    beforeEach(() => {
+      f.getAuditReport.mockResolvedValue({ ok: true, report: priorityReport() } as never)
+      f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [] } as never)
+    })
+
+    it('starts the By switch on Record type and remembers Priority', async () => {
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      const by = w.get('[data-testid="audit-by"]')
+      expect(by.attributes('role')).toBe('group')
+      expect(by.attributes('aria-label')).toBe('By')
+      expect(w.get('[data-testid="audit-by-type"]').text()).toBe('Record type')
+      expect(w.get('[data-testid="audit-by-type"]').attributes('aria-pressed')).toBe('true')
+      expect(w.get('[data-testid="audit-by-priority"]').text()).toBe('Priority')
+      expect(w.get('[data-testid="audit-by-priority"]').attributes('aria-pressed')).toBe('false')
+      expect(w.find('[data-testid="audit-category-P0"]').exists()).toBe(false)
+
+      await w.get('[data-testid="audit-by-priority"]').trigger('click')
+      expect(replace).toHaveBeenCalledWith({
+        query: { by: 'priority', category: undefined, statement: undefined, finding: undefined, source: undefined },
+      })
+      expect(window.localStorage.getItem('darpan.audit.by')).toBe('priority')
+      w.unmount()
+
+      // The next visit, with nothing in the URL, opens on Priority.
+      const w2 = mount(AuditReportPage)
+      await flushPromises()
+      expect(w2.get('[data-testid="audit-by-priority"]').attributes('aria-pressed')).toBe('true')
+      expect(w2.find('[data-testid="audit-category-P0"]').exists()).toBe(true)
+      w2.unmount()
+    })
+
+    it('opens a link saying ?by= on its choice without changing the reader\'s own', async () => {
+      window.localStorage.setItem('darpan.audit.by', 'type')
+      liveRoute.query = { by: 'priority' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.get('[data-testid="audit-by-priority"]').attributes('aria-pressed')).toBe('true')
+      expect(w.find('[data-testid="audit-category-P0"]').exists()).toBe(true)
+      expect(w.find('[data-testid="audit-category-orders"]').exists()).toBe(false)
+      expect(window.localStorage.getItem('darpan.audit.by')).toBe('type')
+      w.unmount()
+    })
+
+    it('lists the levels with their counts, the statements at a level and only its findings', async () => {
+      f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [unit('F-11', 'P0'), unit('F-12', 'P0'), unit('F-13', 'P0'), unit('F-14', 'P1')] } as never)
+      liveRoute.query = { by: 'priority' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.findAll('[data-testid^="audit-category-"]').map((row) => row.attributes('data-testid'))).toEqual([
+        'audit-category-health', 'audit-category-P0', 'audit-category-P1', 'audit-category-P2', 'audit-category-KNOWN',
+      ])
+      expect(w.get('[data-testid="audit-category-P0"]').text()).toContain('3')
+      expect(w.get('[data-testid="audit-category-P1"]').text()).toContain('2')
+      expect(w.get('[data-testid="audit-category-KNOWN"]').text()).toContain('1')
+      // The most urgent level with findings is picked; its statements across record types, the one with findings there
+      // first and picked (the all pill keeps the rest, counted at the level).
+      expect(w.get('[data-testid="audit-category-P0"]').attributes('aria-current')).toBe('true')
+      const atP0 = w.findAll('[data-testid="audit-statement-row-P0"]')
+      expect(atP0[0]!.text()).toContain('R11')
+      expect(atP0[0]!.attributes('aria-current')).toBe('true')
+      expect(atP0.slice(1).map((row) => row.get('.audit-count').text())).toEqual(['0', '0'])
+      // The rest are read at the level only.
+      expect(f.getAuditFindingsByOrder).toHaveBeenLastCalledWith({ audit: 'month-close', statement: 'R11', period: '2026-10', priority: 'P0' }, expect.anything())
+      await openCauses(w)
+      expect(w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))).toEqual(['F-11', 'F-12', 'F-13'])
+      expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('3')
+
+      // P1: R2, and only its P1 findings (not its Known order).
+      await w.get('[data-testid="audit-category-P1"]').trigger('click')
+      expect(push).toHaveBeenLastCalledWith({ query: { by: 'priority', category: 'P1', statement: undefined, finding: undefined, source: undefined } })
+      // The open pill: only the statements with findings at the level.
+      liveRoute.query = { by: 'priority', category: 'P1', show: 'open' }
+      await flushPromises()
+      const rows = w.findAll('[data-testid="audit-statement-row-P1"]')
+      expect(rows.map((row) => row.text())).toEqual([expect.stringContaining('R2')])
+      await rows[0]!.trigger('click')
+      expect(push).toHaveBeenLastCalledWith({ query: { by: 'priority', category: 'P1', show: 'open', statement: 'R2', finding: undefined } })
+      liveRoute.query = { by: 'priority', category: 'P1', statement: 'R2' }
+      await flushPromises()
+      await openCauses(w)
+      expect(w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))).toEqual(['F-1', 'F-2'])
+      expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('2')
+      expect(w.get('[data-testid="audit-statement-text"]').text()).toBe('Every invoice carries the Etail id.')
+
+      // A statement with findings at other levels only says so at this one.
+      liveRoute.query = { by: 'priority', category: 'P2', statement: 'R2' }
+      await flushPromises()
+      expect(w.find('[data-testid="audit-finding-row"]').exists()).toBe(false)
+      expect(w.get('[data-testid="audit-statement-empty-R2"]').text()).toBe('Nothing found')
+      expect(w.get('[data-testid="audit-findings-count"]').text()).toBe('0')
+
+      // A finding open: the rail is the marks and their counts.
+      liveRoute.query = { by: 'priority', category: 'P1', statement: 'R2', finding: 'F-1' }
+      await flushPromises()
+      const rail = w.get('[data-testid="audit-category-P1"]')
+      expect(rail.get('[data-testid="audit-mark"]').text()).toBe('P1')
+      expect(rail.attributes('aria-label')).toContain('P1')
+      expect(rail.text()).toContain('2')
+      w.unmount()
+    })
+
+    it('lands on the most urgent level with findings when switched to Priority, the open finding dropped', async () => {
+      const doc = priorityReport()
+      doc.summary.byPriority = byLevel(0, 2, 0, 1)
+      f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      await w.get('[data-testid="audit-by-priority"]').trigger('click')
+      const query = replace.mock.lastCall![0].query
+      expect(query).toEqual({ by: 'priority', category: undefined, statement: undefined, finding: undefined, source: undefined })
+      liveRoute.query = query
+      await flushPromises()
+      expect(w.get('[data-testid="audit-category-P1"]').attributes('aria-current')).toBe('true')
+      expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(false)
+      expect(w.get('[data-testid="audit-columns"]').classes()).not.toContain('audit-columns--rail')
+
+      // And back: Record type opens on its own default.
+      await w.get('[data-testid="audit-by-type"]').trigger('click')
+      expect(replace).toHaveBeenLastCalledWith({ query: { by: 'type', category: undefined, statement: undefined, finding: undefined, source: undefined } })
+      expect(window.localStorage.getItem('darpan.audit.by')).toBe('type')
+      w.unmount()
+    })
+
+    it('marks statement rows and reason groups by record type, and no statement row by priority', async () => {
+      liveRoute.query = { category: 'orders', statement: 'R2' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.findAll('[data-testid="audit-statement-row-orders"]').map((row) => row.find('[data-testid="audit-mark"]').text())).toEqual(['P1', 'P2'])
+      const groups = w.findAll('[data-testid="audit-findings-group"]')
+      expect(groups.map((g) => g.find('[data-testid="audit-mark"]').text())).toEqual(['P1', 'Known'])
+      expect(groups[1]!.text()).toContain('Fraud cancel')
+      // Record type's rail says how many sit at the most urgent level.
+      expect(w.get('[data-testid="audit-category-orders"]').text()).toContain('2 at P1')
+
+      liveRoute.query = { by: 'priority', category: 'P1' }
+      await flushPromises()
+      const rows = w.findAll('[data-testid="audit-statement-row-P1"]')
+      expect(rows).toHaveLength(3)
+      expect(rows.some((row) => row.find('[data-testid="audit-mark"]').exists())).toBe(false)
+      w.unmount()
+    })
+
+    it('says in the detail where a finding\'s level came from', async () => {
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M9' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-9' }, expect.anything())
+      expect(w.get('[data-testid="audit-finding-eyebrow"] [data-testid="audit-mark"]').text()).toBe('Known')
+      expect(w.get('[data-testid="audit-finding-level"]').text()).toBe('Known set on "Fraud cancel"')
+
+      liveRoute.query = { category: 'returns', statement: 'R11', finding: 'F-11' }
+      await flushPromises()
+      expect(w.get('[data-testid="audit-finding-eyebrow"] [data-testid="audit-mark"]').text()).toBe('P0')
+      expect(w.get('[data-testid="audit-finding-level"]').text()).toBe('P0 from R11')
+      w.unmount()
+    })
+
+    it('draws a report from before priorities as today, and Priority all zeros', async () => {
+      f.getAuditReport.mockResolvedValue({ ok: true, report: report() } as never)
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.find('[data-testid="audit-mark"]').exists()).toBe(false)
+      expect(w.find('[data-testid="audit-finding-level"]').exists()).toBe(false)
+      expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).toBe('R2')
+      expect(w.get('[data-testid="audit-category-orders"]').attributes('aria-label')).toBe('Orders, 2 open')
+
+      liveRoute.query = { by: 'priority' }
+      await flushPromises()
+      for (const level of ['P0', 'P1', 'P2', 'KNOWN']) {
+        expect(w.get(`[data-testid="audit-category-${level}"]`).text()).toContain('nothing found')
+      }
+      expect(w.get('[data-testid="audit-category-P0"]').attributes('aria-current')).toBe('true')
+      expect(w.findAll('[data-testid="audit-statement-row-P0"]').map((row) => row.get('.audit-count').text())).toEqual(['0', '0'])
+      w.unmount()
+    })
   })
 })

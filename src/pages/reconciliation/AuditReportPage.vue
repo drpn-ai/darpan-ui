@@ -84,6 +84,21 @@
             <span class="audit-filter-count">{{ pill.count.toLocaleString('en-US') }}</span> <span>{{ pill.label }}</span>
           </button>
         </div>
+        <!-- DAR-UI-140. The board by record type (today's rail) or by priority; ?by= wins, else the person's last pick. -->
+        <div class="audit-filters" role="group" aria-label="By" data-testid="audit-by">
+          <button
+            v-for="choice in BY_CHOICES"
+            :key="choice.id"
+            type="button"
+            class="audit-filter"
+            :class="{ 'audit-filter--on': choice.id === by }"
+            :aria-pressed="choice.id === by ? 'true' : 'false'"
+            :data-testid="`audit-by-${choice.id}`"
+            @click="chooseBy(choice.id)"
+          >
+            {{ choice.label }}
+          </button>
+        </div>
         <!-- DAR-UI-073. Search, cause and age narrow the whole board; the period's findings load on first use. -->
         <div class="audit-find" role="group" aria-label="Find" @focusin="void loadPeriodFindings()">
           <input
@@ -117,6 +132,7 @@
         :finding="findingId"
         :source="selectedSource"
         :filter="filter"
+        :by="by"
         :level="level"
         :finding-doc="finding"
         :finding-loading="findingLoading"
@@ -179,7 +195,7 @@ import { ApiCallError } from '../../lib/api/client'
 import { downloadIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { downloadTextFile } from '../../lib/utils/download'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
-import type { AuditFindingDocument, AuditFindingListItem, AuditProgress, AuditReport } from '../../lib/api/auditTypes'
+import { AUDIT_LEVELS, type AuditFindingDocument, type AuditFindingListItem, type AuditLevel, type AuditProgress, type AuditReport } from '../../lib/api/auditTypes'
 import { auditMorningQuery, periodOptions, shortRange, systemLabel } from '../../lib/auditReport'
 import {
   HEALTH,
@@ -189,12 +205,15 @@ import {
   causeOptions,
   emptyFindingsMore,
   filterCounts,
+  findStatement,
   findingsLeft,
   hasFindingFilters,
   matchesFindingFilters,
   orderKey,
   isAuditFilter,
   sourceItems,
+  statementItemsByPriority,
+  topLevel,
   type AuditFilter,
   type FindingFilters,
 } from '../../lib/auditColumns'
@@ -252,25 +271,74 @@ const filter = computed<AuditFilter>(() => {
   if (value === 'pending') return 'open'
   return isAuditFilter(value) ? value : 'all'
 })
+// DAR-UI-140. Record type (today's rail) or priority. ?by= wins and is not remembered (a shared link must not change the
+// reader's own default); the switch remembers the person's pick. In priority mode ?category= holds the level.
+type AuditBy = 'type' | 'priority'
+const BY_STORAGE_KEY = 'darpan.audit.by'
+const BY_CHOICES: { id: AuditBy; label: string }[] = [{ id: 'type', label: 'Record type' }, { id: 'priority', label: 'Priority' }]
+const isAuditBy = (value: unknown): value is AuditBy => value === 'type' || value === 'priority'
+function readStoredBy(): AuditBy {
+  try {
+    const value = window.localStorage.getItem(BY_STORAGE_KEY)
+    return isAuditBy(value) ? value : 'type'
+  } catch {
+    return 'type'
+  }
+}
+const storedBy = ref<AuditBy>(readStoredBy())
+const by = computed<AuditBy>(() => {
+  const asked = queryValue('by')
+  return isAuditBy(asked) ? asked : storedBy.value
+})
+const isLevel = (value: string): value is AuditLevel => (AUDIT_LEVELS as readonly string[]).includes(value)
+/** The level priority mode opens on: the most urgent with an open finding, else P0. */
+function defaultLevel(doc: AuditReport): AuditLevel {
+  return topLevel(doc.summary)?.level ?? 'P0'
+}
+
 // A linked finding (?finding alone, as the CLI hands out) opens under its own category and statement.
 const findingHome = computed(() => (findingId.value ? finding.value?.finding : null))
 const selectedCategory = computed(() => {
   const doc = report.value
   if (!doc) return ''
   const asked = queryValue('category')
+  if (by.value === 'priority') {
+    if (asked === HEALTH || isLevel(asked)) return asked
+    return findingHome.value?.priority?.level ?? defaultLevel(doc)
+  }
   if (asked === HEALTH || (asked && doc.categories?.[asked])) return asked
   const home = findingHome.value?.category.id
   if (home && doc.categories?.[home]) return home
   return defaultCategory(doc, filter.value)
 })
+/** DAR-UI-140. The level on show in priority mode; null by record type and on Run health. */
+const pickedLevel = computed<AuditLevel | null>(() =>
+  (by.value === 'priority' && isLevel(selectedCategory.value) ? selectedCategory.value : null))
 const selectedStatement = computed(() => {
-  const category = report.value?.categories?.[selectedCategory.value]
-  if (!category) return ''
+  const doc = report.value
+  if (!doc) return ''
   const asked = queryValue('statement')
-  if (asked && category.statements?.[asked]) return asked
   const home = findingHome.value?.statement.id
+  const level = pickedLevel.value
+  if (level) {
+    // Statements across record types: any the report has opens, as a link may name one with nothing at this level.
+    if (asked && findStatement(doc, asked)) return asked
+    if (home && findStatement(doc, home)) return home
+    const items = statementItemsByPriority(doc, level, filter.value)
+    return (items.find((item) => item.open) ?? items[0])?.id ?? ''
+  }
+  const category = doc.categories?.[selectedCategory.value]
+  if (!category) return ''
+  if (asked && category.statements?.[asked]) return asked
   if (home && category.statements?.[home]) return home
   return defaultStatement(category, filter.value)
+})
+// The statement on show, wherever it sits: its category by record type, any category by priority.
+const statementDoc = computed(() => {
+  const doc = report.value
+  if (!doc || !selectedStatement.value) return null
+  return pickedLevel.value ? (findStatement(doc, selectedStatement.value)?.statement ?? null)
+    : (doc.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value] ?? null)
 })
 const selectedSource = computed(() => {
   const doc = report.value
@@ -421,7 +489,7 @@ onBeforeUnmount(() => {
 const orderUnit = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return null
-  const listed = report.value.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value]?.findings ?? []
+  const listed = statementDoc.value?.findings ?? []
   return [...listed, ...more.value.findings, ...(periodFindings.value?.items ?? [])]
     .find((item) => item.kind === 'order' && (item.id === id || Boolean(item.lines?.some((line) => line.id === id)))) ?? null
 })
@@ -429,7 +497,7 @@ const orderUnit = computed(() => {
 const waiting = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return []
-  const listed = report.value.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value]?.findings ?? []
+  const listed = statementDoc.value?.findings ?? []
   return [...listed, ...more.value.findings, ...(periodFindings.value?.items ?? [])]
     .find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))?.waiting ?? []
 })
@@ -512,7 +580,7 @@ function say(message: string): void {
 // on the read in flight for the same statement and pill; another statement starts its own.
 let moreLoading: { key: string; read: Promise<void> } | null = null
 function loadMore(): Promise<void> {
-  const key = `${selectedStatement.value}|${filter.value}`
+  const key = `${selectedStatement.value}|${filter.value}|${pickedLevel.value ?? ''}`
   if (moreLoading?.key !== key) {
     const read = readMore().finally(() => { if (moreLoading?.read === read) moreLoading = null })
     moreLoading = { key, read }
@@ -522,14 +590,15 @@ function loadMore(): Promise<void> {
 async function readMore(): Promise<void> {
   const statement = selectedStatement.value
   const pill = filter.value
+  const level = pickedLevel.value
   if (!report.value || !statement) return
-  // A read for a statement or pill no longer on show leaves the current one's state alone.
-  const stale = () => statement !== selectedStatement.value || pill !== filter.value
+  // A read for a statement, pill or level no longer on show leaves the current one's state alone.
+  const stale = () => statement !== selectedStatement.value || pill !== filter.value || level !== pickedLevel.value
   more.value = { ...more.value, loading: true, error: '' }
   try {
-    // DAR-UI-075. The rest as the report lists them, one per order, in one read.
+    // DAR-UI-075. The rest as the report lists them, one per order, in one read. DAR-UI-140: at the level on show.
     const response = await auditFacade.getAuditFindingsByOrder(
-      { audit: auditCode.value, statement, period: report.value.report.period, ...pillState.value },
+      { audit: auditCode.value, statement, period: report.value.report.period, ...pillState.value, ...(level ? { priority: level } : {}) },
       abort.signal,
     )
     if (stale()) return
@@ -625,7 +694,9 @@ async function exportFindings(): Promise<void> {
   exporting.value = true
   exportError.value = ''
   try {
-    const response = await auditFacade.getAuditFindingsByOrder({ audit: auditCode.value, statement, period, ...pillState.value }, abort.signal)
+    const level = pickedLevel.value
+    const response = await auditFacade.getAuditFindingsByOrder(
+      { audit: auditCode.value, statement, period, ...pillState.value, ...(level ? { priority: level } : {}) }, abort.signal)
     if (response.ok === false) throw new Error(errorOf(response, 'The findings refused to leave the building. Nothing exported.'))
     const findings = response.findings ?? []
     saveJson(`${auditCode.value}-${period}-${statement}-findings.json`,
@@ -671,6 +742,20 @@ function navigate(patch: Record<string, string | undefined>): void {
 function chooseFilter(next: AuditFilter): void {
   void router.replace({
     query: { ...route.query, show: next === 'all' ? undefined : next, category: undefined, statement: undefined, finding: undefined, source: undefined },
+  })
+}
+
+// DAR-UI-140. A new cut starts the columns over: record type on its default category, priority on its most urgent level.
+// The pick is remembered for the next visit and written to the URL.
+function chooseBy(next: AuditBy): void {
+  storedBy.value = next
+  try {
+    window.localStorage.setItem(BY_STORAGE_KEY, next)
+  } catch {
+    // Storage may be unavailable; the URL still carries the pick.
+  }
+  void router.replace({
+    query: { ...route.query, by: next, category: undefined, statement: undefined, finding: undefined, source: undefined },
   })
 }
 
@@ -722,10 +807,9 @@ watch(auditCode, () => {
   progress.value = null
   void loadProgress()
 }, { immediate: true })
-watch([report, selectedStatement, filter], () => {
+watch([report, selectedStatement, filter, pickedLevel], () => {
   more.value = emptyFindingsMore()
-  const statement = report.value?.categories?.[selectedCategory.value]?.statements?.[selectedStatement.value]
-  if (findingsLeft(statement, 0, null)) void loadMore()
+  if (findingsLeft(statementDoc.value, 0, null)) void loadMore()
 })
 // DAR-UI-075. An order the report does not list (past its 50: a reload, a link) is found in the statement's orders.
 watch([findingId, report, selectedStatement], async () => {

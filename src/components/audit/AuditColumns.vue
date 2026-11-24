@@ -37,12 +37,15 @@
           @click="emit('navigate', { category: item.id, statement: undefined, finding: undefined, source: undefined })"
         >
           <template v-if="rail">
-            <span class="audit-rail-label">{{ item.short }}</span>
+            <!-- DAR-UI-140. By priority the rail is the marks. -->
+            <AuditPriorityMark v-if="item.mark" :level="item.mark" />
+            <span v-else class="audit-rail-label">{{ item.short }}</span>
             <span class="audit-rail-count" :class="{ 'audit-rail-count--hot': item.attention }">{{ item.id === HEALTH ? (item.attention ? '!' : item.running ? '…' : '✓') : item.count }}</span>
           </template>
           <template v-else>
             <span class="audit-row-main">
-              <span>{{ item.label }}</span>
+              <span v-if="item.mark" class="audit-level-head"><AuditPriorityMark :level="item.mark" /><span>{{ item.word }}</span></span>
+              <span v-else>{{ item.label }}</span>
               <span class="audit-row-sub">{{ item.sub }}</span>
             </span>
             <span class="audit-row-chevron" aria-hidden="true">›</span>
@@ -202,7 +205,8 @@
             :data-testid="`audit-statement-row-${category}`"
             @click="emit('navigate', { category, statement: item.id, finding: undefined })"
           >
-            <span class="audit-row-code">{{ item.id }}</span>
+            <!-- DAR-UI-140. By record type each statement carries its level under its code; by priority the rail says it. -->
+            <span class="audit-row-code">{{ item.id }}<AuditPriorityMark v-if="statementLevel(item.id)" :level="statementLevel(item.id)!" /></span>
             <span class="audit-row-text">{{ item.text }}<span v-if="statementDraftTag(drafts?.changed[item.id])" class="audit-draft-tag audit-draft-tag--change" :data-testid="`audit-statement-draft-${item.id}`">{{ statementDraftTag(drafts?.changed[item.id]) }}</span></span>
             <span class="audit-count" :class="`audit-count--${item.tone}`">{{ item.badge }}</span>
           </button>
@@ -220,7 +224,7 @@
             <span>Findings</span>
             <span class="audit-col-head-end">
               <span data-testid="audit-findings-count">{{ findingsTotal.toLocaleString('en-US') }}</span>
-              <button v-if="findings.length" type="button" class="app-icon-action" aria-label="Export findings" title="Export findings" data-testid="audit-export-findings" :disabled="exporting" @click="emit('export', 'statement')">
+              <button v-if="rows.length" type="button" class="app-icon-action" aria-label="Export findings" title="Export findings" data-testid="audit-export-findings" :disabled="exporting" @click="emit('export', 'statement')">
                 <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
               </button>
             </span>
@@ -237,6 +241,7 @@
               @click="toggleGroup(index)"
             >
               <span class="audit-row-chevron audit-group-chevron" aria-hidden="true">›</span>
+              <AuditPriorityMark v-if="groupMark(index)" :level="groupMark(index)!" />
               <span>{{ groupLabel(index) }}</span>
               <span class="audit-fold-count">{{ groupSize(index) }}</span>
             </button>
@@ -260,7 +265,7 @@
               <span class="sr-only">{{ item.id }}</span>
             </button>
           </template>
-          <div v-if="statementDoc && !findings.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
+          <div v-if="statementDoc && !rows.length" class="audit-empty" :data-testid="`audit-statement-empty-${statement}`">
             {{ statementEmpty }}
           </div>
           <InlineValidation v-if="more.error" tone="error" :message="more.error" data-testid="audit-findings-more-error" />
@@ -296,7 +301,9 @@
 
                 <!-- DAR-UI-081. Verdict first: the statement and record, what is wrong, then what it is stuck on and what to do.
                    DAR-UI-092: the record's own facts sit between the title and the verdict. -->
-                <p v-if="eyebrow" class="micro-label audit-eyebrow" data-testid="audit-finding-eyebrow">{{ eyebrow }}</p>
+                <p v-if="eyebrow" class="micro-label audit-eyebrow" data-testid="audit-finding-eyebrow"><AuditPriorityMark v-if="findingLevel" :level="findingLevel.level" />{{ eyebrow }}</p>
+                <!-- DAR-UI-140. Where the level came from: its statement, or the cause it was set on. -->
+                <p v-if="levelLine" class="audit-row-sub audit-eyebrow" data-testid="audit-finding-level">{{ levelLine }}</p>
                 <p class="audit-lead" data-testid="audit-finding-headline">{{ lead }}</p>
 
                 <!-- DAR-UI-139 (Aditi: "all finding have the basix details row"). The same four cells on every finding: each
@@ -513,17 +520,20 @@ import { computed, ref } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import StaticFactStrip from '../ui/StaticFactStrip.vue'
+import AuditPriorityMark from './AuditPriorityMark.vue'
 import { downloadIconPath, resolveIconPath } from '../../lib/iconPaths'
 import type {
   AuditFindingDocument,
   AuditFindingListItem,
   AuditFindingSummary,
+  AuditLevel,
   AuditMoney,
   AuditProgress,
   AuditProgressRun,
   AuditReport,
   AuditWaitingFinding,
 } from '../../lib/api/auditTypes'
+import { AUDIT_LEVELS, LEVEL_LABEL } from '../../lib/api/auditTypes'
 import {
   basicFacts,
   checkStatusBadge,
@@ -553,6 +563,7 @@ import {
   comparedGap,
   countFor,
   findStatement,
+  groupLevel,
   lineLabel,
   narrowedCounts,
   otherLineLabel,
@@ -562,12 +573,15 @@ import {
   progressSteps,
   peakLine,
   elapsedLine,
+  priorityItems,
   sourceItems,
   statementFindings,
   findingRows,
   rowAlsoLabel,
   statementItems,
+  statementItemsByPriority,
   type AuditFilter,
+  type CategoryItem,
   type CheckRow,
   type FindingsMore,
 } from '../../lib/auditColumns'
@@ -583,6 +597,8 @@ const props = defineProps<{
   finding: string
   source: string
   filter: AuditFilter
+  /** DAR-UI-140. Column 1 by record type (default) or by priority; by priority, category holds the level (P0…KNOWN). */
+  by?: 'type' | 'priority'
   /** Which column a phone shows: 1 categories, 2 the list, 3 findings (or a source), 4 the open finding. */
   level: number
   findingDoc: AuditFindingDocument | null
@@ -623,9 +639,20 @@ const addedStatements = computed(() => (props.drafts?.added ?? []).filter((added
 
 const isHealth = computed(() => props.category === HEALTH)
 const rail = computed(() => !isHealth.value && Boolean(props.finding))
+// DAR-UI-140. The level on show by priority; null by record type and on Run health.
+const isLevel = (value: string): value is AuditLevel => (AUDIT_LEVELS as readonly string[]).includes(value)
+const levelOn = computed<AuditLevel | null>(() => (props.by === 'priority' && isLevel(props.category) ? props.category : null))
 // DAR-UI-073. With the toolbar's filters on, every column counts and lists what they left.
 const narrowedBy = computed(() => (props.narrowed ? narrowedCounts(props.narrowed) : null))
-const categories = computed(() => {
+type ColumnItem = CategoryItem & { mark?: AuditLevel; word?: string }
+const categories = computed<ColumnItem[]>(() => {
+  // DAR-UI-140. By priority: the mark and its word ("P0 today"), its count under them. The toolbar's filters narrow the
+  // findings column only here; the rail and statements keep the morning's counts at each level.
+  if (props.by === 'priority') {
+    return priorityItems(props.report, props.progress).map((item) => isLevel(item.id)
+      ? { ...item, mark: item.id, word: item.sub, label: `${item.label} ${item.sub}`, sub: item.count ? `${item.count} open` : 'nothing found' }
+      : item)
+  }
   const items = categoryItems(props.report, props.progress)
   const counted = narrowedBy.value
   if (!counted) return items
@@ -675,12 +702,18 @@ function runBadge(run: AuditProgressRun): { label: string; tone: 'neutral' | 'wa
 const sourceDoc = computed(() => props.report.health.sources?.[props.source] ?? null)
 const categoryDoc = computed(() => props.report.categories?.[props.category] ?? null)
 const statements = computed(() => {
+  if (levelOn.value) return statementItemsByPriority(props.report, levelOn.value, props.filter)
   const items = statementItems(categoryDoc.value, props.filter)
   const counted = narrowedBy.value
   return counted ? items.filter((item) => counted.byStatement.has(item.id))
     .map((item) => ({ ...item, badge: String(counted.byStatement.get(item.id)) })) : items
 })
-const statementDoc = computed(() => categoryDoc.value?.statements?.[props.statement] ?? null)
+const statementDoc = computed(() => (levelOn.value ? (findStatement(props.report, props.statement)?.statement ?? null)
+  : (categoryDoc.value?.statements?.[props.statement] ?? null)))
+// DAR-UI-140. A statement row's mark: by record type only, and only on a report that carries levels.
+function statementLevel(id: string): AuditLevel | null {
+  return levelOn.value ? null : (categoryDoc.value?.statements?.[id]?.priority ?? null)
+}
 // A statement with no findings: says "Running" while one of its checks is in flight, not "Not run yet".
 const statementEmpty = computed(() => {
   const doc = statementDoc.value
@@ -693,7 +726,7 @@ const statementEmpty = computed(() => {
 const findings = computed(() => props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
   : statementFindings(statementDoc.value, props.more.findings))
 // DAR-UI-098. The column's rows: every finding under its cause, an order under each of its lines' causes.
-const rows = computed(() => findingRows(findings.value, props.cause))
+const rows = computed(() => findingRows(findings.value, props.cause, levelOn.value ?? undefined))
 // DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
 // DAR-UI-081 (Aditi: "removed 'held by' and just put item fulfillment status"): a line held by the order's stuck line reads
 // as its own item's status in HotWax (Completed); the stuck line keeps its cause (Backordered).
@@ -703,7 +736,10 @@ function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): strin
   return line.cause ?? findingStateBadge(line.state).label
 }
 // What the picked pill counts for the statement (DAR-UI-073), not the 50 the report lists or the pages loaded so far.
-const findingsTotal = computed(() => (statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts) : findings.value.length))
+const findingsTotal = computed(() => {
+  if (levelOn.value) return statementDoc.value && !props.narrowed ? (statementDoc.value.counts.byPriority?.[levelOn.value] ?? 0) : rows.value.length
+  return statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts) : findings.value.length
+})
 const records = computed(() => recordRows(props.orderUnit?.records ?? props.findingDoc?.finding.records))
 // DAR-UI-099. The open order's lines with no finding of their own (an item set aside, a NetSuite store-credit line).
 const otherLines = computed(() => otherOrderLines(props.orderUnit))
@@ -735,6 +771,10 @@ const rests = computed(() => rows.value.map((row) => row.cause))
 function groupLabel(index: number): string {
   const rest = rests.value[index] ?? ''
   return rest && (index === 0 || rest !== rests.value[index - 1]) ? rest : ''
+}
+// DAR-UI-140. A cause heading's mark: its units' level, by record type, on a report that carries levels.
+function groupMark(index: number): AuditLevel | null {
+  return levelOn.value || !rows.value[index]?.item.priority ? null : groupLevel(rows.value, index)
 }
 
 // DAR-UI-089. Causes fold, per statement; the open finding stays in view under its folded heading. DAR-UI-091 (Aditi:
@@ -782,6 +822,18 @@ const headline = computed(() => props.orderUnit?.headline ?? props.findingDoc?.f
 const eyebrow = computed(() => {
   const split = splitHeadline(headline.value)
   return [props.statement, split.rest ? split.subject : '', orderNameOf(records.value)].filter(Boolean).join(' · ')
+})
+// DAR-UI-140. The open finding's level: the order's (never its line's), else its row's, else its document's.
+const findingLevel = computed<{ level: AuditLevel; source: 'statement' | 'reason'; reason: string | null } | null>(() => {
+  const unit = props.orderUnit?.priority ? props.orderUnit : findings.value.find((item) => item.id === props.finding)
+  if (unit?.priority) return { level: unit.priority, source: unit.prioritySource ?? 'statement', reason: unit.priorityReason ?? null }
+  return props.findingDoc?.finding.priority ?? null
+})
+const levelLine = computed(() => {
+  const at = findingLevel.value
+  if (!at) return ''
+  if (at.source === 'reason' && at.reason) return `${LEVEL_LABEL[at.level]} set on "${at.reason}"`
+  return `${LEVEL_LABEL[at.level]} from ${props.statement || props.findingDoc?.finding.statement.id || ''}`
 })
 const lead = computed(() => {
   const rest = splitHeadline(headline.value).rest
@@ -1392,6 +1444,25 @@ function statementText(id: string): string {
 /* DAR-UI-081. Verdict first: what it is stuck on and what to do, in the panel's one solid border (attention). */
 .audit-eyebrow {
   margin: 0;
+}
+
+/* DAR-UI-140. A level mark keeps its own case and sits beside the words it marks. */
+.audit-eyebrow .audit-mark {
+  margin-right: var(--space-1);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.audit-level-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.audit-row-code .audit-mark {
+  display: block;
+  width: max-content;
+  margin-top: var(--space-00);
 }
 
 .audit-verdict {

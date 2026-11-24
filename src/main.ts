@@ -17,6 +17,8 @@ import { clearAgentConversations } from './components/audit/AuditAgentPanel.vue'
 
 const RECONCILIATION_DRAFT_SESSION_KEY = 'darpan.reconciliationDraftStore'
 const RECENT_COMMANDS_STORAGE_KEY = 'darpan-ui-recent-commands'
+// DAR-UI-140. The audit board's remembered By choice (record type or priority) is the person's own.
+const AUDIT_BY_STORAGE_KEY = 'darpan.audit.by'
 
 initTheme()
 
@@ -38,6 +40,7 @@ setApiCacheReset(() => {
     // the store has not been instantiated yet (no-op if absent).
     window.sessionStorage.removeItem(RECONCILIATION_DRAFT_SESSION_KEY)
     window.localStorage.removeItem(RECENT_COMMANDS_STORAGE_KEY)
+    window.localStorage.removeItem(AUDIT_BY_STORAGE_KEY)
   } catch {
     // Storage may be unavailable in some embedded contexts; the in-memory resets above
     // are what actually close the cross-tenant data path.
