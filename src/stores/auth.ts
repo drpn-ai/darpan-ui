@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { RouteLocationRaw } from 'vue-router'
-import { ApiCallError, clearAuthToken, getAuthToken, setAuthTokenContract } from '../lib/api/client'
+import { ApiCallError, clearAuthToken, getAuthToken, getTabTenant, setAuthTokenContract, setTabTenant } from '../lib/api/client'
 import { authFacade, clearApiResponseCache, settingsFacade } from '../lib/api/facade'
 import type { SaveTenantSettingsPayload } from '../lib/api/facadeTypes'
 import { setReadCacheScope } from '../lib/api/readCache'
@@ -348,8 +348,11 @@ export const useAuthStore = defineStore('auth', () => {
     // leaves the scope as it was.
     if (nextState.status === 'authenticated' && _sessionInfo.value?.userId) {
       setReadCacheScope(`${_sessionInfo.value.userId}|${_sessionInfo.value.activeTenantUserGroupId ?? ''}`)
+      // DAR-UI-141: this tab's calls name the tenant this tab's own session reply named, never another tab's.
+      if (_sessionInfo.value.activeTenantUserGroupId) setTabTenant(_sessionInfo.value.activeTenantUserGroupId)
     } else if (nextState.status === 'unauthenticated') {
       setReadCacheScope(null)
+      setTabTenant(null)
     }
   }
 
@@ -404,6 +407,20 @@ export const useAuthStore = defineStore('auth', () => {
     return false
   }
 
+  // DAR-UI-141: a completed refusal while this tab names a tenant (the membership ended since the tab took it; Moqui
+  // answers an authz refusal as a 200 with an error body) drops the tab tenant and asks once more without it, so the
+  // tab lands on the saved tenant instead of a dead end. No answer at all (5xx, unreachable) is not a refusal.
+  async function getSessionInfoForTab(): Promise<SessionInfoResponse> {
+    try {
+      return await authFacade.getSessionInfo()
+    } catch (err) {
+      const refused = err instanceof ApiCallError && err.status !== 401 && (err.status ?? 500) < 500
+      if (!refused || !getTabTenant()) throw err
+      setTabTenant(null)
+      return authFacade.getSessionInfo()
+    }
+  }
+
   async function ensureAuthenticated(force = false): Promise<boolean> {
     if (authBypass) {
       _applyAuthState({
@@ -421,7 +438,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const inFlight = (async () => {
       try {
-        const response = await authFacade.getSessionInfo()
+        const response = await getSessionInfoForTab()
         const isAuthenticated = _applyAuthResponse(response, 'No active authenticated session detected.')
         if (isAuthenticated) _hydrateReferenceData()
         return isAuthenticated

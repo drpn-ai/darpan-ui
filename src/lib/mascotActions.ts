@@ -935,7 +935,7 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'sign in': {
     title: 'Sign In',
-    body: 'the tenant you were last using becomes active again — in every tab, because the active tenant is a server-side preference.',
+    body: 'the tenant you last switched to opens first. After that, each tab keeps its own.',
   },
   'preview in darpan': {
     title: 'Preview in Darpan',

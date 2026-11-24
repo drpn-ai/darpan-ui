@@ -472,7 +472,9 @@ export const authFacade = {
     return callService<SessionInfoResponse>(AUTH.getSessionInfo, {}, signal)
   },
   saveActiveTenant(activeTenantUserGroupId: string, signal?: AbortSignal): Promise<SaveActiveTenantResponse> {
-    return callService<SaveActiveTenantResponse>(AUTH.saveActiveTenant, { activeTenantUserGroupId }, signal)
+    return callService<SaveActiveTenantResponse>(AUTH.saveActiveTenant, { activeTenantUserGroupId }, signal, {
+      withoutTabTenant: true,
+    })
   },
   saveUserSettings(payload: SaveUserSettingsPayload, signal?: AbortSignal): Promise<SaveUserSettingsResponse> {
     return callService<SaveUserSettingsResponse>(AUTH.saveUserSettings, payload, signal)

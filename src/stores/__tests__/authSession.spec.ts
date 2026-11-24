@@ -169,6 +169,95 @@ describe('auth state', () => {
     expect(clearApiResponseCache).toHaveBeenCalledTimes(1)
   })
 
+  // DAR-UI-141: the tab's tenant follows only this tab's own session replies and switches.
+  describe('tab tenant', () => {
+    const session = (tenant: string) => ({
+      ok: true,
+      messages: [],
+      errors: [],
+      authenticated: true,
+      sessionInfo: {
+        userId: 'backend-user',
+        username: 'backend',
+        activeTenantUserGroupId: tenant,
+        activeTenantLabel: tenant,
+        availableTenants: [
+          { userGroupId: 'GORJANA', label: 'GORJANA' },
+          { userGroupId: 'MALBON', label: 'MALBON' },
+        ],
+      },
+    })
+
+    it('takes the tenant the session reply names', async () => {
+      getSessionInfo.mockResolvedValue(session('GORJANA'))
+      const { useAuthStore } = await import('../auth')
+      const { getTabTenant } = await import('../../lib/api/client')
+
+      await useAuthStore().ensureAuthenticated(true)
+
+      expect(getTabTenant()).toBe('GORJANA')
+    })
+
+    it('moves to the tenant this tab switches into', async () => {
+      getSessionInfo.mockResolvedValue(session('GORJANA'))
+      saveActiveTenantRpc.mockResolvedValue(session('MALBON'))
+      const { useAuthStore } = await import('../auth')
+      const { getTabTenant } = await import('../../lib/api/client')
+
+      await useAuthStore().ensureAuthenticated(true)
+      await useAuthStore().switchActiveTenant('MALBON')
+
+      expect(getTabTenant()).toBe('MALBON')
+    })
+
+    it('forgets it when the session ends', async () => {
+      const { ApiCallError, getTabTenant, setTabTenant } = await import('../../lib/api/client')
+      setTabTenant('GORJANA')
+      getSessionInfo.mockRejectedValue(new ApiCallError('Login key expired', 401))
+      const { useAuthStore } = await import('../auth')
+
+      await useAuthStore().ensureAuthenticated(true)
+
+      expect(getTabTenant()).toBeNull()
+    })
+
+    it('drops a tab tenant the backend refuses (membership gone) and asks again without it', async () => {
+      const { ApiCallError, getTabTenant, setTabTenant } = await import('../../lib/api/client')
+      setTabTenant('MALBON')
+      getSessionInfo
+        .mockRejectedValueOnce(new ApiCallError('Tenant MALBON is not one of your tenants', 200))
+        .mockResolvedValueOnce(session('GORJANA'))
+      const { useAuthStore } = await import('../auth')
+
+      await expect(useAuthStore().ensureAuthenticated(true)).resolves.toBe(true)
+
+      expect(getSessionInfo).toHaveBeenCalledTimes(2)
+      expect(getTabTenant()).toBe('GORJANA')
+    })
+
+    it('keeps the tab tenant through an unreachable backend (no answer is not a refusal)', async () => {
+      const { ApiCallError, getTabTenant, setTabTenant } = await import('../../lib/api/client')
+      setTabTenant('MALBON')
+      getSessionInfo.mockRejectedValue(new ApiCallError('Backend unreachable', 503))
+      const { useAuthStore } = await import('../auth')
+
+      await expect(useAuthStore().ensureAuthenticated(true)).resolves.toBe(false)
+
+      expect(getSessionInfo).toHaveBeenCalledTimes(1)
+      expect(getTabTenant()).toBe('MALBON')
+    })
+
+    it('does not ask again when no tab tenant was sent', async () => {
+      const { ApiCallError } = await import('../../lib/api/client')
+      getSessionInfo.mockRejectedValue(new ApiCallError('Something broke', 500))
+      const { useAuthStore } = await import('../auth')
+
+      await expect(useAuthStore().ensureAuthenticated(true)).resolves.toBe(false)
+
+      expect(getSessionInfo).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('reports a backend refusal as refused, not failed', async () => {
     // response.authenticated true + ok false is the backend saying "not your tenant".
     saveActiveTenantRpc.mockResolvedValue({

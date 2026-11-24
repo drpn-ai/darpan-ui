@@ -652,3 +652,67 @@ describe('callService read-cache invalidation (DAR-UI-051)', () => {
     expect(await readAgain()).toEqual(['cached', 'fresh'])
   })
 })
+
+// DAR-UI-141. The saved active tenant is one per user, shared by every tab; each call names this tab's own tenant
+// (X-Darpan-Tenant, which the backend honours without reading or moving that preference) so tabs stop steering
+// each other.
+describe('tab tenant header', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+    installLocalStorageStub()
+  })
+
+  const okReply = () => new Response(
+    JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true, messages: [], errors: [] } }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )
+  const sentHeaders = (fetchMock: ReturnType<typeof vi.fn>, call: number) =>
+    (fetchMock.mock.calls[call]?.[1] as { headers: Record<string, string> }).headers
+
+  it('names no tenant until the tab has one, then names it on every call', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => okReply())
+    vi.stubGlobal('fetch', fetchMock)
+    const { callService, setTabTenant } = await import('../client')
+
+    await callService('facade.AuthFacadeServices.get#SessionInfo')
+    setTabTenant('MALBON')
+    await callService('facade.AuthFacadeServices.get#SessionInfo')
+
+    expect(sentHeaders(fetchMock, 0)['X-Darpan-Tenant']).toBeUndefined()
+    expect(sentHeaders(fetchMock, 1)['X-Darpan-Tenant']).toBe('MALBON')
+  })
+
+  it('keeps the tab tenant through a reload of the tab, and only in this tab', async () => {
+    const { setTabTenant } = await import('../client')
+    setTabTenant('MALBON')
+    expect(window.sessionStorage.getItem('darpan.tabTenant')).toBe('MALBON')
+    expect(window.localStorage.getItem('darpan.tabTenant')).toBeNull()
+
+    vi.resetModules()
+    const reloaded = await import('../client')
+    expect(reloaded.getTabTenant()).toBe('MALBON')
+  })
+
+  it('leaves the header off a call that opts out (the switch itself)', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => okReply())
+    vi.stubGlobal('fetch', fetchMock)
+    const { callService, setTabTenant } = await import('../client')
+    setTabTenant('GORJANA')
+
+    await callService('facade.AuthFacadeServices.save#ActiveTenant', { activeTenantUserGroupId: 'MALBON' }, undefined, {
+      withoutTabTenant: true,
+    })
+
+    expect(sentHeaders(fetchMock, 0)['X-Darpan-Tenant']).toBeUndefined()
+  })
+
+  it('forgets the tab tenant when the tab signs out', async () => {
+    const { clearAuthToken, getTabTenant, setTabTenant } = await import('../client')
+    setTabTenant('GORJANA')
+    clearAuthToken()
+    expect(getTabTenant()).toBeNull()
+    expect(window.sessionStorage.getItem('darpan.tabTenant')).toBeNull()
+  })
+})
