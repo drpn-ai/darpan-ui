@@ -52,6 +52,18 @@
               <span class="audit-statement__text">{{ statement.text }}</span>
               <span class="audit-statement__count">{{ checksWords(statement.checks.length) }}</span>
             </button>
+            <!-- DAR-UI-140: the level cell is itself the button, as a changeable fact is. -->
+            <button
+              type="button"
+              class="audit-statement__priority audit-level"
+              :aria-label="`${statement.code} priority: ${levelWords(levelOf(statement))}`"
+              :data-testid="`audit-settings-priority-${statement.id}`"
+              :disabled="saving"
+              @click="openPriority(statement)"
+            >
+              <AuditPriorityMark :level="levelOf(statement)" />
+              <span class="audit-level__word">{{ LEVEL_WORD[levelOf(statement)] }}</span>
+            </button>
             <AppToggleSwitch
               class="audit-statement__toggle"
               :model-value="statement.active"
@@ -285,6 +297,80 @@
               </li>
             </ul>
           </div>
+          <!-- DAR-UI-140: each reason's own level. One that closes on every check closes the finding and takes none. -->
+          <div v-if="editingStatement.reasons?.length" class="audit-popup-checks">
+            <span class="workflow-context-label">Reasons</span>
+            <ul class="audit-checks">
+              <li
+                v-for="reason in editingStatement.reasons"
+                :key="reason.conclusion"
+                class="audit-check audit-reason"
+                :data-testid="`audit-settings-reason-${reason.conclusion}`"
+              >
+                <span class="audit-check__name">{{ reason.label }}</span>
+                <span v-if="reason.closes === 'all'" class="audit-reason__closes">Closes</span>
+                <span v-else class="audit-reason__level">
+                  <span
+                    v-if="reason.closes === 'some'"
+                    class="audit-reason__closes"
+                    :data-testid="`audit-settings-reason-closes-${reason.conclusion}`"
+                  >Closes on {{ reason.closesOn }} of {{ reason.checks }} checks</span>
+                  <button
+                    type="button"
+                    class="audit-reason__priority audit-level"
+                    :aria-label="`${reason.label} priority: ${reason.priority ? levelWords(reason.priority) : sameAs(editingStatement)}`"
+                    :data-testid="`audit-settings-reason-priority-${reason.conclusion}`"
+                    :disabled="saving"
+                    @click="openReasonPriority(reason)"
+                  >
+                    <template v-if="reason.priority">
+                      <AuditPriorityMark :level="reason.priority" />
+                      <span class="audit-level__word">{{ LEVEL_WORD[reason.priority] }}</span>
+                    </template>
+                    <span v-else class="audit-level__word">{{ sameAs(editingStatement) }}</span>
+                  </button>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </WorkflowStepForm>
+
+        <!-- DAR-UI-140: how soon a broken statement must be fixed, or (from its popup) one reason's own level. -->
+        <WorkflowStepForm
+          v-else-if="(popup === 'priority' || (popup === 'reasonPriority' && editingReason)) && editingStatement"
+          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          :question="`How soon must a broken ${editingStatement.code} be fixed?`"
+          primary-label="Save"
+          primary-action-variant="save"
+          :primary-test-id="popup === 'priority' ? 'audit-settings-priority-save' : 'audit-settings-reason-priority-save'"
+          :submit-disabled="saving"
+          :show-enter-hint="false"
+          show-cancel-action
+          :cancel-disabled="saving"
+          :cancel-test-id="popup === 'priority' ? 'audit-settings-priority-cancel' : 'audit-settings-reason-priority-cancel'"
+          @cancel="closePopup"
+          @submit="void saveLevel()"
+        >
+          <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="audit-settings-popup-error" />
+          <ul class="audit-levels" role="radiogroup" :aria-label="popupTitle">
+            <li v-for="option in levelOptions" :key="option.key">
+              <button
+                type="button"
+                role="radio"
+                class="audit-levels__option audit-level"
+                :aria-checked="levelDraft === option.level ? 'true' : 'false'"
+                :data-testid="`audit-settings-level-${option.key}`"
+                :disabled="saving"
+                @click="levelDraft = option.level"
+              >
+                <template v-if="option.level">
+                  <AuditPriorityMark :level="option.level" />
+                  <span class="audit-level__word">{{ LEVEL_WORD[option.level] }}</span>
+                </template>
+                <span v-else class="audit-level__word">{{ sameAs(editingStatement) }}</span>
+              </button>
+            </li>
+          </ul>
         </WorkflowStepForm>
 
         <!-- DAR-UI-064: a check added to this statement, in today's editor; saving or cancelling returns to the statement. -->
@@ -349,6 +435,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AuditCheckEditor from '../../components/audit/AuditCheckEditor.vue'
+import AuditPriorityMark from '../../components/audit/AuditPriorityMark.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -362,7 +449,10 @@ import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue
 import { auditFacade, settingsFacade } from '../../lib/api/facade'
 import type { TenantChatSpace } from '../../lib/api/types'
 import { auditMorningQuery } from '../../lib/auditReport'
-import type { AuditSettings, AuditSettingsCheck, AuditSettingsStatement, SaveAuditSettingsPayload } from '../../lib/api/auditTypes'
+import {
+  AUDIT_LEVELS, LEVEL_LABEL, LEVEL_WORD,
+  type AuditLevel, type AuditSettings, type AuditSettingsCheck, type AuditSettingsReason, type AuditSettingsStatement, type SaveAuditSettingsPayload,
+} from '../../lib/api/auditTypes'
 import { backIconPath } from '../../lib/iconPaths'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { twelveHourTime } from '../../lib/scriptDeployment'
@@ -375,7 +465,8 @@ import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 // after each run, and each statement's text and on/off, with a way from each check to its run's rules. DAR-UI-078: also
 // where a new audit gets its statements. DAR-UI-127: a static page with the settings-page header (DAR-UI-126); the name
 // saves on Enter or blur, each toggle at once, and each popup saves what it holds, all through save#AuditSettings.
-type Popup = 'schedule' | 'email' | 'space' | 'statement' | 'check' | 'newStatement'
+// DAR-UI-140: a statement's level from its row, and a reason's own level from the statement's popup.
+type Popup = 'schedule' | 'email' | 'space' | 'statement' | 'check' | 'newStatement' | 'priority' | 'reasonPriority'
 
 const route = useRoute()
 const router = useRouter()
@@ -402,6 +493,9 @@ const alsoSendToInput = ref<InstanceType<typeof WorkflowChipTextInput> | null>(n
 const spaceForm = ref('')
 const editingStatementId = ref<string | null>(null)
 const statementText = ref('')
+const editingReasonConclusion = ref<string | null>(null)
+// The level picked in the priority popups; null is a reason's "Same as" its statement.
+const levelDraft = ref<AuditLevel | null>(null)
 const newForm = ref({ text: '', category: 'orders', weight: 'derived' })
 
 const categoryOptions = [
@@ -417,6 +511,22 @@ const weightOptions = [
 
 const timezoneOptions = computed(() => buildTimezoneOptions(scheduleForm.value.timeZone))
 const editingStatement = computed(() => settings.value?.statements.find((statement) => statement.id === editingStatementId.value) ?? null)
+const editingReason = computed(() => editingStatement.value?.reasons?.find((reason) => reason.conclusion === editingReasonConclusion.value) ?? null)
+
+// DAR-UI-140. A statement with no level reads P2, as the backend reads it.
+function levelOf(statement: AuditSettingsStatement): AuditLevel {
+  return statement.priority ?? 'P2'
+}
+function levelWords(level: AuditLevel): string {
+  return `${LEVEL_LABEL[level]} ${LEVEL_WORD[level]}`
+}
+function sameAs(statement: AuditSettingsStatement): string {
+  return `Same as ${statement.code}`
+}
+const levelOptions = computed(() => {
+  const levels = AUDIT_LEVELS.map((level) => ({ key: level as string, level: level as AuditLevel | null }))
+  return popup.value === 'reasonPriority' ? [{ key: 'same', level: null }, ...levels] : levels
+})
 
 // DAR-BE-207. A simple shape check; the backend has the last word and names any address it refuses.
 function isEmail(value: string): boolean {
@@ -502,6 +612,8 @@ const popupTitle = computed(() => {
     case 'space': return 'Posts to'
     case 'statement':
     case 'check': return `Statement ${editingStatement.value?.code ?? ''}`
+    case 'priority': return `Priority · ${editingStatement.value?.code ?? ''}`
+    case 'reasonPriority': return editingReason.value?.label ?? ''
     case 'newStatement': return 'New statement'
     default: return ''
   }
@@ -527,8 +639,15 @@ function applyLocally(change: Omit<SaveAuditSettingsPayload, 'audit'>) {
   if (!was) return
   const statements = was.statements.map((statement) => {
     const edit = change.statements?.find((candidate) => candidate.id === statement.id)
-    // DAR-UI-140: a null priority in the payload clears a saved level; the page keeps the statement's own until the reload.
-    return edit ? { ...statement, ...edit, priority: edit.priority ?? statement.priority } : statement
+    const reasonEdits = change.reasons?.filter((candidate) => candidate.statement === statement.id) ?? []
+    // DAR-UI-140: a null priority clears a saved level, and a cleared statement reads P2, as the backend reads it.
+    const next = edit ? { ...statement, ...edit, priority: 'priority' in edit ? (edit.priority ?? 'P2') : statement.priority } : statement
+    if (!reasonEdits.length || !next.reasons) return next
+    const reasons = next.reasons.map((reason) => {
+      const reasonEdit = reasonEdits.find((candidate) => candidate.conclusion === reason.conclusion)
+      return reasonEdit ? { ...reason, priority: reasonEdit.priority } : reason
+    })
+    return { ...next, reasons }
   })
   show({
     ...was,
@@ -595,9 +714,10 @@ function openPopup(next: Popup) {
 
 function closePopup() {
   if (saving.value) return
-  // The check editor goes back to its statement; every other popup closes.
-  if (popup.value === 'check') {
+  // The check editor and a reason's level go back to their statement; every other popup closes.
+  if (popup.value === 'check' || popup.value === 'reasonPriority') {
     popup.value = 'statement'
+    popupError.value = null
     return
   }
   popup.value = null
@@ -664,6 +784,35 @@ async function saveStatement() {
   const text = statementText.value.trim()
   if (!statement || !text || saving.value) return
   if (text !== statement.text && !(await persist({ statements: [{ id: statement.id, text }] }, 'popup'))) return
+  closePopup()
+}
+
+// DAR-UI-140. A statement's level opens from its row; a reason's replaces the statement's popup and returns to it.
+function openPriority(statement: AuditSettingsStatement) {
+  editingStatementId.value = statement.id
+  levelDraft.value = levelOf(statement)
+  openPopup('priority')
+}
+
+function openReasonPriority(reason: AuditSettingsReason) {
+  if (reason.closes === 'all') return
+  editingReasonConclusion.value = reason.conclusion
+  levelDraft.value = reason.priority
+  openPopup('reasonPriority')
+}
+
+async function saveLevel() {
+  const statement = editingStatement.value
+  if (!statement || saving.value) return
+  if (popup.value === 'priority') {
+    const level = levelDraft.value ?? 'P2'
+    if (level !== levelOf(statement) && !(await persist({ statements: [{ id: statement.id, priority: level }] }, 'popup'))) return
+  } else {
+    const reason = editingReason.value
+    if (!reason) return
+    const change = { reasons: [{ statement: statement.id, conclusion: reason.conclusion, priority: levelDraft.value }] }
+    if (levelDraft.value !== reason.priority && !(await persist(change, 'popup'))) return
+  }
   closePopup()
 }
 
@@ -779,7 +928,8 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* The statements as one bordered list of equal rows: the row opens the statement, the switch at its end flips it. */
+/* The statements as one bordered list of equal rows: the row opens the statement, its level cell opens the level, the
+   switch at its end flips it. */
 .audit-statements {
   display: grid;
   margin: 0;
@@ -794,7 +944,7 @@ onBeforeUnmount(() => {
 
 .audit-statement {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   min-height: 4.4rem;
 }
@@ -861,6 +1011,88 @@ onBeforeUnmount(() => {
 
 .audit-statement__toggle {
   margin-right: var(--space-3);
+}
+
+/* DAR-UI-140. A level: its mark, then its word. As a button it is the whole cell, tinted on hover like a fact. */
+.audit-level {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.audit-level:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--static-tile-bg) 88%, var(--accent));
+}
+
+.audit-level:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 68%, transparent);
+  outline-offset: -2px;
+}
+
+.audit-level:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.audit-level__word {
+  color: var(--text-muted);
+  font-size: var(--type-note-size);
+}
+
+/* One width for every row's cell, so the marks line up down the list. */
+.audit-statement__priority {
+  width: 8rem;
+  height: 100%;
+  padding-inline: var(--space-3);
+}
+
+.audit-reason__level {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.audit-reason__closes {
+  flex: none;
+  color: var(--text-dim);
+}
+
+.audit-reason__priority {
+  min-width: 7rem;
+  border-radius: var(--radius-sm);
+}
+
+.audit-levels {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.audit-levels > li + li {
+  border-top: 1px solid var(--border-soft);
+}
+
+.audit-levels__option {
+  width: 100%;
+  min-height: 2.6rem;
+}
+
+.audit-levels__option[aria-checked='true'] {
+  background: color-mix(in oklab, var(--static-tile-bg) 80%, var(--accent));
 }
 
 .audit-popup-pair {
@@ -943,6 +1175,11 @@ onBeforeUnmount(() => {
 
   .audit-statement__count {
     display: none;
+  }
+
+  .audit-statement__priority {
+    width: 6.5rem;
+    padding-inline: var(--space-2);
   }
 }
 

@@ -579,3 +579,162 @@ describe('AuditSettingsPage after each run', () => {
     w.unmount()
   })
 })
+
+// DAR-UI-140. How soon a broken statement must be fixed, and under it a reason's own level.
+describe('AuditSettingsPage priorities', () => {
+  const twoChecks = [
+    { id: 'C11', label: 'Orders not in the OMS', savedRunId: null, runName: null },
+    { id: 'C12', label: 'Orders held in the OMS', savedRunId: null, runName: null },
+  ]
+  function prioritySettings(): AuditSettings {
+    return {
+      ...settings(),
+      statements: [
+        { id: 'R11', code: 'R11', text: 'Every order reaches the OMS.', active: true, priority: 'P0', checks: twoChecks, reasons: [
+          // A stale level on a reason that closes on every check: still reads Closes, and opens nothing.
+          { conclusion: 'CONC_ALL', label: 'Order cancelled in Shopify', priority: 'P1', closes: 'all', closesOn: 2, checks: 2 },
+          { conclusion: 'CONC_SOME', label: 'Order on hold for fraud', priority: null, closes: 'some', closesOn: 1, checks: 2 },
+          { conclusion: 'CONC_NONE', label: 'Gift card only', priority: 'KNOWN', closes: 'none', closesOn: 0, checks: 2 },
+        ] },
+        { id: 'R5', code: 'R5', text: 'Every refund reaches NetSuite.', active: true, priority: 'P2', checks: twoChecks, reasons: [
+          { conclusion: 'CONC_X', label: 'Refund still pending', priority: null, closes: 'none', closesOn: 0, checks: 2 },
+        ] },
+      ],
+    }
+  }
+  beforeEach(() => {
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: prioritySettings() } as never)
+  })
+  // The mark and its word, read as the eye reads them (the gap between them is CSS).
+  function parts(node: Element) {
+    return [...node.querySelectorAll('[data-testid="audit-mark"], .audit-level__word')].map((part) => part.textContent?.trim()).join(' ')
+  }
+  function levelText(w: W, testId: string) { return parts(get(w, testId).element) }
+  function options(w: W) { return w.findAll('[role="radio"]').map((option) => parts(option.element)) }
+
+  it('aStatementRowsPriorityCellOpensItsPopup', async () => {
+    const w = await mountPage()
+    const cell = get(w, 'audit-settings-priority-R11')
+    expect(cell.element.tagName).toBe('BUTTON')
+    expect(cell.find('[data-testid="audit-mark"]').text()).toBe('P0')
+    expect(levelText(w, 'audit-settings-priority-R11')).toBe('P0 today')
+    expect(cell.text()).not.toMatch(/Change|Edit/)
+
+    await click(w, 'audit-settings-priority-R11')
+    expect(popupOpen(w)).toBe(true)
+    expect(w.get('.wizard-question').text()).toBe('How soon must a broken R11 be fixed?')
+    expect(options(w)).toEqual(['P0 today', 'P1 this week', 'P2 later', 'Known owned'])
+    expect(get(w, 'audit-settings-level-P0').attributes('aria-checked')).toBe('true')
+    await click(w, 'audit-settings-level-P1')
+    expect(get(w, 'audit-settings-level-P1').attributes('aria-checked')).toBe('true')
+    expect(f.saveAuditSettings).not.toHaveBeenCalled()
+    await click(w, 'audit-settings-priority-save')
+    expect(f.saveAuditSettings).toHaveBeenCalledWith({ audit: 'month-close', statements: [{ id: 'R11', priority: 'P1' }] })
+    expect(popupOpen(w)).toBe(false)
+    expect(levelText(w, 'audit-settings-priority-R11')).toBe('P1 this week')
+    w.unmount()
+  })
+
+  it('closes the priority popup on Cancel, and on Save with the level unchanged, without writing', async () => {
+    const w = await mountPage()
+    await click(w, 'audit-settings-priority-R5')
+    await click(w, 'audit-settings-level-KNOWN')
+    await click(w, 'audit-settings-priority-cancel')
+    expect(popupOpen(w)).toBe(false)
+    await click(w, 'audit-settings-priority-R5')
+    expect(get(w, 'audit-settings-level-P2').attributes('aria-checked')).toBe('true')
+    await click(w, 'audit-settings-priority-save')
+    expect(popupOpen(w)).toBe(false)
+    expect(f.saveAuditSettings).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('keeps a statement\'s level through a save that does not name it, and reads P2 once cleared', async () => {
+    const w = await mountPage()
+    await click(w, 'audit-settings-statement-active-R11')
+    expect(f.saveAuditSettings).toHaveBeenCalledWith({ audit: 'month-close', statements: [{ id: 'R11', active: false }] })
+    expect(levelText(w, 'audit-settings-priority-R11')).toBe('P0 today')
+
+    // A cleared level (null) with no settings in the answer reads as the backend reads it: P2. No row sends null
+    // today, so the save goes in through the page's own persist.
+    const vm = w.vm as unknown as { persist: (change: object, where: 'page' | 'popup') => Promise<boolean> }
+    expect(await vm.persist({ statements: [{ id: 'R11', priority: null }] }, 'page')).toBe(true)
+    await flushPromises()
+    expect(levelText(w, 'audit-settings-priority-R11')).toBe('P2 later')
+    w.unmount()
+  })
+
+  it('reasonsListInTheStatementPopup', async () => {
+    const w = await mountPage()
+    await click(w, 'audit-settings-statement-open-R11')
+    const all = get(w, 'audit-settings-reason-CONC_ALL')
+    expect(all.text()).toContain('Order cancelled in Shopify')
+    expect(all.text()).toContain('Closes')
+    expect(all.find('button').exists()).toBe(false)
+    expect(all.find('[data-testid="audit-mark"]').exists()).toBe(false)
+
+    const some = get(w, 'audit-settings-reason-CONC_SOME')
+    expect(some.text()).toContain('Order on hold for fraud')
+    expect(get(w, 'audit-settings-reason-closes-CONC_SOME').text()).toBe('Closes on 1 of 2 checks')
+    expect(get(w, 'audit-settings-reason-priority-CONC_SOME').element.tagName).toBe('BUTTON')
+    expect(levelText(w, 'audit-settings-reason-priority-CONC_SOME')).toBe('Same as R11')
+
+    expect(levelText(w, 'audit-settings-reason-priority-CONC_NONE')).toBe('Known owned')
+    expect(has(w, 'audit-settings-reason-closes-CONC_NONE')).toBe(false)
+    expect(has(w, 'audit-settings-reason-priority-CONC_ALL')).toBe(false)
+    w.unmount()
+  })
+
+  it('savingAReasonLevel', async () => {
+    const w = await mountPage()
+    await click(w, 'audit-settings-statement-open-R5')
+    await click(w, 'audit-settings-reason-priority-CONC_X')
+    // One popup at a time: the statement's gives way to the reason's.
+    expect(has(w, 'audit-settings-statement-text')).toBe(false)
+    expect(w.findAll('.popup-workflow-modal')).toHaveLength(1)
+    expect(w.get('.wizard-question').text()).toBe('How soon must a broken R5 be fixed?')
+    expect(options(w)).toEqual(['Same as R5', 'P0 today', 'P1 this week', 'P2 later', 'Known owned'])
+    expect(get(w, 'audit-settings-level-same').attributes('aria-checked')).toBe('true')
+    await click(w, 'audit-settings-level-KNOWN')
+    await click(w, 'audit-settings-reason-priority-save')
+    expect(f.saveAuditSettings).toHaveBeenLastCalledWith({ audit: 'month-close',
+      reasons: [{ statement: 'R5', conclusion: 'CONC_X', priority: 'KNOWN' }] })
+    // Back in the statement's popup, the reason at its new level.
+    expect(has(w, 'audit-settings-statement-text')).toBe(true)
+    expect(levelText(w, 'audit-settings-reason-priority-CONC_X')).toBe('Known owned')
+
+    await click(w, 'audit-settings-reason-priority-CONC_X')
+    await click(w, 'audit-settings-level-same')
+    await click(w, 'audit-settings-reason-priority-save')
+    expect(f.saveAuditSettings).toHaveBeenLastCalledWith({ audit: 'month-close',
+      reasons: [{ statement: 'R5', conclusion: 'CONC_X', priority: null }] })
+    expect(levelText(w, 'audit-settings-reason-priority-CONC_X')).toBe('Same as R5')
+    expect(f.saveAuditSettings).toHaveBeenCalledTimes(2)
+    w.unmount()
+  })
+
+  it('goes back to the statement from a reason\'s level on Cancel, its words kept', async () => {
+    const w = await mountPage()
+    await click(w, 'audit-settings-statement-open-R5')
+    await get(w, 'audit-settings-statement-text').setValue('Every refund reaches NetSuite in a day.')
+    await click(w, 'audit-settings-reason-priority-CONC_X')
+    await click(w, 'audit-settings-reason-priority-cancel')
+    expect((get(w, 'audit-settings-statement-text').element as HTMLTextAreaElement).value).toBe('Every refund reaches NetSuite in a day.')
+    expect(f.saveAuditSettings).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('aRefusedReasonLevelKeepsThePopupOpen', async () => {
+    f.saveAuditSettings.mockRejectedValue(new Error('Reason CONC_X closes on every check of R5, so it takes no level.'))
+    const w = await mountPage()
+    await click(w, 'audit-settings-statement-open-R5')
+    await click(w, 'audit-settings-reason-priority-CONC_X')
+    await click(w, 'audit-settings-level-P0')
+    await click(w, 'audit-settings-reason-priority-save')
+    expect(get(w, 'audit-settings-popup-error').text()).toBe('Reason CONC_X closes on every check of R5, so it takes no level.')
+    expect(has(w, 'audit-settings-reason-priority-save')).toBe(true)
+    expect(get(w, 'audit-settings-level-P0').attributes('aria-checked')).toBe('true')
+    expect(has(w, 'audit-settings-error')).toBe(false)
+    w.unmount()
+  })
+})
