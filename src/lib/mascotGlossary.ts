@@ -117,7 +117,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   activeTenant: {
     title: 'Active tenant',
-    body: 'the tenant every read and write in this tab is scoped to. Other tabs keep their own, so check it before you blame the data.',
+    body: 'the tenant every read and write is scoped to. Switching it re-points your other tabs too, so check it before you blame the data.',
   },
   matched: {
     title: 'Matched',
@@ -287,7 +287,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   tenantContext: {
     title: 'Tenant context',
-    body: 'which tenant everything on this page is scoped to. Switching it moves this tab only.',
+    body: 'which tenant everything on this page is scoped to. It is a server-side preference, so switching it re-points your other tabs as well.',
   },
   localization: {
     title: 'Localization',

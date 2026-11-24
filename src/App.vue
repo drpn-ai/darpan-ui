@@ -429,11 +429,12 @@ async function executeCommand(action: CommandAction): Promise<void> {
 }
 
 // One wording for both switch paths — the palette and a deep link are the same event, and the
-// previous split was the whole reason the deep-link notice looked like a different feature. A
-// switch moves this tab only (DAR-UI-141: each tab names its own tenant on every call), so there
-// is no cross-tab warning left to give.
+// previous split was the whole reason the deep-link notice looked like a different feature. The
+// pill is the product's only transient-notice surface, so this still owes the cross-tab warning:
+// the active tenant is a server-side preference, so a switch re-points every other open tab.
+// 'Other tabs too.' is the shortest form of that which still says it.
 function tenantSwitchNotice(label: string): string {
-  return `Now on ${label}.`
+  return `Now on ${label}. Other tabs too.`
 }
 
 async function runSlashCommand(row: SlashResultRow): Promise<void> {

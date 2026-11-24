@@ -326,7 +326,6 @@ export function clearAuthToken(): void {
   authTokenState = null
   persistAuthTokenState(null)
   if (COOKIE_AUTH) clearCsrfToken()
-  setTabTenant(null)
 }
 
 export function getAuthToken(): string | null {
@@ -378,41 +377,6 @@ function clearCsrfToken(): void {
   }
 }
 
-// ---- Tab tenant (DAR-UI-141) ----
-// The backend's saved active tenant is one per user, shared by every tab and device: a tenant link opened in a new
-// tab rewrote it and the tabs already open followed on their next call. Each call now names this tab's own tenant as
-// X-Darpan-Tenant (DAR-CLI-003), which the backend honours without reading or moving that preference. sessionStorage
-// keeps it through a reload and hands it to a duplicated tab; a fresh tab starts empty and takes the saved preference
-// (or its link's tenantId) from its first session reply.
-const TAB_TENANT_STORAGE_KEY = 'darpan.tabTenant'
-const TAB_TENANT_HEADER = 'X-Darpan-Tenant'
-
-function loadStoredTabTenant(): string | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return window.sessionStorage.getItem(TAB_TENANT_STORAGE_KEY) || null
-  } catch {
-    return null
-  }
-}
-
-let tabTenantValue: string | null = loadStoredTabTenant()
-
-export function getTabTenant(): string | null {
-  return tabTenantValue
-}
-
-export function setTabTenant(tenantUserGroupId: string | null): void {
-  tabTenantValue = tenantUserGroupId?.trim() || null
-  try {
-    if (typeof window === 'undefined') return
-    if (tabTenantValue) window.sessionStorage.setItem(TAB_TENANT_STORAGE_KEY, tabTenantValue)
-    else window.sessionStorage.removeItem(TAB_TENANT_STORAGE_KEY)
-  } catch {
-    // ignore storage failures; the in-memory value still holds for the life of the tab
-  }
-}
-
 const rpcCandidates = buildRpcCandidates()
 
 function buildCsrfTokenUrl(): string {
@@ -460,12 +424,10 @@ async function ensureCsrfToken(): Promise<void> {
   }
 }
 
-function buildHeaders(withoutTabTenant = false): Record<string, string> {
+function buildHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
-
-  if (tabTenantValue && !withoutTabTenant) headers[TAB_TENANT_HEADER] = tabTenantValue
 
   if (COOKIE_AUTH) {
     // In cookie-auth mode: send the non-secret CSRF token; the HttpOnly cookie is the credential.
@@ -559,11 +521,6 @@ export interface CallServiceOptions {
    * errors (missing parameters, transport) still throw.
    */
   refusalIsResult?: boolean
-  /**
-   * DAR-UI-141: send no X-Darpan-Tenant. Only save#ActiveTenant: the header outranks the preference it writes, so its
-   * reply would describe the tenant being left.
-   */
-  withoutTabTenant?: boolean
 }
 
 async function dispatchService<T>(
@@ -607,7 +564,7 @@ async function dispatchService<T>(
       sentKey = currentAuthKey()
       response = await fetch(candidateUrl, {
         method: 'POST',
-        headers: buildHeaders(options.withoutTabTenant),
+        headers: buildHeaders(),
         credentials: COOKIE_AUTH ? 'include' : 'omit',
         body: JSON.stringify(request),
         signal,

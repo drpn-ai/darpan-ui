@@ -402,7 +402,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     // The top-centre hint pill is the product's one transient-notice surface; a tenant switch does
     // not get a second one. It still owes the cross-tab warning, which is the surprising part.
     const hint = wrapper.get('.workflow-escape-hint')
-    expect(hint.text()).toContain('Now on Acme Retail.')
+    expect(hint.text()).toContain('Now on Acme Retail. Other tabs too.')
     expect(hint.classes()).not.toContain('workflow-escape-hint--warning')
     expect(wrapper.find('.tenant-switch-banner').exists()).toBe(false)
   })
@@ -489,7 +489,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
 
   async function raiseHint(
     wrapper: { vm: { $nextTick: () => Promise<void> } },
-    message = 'Now on Acme Retail.',
+    message = 'Now on Acme Retail. Other tabs too.',
   ): Promise<void> {
     document.dispatchEvent(new CustomEvent(WORKFLOW_HINT_REQUEST_EVENT, { detail: { message } }))
     await wrapper.vm.$nextTick()
@@ -1573,7 +1573,7 @@ describe('App shell deep-link tenant notice', () => {
     // Verbatim the palette's sentence — a deep link and a typed /switch-tenant are the same event,
     // and the cross-tab clause is the part a user cannot guess: the active tenant is a server-side
     // preference, so arriving on this link re-pointed every other tab.
-    expect(hint.text()).toContain('Now on Rails.')
+    expect(hint.text()).toContain('Now on Rails. Other tabs too.')
     expect(hint.classes()).not.toContain('workflow-escape-hint--warning')
     expect(wrapper.find('.tenant-switch-banner').exists()).toBe(false)
   })
