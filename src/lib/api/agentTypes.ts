@@ -74,6 +74,8 @@ export interface SendAgentTurnPayload {
   auditCode?: string
   /** The finding the panel is open on. */
   findingId?: string
+  /** DAR-BE-252. The statement code (e.g. R2) the panel is open on: the agent sees it and a sample of its Unexplained findings. */
+  statement?: string
   text: string
 }
 

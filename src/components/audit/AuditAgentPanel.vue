@@ -111,6 +111,8 @@ const props = defineProps<{
   tenantId: string
   /** The finding open on the page, sent with each message; empty when none is open. */
   findingId: string
+  /** DAR-BE-252. The statement open on the page (e.g. R2), sent with each message; empty or absent when none is open. */
+  statement?: string
   /** The audit's name, for the line saying what a message is about. */
   auditName?: string
   /** True only for someone allowed to save the audit's checks (get#AgentStatus canApprove). */
@@ -260,6 +262,7 @@ async function send(text: string, typed = false): Promise<void> {
       ...(conversationId.value ? { conversationId: conversationId.value } : {}),
       auditCode: props.auditCode,
       ...(props.findingId ? { findingId: props.findingId } : {}),
+      ...(props.statement ? { statement: props.statement } : {}),
       text: words,
     }, abort.signal)
     if (response.conversationId) {

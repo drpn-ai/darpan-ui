@@ -3817,6 +3817,8 @@ export interface components {
             auditCode?: string;
             /** @description The finding the panel is open on. */
             findingId?: string;
+            /** @description DAR-BE-252. The statement code (e.g. R2) the panel is open on; the turn then carries the statement and a sample of its open Unexplained findings. */
+            statement?: string;
             text: string;
         };
         SendAgentTurnResult: {

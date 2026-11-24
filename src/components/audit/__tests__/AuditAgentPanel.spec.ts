@@ -81,6 +81,22 @@ describe('AuditAgentPanel', () => {
     expect(sendAgentTurn).toHaveBeenCalledWith({ auditCode: 'month-close', text: 'How is the audit doing?' }, expect.any(AbortSignal))
   })
 
+  // DAR-BE-252: the run email's "Explain them to the agent" opens the page on a statement; the turn names it, so the
+  // agent starts from that statement and its Unexplained findings.
+  it('sends the statement the page is open on, and none when no statement is open', async () => {
+    sendAgentTurn.mockResolvedValue(turn())
+    const wrapper = mountPanel({ findingId: '', statement: 'R2' })
+    await flushPromises()
+    await send(wrapper, 'These are all gift card orders.')
+    expect(sendAgentTurn).toHaveBeenLastCalledWith(
+      { auditCode: 'month-close', statement: 'R2', text: 'These are all gift card orders.' }, expect.any(AbortSignal))
+
+    await wrapper.setProps({ statement: '' })
+    await send(wrapper, 'How is the audit doing?')
+    expect(sendAgentTurn).toHaveBeenLastCalledWith(
+      { conversationId: 'C1', auditCode: 'month-close', text: 'How is the audit doing?' }, expect.any(AbortSignal))
+  })
+
   it('shows a declined or rate-limited reply word for word', async () => {
     const declined = 'I can only change this audit through a proposal a person approves.'
     const limited = 'You have sent 20 messages to the agent in the last hour; try again later.'

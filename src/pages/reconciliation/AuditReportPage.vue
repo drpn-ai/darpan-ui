@@ -149,6 +149,7 @@
             :audit-code="auditCode"
             :tenant-id="report.report.tenant.id"
             :finding-id="findingTarget"
+            :statement="selectedStatement"
             :audit-name="report.report.audit.name"
             :can-approve="agentStatus?.canApprove === true"
             @preview="(next) => (draftPreviews = next)"
