@@ -3991,7 +3991,7 @@ export interface components {
             audit: string;
             /** @description The check's code, e.g. invoices-without-etail-id. */
             check: string;
-            /** @description The morning, YYYY-MM-DD; blank is today in the tenant's zone. */
+            /** @description The morning, YYYY-MM-DD; blank is the last morning that was due: yesterday until today's scheduled run, then today (tenant's zone). */
             date?: string;
             /** @description The report's period, e.g. 2026-10. */
             period: string;
@@ -4212,7 +4212,7 @@ export interface components {
         GetAuditReportParams: {
             /** @description The audit's code, e.g. month-close. */
             audit: string;
-            /** @description The morning, YYYY-MM-DD; blank is today in the tenant's zone. */
+            /** @description The morning, YYYY-MM-DD; blank is the last morning that was due: yesterday until today's scheduled run, then today (tenant's zone). */
             date?: string;
             /** @description Which period's run, e.g. 2026-09 while September is extended. */
             period?: string;
