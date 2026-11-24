@@ -234,6 +234,8 @@ const finding = ref<AuditFindingDocument | null>(null)
 const findingLoading = ref(false)
 const findingError = ref('')
 const more = ref(emptyFindingsMore())
+/** DAR-UI-140. A linked order the report does not list, read from the statement's orders at every level. */
+const orderLookup = ref<{ key: string; items: AuditFindingListItem[]; error: string } | null>(null)
 const exporting = ref(false)
 const verifying = ref(false)
 const exportError = ref('')
@@ -286,11 +288,14 @@ function readStoredBy(): AuditBy {
   }
 }
 const storedBy = ref<AuditBy>(readStoredBy())
+const isLevel = (value: string): value is AuditLevel => (AUDIT_LEVELS as readonly string[]).includes(value)
 const by = computed<AuditBy>(() => {
   const asked = queryValue('by')
-  return isAuditBy(asked) ? asked : storedBy.value
+  if (isAuditBy(asked)) return asked
+  // A link from before the switch names a record type and no ?by=: it keeps its meaning under a remembered Priority.
+  const category = queryValue('category')
+  return category && category !== HEALTH && !isLevel(category) ? 'type' : storedBy.value
 })
-const isLevel = (value: string): value is AuditLevel => (AUDIT_LEVELS as readonly string[]).includes(value)
 /** The level priority mode opens on: the most urgent with an open finding, else P0. */
 function defaultLevel(doc: AuditReport): AuditLevel {
   return topLevel(doc.summary)?.level ?? 'P0'
@@ -298,13 +303,29 @@ function defaultLevel(doc: AuditReport): AuditLevel {
 
 // A linked finding (?finding alone, as the CLI hands out) opens under its own category and statement.
 const findingHome = computed(() => (findingId.value ? finding.value?.finding : null))
+/** DAR-UI-140. By priority, the level a link that names none opens on (an email card's ?statement, a Run health row, a
+ *  copied record-type link): the open unit's own level (an order's, never its line's), else the open finding's own, else
+ *  the statement's most urgent, else null. Reads the lists directly, not orderUnit: that reads the statement on show, which reads the level. */
+const linkedLevel = computed<AuditLevel | null>(() => {
+  const doc = report.value
+  if (!doc) return null
+  const statement = queryValue('statement') || findingHome.value?.statement.id || ''
+  const found = statement ? findStatement(doc, statement)?.statement : null
+  const id = findingId.value
+  if (id) {
+    const unit = [...(found?.findings ?? []), ...more.value.findings, ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])]
+      .find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))
+    if (unit?.priority) return unit.priority
+  }
+  return findingHome.value?.priority?.level ?? topLevel(found?.counts)?.level ?? null
+})
 const selectedCategory = computed(() => {
   const doc = report.value
   if (!doc) return ''
   const asked = queryValue('category')
   if (by.value === 'priority') {
     if (asked === HEALTH || isLevel(asked)) return asked
-    return findingHome.value?.priority?.level ?? defaultLevel(doc)
+    return linkedLevel.value ?? defaultLevel(doc)
   }
   if (asked === HEALTH || (asked && doc.categories?.[asked])) return asked
   const home = findingHome.value?.category.id
@@ -490,7 +511,7 @@ const orderUnit = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return null
   const listed = statementDoc.value?.findings ?? []
-  return [...listed, ...more.value.findings, ...(periodFindings.value?.items ?? [])]
+  return [...listed, ...more.value.findings, ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])]
     .find((item) => item.kind === 'order' && (item.id === id || Boolean(item.lines?.some((line) => line.id === id)))) ?? null
 })
 // DAR-BE-250. The open finding's row (an order or a lone finding): what later steps report on the same order.
@@ -498,7 +519,7 @@ const waiting = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return []
   const listed = statementDoc.value?.findings ?? []
-  return [...listed, ...more.value.findings, ...(periodFindings.value?.items ?? [])]
+  return [...listed, ...more.value.findings, ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])]
     .find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))?.waiting ?? []
 })
 // A line's finding is F-<n>; anything else names an order, read once the statement's orders are in.
@@ -699,8 +720,10 @@ async function exportFindings(): Promise<void> {
       { audit: auditCode.value, statement, period, ...pillState.value, ...(level ? { priority: level } : {}) }, abort.signal)
     if (response.ok === false) throw new Error(errorOf(response, 'The findings refused to leave the building. Nothing exported.'))
     const findings = response.findings ?? []
-    saveJson(`${auditCode.value}-${period}-${statement}-findings.json`,
-      { audit: auditCode.value, period, statement, findings: findings.map((item) => ({ ...item, order: item.order ?? orderKey(item) })) })
+    saveJson(`${auditCode.value}-${period}-${statement}${level ? `-${level}` : ''}-findings.json`, {
+      audit: auditCode.value, period, statement, ...(level ? { priority: level } : {}),
+      findings: findings.map((item) => ({ ...item, order: item.order ?? orderKey(item) })),
+    })
   } catch (error) {
     if (!abort.signal.aborted) exportError.value = error instanceof Error ? error.message : 'The findings refused to leave the building. Nothing exported.'
   } finally {
@@ -748,12 +771,15 @@ function chooseFilter(next: AuditFilter): void {
 // DAR-UI-140. A new cut starts the columns over: record type on its default category, priority on its most urgent level.
 // The pick is remembered for the next visit and written to the URL.
 function chooseBy(next: AuditBy): void {
+  const current = by.value
   storedBy.value = next
   try {
     window.localStorage.setItem(BY_STORAGE_KEY, next)
   } catch {
     // Storage may be unavailable; the URL still carries the pick.
   }
+  // The choice on show again: remembered (it may have come from the URL), and the board stays where it is.
+  if (next === current) return
   void router.replace({
     query: { ...route.query, by: next, category: undefined, statement: undefined, finding: undefined, source: undefined },
   })
@@ -812,12 +838,33 @@ watch([report, selectedStatement, filter, pickedLevel], () => {
   if (findingsLeft(statementDoc.value, 0, null)) void loadMore()
 })
 // DAR-UI-075. An order the report does not list (past its 50: a reload, a link) is found in the statement's orders.
+// DAR-UI-140: read at every level, not the one on show, so an order at another level is found and opens on its own.
 watch([findingId, report, selectedStatement], async () => {
   const id = findingId.value
   if (!id || !report.value || isLineId(id) || orderUnit.value) return
-  if (more.value.hasNextPage !== false) await loadMore()
-  if (findingId.value === id && !orderUnit.value && !more.value.error) findingError.value = `Finding ${id} has gone missing. We checked under every row.`
+  // By record type "more" already reads every order of the statement.
+  const atLevel = Boolean(pickedLevel.value)
+  if (atLevel) await lookUpOrders()
+  else if (more.value.hasNextPage !== false) await loadMore()
+  const failed = atLevel ? orderLookup.value?.error : more.value.error
+  if (findingId.value === id && !orderUnit.value && !failed) findingError.value = `Finding ${id} has gone missing. We checked under every row.`
 }, { immediate: true })
+
+async function lookUpOrders(): Promise<void> {
+  const statement = selectedStatement.value
+  const key = `${periodKey.value}|${statement}`
+  if (!report.value || !statement || orderLookup.value?.key === key) return
+  try {
+    const response = await auditFacade.getAuditFindingsByOrder(
+      { audit: auditCode.value, statement, period: report.value.report.period, ...pillState.value }, abort.signal)
+    if (key !== `${periodKey.value}|${selectedStatement.value}`) return
+    orderLookup.value = response.ok === false
+      ? { key, items: [], error: errorOf(response, 'The findings could not be found. Yes, really.') }
+      : { key, items: response.findings ?? [], error: '' }
+  } catch {
+    if (!abort.signal.aborted) orderLookup.value = { key, items: [], error: 'The findings could not be found. Yes, really.' }
+  }
+}
 </script>
 
 <style scoped>

@@ -339,7 +339,7 @@
         <WorkflowStepForm
           v-else-if="(popup === 'priority' || (popup === 'reasonPriority' && editingReason)) && editingStatement"
           class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
-          :question="`How soon must a broken ${editingStatement.code} be fixed?`"
+          :question="levelQuestion"
           primary-label="Save"
           primary-action-variant="save"
           :primary-test-id="popup === 'priority' ? 'audit-settings-priority-save' : 'audit-settings-reason-priority-save'"
@@ -617,6 +617,14 @@ const popupTitle = computed(() => {
     case 'newStatement': return 'New statement'
     default: return ''
   }
+})
+
+// DAR-UI-140. The level popup asks of what it sets: the statement, or one reason on it.
+const levelQuestion = computed(() => {
+  const code = editingStatement.value?.code ?? ''
+  return popup.value === 'reasonPriority' && editingReason.value
+    ? `How soon must "${editingReason.value.label}" on ${code} be fixed?`
+    : `How soon must a broken ${code} be fixed?`
 })
 
 const abort = new AbortController()

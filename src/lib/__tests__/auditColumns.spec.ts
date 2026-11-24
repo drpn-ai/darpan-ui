@@ -485,6 +485,10 @@ describe('audit priorities (DAR-UI-140)', () => {
     const items = categoryItems(withPriority())
     expect(items.find((i) => i.id === 'orders')!.sub).toBe('10 at P0')
     expect(items.find((i) => i.id === 'refunds')!.sub).toBe('5 at P2')
+    // A statement nothing checked is still said beside the level.
+    const unchecked = withPriority()
+    unchecked.categories.orders!.statements.R19!.status = 'notRun'
+    expect(categoryItems(unchecked).find((i) => i.id === 'orders')!.sub).toBe('10 at P0 · 1 not checked')
     // No byPriority: today's text.
     expect(categoryItems(report()).find((i) => i.id === 'orders')!.sub).toBe('1 open')
     expect(topLevel(undefined)).toBeNull()
@@ -531,5 +535,23 @@ describe('audit priorities (DAR-UI-140)', () => {
     expect(groupLevel(rows, 0)).toBe('P0')
     expect(groupLevel(rows, 2)).toBe('P2')
     expect(groupLevel(rows, 9)).toBeNull()
+  })
+
+  // Final review: an order sits under the cause of the line that sets its level, so its heading carries that level.
+  it('groupsAnOrderUnderItsLevelLinesCause', () => {
+    const line = (id: string, cause: string, priority: AuditFindingListItem['priority']) =>
+      ({ id, headline: id, state: 'open', cause, held: false, priority }) as unknown as NonNullable<AuditFindingListItem['lines']>[number]
+    const order = {
+      ...unit('M1', 'P0', 'X'), kind: 'order', order: 'M1', priorityLine: 'F-4', prioritySource: 'reason', priorityReason: 'Y',
+      lines: [line('F-1', 'X', 'KNOWN'), line('F-2', 'X', 'KNOWN'), line('F-3', 'X', 'KNOWN'), line('F-4', 'Y', 'P0')],
+    } as AuditFindingListItem
+    const rows = findingRows([unit('a', 'KNOWN', 'X'), order])
+    expect(rows.map((r) => [r.item.id, r.cause])).toEqual([['a', 'X'], ['M1', 'Y']])
+    expect(rows.find((r) => r.item.id === 'M1')!.also).toEqual([{ cause: 'X', lines: 3 }])
+    // Heading X is marked by its own unit (Known), heading Y by the order (P0).
+    expect(groupLevel(rows, 0)).toBe('KNOWN')
+    expect(groupLevel(rows, 1)).toBe('P0')
+    // The toolbar's picked cause still wins.
+    expect(findingRows([order], 'X')[0]!.cause).toBe('X')
   })
 })

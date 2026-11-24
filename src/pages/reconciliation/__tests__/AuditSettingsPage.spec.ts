@@ -692,7 +692,7 @@ describe('AuditSettingsPage priorities', () => {
     // One popup at a time: the statement's gives way to the reason's.
     expect(has(w, 'audit-settings-statement-text')).toBe(false)
     expect(w.findAll('.popup-workflow-modal')).toHaveLength(1)
-    expect(w.get('.wizard-question').text()).toBe('How soon must a broken R5 be fixed?')
+    expect(w.get('.wizard-question').text()).toBe('How soon must "Refund still pending" on R5 be fixed?')
     expect(options(w)).toEqual(['Same as R5', 'P0 today', 'P1 this week', 'P2 later', 'Known owned'])
     expect(get(w, 'audit-settings-level-same').attributes('aria-checked')).toBe('true')
     await click(w, 'audit-settings-level-KNOWN')

@@ -147,7 +147,7 @@ export function categoryItems(report: AuditReport, progress?: AuditProgress | nu
       id,
       label: category.label,
       short: category.label.split(' ')[0] ?? category.label,
-      sub: top ? `${top.count} at ${LEVEL_LABEL[top.level]}` : [found, unchecked ? `${unchecked} not checked` : ''].filter(Boolean).join(' · '),
+      sub: [top ? `${top.count} at ${LEVEL_LABEL[top.level]}` : found, unchecked ? `${unchecked} not checked` : ''].filter(Boolean).join(' · '),
       open: category.counts?.open ?? 0,
       count: countFor(category.counts),
       attention: (category.counts?.open ?? 0) > 0,
@@ -559,7 +559,9 @@ export function findingRows<T extends AuditFindingSummary>(items: T[], picked = 
   // DAR-UI-140. A level keeps the units at it: an order's own level, never its lines'; no priority reads P2.
   items.filter((item) => !level || (item.priority ?? 'P2') === level).forEach((item) => {
     const causes = orderCauses(item)
-    const head = causes.find((c) => c.cause === picked) ?? causes[0]!
+    // DAR-UI-140. Else an order sits under the cause of the line that sets its level, so its heading carries that level.
+    const levelCause = item.priorityLine ? item.lines?.find((line) => line.id === item.priorityLine)?.cause : undefined
+    const head = causes.find((c) => c.cause === picked) ?? causes.find((c) => c.cause === levelCause) ?? causes[0]!
     const row = { item, cause: head.cause, also: item.kind === 'order' ? causes.filter((c) => c !== head) : [], key: item.id }
     groups.set(head.cause, [...(groups.get(head.cause) ?? []), row])
   })

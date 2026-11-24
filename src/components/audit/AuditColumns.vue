@@ -157,7 +157,7 @@
                     type="button"
                     class="audit-check-row-main"
                     :title="row.id"
-                    @click="emit('navigate', { category: row.category, statement: row.statement, finding: undefined, source: undefined })"
+                    @click="emit('navigate', { category: by === 'priority' ? undefined : row.category, statement: row.statement, finding: undefined, source: undefined })"
                   >
                     <span>{{ row.label || row.id }}</span>
                     <span v-if="row.variants.length" class="audit-row-sub">{{ row.variants.join(' · ') }}</span>
@@ -301,7 +301,7 @@
 
                 <!-- DAR-UI-081. Verdict first: the statement and record, what is wrong, then what it is stuck on and what to do.
                    DAR-UI-092: the record's own facts sit between the title and the verdict. -->
-                <p v-if="eyebrow" class="micro-label audit-eyebrow" data-testid="audit-finding-eyebrow"><AuditPriorityMark v-if="findingLevel" :level="findingLevel.level" />{{ eyebrow }}</p>
+                <p v-if="eyebrow" class="micro-label audit-eyebrow" data-testid="audit-finding-eyebrow"><template v-if="findingLevel"><AuditPriorityMark :level="findingLevel.level" />{{ ' ' }}</template>{{ eyebrow }}</p>
                 <!-- DAR-UI-140. Where the level came from: its statement, or the cause it was set on. -->
                 <p v-if="levelLine" class="audit-row-sub audit-eyebrow" data-testid="audit-finding-level">{{ levelLine }}</p>
                 <p class="audit-lead" data-testid="audit-finding-headline">{{ lead }}</p>
@@ -420,7 +420,8 @@
                       <!-- DAR-BE-254: the item first (Aditi: "it says R4 here.. shouldnt it be the SKU"); the statement after it. -->
                       <span>{{ item.item || item.statement }}</span>
                       <span class="audit-row-sub">{{ item.cause || item.headline }}</span>
-                      <span class="audit-row-sub">{{ item.item ? item.statement : '' }}</span>
+                      <!-- DAR-UI-140. A waiting finding keeps its own statement's level. -->
+                      <span class="audit-row-sub">{{ item.item ? item.statement : '' }}<template v-if="item.priority">{{ item.item ? ' ' : '' }}<AuditPriorityMark :level="item.priority" /></template></span>
                     </li>
                   </ul>
                 </template>
@@ -1446,9 +1447,8 @@ function statementText(id: string): string {
   margin: 0;
 }
 
-/* DAR-UI-140. A level mark keeps its own case and sits beside the words it marks. */
+/* DAR-UI-140. A level mark keeps its own case and sits beside the words it marks, a space apart (read and copied as words). */
 .audit-eyebrow .audit-mark {
-  margin-right: var(--space-1);
   letter-spacing: normal;
   text-transform: none;
 }

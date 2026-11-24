@@ -1458,5 +1458,121 @@ describe('AuditReportPage', () => {
       expect(w.findAll('[data-testid="audit-statement-row-P0"]')).toHaveLength(0)
       w.unmount()
     })
+
+    // Final review: a link that names no level opens where what it names sits.
+    it('opens a statement-only link under a remembered Priority on that statement\'s most urgent level', async () => {
+      window.localStorage.setItem('darpan.audit.by', 'priority')
+      liveRoute.query = { period: '2026-10', date: '2026-10-08', statement: 'R2' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.get('[data-testid="audit-by-priority"]').attributes('aria-pressed')).toBe('true')
+      expect(w.get('[data-testid="audit-category-P1"]').attributes('aria-current')).toBe('true')
+      expect(w.get('[data-testid="audit-statement-row-P1"]').attributes('aria-current')).toBe('true')
+      await openCauses(w)
+      expect(w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))).toEqual(['F-1', 'F-2'])
+      w.unmount()
+    })
+
+    it('opens a Run health check row clicked by priority on its statement\'s level', async () => {
+      liveRoute.query = { by: 'priority', category: 'health', source: 'checks' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      await w.get('[data-testid="audit-check-row-invoices-without-etail-id"] .audit-check-row-main').trigger('click')
+      const query = push.mock.lastCall![0].query
+      expect(query).toEqual({ by: 'priority', category: undefined, statement: 'R2', finding: undefined, source: undefined })
+      liveRoute.query = query
+      await flushPromises()
+      expect(w.get('[data-testid="audit-category-P1"]').attributes('aria-current')).toBe('true')
+      expect(w.get('[data-testid="audit-statement-row-P1"]').attributes('aria-current')).toBe('true')
+      w.unmount()
+    })
+
+    it('finds a linked order past the first 50 at another level, and opens on the order\'s level', async () => {
+      const order = { ...unit('M77', 'P1'), kind: 'order', order: 'M77', priorityLine: 'F-77', stuck: ['F-77'],
+        lines: [{ ...unit('F-77', 'P1'), cause: 'Not in NetSuite', held: false }] }
+      const all = [unit('F-11', 'P0'), unit('F-12', 'P0'), unit('F-13', 'P0'), order]
+      f.getAuditFindingsByOrder.mockImplementation((async (payload: { priority?: string }) =>
+        ({ ok: true, findings: all.filter((item) => !payload.priority || item.priority === payload.priority) })) as never)
+      liveRoute.query = { by: 'priority', statement: 'R11', finding: 'M77' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(f.getAuditFindingsByOrder).toHaveBeenCalledWith({ audit: 'month-close', statement: 'R11', period: '2026-10' }, expect.anything())
+      expect(w.find('[data-testid="audit-finding-error"]').exists()).toBe(false)
+      expect(w.get('[data-testid="audit-category-P1"]').attributes('aria-current')).toBe('true')
+      expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-77' }, expect.anything())
+      w.unmount()
+    })
+
+    it('opens a copied record-type link on its order\'s own level, not its line\'s', async () => {
+      const doc = priorityReport()
+      const m9 = doc.categories.orders!.statements.R2!.findings[2]!
+      m9.lines = [{ ...m9.lines![0]!, priority: 'P1' }]
+      f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+      liveRoute.query = { by: 'priority', category: 'orders', statement: 'R2', finding: 'M9' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.get('[data-testid="audit-category-KNOWN"]').attributes('aria-current')).toBe('true')
+      expect(f.getAuditFinding).toHaveBeenLastCalledWith({ findingId: 'F-9' }, expect.anything())
+      w.unmount()
+    })
+
+    it('reads an old link naming a record type with no ?by= as Record type, whatever is remembered', async () => {
+      window.localStorage.setItem('darpan.audit.by', 'priority')
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.get('[data-testid="audit-by-type"]').attributes('aria-pressed')).toBe('true')
+      expect(w.get('[data-testid="audit-category-orders"]').attributes('aria-current')).toBe('true')
+      expect(window.localStorage.getItem('darpan.audit.by')).toBe('priority')
+      w.unmount()
+    })
+
+    it('leaves the board as it is when the active choice is clicked again', async () => {
+      liveRoute.query = { category: 'orders', statement: 'R2' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      await w.get('[data-testid="audit-by-type"]').trigger('click')
+      expect(replace).not.toHaveBeenCalled()
+      w.unmount()
+
+      // Chosen by the URL: clicking it remembers it, and the board stays.
+      window.localStorage.setItem('darpan.audit.by', 'type')
+      liveRoute.query = { by: 'priority', category: 'P1', statement: 'R2' }
+      const w2 = mount(AuditReportPage)
+      await flushPromises()
+      await w2.get('[data-testid="audit-by-priority"]').trigger('click')
+      expect(replace).not.toHaveBeenCalled()
+      expect(window.localStorage.getItem('darpan.audit.by')).toBe('priority')
+      w2.unmount()
+    })
+
+    it('names the level in a level\'s export', async () => {
+      const download = vi.mocked(downloadTextFile)
+      download.mockReset()
+      f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [unit('F-11', 'P0')] } as never)
+      liveRoute.query = { by: 'priority', category: 'P0', statement: 'R11' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      await w.get('[data-testid="audit-export-findings"]').trigger('click')
+      await flushPromises()
+      const [name, text] = download.mock.lastCall!
+      expect(name).toBe('month-close-2026-10-R11-P0-findings.json')
+      expect(JSON.parse(text)).toMatchObject({ audit: 'month-close', period: '2026-10', statement: 'R11', priority: 'P0' })
+      w.unmount()
+    })
+
+    it('marks each finding waiting on an order with its own level, and keeps the eyebrow\'s words apart', async () => {
+      const doc = priorityReport()
+      const m9 = doc.categories.orders!.statements.R2!.findings[2]!
+      m9.waiting = [{ statement: 'R4', id: 'F-40', headline: 'Order M9: line 2 not billed', cause: 'Not billed', item: 'SKU-2', priority: 'P0' }]
+      f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'M9' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      const waiting = w.get('[data-testid="audit-waiting"]')
+      expect(waiting.get('[data-testid="audit-mark"]').text()).toBe('P0')
+      expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).toMatch(/^Known R2/)
+      w.unmount()
+    })
   })
 })
