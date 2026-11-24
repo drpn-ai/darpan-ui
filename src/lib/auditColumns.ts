@@ -7,6 +7,7 @@ import type {
   AuditOrderLine,
   AuditProgress,
   AuditProgressRun,
+  AuditProgressStep,
   AuditReport,
   AuditStatement,
   AuditStatementCheck,
@@ -264,7 +265,7 @@ const STEP_COUNT = new Intl.NumberFormat('en-US')
  * DAR-UI-096. A run's steps (DAR-BE-173), in the order the run took them: a read named by its system ("Reading NetSuite",
  * "Read HotWax" once done), any other step by its stage. Empty when the run sends no steps, so the card keeps its one line.
  */
-export function progressSteps(run: AuditProgressRun): ProgressStepRow[] {
+export function progressSteps(run: AuditProgressRun, asOf?: string | number | null): ProgressStepRow[] {
   return (run.steps ?? []).map((step, i) => {
     const read = step.stage === 'EXTRACT_FILE1' || step.stage === 'EXTRACT_FILE2'
     const status = (step.status ?? '').toLowerCase()
@@ -272,9 +273,47 @@ export function progressSteps(run: AuditProgressRun): ProgressStepRow[] {
     const count = step.records == null ? '' : STEP_COUNT.format(step.records)
     const detail = status === 'failed' ? 'Failed'
       : status === 'done' ? [count, formatRunStepDuration(step.startedDate, step.completedDate)].filter(Boolean).join(' · ')
-        : count
+        : status === 'running' && read ? movingLine(step, asOf)
+          : count
     return { key: `${step.stage}-${i}`, label, status, detail }
   })
+}
+
+/** DAR-BE-350. A running read proves it moves: its count against yesterday's, when its last page landed, its rate. */
+function movingLine(step: AuditProgressStep, asOf?: string | number | null): string {
+  const records = step.records ?? null
+  const expected = step.expectedRecords ?? null
+  const count = records == null ? ''
+    : expected == null ? STEP_COUNT.format(records)
+      : records > expected ? `${STEP_COUNT.format(records)} · yesterday ${STEP_COUNT.format(expected)}`
+        : `${STEP_COUNT.format(records)} of ~${STEP_COUNT.format(expected)}`
+  const now = timeOf(asOf)
+  const moved = timeOf(step.movedDate)
+  const started = timeOf(step.startedDate)
+  const ago = now != null && moved != null ? `moved ${agoText(Math.max(0, now - moved))} ago` : ''
+  // A rate only beside "moved", and after a minute of reading, so a first page does not read as a burst.
+  const rate = records && now != null && moved != null && started != null && moved - started >= 60000
+    ? `${STEP_COUNT.format(Math.round(records / ((moved - started) / 60000)))}/min` : ''
+  return [count, ago, rate].filter(Boolean).join(' · ')
+}
+
+function timeOf(value?: string | number | null): number | null {
+  if (value == null || value === '') return null
+  const ms = typeof value === 'number' ? value : Date.parse(value)
+  return Number.isFinite(ms) ? ms : null
+}
+
+function agoText(ms: number): string {
+  return ms < 60000 ? `${Math.floor(ms / 1000)}s` : minutesText(ms)
+}
+
+/** DAR-BE-350. A peak period's limits on the tenant's reads, so a slow run says why; empty outside one. */
+export function peakLine(run: AuditProgressRun): string {
+  const parts = [
+    run.limits?.hotwaxSharePct != null ? `HotWax at ${run.limits.hotwaxSharePct}%` : '',
+    run.limits?.netsuiteSerial ? 'NetSuite one read at a time' : '',
+  ].filter(Boolean)
+  return parts.length ? `Peak period: ${parts.join(', ')}` : ''
 }
 
 /** DAR-UI-096. How long the run has been going, against its usual only when one is known; empty without a time. */

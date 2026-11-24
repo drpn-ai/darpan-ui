@@ -30,6 +30,7 @@ import {
   orderKey,
   progressLine,
   progressSteps,
+  peakLine,
   elapsedLine,
   statementFindings,
   sourceItems,
@@ -204,6 +205,38 @@ describe('auditColumns', () => {
       expect(elapsedLine({ ...progress.active[0]!, usualDurationMs: 10 * 60000 })).toBe('4m, usually 10m')
       expect(elapsedLine({ ...progress.active[0]!, usualDurationMs: null })).toBe('4m')
       expect(elapsedLine({ ...progress.active[0]!, elapsedMs: null })).toBe('')
+    })
+
+    // DAR-BE-350 (Aditi: "It says running, but after a long time. I want to make sure it is making progress").
+    it('shows a running read is moving: count against yesterday\'s, when it last moved, its rate', () => {
+      const at = (s: number) => Date.parse('2026-11-24T10:00:00Z') + s * 1000
+      const step = { stage: 'EXTRACT_FILE1', status: 'running', system: 'NetSuite', records: 171000 as number | null,
+        expectedRecords: 169014 as number | null, startedDate: at(-60 * 61), movedDate: at(-4) }
+      const reading = { ...progress.active[0]!, steps: [step] }
+      expect(progressSteps(reading, at(0))[0]!.detail).toBe('171,000 · yesterday 169,014 · moved 4s ago · 2,806/min')
+      const under = { ...reading, steps: [{ ...step, records: 120000 }] }
+      expect(progressSteps(under, at(0))[0]!.detail).toBe('120,000 of ~169,014 · moved 4s ago · 1,969/min')
+      // No history, first minute: count and movement only. No asOf (older backend): today's wording plus the estimate.
+      const fresh = { ...reading, steps: [{ ...step, records: 900, expectedRecords: null, startedDate: at(-30) }] }
+      expect(progressSteps(fresh, at(0))[0]!.detail).toBe('900 · moved 4s ago')
+      expect(progressSteps(reading)[0]!.detail).toBe('171,000 · yesterday 169,014')
+      // A read with no page yet.
+      expect(progressSteps({ ...reading, steps: [{ ...step, records: null }] }, at(0))[0]!.detail).toBe('moved 4s ago')
+      // Minutes once past a minute.
+      expect(progressSteps({ ...reading, steps: [{ ...step, movedDate: at(-125) }] }, at(0))[0]!.detail).toContain('moved 2m ago')
+      // A finished read keeps today's wording.
+      const done = { ...reading, steps: [{ ...step, status: 'done', completedDate: at(0) }] }
+      expect(progressSteps(done, at(0))[0]!.detail).toBe(progressSteps(done)[0]!.detail)
+      expect(progressSteps(done, at(0))[0]!.detail).not.toContain('moved')
+    })
+
+    it('names the peak period\'s read limits that apply, and nothing outside one', () => {
+      const run = progress.active[0]!
+      expect(peakLine({ ...run, limits: { hotwaxSharePct: 50, netsuiteSerial: true } })).toBe('Peak period: HotWax at 50%, NetSuite one read at a time')
+      expect(peakLine({ ...run, limits: { hotwaxSharePct: null, netsuiteSerial: true } })).toBe('Peak period: NetSuite one read at a time')
+      expect(peakLine({ ...run, limits: { hotwaxSharePct: 50, netsuiteSerial: false } })).toBe('Peak period: HotWax at 50%')
+      expect(peakLine({ ...run, limits: null })).toBe('')
+      expect(peakLine(run)).toBe('')
     })
   })
 

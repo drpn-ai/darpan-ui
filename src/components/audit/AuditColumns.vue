@@ -111,7 +111,7 @@
                   </div>
                   <ol class="audit-run-steps">
                     <li
-                      v-for="step in progressSteps(run)"
+                      v-for="step in progressSteps(run, progress?.asOf)"
                       :key="step.key"
                       class="audit-run-step"
                       :class="`audit-run-step--${step.status}`"
@@ -125,6 +125,8 @@
                 </template>
                 <span v-else-if="progressLine(run) !== runBadge(run).label" class="audit-row-sub">{{ progressLine(run) }}</span>
                 <p v-if="run.healthReason" class="section-note">{{ run.healthReason }}</p>
+                <!-- DAR-BE-350. A peak period slows reads on purpose: say so beside Slow. -->
+                <p v-if="peakLine(run)" class="section-note" data-testid="audit-run-peak">{{ peakLine(run) }}</p>
                 <span v-for="label in runCheckLabels(run)" :key="label" class="audit-row-sub">{{ label }}</span>
               </article>
             </template>
@@ -558,6 +560,7 @@ import {
   otherOrderLines,
   progressLine,
   progressSteps,
+  peakLine,
   elapsedLine,
   sourceItems,
   statementFindings,

@@ -4140,12 +4140,14 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /**
-             * @description {checks: configured checks, activeChecks, active: [{run,
+             * @description {checks: configured checks, asOf (server time of this answer), activeChecks, active: [{run,
              *                     checks: [check codes], state: running | queued, attempt, retryAt, stage, progressPercent, elapsedMs,
              *                     usualDurationMs (a past successful run over a window as long; absent when none), health: healthy | slow |
              *                     stuck, healthReason, steps: [{stage, status: running | done | failed, records (so far while running),
-             *                     startedDate, completedDate, system (extract steps: the system that side reads)}] in run order
-             *                     (DAR-BE-173)}]}
+             *                     startedDate, completedDate, movedDate (last write: a read's last page), system (extract steps: the system that
+             *                     side reads), expectedRecords (extract steps: the raw count of the same read on the last successful run)}] in run
+             *                     order (DAR-BE-173), limits ({hotwaxSharePct, netsuiteSerial} while a peak period limits the tenant's reads;
+             *                     DAR-BE-350)}]}
              */
             progress?: Record<string, never>;
         };

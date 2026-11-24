@@ -366,6 +366,8 @@ export interface AuditProgressRun {
   healthReason?: string | null
   /** DAR-BE-173. The run's steps in run order; both extracts run at once when the sides are read in parallel. */
   steps?: AuditProgressStep[] | null
+  /** DAR-BE-350. A peak period's limits on the tenant's reads; absent outside one. */
+  limits?: { hotwaxSharePct?: number | null; netsuiteSerial?: boolean } | null
 }
 
 /** DAR-BE-173. One step of a running run (AuditSettingsSupport.steps). */
@@ -380,10 +382,16 @@ export interface AuditProgressStep {
   completedDate?: string | number | null
   /** An extract's system, as its source is labelled; absent on other stages. */
   system?: string | null
+  /** DAR-BE-350. The step row's last write: for a running read, when its last page landed (server time). */
+  movedDate?: string | number | null
+  /** DAR-BE-350. A read's raw count on the same run's last success (pages read, not records kept); absent without one. */
+  expectedRecords?: number | null
 }
 
 export interface AuditProgress {
   checks: number
+  /** DAR-BE-350. Server time of the answer: "moved N ago" is asOf minus a step's movedDate, no client clock. */
+  asOf?: string | number | null
   activeChecks: number
   active: AuditProgressRun[]
 }
