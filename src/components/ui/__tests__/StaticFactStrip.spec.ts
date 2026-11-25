@@ -27,6 +27,25 @@ describe('StaticFactStrip', () => {
     expect(wrapper.get('[data-testid="f-email"]').find('.static-fact__sub').exists()).toBe(false)
   })
 
+  // DAR-UI-146. The strip sits in a frame that measures its own width; the container rule that turns it 2 x 2 applies
+  // by fact count (four or more at 34rem, three at 25.5rem). Two facts never wrap: each cell already has half the row.
+  it('marks which strips may go 2 x 2 in a narrow column, by how many facts they hold', () => {
+    const frameOf = (list: StaticFact[]) => {
+      const wrapper = mountStrip(list)
+      const strip = wrapper.get('[data-testid="strip"]')
+      expect(strip.element.parentElement?.classList.contains('static-fact-frame')).toBe(true)
+      return strip.classes()
+    }
+    expect(frameOf(facts)).toContain('static-fact-strip--many')
+    expect(frameOf([...facts, { key: 'five', label: 'Five', value: '5' }])).toContain('static-fact-strip--many')
+    const three = frameOf(facts.slice(0, 3))
+    expect(three).toContain('static-fact-strip--three')
+    expect(three).not.toContain('static-fact-strip--many')
+    const two = frameOf(facts.slice(0, 2))
+    expect(two).not.toContain('static-fact-strip--many')
+    expect(two).not.toContain('static-fact-strip--three')
+  })
+
   it('makes a changeable fact the button itself, with no Change text', async () => {
     const wrapper = mountStrip()
     const cell = wrapper.get('[data-testid="f-schedule"]')
