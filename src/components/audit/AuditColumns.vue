@@ -353,7 +353,7 @@
                    finding's lines, each by SKU with every system's word for it; an order-line finding lists its lines below. -->
                 <template v-if="recordLines.length && !orderUnit?.lines?.length">
                   <h3 class="micro-label">Lines <span class="audit-fold-count">{{ recordLines.length }}</span></h3>
-                  <ul class="audit-lines">
+                  <ul class="audit-lines audit-lines--grid">
                     <li v-for="line in recordLines" :key="line.key" class="audit-line" data-testid="audit-record-line">
                       <span>{{ line.label }}</span>
                       <span class="audit-row-sub">{{ line.statuses.map((said) => `${said.system} ${said.status}`).join(' · ') }}</span>
@@ -1274,6 +1274,17 @@ function statementText(id: string): string {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* DAR-BE-368 (browser look on prod, 2026-11-25): one grid for every row, so each line's SKU, statuses and quantity start
+   where the row above's do; a long SKU no longer pushes only its own row's statuses right. */
+.audit-lines--grid {
+  grid-template-columns: minmax(4rem, max-content) minmax(0, 1fr) max-content;
+}
+
+.audit-lines--grid > .audit-line {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
 }
 
 /* DAR-UI-075. One line of an order; the line holding the order up takes the solid border (attention). */
