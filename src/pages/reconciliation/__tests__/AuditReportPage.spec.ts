@@ -1166,6 +1166,32 @@ describe('AuditReportPage', () => {
     expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
   })
 
+  // DAR-UI-144 (review I2). The filters' read is cached on the morning, which an acknowledgement leaves as it was: it is read
+  // again, so the narrowed row reads Acknowledged.
+  it('reads the filters\' list again once a row is acknowledged, so the narrowed row says so', async () => {
+    const item = (acknowledgement: unknown) => ({
+      id: 'F-2', headline: 'Invoice INV2 has no Etail id', state: 'open', firstFound: '2026-10-08', ageDays: 0, difference: null, next: '',
+      audit: 'month-close', period: '2026-10', statement: 'R2', category: 'orders', cause: 'No Etail id', acknowledgement,
+      records: { NetSuite: { invoice: [{ id: 'INV2', internalId: null, status: null }] } } })
+    f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [item(null)] } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', q: 'inv2' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    await openCauses(w)
+    expect(w.findAll('[data-testid="audit-finding-row"]').map((row) => row.attributes('title'))).toEqual(['F-2'])
+    expect(w.find('[data-testid="audit-finding-ack"]').exists()).toBe(false)
+    const reads = f.getAuditFindingsByOrder.mock.calls.length
+
+    f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [item({
+      note: 'Refunded', by: { id: 'U1', label: 'Sam R.' }, at: '2026-10-08T09:00:00-07:00', remindOn: '2026-10-13', reminded: false })] } as never)
+    w.findComponent(AuditColumns).vm.$emit('acknowledged')
+    await flushPromises()
+    await openCauses(w)
+    expect(f.getAuditFindingsByOrder.mock.calls.length).toBe(reads + 1)
+    expect(w.get('[data-testid="audit-finding-row"]').text()).toContain('Acknowledged')
+    expect(w.get('[data-testid="audit-finding-ack"]').text()).toBe('Sam R. · Oct 8 · Refunded')
+  })
+
   // DAR-BE-292 (Aditi's permissions sheet): only editors and tenant admins talk to the agent, so no one else gets the tab.
   it('has no Agent tab for someone who cannot approve', async () => {
     vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: false })
@@ -1703,6 +1729,22 @@ describe('AuditReportPage', () => {
       expect(replace).not.toHaveBeenCalled()
       expect(window.localStorage.getItem('darpan.audit.by')).toBe('priority')
       w2.unmount()
+    })
+
+    // DAR-UI-144 (review I2). An order a level lookup found past the report's 50 is cached on the morning too: read again.
+    it('reads a level\'s order lookup again once a row is acknowledged', async () => {
+      const order = { ...unit('M77', 'P0'), kind: 'order', order: 'M77', lines: [{ ...unit('F-77', 'P0'), cause: 'Not billed', held: false }] }
+      f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [order] } as never)
+      liveRoute.query = { by: 'priority', category: 'P0', statement: 'R11', finding: 'M77' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.find('[data-testid="audit-finding-error"]').exists()).toBe(false)
+      const reads = f.getAuditFindingsByOrder.mock.calls.length
+      w.findComponent(AuditColumns).vm.$emit('acknowledged')
+      await flushPromises()
+      // One more read: the lookup, in place.
+      expect(f.getAuditFindingsByOrder.mock.calls.length - reads).toBe(1)
+      w.unmount()
     })
 
     it('names the level in a level\'s export', async () => {

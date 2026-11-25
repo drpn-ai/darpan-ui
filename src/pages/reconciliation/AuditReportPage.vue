@@ -143,7 +143,7 @@
         @verify="verifyFinding"
         @retry="retryCheck"
         @agent="setAgentTab"
-        @acknowledged="loadReport({ quiet: true })"
+        @acknowledged="void onAcknowledged()"
       >
         <!-- DAR-UI-108. The agent, in the Agent tab of the board's deepest column; DAR-UI-145: or beside it, on a wide window.
              The card is the open finding, pinned when the agent covers it. -->
@@ -690,9 +690,9 @@ function setFindingFilter(key: keyof FindingFilters, value: string): void {
   void router.replace({ query: { ...route.query, [key]: value || undefined, finding: undefined } })
 }
 
-async function loadPeriodFindings(): Promise<void> {
+async function loadPeriodFindings(options: { force?: boolean } = {}): Promise<void> {
   const key = periodKey.value
-  if (!report.value || !key || periodFindings.value?.key === key || periodLoading === key) return
+  if (!report.value || !key || (!options.force && periodFindings.value?.key === key) || periodLoading === key) return
   const period = report.value.report.period
   periodLoading = key
   periodError.value = ''
@@ -709,6 +709,19 @@ async function loadPeriodFindings(): Promise<void> {
 }
 
 watch([() => hasFindingFilters(findingFilters.value), periodKey], ([on]) => { if (on) void loadPeriodFindings() }, { immediate: true })
+
+// DAR-UI-144. An acknowledgement saved or reopened moves its row between Open and Acknowledged without changing the
+// morning, so the two lists cached on it (the filters' read, a level's orders past the report's 50) are dropped and the one
+// on show read again, in place, after the quiet reload.
+async function onAcknowledged(): Promise<void> {
+  const period = periodFindings.value?.key === periodKey.value ? periodFindings.value : null
+  const lookup = orderLookup.value?.key === `${periodKey.value}|${selectedStatement.value}` ? orderLookup.value : null
+  periodFindings.value = period
+  orderLookup.value = lookup
+  await loadReport({ quiet: true })
+  if (period) void loadPeriodFindings({ force: true })
+  if (lookup) void lookUpOrders({ force: true })
+}
 
 // DAR-UI-072. JSON exports: the morning's report and the open finding as the page holds them; a statement's findings
 // read every page (the report lists 50), each named with its order.
@@ -869,10 +882,10 @@ watch([findingId, report, selectedStatement], async () => {
   if (findingId.value === id && !orderUnit.value && !failed) findingError.value = `Finding ${id} has gone missing. We checked under every row.`
 }, { immediate: true })
 
-async function lookUpOrders(): Promise<void> {
+async function lookUpOrders(options: { force?: boolean } = {}): Promise<void> {
   const statement = selectedStatement.value
   const key = `${periodKey.value}|${statement}`
-  if (!report.value || !statement || orderLookup.value?.key === key) return
+  if (!report.value || !statement || (!options.force && orderLookup.value?.key === key)) return
   try {
     const response = await auditFacade.getAuditFindingsByOrder(
       { audit: auditCode.value, statement, period: report.value.report.period, ...pillState.value }, abort.signal)

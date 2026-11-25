@@ -315,12 +315,12 @@
                   <span class="audit-col-head-end">
                     <span class="audit-row-sub">{{ sinceLine }}</span>
                     <!-- DAR-UI-144. Acknowledge the row with a note: an open one with none, or one its reminder brought back. -->
-                    <span v-if="canAcknowledge" class="audit-ack-anchor">
-                      <button type="button" class="app-icon-action" aria-label="Acknowledge" title="Acknowledge" data-testid="audit-acknowledge" :aria-expanded="ackEditing === 'new' ? 'true' : 'false'" @click="toggleAck('new')">
+                    <span v-if="canAcknowledge" class="audit-ack-anchor" @keydown.esc="closeAck">
+                      <button ref="ackButton" type="button" class="app-icon-action" aria-label="Acknowledge" title="Acknowledge" data-testid="audit-acknowledge" aria-haspopup="dialog" :aria-expanded="ackEditing === 'new' ? 'true' : 'false'" @click="toggleAck('new')">
                         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="acknowledgeIconPath" /></svg>
                       </button>
                       <Transition name="audit-ack-pop">
-                        <AuditAcknowledgePopover v-if="ackEditing === 'new'" :finding-id="ackTarget" :initial="null" :remind-days="remindDays" @saved="onAckSaved" @close="ackEditing = null" />
+                        <AuditAcknowledgePopover v-if="ackEditing === 'new'" :finding-id="ackTarget" :initial="null" :remind-days="remindDays" @saved="onAckSaved" @close="closeAck" />
                       </Transition>
                     </span>
                     <!-- DAR-BE-123. Re-checks this finding's record now; it closes if the problem is gone. -->
@@ -338,12 +338,12 @@
                   <div class="audit-detail-head">
                     <span class="audit-row-sub">{{ ackCardLine }}</span>
                     <span class="audit-col-head-end">
-                      <span class="audit-ack-anchor">
-                        <button type="button" class="app-icon-action" aria-label="Edit acknowledgement" title="Edit acknowledgement" data-testid="audit-ack-edit" :aria-expanded="ackEditing === 'edit' ? 'true' : 'false'" @click="toggleAck('edit')">
+                      <span class="audit-ack-anchor" @keydown.esc="closeAck">
+                        <button ref="ackEditButton" type="button" class="app-icon-action" aria-label="Edit acknowledgement" title="Edit acknowledgement" data-testid="audit-ack-edit" aria-haspopup="dialog" :aria-expanded="ackEditing === 'edit' ? 'true' : 'false'" @click="toggleAck('edit')">
                           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="editIconPath" fill="currentColor" /></svg>
                         </button>
                         <Transition name="audit-ack-pop">
-                          <AuditAcknowledgePopover v-if="ackEditing === 'edit'" :finding-id="ackTarget" :initial="acknowledgement" :remind-days="remindDays" @saved="onAckSaved" @close="ackEditing = null" />
+                          <AuditAcknowledgePopover v-if="ackEditing === 'edit'" :finding-id="ackTarget" :initial="acknowledgement" :remind-days="remindDays" @saved="onAckSaved" @close="closeAck" />
                         </Transition>
                       </span>
                       <button v-if="!acknowledgement.reminded" type="button" class="audit-more" data-testid="audit-ack-reopen" :disabled="reopening" @click="reopenAck">Reopen</button>
@@ -588,7 +588,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import AuditAcknowledgePopover from './AuditAcknowledgePopover.vue'
 import type { AgentFindingCard } from './AuditAgentPanel.vue'
@@ -967,13 +967,15 @@ const stuckOn = computed(() => {
     .join('; ')
 })
 
-// DAR-UI-144. The row's acknowledgement: an order's from its row (null there when a line broke after it), else the
-// finding's. What was just saved or reopened shows at once, until the reload brings a different word.
+// DAR-UI-144. The row's acknowledgement: the finding's once it is read (the backend resolves it for the whole row, and a
+// line that broke after it gives null; it is read again on every quiet reload), else its list row's while it loads. The
+// lists can be cached copies from before the acknowledgement. What was just saved or reopened shows at once, until the
+// reload brings a different word.
 const ackTarget = computed(() => props.findingDoc?.finding.id ?? props.finding)
 const sourceAck = computed<AuditAcknowledgement | null>(() => {
-  const unit = props.orderUnit?.acknowledgement
-  if (props.orderUnit && unit !== undefined) return unit
-  return props.findingDoc?.finding.acknowledgement ?? null
+  const read = props.findingDoc?.finding.acknowledgement
+  if (read !== undefined) return read
+  return props.orderUnit?.acknowledgement ?? null
 })
 const ackOverride = ref<{ id: string; acknowledgement: AuditAcknowledgement | null } | null>(null)
 const acknowledgement = computed(() =>
@@ -1016,10 +1018,26 @@ function ackRowLine(ack: AuditAcknowledgement): string {
 function toggleAck(kind: 'new' | 'edit'): void {
   ackEditing.value = ackEditing.value === kind ? null : kind
 }
+// Focus never falls to the page: a closed popover hands it back to its trigger (unless a press outside sent it elsewhere),
+// a save to the pencil (the Acknowledge icon is gone), a reopen to the Acknowledge icon (the pencil is gone).
+const ackButton = ref<HTMLButtonElement | null>(null)
+const ackEditButton = ref<HTMLButtonElement | null>(null)
+function closeAck(): void {
+  const trigger = ackEditing.value === 'edit' ? ackEditButton : ackButton
+  ackEditing.value = null
+  void nextTick(() => {
+    const active = document.activeElement
+    if (!active || active === document.body || trigger.value?.parentElement?.contains(active)) trigger.value?.focus()
+  })
+}
+function focusAfterRender(target: typeof ackButton): void {
+  void nextTick(() => target.value?.focus())
+}
 function onAckSaved(ack: AuditAcknowledgement): void {
   ackOverride.value = { id: ackTarget.value, acknowledgement: ack }
   ackEditing.value = null
   emit('acknowledged')
+  focusAfterRender(ackEditButton)
 }
 async function reopenAck(): Promise<void> {
   const id = ackTarget.value
@@ -1034,6 +1052,7 @@ async function reopenAck(): Promise<void> {
     ackOverride.value = { id, acknowledgement: null }
     ackEditing.value = null
     emit('acknowledged')
+    focusAfterRender(ackButton)
   } catch (err) {
     reopenError.value = err instanceof Error && err.message ? err.message : 'Reopen did not go through. Try again.'
   } finally {

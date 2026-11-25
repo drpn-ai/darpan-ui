@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach } from 'vitest'
 import type { AuditAcknowledgement, AuditFindingDocument, AuditReport } from '../../../lib/api/auditTypes'
 import { emptyFindingsMore } from '../../../lib/auditColumns'
 
@@ -15,6 +16,9 @@ vi.mock('../../../lib/api/facade', () => ({
 }))
 
 import AuditColumns from '../AuditColumns.vue'
+
+// Attached to the document so focus is real; each test's mount is removed after it.
+enableAutoUnmount(afterEach)
 
 const ACK: AuditAcknowledgement = {
   note: 'Refunded in Shopify\nNetSuite catches up on the 12th',
@@ -79,12 +83,13 @@ function doc(acknowledgement: AuditAcknowledgement | null, state = 'open'): Audi
   } as unknown as AuditFindingDocument
 }
 
-function mountColumns(acknowledgement: AuditAcknowledgement | null, state = 'open', remindDays?: number) {
+function mountColumns(acknowledgement: AuditAcknowledgement | null, state = 'open', remindDays?: number, extra: Record<string, unknown> = {}) {
   return mount(AuditColumns, {
+    attachTo: document.body,
     props: {
       report: report(acknowledgement, state, remindDays), category: 'orders', statement: 'R2', finding: 'F-1', source: '', filter: 'all',
       level: 4, findingDoc: doc(acknowledgement, state), findingLoading: false, findingError: '', more: emptyFindingsMore(),
-      exporting: false, verifying: false,
+      exporting: false, verifying: false, ...extra,
     },
   })
 }
@@ -168,6 +173,54 @@ describe('AuditColumns acknowledgement', () => {
     const row = w.get('[data-testid="audit-finding-row"]')
     expect(row.text()).toContain('Acknowledged')
     expect(row.get('[data-testid="audit-finding-ack"]').text()).toBe('Sam R. · Oct 3 · Refunded in Shopify')
+  })
+
+  // Review I1. Focus never falls to the page: Esc hands it back to the trigger, a save to the pencil, a reopen to the icon.
+  it('hands focus back to the trigger on Esc, to the pencil after a save and to the icon after a reopen', async () => {
+    acknowledgeFinding.mockResolvedValue({ ok: true, acknowledgement: ACK })
+    reopenAcknowledgement.mockResolvedValue({ ok: true })
+    const w = mountColumns(null)
+    await w.get(ICON).trigger('click')
+    expect(document.activeElement).toBe(w.get('[data-testid="audit-ack-note-input"]').element)
+    await w.get('[data-testid="audit-ack-popover"]').trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+    expect(w.find('[data-testid="audit-ack-popover"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(w.get(ICON).element)
+
+    await w.get(ICON).trigger('click')
+    await w.get('[data-testid="audit-ack-note-input"]').setValue('Refunded')
+    await w.get('[data-testid="audit-ack-popover"] form').trigger('submit')
+    await flushPromises()
+    expect(document.activeElement).toBe(w.get(PENCIL).element)
+
+    await w.get(PENCIL).trigger('click')
+    await w.get('[data-testid="audit-ack-popover"]').trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+    expect(document.activeElement).toBe(w.get(PENCIL).element)
+
+    await w.get('[data-testid="audit-ack-reopen"]').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(w.get(ICON).element)
+  })
+
+  it('closes on a press outside without pulling focus back from where it went', async () => {
+    const w = mountColumns(null)
+    await w.get(ICON).trigger('click')
+    const outside = w.get('[data-testid="audit-export-finding"]').element as HTMLButtonElement
+    outside.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    outside.focus()
+    await flushPromises()
+    expect(w.find('[data-testid="audit-ack-popover"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(outside)
+  })
+
+  // Review I2. The finding's own read wins over its list row, which can be a cached copy from before the acknowledgement.
+  it('reads the acknowledgement from the finding once it is read, not from a stale list row', () => {
+    const staleRow = { id: 'M1', kind: 'order', order: 'M1', headline: 'Order M1', state: 'open', acknowledgement: null, lines: [] }
+    const w = mountColumns(ACK, 'open', undefined, { orderUnit: staleRow })
+    expect(w.get('.audit-col--detail .status-badge').text()).toBe('Acknowledged')
+    expect(w.find(ICON).exists()).toBe(false)
+    expect(w.get('[data-testid="audit-ack-card"]').text()).toContain('Sam R.')
   })
 
   it('shows a refused reopen beside the note', async () => {
