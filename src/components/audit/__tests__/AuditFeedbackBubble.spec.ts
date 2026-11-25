@@ -67,7 +67,7 @@ describe('AuditFeedbackBubble', () => {
   })
 
   it('keeps Send disabled while blank, then sends, prepends the note and bumps the badge', async () => {
-    sendFindingFeedback.mockResolvedValue({ ok: true, feedback: { recentCount: 3 } })
+    sendFindingFeedback.mockResolvedValue({ ok: true, feedback: { feedbackId: 'N3', note: 'Looks wrong', sentAt: '2026-11-25T10:00:00Z', by: { id: 'U3', label: 'Me T.' } } })
     const w = mountBubble()
     await w.get('[data-testid="audit-feedback"]').trigger('click')
     await flushPromises()
@@ -84,6 +84,8 @@ describe('AuditFeedbackBubble', () => {
     expect(items).toHaveLength(3)
     expect(items[0]!.text()).toContain('Looks wrong')
     expect(items[0]!.text()).toContain('#1003')
+    expect(items[0]!.text()).toContain('Me T.')
+    expect(items[0]!.text()).toContain('Nov 25')
     expect(w.get('[data-testid="audit-feedback-badge"]').text()).toBe('3')
     expect((w.get('[data-testid="audit-feedback-input"]').element as HTMLTextAreaElement).value).toBe('')
   })

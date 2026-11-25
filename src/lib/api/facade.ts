@@ -777,7 +777,7 @@ export const auditFacade = {
   reopenAcknowledgement(findingId: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[] }> {
     return callService(AUDIT.reopenAcknowledgement, { findingId }, signal)
   },
-  sendFindingFeedback(findingId: string, note: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; feedback?: { recentCount: number } }> {
+  sendFindingFeedback(findingId: string, note: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; feedback?: Omit<AuditFeedbackNote, 'record'> }> {
     return callService(AUDIT.sendFindingFeedback, { findingId, note }, signal)
   },
   getFindingFeedback(findingId: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; notes: AuditFeedbackNote[]; shownDays: number }> {

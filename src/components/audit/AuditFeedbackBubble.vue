@@ -71,6 +71,9 @@ const shownCount = computed(() => sentCount.value ?? props.count)
 const triggerLabel = computed(() => shownCount.value > 0 ? `Feedback, ${shownCount.value} recent ${shownCount.value === 1 ? 'note' : 'notes'}` : 'Feedback')
 const heading = computed(() => `Sent in the last ${shownDays.value === 14 ? '2 weeks' : `${shownDays.value} ${shownDays.value === 1 ? 'day' : 'days'}`} on this statement and cause`)
 
+// A fresh count from a reload wins over the local bump.
+watch(() => props.count, () => { sentCount.value = null })
+
 // A new finding starts over.
 watch(() => props.findingId, () => {
   open.value = false
@@ -135,15 +138,13 @@ async function send(): Promise<void> {
       error.value = response.errors?.[0] || 'The note did not send. Try again.'
       return
     }
-    const sent: AuditFeedbackNote = {
-      feedbackId: `sent-${Date.now()}`,
-      note: text,
-      sentAt: new Date().toISOString(),
-      by: { id: '', label: 'You' },
-      record: props.recordLabel,
+    const back = response.feedback
+    if (!back) {
+      error.value = response.errors?.[0] || 'The note did not send. Try again.'
+      return
     }
-    notes.value = [sent, ...notes.value]
-    sentCount.value = response.feedback?.recentCount ?? shownCount.value + 1
+    notes.value = [{ ...back, record: props.recordLabel }, ...notes.value]
+    sentCount.value = shownCount.value + 1
     draft.value = ''
   } catch (err) {
     // The service's own words: a note with '<' ("HTML not allowed") or over 4,000 characters.
