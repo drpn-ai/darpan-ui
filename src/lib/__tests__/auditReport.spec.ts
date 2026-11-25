@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { basicFacts, checkStatusBadge, eventLabel, findingStateBadge, heldChain, orderNameOf, periodOptions, recordDetails, recordKind, typeDetails, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemCards, systemLabel } from '../auditReport'
+import { basicFacts, checkStatusBadge, eventLabel, findingStateBadge, heldChain, orderLineRows, orderNameOf, periodOptions, recordDetails, recordKind, typeDetails, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemCards, systemLabel } from '../auditReport'
 
 // DAR-UI-058. The audit view's words for the report JSON's codes, and rows for its keyed objects.
 describe('auditReport', () => {
@@ -245,5 +245,23 @@ describe('auditReport', () => {
   it('says a history code in words', () => {
     expect(eventLabel('stillOpen')).toBe('Still open')
     expect(eventLabel('found')).toBe('Found')
+  })
+
+  // DAR-BE-368: an order finding's lines, a Shopify line and the HotWax item keeping its id as one row, by SKU.
+  it("pairs each Shopify line with the HotWax item that keeps its id, labelled by SKU, each system's status in order", () => {
+    const rows = recordRows({
+      Shopify: { order: [{ id: '19007848448310', internalId: null, status: 'Unfulfilled', lines: [
+        { id: '71', sku: 'SKU-A', name: 'Anorak', quantity: 2, status: 'Unfulfilled' },
+        { id: '72', sku: null, name: 'Gift card', quantity: 1, status: 'Fulfilled' }] }] },
+      OMS: { order: [{ id: '#9281CAN', internalId: '167426', status: 'Completed', lines: [
+        { id: '71', sku: 'SKU-A', name: null, quantity: 2, status: 'Completed' },
+        { id: '00103', sku: 'SKU-C', name: null, quantity: 1, status: 'Cancelled' }] }] },
+    })
+    expect(orderLineRows(rows)).toEqual([
+      { key: '71', label: 'SKU-A', quantity: '2', statuses: [{ system: 'Shopify', status: 'Unfulfilled' }, { system: 'HotWax', status: 'Completed' }] },
+      { key: '72', label: 'Gift card', quantity: '1', statuses: [{ system: 'Shopify', status: 'Fulfilled' }] },
+      { key: '00103', label: 'SKU-C', quantity: '1', statuses: [{ system: 'HotWax', status: 'Cancelled' }] },
+    ])
+    expect(orderLineRows(recordRows({ OMS: { order: [{ id: 'M1', internalId: null, status: null }] } }))).toEqual([])
   })
 })

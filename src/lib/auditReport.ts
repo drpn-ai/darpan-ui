@@ -1,4 +1,4 @@
-import type { AuditCheckStatus, AuditFindingState, AuditMoney, AuditRecords, AuditSourceRead } from './api/auditTypes'
+import type { AuditCheckStatus, AuditFindingState, AuditMoney, AuditRecordLine, AuditRecords, AuditSourceRead } from './api/auditTypes'
 import type { StaticFact } from '../components/ui/StaticFactStrip.vue'
 
 // DAR-UI-058. What the audit view derives from the report JSON: words and tones for its codes, rows for its keyed
@@ -85,6 +85,7 @@ export interface RecordRow {
   deposits: { id: string; amount: string; status: string }[]
   heldBy: { id: string; status: string } | null
   exchange: { id: string; netsuiteId: string } | null
+  lines: AuditRecordLine[]
 }
 
 /** DAR-UI-071. A record by its system; its type too only when another record shares the system. */
@@ -254,6 +255,33 @@ export function typeDetails(rows: RecordRow[]): RecordFact[] {
   return recordDetails(rows).filter((fact) => !BASIC_LABELS.includes(fact.label))
 }
 
+/** DAR-BE-368. One line of the order across its systems: what it is, how many, and each system's word for it. */
+export interface OrderLineRow {
+  key: string
+  label: string
+  quantity: string
+  statuses: { system: string; status: string }[]
+}
+
+/**
+ * DAR-BE-368 (Aditi: "include the line item details, expecially the SKU", "show both shopify and HW"). The order's lines
+ * from every record that carries them, one row per line: a Shopify line and the HotWax item that keeps its id pair into
+ * one, labelled by SKU (else its name, else its id), each system's status in record order.
+ */
+export function orderLineRows(rows: RecordRow[]): OrderLineRow[] {
+  const byKey = new Map<string, OrderLineRow & { sku: string; name: string }>()
+  rows.forEach((row) => row.lines.forEach((line, index) => {
+    const key = line.id ?? `${row.key}#${index}`
+    const at = byKey.get(key) ?? { key, label: '', quantity: '', statuses: [], sku: '', name: '' }
+    at.sku ||= line.sku ?? ''
+    at.name ||= line.name ?? ''
+    at.quantity ||= line.quantity == null ? '' : String(line.quantity)
+    if (line.status) at.statuses.push({ system: row.system, status: line.status })
+    byKey.set(key, at)
+  }))
+  return [...byKey.values()].map(({ sku, name, ...line }) => ({ ...line, label: sku || name || line.key }))
+}
+
 export interface ChainStep {
   key: string
   label: string
@@ -326,6 +354,7 @@ export function recordRows(records: AuditRecords | null | undefined): RecordRow[
           deposits: (record.deposits ?? []).map((d) => ({ id: d.id, amount: d.amount ?? '', status: d.status ?? '' })),
           heldBy: record.heldBy ? { id: record.heldBy.id, status: record.heldBy.status ?? '' } : null,
           exchange: record.exchange ? { id: record.exchange.id, netsuiteId: record.exchange.netsuiteId ?? '' } : null,
+          lines: record.lines ?? [],
         })
       })
     })

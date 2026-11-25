@@ -47,7 +47,16 @@ export interface AuditRecord {
   /** DAR-UI-081. A return held behind another: the return holding it, and its exchange order (netsuiteId null: not there). */
   heldBy?: { id: string; status: string | null }
   exchange?: { id: string; netsuiteId: string | null }
+  /** DAR-BE-368. An order's lines as its read gave them; id is the Shopify line id on both Shopify and HotWax. */
+  lines?: AuditRecordLine[]
   data?: Record<string, unknown>
+}
+export interface AuditRecordLine {
+  id: string | null
+  sku: string | null
+  name: string | null
+  quantity: number | string | null
+  status: string | null
 }
 export type AuditRecords = Record<string, Record<string, AuditRecord[]>>
 

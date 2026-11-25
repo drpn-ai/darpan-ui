@@ -349,6 +349,19 @@
                   </div>
                 </dl>
 
+                <!-- DAR-BE-368 (Aditi: "include the line item details, expecially the SKU", "show both shopify and HW"). An order
+                   finding's lines, each by SKU with every system's word for it; an order-line finding lists its lines below. -->
+                <template v-if="recordLines.length && !orderUnit?.lines?.length">
+                  <h3 class="micro-label">Lines <span class="audit-fold-count">{{ recordLines.length }}</span></h3>
+                  <ul class="audit-lines">
+                    <li v-for="line in recordLines" :key="line.key" class="audit-line" data-testid="audit-record-line">
+                      <span>{{ line.label }}</span>
+                      <span class="audit-row-sub">{{ line.statuses.map((said) => `${said.system} ${said.status}`).join(' · ') }}</span>
+                      <span class="audit-row-sub">{{ line.quantity ? `× ${line.quantity}` : '' }}</span>
+                    </li>
+                  </ul>
+                </template>
+
                 <p v-if="whyLine && !findingDoc.finding.fix.action" class="audit-body audit-muted">{{ whyLine }}</p>
 
                 <div v-if="stuckOn || findingDoc.finding.fix.action" class="audit-verdict" data-testid="audit-finding-verdict">
@@ -579,6 +592,7 @@ import {
   systemCards,
   systemLabel,
   typeDetails,
+  orderLineRows,
 } from '../../lib/auditReport'
 import {
   HEALTH,
@@ -872,6 +886,8 @@ const lead = computed(() => {
 const cards = computed(() => systemCards(records.value, fixWhere.value))
 const chain = computed(() => heldChain(records.value))
 const details = computed(() => typeDetails(records.value))
+// DAR-BE-368. The order's lines across its systems, from the records that carry them.
+const recordLines = computed(() => orderLineRows(records.value))
 // DAR-UI-139. The systems the finding's check compared this morning (the report's keys, in read order), so a system that
 // holds no record of it still has its cell.
 const comparedSystems = computed(() => {

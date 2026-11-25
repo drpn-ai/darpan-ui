@@ -1202,6 +1202,28 @@ describe('AuditReportPage', () => {
     expect(replace).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-1', tab: undefined } })
   })
 
+  // DAR-BE-368 (Aditi: "include the line item details, expecially the SKU", "show both shopify and HW").
+  it("lists an order finding's lines by SKU with each system's word for them, and no Lines when the records carry none", async () => {
+    const withLines = { ...findingDocument, finding: { ...findingDocument.finding, records: {
+      Shopify: { order: [{ id: '19007848448310', internalId: null, status: 'Unfulfilled', lines: [{ id: '71', sku: 'SKU-A', name: 'Anorak', quantity: 2, status: 'Unfulfilled' }] }] },
+      OMS: { order: [{ id: '#9281CAN', internalId: '167426', status: 'Completed', lines: [{ id: '71', sku: 'SKU-A', name: null, quantity: 2, status: 'Completed' }] }] },
+    } } }
+    f.getAuditFinding.mockResolvedValue({ ok: true, finding: withLines } as never)
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    const lines = w.findAll('[data-testid="audit-record-line"]')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]!.text()).toContain('SKU-A')
+    expect(lines[0]!.text()).toContain('Shopify Unfulfilled · HotWax Completed')
+    expect(lines[0]!.text()).toContain('× 2')
+
+    f.getAuditFinding.mockResolvedValue({ ok: true, finding: findingDocument } as never)
+    const plain = mount(AuditReportPage)
+    await flushPromises()
+    expect(plain.find('[data-testid="audit-record-line"]').exists()).toBe(false)
+  })
+
   // DAR-UI-145 (Aditi: "i like B"): a wide window keeps the finding in view with the agent in its own column beside it.
   it('on a wide window, opens the agent beside the finding: both in view, statements railed, one switch', async () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
