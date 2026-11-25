@@ -1195,8 +1195,44 @@ describe('AuditReportPage', () => {
     expect(open.get('[data-testid="audit-tab-agent"]').attributes('aria-selected')).toBe('true')
     expect(open.get('[data-testid="audit-agent-slot"]').isVisible()).toBe(true)
     expect(open.find('[data-testid="audit-finding-headline"]').exists()).toBe(false)
+    // DAR-UI-145: the tab covers the finding, so the panel pins it.
+    expect(open.getComponent(AuditAgentPanel).props('card')).toMatchObject({ findingId: 'F-1' })
+    expect(open.find('[data-testid="agent-finding-card"]').exists()).toBe(true)
     await open.get('[data-testid="audit-tab-detail"]').trigger('click')
     expect(replace).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-1', tab: undefined } })
+  })
+
+  // DAR-UI-145 (Aditi: "i like B"): a wide window keeps the finding in view with the agent in its own column beside it.
+  it('on a wide window, opens the agent beside the finding: both in view, statements railed, one switch', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+    try {
+      vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: true })
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1', tab: 'agent' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+
+      expect(w.find('[data-testid="audit-tab-agent"]').exists()).toBe(false)
+      expect(w.get('[data-testid="audit-agent-toggle"]').attributes('aria-pressed')).toBe('true')
+      expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
+      expect(w.get('[data-testid="audit-agent-column"]').isVisible()).toBe(true)
+      expect(w.findAllComponents(AuditAgentPanel)).toHaveLength(1)
+      expect(w.getComponent(AuditAgentPanel).props('card')).toBeNull()
+      expect(w.get('[data-testid="audit-columns"]').classes()).toContain('audit-columns--agent')
+      const r2 = w.findAll('[data-testid="audit-statement-row-orders"]').find((row) => row.text().startsWith('R2'))
+      expect(r2?.attributes('aria-label')).toMatch(/^R2, /)
+
+      await w.get('[data-testid="audit-agent-toggle"]').trigger('click')
+      expect(replace).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-1', tab: undefined } })
+
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const shut = mount(AuditReportPage)
+      await flushPromises()
+      expect(shut.get('[data-testid="audit-agent-column"]').isVisible()).toBe(false)
+      expect(shut.get('[data-testid="audit-columns"]').classes()).not.toContain('audit-columns--agent')
+      expect(shut.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   // DAR-UI-109: a waiting draft is marked on the board before anyone approves it.

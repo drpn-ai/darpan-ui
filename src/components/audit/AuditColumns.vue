@@ -1,5 +1,5 @@
 <template>
-  <div class="audit-columns" :class="{ 'audit-columns--rail': rail, 'audit-columns--health': isHealth, 'audit-columns--health-flat': healthFlat }" :data-level="level" data-testid="audit-columns">
+  <div class="audit-columns" :class="{ 'audit-columns--rail': rail, 'audit-columns--health': isHealth, 'audit-columns--health-flat': healthFlat, 'audit-columns--agent': agentBeside }" :data-level="level" data-testid="audit-columns">
     <nav class="audit-path" aria-label="Path">
       <button type="button" class="audit-path-step" data-testid="audit-path-top" @click="emit('navigate', { category: undefined, statement: undefined, finding: undefined, source: undefined })">
         {{ report.report.audit.name }}
@@ -91,11 +91,15 @@
 
         <section class="audit-col audit-col--3 audit-col--detail" aria-label="Detail" data-testid="audit-source-detail">
           <!-- DAR-UI-108. The deepest column's own content and the agent, one tab each, only when the agent is on. -->
-          <div v-if="agent" class="audit-detail-tabs" role="tablist" aria-label="Show" data-testid="audit-detail-tabs">
+          <div v-if="agent && !wide" class="audit-detail-tabs" role="tablist" aria-label="Show" data-testid="audit-detail-tabs">
             <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'false' : 'true'" data-testid="audit-tab-detail" @click="emit('agent', false)">{{ detailTabLabel }}</button>
             <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'true' : 'false'" data-testid="audit-tab-agent" @click="emit('agent', true)">Agent</button>
           </div>
-          <div v-if="agent" v-show="agentShown" class="audit-agent-slot" data-testid="audit-agent-slot"><slot name="agent" /></div>
+          <!-- DAR-UI-145. Wide: the agent opens in its own column beside this one, so one switch, not two tabs. -->
+          <div v-if="agent && wide" class="audit-detail-tabs">
+            <button type="button" class="audit-detail-tab" :aria-pressed="agentOpen ? 'true' : 'false'" data-testid="audit-agent-toggle" @click="emit('agent', !agentOpen)">Agent</button>
+          </div>
+          <div v-if="agent && !wide" v-show="agentShown" class="audit-agent-slot" data-testid="audit-agent-slot"><slot name="agent" :card="null" /></div>
           <template v-if="!agentShown">
             <!-- DAR-UI-085. A play in progress: each run, the checks it feeds, where it is and whether it looks right. -->
             <template v-if="source === SOURCE_RUNNING && progress">
@@ -217,6 +221,8 @@
             class="audit-row audit-row--statement"
             :class="{ 'audit-row--picked': item.id === statement, 'audit-row--quiet': item.tone === 'clean' || item.tone === 'notChecked' }"
             :aria-current="item.id === statement ? 'true' : undefined"
+            :aria-label="agentBeside ? `${item.id}, ${item.text}, ${item.badge}` : undefined"
+            :title="agentBeside ? item.text : undefined"
             :data-testid="`audit-statement-row-${category}`"
             @click="emit('navigate', { category, statement: item.id, finding: undefined })"
           >
@@ -288,11 +294,15 @@
         <section class="audit-col audit-col--4 audit-col--detail" aria-label="Detail">
           <!-- The deepest pick: the finding when one is open, else the statement and what checked it. -->
           <!-- DAR-UI-108. Its own content and the agent, one tab each, only when the agent is on. -->
-          <div v-if="agent" class="audit-detail-tabs" role="tablist" aria-label="Show" data-testid="audit-detail-tabs">
+          <div v-if="agent && !wide" class="audit-detail-tabs" role="tablist" aria-label="Show" data-testid="audit-detail-tabs">
             <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'false' : 'true'" data-testid="audit-tab-detail" @click="emit('agent', false)">{{ detailTabLabel }}</button>
             <button type="button" role="tab" class="audit-detail-tab" :aria-selected="agentShown ? 'true' : 'false'" data-testid="audit-tab-agent" @click="emit('agent', true)">Agent</button>
           </div>
-          <div v-if="agent" v-show="agentShown" class="audit-agent-slot" data-testid="audit-agent-slot"><slot name="agent" /></div>
+          <!-- DAR-UI-145. Wide: the agent opens in its own column beside this one, so one switch, not two tabs. -->
+          <div v-if="agent && wide" class="audit-detail-tabs">
+            <button type="button" class="audit-detail-tab" :aria-pressed="agentOpen ? 'true' : 'false'" data-testid="audit-agent-toggle" @click="emit('agent', !agentOpen)">Agent</button>
+          </div>
+          <div v-if="agent && !wide" v-show="agentShown" class="audit-agent-slot" data-testid="audit-agent-slot"><slot name="agent" :card="agentCard" /></div>
           <template v-if="!agentShown">
             <template v-if="finding">
               <p v-if="findingLoading" class="section-note">Loading finding...</p>
@@ -524,13 +534,19 @@
           </template>
         </section>
       </template>
+
+      <!-- DAR-UI-145. Wide: the agent beside the detail. Hidden, not removed, when switched off, so the thread stays. -->
+      <section v-if="agent && wide" v-show="agentOpen" class="audit-col audit-col--detail audit-col--agent" aria-label="Agent" data-testid="audit-agent-column">
+        <div class="audit-agent-slot" data-testid="audit-agent-slot"><slot name="agent" :card="null" /></div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
+import type { AgentFindingCard } from './AuditAgentPanel.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import StaticFactStrip from '../ui/StaticFactStrip.vue'
 import { downloadIconPath, resolveIconPath } from '../../lib/iconPaths'
@@ -644,13 +660,24 @@ const props = defineProps<{
 
 const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; by: [by: 'type' | 'priority']; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [checks: string[]]; agent: [open: boolean] }>()
 
-const agentShown = computed(() => Boolean(props.agent && props.agentOpen))
+// DAR-UI-145 (Aditi: "i like B", artifact QabewkAY8iL1UvVVzqRSZG). A window wide enough gives the agent a column of its
+// own beside the detail, so the finding stays in view; a narrower one keeps the Agent tab with the finding pinned in it.
+const WIDE_QUERY = '(min-width: 1200px)'
+const wideMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(WIDE_QUERY) : null
+const wide = ref(wideMedia?.matches ?? false)
+const onWideChange = (event: MediaQueryListEvent) => { wide.value = event.matches }
+onMounted(() => wideMedia?.addEventListener('change', onWideChange))
+onBeforeUnmount(() => wideMedia?.removeEventListener('change', onWideChange))
+/** The agent in its own column beside the detail. */
+const agentBeside = computed(() => Boolean(props.agent && props.agentOpen && wide.value))
+/** The agent in the deepest column's tab, in place of the detail. */
+const agentShown = computed(() => Boolean(props.agent && props.agentOpen && !wide.value))
 const closing = computed(() => new Set(props.drafts?.closing ?? []))
 const addedStatements = computed(() => (props.drafts?.added ?? []).filter((added) => !added.category || added.category === props.category))
 
 const BY_CHOICES: { id: 'type' | 'priority'; label: string }[] = [{ id: 'type', label: 'Record type' }, { id: 'priority', label: 'Priority' }]
 const isHealth = computed(() => props.category === HEALTH)
-const rail = computed(() => !isHealth.value && Boolean(props.finding))
+const rail = computed(() => (!isHealth.value && Boolean(props.finding)) || agentBeside.value)
 // DAR-UI-140. The level on show by priority; null by record type and on Run health.
 const isLevel = (value: string): value is AuditLevel => (AUDIT_LEVELS as readonly string[]).includes(value)
 const levelOn = computed<AuditLevel | null>(() => (props.by === 'priority' && isLevel(props.category) ? props.category : null))
@@ -853,6 +880,12 @@ const comparedSystems = computed(() => {
   return Object.keys(check?.compared ?? {})
 })
 const basics = computed(() => basicFacts(records.value, comparedSystems.value))
+// DAR-UI-145. What the Agent tab pins: the open finding's badge, lead and basics. None beside (the finding is in view).
+const agentCard = computed<AgentFindingCard | null>(() => {
+  const doc = props.findingDoc
+  if (!props.finding || !doc || isHealth.value) return null
+  return { findingId: props.finding, badge: findingStateBadge(doc.finding.status.state), lead: lead.value, facts: basics.value }
+})
 const kind = computed(() => recordKind(props.findingDoc?.finding.category.id ?? '', records.value))
 // DAR-UI-081 (Aditi: "add location ID to the line box", "with location ID, show the location name"). An order line's
 // location, from its HotWax item: "Chicago · 58".
@@ -979,6 +1012,38 @@ function statementText(id: string): string {
 
 .audit-columns--health-flat .audit-columns-grid {
   grid-template-columns: minmax(10rem, 0.8fr) minmax(18rem, 3.6fr);
+}
+
+/* DAR-UI-145. The agent beside the detail: the categories and statements turn to rails, the findings list narrows, so
+   the detail and the agent both get the room to read. Only above the 1200px the page checks, so the minimums fit. */
+.audit-columns--agent .audit-columns-grid {
+  grid-template-columns: 5.5rem 5.5rem minmax(11rem, 0.9fr) minmax(18rem, 1.6fr) minmax(18rem, 1.3fr);
+}
+
+.audit-columns--agent.audit-columns--health .audit-columns-grid {
+  grid-template-columns: 5.5rem minmax(11rem, 0.9fr) minmax(18rem, 1.6fr) minmax(18rem, 1.3fr);
+}
+
+.audit-columns--agent.audit-columns--health-flat .audit-columns-grid {
+  grid-template-columns: 5.5rem minmax(18rem, 1.6fr) minmax(18rem, 1.3fr);
+}
+
+/* The statements rail: each row its code and count, the text in its label. The head keeps its height, empty. */
+.audit-columns--agent .audit-col--2 .audit-col-head > *,
+.audit-columns--agent .audit-col--2 .audit-row-text,
+.audit-columns--agent .audit-col--2 .audit-draft-tag {
+  display: none;
+}
+
+.audit-columns--agent .audit-col--2 .audit-row {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding-inline: var(--space-2);
+}
+
+.audit-columns--agent .audit-col--2 .audit-row-code {
+  width: auto;
 }
 
 .audit-col {
@@ -1373,7 +1438,8 @@ function statementText(id: string): string {
   cursor: pointer;
 }
 
-.audit-detail-tab[aria-selected='true'] {
+.audit-detail-tab[aria-selected='true'],
+.audit-detail-tab[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-ink);

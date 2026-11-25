@@ -144,9 +144,11 @@
         @retry="retryCheck"
         @agent="setAgentTab"
       >
-        <!-- DAR-UI-108. The agent, in the Agent tab of the board's deepest column. -->
-        <template #agent>
+        <!-- DAR-UI-108. The agent, in the Agent tab of the board's deepest column; DAR-UI-145: or beside it, on a wide window.
+             The card is the open finding, pinned when the agent covers it. -->
+        <template #agent="{ card }">
           <AuditAgentPanel
+            :card="card"
             :key="`${report.report.tenant.id}:${auditCode}`"
             :audit-code="auditCode"
             :tenant-id="report.report.tenant.id"

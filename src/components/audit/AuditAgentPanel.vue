@@ -1,6 +1,15 @@
 <template>
   <section class="audit-agent" aria-label="Agent" data-testid="agent-panel">
-    <p class="audit-agent-note" data-testid="agent-about">{{ about }}</p>
+    <!-- DAR-UI-145. On a window too narrow for the agent's own column, the finding being asked about stays pinned here. -->
+    <div v-if="card" class="audit-agent-card" data-testid="agent-finding-card">
+      <span class="audit-agent-card-head">
+        <StatusBadge :label="card.badge.label" :tone="card.badge.tone" />
+        <span class="audit-agent-note">{{ card.findingId }}</span>
+      </span>
+      <p class="audit-agent-card-lead" data-testid="agent-finding-lead">{{ card.lead }}</p>
+      <StaticFactStrip v-if="card.facts.length" :facts="card.facts" test-id="agent-finding-basics" />
+    </div>
+    <p v-else class="audit-agent-note" data-testid="agent-about">{{ about }}</p>
     <ol v-if="shownMessages.length" class="audit-agent-thread">
       <li
         v-for="message in shownMessages"
@@ -71,9 +80,19 @@
 </template>
 
 <script lang="ts">
+import type { StaticFact } from '../ui/StaticFactStrip.vue'
+
 // DAR-UI-104. One conversation per tenant and audit, kept by id in this browser and reloaded with get#AgentConversation.
 // main.ts forgets them all on login, logout and tenant switch, as it does every other per-user store.
 const CONVERSATION_KEY_PREFIX = 'darpan.agentConversation:'
+
+/** DAR-UI-145. The open finding, pinned above the thread when the agent shares the finding's column. */
+export interface AgentFindingCard {
+  findingId: string
+  badge: { label: string; tone: 'neutral' | 'success' | 'warning' | 'danger' }
+  lead: string
+  facts: StaticFact[]
+}
 
 export function agentConversationKey(tenantId: string, auditCode: string): string {
   return `${CONVERSATION_KEY_PREFIX}${tenantId}:${auditCode}`
@@ -96,6 +115,8 @@ export function clearAgentConversations(): void {
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
+import StatusBadge from '../ui/StatusBadge.vue'
+import StaticFactStrip from '../ui/StaticFactStrip.vue'
 import ProposalCard from './ProposalCard.vue'
 import { agentFacade } from '../../lib/api/facade'
 import { ApiCallError } from '../../lib/api/client'
@@ -117,6 +138,8 @@ const props = defineProps<{
   auditName?: string
   /** True only for someone allowed to save the audit's checks (get#AgentStatus canApprove). */
   canApprove: boolean
+  /** DAR-UI-145. The open finding to pin above the thread; absent when the finding is in view beside the agent. */
+  card?: AgentFindingCard | null
 }>()
 
 const emit = defineEmits<{
@@ -301,6 +324,27 @@ onMounted(() => void reload())
   flex-direction: column;
   gap: var(--space-2);
   min-height: 100%;
+}
+
+/* DAR-UI-145. The pinned finding: the same badge, lead and basics strip the Finding tab opens with. */
+.audit-agent-card {
+  display: grid;
+  gap: var(--space-1-5);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.audit-agent-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.audit-agent-card-lead {
+  margin: 0;
+  line-height: 1.45;
 }
 
 .audit-agent > .audit-agent-form {

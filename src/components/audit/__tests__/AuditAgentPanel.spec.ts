@@ -56,6 +56,24 @@ describe('AuditAgentPanel', () => {
     expect(wrapper.get('[data-testid="agent-about"]').text()).toBe('About Month close')
   })
 
+  // DAR-UI-145: in the Agent tab the finding is out of view, so it is pinned above the thread.
+  it('pins the open finding above the thread in place of the about line, and drops it when the card goes', async () => {
+    const card = { findingId: 'F-7', badge: { label: 'Open', tone: 'danger' as const }, lead: 'Shipped in HotWax, no fulfillment in NetSuite',
+      facts: [{ key: 'oms', label: 'HotWax', value: 'Completed' }, { key: 'ns', label: 'NetSuite', value: '—' }] }
+    const wrapper = mountPanel({ auditName: 'Month close', card })
+    await flushPromises()
+    const pinned = wrapper.get('[data-testid="agent-finding-card"]')
+    expect(pinned.text()).toContain('Open')
+    expect(pinned.text()).toContain('F-7')
+    expect(wrapper.get('[data-testid="agent-finding-lead"]').text()).toBe('Shipped in HotWax, no fulfillment in NetSuite')
+    expect(wrapper.get('[data-testid="agent-finding-basics"]').text()).toContain('NetSuite')
+    expect(wrapper.find('[data-testid="agent-about"]').exists()).toBe(false)
+
+    await wrapper.setProps({ card: null })
+    expect(wrapper.find('[data-testid="agent-finding-card"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="agent-about"]').text()).toBe('About F-7 · Month close')
+  })
+
   it('sends the message with the audit code and the open finding, and keeps the conversation for this audit', async () => {
     sendAgentTurn.mockResolvedValueOnce(turn())
     const wrapper = mountPanel()
