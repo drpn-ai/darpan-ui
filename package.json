@@ -1,6 +1,6 @@
 {
   "name": "darpan-ui",
-  "version": "4.4.12",
+  "version": "4.4.13",
   "private": true,
   "type": "module",
   "description": "Darpan frontend app (Vue + TypeScript + Vite)",
