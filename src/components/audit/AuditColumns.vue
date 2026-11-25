@@ -636,6 +636,7 @@ import {
   SOURCE_CHECKS,
   SOURCE_NOT_COVERED,
   SOURCE_RUNNING,
+  acknowledgedDaysAgo,
   categoryItems,
   checkGroups,
   comparedBars,
@@ -742,7 +743,7 @@ const categories = computed<CategoryItem[]>(() => {
       ? { ...item, label: `${item.label} ${item.sub}`, sub: item.count ? `${item.count} open` : 'nothing found' }
       : item)
   }
-  const items = categoryItems(props.report, props.progress)
+  const items = categoryItems(props.report, props.progress, props.filter)
   const counted = narrowedBy.value
   if (!counted) return items
   return items.map((item) => item.id === HEALTH ? item : { ...item, count: counted.byCategory.get(item.id) ?? 0,
@@ -809,7 +810,7 @@ const statementEmpty = computed(() => {
   return 'Nothing found'
 })
 const findings = computed(() => props.narrowed ? props.narrowed.filter((item) => item.statement === props.statement)
-  : statementFindings(statementDoc.value, props.more.findings))
+  : statementFindings(statementDoc.value, props.more.findings, props.filter))
 // DAR-UI-098. The column's rows: every finding under its cause, an order under each of its lines' causes.
 const rows = computed(() => findingRows(findings.value, props.cause, levelOn.value ?? undefined))
 // DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
@@ -821,9 +822,13 @@ function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): strin
   return line.cause ?? findingStateBadge(line.state).label
 }
 // What the picked pill counts for the statement (DAR-UI-073), not the 50 the report lists or the pages loaded so far.
+// DAR-UI-144. A level's count is of open rows only, so under another pill the rows listed are the count.
 const findingsTotal = computed(() => {
-  if (levelOn.value) return statementDoc.value && !props.narrowed ? (statementDoc.value.counts.byPriority?.[levelOn.value] ?? 0) : rows.value.length
-  return statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts) : findings.value.length
+  if (levelOn.value) {
+    return statementDoc.value && !props.narrowed && props.filter === 'open'
+      ? (statementDoc.value.counts.byPriority?.[levelOn.value] ?? 0) : rows.value.length
+  }
+  return statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts, props.filter) : findings.value.length
 })
 const records = computed(() => recordRows(props.orderUnit?.records ?? props.findingDoc?.finding.records))
 // DAR-UI-099. The open order's lines with no finding of their own (an item set aside, a NetSuite store-credit line).
@@ -1003,14 +1008,12 @@ const detailBadge = computed(() => acknowledged.value
 function ackWho(ack: AuditAcknowledgement): string {
   return ack.by.label || ack.by.id
 }
-function dayNumber(text: string): number {
-  return Date.UTC(Number(text.slice(0, 4)), Number(text.slice(5, 7)) - 1, Number(text.slice(8, 10)))
-}
 const ackCardLine = computed(() => {
   const ack = acknowledgement.value
   if (!ack) return ''
   if (!ack.reminded) return `${ackWho(ack)} · ${shortDate(ack.at.slice(0, 10))}`
-  const days = Math.max(0, Math.round((dayNumber(props.report.report.date) - dayNumber(ack.at)) / 86_400_000))
+  // Counted to the tenant's today, not the report's morning (yesterday's until today's run lands).
+  const days = acknowledgedDaysAgo(ack.at, props.report.report.tenant.timeZone)
   return `Acknowledged ${days} ${days === 1 ? 'day' : 'days'} ago by ${ackWho(ack)}, still open`
 })
 function rowAcknowledged(item: AuditFindingSummary): boolean {

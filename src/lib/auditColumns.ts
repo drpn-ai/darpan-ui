@@ -91,10 +91,13 @@ function notCheckedCount(category: AuditCategory | null | undefined): number {
 }
 
 /** Column 1: the run's health first, then the report's categories in the document's order. */
-// DAR-UI-073 / DAR-BE-206. Every column counts and lists the open findings, whatever the pill (a finding is open or
-// fixed), so the rail, a statement's badge, the findings heading and the rows listed always agree.
-export function countFor(counts: AuditFindingCounts | null | undefined): number {
-  return counts?.open ?? 0
+// DAR-UI-073 / DAR-BE-206. Every column counts and lists open findings (a finding is open or fixed), so the rail, a
+// statement's badge, the findings heading and the rows listed always agree. DAR-UI-144: what the picked pill keeps of
+// them. Open leaves acknowledged rows out, acknowledged counts only those, all counts both.
+export function countFor(counts: AuditFindingCounts | null | undefined, filter: AuditFilter = 'open'): number {
+  const acknowledged = counts?.acknowledged ?? 0
+  if (filter === 'acknowledged') return acknowledged
+  return (counts?.open ?? 0) + (filter === 'all' ? acknowledged : 0)
 }
 
 /** DAR-UI-085. True while any check of the audit is running or queued. */
@@ -137,7 +140,7 @@ function healthItem(report: AuditReport, progress?: AuditProgress | null): Categ
   return health
 }
 
-export function categoryItems(report: AuditReport, progress?: AuditProgress | null): CategoryItem[] {
+export function categoryItems(report: AuditReport, progress?: AuditProgress | null, filter: AuditFilter = 'open'): CategoryItem[] {
   const health = healthItem(report, progress)
   return [health, ...Object.entries(report.categories ?? {}).map(([id, category]) => {
     const unchecked = notCheckedCount(category)
@@ -150,7 +153,7 @@ export function categoryItems(report: AuditReport, progress?: AuditProgress | nu
       short: category.label.split(' ')[0] ?? category.label,
       sub: [top ? `${top.count} at ${LEVEL_LABEL[top.level]}` : found, unchecked ? `${unchecked} not checked` : ''].filter(Boolean).join(' · '),
       open: category.counts?.open ?? 0,
-      count: countFor(category.counts),
+      count: countFor(category.counts, filter),
       attention: (category.counts?.open ?? 0) > 0,
       running: false,
     }
@@ -184,8 +187,8 @@ export function keepStatement(statement: AuditStatement, filter: AuditFilter): b
 /** Column 2: a category's statements that the filter keeps. */
 export function statementItems(category: AuditCategory | null | undefined, filter: AuditFilter): StatementItem[] {
   return statementsOf(category).filter((statement) => keepStatement(statement, filter)).map((statement) => {
-    // DAR-UI-144. Under the acknowledged pill a statement shows its acknowledged rows, not the open ones.
-    const open = filter === 'acknowledged' ? (statement.counts?.acknowledged ?? 0) : countFor(statement.counts)
+    // DAR-UI-144. What the pill keeps: under acknowledged its acknowledged rows, under all its open and acknowledged.
+    const open = countFor(statement.counts, filter)
     const notChecked = statement.status === 'notRun'
     return {
       id: statement.id,
@@ -228,7 +231,7 @@ export function filterCounts(report: AuditReport): Record<AuditFilter, number> {
     open: report.summary.open,
     acknowledged: report.summary.acknowledged ?? 0,
     notChecked: statements.filter((statement) => statement.status === 'notRun').length,
-    all: countFor(report.summary),
+    all: countFor(report.summary, 'all'),
   }
 }
 
@@ -239,7 +242,7 @@ export function defaultCategory(report: AuditReport, filter: AuditFilter): strin
   const pool = kept.length ? kept : entries
   let best = pool[0]
   for (const entry of pool) {
-    if (countFor(entry[1].counts) > (best ? countFor(best[1].counts) : 0)) best = entry
+    if (countFor(entry[1].counts, filter) > (best ? countFor(best[1].counts, filter) : 0)) best = entry
   }
   return best?.[0] ?? HEALTH
 }
@@ -505,12 +508,39 @@ export function emptyFindingsMore(): FindingsMore {
   return { findings: [], hasNextPage: null, loading: false, error: '' }
 }
 
+/** DAR-UI-144. A row the pill lists: an open row taken with a note (not yet reminded) shows under acknowledged only; a
+ *  reminded one is open again. All lists every open row. */
+export function showsUnder(item: AuditFindingSummary, filter: AuditFilter): boolean {
+  if (item.state !== 'open') return false
+  const taken = Boolean(item.acknowledgement && !item.acknowledgement.reminded)
+  if (filter === 'open') return !taken
+  if (filter === 'acknowledged') return taken
+  return true
+}
+
 // DAR-UI-069. A fixed finding stays in the report for the day's "fixed today" only; the board lists what is still wrong.
 // DAR-UI-070. The report lists 50 a statement; the pages "N more" fetched follow them, each finding once.
-export function statementFindings(statement: AuditStatement | null | undefined, more: AuditFindingSummary[]): AuditFindingSummary[] {
-  const listed = (statement?.findings ?? []).filter((item) => item.state === 'open')
+// DAR-UI-144. The report lists every open row of a statement, acknowledged ones too, so the pill is applied here.
+export function statementFindings(statement: AuditStatement | null | undefined, more: AuditFindingSummary[],
+  filter: AuditFilter = 'all'): AuditFindingSummary[] {
+  const listed = (statement?.findings ?? []).filter((item) => showsUnder(item, filter))
   const seen = new Set(listed.map((item) => item.id))
-  return [...listed, ...more.filter((item) => item.state === 'open' && !seen.has(item.id))]
+  return [...listed, ...more.filter((item) => showsUnder(item, filter) && !seen.has(item.id))]
+}
+
+/** DAR-UI-144. The tenant's calendar day today (YYYY-MM-DD); the browser's own day when the zone is unknown. */
+export function tenantToday(timeZone: string | null | undefined, now: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: timeZone || undefined, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+  } catch {
+    return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+  }
+}
+
+/** DAR-UI-144. Whole days from an acknowledgement (its stamp is in the tenant's zone) to the tenant's today, never below 0. */
+export function acknowledgedDaysAgo(at: string, timeZone: string | null | undefined, now: Date = new Date()): number {
+  const day = (text: string) => Date.UTC(Number(text.slice(0, 4)), Number(text.slice(5, 7)) - 1, Number(text.slice(8, 10)))
+  return Math.max(0, Math.round((day(tenantToday(timeZone, now)) - day(at)) / 86_400_000))
 }
 
 // DAR-BE-125. A finding's heading: its cause in the catalog's words (renamed since the finding was written, it still reads
@@ -686,10 +716,11 @@ export function narrowedCounts(items: AuditFindingListItem[]): { byCategory: Map
   return { byCategory, byStatement }
 }
 
-/** How many open findings the board has not shown yet; none once the last page is in. */
-export function findingsLeft(statement: AuditStatement | null | undefined, shown: number, hasNextPage: boolean | null): number {
+/** How many findings the pill counts that the board has not shown yet; none once the last page is in. */
+export function findingsLeft(statement: AuditStatement | null | undefined, shown: number, hasNextPage: boolean | null,
+  filter: AuditFilter = 'open'): number {
   if (!statement || hasNextPage === false || (hasNextPage === null && !statement.findingsOmitted)) return 0
-  return Math.max(countFor(statement.counts) - shown, 0)
+  return Math.max(countFor(statement.counts, filter) - shown, 0)
 }
 
 export function findStatement(report: AuditReport, id: string): { categoryId: string; statement: AuditStatement } | null {

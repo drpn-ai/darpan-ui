@@ -35,6 +35,9 @@ import {
   peakLine,
   elapsedLine,
   statementFindings,
+  showsUnder,
+  tenantToday,
+  acknowledgedDaysAgo,
   sourceItems,
   statementItems,
   topLevel,
@@ -129,6 +132,30 @@ describe('auditColumns', () => {
     expect(keepStatement(statement('R2', 3), 'acknowledged')).toBe(false)
     const category = { label: 'Orders', counts: counts(3), statements: { R1: kept, R2: statement('R2', 3) } }
     expect(statementItems(category, 'acknowledged').map((item) => [item.id, item.open, item.badge])).toEqual([['R1', 2, '2']])
+  })
+
+  // DAR-UI-144. Under all, a count is open plus acknowledged at the summary, category and statement; under acknowledged
+  // only those; under open the acknowledged rows are left out.
+  it('countsFollowThePill', () => {
+    const withAck = { ...counts(3), acknowledged: 2 }
+    expect([countFor(withAck), countFor(withAck, 'open'), countFor(withAck, 'acknowledged'), countFor(withAck, 'all'), countFor(withAck, 'notChecked')])
+      .toEqual([3, 3, 2, 5, 3])
+    expect([countFor(counts(3), 'all'), countFor(counts(3), 'acknowledged'), countFor(undefined, 'all')]).toEqual([3, 0, 0])
+    const doc = report()
+    doc.summary.acknowledged = 4
+    doc.categories.orders!.counts.acknowledged = 2
+    const r1 = doc.categories.orders!.statements.R1!
+    r1.counts.acknowledged = 2
+    expect(filterCounts(doc)).toEqual({ open: 3, acknowledged: 4, notChecked: 1, all: 7 })
+    expect(categoryItems(doc, null, 'all').map((item) => item.count)).toEqual([0, 3, 2, 0])
+    expect(categoryItems(doc, null, 'acknowledged').map((item) => item.count)).toEqual([0, 2, 0, 0])
+    expect(categoryItems(doc, null, 'open').map((item) => item.count)).toEqual([0, 1, 2, 0])
+    expect(statementItems(doc.categories.orders, 'all').find((item) => item.id === 'R1')).toMatchObject({ open: 3, badge: '3' })
+    expect(statementItems(doc.categories.orders, 'open').find((item) => item.id === 'R1')).toMatchObject({ open: 1, badge: '1' })
+    // A statement with only acknowledged rows still asks for more under acknowledged and all, not under open.
+    const ackOnly = { ...statement('R7', 0), findingsOmitted: 60 }
+    ackOnly.counts.acknowledged = 110
+    expect([findingsLeft(ackOnly, 0, null), findingsLeft(ackOnly, 0, null, 'acknowledged'), findingsLeft(ackOnly, 50, null, 'all')]).toEqual([0, 110, 60])
   })
 
   it('opens on the category with the most open findings the filter keeps, and its first statement with findings', () => {
@@ -284,6 +311,31 @@ describe('auditColumns', () => {
     expect(statementFindings(doc, [])).toEqual([summary('F-1'), summary('F-3')])
     expect(statementFindings(doc, [summary('F-1'), summary('F-4'), summary('F-5')]).map((item) => item.id)).toEqual(['F-1', 'F-3', 'F-4', 'F-5'])
     expect(statementFindings(null, [])).toEqual([])
+  })
+
+  // DAR-UI-144. The report lists every open row, acknowledged ones too: the pill picks which show.
+  it('listsTheRowsThePillKeeps', () => {
+    const ack = (reminded: boolean) => ({ note: 'n', by: { id: 'u', label: null }, at: '2026-10-20T09:00:00', remindOn: null, reminded })
+    const row = (id: string, acknowledgement: ReturnType<typeof ack> | null = null, state: 'open' | 'fixed' = 'open') =>
+      ({ id, headline: id, state, firstFound: '2026-10-01', ageDays: 1, records: {}, difference: null, next: '', acknowledgement })
+    const doc = { ...statement('R1', 2), findings: [row('F-1'), row('F-2', ack(false)), row('F-3', ack(true)), row('F-4', ack(false), 'fixed')] }
+    const more = [row('F-5', ack(false)), row('F-6')]
+    expect(statementFindings(doc, more, 'open').map((item) => item.id)).toEqual(['F-1', 'F-3', 'F-6'])
+    expect(statementFindings(doc, more, 'acknowledged').map((item) => item.id)).toEqual(['F-2', 'F-5'])
+    expect(statementFindings(doc, more, 'all').map((item) => item.id)).toEqual(['F-1', 'F-2', 'F-3', 'F-5', 'F-6'])
+    expect([showsUnder(row('F-3', ack(true)), 'acknowledged'), showsUnder(row('F-4', ack(false), 'fixed'), 'all')]).toEqual([false, false])
+  })
+
+  // DAR-UI-144 (T10-M1). Days since an acknowledgement count to the tenant's today, not the report's morning or UTC.
+  it('countsAcknowledgedDaysToTheTenantsToday', () => {
+    // 03:00 UTC on the 25th is still the 24th in Los Angeles.
+    const now = new Date('2026-11-25T03:00:00Z')
+    expect(tenantToday('America/Los_Angeles', now)).toBe('2026-11-24')
+    expect(tenantToday('UTC', now)).toBe('2026-11-25')
+    expect(acknowledgedDaysAgo('2026-11-20T18:30:00', 'America/Los_Angeles', now)).toBe(4)
+    expect(acknowledgedDaysAgo('2026-11-20T18:30:00', 'UTC', now)).toBe(5)
+    expect(acknowledgedDaysAgo('2026-11-26T08:00:00', 'UTC', now)).toBe(0)
+    expect(tenantToday('Not/AZone', now)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
   it('says how many findings are left to show, and none once the last page is in', () => {

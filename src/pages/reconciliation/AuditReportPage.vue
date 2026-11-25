@@ -867,7 +867,7 @@ watch(auditCode, () => {
 }, { immediate: true })
 watch([report, selectedStatement, filter, pickedLevel], () => {
   more.value = emptyFindingsMore()
-  if (findingsLeft(statementDoc.value, 0, null)) void loadMore()
+  if (findingsLeft(statementDoc.value, 0, null, filter.value)) void loadMore()
 })
 // DAR-UI-075. An order the report does not list (past its 50: a reload, a link) is found in the statement's orders.
 // DAR-UI-140: read at every level, not the one on show, so an order at another level is found and opens on its own.
