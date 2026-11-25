@@ -54,16 +54,18 @@ describe('AuditFeedbackBubble', () => {
     expect(items[0]!.text()).toContain('Nov 24')
     const text = w.get('[data-testid="audit-feedback-popover"]').text()
     expect(text).not.toMatch(/reply received|answered|received/i)
-    expect(w.get('[data-testid="audit-feedback-heading"]').text()).toBe('Sent in the last 2 weeks on this statement and cause')
+    expect(w.get('[data-testid="audit-feedback-heading"]').text()).toBe('Previous notes')
+    expect(text).not.toContain('Sent in the last')
     expect(text).toContain('Darpan replies by email')
   })
 
-  it('reads the days when the window is not 14', async () => {
-    getFindingFeedback.mockResolvedValue({ ok: true, notes: [], shownDays: 7 })
+  it('shows no header and no sentence when there are no notes yet', async () => {
+    getFindingFeedback.mockResolvedValue({ ok: true, notes: [], shownDays: 14 })
     const w = mountBubble(0)
     await w.get('[data-testid="audit-feedback"]').trigger('click')
     await flushPromises()
-    expect(w.get('[data-testid="audit-feedback-heading"]').text()).toBe('Sent in the last 7 days on this statement and cause')
+    expect(w.find('[data-testid="audit-feedback-heading"]').exists()).toBe(false)
+    expect(w.get('[data-testid="audit-feedback-popover"]').text()).not.toContain('Sent in the last')
   })
 
   it('keeps Send disabled while blank, then sends, prepends the note and bumps the badge', async () => {

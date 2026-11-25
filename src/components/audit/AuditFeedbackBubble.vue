@@ -18,9 +18,9 @@
     </button>
     <Transition name="audit-feedback-pop">
       <div v-if="open" ref="root" class="audit-feedback-popover" role="dialog" aria-label="Feedback" data-testid="audit-feedback-popover">
-        <p class="audit-feedback-heading" data-testid="audit-feedback-heading">{{ heading }}</p>
         <InlineValidation v-if="loadError" tone="error" :message="loadError" data-testid="audit-feedback-load-error" />
-        <ul v-if="notes.length" class="audit-feedback-list">
+        <p v-if="notes.length" class="audit-feedback-heading" data-testid="audit-feedback-heading">Previous notes</p>
+        <ul v-if="notes.length" class="audit-feedback-list" aria-label="Previous notes">
           <li v-for="item in notes" :key="item.feedbackId" class="audit-feedback-note" data-testid="audit-feedback-note">
             <span class="audit-feedback-meta">{{ meta(item) }}</span>
             <span class="audit-feedback-text">{{ item.note }}</span>
@@ -56,7 +56,6 @@ const props = defineProps<{
 
 const open = ref(false)
 const notes = ref<AuditFeedbackNote[]>([])
-const shownDays = ref(14)
 const sentCount = ref<number | null>(null)
 const draft = ref('')
 const sending = ref(false)
@@ -69,7 +68,6 @@ const input = ref<HTMLTextAreaElement | null>(null)
 
 const shownCount = computed(() => sentCount.value ?? props.count)
 const triggerLabel = computed(() => shownCount.value > 0 ? `Feedback, ${shownCount.value} recent ${shownCount.value === 1 ? 'note' : 'notes'}` : 'Feedback')
-const heading = computed(() => `Sent in the last ${shownDays.value === 14 ? '2 weeks' : `${shownDays.value} ${shownDays.value === 1 ? 'day' : 'days'}`} on this statement and cause`)
 
 // A fresh count from a reload wins over the local bump.
 watch(() => props.count, () => { sentCount.value = null })
@@ -101,7 +99,6 @@ async function load(): Promise<void> {
       return
     }
     notes.value = [...(response.notes ?? [])].sort((a, b) => b.sentAt.localeCompare(a.sentAt))
-    shownDays.value = response.shownDays ?? 14
   } catch (err) {
     loadError.value = err instanceof Error && err.message ? err.message : 'The notes did not load.'
   }
