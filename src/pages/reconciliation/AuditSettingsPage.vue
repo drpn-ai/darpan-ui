@@ -347,21 +347,13 @@
           @submit="void saveLevel()"
         >
           <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="audit-settings-popup-error" />
-          <ul class="audit-levels" role="radiogroup" :aria-label="popupTitle">
-            <li v-for="option in levelOptions" :key="option.key">
-              <button
-                type="button"
-                role="radio"
-                class="audit-levels__option audit-level"
-                :aria-checked="levelDraft === option.level ? 'true' : 'false'"
-                :data-testid="`audit-settings-level-${option.key}`"
-                :disabled="saving"
-                @click="levelDraft = option.level"
-              >
-                <span class="audit-level__word">{{ option.level ? levelWords(option.level) : sameAs(editingStatement) }}</span>
-              </button>
-            </li>
-          </ul>
+          <!-- The shared lettered cards (fixed choices), full width like every popup's; the picked one is the active card. -->
+          <WorkflowShortcutChoiceCards
+            :options="levelOptions"
+            :selected-value="levelDraft ?? 'same'"
+            test-id-prefix="audit-settings-level"
+            @choose="levelDraft = $event === 'same' ? null : ($event as AuditLevel)"
+          />
         </WorkflowStepForm>
 
         <!-- DAR-UI-064: a check added to this statement, in today's editor; saving or cancelling returns to the statement. -->
@@ -434,6 +426,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowChipTextInput from '../../components/workflow/WorkflowChipTextInput.vue'
+import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import { auditFacade, settingsFacade } from '../../lib/api/facade'
@@ -513,9 +506,13 @@ function levelWords(level: AuditLevel): string {
 function sameAs(statement: AuditSettingsStatement): string {
   return `Same as ${statement.code}`
 }
-const levelOptions = computed(() => {
-  const levels = AUDIT_LEVELS.map((level) => ({ key: level as string, level: level as AuditLevel | null }))
-  return popup.value === 'reasonPriority' ? [{ key: 'same', level: null }, ...levels] : levels
+// The level popup's lettered cards; a reason's popup opens with "Same as" its statement.
+const levelOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
+  const levels = AUDIT_LEVELS.map((level) => ({ value: level as string, label: levelWords(level) }))
+  const choices = popup.value === 'reasonPriority' && editingStatement.value
+    ? [{ value: 'same', label: sameAs(editingStatement.value) }, ...levels]
+    : levels
+  return choices.map((choice, index) => ({ ...choice, shortcutKey: String.fromCharCode(65 + index) }))
 })
 
 // DAR-BE-207. A simple shape check; the backend has the last word and names any address it refuses.
@@ -1008,7 +1005,7 @@ onBeforeUnmount(() => {
 }
 
 .audit-statement__toggle {
-  margin-right: var(--space-3);
+  margin-inline: var(--space-3);
 }
 
 /* DAR-UI-140. A level as plain words ("P0 today"; Aditi: no marks). As a button it is the whole cell, tinted on hover like a fact. */
@@ -1045,11 +1042,14 @@ onBeforeUnmount(() => {
   font-size: var(--type-note-size);
 }
 
-/* One width for every row's cell, so the levels line up down the list. */
+/* One width for every row's cell, so the levels line up down the list; hairlines either side make it a cell of the
+   row (as the fact strip divides its cells), so its hover tint fills a bounded cell. */
 .audit-statement__priority {
-  width: 8rem;
+  width: 9rem;
   height: 100%;
   padding-inline: var(--space-3);
+  border-left: 1px solid var(--static-tile-border);
+  border-right: 1px solid var(--static-tile-border);
 }
 
 .audit-reason__level {
@@ -1069,29 +1069,6 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm);
 }
 
-.audit-levels {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.audit-levels > li + li {
-  border-top: 1px solid var(--border-soft);
-}
-
-.audit-levels__option {
-  width: 100%;
-  min-height: 2.6rem;
-}
-
-.audit-levels__option[aria-checked='true'] {
-  background: color-mix(in oklab, var(--static-tile-bg) 80%, var(--accent));
-}
-
 .audit-popup-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1105,8 +1082,12 @@ onBeforeUnmount(() => {
   color: var(--text-soft);
 }
 
+/* Full width whatever its rows hold: the popup body sizes children to their content, so a short list (a statement's
+   one reason) shrank to its words while the checks list above it spanned the popup. */
 .audit-popup-checks {
   display: grid;
+  align-self: stretch;
+  width: 100%;
   gap: var(--space-1);
 }
 

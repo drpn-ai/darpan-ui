@@ -10,6 +10,7 @@
         },
       ]"
       :data-testid="`${testIdPrefix}-${option.value}`"
+      :aria-pressed="selectedValue ? (selectedValue === option.value ? 'true' : 'false') : undefined"
       :aria-keyshortcuts="option.shortcutKey.toLowerCase()"
       type="button"
       @click="emit('choose', option.value)"

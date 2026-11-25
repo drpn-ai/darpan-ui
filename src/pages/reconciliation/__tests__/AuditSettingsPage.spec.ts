@@ -610,7 +610,8 @@ describe('AuditSettingsPage priorities', () => {
     return [...node.querySelectorAll('.audit-level__word')].map((part) => part.textContent?.trim()).join(' ')
   }
   function levelText(w: W, testId: string) { return parts(get(w, testId).element) }
-  function options(w: W) { return w.findAll('[role="radio"]').map((option) => parts(option.element)) }
+  // The level popup's lettered cards: each card's label, in order.
+  function options(w: W) { return w.findAll('.workflow-shortcut-choice-card__label').map((label) => label.text()) }
 
   it('aStatementRowsPriorityCellOpensItsPopup', async () => {
     const w = await mountPage()
@@ -623,9 +624,9 @@ describe('AuditSettingsPage priorities', () => {
     expect(popupOpen(w)).toBe(true)
     expect(w.get('.wizard-question').text()).toBe('How soon must a broken R11 be fixed?')
     expect(options(w)).toEqual(['P0 today', 'P1 this week', 'P2 later', 'Known owned'])
-    expect(get(w, 'audit-settings-level-P0').attributes('aria-checked')).toBe('true')
+    expect(get(w, 'audit-settings-level-P0').attributes('aria-pressed')).toBe('true')
     await click(w, 'audit-settings-level-P1')
-    expect(get(w, 'audit-settings-level-P1').attributes('aria-checked')).toBe('true')
+    expect(get(w, 'audit-settings-level-P1').attributes('aria-pressed')).toBe('true')
     expect(f.saveAuditSettings).not.toHaveBeenCalled()
     await click(w, 'audit-settings-priority-save')
     expect(f.saveAuditSettings).toHaveBeenCalledWith({ audit: 'month-close', statements: [{ id: 'R11', priority: 'P1' }] })
@@ -641,7 +642,7 @@ describe('AuditSettingsPage priorities', () => {
     await click(w, 'audit-settings-priority-cancel')
     expect(popupOpen(w)).toBe(false)
     await click(w, 'audit-settings-priority-R5')
-    expect(get(w, 'audit-settings-level-P2').attributes('aria-checked')).toBe('true')
+    expect(get(w, 'audit-settings-level-P2').attributes('aria-pressed')).toBe('true')
     await click(w, 'audit-settings-priority-save')
     expect(popupOpen(w)).toBe(false)
     expect(f.saveAuditSettings).not.toHaveBeenCalled()
@@ -693,7 +694,7 @@ describe('AuditSettingsPage priorities', () => {
     expect(w.findAll('.popup-workflow-modal')).toHaveLength(1)
     expect(w.get('.wizard-question').text()).toBe('How soon must "Refund still pending" on R5 be fixed?')
     expect(options(w)).toEqual(['Same as R5', 'P0 today', 'P1 this week', 'P2 later', 'Known owned'])
-    expect(get(w, 'audit-settings-level-same').attributes('aria-checked')).toBe('true')
+    expect(get(w, 'audit-settings-level-same').attributes('aria-pressed')).toBe('true')
     await click(w, 'audit-settings-level-KNOWN')
     await click(w, 'audit-settings-reason-priority-save')
     expect(f.saveAuditSettings).toHaveBeenLastCalledWith({ audit: 'month-close',
@@ -732,7 +733,7 @@ describe('AuditSettingsPage priorities', () => {
     await click(w, 'audit-settings-reason-priority-save')
     expect(get(w, 'audit-settings-popup-error').text()).toBe('Reason CONC_X closes on every check of R5, so it takes no level.')
     expect(has(w, 'audit-settings-reason-priority-save')).toBe(true)
-    expect(get(w, 'audit-settings-level-P0').attributes('aria-checked')).toBe('true')
+    expect(get(w, 'audit-settings-level-P0').attributes('aria-pressed')).toBe('true')
     expect(has(w, 'audit-settings-error')).toBe(false)
     w.unmount()
   })
