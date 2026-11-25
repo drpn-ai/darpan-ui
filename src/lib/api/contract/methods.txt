@@ -35,6 +35,8 @@ admin.EmailAdminServices.get#EmailTemplates
 admin.EmailAdminServices.preview#EmailTemplate
 admin.EmailAdminServices.reset#EmailTemplate
 admin.EmailAdminServices.update#EmailTemplate
+admin.FeedbackAdminServices.get#FeedbackList
+admin.FeedbackAdminServices.reply#Feedback
 admin.KnowledgeAdminServices.get#KnowledgeEntry
 admin.KnowledgeAdminServices.get#KnowledgeForReview
 admin.KnowledgeAdminServices.get#KnowledgeIdentifiers
@@ -103,11 +105,14 @@ facade.AgentTurnFacadeServices.get#AgentStatus
 facade.AgentTurnFacadeServices.send#AgentQueryTurn
 facade.AgentTurnFacadeServices.send#AgentTurn
 facade.AppContentFacadeServices.get#AppContent
+facade.AuditFacadeServices.acknowledge#AuditFinding
 facade.AuditFacadeServices.add#AuditStatement
 facade.AuditFacadeServices.create#Audit
+facade.AuditFacadeServices.delete#AuditFindingAcknowledgement
 facade.AuditFacadeServices.get#AuditCheckExtracts
 facade.AuditFacadeServices.get#AuditCheckOptions
 facade.AuditFacadeServices.get#AuditFinding
+facade.AuditFacadeServices.get#AuditFindingFeedback
 facade.AuditFacadeServices.get#AuditFindingsByOrder
 facade.AuditFacadeServices.get#AuditProgress
 facade.AuditFacadeServices.get#AuditReadReport
@@ -118,6 +123,8 @@ facade.AuditFacadeServices.retry#AuditCheck
 facade.AuditFacadeServices.run#Audit
 facade.AuditFacadeServices.save#AuditCheck
 facade.AuditFacadeServices.save#AuditSettings
+facade.AuditFacadeServices.send#AuditFindingFeedback
+facade.AuditFacadeServices.update#AuditFindingAcknowledgement
 facade.AuditFacadeServices.verify#AuditFinding
 facade.AuthFacadeServices.begin#PasskeyFirstSignIn
 facade.AuthFacadeServices.begin#PasskeyProof

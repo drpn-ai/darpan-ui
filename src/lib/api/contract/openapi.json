@@ -2,7 +2,7 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Darpan Facade API",
-        "version": "3.4.3",
+        "version": "3.4.5",
         "x-darpan-contract-version": 5,
         "description": "GENERATED from the facade service XML \u2014 do not edit by hand. Regenerate with ./gradlew :runtime:component:darpan:generateApiContract.\n\nTransport: JSON-RPC 2.0 over POST /rpc/json. Auth channels: browser SPA uses the HttpOnly darpan_login_key cookie + CSRF token (canonical); integration callers and no-credentialed-CORS fallbacks use the login_key header (in-memory only, never query params). HTTP status is 200 for every dispatched call; distinguish outcomes by shape. JSON-RPC error object: protocol failures (-32700 parse, -32600 invalid request, -32601 method not found, -32602 invalid params), unhandled service errors (code 500), authorization denial (code 403). Facade business validation instead returns a success envelope with result.ok=false and result.errors[]."
     },
@@ -133,6 +133,12 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/UpdateEmailTemplateRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/GetFeedbackListRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/ReplyFeedbackRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/GetKnowledgeEntryRequest"
@@ -339,10 +345,16 @@
                                         "$ref": "#/components/schemas/GetAppContentRequest"
                                     },
                                     {
+                                        "$ref": "#/components/schemas/AcknowledgeAuditFindingRequest"
+                                    },
+                                    {
                                         "$ref": "#/components/schemas/AddAuditStatementRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/CreateAuditRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/DeleteAuditFindingAcknowledgementRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/GetAuditCheckExtractsRequest"
@@ -352,6 +364,9 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/GetAuditFindingRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/GetAuditFindingFeedbackRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/GetAuditFindingsByOrderRequest"
@@ -382,6 +397,12 @@
                                     },
                                     {
                                         "$ref": "#/components/schemas/SaveAuditSettingsRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/SendAuditFindingFeedbackRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/UpdateAuditFindingAcknowledgementRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/VerifyAuditFindingRequest"
@@ -1021,6 +1042,8 @@
                                         "admin.EmailAdminServices.preview#EmailTemplate": "#/components/schemas/PreviewEmailTemplateRequest",
                                         "admin.EmailAdminServices.reset#EmailTemplate": "#/components/schemas/ResetEmailTemplateRequest",
                                         "admin.EmailAdminServices.update#EmailTemplate": "#/components/schemas/UpdateEmailTemplateRequest",
+                                        "admin.FeedbackAdminServices.get#FeedbackList": "#/components/schemas/GetFeedbackListRequest",
+                                        "admin.FeedbackAdminServices.reply#Feedback": "#/components/schemas/ReplyFeedbackRequest",
                                         "admin.KnowledgeAdminServices.get#KnowledgeEntry": "#/components/schemas/GetKnowledgeEntryRequest",
                                         "admin.KnowledgeAdminServices.get#KnowledgeForReview": "#/components/schemas/GetKnowledgeForReviewRequest",
                                         "admin.KnowledgeAdminServices.get#KnowledgeIdentifiers": "#/components/schemas/GetKnowledgeIdentifiersRequest",
@@ -1089,11 +1112,14 @@
                                         "facade.AgentTurnFacadeServices.send#AgentQueryTurn": "#/components/schemas/SendAgentQueryTurnRequest",
                                         "facade.AgentTurnFacadeServices.send#AgentTurn": "#/components/schemas/SendAgentTurnRequest",
                                         "facade.AppContentFacadeServices.get#AppContent": "#/components/schemas/GetAppContentRequest",
+                                        "facade.AuditFacadeServices.acknowledge#AuditFinding": "#/components/schemas/AcknowledgeAuditFindingRequest",
                                         "facade.AuditFacadeServices.add#AuditStatement": "#/components/schemas/AddAuditStatementRequest",
                                         "facade.AuditFacadeServices.create#Audit": "#/components/schemas/CreateAuditRequest",
+                                        "facade.AuditFacadeServices.delete#AuditFindingAcknowledgement": "#/components/schemas/DeleteAuditFindingAcknowledgementRequest",
                                         "facade.AuditFacadeServices.get#AuditCheckExtracts": "#/components/schemas/GetAuditCheckExtractsRequest",
                                         "facade.AuditFacadeServices.get#AuditCheckOptions": "#/components/schemas/GetAuditCheckOptionsRequest",
                                         "facade.AuditFacadeServices.get#AuditFinding": "#/components/schemas/GetAuditFindingRequest",
+                                        "facade.AuditFacadeServices.get#AuditFindingFeedback": "#/components/schemas/GetAuditFindingFeedbackRequest",
                                         "facade.AuditFacadeServices.get#AuditFindingsByOrder": "#/components/schemas/GetAuditFindingsByOrderRequest",
                                         "facade.AuditFacadeServices.get#AuditProgress": "#/components/schemas/GetAuditProgressRequest",
                                         "facade.AuditFacadeServices.get#AuditReadReport": "#/components/schemas/GetAuditReadReportRequest",
@@ -1104,6 +1130,8 @@
                                         "facade.AuditFacadeServices.run#Audit": "#/components/schemas/RunAuditRequest",
                                         "facade.AuditFacadeServices.save#AuditCheck": "#/components/schemas/SaveAuditCheckRequest",
                                         "facade.AuditFacadeServices.save#AuditSettings": "#/components/schemas/SaveAuditSettingsRequest",
+                                        "facade.AuditFacadeServices.send#AuditFindingFeedback": "#/components/schemas/SendAuditFindingFeedbackRequest",
+                                        "facade.AuditFacadeServices.update#AuditFindingAcknowledgement": "#/components/schemas/UpdateAuditFindingAcknowledgementRequest",
                                         "facade.AuditFacadeServices.verify#AuditFinding": "#/components/schemas/VerifyAuditFindingRequest",
                                         "facade.AuthFacadeServices.begin#PasskeyFirstSignIn": "#/components/schemas/BeginPasskeyFirstSignInRequest",
                                         "facade.AuthFacadeServices.begin#PasskeyProof": "#/components/schemas/BeginPasskeyProofRequest",
@@ -1431,6 +1459,12 @@
                                             "$ref": "#/components/schemas/UpdateEmailTemplateResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/GetFeedbackListResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/ReplyFeedbackResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/GetKnowledgeEntryResponse"
                                         },
                                         {
@@ -1635,10 +1669,16 @@
                                             "$ref": "#/components/schemas/GetAppContentResponse"
                                         },
                                         {
+                                            "$ref": "#/components/schemas/AcknowledgeAuditFindingResponse"
+                                        },
+                                        {
                                             "$ref": "#/components/schemas/AddAuditStatementResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/CreateAuditResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/DeleteAuditFindingAcknowledgementResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/GetAuditCheckExtractsResponse"
@@ -1648,6 +1688,9 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/GetAuditFindingResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/GetAuditFindingFeedbackResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/GetAuditFindingsByOrderResponse"
@@ -1678,6 +1721,12 @@
                                         },
                                         {
                                             "$ref": "#/components/schemas/SaveAuditSettingsResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/SendAuditFindingFeedbackResponse"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/UpdateAuditFindingAcknowledgementResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/VerifyAuditFindingResponse"
@@ -5760,6 +5809,176 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/UpdateEmailTemplateResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "GetFeedbackListParams": {
+                "type": "object",
+                "properties": {
+                    "unansweredOnly": {
+                        "type": "boolean"
+                    },
+                    "limit": {
+                        "type": "integer"
+                    }
+                },
+                "description": "Feedback across tenants, unanswered first then newest: [feedbackId, tenant: [id, name], statement, cause, record,\n            note, sentBy, sentAt, ageDays, answer, answeredAt]. unansweredOnly (default true) leaves out the answered ones."
+            },
+            "GetFeedbackListResult": {
+                "type": "object",
+                "properties": {
+                    "feedback": {
+                        "type": "array",
+                        "items": {
+                            
+                        }
+                    }
+                }
+            },
+            "GetFeedbackListRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for admin.FeedbackAdminServices.get#FeedbackList",
+                "x-darpan-method": "admin.FeedbackAdminServices.get#FeedbackList",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "admin.FeedbackAdminServices.get#FeedbackList"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetFeedbackListParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetFeedbackListResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for admin.FeedbackAdminServices.get#FeedbackList. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetFeedbackListResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "ReplyFeedbackParams": {
+                "type": "object",
+                "properties": {
+                    "feedbackId": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "feedbackId",
+                    "answer"
+                ],
+                "description": "Answers one piece of feedback by email to its sender (their note quoted, then the answer) and saves the answer. A\n            second reply overwrites the answer and sends again. Refuses a blank answer and an unknown id; if the mail is not sent,\n            nothing is saved."
+            },
+            "ReplyFeedbackResult": {
+                "type": "object",
+                "properties": {
+                    "feedbackId": {
+                        "type": "string"
+                    },
+                    "answeredAt": {
+                        "type": "string"
+                    }
+                }
+            },
+            "ReplyFeedbackRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for admin.FeedbackAdminServices.reply#Feedback",
+                "x-darpan-method": "admin.FeedbackAdminServices.reply#Feedback",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "admin.FeedbackAdminServices.reply#Feedback"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/ReplyFeedbackParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "ReplyFeedbackResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for admin.FeedbackAdminServices.reply#Feedback. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/ReplyFeedbackResult"
                     }
                 },
                 "required": [
@@ -12712,6 +12931,111 @@
                     "result"
                 ]
             },
+            "AcknowledgeAuditFindingParams": {
+                "type": "object",
+                "properties": {
+                    "findingId": {
+                        "type": "string",
+                        "description": "Any finding of the row, e.g. F-20761."
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "Why the problem is known; required, at most 4,000 characters."
+                    },
+                    "remind": {
+                        "type": "boolean",
+                        "description": "Bring the row back to Open after the remind\n                days if it is still open."
+                    }
+                },
+                "required": [
+                    "findingId"
+                ],
+                "description": "Acknowledges the report row holding one open finding: every open line of its order under its statement\n            and the later-step lines waiting under it get the note and one remind day (today in the tenant's zone plus the\n            audit.acknowledge.remindDays setting; none when remind is off). Replaces an earlier acknowledgement of those\n            findings. A fixed finding cannot be acknowledged."
+            },
+            "AcknowledgeAuditFindingResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "acknowledgement": {
+                        "type": "object",
+                        "description": "{note, by: {id, label}, at, remindOn, reminded}"
+                    }
+                }
+            },
+            "AcknowledgeAuditFindingRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AuditFacadeServices.acknowledge#AuditFinding",
+                "x-darpan-method": "facade.AuditFacadeServices.acknowledge#AuditFinding",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AuditFacadeServices.acknowledge#AuditFinding"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/AcknowledgeAuditFindingParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "AcknowledgeAuditFindingResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AuditFacadeServices.acknowledge#AuditFinding. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/AcknowledgeAuditFindingResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "AddAuditStatementParams": {
                 "type": "object",
                 "properties": {
@@ -12917,6 +13241,99 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/CreateAuditResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "DeleteAuditFindingAcknowledgementParams": {
+                "type": "object",
+                "properties": {
+                    "findingId": {
+                        "type": "string",
+                        "description": "Any finding of the row, e.g. F-20761."
+                    }
+                },
+                "required": [
+                    "findingId"
+                ],
+                "description": "Reopens the report row holding one finding: removes the acknowledgement of every covered finding, each\n            with a history event. Nothing to remove is not an error."
+            },
+            "DeleteAuditFindingAcknowledgementResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "DeleteAuditFindingAcknowledgementRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AuditFacadeServices.delete#AuditFindingAcknowledgement",
+                "x-darpan-method": "facade.AuditFacadeServices.delete#AuditFindingAcknowledgement",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AuditFacadeServices.delete#AuditFindingAcknowledgement"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/DeleteAuditFindingAcknowledgementParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "DeleteAuditFindingAcknowledgementResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AuditFacadeServices.delete#AuditFindingAcknowledgement. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/DeleteAuditFindingAcknowledgementResult"
                     }
                 },
                 "required": [
@@ -13229,6 +13646,110 @@
                     "result"
                 ]
             },
+            "GetAuditFindingFeedbackParams": {
+                "type": "object",
+                "properties": {
+                    "findingId": {
+                        "type": "string",
+                        "description": "The finding's id, e.g. F-20761."
+                    }
+                },
+                "required": [
+                    "findingId"
+                ],
+                "description": "The notes this tenant sent Darpan on the finding's statement and cause (an Unexplained finding: its\n            statement) within the shown days, newest first. Older notes are kept, just not listed."
+            },
+            "GetAuditFindingFeedbackResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "notes": {
+                        "type": "array",
+                        "items": {
+                            
+                        },
+                        "description": "[{feedbackId, note, sentAt, by: {id, label}, record}]"
+                    },
+                    "shownDays": {
+                        "type": "integer",
+                        "description": "The audit.feedback.shownDays setting."
+                    }
+                }
+            },
+            "GetAuditFindingFeedbackRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditFindingFeedback",
+                "x-darpan-method": "facade.AuditFacadeServices.get#AuditFindingFeedback",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AuditFacadeServices.get#AuditFindingFeedback"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/GetAuditFindingFeedbackParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "GetAuditFindingFeedbackResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AuditFacadeServices.get#AuditFindingFeedback. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/GetAuditFindingFeedbackResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
             "GetAuditFindingsByOrderParams": {
                 "type": "object",
                 "properties": {
@@ -13246,7 +13767,7 @@
                     },
                     "state": {
                         "type": "string",
-                        "description": "Kept for callers that send it: a finding is only ever open or fixed, and this\n                lists the open ones whatever the value (DAR-BE-206)."
+                        "description": "DAR-BE-361. open: the rows not acknowledged today (a reminded row is open);\n                acknowledged: the rows acknowledged today; blank: every open row. Any other value is an error. A finding\n                itself is only ever open or fixed (DAR-BE-206)."
                     },
                     "priority": {
                         "type": "string",
@@ -13256,7 +13777,7 @@
                 "required": [
                     "audit"
                 ],
-                "description": "Every open finding of one audit and period, one per order (an order's lines under it, the\n            line holding it up named), each with its statement and category. State is as of today."
+                "description": "Every open finding of one audit and period, one per order (an order's lines under it, the\n            line holding it up named), each with its statement and category and its row's acknowledgement. State and\n            acknowledgements are as of today."
             },
             "GetAuditFindingsByOrderResult": {
                 "type": "object",
@@ -14313,6 +14834,211 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/SaveAuditSettingsResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "SendAuditFindingFeedbackParams": {
+                "type": "object",
+                "properties": {
+                    "findingId": {
+                        "type": "string",
+                        "description": "The finding's id, e.g. F-20761."
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "The note to Darpan; required, at most 4,000 characters."
+                    }
+                },
+                "required": [
+                    "findingId"
+                ],
+                "description": "Sends Darpan a note about one finding: saves it with a snapshot of the finding's statement, cause, record\n            and headline, posts it to Darpan's feedback chat space when one is set, and emails the sender a thank-you. Darpan\n            replies by email."
+            },
+            "SendAuditFindingFeedbackResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "feedback": {
+                        "type": "object",
+                        "description": "{feedbackId, note, sentAt, by: {id, label}}"
+                    }
+                }
+            },
+            "SendAuditFindingFeedbackRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AuditFacadeServices.send#AuditFindingFeedback",
+                "x-darpan-method": "facade.AuditFacadeServices.send#AuditFindingFeedback",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AuditFacadeServices.send#AuditFindingFeedback"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/SendAuditFindingFeedbackParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "SendAuditFindingFeedbackResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AuditFacadeServices.send#AuditFindingFeedback. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/SendAuditFindingFeedbackResult"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "result"
+                ]
+            },
+            "UpdateAuditFindingAcknowledgementParams": {
+                "type": "object",
+                "properties": {
+                    "findingId": {
+                        "type": "string",
+                        "description": "Any finding of the row, e.g. F-20761."
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "The new note; required, at most 4,000 characters."
+                    },
+                    "remind": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "findingId"
+                ],
+                "description": "Changes the acknowledgement of the report row holding one finding: the note on every covered finding,\n            and the remind day. Remind off clears it; remind on keeps a remind day not yet reached and starts a fresh one\n            (today plus the remind days) when it was off or has passed."
+            },
+            "UpdateAuditFindingAcknowledgementResult": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "acknowledgement": {
+                        "type": "object",
+                        "description": "{note, by: {id, label}, at, remindOn, reminded}"
+                    }
+                }
+            },
+            "UpdateAuditFindingAcknowledgementRequest": {
+                "type": "object",
+                "description": "JSON-RPC request envelope for facade.AuditFacadeServices.update#AuditFindingAcknowledgement",
+                "x-darpan-method": "facade.AuditFacadeServices.update#AuditFindingAcknowledgement",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "method": {
+                        "type": "string",
+                        "const": "facade.AuditFacadeServices.update#AuditFindingAcknowledgement"
+                    },
+                    "params": {
+                        "$ref": "#/components/schemas/UpdateAuditFindingAcknowledgementParams"
+                    }
+                },
+                "required": [
+                    "jsonrpc",
+                    "id",
+                    "method"
+                ]
+            },
+            "UpdateAuditFindingAcknowledgementResponse": {
+                "type": "object",
+                "description": "JSON-RPC success envelope for facade.AuditFacadeServices.update#AuditFindingAcknowledgement. Check result.ok / result.errors for business failures.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "const": "2.0"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "result": {
+                        "$ref": "#/components/schemas/UpdateAuditFindingAcknowledgementResult"
                     }
                 },
                 "required": [
@@ -41474,6 +42200,8 @@
         "admin.EmailAdminServices.preview#EmailTemplate": "PreviewEmailTemplate",
         "admin.EmailAdminServices.reset#EmailTemplate": "ResetEmailTemplate",
         "admin.EmailAdminServices.update#EmailTemplate": "UpdateEmailTemplate",
+        "admin.FeedbackAdminServices.get#FeedbackList": "GetFeedbackList",
+        "admin.FeedbackAdminServices.reply#Feedback": "ReplyFeedback",
         "admin.KnowledgeAdminServices.get#KnowledgeEntry": "GetKnowledgeEntry",
         "admin.KnowledgeAdminServices.get#KnowledgeForReview": "GetKnowledgeForReview",
         "admin.KnowledgeAdminServices.get#KnowledgeIdentifiers": "GetKnowledgeIdentifiers",
@@ -41542,11 +42270,14 @@
         "facade.AgentTurnFacadeServices.send#AgentQueryTurn": "SendAgentQueryTurn",
         "facade.AgentTurnFacadeServices.send#AgentTurn": "SendAgentTurn",
         "facade.AppContentFacadeServices.get#AppContent": "GetAppContent",
+        "facade.AuditFacadeServices.acknowledge#AuditFinding": "AcknowledgeAuditFinding",
         "facade.AuditFacadeServices.add#AuditStatement": "AddAuditStatement",
         "facade.AuditFacadeServices.create#Audit": "CreateAudit",
+        "facade.AuditFacadeServices.delete#AuditFindingAcknowledgement": "DeleteAuditFindingAcknowledgement",
         "facade.AuditFacadeServices.get#AuditCheckExtracts": "GetAuditCheckExtracts",
         "facade.AuditFacadeServices.get#AuditCheckOptions": "GetAuditCheckOptions",
         "facade.AuditFacadeServices.get#AuditFinding": "GetAuditFinding",
+        "facade.AuditFacadeServices.get#AuditFindingFeedback": "GetAuditFindingFeedback",
         "facade.AuditFacadeServices.get#AuditFindingsByOrder": "GetAuditFindingsByOrder",
         "facade.AuditFacadeServices.get#AuditProgress": "GetAuditProgress",
         "facade.AuditFacadeServices.get#AuditReadReport": "GetAuditReadReport",
@@ -41557,6 +42288,8 @@
         "facade.AuditFacadeServices.run#Audit": "RunAudit",
         "facade.AuditFacadeServices.save#AuditCheck": "SaveAuditCheck",
         "facade.AuditFacadeServices.save#AuditSettings": "SaveAuditSettings",
+        "facade.AuditFacadeServices.send#AuditFindingFeedback": "SendAuditFindingFeedback",
+        "facade.AuditFacadeServices.update#AuditFindingAcknowledgement": "UpdateAuditFindingAcknowledgement",
         "facade.AuditFacadeServices.verify#AuditFinding": "VerifyAuditFinding",
         "facade.AuthFacadeServices.begin#PasskeyFirstSignIn": "BeginPasskeyFirstSignIn",
         "facade.AuthFacadeServices.begin#PasskeyProof": "BeginPasskeyProof",

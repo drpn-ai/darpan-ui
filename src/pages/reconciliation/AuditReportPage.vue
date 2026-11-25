@@ -362,9 +362,9 @@ const level = computed(() => {
   return queryValue('category') ? 2 : 1
 })
 
-const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', notChecked: 'not checked', all: 'all' }
+const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', acknowledged: 'acknowledged', notChecked: 'not checked', all: 'all' }
 // DAR-UI-087. The finding pills first, then the statements' one, as the left column words it.
-const PILL_ORDER: AuditFilter[] = ['open', 'all', 'notChecked']
+const PILL_ORDER: AuditFilter[] = ['open', 'acknowledged', 'all', 'notChecked']
 const pills = computed(() => {
   const doc = report.value
   if (!doc) return []
@@ -650,7 +650,9 @@ async function readMore(): Promise<void> {
 }
 
 // DAR-UI-073. The picked pill's state, sent with every findings page, so "more" and the export list what the board counts.
-const pillState = computed<{ state?: 'open' }>(() => (filter.value === 'open' ? { state: 'open' } : {}))
+// DAR-UI-144. Open excludes acknowledged rows; the acknowledged pill lists only those; all lists both.
+const pillState = computed<{ state?: 'open' | 'acknowledged' }>(() =>
+  filter.value === 'open' || filter.value === 'acknowledged' ? { state: filter.value } : {})
 
 // DAR-UI-073. The toolbar's filters: ?q (an order or record id), ?cause, ?age (at least N days). The report lists 50
 // findings a statement and no cause, so a filter reads every open finding of the period, once per morning,

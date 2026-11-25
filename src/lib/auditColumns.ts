@@ -26,8 +26,9 @@ export const SOURCE_NOT_COVERED = 'notCovered'
 /** DAR-UI-085. Under Run health while checks are in flight. */
 export const SOURCE_RUNNING = 'running'
 
-export type AuditFilter = 'all' | 'open' | 'notChecked'
-export const AUDIT_FILTERS: AuditFilter[] = ['open', 'notChecked', 'all']
+// DAR-UI-144. 'acknowledged': rows a person has taken, listed apart from open (open excludes them).
+export type AuditFilter = 'all' | 'open' | 'acknowledged' | 'notChecked'
+export const AUDIT_FILTERS: AuditFilter[] = ['open', 'acknowledged', 'notChecked', 'all']
 
 export function isAuditFilter(value: unknown): value is AuditFilter {
   return typeof value === 'string' && (AUDIT_FILTERS as string[]).includes(value)
@@ -175,6 +176,7 @@ export function priorityItems(report: AuditReport, progress?: AuditProgress | nu
 
 export function keepStatement(statement: AuditStatement, filter: AuditFilter): boolean {
   if (filter === 'open') return (statement.counts?.open ?? 0) > 0
+  if (filter === 'acknowledged') return (statement.counts?.acknowledged ?? 0) > 0
   if (filter === 'notChecked') return statement.status === 'notRun'
   return true
 }
@@ -223,6 +225,7 @@ export function filterCounts(report: AuditReport): Record<AuditFilter, number> {
   const statements = Object.values(report.categories ?? {}).flatMap(statementsOf)
   return {
     open: report.summary.open,
+    acknowledged: report.summary.acknowledged ?? 0,
     notChecked: statements.filter((statement) => statement.status === 'notRun').length,
     all: countFor(report.summary),
   }

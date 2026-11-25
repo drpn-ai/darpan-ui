@@ -12,6 +12,8 @@ import type {
 import type {
   GetAuditFindingResponse,
   GetAuditCheckExtractsResponse,
+  AuditAcknowledgement,
+  AuditFeedbackNote,
   GetAuditFindingsByOrderResponse,
   GetAuditReportResponse,
   GetAuditSettingsResponse,
@@ -742,6 +744,11 @@ const AUDIT = {
   addAuditStatement: 'facade.AuditFacadeServices.add#AuditStatement',
   runAudit: 'facade.AuditFacadeServices.run#Audit',
   verifyAuditFinding: 'facade.AuditFacadeServices.verify#AuditFinding',
+  acknowledgeFinding: 'facade.AuditFacadeServices.acknowledge#AuditFinding',
+  updateAcknowledgement: 'facade.AuditFacadeServices.update#AuditFindingAcknowledgement',
+  reopenAcknowledgement: 'facade.AuditFacadeServices.delete#AuditFindingAcknowledgement',
+  sendFindingFeedback: 'facade.AuditFacadeServices.send#AuditFindingFeedback',
+  getFindingFeedback: 'facade.AuditFacadeServices.get#AuditFindingFeedback',
 }
 
 export const auditFacade = {
@@ -755,10 +762,26 @@ export const auditFacade = {
     return callService<GetAuditFindingResponse>(AUDIT.getAuditFinding, payload, signal)
   },
   getAuditFindingsByOrder(
-    payload: { audit: string; statement?: string; state?: 'open'; period?: string; priority?: AuditLevel },
+    payload: { audit: string; statement?: string; state?: 'open' | 'acknowledged'; period?: string; priority?: AuditLevel },
     signal?: AbortSignal,
   ): Promise<GetAuditFindingsByOrderResponse> {
     return callService<GetAuditFindingsByOrderResponse>(AUDIT.getAuditFindingsByOrder, payload, signal)
+  },
+  // DAR-UI-144. Acknowledge a row with a note and a remind choice; change it; reopen it; tell Darpan about a finding.
+  acknowledgeFinding(findingId: string, note: string, remind: boolean, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; acknowledgement?: AuditAcknowledgement }> {
+    return callService(AUDIT.acknowledgeFinding, { findingId, note, remind }, signal)
+  },
+  updateAcknowledgement(findingId: string, note: string, remind: boolean, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; acknowledgement?: AuditAcknowledgement }> {
+    return callService(AUDIT.updateAcknowledgement, { findingId, note, remind }, signal)
+  },
+  reopenAcknowledgement(findingId: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[] }> {
+    return callService(AUDIT.reopenAcknowledgement, { findingId }, signal)
+  },
+  sendFindingFeedback(findingId: string, note: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; feedback?: { recentCount: number } }> {
+    return callService(AUDIT.sendFindingFeedback, { findingId, note }, signal)
+  },
+  getFindingFeedback(findingId: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; notes: AuditFeedbackNote[]; shownDays: number }> {
+    return callService(AUDIT.getFindingFeedback, { findingId }, signal)
   },
   getAuditCheckExtracts(
     payload: { audit: string; check: string; date: string; period: string },

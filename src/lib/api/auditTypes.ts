@@ -81,6 +81,26 @@ export interface AuditRef {
 }
 
 export interface AuditSourceHealth {
+  /** DAR-UI-144. Rows a person acknowledged; open and byPriority exclude them. Absent on older reports. */
+  acknowledged?: number
+}
+
+/** DAR-UI-144. A row taken with a note; reminded once remindOn has passed and the row reads open again. */
+export interface AuditAcknowledgement {
+  note: string
+  by: { id: string; label: string | null }
+  at: string
+  remindOn: string | null
+  reminded: boolean
+}
+
+/** DAR-UI-144. A note sent to Darpan about a finding group. */
+export interface AuditFeedbackNote {
+  feedbackId: string
+  note: string
+  sentAt: string
+  by: { id: string; label: string | null }
+  record: string | null
   read: AuditSourceRead
   records: number | null
   readAt: string | null
@@ -141,6 +161,8 @@ export interface AuditFindingSummary {
  * DAR-BE-250. A finding on an order an earlier step already reports: its statement, id, headline and cause. DAR-BE-254:
  * item names what it is about (the SKU, or the line when the record has none), so the row reads as the thing, not a code.
  */
+  /** DAR-UI-144. Null or absent when the row is open. */
+  acknowledgement?: AuditAcknowledgement | null
 export interface AuditWaitingFinding {
   statement: string
   id: string
@@ -223,6 +245,8 @@ export interface AuditReport {
   categories: Record<string, AuditCategory>
 }
 
+    /** DAR-UI-144. Days before an acknowledged row is raised again. */
+    acknowledgeRemindDays?: number
 export interface AuditFindingEvent {
   at: string
   event: string
@@ -277,6 +301,9 @@ export interface AuditListItem {
   name: string
   period: string | null
 }
+    /** DAR-UI-144. */
+    acknowledgement?: AuditAcknowledgement | null
+    feedback?: { recentCount: number }
 
 interface AuditEnvelope {
   ok?: boolean

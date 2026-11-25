@@ -21,6 +21,8 @@ import {
   defaultSource,
   defaultStatement,
   filterCounts,
+  AUDIT_FILTERS,
+  keepStatement,
   findStatement,
   findingsLeft,
   isAuditFilter,
@@ -110,8 +112,21 @@ describe('auditColumns', () => {
   it('counts open findings in every column, and offers no pending pill', () => {
     expect([countFor(counts(340)), countFor(undefined)]).toEqual([340, 0])
     expect(categoryItems(report()).map((item) => item.count)).toEqual([0, 1, 2, 0])
-    expect(filterCounts(report())).toEqual({ open: 3, notChecked: 1, all: 3 })
+    expect(filterCounts(report())).toEqual({ open: 3, acknowledged: 0, notChecked: 1, all: 3 })
     expect(isAuditFilter('pending')).toBe(false)
+  })
+
+  it('counts acknowledged rows from the summary, 0 on older reports, and keeps statements that have them', () => {
+    const doc = report()
+    expect(filterCounts(doc).acknowledged).toBe(0)
+    doc.summary.acknowledged = 4
+    expect(filterCounts(doc).acknowledged).toBe(4)
+    expect(AUDIT_FILTERS).toEqual(['open', 'acknowledged', 'notChecked', 'all'])
+    expect(isAuditFilter('acknowledged')).toBe(true)
+    const kept = statement('R1', 0)
+    kept.counts.acknowledged = 2
+    expect(keepStatement(kept, 'acknowledged')).toBe(true)
+    expect(keepStatement(statement('R2', 3), 'acknowledged')).toBe(false)
   })
 
   it('opens on the category with the most open findings the filter keeps, and its first statement with findings', () => {
