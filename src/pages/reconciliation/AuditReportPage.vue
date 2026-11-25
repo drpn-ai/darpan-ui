@@ -402,6 +402,8 @@ async function loadReport(options: { quiet?: boolean } = {}): Promise<void> {
       pageError.value = errorOf(response, 'The audit got lost on the way here. Send a search party.')
     } else {
       report.value = response.report
+      // DAR-UI-143. The list moved under an open finding: read the finding too, so the row and the detail agree.
+      if (options.quiet) void loadFinding({ quiet: true })
     }
   } catch {
     if (!abort.signal.aborted && !options.quiet) pageError.value = 'The audit got lost on the way here. Send a search party.'
@@ -476,9 +478,14 @@ async function retryCheck(checks: string[]): Promise<void> {
   }
 }
 
+// A check is in flight, or a play was just submitted and its runs may not show yet.
+function playInFlight(): boolean {
+  return (progress.value?.activeChecks ?? 0) > 0 || Date.now() < watchPlayUntil
+}
+
 function scheduleProgress(): void {
   clearTimeout(progressTimer)
-  if ((progress.value?.activeChecks ?? 0) === 0 && Date.now() >= watchPlayUntil) return
+  if (!playInFlight()) return
   progressTimer = setTimeout(() => {
     if (document.hidden) scheduleProgress()
     else void loadProgress()
@@ -493,21 +500,25 @@ onBeforeUnmount(() => {
 // DAR-UI-075. An order open in the detail: its row in the list (the report's, "more", or the filters' read). Its detail
 // reads the stuck line's finding (else its first open line's), whose fix and history are the order's. DAR-UI-081 (Aditi:
 // "remove the click and detail page"): a line has no page of its own; its finding id opens its order.
+const listedRows = computed(() => [...(statementDoc.value?.findings ?? []), ...more.value.findings,
+  ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])])
 const orderUnit = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return null
-  const listed = statementDoc.value?.findings ?? []
-  return [...listed, ...more.value.findings, ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])]
+  return listedRows.value
     .find((item) => item.kind === 'order' && (item.id === id || Boolean(item.lines?.some((line) => line.id === id)))) ?? null
 })
 // DAR-BE-250. The open finding's row (an order or a lone finding): what later steps report on the same order.
 const waiting = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return []
-  const listed = statementDoc.value?.findings ?? []
-  return [...listed, ...more.value.findings, ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])]
-    .find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))?.waiting ?? []
+  return listedRows.value.find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))?.waiting ?? []
 })
+// DAR-UI-143. A finding's state as the list says it: its line's on an order row, else its own row's.
+function listedState(id: string): string | undefined {
+  if (orderUnit.value) return orderUnit.value.lines?.find((line) => line.id === id)?.state
+  return listedRows.value.find((item) => item.id === id)?.state
+}
 // A line's finding is F-<n>; anything else names an order, read once the statement's orders are in.
 const isLineId = (id: string) => /^F-\d+$/.test(id)
 const findingTarget = computed(() => {
@@ -518,19 +529,36 @@ const findingTarget = computed(() => {
   return isLineId(findingId.value) ? findingId.value : ''
 })
 
-async function loadFinding(): Promise<void> {
-  finding.value = null
-  findingError.value = ''
-  if (!findingTarget.value) return
-  findingLoading.value = true
+// DAR-UI-143. Its own abort: a quiet report refresh mid-run aborted the shared one and left the detail blank.
+let findingAbort = new AbortController()
+onBeforeUnmount(() => findingAbort.abort())
+// quiet: a re-read under an open finding keeps it on screen and keeps it if the read fails. A fresh read that disagrees
+// with its row while a play runs reads the report again (once: that refresh's re-read is quiet and asks for no more).
+async function loadFinding(options: { quiet?: boolean } = {}): Promise<void> {
+  findingAbort.abort()
+  const controller = (findingAbort = new AbortController())
+  const id = findingTarget.value
+  if (!options.quiet) {
+    finding.value = null
+    findingError.value = ''
+  }
+  if (!id) return
+  if (!options.quiet) findingLoading.value = true
   try {
-    const response = await auditFacade.getAuditFinding({ findingId: findingTarget.value }, abort.signal)
-    if (response.ok === false || !response.finding) findingError.value = errorOf(response, 'This finding is lost. Ironic, we know.')
-    else finding.value = response.finding
+    const response = await auditFacade.getAuditFinding({ findingId: id }, controller.signal)
+    if (controller.signal.aborted) return
+    if (response.ok === false || !response.finding) {
+      if (!options.quiet) findingError.value = errorOf(response, 'This finding is lost. Ironic, we know.')
+      return
+    }
+    finding.value = response.finding
+    findingError.value = ''
+    const listed = listedState(id)
+    if (!options.quiet && playInFlight() && listed && listed !== response.finding.finding.status.state) void loadReport({ quiet: true })
   } catch {
-    if (!abort.signal.aborted) findingError.value = 'This finding is lost. Ironic, we know.'
+    if (!controller.signal.aborted && !options.quiet) findingError.value = 'This finding is lost. Ironic, we know.'
   } finally {
-    findingLoading.value = false
+    if (controller === findingAbort) findingLoading.value = false
   }
 }
 

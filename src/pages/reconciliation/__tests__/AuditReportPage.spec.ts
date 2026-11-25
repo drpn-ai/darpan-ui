@@ -1,5 +1,5 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { route, replace, push } = vi.hoisted(() => ({
   route: { params: { audit: 'month-close' }, query: {} as Record<string, string | undefined> },
@@ -38,6 +38,8 @@ import AuditColumns from '../../../components/audit/AuditColumns.vue'
 import type { AuditReport } from '../../../lib/api/auditTypes'
 
 const f = vi.mocked(auditFacade)
+// DAR-UI-143: a page a test leaves mounted still reacts to the shared route and counts as reads in the next test.
+enableAutoUnmount(afterEach)
 // The page reads the reactive route the mock hands out; change it through that, or nothing reacts.
 const liveRoute = useRoute() as unknown as { query: Record<string, string | undefined> }
 
@@ -314,6 +316,84 @@ describe('AuditReportPage', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // DAR-UI-143 (Aditi: "while an audit is running there is a brief moment when the tab says open and the finding detail
+  // says fixed"). The list and the detail are read at different times; while a play runs, the later read wins both.
+  describe('row and detail agree while a play runs', () => {
+    const running = {
+      run: 'Invoices vs Shopify', checks: ['invoices-without-etail-id'], state: 'running', attempt: 1,
+      stage: 'COMPARE', progressPercent: 60, elapsedMs: 60000, usualDurationMs: 300000, health: 'healthy',
+    }
+    const fixedDocument = { ...findingDocument, finding: { ...findingDocument.finding,
+      status: { ...findingDocument.finding.status, state: 'fixed', closedAt: '2026-10-08T06:20:00-07:00' } } }
+    function reportWithF1(state: 'open' | 'fixed'): AuditReport {
+      const doc = report()
+      const listed = doc.categories.orders!.statements.R2!.findings
+      listed[0] = { ...listed[0]!, state }
+      return doc
+    }
+    const rowSays = (w: ReturnType<typeof mount>, id: string) =>
+      w.findAll('[data-testid="audit-finding-row"]').find((row) => row.attributes('title') === id)?.text() ?? ''
+    const detailSays = (w: ReturnType<typeof mount>) => w.get('.audit-detail-head').text()
+
+    it('reads the report again when a fresh finding says Fixed and its row still says Open', async () => {
+      f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 1, active: [running] } } as never)
+      f.getAuditReport.mockResolvedValueOnce({ ok: true, report: reportWithF1('open') } as never)
+        .mockResolvedValue({ ok: true, report: reportWithF1('fixed') } as never)
+      f.getAuditFinding.mockResolvedValue({ ok: true, finding: fixedDocument } as never)
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+
+      expect(f.getAuditReport).toHaveBeenCalledTimes(2)
+      expect(detailSays(w)).toContain('Fixed')
+      // Fixed findings leave the list, so no row says Open beside a Fixed detail.
+      expect(rowSays(w, 'F-1')).not.toContain('Open')
+      w.unmount()
+    })
+
+    it('reads the open finding again when a check finishes, keeping it on screen meanwhile', async () => {
+      vi.useFakeTimers()
+      f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 1, active: [running] } } as never)
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const w = mount(AuditReportPage)
+      try {
+        await flushPromises()
+        expect(detailSays(w)).toContain('Open')
+        expect(f.getAuditReport).toHaveBeenCalledTimes(1)
+
+        // The check closes F-1 and finishes: the report is read again, then the finding, without a "Loading" blank.
+        f.getAuditReport.mockResolvedValue({ ok: true, report: reportWithF1('fixed') } as never)
+        let answer: (value: unknown) => void = () => {}
+        f.getAuditFinding.mockImplementation(() => new Promise((resolve) => (answer = resolve)) as never)
+        f.getAuditProgress.mockResolvedValue({ ok: true, progress: { checks: 1, activeChecks: 0, active: [] } } as never)
+        await vi.advanceTimersByTimeAsync(10_000)
+        await flushPromises()
+        expect(f.getAuditReport).toHaveBeenCalledTimes(2)
+        expect(f.getAuditFinding).toHaveBeenCalledTimes(2)
+        expect(w.text()).not.toContain('Loading finding...')
+        expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Invoice INV1 has no Etail id')
+
+        answer({ ok: true, finding: fixedDocument })
+        await flushPromises()
+        expect(detailSays(w)).toContain('Fixed')
+      } finally {
+        w.unmount()
+        vi.useRealTimers()
+      }
+    })
+
+    it('reads nothing more when no play is in flight', async () => {
+      f.getAuditReport.mockResolvedValue({ ok: true, report: reportWithF1('open') } as never)
+      f.getAuditFinding.mockResolvedValue({ ok: true, finding: fixedDocument } as never)
+      liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(f.getAuditReport).toHaveBeenCalledTimes(1)
+      expect(f.getAuditFinding).toHaveBeenCalledTimes(1)
+      w.unmount()
+    })
   })
 
   // DAR-UI-096: Running now lists a run's steps in run order on the card, both reads at once while they run in parallel.
