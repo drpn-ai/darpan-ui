@@ -72,15 +72,6 @@ export interface AuditFindingCounts {
   fixedToday: number
   /** DAR-BE-348. Open findings by level; absent on reports before it. */
   byPriority?: Record<AuditLevel, number>
-}
-
-export interface AuditRef {
-  id: string
-  name: string
-  period?: string
-}
-
-export interface AuditSourceHealth {
   /** DAR-UI-144. Rows a person acknowledged; open and byPriority exclude them. Absent on older reports. */
   acknowledged?: number
 }
@@ -101,6 +92,15 @@ export interface AuditFeedbackNote {
   sentAt: string
   by: { id: string; label: string | null }
   record: string | null
+}
+
+export interface AuditRef {
+  id: string
+  name: string
+  period?: string
+}
+
+export interface AuditSourceHealth {
   read: AuditSourceRead
   records: number | null
   readAt: string | null
@@ -152,6 +152,8 @@ export interface AuditFindingSummary {
   /** DAR-BE-348. The unit's level, where it came from (its statement or its cause) and the cause's name when
    *  prioritySource is 'reason'. priorityLine: an order unit's level line. All absent on reports before it. */
   priority?: AuditLevel
+  /** DAR-UI-144. Null or absent when the row is open. */
+  acknowledgement?: AuditAcknowledgement | null
   prioritySource?: 'statement' | 'reason'
   priorityReason?: string | null
   priorityLine?: string
@@ -161,8 +163,6 @@ export interface AuditFindingSummary {
  * DAR-BE-250. A finding on an order an earlier step already reports: its statement, id, headline and cause. DAR-BE-254:
  * item names what it is about (the SKU, or the line when the record has none), so the row reads as the thing, not a code.
  */
-  /** DAR-UI-144. Null or absent when the row is open. */
-  acknowledgement?: AuditAcknowledgement | null
 export interface AuditWaitingFinding {
   statement: string
   id: string
@@ -236,6 +236,8 @@ export interface AuditReport {
     running: boolean
     period: string
     generatedAt: string
+    /** DAR-UI-144. Days before an acknowledged row is raised again. */
+    acknowledgeRemindDays?: number
   }
   health: AuditHealth
   summary: AuditFindingCounts & {
@@ -245,8 +247,6 @@ export interface AuditReport {
   categories: Record<string, AuditCategory>
 }
 
-    /** DAR-UI-144. Days before an acknowledged row is raised again. */
-    acknowledgeRemindDays?: number
 export interface AuditFindingEvent {
   at: string
   event: string
@@ -292,6 +292,9 @@ export interface AuditFindingDocument {
       darpanChanges: string
     }
     history: AuditFindingEvent[]
+    /** DAR-UI-144. */
+    acknowledgement?: AuditAcknowledgement | null
+    feedback?: { recentCount: number }
   }
   access: { mode: string; note: string }
 }
@@ -301,9 +304,6 @@ export interface AuditListItem {
   name: string
   period: string | null
 }
-    /** DAR-UI-144. */
-    acknowledgement?: AuditAcknowledgement | null
-    feedback?: { recentCount: number }
 
 interface AuditEnvelope {
   ok?: boolean

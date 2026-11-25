@@ -127,6 +127,8 @@ describe('auditColumns', () => {
     kept.counts.acknowledged = 2
     expect(keepStatement(kept, 'acknowledged')).toBe(true)
     expect(keepStatement(statement('R2', 3), 'acknowledged')).toBe(false)
+    const category = { label: 'Orders', counts: counts(3), statements: { R1: kept, R2: statement('R2', 3) } }
+    expect(statementItems(category, 'acknowledged').map((item) => [item.id, item.open, item.badge])).toEqual([['R1', 2, '2']])
   })
 
   it('opens on the category with the most open findings the filter keeps, and its first statement with findings', () => {

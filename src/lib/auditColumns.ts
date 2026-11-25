@@ -184,7 +184,8 @@ export function keepStatement(statement: AuditStatement, filter: AuditFilter): b
 /** Column 2: a category's statements that the filter keeps. */
 export function statementItems(category: AuditCategory | null | undefined, filter: AuditFilter): StatementItem[] {
   return statementsOf(category).filter((statement) => keepStatement(statement, filter)).map((statement) => {
-    const open = countFor(statement.counts)
+    // DAR-UI-144. Under the acknowledged pill a statement shows its acknowledged rows, not the open ones.
+    const open = filter === 'acknowledged' ? (statement.counts?.acknowledged ?? 0) : countFor(statement.counts)
     const notChecked = statement.status === 'notRun'
     return {
       id: statement.id,
