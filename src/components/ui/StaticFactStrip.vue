@@ -57,6 +57,9 @@ const emit = defineEmits<{ open: [key: string] }>()
   border-radius: var(--static-surface-radius);
   background: var(--static-tile-bg);
   overflow: hidden;
+  /* overflow: hidden drops a flex item's content-sized minimum, so a fixed-height flex column (the audit finding detail)
+     squeezed the strip to its labels and clipped the values. */
+  flex-shrink: 0;
 }
 
 /* Every cell the same height: the label on top, the value taking the middle, the dim line at the bottom. */
