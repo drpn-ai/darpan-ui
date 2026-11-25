@@ -11365,6 +11365,17 @@ export interface components {
             file2RecordRootExpression?: string;
             file2PrimaryIdExpression?: string;
             file2PrimaryIdExpressions?: unknown[];
+            /**
+             * @description DAR-UI-148. This side's extract options, only the names
+             *                     its connector declares (SourceSystemConnector.extractOptionsJson), e.g. {"withLineItems": true}. Omit to leave the
+             *                     stored options unchanged; send an empty map to clear them.
+             */
+            file1ExtractOptions?: Record<string, never>;
+            /**
+             * @description DAR-UI-148. As file1ExtractOptions, for the second
+             *                     side.
+             */
+            file2ExtractOptions?: Record<string, never>;
             rules?: {
                 ruleId?: string;
                 sequenceNum?: number;

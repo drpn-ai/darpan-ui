@@ -17,6 +17,7 @@ const routerPush = vi.hoisted(() => vi.fn())
 const getRunConclusions = vi.hoisted(() => vi.fn())
 const saveRunConclusions = vi.hoisted(() => vi.fn())
 const saveSavedRunName = vi.hoisted(() => vi.fn())
+const saveRuleSetRun = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     activeTenantUserGroupId: 'tenant-a',
@@ -51,6 +52,7 @@ vi.mock('../../../lib/api/facade', () => ({
   reconciliationFacade: {
     deleteSavedRun,
     listAutomationSourceOptions,
+    saveRuleSetRun,
     saveSavedRunName,
   },
   settingsFacade: {
@@ -204,6 +206,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
     getJsonSchema.mockReset()
     deleteSavedRun.mockReset()
     listAutomationSourceOptions.mockReset()
+    saveRuleSetRun.mockReset()
     listAutomationSourceOptions.mockResolvedValue({ ok: true, messages: [], errors: [], sourceConfigs: [] })
     listOmsRestSourceConfigs.mockReset()
     getShopifyAuthConfig.mockReset()
@@ -640,6 +643,86 @@ describe('ReconciliationRuleSetManagerPage', () => {
     const dialog = wrapper.get('[data-testid="ruleset-manager-auth-popup"]')
     expect(dialog.findAll('[data-testid="ruleset-manager-auth-popup-endpoint"]')).toHaveLength(1)
     expect(dialog.text()).not.toContain('Returns API')
+  })
+
+  // DAR-UI-148 (Aditi: "Build the editor"): an existing run's read options are seen and switched in place.
+  describe('read options', () => {
+    const optionRows = [
+      { sourceConfigId: 'dev_oms', systemEnumId: 'OMS', description: 'Dev OMS',
+        extractOptions: [{ name: 'keepExchangeOrders', label: 'Keep exchange orders', type: 'boolean' },
+          { name: 'withOrderItems', label: 'Order items', type: 'boolean' }, { name: 'note', label: 'A text one', type: 'text' }] },
+      // The same config's other endpoints: their options never show on the Orders side.
+      { sourceConfigId: 'dev_shopify', systemEnumId: 'SHOPIFY_ORDER_LINE_UNITS', extractOptions: [{ name: 'unitsOnly', label: 'Units only', type: 'boolean' }] },
+      { sourceConfigId: 'dev_shopify', systemEnumId: 'SHOPIFY', extractOptions: [{ name: 'withLineItems', label: 'Order lines', type: 'boolean' }] },
+    ]
+
+    function withOptions(file1ExtractOptions?: Record<string, boolean | string>) {
+      draftStoreState.ruleSetDraftState = { draft: { ...createApiDraftState().draft, file1ExtractOptions }, resumeStepId: 'ruleset-manager' }
+      listAutomationSourceOptions.mockResolvedValue({ ok: true, messages: [], errors: [], sourceConfigs: optionRows })
+    }
+
+    it('lists each side\'s declared switches with whether the run has them on, its own endpoint only', async () => {
+      withOptions({ keepExchangeOrders: true })
+      const wrapper = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      const rows = wrapper.findAll('[data-testid="ruleset-manager-read-option-row"]')
+      expect(rows.map((row) => row.text())).toEqual([
+        expect.stringContaining('Keep exchange orders'), expect.stringContaining('Order items'), expect.stringContaining('Order lines')])
+      expect(wrapper.get('[data-testid="ruleset-manager-read-option-file1-keepExchangeOrders"]').attributes('aria-checked')).toBe('true')
+      expect(wrapper.get('[data-testid="ruleset-manager-read-option-file1-withOrderItems"]').attributes('aria-checked')).toBe('false')
+      expect(wrapper.text()).not.toContain('Units only')
+      expect(wrapper.text()).not.toContain('A text one')
+    })
+
+    it('saves the run with the side\'s options when a switch turns on, and keeps the other options', async () => {
+      withOptions({ keepExchangeOrders: true })
+      saveRuleSetRun.mockResolvedValue({ ok: true, messages: [], errors: [] })
+      const wrapper = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="ruleset-manager-read-option-file1-withOrderItems"]').trigger('click')
+      await flushPromises()
+      expect(saveRuleSetRun).toHaveBeenCalledTimes(1)
+      expect(saveRuleSetRun.mock.calls[0]![0]).toMatchObject({ savedRunId: 'RS_API_ORDER_SYNC',
+        file1ExtractOptions: { keepExchangeOrders: true, withOrderItems: true } })
+      expect(draftStoreState.setRuleSetDraft).toHaveBeenLastCalledWith(
+        expect.objectContaining({ file1ExtractOptions: { keepExchangeOrders: true, withOrderItems: true } }), 'ruleset-manager')
+    })
+
+    it('sends an empty set when the last option on a side turns off, so the stored one clears', async () => {
+      withOptions({ keepExchangeOrders: true })
+      saveRuleSetRun.mockResolvedValue({ ok: true, messages: [], errors: [] })
+      const wrapper = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="ruleset-manager-read-option-file1-keepExchangeOrders"]').trigger('click')
+      await flushPromises()
+      expect(saveRuleSetRun.mock.calls[0]![0].file1ExtractOptions).toEqual({})
+      expect(draftStoreState.setRuleSetDraft).toHaveBeenLastCalledWith(expect.objectContaining({ file1ExtractOptions: undefined }), 'ruleset-manager')
+    })
+
+    it('says why when the save fails and leaves the switch as it was', async () => {
+      withOptions(undefined)
+      saveRuleSetRun.mockRejectedValue(new Error('network'))
+      const wrapper = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="ruleset-manager-read-option-file2-withLineItems"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="ruleset-manager-read-option-error"]').text()).toContain('Order lines was not saved.')
+      expect(draftStoreState.setRuleSetDraft).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="ruleset-manager-read-option-file2-withLineItems"]').attributes('aria-checked')).toBe('false')
+    })
+
+    it('shows no section when no side\'s connector declares an option, and no switch works for a viewer', async () => {
+      draftStoreState.ruleSetDraftState = createApiDraftState()
+      const plain = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      expect(plain.find('[data-testid="ruleset-manager-read-options"]').exists()).toBe(false)
+
+      permissionState.canEditTenantSettings = false
+      withOptions(undefined)
+      const viewer = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      expect(viewer.get('[data-testid="ruleset-manager-read-option-file2-withLineItems"]').attributes('disabled')).toBeDefined()
+    })
   })
 
   it('names each API source config by its description, per system when one id serves both sides', async () => {

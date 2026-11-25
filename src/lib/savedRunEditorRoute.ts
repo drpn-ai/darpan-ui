@@ -1,5 +1,6 @@
 import type { RouteLocationRaw } from 'vue-router'
 import { reconciliationFacade } from './api/facade'
+import type { SourceExtractOptions } from './api/authoringTypes'
 import type { SavedRunSummary, SavedRunSystemOption } from './api/types'
 import {
   normalizePreActions,
@@ -47,6 +48,24 @@ function effectivePrimaryIdExpression(option: SavedRunSystemOption | undefined):
   if (option?.idFieldExpressions?.length) return option.idFieldExpressions
   if (option?.idFieldExpression) return [option.idFieldExpression]
   return []
+}
+
+/**
+ * DAR-UI-148. A side's stored extract options (list#SavedRuns systemOptions[].extractParametersJson), so a draft opened
+ * from a run shows them and its saves send them back. Undefined when none are stored or the JSON is unreadable.
+ */
+export function storedExtractOptions(option: SavedRunSystemOption | undefined): SourceExtractOptions | undefined {
+  const raw = option?.extractParametersJson?.trim()
+  if (!raw) return undefined
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+    const kept = Object.entries(parsed as Record<string, unknown>)
+      .filter((entry): entry is [string, boolean | string] => typeof entry[1] === 'boolean' || typeof entry[1] === 'string')
+    return kept.length ? Object.fromEntries(kept) : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDraft | null {
@@ -109,6 +128,8 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
     file2FileTypeEnumId: file2Option ? (file2Option.fileTypeEnumId || 'DftCsv') : '',
     file2SchemaFileName: file2Option?.schemaFileName,
     file2PrimaryIdExpression,
+    file1ExtractOptions: storedExtractOptions(file1Option),
+    file2ExtractOptions: isSingleSided ? undefined : storedExtractOptions(file2Option),
     rules: row.rules?.map((rule, index) => {
       const directPreActions = normalizePreActions(rule.preActions)
       const preActions = directPreActions.length

@@ -649,6 +649,8 @@ export interface MappingSystemOption {
 
 export interface SavedRunSystemOption extends MappingSystemOption {
   fileSide?: string
+  /** DAR-UI-148. The side's stored extract options as JSON ({"withLineItems":true}); null or absent when none are on. */
+  extractParametersJson?: string | null
 }
 
 export interface SavedRunRule {

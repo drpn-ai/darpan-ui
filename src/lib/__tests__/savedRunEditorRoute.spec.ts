@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildRuleSetDraft } from '../savedRunEditorRoute'
-import { buildRuleSetRulePayloads } from '../reconciliationRuleSetDraft'
+import { buildRuleSetDraft, storedExtractOptions } from '../savedRunEditorRoute'
+import { buildRuleSetRulePayloads, buildSaveRuleSetRunPayload } from '../reconciliationRuleSetDraft'
 import type { SavedRunSummary, SavedRunSystemOption } from '../api/types'
 
 function createSystemOption(overrides: Partial<SavedRunSystemOption> = {}): SavedRunSystemOption {
@@ -25,6 +25,30 @@ function createSavedRun(overrides: Partial<SavedRunSummary> = {}): SavedRunSumma
 }
 
 describe('buildRuleSetDraft', () => {
+  // DAR-UI-148: a run's stored options load into its draft, so the manager shows them and every save sends them back.
+  it('loads each side\'s stored extract options, and a save sends them back', () => {
+    const row = createSavedRun({
+      systemOptions: [
+        createSystemOption({ enumId: 'OMS_GQL', fileSide: 'FILE_1', idFieldExpression: 'externalId', extractParametersJson: '{"withOrderItems":true}' }),
+        createSystemOption({ enumId: 'SHOPIFY', fileSide: 'FILE_2', idFieldExpression: 'legacyResourceId', extractParametersJson: null }),
+      ],
+    })
+    const draft = buildRuleSetDraft(row)!
+    expect(draft.file1ExtractOptions).toEqual({ withOrderItems: true })
+    expect(draft.file2ExtractOptions).toBeUndefined()
+    const payload = buildSaveRuleSetRunPayload(draft)
+    expect(payload.file1ExtractOptions).toEqual({ withOrderItems: true })
+    expect('file2ExtractOptions' in payload).toBe(false)
+  })
+
+  it('reads only boolean and text values from stored options, and nothing from unreadable JSON', () => {
+    expect(storedExtractOptions(createSystemOption({ extractParametersJson: '{"a":true,"b":"x","c":3,"d":null}' }))).toEqual({ a: true, b: 'x' })
+    expect(storedExtractOptions(createSystemOption({ extractParametersJson: '{not json' }))).toBeUndefined()
+    expect(storedExtractOptions(createSystemOption({ extractParametersJson: '[1]' }))).toBeUndefined()
+    expect(storedExtractOptions(createSystemOption({ extractParametersJson: '  ' }))).toBeUndefined()
+    expect(storedExtractOptions(undefined)).toBeUndefined()
+  })
+
   it('hydrates composite primary-key arrays from idFieldExpressions', () => {
     const row = createSavedRun({
       systemOptions: [

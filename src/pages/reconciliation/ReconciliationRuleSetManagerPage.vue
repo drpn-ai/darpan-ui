@@ -61,6 +61,36 @@
       </ul>
     </StaticPageSection>
 
+    <!-- DAR-UI-148. What each side reads beyond its records (its connector's declared options), switched in place. Only
+         sides whose connector declares any; a switch saves the run at once, nothing else about it changes. -->
+    <StaticPageSection v-if="draft && readOptionRows.length" data-testid="ruleset-manager-read-options">
+      <template #header>
+        <div class="ruleset-manager-section-header section-header-row">
+          <h2 class="static-page-section-heading">Read options</h2>
+        </div>
+      </template>
+      <InlineValidation v-if="readOptionError" tone="error" :message="readOptionError" data-testid="ruleset-manager-read-option-error" />
+      <ul class="ruleset-manager-rows" data-testid="ruleset-manager-read-option-list">
+        <li
+          v-for="row in readOptionRows"
+          :key="row.key"
+          class="ruleset-manager-row ruleset-manager-row--option"
+          data-testid="ruleset-manager-read-option-row"
+        >
+          <span class="ruleset-manager-row__dim">{{ row.system }}</span>
+          <span>{{ row.label }}</span>
+          <AppToggleSwitch
+            :model-value="row.on"
+            :label="`${row.label}, ${row.system}`"
+            :busy="savingReadOption === row.key"
+            :disabled="!canEditTenantSettings || (Boolean(savingReadOption) && savingReadOption !== row.key)"
+            :test-id="`ruleset-manager-read-option-${row.side}-${row.name}`"
+            @update:model-value="(on: boolean) => void setReadOption(row, on)"
+          />
+        </li>
+      </ul>
+    </StaticPageSection>
+
     <StaticPageSection data-testid="ruleset-manager-rules">
       <template #header>
         <div class="ruleset-manager-section-header section-header-row">
@@ -277,6 +307,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
+import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import StaticFactStrip, { type StaticFact } from '../../components/ui/StaticFactStrip.vue'
@@ -295,12 +326,14 @@ import type {
   ShopifyAuthConfigRecord,
   SourceConfigEndpoint,
 } from '../../lib/api/types'
+import type { SourceExtractOption, SourceExtractOptions } from '../../lib/api/authoringTypes'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { backIconPath, editIconPath, listIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
+  buildSaveRuleSetRunPayload,
   formatReconciliationFieldKey,
   normalizeReconciliationFieldPath,
   type ReconciliationRuleSetDraft,
@@ -548,6 +581,70 @@ const facts = computed<StaticFact[]>(() => {
     },
   ]
 })
+
+// DAR-UI-148. A side's read options: the boolean ones its connector declares for this side's config and endpoint
+// (list#AutomationSourceOptions, the rows the create wizard offers), each with whether the run has it on.
+interface ReadOptionRow {
+  key: string
+  side: SourceSide
+  system: string
+  name: string
+  label: string
+  on: boolean
+}
+
+const savingReadOption = ref('')
+const readOptionError = ref('')
+
+function sideExtractOptions(draftValue: ReconciliationRuleSetDraft, side: SourceSide): SourceExtractOptions {
+  return (side === 'file1' ? draftValue.file1ExtractOptions : draftValue.file2ExtractOptions) ?? {}
+}
+
+function declaredBooleanOptions(draftValue: ReconciliationRuleSetDraft, side: SourceSide): SourceExtractOption[] {
+  const configId = (side === 'file1' ? draftValue.file1SourceConfigId : draftValue.file2SourceConfigId)?.trim()
+  const systemEnumId = (side === 'file1' ? draftValue.file1SystemEnumId : draftValue.file2SystemEnumId)?.trim().toUpperCase()
+  if (!configId || !systemEnumId) return []
+  // The endpoint itself, never its family: one Shopify config is the Orders, Order lines and Returns endpoints at once.
+  const row = sourceConfigOptions.value.find((option) =>
+    option.sourceConfigId?.trim() === configId && option.systemEnumId?.trim().toUpperCase() === systemEnumId)
+  return (row?.extractOptions ?? []).filter((option) => Boolean(option?.name?.trim()) && option.type === 'boolean')
+}
+
+const readOptionRows = computed<ReadOptionRow[]>(() => {
+  const draftValue = draft.value
+  if (!draftValue) return []
+  const sides: SourceSide[] = isSingleSided.value ? ['file1'] : ['file1', 'file2']
+  return sides.flatMap((side) => {
+    const chosen = sideExtractOptions(draftValue, side)
+    const system = side === 'file1' ? file1Title.value : file2Title.value
+    return declaredBooleanOptions(draftValue, side).map((option) => ({
+      key: `${side}-${option.name}`, side, system, name: option.name, label: option.label || option.name, on: chosen[option.name] === true,
+    }))
+  })
+})
+
+async function setReadOption(row: ReadOptionRow, on: boolean): Promise<void> {
+  const draftValue = draft.value
+  if (!draftValue || !canEditTenantSettings.value || savingReadOption.value) return
+  const options: SourceExtractOptions = { ...sideExtractOptions(draftValue, row.side) }
+  if (on) options[row.name] = true
+  else delete options[row.name]
+  const kept = Object.keys(options).length ? options : undefined
+  const nextDraft: ReconciliationRuleSetDraft = row.side === 'file1'
+    ? { ...draftValue, file1ExtractOptions: kept }
+    : { ...draftValue, file2ExtractOptions: kept }
+  savingReadOption.value = row.key
+  readOptionError.value = ''
+  try {
+    // The run's own full save, as the rules editor sends it; the side's options go explicitly, so the last one off clears them.
+    await reconciliationFacade.saveRuleSetRun({ ...buildSaveRuleSetRunPayload(nextDraft), [`${row.side}ExtractOptions`]: options })
+    draftStore.setRuleSetDraft(nextDraft, draftState.value?.resumeStepId ?? null)
+  } catch (error) {
+    readOptionError.value = error instanceof ApiCallError ? error.message : `${row.label} was not saved.`
+  } finally {
+    savingReadOption.value = ''
+  }
+}
 
 function openFact(key: string): void {
   if (key === 'file1' || key === 'file2') openAuthInfoPopupForSide(key)
@@ -1070,6 +1167,11 @@ onMounted(() => {
 
 .ruleset-manager-row--filter {
   grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.3fr);
+}
+
+/* DAR-UI-148. A read option: its side, what it reads, its switch at the end. */
+.ruleset-manager-row--option {
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 2.1fr) max-content;
 }
 
 .ruleset-manager-row--note {
