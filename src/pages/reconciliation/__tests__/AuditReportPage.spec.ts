@@ -1151,6 +1151,21 @@ describe('AuditReportPage', () => {
     expect(failed.find('[data-testid="audit-tab-agent"]').exists()).toBe(false)
   })
 
+  // DAR-UI-144. An acknowledgement saved or reopened moves the row between Open and Acknowledged: the report and the open
+  // finding are read again, quietly, the page staying on screen.
+  it('reads the report and the finding again quietly once a row is acknowledged or reopened', async () => {
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(f.getAuditReport).toHaveBeenCalledTimes(1)
+    const findingReads = f.getAuditFinding.mock.calls.length
+    w.findComponent(AuditColumns).vm.$emit('acknowledged')
+    await flushPromises()
+    expect(f.getAuditReport).toHaveBeenCalledTimes(2)
+    expect(f.getAuditFinding.mock.calls.length).toBeGreaterThan(findingReads)
+    expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
+  })
+
   // DAR-BE-292 (Aditi's permissions sheet): only editors and tenant admins talk to the agent, so no one else gets the tab.
   it('has no Agent tab for someone who cannot approve', async () => {
     vi.mocked(agentFacade.getAgentStatus).mockResolvedValue({ state: 'ON', grantState: 'LIVE', canApprove: false })

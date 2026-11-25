@@ -42,6 +42,9 @@ export const auditIconPath = 'M4 6l1.5 1.5L8.5 4.5M11 6h9M4 12l1.5 1.5L8.5 10.5M
 // DAR-BE-123. Resolve one finding: a tick in a ring. Stroked on a 24-unit viewBox.
 export const resolveIconPath = 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18ZM8 12.5l2.5 2.5L16 9.5'
 
+// DAR-UI-144. Acknowledge a finding: an eye with a check for its pupil, seen and known. Stroked on a 24-unit viewBox.
+export const acknowledgeIconPath = 'M2.5 12C4.5 8 8 6 12 6s7.5 2 9.5 6c-2 4-5.5 6-9.5 6s-7.5-2-9.5-6ZM9.25 12.25l1.75 1.75 3.75-3.75'
+
 export const lifecycleIconPath =
   'M10 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM10 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM10 20a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 6v4M8 14v4M10 12h9M16 9l3 3-3 3'
 

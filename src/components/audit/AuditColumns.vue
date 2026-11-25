@@ -276,11 +276,13 @@
             >
               <span class="audit-row-split">
                 <span class="audit-finding-subject">{{ splitHeadline(item.headline).subject }}</span>
-                <span class="audit-row-sub" :class="{ 'audit-hot': item.state === 'open' }">{{ findingStateBadge(item.state).label }} · {{ ageShort(item.ageDays) }}<span v-if="closing.has(item.id)" class="audit-draft-tag" data-testid="audit-finding-closing"> · a draft closes it</span></span>
+                <span class="audit-row-sub" :class="{ 'audit-hot': item.state === 'open' && !rowAcknowledged(item) }">{{ rowAcknowledged(item) ? 'Acknowledged' : findingStateBadge(item.state).label }} · {{ ageShort(item.ageDays) }}<span v-if="closing.has(item.id)" class="audit-draft-tag" data-testid="audit-finding-closing"> · a draft closes it</span></span>
               </span>
               <!-- DAR-UI-075. An order: what holds it up, under its name. DAR-UI-098: its heading says the cause, so the row names
                    only the order's other causes. -->
               <span v-if="rowAlsoLabel(rows[index]!)" class="audit-row-sub" data-testid="audit-finding-also">{{ rowAlsoLabel(rows[index]!) }}</span>
+              <!-- DAR-UI-144. An acknowledged row: who, when and the note's first line. -->
+              <span v-if="item.state === 'open' && item.acknowledgement" class="audit-row-sub" data-testid="audit-finding-ack">{{ ackRowLine(item.acknowledgement) }}</span>
               <span class="sr-only">{{ item.id }}</span>
             </button>
           </template>
@@ -309,9 +311,18 @@
               <InlineValidation v-if="findingError" tone="error" :message="findingError" data-testid="audit-finding-error" />
               <template v-if="findingDoc">
                 <div class="audit-detail-head">
-                  <StatusBadge :label="findingStateBadge(findingDoc.finding.status.state).label" :tone="findingStateBadge(findingDoc.finding.status.state).tone" />
+                  <StatusBadge :label="detailBadge.label" :tone="detailBadge.tone" />
                   <span class="audit-col-head-end">
                     <span class="audit-row-sub">{{ sinceLine }}</span>
+                    <!-- DAR-UI-144. Acknowledge the row with a note: an open one with none, or one its reminder brought back. -->
+                    <span v-if="canAcknowledge" class="audit-ack-anchor">
+                      <button type="button" class="app-icon-action" aria-label="Acknowledge" title="Acknowledge" data-testid="audit-acknowledge" :aria-expanded="ackEditing === 'new' ? 'true' : 'false'" @click="toggleAck('new')">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="acknowledgeIconPath" /></svg>
+                      </button>
+                      <Transition name="audit-ack-pop">
+                        <AuditAcknowledgePopover v-if="ackEditing === 'new'" :finding-id="ackTarget" :initial="null" :remind-days="remindDays" @saved="onAckSaved" @close="ackEditing = null" />
+                      </Transition>
+                    </span>
                     <!-- DAR-BE-123. Re-checks this finding's record now; it closes if the problem is gone. -->
                     <button v-if="canResolve && findingDoc.finding.status.state !== 'fixed'" type="button" class="app-icon-action" aria-label="Resolve finding" title="Resolve finding" data-testid="audit-verify-finding" :disabled="verifying" @click="emit('verify')">
                       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="resolveIconPath" /></svg>
@@ -320,6 +331,26 @@
                       <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
                     </button>
                   </span>
+                </div>
+
+                <!-- DAR-UI-144. The row's acknowledgement: who and when, or how long ago once its reminder brought it back. -->
+                <div v-if="acknowledgement && findingDoc.finding.status.state === 'open'" class="audit-ack-card" data-testid="audit-ack-card">
+                  <div class="audit-detail-head">
+                    <span class="audit-row-sub">{{ ackCardLine }}</span>
+                    <span class="audit-col-head-end">
+                      <span class="audit-ack-anchor">
+                        <button type="button" class="app-icon-action" aria-label="Edit acknowledgement" title="Edit acknowledgement" data-testid="audit-ack-edit" :aria-expanded="ackEditing === 'edit' ? 'true' : 'false'" @click="toggleAck('edit')">
+                          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="editIconPath" fill="currentColor" /></svg>
+                        </button>
+                        <Transition name="audit-ack-pop">
+                          <AuditAcknowledgePopover v-if="ackEditing === 'edit'" :finding-id="ackTarget" :initial="acknowledgement" :remind-days="remindDays" @saved="onAckSaved" @close="ackEditing = null" />
+                        </Transition>
+                      </span>
+                      <button v-if="!acknowledgement.reminded" type="button" class="audit-more" data-testid="audit-ack-reopen" :disabled="reopening" @click="reopenAck">Reopen</button>
+                    </span>
+                  </div>
+                  <p class="audit-body audit-ack-note" data-testid="audit-ack-note">{{ acknowledgement.note }}</p>
+                  <InlineValidation v-if="reopenError" tone="error" :message="reopenError" data-testid="audit-ack-reopen-error" />
                 </div>
 
                 <!-- DAR-UI-081. Verdict first: the statement and record, what is wrong, then what it is stuck on and what to do.
@@ -557,13 +588,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
+import AuditAcknowledgePopover from './AuditAcknowledgePopover.vue'
 import type { AgentFindingCard } from './AuditAgentPanel.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import StaticFactStrip from '../ui/StaticFactStrip.vue'
-import { downloadIconPath, resolveIconPath } from '../../lib/iconPaths'
+import { acknowledgeIconPath, downloadIconPath, editIconPath, resolveIconPath } from '../../lib/iconPaths'
+import { auditFacade } from '../../lib/api/facade'
 import type {
+  AuditAcknowledgement,
   AuditFindingDocument,
   AuditFindingListItem,
   AuditFindingSummary,
@@ -672,7 +706,7 @@ const props = defineProps<{
   drafts?: BoardDrafts | null
 }>()
 
-const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; by: [by: 'type' | 'priority']; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [checks: string[]]; agent: [open: boolean] }>()
+const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; by: [by: 'type' | 'priority']; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [checks: string[]]; agent: [open: boolean]; acknowledged: [] }>()
 
 // DAR-UI-145 (Aditi: "i like B", artifact QabewkAY8iL1UvVVzqRSZG). A window wide enough gives the agent a column of its
 // own beside the detail, so the finding stays in view; a narrower one keeps the Agent tab with the finding pinned in it.
@@ -932,6 +966,80 @@ const stuckOn = computed(() => {
     })
     .join('; ')
 })
+
+// DAR-UI-144. The row's acknowledgement: an order's from its row (null there when a line broke after it), else the
+// finding's. What was just saved or reopened shows at once, until the reload brings a different word.
+const ackTarget = computed(() => props.findingDoc?.finding.id ?? props.finding)
+const sourceAck = computed<AuditAcknowledgement | null>(() => {
+  const unit = props.orderUnit?.acknowledgement
+  if (props.orderUnit && unit !== undefined) return unit
+  return props.findingDoc?.finding.acknowledgement ?? null
+})
+const ackOverride = ref<{ id: string; acknowledgement: AuditAcknowledgement | null } | null>(null)
+const acknowledgement = computed(() =>
+  ackOverride.value && ackOverride.value.id === ackTarget.value ? ackOverride.value.acknowledgement : sourceAck.value)
+const ackEditing = ref<'new' | 'edit' | null>(null)
+const reopening = ref(false)
+const reopenError = ref('')
+watch(() => props.finding, () => {
+  ackOverride.value = null
+  ackEditing.value = null
+  reopenError.value = ''
+})
+watch(() => JSON.stringify(sourceAck.value), () => { ackOverride.value = null })
+const remindDays = computed(() => props.report.report.acknowledgeRemindDays ?? 5)
+const findingOpen = computed(() => props.findingDoc?.finding.status.state === 'open')
+const acknowledged = computed(() => findingOpen.value && Boolean(acknowledgement.value && !acknowledgement.value.reminded))
+const canAcknowledge = computed(() => findingOpen.value && (!acknowledgement.value || acknowledgement.value.reminded))
+const detailBadge = computed(() => acknowledged.value
+  ? { label: 'Acknowledged', tone: 'neutral' as const }
+  : findingStateBadge(props.findingDoc?.finding.status.state ?? ''))
+function ackWho(ack: AuditAcknowledgement): string {
+  return ack.by.label || ack.by.id
+}
+function dayNumber(text: string): number {
+  return Date.UTC(Number(text.slice(0, 4)), Number(text.slice(5, 7)) - 1, Number(text.slice(8, 10)))
+}
+const ackCardLine = computed(() => {
+  const ack = acknowledgement.value
+  if (!ack) return ''
+  if (!ack.reminded) return `${ackWho(ack)} · ${shortDate(ack.at.slice(0, 10))}`
+  const days = Math.max(0, Math.round((dayNumber(props.report.report.date) - dayNumber(ack.at)) / 86_400_000))
+  return `Acknowledged ${days} ${days === 1 ? 'day' : 'days'} ago by ${ackWho(ack)}, still open`
+})
+function rowAcknowledged(item: AuditFindingSummary): boolean {
+  return item.state === 'open' && Boolean(item.acknowledgement && !item.acknowledgement.reminded)
+}
+function ackRowLine(ack: AuditAcknowledgement): string {
+  return [ackWho(ack), shortDate(ack.at.slice(0, 10)), ack.note.split('\n')[0]!.trim()].filter(Boolean).join(' · ')
+}
+function toggleAck(kind: 'new' | 'edit'): void {
+  ackEditing.value = ackEditing.value === kind ? null : kind
+}
+function onAckSaved(ack: AuditAcknowledgement): void {
+  ackOverride.value = { id: ackTarget.value, acknowledgement: ack }
+  ackEditing.value = null
+  emit('acknowledged')
+}
+async function reopenAck(): Promise<void> {
+  const id = ackTarget.value
+  reopening.value = true
+  reopenError.value = ''
+  try {
+    const response = await auditFacade.reopenAcknowledgement(id)
+    if (response.ok === false) {
+      reopenError.value = response.errors?.[0] || 'Reopen did not go through. Try again.'
+      return
+    }
+    ackOverride.value = { id, acknowledgement: null }
+    ackEditing.value = null
+    emit('acknowledged')
+  } catch (err) {
+    reopenError.value = err instanceof Error && err.message ? err.message : 'Reopen did not go through. Try again.'
+  } finally {
+    reopening.value = false
+  }
+}
 
 const sinceLine = computed(() => {
   const status = props.findingDoc?.finding.status
@@ -1503,6 +1611,39 @@ function statementText(id: string): string {
   justify-content: space-between;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* DAR-UI-144. The acknowledge popover hangs from its trigger and scales from it; the exit is the shorter one. */
+.audit-ack-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.audit-ack-pop-enter-active {
+  transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out);
+}
+
+.audit-ack-pop-leave-active {
+  transition: opacity var(--motion-exit) var(--ease-out), transform var(--motion-exit) var(--ease-out);
+}
+
+.audit-ack-pop-enter-from,
+.audit-ack-pop-leave-to {
+  opacity: 0;
+  transform: scale(var(--motion-enter-scale));
+}
+
+.audit-ack-card {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.audit-ack-note {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 .audit-detail-head .micro-label {

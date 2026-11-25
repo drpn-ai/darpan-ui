@@ -143,6 +143,7 @@
         @verify="verifyFinding"
         @retry="retryCheck"
         @agent="setAgentTab"
+        @acknowledged="loadReport({ quiet: true })"
       >
         <!-- DAR-UI-108. The agent, in the Agent tab of the board's deepest column; DAR-UI-145: or beside it, on a wide window.
              The card is the open finding, pinned when the agent covers it. -->
