@@ -211,6 +211,16 @@ describe('auditReport', () => {
     expect(basicFacts(bare, []).map((f) => [f.label, f.value])).toEqual([
       ['HotWax', 'Completed'], ['Other system', '—'], ['Total', '—'], ['Day', '—'],
     ])
+    // DAR-BE-360 (Aditi: "add payment status to all orders and refunds"): each system's payment status beside its status,
+    // from another of its records when the first has none (an item's order); alone when its record has no status.
+    const paid = recordRows({
+      OMS: { orderItem: [{ id: 'M1/01', internalId: null, status: 'Completed', orderStatus: 'Completed' }],
+        order: [{ id: 'M1', internalId: null, status: 'Completed', paymentStatus: 'Settled, Refunded' }] },
+      Shopify: { order: [{ id: '501', internalId: null, status: null, paymentStatus: 'Paid' }] },
+    })
+    expect(basicFacts(paid, ['OMS', 'Shopify']).slice(0, 2).map((f) => [f.label, f.value])).toEqual([
+      ['HotWax', 'Completed · Settled, Refunded'], ['Shopify', 'Paid'],
+    ])
   })
 
   // DAR-UI-139. What kind of record the finding is about, from its category, else its records.

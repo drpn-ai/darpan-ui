@@ -41,6 +41,8 @@ export interface AuditRecord {
   /** The order's total (its own, or the one its item or return carries) and a return's own. */
   orderTotal?: AuditMoney
   returnTotal?: AuditMoney
+  /** DAR-BE-360. The record's payment status in its system's words (Paid, Settled, Refunded, Fully Applied). */
+  paymentStatus?: string | null
   deposits?: { id: string; amount: string | null; status: string | null }[]
   /** DAR-UI-081. A return held behind another: the return holding it, and its exchange order (netsuiteId null: not there). */
   heldBy?: { id: string; status: string | null }

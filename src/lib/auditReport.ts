@@ -81,6 +81,7 @@ export interface RecordRow {
   warrantyId: string
   orderTotal: string
   returnTotal: string
+  paymentStatus: string
   deposits: { id: string; amount: string; status: string }[]
   heldBy: { id: string; status: string } | null
   exchange: { id: string; netsuiteId: string } | null
@@ -207,7 +208,7 @@ const DETAIL_ORDER = ['Customer', 'Order date', 'Sales channel', 'Ship method', 
 /**
  * DAR-UI-139 (Aditi: "all finding have the basix details row"). The same four cells on every finding: each of the two
  * systems the check compared (report keys, in read order) and its record's status, "None" when that system holds no
- * record of it; the amount (a return's total, else its order's); the day (a return's, else its order's). A check that has
+ * record of it, with its payment status beside (DAR-BE-360); the amount (a return's total, else its order's); the day (a return's, else its order's). A check that has
  * not run names no systems, so the records' own systems stand in. A fact nobody read is a dash, so every row is even.
  */
 export function basicFacts(rows: RecordRow[], compared: string[]): StaticFact[] {
@@ -217,7 +218,10 @@ export function basicFacts(rows: RecordRow[], compared: string[]): StaticFact[] 
     if (!system) return { key: `system${index}`, label: 'Other system', value: '—' }
     const row = rows.find((candidate) => candidate.system === system)
     const status = row ? (row.recordType === 'orderItem' ? row.orderStatus || row.status : row.status) : ''
-    return { key: `system${index}`, label: system, value: row ? status || '—' : 'None' }
+    // DAR-BE-360: and its payment status, from another of its records when this one has none (an item's order).
+    const paid = row ? row.paymentStatus || rows.find((candidate) => candidate.system === system && candidate.paymentStatus)?.paymentStatus : ''
+    const value = [status, paid].filter(Boolean).join(' · ')
+    return { key: `system${index}`, label: system, value: row ? value || '—' : 'None' }
   }
   const returned = rows.find((row) => row.returnTotal || row.returnDate)
   const total = rows.find((row) => row.returnTotal)?.returnTotal
@@ -318,6 +322,7 @@ export function recordRows(records: AuditRecords | null | undefined): RecordRow[
           warrantyId: record.warrantyId ?? '',
           orderTotal: moneyText(record.orderTotal),
           returnTotal: moneyText(record.returnTotal),
+          paymentStatus: record.paymentStatus ?? '',
           deposits: (record.deposits ?? []).map((d) => ({ id: d.id, amount: d.amount ?? '', status: d.status ?? '' })),
           heldBy: record.heldBy ? { id: record.heldBy.id, status: record.heldBy.status ?? '' } : null,
           exchange: record.exchange ? { id: record.exchange.id, netsuiteId: record.exchange.netsuiteId ?? '' } : null,
