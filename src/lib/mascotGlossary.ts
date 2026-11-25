@@ -936,7 +936,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   queryDataName: {
     title: 'The script calls it',
-    body: 'the name the script reads this data by, as input.<name>. Rename it and any line still using the old name breaks.',
+    body: 'the name the script reads this data by: input.orders for data called orders. Rename it and any line still using the old name breaks.',
     byDirectiveOnly: true,
   },
   scriptLastRun: {
