@@ -314,6 +314,8 @@
                   <StatusBadge :label="detailBadge.label" :tone="detailBadge.tone" />
                   <span class="audit-col-head-end">
                     <span class="audit-row-sub">{{ sinceLine }}</span>
+                    <!-- DAR-UI-144. Feedback to Darpan on this statement and cause: recent notes and a box to send one. -->
+                    <AuditFeedbackBubble :finding-id="ackTarget" :record-label="feedbackRecord" :count="findingDoc.finding.feedback?.recentCount ?? 0" />
                     <!-- DAR-UI-144. Acknowledge the row with a note: an open one with none, or one its reminder brought back. -->
                     <span v-if="canAcknowledge" class="audit-ack-anchor" @keydown.esc="closeAck">
                       <button ref="ackButton" type="button" class="app-icon-action" aria-label="Acknowledge" title="Acknowledge" data-testid="audit-acknowledge" aria-haspopup="dialog" :aria-expanded="ackEditing === 'new' ? 'true' : 'false'" @click="toggleAck('new')">
@@ -591,6 +593,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import AuditAcknowledgePopover from './AuditAcknowledgePopover.vue'
+import AuditFeedbackBubble from './AuditFeedbackBubble.vue'
 import type { AgentFindingCard } from './AuditAgentPanel.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import StaticFactStrip from '../ui/StaticFactStrip.vue'
@@ -971,6 +974,7 @@ const stuckOn = computed(() => {
 // line that broke after it gives null; it is read again on every quiet reload), else its list row's while it loads. The
 // lists can be cached copies from before the acknowledgement. What was just saved or reopened shows at once, until the
 // reload brings a different word.
+const feedbackRecord = computed(() => props.orderUnit?.order ?? props.orderUnit?.headline ?? props.findingDoc?.finding.headline ?? null)
 const ackTarget = computed(() => props.findingDoc?.finding.id ?? props.finding)
 const sourceAck = computed<AuditAcknowledgement | null>(() => {
   const read = props.findingDoc?.finding.acknowledgement

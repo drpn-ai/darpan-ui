@@ -51,3 +51,6 @@ export const lifecycleIconPath =
 // A plus: add one. Filled on a 20-unit viewBox.
 export const plusIconPath =
   'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'
+
+/** DAR-UI-144. Speech bubble: the feedback trigger on a finding. */
+export const feedbackIconPath = 'M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8l-4.5 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z'
