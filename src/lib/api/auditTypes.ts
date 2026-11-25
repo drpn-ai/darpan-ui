@@ -527,3 +527,17 @@ export interface RunAuditResponse extends AuditEnvelope {
 export interface VerifyAuditFindingResponse extends AuditEnvelope {
   submitted?: boolean
 }
+
+// DAR-BE-369. Re-check all: every open finding of a statement (or of the audit) re-checked in the background, one run per
+// automation; get#AuditRecheckProgress counts the ones checked since checkedSince.
+export interface VerifyAuditFindingsResponse extends AuditEnvelope {
+  findings?: number
+  runs?: number
+  skipped?: number
+  checkedSince?: string
+}
+
+export interface GetAuditRecheckProgressResponse extends AuditEnvelope {
+  checked?: number
+  closed?: number
+}

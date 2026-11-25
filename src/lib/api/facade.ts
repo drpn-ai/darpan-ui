@@ -29,6 +29,8 @@ import type {
   AddAuditStatementPayload,
   AddAuditStatementResponse,
   VerifyAuditFindingResponse,
+  VerifyAuditFindingsResponse,
+  GetAuditRecheckProgressResponse,
   AuditLevel,
 } from './auditTypes'
 import type {
@@ -744,6 +746,8 @@ const AUDIT = {
   addAuditStatement: 'facade.AuditFacadeServices.add#AuditStatement',
   runAudit: 'facade.AuditFacadeServices.run#Audit',
   verifyAuditFinding: 'facade.AuditFacadeServices.verify#AuditFinding',
+  verifyAuditFindings: 'facade.AuditFacadeServices.verify#AuditFindings',
+  getAuditRecheckProgress: 'facade.AuditFacadeServices.get#AuditRecheckProgress',
   acknowledgeFinding: 'facade.AuditFacadeServices.acknowledge#AuditFinding',
   updateAcknowledgement: 'facade.AuditFacadeServices.update#AuditFindingAcknowledgement',
   reopenAcknowledgement: 'facade.AuditFacadeServices.delete#AuditFindingAcknowledgement',
@@ -814,6 +818,12 @@ export const auditFacade = {
   },
   verifyAuditFinding(payload: { findingId: string }, signal?: AbortSignal): Promise<VerifyAuditFindingResponse> {
     return callService<VerifyAuditFindingResponse>(AUDIT.verifyAuditFinding, payload, signal)
+  },
+  verifyAuditFindings(payload: { audit: string; period: string; statement?: string }, signal?: AbortSignal): Promise<VerifyAuditFindingsResponse> {
+    return callService<VerifyAuditFindingsResponse>(AUDIT.verifyAuditFindings, payload, signal)
+  },
+  getAuditRecheckProgress(payload: { audit: string; period: string; statement?: string; since: string }, signal?: AbortSignal): Promise<GetAuditRecheckProgressResponse> {
+    return callService<GetAuditRecheckProgressResponse>(AUDIT.getAuditRecheckProgress, payload, signal)
   },
 }
 

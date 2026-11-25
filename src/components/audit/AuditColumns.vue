@@ -244,6 +244,10 @@
             <span>Findings</span>
             <span class="audit-col-head-end">
               <span data-testid="audit-findings-count">{{ findingsTotal.toLocaleString('en-US') }}</span>
+              <!-- DAR-UI-147. Re-check every open finding of this statement now; what was fixed since the morning closes. -->
+              <button v-if="canResolve && statement" type="button" class="app-icon-action" aria-label="Re-check all findings" title="Re-check all findings" data-testid="audit-recheck-statement" :disabled="rechecking" @click="emit('recheck', statement)">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="recheckIconPath" /></svg>
+              </button>
               <button v-if="rows.length" type="button" class="app-icon-action" aria-label="Export findings" title="Export findings" data-testid="audit-export-findings" :disabled="exporting" @click="emit('export', 'statement')">
                 <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
               </button>
@@ -597,7 +601,7 @@ import AuditFeedbackBubble from './AuditFeedbackBubble.vue'
 import type { AgentFindingCard } from './AuditAgentPanel.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import StaticFactStrip from '../ui/StaticFactStrip.vue'
-import { acknowledgeIconPath, downloadIconPath, editIconPath, resolveIconPath } from '../../lib/iconPaths'
+import { acknowledgeIconPath, downloadIconPath, editIconPath, recheckIconPath, resolveIconPath } from '../../lib/iconPaths'
 import { auditFacade } from '../../lib/api/facade'
 import type {
   AuditAcknowledgement,
@@ -694,6 +698,8 @@ const props = defineProps<{
   /** DAR-BE-250. Later steps' findings on the open finding's order (earliest step wins). */
   waiting?: AuditWaitingFinding[]
   verifying: boolean
+  /** DAR-UI-147. A Re-check all is in flight (this statement's or the whole audit's). */
+  rechecking?: boolean
   /** DAR-BE-292. The person may re-check a finding (run access); without it there is no Resolve. */
   canResolve?: boolean
   /** DAR-UI-085. What the checks are doing right now; null when nothing was read yet. */
@@ -710,7 +716,7 @@ const props = defineProps<{
   drafts?: BoardDrafts | null
 }>()
 
-const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; by: [by: 'type' | 'priority']; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; retry: [checks: string[]]; agent: [open: boolean]; acknowledged: [] }>()
+const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; by: [by: 'type' | 'priority']; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; recheck: [statement: string]; retry: [checks: string[]]; agent: [open: boolean]; acknowledged: [] }>()
 
 // DAR-UI-145 (Aditi: "i like B", artifact QabewkAY8iL1UvVVzqRSZG). A window wide enough gives the agent a column of its
 // own beside the detail, so the finding stays in view; a narrower one keeps the Agent tab with the finding pinned in it.

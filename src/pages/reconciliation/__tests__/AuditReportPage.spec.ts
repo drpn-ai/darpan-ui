@@ -16,7 +16,7 @@ vi.mock('vue-router', async () => {
   }
 })
 vi.mock('../../../lib/api/facade', () => ({
-  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn(), getAuditProgress: vi.fn(), retryAuditCheck: vi.fn() },
+  auditFacade: { getAuditReport: vi.fn(), getAuditFinding: vi.fn(), getAuditFindingsByOrder: vi.fn(), getAuditCheckExtracts: vi.fn(), getAudits: vi.fn(), verifyAuditFinding: vi.fn(), verifyAuditFindings: vi.fn(), getAuditRecheckProgress: vi.fn(), getAuditProgress: vi.fn(), retryAuditCheck: vi.fn() },
   reconciliationFacade: { getGeneratedOutput: vi.fn() },
   agentFacade: { getAgentStatus: vi.fn(), getAgentConversation: vi.fn(), sendAgentTurn: vi.fn() },
 }))
@@ -1775,6 +1775,108 @@ describe('AuditReportPage', () => {
       expect(waiting.text()).not.toContain('P0')
       expect(w.get('[data-testid="audit-finding-eyebrow"]').text()).toMatch(/^R2/)
       w.unmount()
+    })
+  })
+
+  // DAR-BE-369 / DAR-UI-147 (Aditi: "maybe we can do a button that refreshes findings?"). Re-check all: every open finding
+  // of the statement (or of the audit) read again now; the page waits until each was checked, then says what closed.
+  describe('re-check all', () => {
+    async function listen(run: (heard: string[]) => Promise<void>): Promise<void> {
+      vi.useFakeTimers()
+      const heard: string[] = []
+      const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail.message)
+      document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+      try { await run(heard) } finally {
+        document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+        vi.useRealTimers()
+      }
+    }
+
+    it('re-checks the open statement, waits for every finding, says what closed and reloads the report', async () => {
+      await listen(async (heard) => {
+        liveRoute.query = { category: 'orders', statement: 'R2' }
+        const w = mount(AuditReportPage)
+        await flushPromises()
+        f.verifyAuditFindings.mockResolvedValue({ ok: true, findings: 2, runs: 1, skipped: 0, checkedSince: '2026-10-08T10:00:00Z' } as never)
+        f.getAuditRecheckProgress
+          .mockResolvedValueOnce({ ok: true, checked: 0, closed: 0 } as never)
+          .mockResolvedValueOnce({ ok: true, checked: 2, closed: 1 } as never)
+        const reads = f.getAuditReport.mock.calls.length
+        await w.get('[data-testid="audit-recheck-statement"]').trigger('click')
+        await flushPromises()
+        expect(f.verifyAuditFindings).toHaveBeenCalledWith({ audit: 'month-close', period: '2026-10', statement: 'R2' })
+        expect(w.get('[data-testid="audit-recheck-statement"]').attributes('disabled')).toBeDefined()
+        await vi.advanceTimersByTimeAsync(3_000)
+        expect(heard).toEqual([])
+        await vi.advanceTimersByTimeAsync(3_000)
+        await flushPromises()
+        expect(f.getAuditRecheckProgress).toHaveBeenLastCalledWith({ audit: 'month-close', period: '2026-10', statement: 'R2', since: '2026-10-08T10:00:00Z' })
+        expect(heard).toEqual(['Re-checked 2. 1 closed, 1 still open.'])
+        expect(f.getAuditReport.mock.calls.length).toBeGreaterThan(reads)
+        expect(w.get('[data-testid="audit-recheck-statement"]').attributes('disabled')).toBeUndefined()
+      })
+    })
+
+    it('re-checks the whole audit from the header', async () => {
+      await listen(async (heard) => {
+        const w = mount(AuditReportPage)
+        await flushPromises()
+        f.verifyAuditFindings.mockResolvedValue({ ok: true, findings: 3, runs: 2, skipped: 0, checkedSince: 'S' } as never)
+        f.getAuditRecheckProgress.mockResolvedValue({ ok: true, checked: 3, closed: 3 } as never)
+        await w.get('[data-testid="audit-recheck-report"]').trigger('click')
+        await flushPromises()
+        expect(f.verifyAuditFindings).toHaveBeenCalledWith({ audit: 'month-close', period: '2026-10' })
+        await vi.advanceTimersByTimeAsync(3_000)
+        expect(f.getAuditRecheckProgress).toHaveBeenCalledWith({ audit: 'month-close', period: '2026-10', since: 'S' })
+        expect(heard).toEqual(['Re-checked 3. All 3 closed.'])
+      })
+    })
+
+    it('says so when nothing is open, and does not wait', async () => {
+      await listen(async (heard) => {
+        liveRoute.query = { category: 'orders', statement: 'R2' }
+        const w = mount(AuditReportPage)
+        await flushPromises()
+        f.verifyAuditFindings.mockResolvedValue({ ok: true, findings: 0, runs: 0, skipped: 0, checkedSince: 'S' } as never)
+        await w.get('[data-testid="audit-recheck-statement"]').trigger('click')
+        await flushPromises()
+        expect(heard).toEqual(['Nothing open to re-check.'])
+        expect(f.getAuditRecheckProgress).not.toHaveBeenCalled()
+      })
+    })
+
+    it('stops waiting after five minutes and reloads what closed so far', async () => {
+      await listen(async (heard) => {
+        liveRoute.query = { category: 'orders', statement: 'R2' }
+        const w = mount(AuditReportPage)
+        await flushPromises()
+        f.verifyAuditFindings.mockResolvedValue({ ok: true, findings: 2, runs: 1, skipped: 0, checkedSince: 'S' } as never)
+        f.getAuditRecheckProgress.mockResolvedValue({ ok: true, checked: 1, closed: 1 } as never)
+        await w.get('[data-testid="audit-recheck-statement"]').trigger('click')
+        await flushPromises()
+        await vi.advanceTimersByTimeAsync(300_000)
+        await flushPromises()
+        expect(heard).toEqual(['1 closed so far. The rest are still being checked.'])
+      })
+    })
+
+    it('shows the refusal in words', async () => {
+      liveRoute.query = { category: 'orders', statement: 'R2' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      f.verifyAuditFindings.mockRejectedValue(new ApiCallError('Statement R2 is not part of audit month-close.'))
+      await w.get('[data-testid="audit-recheck-statement"]').trigger('click')
+      await flushPromises()
+      expect(w.get('[data-testid="audit-recheck-error"]').text()).toContain('Statement R2 is not part of audit month-close.')
+    })
+
+    it('is not offered without run access', async () => {
+      permissions.canRunActiveTenantReconciliation = false
+      liveRoute.query = { category: 'orders', statement: 'R2' }
+      const w = mount(AuditReportPage)
+      await flushPromises()
+      expect(w.find('[data-testid="audit-recheck-statement"]').exists()).toBe(false)
+      expect(w.find('[data-testid="audit-recheck-report"]').exists()).toBe(false)
     })
   })
 })

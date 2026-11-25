@@ -37,6 +37,19 @@
           >
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
           </button>
+          <!-- DAR-UI-147. Re-check every open finding of the audit now; what was fixed since the morning closes. -->
+          <button
+            v-if="report && canRun"
+            type="button"
+            class="app-icon-action app-icon-action--large"
+            aria-label="Re-check all findings"
+            title="Re-check all findings"
+            data-testid="audit-recheck-report"
+            :disabled="rechecking"
+            @click="recheckAll()"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="recheckIconPath" /></svg>
+          </button>
           <RouterLink
             :to="{ name: 'audit-settings', params: { audit: auditCode }, query: carriedQuery }"
             class="app-icon-action app-icon-action--large"
@@ -64,6 +77,7 @@
     <LoadingState v-if="loading" noun="audit" />
     <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="audit-page-error" />
     <InlineValidation v-if="exportError" tone="error" :message="exportError" data-testid="audit-export-error" />
+    <InlineValidation v-if="recheckError" tone="error" :message="recheckError" data-testid="audit-recheck-error" />
     <InlineValidation v-if="periodError" tone="error" :message="periodError" data-testid="audit-find-error" />
 
     <template v-if="report">
@@ -129,6 +143,7 @@
         :order-unit="orderUnit"
         :waiting="waiting"
         :verifying="verifying"
+        :rechecking="rechecking"
         :progress="progress"
         :retryable="isTodaysMorning && canRun"
         :retrying="retryingChecks"
@@ -141,6 +156,7 @@
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
         @extract="(check, system) => void exportExtract(check, system)"
         @verify="verifyFinding"
+        @recheck="(statement) => void recheckAll(statement)"
         @retry="retryCheck"
         @agent="setAgentTab"
         @acknowledged="void onAcknowledged()"
@@ -181,7 +197,7 @@ import { usePermissionsStore } from '../../stores/permissions'
 import type { GetAgentStatusResponse } from '../../lib/api/agentTypes'
 import { boardDrafts, type DraftPreview } from '../../lib/agentDrafts'
 import { ApiCallError } from '../../lib/api/client'
-import { downloadIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
+import { downloadIconPath, playIconPath, playIconTransform, recheckIconPath, settingsIconPath } from '../../lib/iconPaths'
 import { downloadTextFile } from '../../lib/utils/download'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
 import { AUDIT_LEVELS, type AuditFindingDocument, type AuditFindingListItem, type AuditLevel, type AuditProgress, type AuditReport } from '../../lib/api/auditTypes'
@@ -227,6 +243,9 @@ const more = ref(emptyFindingsMore())
 const orderLookup = ref<{ key: string; items: AuditFindingListItem[]; error: string } | null>(null)
 const exporting = ref(false)
 const verifying = ref(false)
+// DAR-UI-147. A Re-check all in flight (statement or whole audit): one at a time.
+const rechecking = ref(false)
+const recheckError = ref('')
 const exportError = ref('')
 
 let abort = new AbortController()
@@ -604,6 +623,49 @@ async function verifyFinding(): Promise<void> {
     if (watching()) findingError.value = error instanceof ApiCallError ? error.message : 'The finding dodged the check. Try again.'
   } finally {
     verifying.value = false
+  }
+}
+
+// DAR-UI-147 (Aditi: "maybe we can do a button that refreshes findings?"). Re-check all: the statement's open findings, or
+// the audit's, read again now (verify#AuditFindings, one run per automation); wait until each was checked, then say what
+// closed and reload. A finding whose read does not finish is never counted, so the wait ends at five minutes.
+const RECHECK_POLL_MS = 3000
+const RECHECK_POLL_TRIES = 100
+async function recheckAll(statement?: string): Promise<void> {
+  const period = report.value?.report.period
+  if (!period || rechecking.value) return
+  const audit = auditCode.value
+  const scope = statement ? { statement } : {}
+  const watching = () => !left && auditCode.value === audit && report.value?.report.period === period
+  rechecking.value = true
+  recheckError.value = ''
+  try {
+    const started = await auditFacade.verifyAuditFindings({ audit, period, ...scope })
+    const total = started.findings ?? 0
+    if (!total || !started.checkedSince) {
+      say(started.skipped ? 'Nothing to re-check until the audit has run once.' : 'Nothing open to re-check.')
+      return
+    }
+    let closed = 0
+    for (let tries = 0; tries < RECHECK_POLL_TRIES && watching(); tries++) {
+      await new Promise((resolve) => setTimeout(resolve, RECHECK_POLL_MS))
+      if (!watching()) return
+      const progress = await auditFacade.getAuditRecheckProgress({ audit, period, ...scope, since: started.checkedSince })
+      closed = progress.closed ?? 0
+      if ((progress.checked ?? 0) >= total) {
+        say(closed >= total ? `Re-checked ${total}. All ${total} closed.` : `Re-checked ${total}. ${closed} closed, ${total - closed} still open.`)
+        void loadReport({ quiet: true })
+        return
+      }
+    }
+    if (watching()) {
+      say(`${closed} closed so far. The rest are still being checked.`)
+      void loadReport({ quiet: true })
+    }
+  } catch (error) {
+    if (watching()) recheckError.value = error instanceof ApiCallError ? error.message : 'The re-check did not start. Try again.'
+  } finally {
+    rechecking.value = false
   }
 }
 
