@@ -29,6 +29,7 @@ vi.mock('../../../stores/permissions', () => ({ usePermissionsStore: () => permi
 import { downloadTextFile } from '../../../lib/utils/download'
 import { useRoute } from 'vue-router'
 import { WORKFLOW_HINT_REQUEST_EVENT } from '../../../lib/uiEvents'
+import { useMascotStore } from '../../../stores/mascot'
 import { agentFacade, auditFacade, reconciliationFacade } from '../../../lib/api/facade'
 import { ApiCallError } from '../../../lib/api/client'
 import { installLocalStorageStub } from '../../../test/localStorage'
@@ -460,6 +461,38 @@ describe('AuditReportPage', () => {
       w.unmount()
       past.unmount()
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). Retry says so the moment it
+  // is pressed; the submit answers behind it, and only a refusal speaks again.
+  it('says a retry is going before its submit answers, then says a refusal', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-08T18:00:00Z'))
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as CustomEvent<{ message: string }>).detail.message)
+    document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
+    try {
+      const doc = report()
+      const r2 = doc.categories.orders!.statements.R2!
+      r2.status = 'notRun'
+      r2.checks = [{ ...r2.checks[0]!, status: 'notRun', reason: 'The compare failed: UNRESOLVED_COLUMN' }]
+      f.getAuditReport.mockResolvedValue({ ok: true, report: doc } as never)
+      let answer: (value: unknown) => void = () => {}
+      f.retryAuditCheck.mockReturnValue(new Promise((resolve) => { answer = resolve }) as never)
+      const w = mount(AuditReportPage)
+      await flushPromises()
+
+      await w.get('[data-testid="audit-retry-check-invoices-without-etail-id"]').trigger('click')
+      expect(heard).toEqual(['Retrying from the last read. Nothing is read again.'])
+
+      answer({ ok: false, errors: ['The check is already running.'] })
+      await flushPromises()
+      expect(heard).toEqual(['Retrying from the last read. Nothing is read again.', 'The check is already running.'])
+      w.unmount()
+    } finally {
+      document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, listener)
       vi.useRealTimers()
     }
   })
@@ -1158,11 +1191,55 @@ describe('AuditReportPage', () => {
     await flushPromises()
     expect(f.getAuditReport).toHaveBeenCalledTimes(1)
     const findingReads = f.getAuditFinding.mock.calls.length
-    w.findComponent(AuditColumns).vm.$emit('acknowledged')
+    w.findComponent(AuditColumns).vm.$emit('acknowledged', 'F-1', 1)
     await flushPromises()
     expect(f.getAuditReport).toHaveBeenCalledTimes(2)
     expect(f.getAuditFinding.mock.calls.length).toBeGreaterThan(findingReads)
     expect(w.find('[data-testid="audit-finding-headline"]').exists()).toBe(true)
+  })
+
+  // DAR-UI-155 (Aditi: "UI changes should always be immediate.. backend can do its thing"). The row and the pills move the
+  // moment the board says so, with no read; a refusal puts them back; once saved, the reload's word replaces the patch.
+  it('moves an acknowledged row and the pill counts at once, and puts them back if the backend refuses', async () => {
+    liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
+    const w = mount(AuditReportPage)
+    await flushPromises()
+    expect(w.get('[data-testid="audit-filter-open"]').text()).toBe('2 open')
+    const ack = { note: 'Refunded', by: { id: 'U1', label: 'Sam R.' }, at: '2026-10-08T09:00:00', remindOn: null, reminded: false }
+    const columns = w.findComponent(AuditColumns)
+    columns.vm.$emit('acknowledging', 'F-1', ack, null, 1)
+    await w.vm.$nextTick()
+    expect(f.getAuditReport).toHaveBeenCalledTimes(1)
+    expect(w.get('[data-testid="audit-filter-open"]').text()).toBe('1 open')
+    expect(w.get('[data-testid="audit-filter-acknowledged"]').text()).toBe('1 acknowledged')
+    expect(columns.props('report').categories.orders!.statements.R2!.findings[0]!.acknowledgement).toEqual(ack)
+
+    // Refused: the row shows what the backend holds at once, the page reads again, and nothing is said twice.
+    columns.vm.$emit('ackFailed', 'F-1', 'Finding F-1 is fixed', true, null, 1)
+    await w.vm.$nextTick()
+    expect(w.get('[data-testid="audit-filter-open"]').text()).toBe('2 open')
+    await flushPromises()
+    expect(f.getAuditReport).toHaveBeenCalledTimes(2)
+    expect(useMascotStore().warnings).toEqual([])
+
+    // Refused after the person moved to another finding: the mascot says it.
+    columns.vm.$emit('acknowledging', 'F-1', ack, null, 2)
+    columns.vm.$emit('ackFailed', 'F-1', 'Finding F-1 is fixed', false, null, 2)
+    await flushPromises()
+    expect(useMascotStore().warnings[0]).toMatchObject({ id: 'audit-ack-F-1', body: 'Finding F-1 is fixed' })
+
+    // Saved: the patch stays until the reload is in, then the reload's word is the one shown.
+    columns.vm.$emit('acknowledging', 'F-1', ack, null, 3)
+    const saved = report()
+    saved.categories.orders!.statements.R2!.findings[0]!.acknowledgement = ack
+    saved.summary = { ...saved.summary, open: 1, acknowledged: 1 }
+    f.getAuditReport.mockResolvedValue({ ok: true, report: saved } as never)
+    columns.vm.$emit('acknowledged', 'F-1', 3)
+    await flushPromises()
+    // The first read, one after each refusal, and this one.
+    expect(f.getAuditReport).toHaveBeenCalledTimes(4)
+    expect(w.get('[data-testid="audit-filter-open"]').text()).toBe('1 open')
+    expect(w.get('[data-testid="audit-filter-acknowledged"]').text()).toBe('1 acknowledged')
   })
 
   // DAR-UI-144 (review I2). The filters' read is cached on the morning, which an acknowledgement leaves as it was: it is read
@@ -1183,7 +1260,7 @@ describe('AuditReportPage', () => {
 
     f.getAuditFindingsByOrder.mockResolvedValue({ ok: true, findings: [item({
       note: 'Refunded', by: { id: 'U1', label: 'Sam R.' }, at: '2026-10-08T09:00:00-07:00', remindOn: '2026-10-13', reminded: false })] } as never)
-    w.findComponent(AuditColumns).vm.$emit('acknowledged')
+    w.findComponent(AuditColumns).vm.$emit('acknowledged', 'F-1', 1)
     await flushPromises()
     await openCauses(w)
     expect(f.getAuditFindingsByOrder.mock.calls.length).toBe(reads + 1)
@@ -1741,7 +1818,7 @@ describe('AuditReportPage', () => {
       await flushPromises()
       expect(w.find('[data-testid="audit-finding-error"]').exists()).toBe(false)
       const reads = f.getAuditFindingsByOrder.mock.calls.length
-      w.findComponent(AuditColumns).vm.$emit('acknowledged')
+      w.findComponent(AuditColumns).vm.$emit('acknowledged', 'F-1', 1)
       await flushPromises()
       // One more read: the lookup, in place.
       expect(f.getAuditFindingsByOrder.mock.calls.length - reads).toBe(1)

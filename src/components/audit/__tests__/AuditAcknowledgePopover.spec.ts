@@ -1,16 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
-import { ApiCallError } from '../../../lib/api/client'
+import { describe, expect, it } from 'vitest'
+import { mount } from '@vue/test-utils'
 import type { AuditAcknowledgement } from '../../../lib/api/auditTypes'
 
-// DAR-UI-144. Acknowledge a finding's row: a required note and whether to raise it again if it is still open.
-
-const acknowledgeFinding = vi.hoisted(() => vi.fn())
-const updateAcknowledgement = vi.hoisted(() => vi.fn())
-
-vi.mock('../../../lib/api/facade', () => ({
-  auditFacade: { acknowledgeFinding, updateAcknowledgement },
-}))
+// DAR-UI-144. Acknowledge a finding's row: a note and whether to raise it again if it is still open.
+// DAR-UI-155: the popover saves nothing. Submit hands the note to the board, which shows it at once and saves behind it.
 
 import AuditAcknowledgePopover from '../AuditAcknowledgePopover.vue'
 
@@ -23,70 +16,56 @@ const ACK: AuditAcknowledgement = {
 }
 
 function mountPopover(props: Partial<{ initial: AuditAcknowledgement | null; remindDays: number }> = {}) {
-  return mount(AuditAcknowledgePopover, { props: { findingId: 'F-1', initial: null, remindDays: 5, ...props } })
+  return mount(AuditAcknowledgePopover, { props: { initial: null, remindDays: 5, ...props } })
 }
-
-beforeEach(() => {
-  acknowledgeFinding.mockReset()
-  updateAcknowledgement.mockReset()
-})
 
 describe('AuditAcknowledgePopover', () => {
   // DAR-UI-152 (Aditi: "typing something doesnt need to be required").
-  it('acknowledges with no note, reminds by default and reads the remind days', async () => {
-    acknowledgeFinding.mockResolvedValue({ ok: true, acknowledgement: { ...ACK, note: null } })
+  it('submits with no note, reminds by default and reads the remind days', async () => {
     const w = mountPopover()
     const submit = w.get('[data-testid="audit-ack-submit"]')
     expect(submit.attributes('disabled')).toBeUndefined()
     await w.get('[data-testid="audit-ack-note-input"]').setValue('   ')
     await w.get('form').trigger('submit')
-    await flushPromises()
-    expect(acknowledgeFinding).toHaveBeenCalledWith('F-1', '', true)
-    expect(w.emitted('saved')).toEqual([[{ ...ACK, note: null }]])
+    expect(w.emitted('submit')).toEqual([['', true]])
     expect(w.get('[data-testid="audit-ack-remind"]').attributes('aria-checked')).toBe('true')
     expect(w.get('[data-testid="audit-ack-remind-label"]').text()).toBe('Remind me in 5 days if still open')
     expect(mountPopover({ remindDays: 1 }).get('[data-testid="audit-ack-remind-label"]').text()).toBe('Remind me in 1 day if still open')
   })
 
-  it('acknowledges with the note and the remind choice, then says it is saved', async () => {
-    acknowledgeFinding.mockResolvedValue({ ok: true, acknowledgement: ACK })
+  // DAR-UI-155. Submitting is synchronous: nothing waits on the backend here.
+  it('submits the note and the remind choice at once, with the button never held', async () => {
     const w = mountPopover()
-    await w.get('[data-testid="audit-ack-note-input"]').setValue('Refunded')
+    await w.get('[data-testid="audit-ack-note-input"]').setValue(' Refunded ')
     await w.get('form').trigger('submit')
-    await flushPromises()
-    expect(acknowledgeFinding).toHaveBeenCalledWith('F-1', 'Refunded', true)
-    expect(updateAcknowledgement).not.toHaveBeenCalled()
-    expect(w.emitted('saved')).toEqual([[ACK]])
+    expect(w.emitted('submit')).toEqual([['Refunded', true]])
+    expect(w.get('[data-testid="audit-ack-submit"]').attributes('disabled')).toBeUndefined()
   })
 
   it('changes an acknowledgement in place: the note and toggle start from it', async () => {
-    updateAcknowledgement.mockResolvedValue({ ok: true, acknowledgement: { ...ACK, note: 'Refunded twice', remindOn: null } })
     const w = mountPopover({ initial: { ...ACK, remindOn: null } })
     expect((w.get('[data-testid="audit-ack-note-input"]').element as HTMLTextAreaElement).value).toBe('Refunded')
     expect(w.get('[data-testid="audit-ack-remind"]').attributes('aria-checked')).toBe('false')
+    expect(w.get('[data-testid="audit-ack-submit"]').text()).toBe('Save')
     await w.get('[data-testid="audit-ack-remind"]').trigger('click')
     await w.get('[data-testid="audit-ack-note-input"]').setValue('Refunded twice')
     await w.get('form').trigger('submit')
-    await flushPromises()
-    expect(updateAcknowledgement).toHaveBeenCalledWith('F-1', 'Refunded twice', true)
-    expect(acknowledgeFinding).not.toHaveBeenCalled()
-    expect(w.emitted('saved')).toHaveLength(1)
+    expect(w.emitted('submit')).toEqual([['Refunded twice', true]])
   })
 
-  it('shows the service\'s refusal in the popover and stays open', async () => {
-    acknowledgeFinding.mockRejectedValue(new ApiCallError('HTML not allowed'))
+  // The two notes the service refuses stay in the popover with the text typed, so nothing is shown and then taken back.
+  it('keeps a note the service would refuse, with its words, and submits nothing', async () => {
     const w = mountPopover()
     await w.get('[data-testid="audit-ack-note-input"]').setValue('<b>done</b>')
     await w.get('form').trigger('submit')
-    await flushPromises()
     expect(w.get('[data-testid="audit-ack-error"]').text()).toBe('HTML not allowed')
-    expect(w.emitted('saved')).toBeUndefined()
-
-    acknowledgeFinding.mockResolvedValue({ ok: false, errors: ['Keep the note under 4,000 characters'] })
+    await w.get('[data-testid="audit-ack-note-input"]').setValue('x'.repeat(4001))
     await w.get('form').trigger('submit')
-    await flushPromises()
     expect(w.get('[data-testid="audit-ack-error"]').text()).toBe('Keep the note under 4,000 characters')
-    expect(w.emitted('saved')).toBeUndefined()
+    expect(w.emitted('submit')).toBeUndefined()
+    await w.get('[data-testid="audit-ack-note-input"]').setValue('x'.repeat(4000))
+    await w.get('form').trigger('submit')
+    expect(w.emitted('submit')).toHaveLength(1)
   })
 
   it('closes on Escape', async () => {

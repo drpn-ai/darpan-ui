@@ -1,6 +1,7 @@
 <template>
   <!-- DAR-UI-144. Acknowledge a finding's row: why the problem is known, and whether to raise it again if it is still open.
-       Anchored to its trigger and scaling from it; with an acknowledgement in hand it changes that one in place. -->
+       Anchored to its trigger and scaling from it; with an acknowledgement in hand it changes that one in place.
+       DAR-UI-155: it saves nothing itself. Submit hands the note to the board, which shows it at once and saves behind it. -->
   <div ref="root" class="audit-ack-popover" role="dialog" aria-label="Acknowledgement" data-testid="audit-ack-popover" @keydown.esc.stop="emit('close')">
     <form class="audit-ack-form" @submit.prevent="save">
       <textarea
@@ -17,7 +18,7 @@
         <AppToggleSwitch v-model="remind" :label="remindLabel" test-id="audit-ack-remind" />
       </div>
       <InlineValidation v-if="error" tone="error" :message="error" data-testid="audit-ack-error" />
-      <button type="submit" class="btn-primary audit-ack-submit" :disabled="saving" data-testid="audit-ack-submit">
+      <button type="submit" class="btn-primary audit-ack-submit" data-testid="audit-ack-submit">
         {{ initial ? 'Save' : 'Acknowledge' }}
       </button>
     </form>
@@ -28,50 +29,33 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppToggleSwitch from '../ui/AppToggleSwitch.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
-import { auditFacade } from '../../lib/api/facade'
 import type { AuditAcknowledgement } from '../../lib/api/auditTypes'
 
 const props = defineProps<{
-  findingId: string
   /** The row's acknowledgement when changing it; null to acknowledge afresh. */
   initial: AuditAcknowledgement | null
   /** The report's audit.acknowledge.remindDays. */
   remindDays: number
 }>()
 
-const emit = defineEmits<{ saved: [acknowledgement: AuditAcknowledgement]; close: [] }>()
+const emit = defineEmits<{ submit: [note: string, remind: boolean]; close: [] }>()
 
 const note = ref(props.initial?.note ?? '')
 // Default on: a "handled" that did not work is the costlier miss.
 const remind = ref(props.initial ? props.initial.remindOn != null : true)
-const saving = ref(false)
 const error = ref('')
 const remindLabel = computed(() => `Remind me in ${props.remindDays} ${props.remindDays === 1 ? 'day' : 'days'} if still open`)
 
 const root = ref<HTMLElement | null>(null)
 const input = ref<HTMLTextAreaElement | null>(null)
 
-async function save(): Promise<void> {
-  // DAR-UI-152 (Aditi: "typing something doesnt need to be required"): a blank note acknowledges too.
+// DAR-UI-152 (Aditi: "typing something doesnt need to be required"): a blank note acknowledges too.
+// DAR-UI-155: the two notes the service refuses (its own words) stay here with the text, before anything is shown.
+function save(): void {
   const text = note.value.trim()
-  if (saving.value) return
-  saving.value = true
-  error.value = ''
-  try {
-    const response = props.initial
-      ? await auditFacade.updateAcknowledgement(props.findingId, text, remind.value)
-      : await auditFacade.acknowledgeFinding(props.findingId, text, remind.value)
-    if (response.ok === false || !response.acknowledgement) {
-      error.value = response.errors?.[0] || 'The note did not save. Try again.'
-      return
-    }
-    emit('saved', response.acknowledgement)
-  } catch (err) {
-    // The service's own words: a note with '<' ("HTML not allowed") or over 4,000 characters.
-    error.value = err instanceof Error && err.message ? err.message : 'The note did not save. Try again.'
-  } finally {
-    saving.value = false
-  }
+  if (text.includes('<')) error.value = 'HTML not allowed'
+  else if (text.length > 4000) error.value = 'Keep the note under 4,000 characters'
+  else emit('submit', text, remind.value)
 }
 
 // A press outside the popover and its trigger closes it; the trigger toggles it itself.
@@ -128,8 +112,4 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onPointerDown)
   margin-top: 0;
 }
 
-.audit-ack-submit:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
 </style>

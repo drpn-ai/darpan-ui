@@ -1,4 +1,5 @@
 import type {
+  AuditAcknowledgement,
   AuditCategory,
   AuditCheckStatus,
   AuditFindingCounts,
@@ -739,4 +740,119 @@ export function comparedGap(check: AuditStatementCheck): string {
   if (counts.length !== 2) return ''
   const gap = Math.abs(counts[0]! - counts[1]!)
   return gap ? `${plural(gap, 'record')} not matched` : 'every record matched'
+}
+
+/** DAR-UI-155. An acknowledgement saved (or changed, or reopened) on screen before the backend has: the board shows it at
+ *  once and the backend saves behind it. Keyed by the finding id acknowledged (a lone row's, or an order's stuck line).
+ *  `was` and `base` let the counts move before any reload: once a report arrives the row as that report has it is
+ *  the starting point instead, so a reload that already carries the acknowledgement is not counted twice. */
+export interface AckPatch {
+  statement: string
+  acknowledgement: AuditAcknowledgement | null
+  /** The row's acknowledgement in `base`, before the person acted. */
+  was: AuditAcknowledgement | null
+  /** The row's level, for byPriority; the statement's when absent. */
+  priority: AuditLevel | null
+  base: AuditReport
+}
+export type AckPatches = ReadonlyMap<string, AckPatch>
+
+function holdsFinding(item: AuditFindingSummary, id: string): boolean {
+  return item.id === id || Boolean(item.lines?.some((line) => line.id === id))
+}
+
+function taken(state: string, ack: AuditAcknowledgement | null | undefined): boolean {
+  return state === 'open' && Boolean(ack && !ack.reminded)
+}
+
+/** DAR-UI-155. Rows with their pending acknowledgement in place of the listed one. */
+export function withAckRows<T extends AuditFindingSummary>(items: T[], patches: AckPatches): T[] {
+  if (!patches.size) return items
+  return items.map((item) => {
+    for (const [id, patch] of patches) if (holdsFinding(item, id)) return { ...item, acknowledgement: patch.acknowledgement }
+    return item
+  })
+}
+
+/** Moves `shift` rows from open to acknowledged (negative: back), never below 0. */
+function shiftCounts<T extends AuditFindingCounts>(counts: T, shift: number, level: AuditLevel): T {
+  const byPriority = counts.byPriority ? { ...counts.byPriority, [level]: Math.max(0, (counts.byPriority[level] ?? 0) - shift) } : undefined
+  return {
+    ...counts,
+    open: Math.max(0, counts.open - shift),
+    acknowledged: Math.max(0, (counts.acknowledged ?? 0) + shift),
+    ...(byPriority ? { byPriority } : {}),
+  }
+}
+
+/** DAR-UI-155. The report with every pending acknowledgement on its row and in the counts (statement, category, summary). */
+export function withAckPatches(report: AuditReport, patches: AckPatches): AuditReport {
+  if (!patches.size) return report
+  let next = report
+  for (const [id, patch] of patches) {
+    const home = findStatement(next, patch.statement)
+    if (!home) continue
+    const { categoryId, statement } = home
+    const row = statement.findings.find((item) => holdsFinding(item, id))
+    // The row this report lists is the truth to move from; one past the report's 50 only while the report is the one acted on.
+    const before = row ? taken(row.state, row.acknowledgement) : report === patch.base ? taken('open', patch.was) : null
+    const after = taken(row?.state ?? 'open', patch.acknowledgement)
+    const shift = before === null || before === after ? 0 : after ? 1 : -1
+    const level = row?.priority ?? patch.priority ?? statement.priority ?? 'P2'
+    const category = next.categories[categoryId]!
+    next = {
+      ...next,
+      summary: shift ? shiftCounts(next.summary, shift, level) : next.summary,
+      categories: {
+        ...next.categories,
+        [categoryId]: {
+          ...category,
+          counts: shift ? shiftCounts(category.counts, shift, level) : category.counts,
+          statements: {
+            ...category.statements,
+            [statement.id]: {
+              ...statement,
+              counts: shift ? shiftCounts(statement.counts, shift, level) : statement.counts,
+              findings: row ? withAckRows(statement.findings, new Map([[id, patch]])) : statement.findings,
+            },
+          },
+        },
+      },
+    }
+  }
+  return next
+}
+
+/** DAR-UI-155. What the board shows the moment a person acknowledges (or changes an acknowledgement), before the backend
+ *  answers: their note, them and now (a change keeps who acknowledged first and when), and the remind day. Stamps are the
+ *  tenant's wall clock, as the backend's are; the reload after the save brings the backend's own. */
+export function pendingAcknowledgement(input: {
+  note: string
+  remind: boolean
+  remindDays: number
+  me: { id: string; label: string | null }
+  timeZone: string | null | undefined
+  initial: AuditAcknowledgement | null
+  now?: Date
+}): AuditAcknowledgement {
+  const now = input.now ?? new Date()
+  const today = tenantToday(input.timeZone, now)
+  const remindOn = new Date(`${today}T00:00:00Z`)
+  remindOn.setUTCDate(remindOn.getUTCDate() + input.remindDays)
+  return {
+    note: input.note || null,
+    by: input.initial?.by ?? input.me,
+    at: input.initial?.at ?? `${today}T${tenantClock(input.timeZone, now)}`,
+    remindOn: input.remind ? remindOn.toISOString().slice(0, 10) : null,
+    reminded: false,
+  }
+}
+
+function tenantClock(timeZone: string | null | undefined, now: Date): string {
+  const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }
+  try {
+    return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: timeZone || undefined }).format(now)
+  } catch {
+    return new Intl.DateTimeFormat('en-GB', options).format(now)
+  }
 }

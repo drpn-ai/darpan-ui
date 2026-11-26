@@ -326,7 +326,7 @@
                         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="acknowledgeIconPath" /></svg>
                       </button>
                       <Transition name="audit-ack-pop">
-                        <AuditAcknowledgePopover v-if="ackEditing === 'new'" :finding-id="ackTarget" :initial="null" :remind-days="remindDays" @saved="onAckSaved" @close="closeAck" />
+                        <AuditAcknowledgePopover v-if="ackEditing === 'new'" :initial="null" :remind-days="remindDays" @submit="(note: string, remind: boolean) => submitAck('new', note, remind)" @close="closeAck" />
                       </Transition>
                     </span>
                     <!-- DAR-BE-123. Re-checks this finding's record now; it closes if the problem is gone. -->
@@ -349,15 +349,16 @@
                           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="editIconPath" fill="currentColor" /></svg>
                         </button>
                         <Transition name="audit-ack-pop">
-                          <AuditAcknowledgePopover v-if="ackEditing === 'edit'" :finding-id="ackTarget" :initial="acknowledgement" :remind-days="remindDays" @saved="onAckSaved" @close="closeAck" />
+                          <AuditAcknowledgePopover v-if="ackEditing === 'edit'" :initial="acknowledgement" :remind-days="remindDays" @submit="(note: string, remind: boolean) => submitAck('edit', note, remind)" @close="closeAck" />
                         </Transition>
                       </span>
-                      <button v-if="!acknowledgement.reminded" type="button" class="audit-more" data-testid="audit-ack-reopen" :disabled="reopening" @click="reopenAck">Reopen</button>
+                      <button v-if="!acknowledgement.reminded" type="button" class="audit-more" data-testid="audit-ack-reopen" @click="reopenAck">Reopen</button>
                     </span>
                   </div>
                   <p v-if="acknowledgement.note" class="audit-body audit-ack-note" data-testid="audit-ack-note">{{ acknowledgement.note }}</p>
-                  <InlineValidation v-if="reopenError" tone="error" :message="reopenError" data-testid="audit-ack-reopen-error" />
                 </div>
+                <!-- DAR-UI-155. A save the backend refused: the row is back as it was, and this says why. -->
+                <InlineValidation v-if="ackError" tone="error" :message="ackError" data-testid="audit-ack-error" />
 
                 <!-- DAR-UI-081. Verdict first: the statement and record, what is wrong, then what it is stuck on and what to do.
                    DAR-UI-092: the record's own facts sit between the title and the verdict. -->
@@ -620,6 +621,7 @@ import {
   SOURCE_NOT_COVERED,
   SOURCE_RUNNING,
   acknowledgedDaysAgo,
+  pendingAcknowledgement,
   categoryItems,
   checkGroups,
   comparedBars,
@@ -693,9 +695,18 @@ const props = defineProps<{
   agentOpen?: boolean
   /** DAR-UI-109. What the agent's waiting drafts would change. */
   drafts?: BoardDrafts | null
+  /** DAR-UI-155. The person signed in: who an acknowledgement is by until the backend's answer replaces it. */
+  me?: { id: string; label: string | null } | null
 }>()
 
-const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; by: [by: 'type' | 'priority']; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; recheck: [statement: string]; retry: [checks: string[]]; agent: [open: boolean]; acknowledged: [] }>()
+const emit = defineEmits<{ navigate: [patch: Record<string, string | undefined>]; by: [by: 'type' | 'priority']; export: [what: 'statement' | 'finding']; extract: [check: string, system: string]; verify: []; recheck: [statement: string]; retry: [checks: string[]]; agent: [open: boolean]
+  /** DAR-UI-155. Shown at once: the finding's acknowledgement as the person set it (null: reopened), what the backend
+   *  holds, and the save's number (the page's patch is that save's, so a later save's is never dropped for it). */
+  acknowledging: [findingId: string, acknowledgement: AuditAcknowledgement | null, was: AuditAcknowledgement | null, seq: number]
+  /** The backend saved it. */
+  acknowledged: [findingId: string, seq: number]
+  /** The backend refused it: why, whether it was said here, and what the backend holds, to put back. */
+  ackFailed: [findingId: string, reason: string, shown: boolean, held: AuditAcknowledgement | null, seq: number] }>()
 
 // DAR-UI-145 (Aditi: "i like B", artifact QabewkAY8iL1UvVVzqRSZG). A window wide enough gives the agent a column of its
 // own beside the detail, so the finding stays in view; a narrower one keeps the Agent tab with the finding pinned in it.
@@ -974,12 +985,11 @@ const ackOverride = ref<{ id: string; acknowledgement: AuditAcknowledgement | nu
 const acknowledgement = computed(() =>
   ackOverride.value && ackOverride.value.id === ackTarget.value ? ackOverride.value.acknowledgement : sourceAck.value)
 const ackEditing = ref<'new' | 'edit' | null>(null)
-const reopening = ref(false)
-const reopenError = ref('')
+const ackError = ref('')
 watch(() => props.finding, () => {
   ackOverride.value = null
   ackEditing.value = null
-  reopenError.value = ''
+  ackError.value = ''
 })
 watch(() => JSON.stringify(sourceAck.value), () => { ackOverride.value = null })
 const remindDays = computed(() => props.report.report.acknowledgeRemindDays ?? 5)
@@ -1024,31 +1034,67 @@ function closeAck(): void {
 function focusAfterRender(target: typeof ackButton): void {
   void nextTick(() => target.value?.focus())
 }
-function onAckSaved(ack: AuditAcknowledgement): void {
-  ackOverride.value = { id: ackTarget.value, acknowledgement: ack }
+// DAR-UI-155 (Aditi: "UI changes should always be immediate.. backend can do its thing"). Acknowledge, change and Reopen
+// show at once: the card here, the row and the counts on the page (acknowledging). The saves run one after another, so a
+// Reopen pressed while its acknowledge is still saving lands after it. Only a refusal changes the screen again: the
+// acknowledgement goes back to what it was and the reason shows under the head.
+type AckSave = Promise<{ ok?: boolean; errors?: string[]; acknowledgement?: AuditAcknowledgement }>
+let ackSaves: Promise<void> = Promise.resolve()
+// Which showAck is on screen (the ref holds a reactive copy, so the object itself cannot be compared).
+let ackShown = 0
+// Per finding while its saves are queued: what the backend holds (as of the last answer), and how many are queued.
+// A refusal puts that back, never the value an earlier save in the queue showed but the backend may not have kept.
+const ackServer = new Map<string, AuditAcknowledgement | null>()
+const ackQueued = new Map<string, number>()
+function showAck(id: string, next: AuditAcknowledgement | null, save: () => AckSave, refused: string): void {
+  if (!ackQueued.get(id)) ackServer.set(id, acknowledgement.value)
+  ackQueued.set(id, (ackQueued.get(id) ?? 0) + 1)
+  const was = ackServer.get(id) ?? null
+  const seq = ++ackShown
+  ackOverride.value = { id, acknowledgement: next }
   ackEditing.value = null
-  emit('acknowledged')
+  ackError.value = ''
+  emit('acknowledging', id, next, was, seq)
+  const stillShown = () => ackShown === seq && ackOverride.value?.id === id
+  ackSaves = ackSaves.then(async () => {
+    try {
+      const response = await save()
+      if (response.ok === false) throw new Error(response.errors?.[0] || refused)
+      ackServer.set(id, next === null ? null : (response.acknowledgement ?? next))
+      if (stillShown() && response.acknowledgement) ackOverride.value = { id, acknowledgement: response.acknowledgement }
+      emit('acknowledged', id, seq)
+    } catch (err) {
+      const reason = err instanceof Error && err.message ? err.message : refused
+      const held = ackServer.get(id) ?? null
+      if (stillShown()) ackOverride.value = { id, acknowledgement: held }
+      // Said here while this finding is open; the page has the mascot say it once the person has moved on.
+      const shown = ackTarget.value === id
+      if (shown) ackError.value = reason
+      emit('ackFailed', id, reason, shown, held, seq)
+    } finally {
+      const left = (ackQueued.get(id) ?? 1) - 1
+      if (left > 0) ackQueued.set(id, left)
+      else {
+        ackQueued.delete(id)
+        ackServer.delete(id)
+      }
+    }
+  })
+}
+function submitAck(kind: 'new' | 'edit', note: string, remind: boolean): void {
+  const id = ackTarget.value
+  const next = pendingAcknowledgement({
+    note, remind, remindDays: remindDays.value, me: props.me ?? { id: '', label: 'You' },
+    timeZone: props.report.report.tenant.timeZone, initial: kind === 'edit' ? acknowledgement.value : null,
+  })
+  showAck(id, next, () => (kind === 'edit' ? auditFacade.updateAcknowledgement(id, note, remind)
+    : auditFacade.acknowledgeFinding(id, note, remind)), 'The note did not save. Try again.')
   focusAfterRender(ackEditButton)
 }
-async function reopenAck(): Promise<void> {
+function reopenAck(): void {
   const id = ackTarget.value
-  reopening.value = true
-  reopenError.value = ''
-  try {
-    const response = await auditFacade.reopenAcknowledgement(id)
-    if (response.ok === false) {
-      reopenError.value = response.errors?.[0] || 'Reopen did not go through. Try again.'
-      return
-    }
-    ackOverride.value = { id, acknowledgement: null }
-    ackEditing.value = null
-    emit('acknowledged')
-    focusAfterRender(ackButton)
-  } catch (err) {
-    reopenError.value = err instanceof Error && err.message ? err.message : 'Reopen did not go through. Try again.'
-  } finally {
-    reopening.value = false
-  }
+  showAck(id, null, () => auditFacade.reopenAcknowledgement(id), 'Reopen did not go through. Try again.')
+  focusAfterRender(ackButton)
 }
 
 const sinceLine = computed(() => {

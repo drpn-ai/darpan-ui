@@ -125,7 +125,7 @@
       </div>
 
       <AuditColumns
-        :report="report"
+        :report="boardReport ?? report"
         :category="selectedCategory"
         :statement="selectedStatement"
         :finding="findingId"
@@ -136,7 +136,7 @@
         :finding-doc="finding"
         :finding-loading="findingLoading"
         :finding-error="findingError"
-        :more="more"
+        :more="boardMore"
         :exporting="exporting"
         :narrowed="narrowed"
         :cause="findingFilters.cause"
@@ -151,6 +151,7 @@
         :agent="agentOn"
         :agent-open="agentOpen"
         :drafts="drafts"
+        :me="me"
         @navigate="navigate"
         @by="chooseBy"
         @export="(what) => (what === 'finding' ? exportFinding() : void exportFindings())"
@@ -159,7 +160,9 @@
         @recheck="(statement) => void recheckAll(statement)"
         @retry="retryCheck"
         @agent="setAgentTab"
-        @acknowledged="void onAcknowledged()"
+        @acknowledging="onAcknowledging"
+        @acknowledged="(id: string, seq: number) => void onAcknowledged(id, seq)"
+        @ack-failed="onAckFailed"
       >
         <!-- DAR-UI-108. The agent, in the Agent tab of the board's deepest column; DAR-UI-145: or beside it, on a wide window.
              The card is the open finding, pinned when the agent covers it. -->
@@ -194,13 +197,15 @@ import AuditColumns from '../../components/audit/AuditColumns.vue'
 import AuditAgentPanel from '../../components/audit/AuditAgentPanel.vue'
 import { agentFacade, auditFacade, reconciliationFacade } from '../../lib/api/facade'
 import { usePermissionsStore } from '../../stores/permissions'
+import { useAuthStore } from '../../stores/auth'
+import { useMascotStore } from '../../stores/mascot'
 import type { GetAgentStatusResponse } from '../../lib/api/agentTypes'
 import { boardDrafts, type DraftPreview } from '../../lib/agentDrafts'
 import { ApiCallError } from '../../lib/api/client'
 import { downloadIconPath, playIconPath, playIconTransform, recheckIconPath, settingsIconPath } from '../../lib/iconPaths'
 import { downloadTextFile } from '../../lib/utils/download'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
-import { AUDIT_LEVELS, type AuditFindingDocument, type AuditFindingListItem, type AuditLevel, type AuditProgress, type AuditReport } from '../../lib/api/auditTypes'
+import { AUDIT_LEVELS, type AuditAcknowledgement, type AuditFindingDocument, type AuditFindingListItem, type AuditLevel, type AuditProgress, type AuditReport } from '../../lib/api/auditTypes'
 import { auditMorningQuery, periodOptions, shortRange, systemLabel } from '../../lib/auditReport'
 import {
   HEALTH,
@@ -209,6 +214,9 @@ import {
   defaultStatement,
   causeOptions,
   emptyFindingsMore,
+  withAckPatches,
+  withAckRows,
+  type AckPatch,
   filterCounts,
   findStatement,
   findingsLeft,
@@ -386,7 +394,7 @@ const FILTER_LABELS: Record<AuditFilter, string> = { open: 'open', acknowledged:
 // DAR-UI-087. The finding pills first, then the statements' one, as the left column words it.
 const PILL_ORDER: AuditFilter[] = ['open', 'acknowledged', 'all', 'notChecked']
 const pills = computed(() => {
-  const doc = report.value
+  const doc = boardReport.value
   if (!doc) return []
   const counts = filterCounts(doc)
   return PILL_ORDER.map((id) => ({ id, count: counts[id], label: FILTER_LABELS[id] }))
@@ -405,8 +413,9 @@ function errorOf(response: { errors?: string[] }, fallback: string): string {
 }
 
 // quiet (DAR-UI-085): a refresh while a play runs keeps the page on screen and keeps the last report if it fails.
-async function loadReport(options: { quiet?: boolean } = {}): Promise<void> {
-  if (!auditCode.value) return
+/** True when the report was read (DAR-UI-155: a pending acknowledgement waits for one). */
+async function loadReport(options: { quiet?: boolean } = {}): Promise<boolean> {
+  if (!auditCode.value) return false
   abort.abort()
   abort = new AbortController()
   if (!options.quiet) {
@@ -419,19 +428,21 @@ async function loadReport(options: { quiet?: boolean } = {}): Promise<void> {
       abort.signal,
     )
     if (response.ok === false || !response.report) {
-      if (options.quiet) return
+      if (options.quiet) return false
       report.value = null
       pageError.value = errorOf(response, 'The audit got lost on the way here. Send a search party.')
     } else {
       report.value = response.report
       // DAR-UI-143. The list moved under an open finding: read the finding too, so the row and the detail agree.
       if (options.quiet) void loadFinding({ quiet: true })
+      return true
     }
   } catch {
     if (!abort.signal.aborted && !options.quiet) pageError.value = 'The audit got lost on the way here. Send a search party.'
   } finally {
     if (!options.quiet) loading.value = false
   }
+  return false
 }
 
 // DAR-UI-085. What the checks are doing right now, for Run health. Read when the audit opens, then every 10 s while any
@@ -482,6 +493,9 @@ async function retryCheck(checks: string[]): Promise<void> {
   const doc = report.value?.report
   if (!doc || retryingChecks.value.length || !checks.length) return
   retryingChecks.value = checks
+  // DAR-UI-156: says so and starts watching at once; the submits answer behind, and only a refusal speaks again.
+  say('Retrying from the last read. Nothing is read again.')
+  watchPlayUntil = Date.now() + PLAY_WATCH_MS
   try {
     for (const check of checks) {
       const response = await auditFacade.retryAuditCheck({ audit: auditCode.value, check, date: doc.date, period: doc.period })
@@ -490,8 +504,6 @@ async function retryCheck(checks: string[]): Promise<void> {
         return
       }
     }
-    say('Retrying from the last read. Nothing is read again.')
-    watchPlayUntil = Date.now() + PLAY_WATCH_MS
     void loadProgress()
   } catch (err) {
     say(err instanceof Error && err.message ? err.message : 'The check would not go again. Try a play instead.')
@@ -522,8 +534,8 @@ onBeforeUnmount(() => {
 // DAR-UI-075. An order open in the detail: its row in the list (the report's, "more", or the filters' read). Its detail
 // reads the stuck line's finding (else its first open line's), whose fix and history are the order's. DAR-UI-081 (Aditi:
 // "remove the click and detail page"): a line has no page of its own; its finding id opens its order.
-const listedRows = computed(() => [...(statementDoc.value?.findings ?? []), ...more.value.findings,
-  ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])])
+const listedRows = computed(() => withAckRows([...(statementDoc.value?.findings ?? []), ...more.value.findings,
+  ...(orderLookup.value?.items ?? []), ...(periodFindings.value?.items ?? [])], ackPatches.value))
 const orderUnit = computed(() => {
   const id = findingId.value
   if (!id || !report.value) return null
@@ -739,7 +751,7 @@ const periodKey = computed(() =>
   report.value ? `${auditCode.value}|${report.value.report.date}|${report.value.report.period}|${filter.value}` : '')
 const narrowed = computed<AuditFindingListItem[] | null>(() => {
   if (!hasFindingFilters(findingFilters.value) || periodFindings.value?.key !== periodKey.value) return null
-  return periodFindings.value.items.filter((item) => matchesFindingFilters(item, findingFilters.value))
+  return withAckRows(periodFindings.value.items.filter((item) => matchesFindingFilters(item, findingFilters.value)), ackPatches.value)
 })
 const causeSelectOptions = computed(() => {
   const causes = causeOptions(periodFindings.value?.items ?? [])
@@ -772,17 +784,72 @@ async function loadPeriodFindings(options: { force?: boolean } = {}): Promise<vo
 
 watch([() => hasFindingFilters(findingFilters.value), periodKey], ([on]) => { if (on) void loadPeriodFindings() }, { immediate: true })
 
-// DAR-UI-144. An acknowledgement saved or reopened moves its row between Open and Acknowledged without changing the
-// morning, so the two lists cached on it (the filters' read, a level's orders past the report's 50) are dropped and the one
-// on show read again, in place, after the quiet reload.
-async function onAcknowledged(): Promise<void> {
+// DAR-UI-155 (Aditi: "UI changes should always be immediate.. backend can do its thing"). An acknowledgement set on the
+// board shows at once: its row moves between Open and Acknowledged and the counts with it, from a patch over what the
+// backend last said. The patch stays until the reads after its save land (so a quiet reload mid-save cannot put the row
+// back), and goes at once if the backend refuses it.
+const auth = useAuthStore()
+const mascot = useMascotStore()
+const me = computed(() => (auth.userId ? { id: auth.userId, label: auth.sessionInfo?.displayName ?? auth.userId } : null))
+// Each patch carries the number of the save that set it, so a save's answer only ever settles its own patch.
+const ackPatches = ref<ReadonlyMap<string, AckPatch & { version: number }>>(new Map())
+const boardReport = computed(() => (report.value ? withAckPatches(report.value, ackPatches.value) : null))
+const boardMore = computed(() => (ackPatches.value.size ? { ...more.value, findings: withAckRows(more.value.findings, ackPatches.value) } : more.value))
+
+function onAcknowledging(id: string, acknowledgement: AuditAcknowledgement | null, was: AuditAcknowledgement | null, seq: number): void {
+  if (!report.value) return
+  // A second change before the first is saved keeps the first's starting point.
+  const held = ackPatches.value.get(id)
+  const unit = listedRows.value.find((item) => item.id === id || Boolean(item.lines?.some((line) => line.id === id)))
+  const next = new Map(ackPatches.value)
+  next.set(id, {
+    statement: selectedStatement.value, acknowledgement, was: held ? held.was : was, base: held ? held.base : report.value,
+    priority: unit?.priority ?? null, version: seq,
+  })
+  ackPatches.value = next
+}
+
+/** Drops a save's pending acknowledgement, only if no later save replaced it meanwhile. */
+function dropAckPatch(id: string, version: number): void {
+  const held = ackPatches.value.get(id)
+  if (!held || held.version !== version) return
+  const next = new Map(ackPatches.value)
+  next.delete(id)
+  ackPatches.value = next
+}
+
+// DAR-UI-144. A saved acknowledgement moves its row without changing the morning, so the two lists cached on it (the
+// filters' read, a level's orders past the report's 50) are read again, in place, with the quiet reload. DAR-UI-155: the
+// board already shows it; the patch goes once all three reads are in, and stays if the report could not be read.
+async function onAcknowledged(id: string, seq: number): Promise<void> {
   const period = periodFindings.value?.key === periodKey.value ? periodFindings.value : null
   const lookup = orderLookup.value?.key === `${periodKey.value}|${selectedStatement.value}` ? orderLookup.value : null
   periodFindings.value = period
   orderLookup.value = lookup
-  await loadReport({ quiet: true })
-  if (period) void loadPeriodFindings({ force: true })
-  if (lookup) void lookUpOrders({ force: true })
+  const read = await loadReport({ quiet: true })
+  await Promise.all([period ? loadPeriodFindings({ force: true }) : null, lookup ? lookUpOrders({ force: true }) : null])
+  if (read) dropAckPatch(id, seq)
+}
+
+// A refusal: the row shows what the backend holds (its own patch says so until the reads land, so a stale report
+// cannot flash the wrong word), and if the person has moved off the finding the mascot says it, since nothing else will.
+function onAckFailed(id: string, reason: string, shown: boolean, held: AuditAcknowledgement | null, seq: number): void {
+  const patch = ackPatches.value.get(id)
+  if (patch && patch.version === seq) {
+    const next = new Map(ackPatches.value)
+    next.set(id, { ...patch, acknowledgement: held })
+    ackPatches.value = next
+    void onAcknowledged(id, seq)
+  }
+  if (!shown) {
+    mascot.raise({
+      id: `audit-ack-${id}`,
+      title: 'An acknowledgement did not save',
+      prompt: `${id} is not acknowledged.`,
+      body: reason,
+      actions: [],
+    })
+  }
 }
 
 // DAR-UI-072. JSON exports: the morning's report and the open finding as the page holds them; a statement's findings

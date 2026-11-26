@@ -116,21 +116,108 @@ describe('AuditColumns acknowledgement', () => {
     expect(fixed.find('[data-testid="audit-ack-card"]').exists()).toBe(false)
   })
 
-  it('opens the popover from the icon with the report\'s remind days, and says acknowledged once saved', async () => {
-    acknowledgeFinding.mockResolvedValue({ ok: true, acknowledgement: ACK })
-    const w = mountColumns(null, 'open', 7)
+  // DAR-UI-155 (Aditi: "UI changes should always be immediate.. backend can do its thing").
+  it('shows the acknowledgement the moment it is submitted, before the save answers, then says it is saved', async () => {
+    let answer: (value: unknown) => void = () => {}
+    acknowledgeFinding.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    const w = mountColumns(null, 'open', 7, { me: { id: 'U9', label: 'Aditi P.' } })
     expect(w.find('[data-testid="audit-ack-popover"]').exists()).toBe(false)
     await w.get(ICON).trigger('click')
     expect(w.get('[data-testid="audit-ack-remind-label"]').text()).toBe('Remind me in 7 days if still open')
     await w.get('[data-testid="audit-ack-note-input"]').setValue('Refunded')
     await w.get('[data-testid="audit-ack-popover"] form').trigger('submit')
-    await flushPromises()
+    // The save has not answered: the popover is closed and the card, badge and pencil are already there.
     expect(acknowledgeFinding).toHaveBeenCalledWith('F-1', 'Refunded', true)
-    expect(w.emitted('acknowledged')).toHaveLength(1)
     expect(w.find('[data-testid="audit-ack-popover"]').exists()).toBe(false)
-    // The row reads acknowledged at once, before the quiet reload brings the report.
-    expect(w.get('[data-testid="audit-ack-card"]').text()).toContain('Sam R.')
+    expect(w.get('[data-testid="audit-ack-card"]').text()).toContain('Aditi P.')
+    expect(w.get('[data-testid="audit-ack-note"]').text()).toBe('Refunded')
+    expect(w.get('.audit-col--detail .status-badge').text()).toBe('Acknowledged')
     expect(w.find(ICON).exists()).toBe(false)
+    const [shown] = w.emitted('acknowledging')!
+    expect(shown![0]).toBe('F-1')
+    expect(shown![1]).toMatchObject({ note: 'Refunded', by: { id: 'U9', label: 'Aditi P.' }, reminded: false })
+    expect(shown![2]).toBeNull()
+    expect(w.emitted('acknowledged')).toBeUndefined()
+
+    answer({ ok: true, acknowledgement: ACK })
+    await flushPromises()
+    expect(w.emitted('acknowledged')).toEqual([['F-1', 1]])
+    // The backend's own record replaces the one shown.
+    expect(w.get('[data-testid="audit-ack-card"]').text()).toContain('Sam R.')
+  })
+
+  it('puts the row back and says why when the backend refuses an acknowledge', async () => {
+    let answer: (value: unknown) => void = () => {}
+    acknowledgeFinding.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    const w = mountColumns(null)
+    await w.get(ICON).trigger('click')
+    await w.get('[data-testid="audit-ack-popover"] form').trigger('submit')
+    expect(w.find('[data-testid="audit-ack-card"]').exists()).toBe(true)
+    answer({ ok: false, errors: ['Finding F-1 is fixed'] })
+    await flushPromises()
+    expect(w.find('[data-testid="audit-ack-card"]').exists()).toBe(false)
+    expect(w.find(ICON).exists()).toBe(true)
+    expect(w.get('[data-testid="audit-ack-error"]').text()).toBe('Finding F-1 is fixed')
+    expect(w.emitted('ackFailed')).toEqual([['F-1', 'Finding F-1 is fixed', true, null, 1]])
+    expect(w.emitted('acknowledged')).toBeUndefined()
+  })
+
+  // Review I1: an earlier save in the queue showed a value the backend may never have kept. A refusal puts back what the
+  // backend holds, never that.
+  it('puts back what the backend holds when a queued change is refused after an earlier one was', async () => {
+    let answerFirst: (value: unknown) => void = () => {}
+    acknowledgeFinding.mockReturnValue(new Promise((resolve) => { answerFirst = resolve }))
+    updateAcknowledgement.mockResolvedValue({ ok: false, errors: ['Nothing to change'] })
+    const w = mountColumns(null)
+    await w.get(ICON).trigger('click')
+    await w.get('[data-testid="audit-ack-popover"] form').trigger('submit')
+    await flushPromises()
+    await w.get(PENCIL).trigger('click')
+    await w.get('[data-testid="audit-ack-note-input"]').setValue('Edited')
+    await w.get('[data-testid="audit-ack-popover"] form').trigger('submit')
+    answerFirst({ ok: false, errors: ['Finding F-1 is fixed'] })
+    await flushPromises()
+    // Both refused: the card is what the backend holds (none), not the first save's unsaved acknowledgement.
+    expect(w.find('[data-testid="audit-ack-card"]').exists()).toBe(false)
+    expect(w.find(ICON).exists()).toBe(true)
+    const shown = w.emitted('acknowledging')!
+    expect(shown[1]![2]).toBeNull()
+    expect(w.emitted('ackFailed')!.map((event) => [event[3], event[4]])).toEqual([[null, 1], [null, 2]])
+  })
+
+  // Review I2: the person opened another finding before the backend answered; the page has the mascot say it.
+  it('says a refusal is not shown here once another finding is open', async () => {
+    let answer: (value: unknown) => void = () => {}
+    acknowledgeFinding.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+    const w = mountColumns(null)
+    await w.get(ICON).trigger('click')
+    await w.get('[data-testid="audit-ack-popover"] form').trigger('submit')
+    await w.setProps({ finding: 'F-2', findingDoc: null })
+    answer({ ok: false, errors: ['Finding F-1 is fixed'] })
+    await flushPromises()
+    expect(w.emitted('ackFailed')).toEqual([['F-1', 'Finding F-1 is fixed', false, null, 1]])
+  })
+
+  // A Reopen pressed while its acknowledge is still saving goes to the backend after it, never before.
+  it('saves an acknowledge then a quick Reopen in order', async () => {
+    const calls: string[] = []
+    let answer: (value: unknown) => void = () => {}
+    acknowledgeFinding.mockImplementation(() => { calls.push('acknowledge'); return new Promise((resolve) => { answer = resolve }) })
+    reopenAcknowledgement.mockImplementation(() => { calls.push('reopen'); return Promise.resolve({ ok: true }) })
+    const w = mountColumns(null)
+    await w.get(ICON).trigger('click')
+    await w.get('[data-testid="audit-ack-popover"] form').trigger('submit')
+    await flushPromises()
+    await w.get('[data-testid="audit-ack-reopen"]').trigger('click')
+    expect(w.find('[data-testid="audit-ack-card"]').exists()).toBe(false)
+    await flushPromises()
+    expect(calls).toEqual(['acknowledge'])
+    answer({ ok: true, acknowledgement: ACK })
+    await flushPromises()
+    expect(calls).toEqual(['acknowledge', 'reopen'])
+    expect(w.emitted('acknowledged')).toEqual([['F-1', 1], ['F-1', 2]])
+    // The acknowledge's answer does not bring back the card the Reopen took away.
+    expect(w.find('[data-testid="audit-ack-card"]').exists()).toBe(false)
   })
 
   it('reads 5 remind days when the report says none', async () => {
@@ -160,9 +247,12 @@ describe('AuditColumns acknowledgement', () => {
     expect((w.get('[data-testid="audit-ack-note-input"]').element as HTMLTextAreaElement).value).toBe(ACK.note)
 
     await w.get('[data-testid="audit-ack-reopen"]').trigger('click')
+    // Gone at once; the save answers after.
+    expect(w.find('[data-testid="audit-ack-card"]').exists()).toBe(false)
+    expect(w.find(ICON).exists()).toBe(true)
     await flushPromises()
     expect(reopenAcknowledgement).toHaveBeenCalledWith('F-1')
-    expect(w.emitted('acknowledged')).toHaveLength(1)
+    expect(w.emitted('acknowledged')).toEqual([['F-1', 1]])
   })
 
   // T10-M1. Days count to the tenant's today: 03:00 UTC on Oct 10 is Oct 9 in Los Angeles, 6 days after Oct 3 (the
@@ -235,12 +325,14 @@ describe('AuditColumns acknowledgement', () => {
     expect(w.get('[data-testid="audit-ack-card"]').text()).toContain('Sam R.')
   })
 
-  it('shows a refused reopen beside the note', async () => {
+  it('brings a refused reopen\'s note card back and says why', async () => {
     reopenAcknowledgement.mockResolvedValue({ ok: false, errors: ['Finding F-1 was not found'] })
     const w = mountColumns(ACK)
     await w.get('[data-testid="audit-ack-reopen"]').trigger('click')
     await flushPromises()
-    expect(w.get('[data-testid="audit-ack-reopen-error"]').text()).toBe('Finding F-1 was not found')
+    expect(w.get('[data-testid="audit-ack-card"]').text()).toContain('Sam R.')
+    expect(w.get('[data-testid="audit-ack-error"]').text()).toBe('Finding F-1 was not found')
+    expect(w.emitted('ackFailed')).toEqual([['F-1', 'Finding F-1 was not found', true, ACK, 1]])
     expect(w.emitted('acknowledged')).toBeUndefined()
   })
 })
