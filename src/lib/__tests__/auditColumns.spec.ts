@@ -394,7 +394,13 @@ describe('auditColumns', () => {
     const lines = [line('F-1', 'M1168785/01', 'Backordered in NetSuite'),
       line('F-2', 'M1168785/02', 'Shipped, not billed: another line of its order is backordered in NetSuite', true)]
     expect(lines.map((l) => lineLabel('M1168785', l))).toEqual(['Line 1', 'Line 2'])
-    expect(lineLabel('M1168785', { ...lines[0]!, records: {} })).toBe('F-1')
+    // DAR-BE-372 rule 5: never the finding id. A line with no HotWax item reads the item its headline names (Gorjana R10
+    // F-126830, keyed by NetSuite sales order SO7389324), else "Line".
+    expect(lineLabel('M1168785', { ...lines[0]!, records: {} })).not.toBe('F-1')
+    expect(lineLabel('SO7389324', { ...lines[0]!, id: 'F-126830', records: {},
+      headline: 'Line M1230020/01 is open in NetSuite and not at the warehouse in HotWax' })).toBe('M1230020/01')
+    expect(lineLabel('M1230020', { ...lines[0]!, id: 'F-126830', records: {}, headline: 'Line M1230020/01 is open in NetSuite' })).toBe('Line 1')
+    expect(lineLabel('M1168785', { ...lines[0]!, id: 'F-9', records: {}, headline: 'Parked in HotWax' })).toBe('Line')
     // DAR-UI-081 (Aditi: "show SKU instead of line 1, line 2").
     expect(lineLabel('M1168785', { ...lines[0]!, records: { OMS: { orderItem: [{ id: 'M1168785/01', internalId: null, status: null, sku: '263-203-186-G' }] } } }))
       .toBe('263-203-186-G')

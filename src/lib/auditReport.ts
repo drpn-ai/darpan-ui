@@ -81,6 +81,8 @@ export interface RecordRow {
   warrantyId: string
   orderTotal: string
   returnTotal: string
+  lineTotal: string
+  hotwaxStatus: string
   paymentStatus: string
   deposits: { id: string; amount: string; status: string }[]
   heldBy: { id: string; status: string } | null
@@ -143,34 +145,43 @@ const DETAIL_ORDER = ['Customer', 'Order date', 'Sales channel', 'Ship method', 
 
 /**
  * DAR-UI-139 (Aditi: "all finding have the basix details row"). The same four cells on every finding: each of the two
- * systems the check compared (report keys, in read order) and its record's status, "None" when that system holds no
- * record of it, with its payment status beside (DAR-BE-360); the amount (a return's total, else its order's); the day (a return's, else its order's). The
- * check names its systems whether or not it ran (DAR-BE-371). A fact nobody read is a dash, so every row is even.
+ * systems the check compared (report keys, in read order) and its record's status, "Missing" when that system holds no
+ * record of it (DAR-BE-372 rule 7; HotWax's word carried on another system's row counts), with its payment status beside
+ * (DAR-BE-360); the amount (a return's total, else its order's, else its line's); the day (a return's, else its order's).
+ * The check names its systems whether or not it ran (DAR-BE-371). A one-system check has one cell; a dash is left only
+ * where a held record's read gave nothing, which FindingCardRulesTests (backend) guards against.
  */
 export function basicFacts(rows: RecordRow[], compared: string[]): StaticFact[] {
   // DAR-BE-371 (Aditi: "if we are looking at HW to NS then the info should be HW to NS"): only the compared systems; a
   // one-system check gets one cell. The records' own systems stand in only when the check names none.
   const systems = compared.length ? [...new Set(compared.map(systemLabel))].slice(0, 2)
     : [...new Set(rows.map((row) => row.system))].slice(0, 2)
-  const side = (index: number): StaticFact => {
+  // DAR-BE-372 rule 2: HotWax's own word for the record when another system's row carries it (an R10 NetSuite line's item
+  // status), else the HotWax order status an item carries.
+  const carriedHotWax = rows.find((row) => row.system !== 'HotWax' && row.hotwaxStatus)?.hotwaxStatus
+    || rows.find((row) => row.system !== 'HotWax' && row.orderStatus)?.orderStatus || ''
+  const side = (index: number): StaticFact | null => {
     const system = systems[index]
-    if (!system) return { key: `system${index}`, label: 'Other system', value: '—' }
+    if (!system) return null
     const row = rows.find((candidate) => candidate.system === system)
-    const status = row ? (row.recordType === 'orderItem' ? row.orderStatus || row.status : row.status) : ''
+    const own = row ? (row.recordType === 'orderItem' ? row.orderStatus || row.status : row.status) : ''
+    const status = own || (system === 'HotWax' ? carriedHotWax : '')
     // DAR-BE-360: and its payment status, from another of its records when this one has none (an item's order).
     const paid = row ? row.paymentStatus || rows.find((candidate) => candidate.system === system && candidate.paymentStatus)?.paymentStatus : ''
     const value = [status, paid].filter(Boolean).join(' · ')
-    return { key: `system${index}`, label: system, value: row ? value || '—' : 'None' }
+    // DAR-BE-372 rule 7 (Aditi: "if the item is missing from one system.. that should be said.. not dash").
+    return { key: `system${index}`, label: system, value: value || (row ? '—' : 'Missing') }
   }
   const returned = rows.find((row) => row.returnTotal || row.returnDate)
   const total = rows.find((row) => row.returnTotal)?.returnTotal
   const orderTotal = rows.find((row) => row.orderTotal)?.orderTotal
+  const lineTotal = rows.find((row) => row.lineTotal)?.lineTotal
   const ordered = rows.find((row) => row.orderDate)?.orderDate
   return [
-    side(0),
-    ...(compared.length && systems.length === 1 ? [] : [side(1)]),
+    ...[side(0), side(1)].filter((fact): fact is StaticFact => fact !== null),
     total ? { key: 'amount', label: 'Return total', value: total }
-      : orderTotal ? { key: 'amount', label: 'Order total', value: orderTotal } : { key: 'amount', label: 'Total', value: '—' },
+      : orderTotal ? { key: 'amount', label: 'Order total', value: orderTotal }
+        : lineTotal ? { key: 'amount', label: 'Line total', value: lineTotal } : { key: 'amount', label: 'Total', value: '—' },
     returned?.returnDate ? { key: 'day', label: 'Returned', value: shortDate(returned.returnDate) }
       : ordered ? { key: 'day', label: 'Ordered', value: shortDate(ordered) } : { key: 'day', label: 'Day', value: '—' },
   ]
@@ -301,6 +312,8 @@ export function recordRows(records: AuditRecords | null | undefined): RecordRow[
           warrantyId: record.warrantyId ?? '',
           orderTotal: moneyText(record.orderTotal),
           returnTotal: moneyText(record.returnTotal),
+          lineTotal: moneyText(record.lineTotal),
+          hotwaxStatus: record.hotwaxStatus ?? '',
           paymentStatus: record.paymentStatus ?? '',
           deposits: (record.deposits ?? []).map((d) => ({ id: d.id, amount: d.amount ?? '', status: d.status ?? '' })),
           heldBy: record.heldBy ? { id: record.heldBy.id, status: record.heldBy.status ?? '' } : null,

@@ -41,6 +41,9 @@ export interface AuditRecord {
   /** The order's total (its own, or the one its item or return carries) and a return's own. */
   orderTotal?: AuditMoney
   returnTotal?: AuditMoney
+  /** DAR-BE-372. A line's own amount (NetSuite lineAmount), and HotWax's word for the record carried on another system's row. */
+  lineTotal?: AuditMoney
+  hotwaxStatus?: string | null
   /** DAR-BE-360. The record's payment status in its system's words (Paid, Settled, Refunded, Fully Applied). */
   paymentStatus?: string | null
   deposits?: { id: string; amount: string | null; status: string | null }[]

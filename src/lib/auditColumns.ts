@@ -641,18 +641,22 @@ function findingCauses(item: AuditFindingListItem): string[] {
 }
 
 /**
- * "Line 1" for item M1168785/01 of order M1168785, as the report's order headline names it; else the line's finding id.
+ * "Line 1" for item M1168785/01 of order M1168785, as the report's order headline names it; the item id itself when it is
+ * not under the order's key (R10 keys an order by its NetSuite sales order). DAR-BE-372 rule 5: never the finding id; the
+ * item is the HotWax item record's, else the one the line's own headline names ("Line M1230020/01 is open ..."); a line
+ * nothing names reads "Line".
  * DAR-UI-081 (Aditi: "show SKU instead of line 1, line 2"): an item is named by its SKU when its read gave one, and by its
  * line too when another of the order's lines carries the same SKU (gorjana M1168149: one product on three lines).
  */
 export function lineLabel(order: string, line: AuditFindingSummary, lines: AuditFindingSummary[] = []): string {
   const item = line.records?.OMS?.orderItem?.[0]
-  const number = lineNumber(order, item?.id ?? '')
+  const itemId = item?.id || /^(?:Line|Item) (\S+)/.exec(line.headline ?? '')?.[1] || ''
+  const number = lineNumber(order, itemId)
   if (item?.sku) {
     const twin = lines.some((other) => other !== line && other.records?.OMS?.orderItem?.[0]?.sku === item.sku)
     return twin && number ? `${item.sku} · ${number.toLowerCase()}` : item.sku
   }
-  return number || line.id
+  return number || itemId || 'Line'
 }
 
 /** DAR-UI-099 (Aditi: "always make sure all lines are present within the order"). The order's lines with no finding of

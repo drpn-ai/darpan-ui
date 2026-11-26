@@ -681,9 +681,9 @@ describe('AuditReportPage', () => {
     await flushPromises()
 
     // The check compares NetSuite alone (the report's statement R2); the finding holds no NetSuite record, so its cell says
-    // None. DAR-BE-371: only the compared system, never the HotWax record beside it.
+    // Missing (DAR-BE-372 rule 7). DAR-BE-371: only the compared system, never the HotWax record beside it.
     const cells = w.get('[data-testid="audit-finding-basics"]').findAll('.static-fact')
-    expect(cells.map((cell) => cell.text())).toEqual(['NetSuiteNone', 'Order total486.53 USD', 'OrderedNov 16'])
+    expect(cells.map((cell) => cell.text())).toEqual(['NetSuiteMissing', 'Order total486.53 USD', 'OrderedNov 16'])
     expect(w.get('[data-testid="audit-record-kind"]').text()).toBe('Order')
     // Said once: the total and day sit in the basics, not again under the order.
     expect(w.findAll('[data-testid="audit-record-detail"]').map((row) => row.text())).toEqual(['CustomerAda Lovelace', 'Sales channelWeb', 'Ship method—'])

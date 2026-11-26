@@ -149,7 +149,7 @@ describe('auditReport', () => {
       OMS: { order: [{ id: '#931462', internalId: '118451', status: 'Approved', orderTotal: { amount: '486.53', currency: 'USD' }, orderDate: '2026-11-16' }] },
     })
     expect(basicFacts(order, ['OMS', 'NetSuite']).map((f) => [f.label, f.value])).toEqual([
-      ['HotWax', 'Approved'], ['NetSuite', 'None'], ['Order total', '486.53 USD'], ['Ordered', 'Nov 16'],
+      ['HotWax', 'Approved'], ['NetSuite', 'Missing'], ['Order total', '486.53 USD'], ['Ordered', 'Nov 16'],
     ])
     // An item's card reads its order's status; a return's total and day win over its order's.
     const ret = recordRows({
@@ -160,10 +160,10 @@ describe('auditReport', () => {
     expect(basicFacts(ret, ['Shopify', 'NetSuite']).map((f) => [f.label, f.value])).toEqual([
       ['Shopify', 'Completed'], ['NetSuite', 'Pending Billing'], ['Return total', '128.00 USD'], ['Returned', 'Nov 18'],
     ])
-    // A check that has not run names no systems: the records' own, and a fact nobody read is a dash.
+    // A check that names no systems: the records' own (no "Other system" filler), and a fact nobody read is a dash.
     const bare = recordRows({ OMS: { orderItem: [{ id: 'M1/01', internalId: null, status: 'Completed', orderStatus: 'Completed' }] } })
     expect(basicFacts(bare, []).map((f) => [f.label, f.value])).toEqual([
-      ['HotWax', 'Completed'], ['Other system', '—'], ['Total', '—'], ['Day', '—'],
+      ['HotWax', 'Completed'], ['Total', '—'], ['Day', '—'],
     ])
     // DAR-BE-360 (Aditi: "add payment status to all orders and refunds"): each system's payment status beside its status,
     // from another of its records when the first has none (an item's order); alone when its record has no status.
@@ -181,8 +181,18 @@ describe('auditReport', () => {
       OMS: { order: [{ id: '#GOR197449616', internalId: 'M1237624', status: 'Approved' }] },
       Shopify: { order: [{ id: '18997506769027', internalId: null, status: null }] },
     })
-    expect(basicFacts(r7, ['OMS', 'NetSuite']).slice(0, 2).map((f) => [f.label, f.value])).toEqual([['HotWax', 'Approved'], ['NetSuite', 'None']])
+    expect(basicFacts(r7, ['OMS', 'NetSuite']).slice(0, 2).map((f) => [f.label, f.value])).toEqual([['HotWax', 'Approved'], ['NetSuite', 'Missing']])
     expect(basicFacts(r7, ['NetSuite']).map((f) => f.label)).toEqual(['NetSuite', 'Total', 'Day'])
+    // DAR-BE-372 (Gorjana R10 F-126830): HotWax's item status carried on the NetSuite line fills the HotWax cell, the
+    // line's amount the total, NetSuite's date the day; R13: a HotWax side nobody kept and nothing carries is Missing.
+    const r10 = recordRows({
+      NetSuite: { salesOrderLine: [{ id: 'SO7389324', internalId: null, status: 'Pending Fulfillment', hotwaxStatus: 'Approved',
+        lineTotal: { amount: '275.00', currency: 'USD' }, orderDate: '2026-11-07' }] },
+      OMS: { order: [{ id: '#GOR197443011', internalId: 'M1230020', status: null }] },
+    })
+    expect(basicFacts(r10, ['NetSuite', 'OMS']).map((f) => [f.label, f.value])).toEqual([
+      ['NetSuite', 'Pending Fulfillment'], ['HotWax', 'Approved'], ['Line total', '275.00 USD'], ['Ordered', 'Nov 7'],
+    ])
   })
 
   // DAR-UI-139. What kind of record the finding is about, from its category, else its records.

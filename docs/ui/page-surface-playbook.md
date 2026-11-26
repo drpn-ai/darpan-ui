@@ -56,6 +56,18 @@ Motion confirms, it never decorates. It may carry border, background, opacity, a
 - **Tokens only.** No literal duration or curve (`160ms ease`) in any `transition` or `animation`; `src/__tests__/motionUsesTokens.spec.ts` sweeps `src/**/*.{css,vue}` and lists its few exceptions with reasons.
 - `prefers-reduced-motion` collapses all of it (global rule at the end of `src/style.css`).
 
+## Audit finding card
+
+The finding detail (`AuditColumns.vue`, built from `src/lib/auditReport.ts` over the backend's `AuditReportAssembler.recordFacts`) follows one contract, so no finding reads emptier or stranger than another (DAR-BE-372, Aditi 2026-11-26).
+
+1. **Only the compared systems.** The card speaks of the systems its check compares (`check.systems`: the systems its label names, else its statement, else its automation's sources), whether or not the check ran today. A HotWax-to-NetSuite finding never shows Shopify; a one-system check has one cell.
+2. **Basics come from the read.** Each compared system's status, the amount and the day are filled from any field the check's read carries, including another system's word carried on a row (`omsItemStatusId` on a NetSuite line is HotWax's status). Every status, amount or date field a read gives is placed in `AuditReportAssembler.CARD_FIELDS`; `FindingCardRulesTests` fails on one that is not.
+3. **Same rows per kind.** Order: Customer, Sales channel, Ship method. Return: Customer, Sales channel, Channel. Exchange: Customer, Sales channel, Warranty ID. Then anything else known (deposits).
+4. **Reference ids.** The order name and the HotWax order id, the ids every system carries; no per-system id cards.
+5. **Name records by their business id.** The headline and "Stuck on" name a line by its HotWax item (or the item its own headline names), an order by its name; never the finding id.
+6. **No filler.** No "No status read", no "Other system", no dashed boxes for missing data.
+7. **Missing is said.** A compared system that holds no record of it reads "Missing", never a dash. A dash is left only where a held record's read gave nothing, which rule 2 exists to prevent.
+
 ## Migration rules
 
 - Split settings pages into static saved-record surfaces and workflow create/edit surfaces when the page is doing both jobs.
