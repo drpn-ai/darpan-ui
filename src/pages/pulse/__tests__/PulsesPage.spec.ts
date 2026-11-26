@@ -137,7 +137,7 @@ describe('PulsesPage', () => {
     let wrapper = await mountPage()
     expect(wrapper.find('[data-testid="pulses-settings"]').exists()).toBe(false)
     await wrapper.findAll('[data-testid="pulse-card-open"]')[1]!.trigger('click')
-    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-sync-pair', params: { syncPairId: '100102' } })
+    expect(push).toHaveBeenCalledWith({ name: 'pulse', params: { syncPairId: '100102' } })
     permissions.canEditTenantSettings = true
     wrapper = await mountPage()
     expect(wrapper.get('[data-testid="pulses-settings"]').attributes('data-to')).toContain('settings-tenant-sync-pairs')

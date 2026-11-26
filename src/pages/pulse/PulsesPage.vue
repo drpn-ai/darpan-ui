@@ -109,7 +109,7 @@ function periodDates(period: PeakPeriodSummary): string {
 }
 
 function open(syncPairId: string): void {
-  void router.push({ name: 'settings-tenant-sync-pair', params: { syncPairId } })
+  void router.push({ name: 'pulse', params: { syncPairId } })
 }
 
 async function cardFor(row: SyncPulseRow, nextPulse: Map<string, NextPulse>): Promise<PulseCard> {

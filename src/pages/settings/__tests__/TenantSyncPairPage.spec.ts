@@ -13,7 +13,7 @@ const saveSyncPair = vi.hoisted(() => vi.fn())
 const deleteSyncPair = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const replace = vi.hoisted(() => vi.fn())
-const route = vi.hoisted(() => ({ params: { syncPairId: 'SP1' } as Record<string, string> }))
+const route = vi.hoisted(() => ({ name: 'pulse', params: { syncPairId: 'SP1' } as Record<string, string> }))
 const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 
 vi.mock('../../../lib/api/facade', () => ({
@@ -92,6 +92,7 @@ describe('TenantSyncPairPage', () => {
     vi.clearAllMocks()
     setDefaultDisplayTimeZone('UTC')
     permissions.canEditTenantSettings = true
+    route.name = 'pulse'
     route.params = { syncPairId: 'SP1' }
     document.body.replaceChildren()
     getSyncPair.mockResolvedValue(got())
@@ -343,7 +344,7 @@ describe('TenantSyncPairPage', () => {
     expect(text(wrapper, 'sync-pair-fact-oldest')).toContain('6h 40m')
   })
 
-  it('deletes the pair after asking, then goes back to the list', async () => {
+  it('deletes the pair after asking, then goes back to Pulses', async () => {
     const wrapper = await mountPage()
     await wrapper.find('[data-testid="sync-pair-delete"]').trigger('click')
     expect(text(wrapper, 'sync-pair-popup-title')).toBe('Delete sync pair')
@@ -351,7 +352,7 @@ describe('TenantSyncPairPage', () => {
     await wrapper.find('[data-testid="sync-pair-delete-confirm"]').trigger('click')
     await flushPromises()
     expect(deleteSyncPair).toHaveBeenCalledWith({ syncPairId: 'SP1' })
-    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-sync-pairs' })
+    expect(push).toHaveBeenCalledWith({ name: 'pulses' })
   })
 
   it('shows a refused delete in its popup', async () => {
@@ -372,7 +373,9 @@ describe('TenantSyncPairPage', () => {
     expect(wrapper.find('[data-testid="sync-pair-on"]').attributes('disabled')).toBeDefined()
     expect(wrapper.find('[data-testid="sync-pair-save"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="sync-pair-delete"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="sync-pair-back"]').attributes('data-to')).toBe(JSON.stringify({ name: 'settings-tenant-sync-pairs' }))
+    const back = wrapper.find('[data-testid="sync-pair-back"]')
+    expect(back.attributes('data-to')).toBe(JSON.stringify({ name: 'pulses' }))
+    expect(back.attributes('aria-label')).toBe('Back to pulses')
   })
 
   it('reads the pair again every minute, skips while edited, and stops when the page closes', async () => {
@@ -414,9 +417,17 @@ describe('TenantSyncPairPage', () => {
 
   describe('a new pair', () => {
     beforeEach(() => {
+      route.name = 'settings-tenant-sync-pair-new'
       route.params = {}
       getSyncPair.mockResolvedValue(got({ syncPair: undefined as unknown as SyncPair, samplesToday: [], pastOrders: [] }))
       saveSyncPair.mockResolvedValue({ ok: true, messages: [], errors: [], syncPairId: 'SP9' })
+    })
+
+    it('goes back to the Tenant Settings sync pulse list, where a new pair is made', async () => {
+      const wrapper = await mountPage()
+      const back = wrapper.find('[data-testid="sync-pair-back"]')
+      expect(back.attributes('data-to')).toBe(JSON.stringify({ name: 'settings-tenant-sync-pairs' }))
+      expect(back.attributes('aria-label')).toBe('Back to sync pulse')
     })
 
     it('reads only the pickers, and offers Run, Upstream side, Every, Allowance, Chat space and Hourly summary', async () => {
@@ -473,7 +484,7 @@ describe('TenantSyncPairPage', () => {
         automationId: 'A2', upstreamSide: 'FILE_2', allowanceMinutes: 30, pulseEveryMinutes: 60,
         chatSpaceId: 'CS2', hourlySummary: true, isActive: true,
       })
-      expect(replace).toHaveBeenCalledWith({ name: 'settings-tenant-sync-pair', params: { syncPairId: 'SP9' } })
+      expect(replace).toHaveBeenCalledWith({ name: 'pulse', params: { syncPairId: 'SP9' } })
       expect(getSyncPair).toHaveBeenLastCalledWith({ syncPairId: 'SP9' })
     })
 

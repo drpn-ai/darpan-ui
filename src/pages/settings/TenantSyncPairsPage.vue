@@ -100,7 +100,7 @@ const pageError = ref('')
 const controller = new AbortController()
 
 function open(syncPairId: string): void {
-  void router.push({ name: 'settings-tenant-sync-pair', params: { syncPairId } })
+  void router.push({ name: 'pulse', params: { syncPairId } })
 }
 
 async function load(): Promise<void> {

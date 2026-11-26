@@ -702,6 +702,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Add sync pair',
     body: 'a new pair on its own page. Nothing is watched until it has a run, an upstream side and is saved.',
   },
+  'back to pulses': {
+    title: 'Back to Pulses',
+    body: 'every pulse this tenant watches, each with its window, last pulse and anything past the allowance.',
+  },
   'back to sync pulse': {
     title: 'Back to sync pulse',
     body: 'the list of this tenant’s sync pairs. Unsaved edits here are dropped on the way out.',

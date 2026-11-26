@@ -70,10 +70,10 @@
     <template #actions>
       <div class="action-row">
         <RouterLink
-          :to="{ name: 'settings-tenant-sync-pairs' }"
+          :to="back"
           class="app-icon-action app-icon-action--large"
-          aria-label="Back to sync pulse"
-          title="Back to sync pulse"
+          :aria-label="isNewRoute ? 'Back to sync pulse' : 'Back to pulses'"
+          :title="isNewRoute ? 'Back to sync pulse' : 'Back to pulses'"
           data-testid="sync-pair-back"
         >
           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -355,6 +355,9 @@ const permissionsStore = usePermissionsStore()
 const canEdit = computed(() => permissionsStore.canEditTenantSettings)
 
 const routePairId = computed(() => String(route.params.syncPairId ?? ''))
+// A new pair is made from Tenant Settings and goes back there; a saved pulse's page sits under Pulses (DAR-UI-154).
+const isNewRoute = computed(() => route.name === 'settings-tenant-sync-pair-new')
+const back = computed(() => ({ name: isNewRoute.value ? 'settings-tenant-sync-pairs' : 'pulses' }))
 
 const saved = ref<SyncPair | null>(null)
 const samples = ref<SyncSample[]>([])
@@ -743,7 +746,7 @@ async function deletePair(): Promise<void> {
     }
     popupBusy.value = false
     closePopup()
-    void router.push({ name: 'settings-tenant-sync-pairs' })
+    void router.push({ name: 'pulses' })
   } catch (error) {
     popupError.value = messageOf(error, 'Could not delete the sync pair.')
   } finally {
@@ -810,7 +813,7 @@ async function save(): Promise<void> {
     }
     if (!wasNew) return
     current.syncPairId = out.syncPairId
-    void router.replace({ name: 'settings-tenant-sync-pair', params: { syncPairId: out.syncPairId } })
+    void router.replace({ name: 'pulse', params: { syncPairId: out.syncPairId } })
     try {
       apply(await fetchPair(out.syncPairId))
       resetDraft()

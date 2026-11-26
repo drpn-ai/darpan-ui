@@ -403,7 +403,7 @@
                   v-if="pulseFlagFor(row.recordId)"
                   class="run-result-record-cell__brief run-result-record-cell__pulse"
                   data-testid="diff-details-pulse-flag"
-                  :to="{ name: 'settings-tenant-sync-pair', params: { syncPairId: pulseSyncPairId } }"
+                  :to="{ name: 'pulse', params: { syncPairId: pulseSyncPairId } }"
                 >
                   flagged by sync pulse {{ pulseFlagFor(row.recordId) }}
                 </RouterLink>

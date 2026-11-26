@@ -1534,7 +1534,7 @@ describe('ReconciliationRunResultPage', () => {
       const flags = wrapper.findAll('[data-testid="diff-details-pulse-flag"]')
       expect(flags).toHaveLength(1)
       expect(flags[0]!.text()).toBe('flagged by sync pulse 08:05')
-      expect(flags[0]!.attributes('data-to')).toContain('settings-tenant-sync-pair')
+      expect(flags[0]!.attributes('data-to')).toContain('pulse')
       expect(flags[0]!.attributes('data-to')).toContain('SP1')
       setDefaultDisplayTimeZone(undefined)
     })

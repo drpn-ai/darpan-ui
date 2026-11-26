@@ -113,7 +113,7 @@ describe('TenantSyncPairsPage', () => {
     const row = wrapper.get('[data-testid="sync-pair-row"]')
     expect(row.attributes('aria-label')).toBe('Open sync pair Daily')
     await row.trigger('click')
-    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-sync-pair', params: { syncPairId: '77' } })
+    expect(push).toHaveBeenCalledWith({ name: 'pulse', params: { syncPairId: '77' } })
   })
 
   it('shows add to editors only, pointing at the new route', async () => {
