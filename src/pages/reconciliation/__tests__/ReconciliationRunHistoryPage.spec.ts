@@ -380,6 +380,22 @@ describe('ReconciliationRunHistoryPage', () => {
     expect(featuredTile.text()).toContain('Missing from HotWax Transfer Orders')
   })
 
+  // DAR-UI-157: a result whose run is known opens at the run's short address, with what the page needs handed over.
+  it('opens a result whose run is known at the run\'s short address', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true, messages: [], errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{ ...buildGeneratedOutput(31), reconciliationRunResultId: 'RR_31' }],
+    })
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+    expect(JSON.parse(wrapper.get('[data-testid="run-history-featured-tile"]').attributes('data-to') ?? '{}')).toEqual({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RR_31' },
+      state: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY', resultFileName: 'CSV-Order-Compare-diff-20260331-090000.json' },
+    })
+  })
+
   it('loads saved-run scoped results and features the most recent output above the previous results list', async () => {
     const wrapper = mount(ReconciliationRunHistoryPage)
     await flushPromises()
@@ -679,7 +695,7 @@ describe('ReconciliationRunHistoryPage', () => {
     expect(JSON.parse(runningTile.attributes('data-to') as string)).toEqual({
       name: 'reconciliation-run-live',
       params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RUN_RESULT_OPENABLE' },
-      query: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
+      state: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
     })
 
     // A local pending marker has no backend run id yet, so its tile has nothing to open.
@@ -847,7 +863,7 @@ describe('ReconciliationRunHistoryPage', () => {
     expect(JSON.parse(failedTile.attributes('data-to') as string)).toEqual({
       name: 'reconciliation-run-live',
       params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RUN_RESULT_FAILED' },
-      query: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
+      state: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
     })
 
     // A failure with no backend run id has no run view to open, exactly like a local pending marker.

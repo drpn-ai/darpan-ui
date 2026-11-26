@@ -42,6 +42,18 @@ function control(testId: string): string {
   return `[data-testid="${testId}"]`
 }
 
+const RUN_RESULT_HINTS: readonly Hint[] = Object.freeze([
+  { id: 'run-result-live-failed', text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
+  // The empty message also shows when a filter matches nothing, so it must not be read
+  // as "the run found nothing".
+  { id: 'diff-details-empty', text: 'Nothing here yet — a bucket or the search may be filtering it out, not the run.', when: control('diff-details-empty') },
+  { id: 'diff-bucket-file-1', text: 'Click a bucket to narrow the table to just those records.', when: control('diff-bucket-file-1') },
+  { id: 'rest-any-count-i', text: 'Rest on any count and I will tell you what it does and does not include.' },
+  { id: 'differences-missing-records-counted', text: 'Differences and missing records are counted separately — a zero in one says nothing about the other.' },
+  { id: 'run-result-source-download', text: 'The source files are the run’s own — download one to check a record it calls missing.', when: control('run-result-source-download') },
+  { id: 'run-result-download', text: 'Download gives you the result exactly as the run wrote it.', when: control('run-result-download') },
+])
+
 export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.freeze({
   // RuleSetBoard: @dblclick opens the filter editor, pointerdown/up draws a pairing,
   // and Enter is the keyboard equivalent of the drag.
@@ -75,22 +87,17 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
   ]),
   // Two routes, one component. The saved result is the forensic view; the live run is the
   // same page while it is still moving, and almost everything it offers is conditional.
-  'reconciliation-run-result': Object.freeze([
-    { id: 'run-result-live-failed', text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
-    // The empty message also shows when a filter matches nothing, so it must not be read
-    // as "the run found nothing".
-    { id: 'diff-details-empty', text: 'Nothing here yet — a bucket or the search may be filtering it out, not the run.', when: control('diff-details-empty') },
-    { id: 'diff-bucket-file-1', text: 'Click a bucket to narrow the table to just those records.', when: control('diff-bucket-file-1') },
-    { id: 'rest-any-count-i', text: 'Rest on any count and I will tell you what it does and does not include.' },
-    { id: 'differences-missing-records-counted', text: 'Differences and missing records are counted separately — a zero in one says nothing about the other.' },
-    { id: 'run-result-source-download', text: 'The source files are the run’s own — download one to check a record it calls missing.', when: control('run-result-source-download') },
-    { id: 'run-result-download', text: 'Download gives you the result exactly as the run wrote it.', when: control('run-result-download') },
-  ]),
+  'reconciliation-run-result': RUN_RESULT_HINTS,
+  // DAR-UI-157: the run's short address shows it live and, once it finishes, its result in place, so it offers the
+  // result's hints too; the two that hold anywhere on a result wait for its Download, so a run still going never gets them.
   'reconciliation-run-live': Object.freeze([
     { id: 'run-result-live-failed', text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
     { id: 'run-result-notify-me', text: 'Notify me pings a chat space when this finishes, so you do not have to wait here.', when: control('run-result-notify-me') },
     { id: 'run-result-cancel', text: 'Cancel run stops it. Whatever it has done so far is discarded.', when: control('run-result-cancel') },
     { id: 'run-result-step-timeline', text: 'Run steps fills in as each stage finishes — it is the live part of this page.', when: control('run-result-step-timeline') },
+    ...RUN_RESULT_HINTS
+      .filter((hint) => hint.id !== 'run-result-live-failed')
+      .map((hint) => (hint.when ? hint : { ...hint, when: control('run-result-download') })),
   ]),
   'reconciliation-run-history': Object.freeze([
     { id: 'run-history-running-tile', text: 'A run still going shows its progress here rather than a result.', when: control('run-history-running-tile') },

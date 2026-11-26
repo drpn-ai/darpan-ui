@@ -34,7 +34,8 @@ import { useRunResultsStore } from '../../../stores/runResults'
 import { useMascotStore } from '../../../stores/mascot'
 
 const context = { savedRunId: 'RS_1', runName: 'Orders', file1SystemLabel: 'HotWax', file2SystemLabel: 'Shopify' }
-const LIVE = { name: 'reconciliation-run-live', params: { savedRunId: 'RS_1', runResultId: '103112' }, query: { runName: 'Orders', file1SystemLabel: 'HotWax', file2SystemLabel: 'Shopify' } }
+// DAR-UI-157: the run's short address; what this page knows goes in history state.
+const LIVE = { name: 'reconciliation-run-live', params: { savedRunId: 'RS_1', runResultId: '103112' }, state: { runName: 'Orders', file1SystemLabel: 'HotWax', file2SystemLabel: 'Shopify' } }
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => {}

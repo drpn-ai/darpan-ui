@@ -243,7 +243,7 @@ import {
 } from '../../lib/reconciliationAutomationDraft'
 import {
   buildReconciliationRunLiveRoute,
-  buildReconciliationRunResultRoute,
+  buildReconciliationOutputRoute,
   buildReconciliationRunStartingRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
@@ -594,7 +594,8 @@ function executionResultRoute(execution: AutomationExecutionSummary): RouteLocat
 
   const outputFileName = executionResultPath(execution)
   if (!outputFileName) return null
-  return buildReconciliationRunResultRoute(routeContext, outputFileName)
+  // DAR-UI-157: the run's short address when the execution names its run.
+  return buildReconciliationOutputRoute(routeContext, { fileName: outputFileName, reconciliationRunResultId: runResultId })
 }
 
 function executionRowActionLabel(row: Record<string, unknown>): string | null {

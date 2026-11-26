@@ -81,7 +81,7 @@
 
       <StaticPageSection>
         <InlineValidation v-if="runSettingsError" tone="error" :message="runSettingsError" />
-        <LoadingState v-if="loading" noun="saved result" data-testid="run-result-loading" />
+        <LoadingState v-if="loading || awaitingRunStatus" noun="run" data-testid="run-result-loading" />
         <InlineValidation v-else-if="loadError" tone="error" :message="loadError" />
 
         <section v-else-if="savedOutput || liveRunResultId" class="reconciliation-diff-details">
@@ -461,7 +461,7 @@
         </section>
       </StaticPageSection>
 
-      <template v-if="savedOutput || liveRunResultId" #actions>
+      <template v-if="(savedOutput || liveRunResultId) && !awaitingRunStatus" #actions>
         <!-- A Lifecycle place's records: back to the lifecycle run they came from. The check behind the place is the
              lifecycle's own, so its play, history and settings are the lifecycle's, on that page. -->
         <div v-if="lifecycleBackRoute" class="action-row">
@@ -605,6 +605,7 @@ import type {
   RunConclusionCount,
   RunConclusionQuestion,
   RunConclusionSuggestedFilter,
+  SavedRunSummary,
   TenantChatSpace,
 } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -621,10 +622,11 @@ import {
 import {
   buildReconciliationDiffRoute,
   buildReconciliationRunHistoryRoute,
-  buildReconciliationRunResultRoute,
+  buildReconciliationRunLiveRoute,
+  shortRunQuery,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
-import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
+import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget, savedRunSystemLabel } from '../../lib/savedRunEditorRoute'
 import { backIconPath, downloadIconPath, listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { formatClockTime, formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
@@ -685,18 +687,56 @@ const diffDetailsSummary = ref<DiffDetailsSummary>({})
 const savedRunId = computed(() =>
   typeof route.params.savedRunId === 'string' ? route.params.savedRunId.trim() : '',
 )
-const outputFileName = computed(() =>
-  typeof route.params.outputFileName === 'string' ? route.params.outputFileName.trim() : '',
-)
-// Live mode (reconciliation-run-live route): the run is still executing, so there is no output
-// file to load — the page renders off the run-status poll instead, then swaps itself to the
-// canonical run-result route once the run succeeds and names its result file.
-const liveRunResultId = computed(() =>
+const runResultsStore = useRunResultsStore()
+// DAR-UI-157 (Aditi: make the run-result URL short). A run has one address, /runs/<savedRunId>/<runId>, live and
+// finished; the long /reconciliation/run-result/<savedRunId>/<file> one still opens (chat cards, emails, search send it).
+const routeRunResultId = computed(() =>
   typeof route.params.runResultId === 'string' ? route.params.runResultId.trim() : '',
 )
+// What the opening page handed over in history state (never the address): the name, the systems, the result file.
+const handedOver = computed<Record<string, unknown>>(() => {
+  void route.fullPath
+  const state: unknown = typeof window === 'undefined' ? null : window.history.state
+  return state && typeof state === 'object' ? state as Record<string, unknown> : {}
+})
+function handed(key: string): string {
+  const value = handedOver.value[key]
+  return typeof value === 'string' ? value.trim() : ''
+}
+function routeQuery(key: string): string {
+  const value = route.query[key]
+  return typeof value === 'string' ? value.trim() : ''
+}
+// A finished run's status names its result file, so the short address shows the result in place. Read by the route's
+// run id, not the timeline's, which itself follows the file.
+const statusResultFileName = computed(() => {
+  const status = routeRunResultId.value ? runResultsStore.getRunStatus(routeRunResultId.value) : null
+  return status?.ok === true && status.statusEnumId === 'AUT_STAT_SUCCESS' ? normalizeDisplayText(status.resultFileName) : ''
+})
+const outputFileName = computed(() =>
+  (typeof route.params.outputFileName === 'string' ? route.params.outputFileName.trim() : '') ||
+  (routeRunResultId.value ? handed('resultFileName') : '') ||
+  statusResultFileName.value,
+)
+// Live mode: the run has no result file yet, so the page renders off the run-status poll.
+const liveRunResultId = computed(() => (outputFileName.value ? '' : routeRunResultId.value))
+// A shared short link: until the run's status answers, a finished run cannot be told from one still going.
+const awaitingRunStatus = computed(() =>
+  Boolean(liveRunResultId.value) && !runResultsStore.getRunStatus(liveRunResultId.value))
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 const canRunActiveTenantReconciliation = computed(() => permissionsStore.canRunActiveTenantReconciliation)
-const routeRunName = computed(() => (typeof route.query.runName === 'string' && route.query.runName.trim() ? route.query.runName.trim() : 'Selected Run'))
+// The short address carries no name or systems: the old address's query, what the opener handed over, else the
+// saved run (Home's list, usually warm).
+const savedRunRow = ref<SavedRunSummary | null>(null)
+watch(savedRunId, async (id) => {
+  savedRunRow.value = null
+  if (!id || (routeQuery('runName') && routeQuery('file1SystemLabel')) || (handed('runName') && handed('file1SystemLabel'))) return
+  const row = await resolveSavedRunEditorTarget(id).catch(() => null)
+  if (savedRunId.value === id) savedRunRow.value = row
+}, { immediate: true })
+const PLACEHOLDER_RUN_NAME = 'Selected Run'
+const routeRunName = computed(() =>
+  routeQuery('runName') || handed('runName') || normalizeDisplayText(savedRunRow.value?.runName) || PLACEHOLDER_RUN_NAME)
 
 const {
   editableRunName,
@@ -714,12 +754,10 @@ const {
 })
 
 const runName = computed(() => editableRunName.value || routeRunName.value)
-const file1SystemLabel = computed(() =>
-  typeof route.query.file1SystemLabel === 'string' && route.query.file1SystemLabel.trim() ? route.query.file1SystemLabel.trim() : 'System 1',
-)
-const file2SystemLabel = computed(() =>
-  typeof route.query.file2SystemLabel === 'string' && route.query.file2SystemLabel.trim() ? route.query.file2SystemLabel.trim() : 'System 2',
-)
+const file1SystemLabel = computed(() => routeQuery('file1SystemLabel') || handed('file1SystemLabel') ||
+  (savedRunRow.value ? savedRunSystemLabel(savedRunRow.value, savedRunRow.value.defaultFile1SystemEnumId) : '') || 'System 1')
+const file2SystemLabel = computed(() => routeQuery('file2SystemLabel') || handed('file2SystemLabel') ||
+  (savedRunRow.value ? savedRunSystemLabel(savedRunRow.value, savedRunRow.value.defaultFile2SystemEnumId) : '') || 'System 2')
 const heroDescription = computed(() => {
   if (liveRunResultId.value) {
     const startedDate = runStatus.value?.startedDate
@@ -769,10 +807,9 @@ const canOpenRunSettings = computed(() => canEditTenantSettings.value && Boolean
 // the route; on the saved-result route the differences payload does not carry the run-result
 // id, so it is resolved from the run-results cache descriptor for this file. The store poll
 // self-terminates once the run status is terminal.
-const runResultsStore = useRunResultsStore()
 const polledTimelineRunIds = new Set<string>()
 const timelineRunResultId = computed(() =>
-  liveRunResultId.value ||
+  routeRunResultId.value ||
   normalizeDisplayText(runResultsStore.getByFileName(outputFileName.value)?.reconciliationRunResultId),
 )
 // Sync pulse (DAR-BE-328): the orders the pulse had already flagged when this run started, read once per run.
@@ -804,6 +841,8 @@ const showStepTimeline = computed(() => runStatus.value?.ok === true)
 // Collapsed by default on the saved-result view (a forensic detail there); expanded when the
 // page opens on a live run, where step progress IS the primary content.
 const stepTimelineCollapsed = ref(!liveRunResultId.value)
+// A run that finishes here shows its result in place: the steps fold away, as they open on a finished result.
+watch(liveRunResultId, (id, was) => { if (was && !id) stepTimelineCollapsed.value = true })
 
 const liveRunStatusEnumId = computed(() => normalizeDisplayText(runStatus.value?.statusEnumId))
 const liveRunFailed = computed(() => Boolean(liveRunResultId.value) && liveRunStatusEnumId.value === 'AUT_STAT_FAILED')
@@ -922,19 +961,6 @@ watch(runStatus, (status) => {
   runSourceDetails.value = status?.sourceDetails ?? null
 })
 
-// Live→terminal handoff: a successful run names its result file, so the page swaps itself to
-// the canonical saved-result route and loads the differences. Failure and no-data terminals
-// stay on the live view, which renders their message and the failing step.
-watch([liveRunStatusEnumId, liveRunResultId], ([statusEnumId]) => {
-  if (!liveRunResultId.value || runStatus.value?.ok !== true) return
-  if (statusEnumId !== 'AUT_STAT_SUCCESS') return
-  const resultFileName = normalizeDisplayText(runStatus.value?.resultFileName)
-  if (!resultFileName) return
-  // Keeps where it was opened from: a Lifecycle place's live run still leads back to that lifecycle once it finishes.
-  const next = buildReconciliationRunResultRoute(reconciliationRunRouteContext.value, resultFileName)
-  const from = Object.fromEntries(['fromLifecycle', 'fromLifecycleRun'].filter((k) => typeof route.query[k] === 'string').map((k) => [k, route.query[k]]))
-  void router.replace(typeof next === 'string' || !('query' in next) ? next : { ...next, query: { ...next.query, ...from } })
-}, { immediate: true })
 
 // Notify-me (Task 12): subscribe/unsubscribe the current user to chat notifications
 // for this run. Only offered while the run is still active (PENDING/RUNNING) — a terminal
@@ -1417,6 +1443,7 @@ async function loadSavedResult(): Promise<void> {
       drawnTableQuery = tableQuery()
       loading.value = false
     })
+    void shortenAddress(requestedSavedRunId, requestedOutputFileName)
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     if (savedRunId.value !== requestedSavedRunId || outputFileName.value !== requestedOutputFileName) return
@@ -1436,18 +1463,45 @@ async function loadSavedResult(): Promise<void> {
   }
 }
 
+// DAR-UI-157. The long address (chat cards, emails and search still send it) becomes the run's short one, but only once
+// the run's own status names this same file: a short address that could not find its result would be worse.
+async function shortenAddress(requestedSavedRunId: string, file: string): Promise<void> {
+  if (route.name !== 'reconciliation-run-result') return
+  let runId = normalizeDisplayText(runResultsStore.getByFileName(file)?.reconciliationRunResultId)
+  if (!runId) {
+    const response = await reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 5, query: file }).catch(() => null)
+    const found = response?.generatedOutputs?.find((output) => output.fileName === file)
+    if (found) runResultsStore.upsertOutput(found)
+    runId = normalizeDisplayText(found?.reconciliationRunResultId)
+  }
+  if (!runId) return
+  await runResultsStore.refreshRunStatus(runId).catch(() => undefined)
+  const status = runResultsStore.getRunStatus(runId)
+  const stillHere = route.name === 'reconciliation-run-result' && savedRunId.value === requestedSavedRunId && outputFileName.value === file
+  if (!stillHere || status?.statusEnumId !== 'AUT_STAT_SUCCESS' || normalizeDisplayText(status.resultFileName) !== file) return
+  const next = buildReconciliationRunLiveRoute(reconciliationRunRouteContext.value, runId, file) as Exclude<RouteLocationRaw, string>
+  void router.replace({ ...next, query: shortRunQuery(route.query) })
+}
+
 watch([savedRunId, outputFileName], () => {
-  // Live mode has no output file yet — the run-status poll drives the page until the
-  // completion swap lands this component on the saved-result route. There is no saved output
-  // to carry the persisted run name either, so seed the title from the route: the submitting
-  // page put the run name there, and without this the hero shows its generic placeholder for
-  // the whole run.
+  // Live mode has no output file yet: the run-status poll drives the page until the run names its result, which then
+  // shows here. There is no saved output to carry the run name either, so the title comes from the route, the opener
+  // or the saved run, else the hero shows its generic placeholder for the whole run.
   if (liveRunResultId.value && !outputFileName.value) {
     resetRunNameState()
     return
   }
   void loadSavedResult()
 }, { immediate: true })
+// A shared short link learns the run's name from the saved run, which can answer after the title was first set: it
+// replaces the placeholder, live or finished, never a name being typed.
+watch(savedRunRow, () => {
+  if (liveRunResultId.value && !outputFileName.value) resetRunNameState()
+  else if (persistedRunName.value === PLACEHOLDER_RUN_NAME && editableRunName.value === persistedRunName.value) {
+    editableRunName.value = routeRunName.value
+    persistedRunName.value = routeRunName.value
+  }
+})
 </script>
 
 <style scoped>

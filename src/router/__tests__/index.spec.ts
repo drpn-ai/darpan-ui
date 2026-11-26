@@ -45,7 +45,9 @@ describe('router release scope', () => {
     { name: 'reconciliation-automation-dashboard', path: '/reconciliation/automations/:automationId', surfaceMode: 'static', staticPageLabel: 'Automation' },
     { name: 'reconciliation-diff', path: '/reconciliation/diff', surfaceMode: 'workflow' },
     { name: 'reconciliation-run-result', path: '/reconciliation/run-result/:savedRunId/:outputFileName', surfaceMode: 'static' },
-    { name: 'reconciliation-run-live', path: '/reconciliation/run-live/:savedRunId/:runResultId', surfaceMode: 'static', staticPageLabel: 'Run Progress' },
+    // DAR-UI-157. A run's address is short, live or finished; the name stays (the mascot hints are keyed on it).
+    { name: 'reconciliation-run-live', path: '/runs/:savedRunId/:runResultId', surfaceMode: 'static', staticPageLabel: 'Run' },
+    { name: 'reconciliation-run-live-legacy', path: '/reconciliation/run-live/:savedRunId/:runResultId', redirect: true },
     { name: 'reconciliation-run-history', path: '/reconciliation/run-history/:savedRunId', surfaceMode: 'static' },
     { name: 'hub', path: '/', surfaceMode: 'static' },
     { name: 'audit-report', path: '/audits/:audit', surfaceMode: 'static', staticPageLabel: 'Audit' },
@@ -67,6 +69,20 @@ describe('router release scope', () => {
     if (surfaceMode) expect(route?.meta.surfaceMode).toBe(surfaceMode)
     if (staticPageLabel) expect(route?.meta.staticPageLabel).toBe(staticPageLabel)
     if (redirect) expect(route?.redirect).toBeTruthy()
+  })
+
+  // DAR-UI-157. The backend still sends the old live address (automation messages): it lands on the short one, without
+  // the name and labels the page reads from the run, keeping the tenant and the way back to a lifecycle.
+  it('moves an old live-run address to the short one', () => {
+    const redirect = router.getRoutes().find((record) => record.name === 'reconciliation-run-live-legacy')?.redirect as (to: RouteLocationNormalized) => unknown
+    const old = router.resolve('/reconciliation/run-live/RS_100033/103112?runName=Daily+Returns&file1SystemLabel=Shopify&file2SystemLabel=HotWax&tenantId=RAILS&fromLifecycle=L1')
+    expect(redirect(old as RouteLocationNormalized)).toEqual({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: 'RS_100033', runResultId: '103112' },
+      query: { tenantId: 'RAILS', fromLifecycle: 'L1' },
+    })
+    expect(router.resolve({ name: 'reconciliation-run-live', params: { savedRunId: 'RS_100033', runResultId: '103112' }, query: { tenantId: 'RAILS' } }).fullPath)
+      .toBe('/runs/RS_100033/103112?tenantId=RAILS')
   })
 
   // DAR-UI-123. The Slack OAuth callback returns to /settings?slack=...; it lands on Notifications with its result.

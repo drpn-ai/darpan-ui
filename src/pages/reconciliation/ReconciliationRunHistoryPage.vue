@@ -55,7 +55,7 @@
       <RouterLink
         class="static-page-tile run-history-tile run-history-featured-tile"
         data-testid="run-history-featured-tile"
-        :to="buildResultRoute(featuredOutput.fileName)"
+        :to="buildResultRoute(featuredOutput)"
       >
         <div class="run-history-tile__head">
           <span class="static-page-tile-title">{{ formatSavedResultDateTime(featuredOutput.createdDate) }}</span>
@@ -97,7 +97,7 @@
           :key="output.fileName"
           class="static-page-tile run-history-tile"
           data-testid="run-history-result-tile"
-          :to="buildResultRoute(output.fileName)"
+          :to="buildResultRoute(output)"
         >
           <div class="run-history-tile__head">
             <span class="static-page-tile-title">{{ formatSavedResultDateTime(output.createdDate) }}</span>
@@ -204,7 +204,7 @@ import { normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconc
 import {
   buildReconciliationDiffRoute,
   buildReconciliationRunLiveRoute,
-  buildReconciliationRunResultRoute,
+  buildReconciliationOutputRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
@@ -349,8 +349,9 @@ function sourceSystemNames(output: GeneratedOutput): { file1: string, file2: str
   )
 }
 
-function buildResultRoute(outputFileName: string) {
-  return buildReconciliationRunResultRoute(reconciliationRunRouteContext.value, outputFileName)
+// DAR-UI-157: the run's short address when the result names its run.
+function buildResultRoute(output: GeneratedOutput) {
+  return buildReconciliationOutputRoute(reconciliationRunRouteContext.value, output)
 }
 
 async function openRunSettings(): Promise<void> {

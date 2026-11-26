@@ -179,7 +179,7 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { pollForRegisteredRunResultId } from '../../lib/runRegistration'
-import type { SavedRunSummary, SavedRunSystemOption } from '../../lib/api/types'
+import type { GeneratedOutput, SavedRunSummary, SavedRunSystemOption } from '../../lib/api/types'
 import type { RunSavedRunDiffPayload } from '../../lib/api/facadeTypes'
 import {
   clearPendingReconciliationRun,
@@ -188,7 +188,7 @@ import {
 import {
   buildReconciliationDiffRoute,
   buildReconciliationRunHistoryRoute,
-  buildReconciliationRunResultRoute,
+  buildReconciliationOutputRoute,
   buildReconciliationRunStartingRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
@@ -359,7 +359,7 @@ const activeFileAccept = computed(() => {
   if (currentStep.value.id === 'file-2') return acceptForExpectedFileType(file2ExpectedFileType.value)
   return ''
 })
-const latestSavedOutputRoute = computed<RouteLocationRaw | null>(() => buildRunResultRoute(latestSavedOutput.value?.fileName ?? ''))
+const latestSavedOutputRoute = computed<RouteLocationRaw | null>(() => buildRunResultRoute(latestSavedOutput.value))
 // The saved-result card counts records per SYSTEM, so it names the system rather than the endpoint
 // the run extracted ("Shopify Order Return References"). The upload prompts keep the endpoint name:
 // there it is what tells an operator which extract to hand over.
@@ -454,11 +454,12 @@ function isFileStepId(stepId: UploadStep['id']): stepId is FileStepId {
   return stepId === 'file-1' || stepId === 'file-2'
 }
 
-function buildRunResultRoute(outputFileName: string): RouteLocationRaw | null {
-  const trimmedOutputFileName = outputFileName.trim()
-  if (!reconciliationRunRouteContext.value || !trimmedOutputFileName) return null
+// DAR-UI-157: the run's short address when the output names its run, else the long one.
+function buildRunResultRoute(output: GeneratedOutput | null | undefined): RouteLocationRaw | null {
+  const fileName = output?.fileName?.trim()
+  if (!reconciliationRunRouteContext.value || !fileName) return null
 
-  return buildReconciliationRunResultRoute(reconciliationRunRouteContext.value, trimmedOutputFileName)
+  return buildReconciliationOutputRoute(reconciliationRunRouteContext.value, { ...output, fileName })
 }
 
 function resolveSystemOptionForFileSide(fileSide: 'FILE_1' | 'FILE_2', systemEnumId: string): SavedRunSystemOption | null {
@@ -879,7 +880,7 @@ async function submitSavedRun(payload: RunSavedRunDiffPayload, pendingRunId: str
     if (!fileName) {
       return { error: response?.errors?.[0] ?? 'Diff did not return a saved result.', details: response?.runResult?.validationErrors ?? [] }
     }
-    const resultRoute = buildRunResultRoute(fileName)
+    const resultRoute = buildRunResultRoute(response?.runResult?.generatedOutput)
     return resultRoute ? { route: resultRoute } : { error: 'Diff completed without a saved result route.' }
   } catch (error) {
     // Only the thrown 503 keep-alive (the request dropped after the run started) keeps the marker. The run may be going,

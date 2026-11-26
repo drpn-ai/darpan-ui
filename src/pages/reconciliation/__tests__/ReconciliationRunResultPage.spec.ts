@@ -43,9 +43,8 @@ const authState = vi.hoisted(() => ({
 // Server search debounce on the page; tests wait slightly longer than this before asserting.
 const SEARCH_DEBOUNCE_WAIT = 360
 
-// The page reacts to route changes (the live→result swap re-keys the same component), so the
-// mocked route must be reactive. Tests that set params before mount can keep writing to the
-// raw `route` object; mutating after mount must go through `liveRoute` to notify watchers.
+// The page reacts to route changes, so the mocked route is reactive, as the router's is. Tests set params on the raw
+// `route` object before mount.
 vi.mock('vue-router', async () => {
   const { reactive } = await vi.importActual<typeof import('vue')>('vue')
   const reactiveRoute = reactive(route)
@@ -126,14 +125,12 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
   }),
 }))
 
-import { useRoute } from 'vue-router'
 import ReconciliationRunResultPage from '../ReconciliationRunResultPage.vue'
 import { useRunResultsStore } from '../../../stores/runResults'
 import { homeSavedRuns } from '../../../lib/api/queries'
 import { invalidateReadCache, prefetchQuery } from '../../../lib/api/readCache'
 
 // The reactive proxy the mounted page reads; write through this to change the route mid-test.
-const liveRoute = useRoute()
 
 function buildGeneratedOutputFile(contentText: string, outputFileOverrides: Record<string, unknown> = {}) {
   return {
@@ -849,10 +846,12 @@ describe('ReconciliationRunResultPage', () => {
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
 
-    // Same component, other route name: none of the live controls are rendered here, so
-    // the live route's hints are all withheld rather than promising a Cancel that is gone.
-    expect(hintsFor('reconciliation-run-live', wrapper.element)).toEqual([])
-    expect(hintsFor('reconciliation-run-result', wrapper.element).length).toBeGreaterThan(0)
+    // DAR-UI-157: a finished run shows at its short address (route reconciliation-run-live) too. It offers what the
+    // old address did, and nothing that belongs to a run still going: no Cancel that is gone.
+    const short = hintsFor('reconciliation-run-live', wrapper.element)
+    expect(short.some((text) => /^(Cancel run|Notify me|Run steps)/.test(text))).toBe(false)
+    expect(new Set(short)).toEqual(new Set(hintsFor('reconciliation-run-result', wrapper.element)))
+    expect(short.length).toBeGreaterThan(0)
   })
 
   it('renders API date range source details and downloads compared source files', async () => {
@@ -1890,6 +1889,8 @@ describe('ReconciliationRunResultPage', () => {
     expect(offered.some((text) => text.startsWith('Run steps'))).toBe(true)
     // It has not failed, so the line about a failed step must not be offered.
     expect(offered.some((text) => text.includes('step failed'))).toBe(false)
+    // Nor a line about the result it does not have yet.
+    expect(offered.some((text) => /bucket|Download|counted separately|Rest on any count/.test(text))).toBe(false)
   })
 
   it('shows completed, running, and remaining steps for a run still in progress', async () => {
@@ -2040,7 +2041,9 @@ describe('ReconciliationRunResultPage', () => {
     expect(sourceDetails.text()).not.toContain('file2')
   })
 
-  it('swaps to the saved result route once the run succeeds', async () => {
+  // DAR-UI-157 (Aditi: make the run-result URL short). The run's address does not change when it finishes: the
+  // result shows in place, read from the file its status names.
+  it('shows the result in place once the run succeeds, at the same short address', async () => {
     enterLiveRunRoute()
     getReconciliationRunStatus.mockResolvedValue({
       ok: true,
@@ -2050,7 +2053,7 @@ describe('ReconciliationRunResultPage', () => {
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
-    expect(routerReplace).not.toHaveBeenCalled()
+    expect(getGeneratedOutputDifferences).not.toHaveBeenCalled()
 
     getReconciliationRunStatus.mockResolvedValue({
       ok: true,
@@ -2061,24 +2064,124 @@ describe('ReconciliationRunResultPage', () => {
     await useRunResultsStore().refreshRunStatus('RR_LIVE')
     await flushPromises()
 
-    expect(routerReplace).toHaveBeenCalledWith({
-      name: 'reconciliation-run-result',
-      params: {
-        savedRunId: 'RS_ORDER_CSV',
-        outputFileName: 'reconciliation/CSV-Order-Compare-diff-20260331-063304.json',
-      },
-      query: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
-    })
-
-    // The route swap lands on the same component, so completing it here proves the page then
-    // loads and renders the saved differences rather than sitting on the live placeholder.
-    ;(liveRoute.params as Record<string, unknown>).runResultId = ''
-    liveRoute.params.outputFileName = 'CSV-Order-Compare-diff-20260331-063304.json'
-    await flushPromises()
-
-    expect(getGeneratedOutputDifferences).toHaveBeenCalled()
+    expect(routerReplace).not.toHaveBeenCalled()
+    expect(getGeneratedOutputDifferences.mock.calls.at(-1)?.[0]).toMatchObject({ fileName: 'reconciliation/CSV-Order-Compare-diff-20260331-063304.json' })
     expect(wrapper.find('[data-testid="run-result-live-note"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-testid="diff-details-row"]').length).toBeGreaterThan(0)
+  })
+
+  // A shared short link to a finished run: until its status answers the page cannot tell a finished run from a
+  // running one, so it shows it is loading rather than a run that looks like it is still going.
+  it('opens a finished run from its short address with no running view first', async () => {
+    enterLiveRunRoute()
+    route.query = {} as typeof route.query
+    let answer: (value: unknown) => void = () => {}
+    getReconciliationRunStatus.mockReturnValue(new Promise((resolve) => { answer = resolve }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-result-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-result-live-note"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-result-step-timeline"]').exists()).toBe(false)
+
+    answer({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', resultFileName: 'CSV-Order-Compare-diff-20260331-063304.json', steps: [] })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-result-loading"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="diff-details-row"]').length).toBeGreaterThan(0)
+    expect(routerReplace).not.toHaveBeenCalled()
+  })
+
+  // The short address carries no name or systems: the saved run has them.
+  it('names a run and its systems from the saved run when the address carries neither', async () => {
+    enterLiveRunRoute()
+    route.query = {} as typeof route.query
+    listSavedRuns.mockResolvedValue({
+      ok: true, messages: [], errors: [],
+      pagination: { pageIndex: 0, pageSize: 100, totalCount: 1, pageCount: 1 },
+      savedRuns: [{ ...buildSavedRunSummary(), systemOptions: buildSavedRunSummary().systemOptions.map((option) => ({ ...option, label: option.enumId === 'OMS' ? 'HotWax' : 'Shopify' })) }],
+    })
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_RUNNING',
+      steps: [{ stageCode: 'EXTRACT_FILE1', stageSequence: 2, statusEnumId: 'AUT_STAT_RUNNING' }],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="run-result-title"]').text()).toBe('CSV Order Compare')
+    expect(wrapper.get('[data-testid="run-result-step-timeline"]').text()).toContain('Extracting HotWax')
+  })
+
+  // A result written without the run's name: the saved run names it, even when it answers after the result has drawn.
+  it('names a finished run from the saved run that answers after its result', async () => {
+    enterLiveRunRoute()
+    route.query = {} as typeof route.query
+    let listed: (value: unknown) => void = () => {}
+    listSavedRuns.mockReturnValue(new Promise((resolve) => { listed = resolve }))
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', resultFileName: 'CSV-Order-Compare-diff-20260331-063304.json', steps: [] })
+    const unnamed = { ...defaultDiffDetails, metadata: { ...(defaultDiffDetails.metadata as Record<string, unknown>), savedRunName: undefined, reconciliationMappingName: undefined } }
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences(unnamed, { sourceDetails: defaultSourceDetails }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="diff-details-row"]').length).toBeGreaterThan(0)
+    expect(wrapper.get('[data-testid="run-result-title"]').text()).toBe('Selected Run')
+
+    listed({ ok: true, messages: [], errors: [], pagination: { pageIndex: 0, pageSize: 100, totalCount: 1, pageCount: 1 }, savedRuns: [buildSavedRunSummary()] })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="run-result-title"]').text()).toBe('CSV Order Compare')
+  })
+
+  // A click inside the app hands the page what it knows (history state, never the address): the result draws at once.
+  it('uses the name, systems and result file the opening page handed over', async () => {
+    enterLiveRunRoute()
+    route.query = {} as typeof route.query
+    window.history.replaceState({ runName: 'Handed Over', file1SystemLabel: 'HotWax', file2SystemLabel: 'Shopify', resultFileName: 'CSV-Order-Compare-diff-20260331-063304.json' }, '')
+    getReconciliationRunStatus.mockReturnValue(new Promise(() => {}))
+    try {
+      const wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(getGeneratedOutputDifferences.mock.calls.at(-1)?.[0]).toMatchObject({ fileName: 'CSV-Order-Compare-diff-20260331-063304.json' })
+      expect(wrapper.findAll('[data-testid="diff-details-row"]').length).toBeGreaterThan(0)
+      expect(wrapper.find('[data-testid="run-result-loading"]').exists()).toBe(false)
+    } finally {
+      window.history.replaceState(null, '')
+    }
+  })
+
+  // Chat cards, emails and search still send the long address. It opens as before, then becomes the short one, but
+  // only once the run's own status names this same file: a short address that could not find its result is worse.
+  it('moves an old long address to the short one once the run is known to have this result', async () => {
+    const at = route as unknown as { name?: string }
+    at.name = 'reconciliation-run-result'
+    ;(route.query as Record<string, string>).tenantId = 'ACME'
+    const file = 'CSV-Order-Compare-diff-20260331-063304.json'
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true, messages: [], errors: [],
+      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{ fileName: file, reconciliationRunResultId: 'RR_9', savedRunId: 'RS_ORDER_CSV', createdDate: 1 }],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', resultFileName: file, steps: [] })
+    try {
+      mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(routerReplace).toHaveBeenCalledWith({
+        name: 'reconciliation-run-live',
+        params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RR_9' },
+        query: { tenantId: 'ACME' },
+        state: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY', resultFileName: file },
+      })
+
+      routerReplace.mockReset()
+      getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', resultFileName: 'another.json', steps: [] })
+      useRunResultsStore().reset()
+      mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(routerReplace).not.toHaveBeenCalled()
+    } finally {
+      delete at.name
+      delete (route.query as Record<string, string>).tenantId
+    }
   })
 
   it('cancels a running run and reports that it is stopping until the run ends', async () => {

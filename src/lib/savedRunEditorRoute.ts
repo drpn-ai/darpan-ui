@@ -22,6 +22,13 @@ const editorLookupFirstPage: typeof homeSavedRuns = {
   fetch: () => reconciliationFacade.listSavedRuns({ pageIndex: 0, pageSize: SAVED_RUN_EDITOR_LOOKUP_PAGE_SIZE, query: '' }),
 }
 
+/** The label of one of a saved run's systems, by its enum id; '' when the run has no such option. */
+export function savedRunSystemLabel(savedRun: SavedRunSummary, enumId?: string): string {
+  if (!enumId) return ''
+  const option = savedRun.systemOptions.find((systemOption) => systemOption.enumId === enumId)
+  return option?.label || option?.description || option?.enumCode || option?.enumId || ''
+}
+
 export function savedRunName(row: SavedRunSummary): string {
   return resolveRecordLabel({
     primary: row.runName,

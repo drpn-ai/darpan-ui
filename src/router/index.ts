@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { buildAuthRedirect, useAuthStore } from '../stores/auth'
 import { usePermissionsStore } from '../stores/permissions'
 import { scheduleRoutePrefetch } from './prefetchRoutes'
+import { shortRunQuery } from '../lib/reconciliationRoutes'
 import NotFoundPage from '../pages/NotFoundPage.vue'
 import AccessDeniedPage from '../pages/AccessDeniedPage.vue'
 
@@ -67,10 +68,22 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run Progress' },
   },
   {
-    path: '/reconciliation/run-live/:savedRunId/:runResultId',
+    // DAR-UI-157 (Aditi: make the run-result URL short). One address for a run, live and finished: the page shows the
+    // result in place once the run names it. The name stays: the mascot hints are keyed on it.
+    path: '/runs/:savedRunId/:runResultId',
     name: 'reconciliation-run-live',
     component: () => import('../pages/reconciliation/ReconciliationRunResultPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run Progress' },
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run' },
+  },
+  {
+    // The backend still sends this address (automation messages).
+    path: '/reconciliation/run-live/:savedRunId/:runResultId',
+    name: 'reconciliation-run-live-legacy',
+    redirect: (to) => ({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: to.params.savedRunId, runResultId: to.params.runResultId },
+      query: shortRunQuery(to.query),
+    }),
   },
   {
     path: '/reconciliation/automation/create',

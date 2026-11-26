@@ -58,7 +58,8 @@ describe('mascot seed rows', () => {
 
   it('gives hints sequences in steps of ten, in authored order', () => {
     const live = ofKind('MASCOT_HINT').filter((row) => row.routeName === 'reconciliation-run-live')
-    expect(live.map((row) => row.defaultSequence).sort((a, b) => a! - b!)).toEqual([10, 20, 30, 40])
+    // DAR-UI-157: four of a run still going, then the six of its result, shown at the same address once it finishes.
+    expect(live.map((row) => row.defaultSequence).sort((a, b) => a! - b!)).toEqual([10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
   })
 })
 

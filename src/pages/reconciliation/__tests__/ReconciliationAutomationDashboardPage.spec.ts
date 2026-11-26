@@ -712,6 +712,36 @@ describe('ReconciliationAutomationDashboardPage', () => {
     })
   })
 
+  // DAR-UI-157: a finished execution whose run is known opens at the run's short address.
+  it('opens a finished execution whose run is known at the run\'s short address', async () => {
+    listAutomationExecutions.mockResolvedValueOnce({
+      ok: true,
+      messages: [],
+      errors: [],
+      executions: [
+        {
+          automationExecutionId: 'EXEC_DONE',
+          statusEnumId: 'AUT_STAT_SUCCESS',
+          statusLabel: 'Succeeded',
+          scheduledDate: '2026-05-03T06:00:00Z',
+          completedDate: '2026-05-03T06:03:00Z',
+          reconciliationRunResultId: 'RR_DONE',
+          resultDataManagerPath: 'reconciliation-runs/RS_API/20260503/orders_result.json',
+        },
+      ],
+      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
+    })
+
+    const wrapper = mount(ReconciliationAutomationDashboardPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="automation-execution-row"]').trigger('click')
+    expect(push.mock.calls[0]?.[0]).toMatchObject({
+      name: 'reconciliation-run-live',
+      params: { runResultId: 'RR_DONE' },
+      state: { resultFileName: 'reconciliation-runs/RS_API/20260503/orders_result.json' },
+    })
+  })
+
   it('does not render an unlinked open-result label when no route target is available', async () => {
     listAutomationExecutions.mockResolvedValueOnce({
       ok: true,

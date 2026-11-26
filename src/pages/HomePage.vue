@@ -120,6 +120,7 @@ import type { FlowchartRun } from '../lib/api/flowchartTypes'
 import type { AuditListItem } from '../lib/api/auditTypes'
 import { RUN_TYPES } from '../lib/runTypes'
 import { buildReconciliationDiffRoute } from '../lib/reconciliationRoutes'
+import { savedRunSystemLabel } from '../lib/savedRunEditorRoute'
 
 interface DashboardFlowCard {
   id: string
@@ -164,12 +165,6 @@ function resolveSavedRunTitle(runName: string): string {
   if (!trimmed || /[a-z]/.test(trimmed)) return trimmed
   if (!/[A-Z]/.test(trimmed)) return trimmed
   return trimmed.split(' ').map(titleizeSavedRunToken).join(' ')
-}
-
-function resolveSystemLabel(savedRun: SavedRunSummary, enumId?: string): string {
-  if (!enumId) return ''
-  const option = savedRun.systemOptions.find((systemOption) => systemOption.enumId === enumId)
-  return option?.label || option?.description || option?.enumCode || option?.enumId || ''
 }
 
 /**
@@ -240,8 +235,8 @@ const savedRunCards = computed<DashboardFlowCard[]>(() =>
         {
           savedRunId: savedRun.savedRunId,
           runName: title,
-          file1SystemLabel: resolveSystemLabel(savedRun, savedRun.defaultFile1SystemEnumId),
-          file2SystemLabel: resolveSystemLabel(savedRun, savedRun.defaultFile2SystemEnumId),
+          file1SystemLabel: savedRunSystemLabel(savedRun, savedRun.defaultFile1SystemEnumId),
+          file2SystemLabel: savedRunSystemLabel(savedRun, savedRun.defaultFile2SystemEnumId),
         },
       ),
       pinnable: true,
