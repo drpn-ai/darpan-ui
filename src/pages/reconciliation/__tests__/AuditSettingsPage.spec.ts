@@ -251,15 +251,16 @@ describe('AuditSettingsPage', () => {
     w.unmount()
   })
 
-  it('keeps the statement popup open with the refusal in it', async () => {
+  // DAR-UI-156: the popup has closed by the time the backend answers, so a refusal says why on the page.
+  it('puts a refused statement\'s words back and says why on the page', async () => {
     f.saveAuditSettings.mockResolvedValue({ ok: false, errors: ['Statement ST2 needs its text.'] } as never)
     const w = await mountPage()
     await click(w, 'audit-settings-statement-open-ST2')
     await get(w, 'audit-settings-statement-text').setValue('Every store sale names its store.')
     await click(w, 'audit-settings-statement-save')
-    expect(get(w, 'audit-settings-popup-error').text()).toBe('Statement ST2 needs its text.')
-    expect(popupOpen(w)).toBe(true)
-    expect(has(w, 'audit-settings-error')).toBe(false)
+    expect(popupOpen(w)).toBe(false)
+    expect(get(w, 'audit-settings-error').text()).toBe('Statement ST2 needs its text.')
+    expect(get(w, 'audit-settings-statement-ST2').text()).toContain('Every store sale carries its store.')
     w.unmount()
   })
 
@@ -464,14 +465,15 @@ describe('AuditSettingsPage after each run', () => {
     w.unmount()
   })
 
-  it('shows the backend refusal naming an address in the popup and stays', async () => {
+  it('takes back an address the backend refuses and names it on the page', async () => {
     f.saveAuditSettings.mockRejectedValue(new Error('Not an email address: cfo@gorjana.con'))
     const w = await mountPage()
     await click(w, 'audit-settings-fact-after-run')
     await address(w).setValue('cfo@gorjana.con')
     await click(w, 'audit-settings-run-email-save')
-    expect(get(w, 'audit-settings-popup-error').text()).toBe('Not an email address: cfo@gorjana.con')
-    expect(popupOpen(w)).toBe(true)
+    expect(popupOpen(w)).toBe(false)
+    expect(get(w, 'audit-settings-error').text()).toBe('Not an email address: cfo@gorjana.con')
+    expect(factValue(w, 'audit-settings-fact-after-run')).toBe('Email to 4 people + 1 more')
     w.unmount()
   })
 
@@ -657,8 +659,8 @@ describe('AuditSettingsPage priorities', () => {
 
     // A cleared level (null) with no settings in the answer reads as the backend reads it: P2. No row sends null
     // today, so the save goes in through the page's own persist.
-    const vm = w.vm as unknown as { persist: (change: object, where: 'page' | 'popup') => Promise<boolean> }
-    expect(await vm.persist({ statements: [{ id: 'R11', priority: null }] }, 'page')).toBe(true)
+    const vm = w.vm as unknown as { persist: (change: object) => Promise<boolean> }
+    expect(await vm.persist({ statements: [{ id: 'R11', priority: null }] })).toBe(true)
     await flushPromises()
     expect(levelText(w, 'audit-settings-priority-R11')).toBe('P2 later')
     w.unmount()
@@ -724,17 +726,197 @@ describe('AuditSettingsPage priorities', () => {
     w.unmount()
   })
 
-  it('aRefusedReasonLevelKeepsThePopupOpen', async () => {
+  // DAR-UI-156: back in the statement's popup at once; a refusal puts the level back and says why there.
+  it('aRefusedReasonLevelGoesBackAndSaysWhyInTheStatementPopup', async () => {
     f.saveAuditSettings.mockRejectedValue(new Error('Reason CONC_X closes on every check of R5, so it takes no level.'))
     const w = await mountPage()
     await click(w, 'audit-settings-statement-open-R5')
     await click(w, 'audit-settings-reason-priority-CONC_X')
     await click(w, 'audit-settings-level-P0')
     await click(w, 'audit-settings-reason-priority-save')
+    expect(has(w, 'audit-settings-statement-text')).toBe(true)
     expect(get(w, 'audit-settings-popup-error').text()).toBe('Reason CONC_X closes on every check of R5, so it takes no level.')
-    expect(has(w, 'audit-settings-reason-priority-save')).toBe(true)
-    expect(get(w, 'audit-settings-level-P0').attributes('aria-pressed')).toBe('true')
+    expect(levelText(w, 'audit-settings-reason-priority-CONC_X')).toBe('Same as R5')
     expect(has(w, 'audit-settings-error')).toBe(false)
+    w.unmount()
+  })
+
+  it('aLevelShowsAndItsPopupClosesBeforeTheSaveAnswers', async () => {
+    f.saveAuditSettings.mockReturnValue(new Promise(() => {}) as never)
+    const w = await mountPage()
+    await click(w, 'audit-settings-priority-R11')
+    await click(w, 'audit-settings-level-P1')
+    await click(w, 'audit-settings-priority-save')
+    expect(popupOpen(w)).toBe(false)
+    expect(levelText(w, 'audit-settings-priority-R11')).toBe('P1 this week')
+
+    await click(w, 'audit-settings-statement-open-R5')
+    await click(w, 'audit-settings-reason-priority-CONC_X')
+    await click(w, 'audit-settings-level-KNOWN')
+    await click(w, 'audit-settings-reason-priority-save')
+    expect(has(w, 'audit-settings-statement-text')).toBe(true)
+    expect(levelText(w, 'audit-settings-reason-priority-CONC_X')).toBe('Known owned')
+    // The second save waits its turn behind the first, which never answers.
+    expect(f.saveAuditSettings).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+})
+
+// DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). The screen changes at once,
+// the saves run behind it one after another, and only a refusal changes it again.
+describe('AuditSettingsPage saves behind the screen', () => {
+  const runEmail = { active: true, alsoSendTo: ['ops@gorjana.com'], members: 4, chatSpaceId: 'spaces/AAA' }
+  function deferred() {
+    let resolve!: (value: unknown) => void
+    const promise = new Promise((done) => { resolve = done })
+    return { promise, resolve }
+  }
+  async function rename(w: W, name: string) {
+    const title = get(w, 'audit-settings-name')
+    await title.trigger('focus')
+    ;(title.element as HTMLElement).textContent = name
+    await title.trigger('input')
+    await title.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+  }
+
+  it('flips the switches and takes the name before the save answers', async () => {
+    f.saveAuditSettings.mockReturnValue(new Promise(() => {}) as never)
+    const w = await mountPage()
+    await click(w, 'audit-settings-schedule-active')
+    expect(get(w, 'audit-settings-schedule-active').attributes('aria-checked')).toBe('false')
+    expect(factValue(w, 'audit-settings-fact-schedule')).toBe('Off · 6:00 AM')
+    await click(w, 'audit-settings-statement-active-ST1')
+    expect(get(w, 'audit-settings-statement-active-ST1').attributes('aria-checked')).toBe('false')
+    expect(factValue(w, 'audit-settings-fact-statements')).toBe('1 of 3 on')
+    // Nothing waits on the save: the switches stay live.
+    expect(get(w, 'audit-settings-statement-active-ST2').attributes('disabled')).toBeUndefined()
+    await rename(w, 'System health')
+    expect(get(w, 'audit-settings-name').text()).toBe('System health')
+    expect(f.saveAuditSettings).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
+  it('closes each popup with its change shown before the save answers', async () => {
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { ...settings(), runEmail } } as never)
+    f.saveAuditSettings.mockReturnValue(new Promise(() => {}) as never)
+    const w = await mountPage()
+    await click(w, 'audit-settings-fact-schedule')
+    w.findComponent({ name: 'WorkflowTimeSelect' }).vm.$emit('update:modelValue', '07:30')
+    await flushPromises()
+    await click(w, 'audit-settings-schedule-save')
+    expect(popupOpen(w)).toBe(false)
+    expect(factValue(w, 'audit-settings-fact-schedule')).toBe('Daily at 7:30 AM')
+
+    await click(w, 'audit-settings-fact-after-run')
+    await click(w, 'audit-settings-run-email-active')
+    await click(w, 'audit-settings-run-email-save')
+    expect(popupOpen(w)).toBe(false)
+    expect(factValue(w, 'audit-settings-fact-after-run')).toBe('Off')
+
+    await click(w, 'audit-settings-fact-posts-to')
+    select(w, 'audit-settings-chat-space').vm.$emit('update:modelValue', 'spaces/BBB')
+    await flushPromises()
+    await click(w, 'audit-settings-chat-space-save')
+    expect(popupOpen(w)).toBe(false)
+    expect(factValue(w, 'audit-settings-fact-posts-to')).toBe('Gorjana accounting')
+
+    await click(w, 'audit-settings-statement-open-ST2')
+    await get(w, 'audit-settings-statement-text').setValue('Every store sale names its store.')
+    await click(w, 'audit-settings-statement-save')
+    expect(popupOpen(w)).toBe(false)
+    expect(get(w, 'audit-settings-statement-ST2').text()).toContain('Every store sale names its store.')
+    w.unmount()
+  })
+
+  // Review: a late answer to another save used to reset the name box, wiping a name being typed.
+  it('keeps a name being typed when another save answers', async () => {
+    const save = deferred()
+    f.saveAuditSettings.mockReturnValueOnce(save.promise as never)
+    const w = await mountPage()
+    await click(w, 'audit-settings-schedule-active')
+    const title = get(w, 'audit-settings-name')
+    await title.trigger('focus')
+    ;(title.element as HTMLElement).textContent = 'System he'
+    await title.trigger('input')
+    save.resolve({ ok: true })
+    await flushPromises()
+    expect(get(w, 'audit-settings-name').text()).toBe('System he')
+    w.unmount()
+  })
+
+  // Review: a refusal belongs to the popup that made the change, not one opened since.
+  it('says a refusal on the page once its popup has closed, even with another popup open', async () => {
+    const save = deferred()
+    f.saveAuditSettings.mockReturnValueOnce(save.promise as never)
+    const w = await mountPage()
+    await click(w, 'audit-settings-fact-schedule')
+    w.findComponent({ name: 'WorkflowTimeSelect' }).vm.$emit('update:modelValue', '07:30')
+    await flushPromises()
+    await click(w, 'audit-settings-schedule-save')
+    expect(f.saveAuditSettings).toHaveBeenCalledTimes(1)
+    expect(popupOpen(w)).toBe(false)
+    await click(w, 'audit-settings-fact-schedule')
+    expect(popupOpen(w)).toBe(true)
+    save.resolve({ ok: false, errors: ['Your active tenant only has view access for audit changes.'] })
+    await flushPromises()
+    expect(get(w, 'audit-settings-error').text()).toBe('Your active tenant only has view access for audit changes.')
+    w.unmount()
+  })
+
+  it('puts a refused switch back and says why on the page', async () => {
+    f.saveAuditSettings.mockRejectedValue(new Error('Your active tenant only has view access for audit changes.'))
+    const w = await mountPage()
+    await click(w, 'audit-settings-schedule-active')
+    expect(get(w, 'audit-settings-schedule-active').attributes('aria-checked')).toBe('true')
+    expect(factValue(w, 'audit-settings-fact-schedule')).toBe('Daily at 6:00 AM')
+    expect(get(w, 'audit-settings-error').text()).toBe('Your active tenant only has view access for audit changes.')
+
+    f.saveAuditSettings.mockResolvedValue({ ok: false, errors: ['Statement ST1 is locked.'] } as never)
+    await click(w, 'audit-settings-statement-active-ST1')
+    expect(get(w, 'audit-settings-statement-active-ST1').attributes('aria-checked')).toBe('true')
+    expect(factValue(w, 'audit-settings-fact-statements')).toBe('2 of 3 on')
+    expect(get(w, 'audit-settings-error').text()).toBe('Statement ST1 is locked.')
+    w.unmount()
+  })
+
+  it('saves in order, and an older answer does not undo a newer change', async () => {
+    const first = deferred()
+    const second = deferred()
+    f.saveAuditSettings.mockReturnValueOnce(first.promise as never).mockReturnValueOnce(second.promise as never)
+    const w = await mountPage()
+    await click(w, 'audit-settings-statement-active-ST1')
+    await click(w, 'audit-settings-statement-active-ST1')
+    expect(get(w, 'audit-settings-statement-active-ST1').attributes('aria-checked')).toBe('true')
+    expect(f.saveAuditSettings).toHaveBeenCalledTimes(1)
+
+    // The first answer says ST1 is off, as it was then; the newer "on" still saving stays on screen.
+    const off = settings()
+    off.statements[0]!.active = false
+    first.resolve({ ok: true, settings: off })
+    await flushPromises()
+    expect(get(w, 'audit-settings-statement-active-ST1').attributes('aria-checked')).toBe('true')
+    expect(f.saveAuditSettings).toHaveBeenCalledTimes(2)
+    expect(f.saveAuditSettings).toHaveBeenLastCalledWith({ audit: 'month-close', statements: [{ id: 'ST1', active: true }] })
+
+    second.resolve({ ok: true })
+    await flushPromises()
+    expect(get(w, 'audit-settings-statement-active-ST1').attributes('aria-checked')).toBe('true')
+    expect(has(w, 'audit-settings-error')).toBe(false)
+    w.unmount()
+  })
+
+  it('takes back only the refused change, keeping a newer one still saving', async () => {
+    const first = deferred()
+    f.saveAuditSettings.mockReturnValueOnce(first.promise as never).mockReturnValueOnce(new Promise(() => {}) as never)
+    const w = await mountPage()
+    await click(w, 'audit-settings-schedule-active')
+    await click(w, 'audit-settings-statement-active-ST2')
+    first.resolve({ ok: false, errors: ['The schedule is locked.'] })
+    await flushPromises()
+    expect(get(w, 'audit-settings-schedule-active').attributes('aria-checked')).toBe('true')
+    expect(get(w, 'audit-settings-statement-active-ST2').attributes('aria-checked')).toBe('false')
+    expect(get(w, 'audit-settings-error').text()).toBe('The schedule is locked.')
     w.unmount()
   })
 })

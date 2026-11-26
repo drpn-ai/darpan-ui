@@ -129,6 +129,8 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 import { useRoute } from 'vue-router'
 import ReconciliationRunResultPage from '../ReconciliationRunResultPage.vue'
 import { useRunResultsStore } from '../../../stores/runResults'
+import { homeSavedRuns } from '../../../lib/api/queries'
+import { invalidateReadCache, prefetchQuery } from '../../../lib/api/readCache'
 
 // The reactive proxy the mounted page reads; write through this to change the route mid-test.
 const liveRoute = useRoute()
@@ -575,6 +577,8 @@ function buildSavedRunSummary() {
 
 describe('ReconciliationRunResultPage', () => {
   beforeEach(() => {
+    // DAR-UI-156: run settings read list#SavedRuns through the shared read cache; no test inherits another's copy.
+    invalidateReadCache()
     authState.sessionInfo = {
       userId: 'editor',
       canRunActiveTenantReconciliation: true,
@@ -639,6 +643,34 @@ describe('ReconciliationRunResultPage', () => {
         systemOptions: [],
       },
     })
+  })
+
+  // DAR-UI-156: the list Home and the session preload keep warm answers the click, so it navigates at once.
+  it('opens run settings at once from the warm saved-run list, before list#SavedRuns answers again', async () => {
+    await prefetchQuery(homeSavedRuns)
+    listSavedRuns.mockClear()
+    listSavedRuns.mockReturnValue(new Promise(() => {}))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    await wrapper.get('.static-page-actions [data-testid="run-result-open-settings"]').trigger('click')
+    await flushPromises()
+
+    expect(listSavedRuns).not.toHaveBeenCalled()
+    expect(routerPush).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
+  })
+
+  it('shows why run settings did not open when list#SavedRuns is refused', async () => {
+    listSavedRuns.mockRejectedValue(new ApiCallError('Saved runs are unavailable.'))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    await wrapper.get('.static-page-actions [data-testid="run-result-open-settings"]').trigger('click')
+    await flushPromises()
+
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Saved runs are unavailable.')
+    expect(wrapper.get('.static-page-actions [data-testid="run-result-open-settings"]').attributes('disabled')).toBeUndefined()
   })
 
   it('loads saved result details on the static surface and links back to history and workflow', async () => {
@@ -2095,6 +2127,52 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.get('[data-testid="run-result-step-timeline"]').text()).toContain('Cancelled')
     expect(wrapper.find('[data-testid="run-result-cancel"]').exists()).toBe(false)
     expect(routerReplace).not.toHaveBeenCalled()
+  })
+
+  // DAR-UI-156: the screen changes when the person confirms; the backend catches up.
+  it('says the run is stopping the moment the person confirms, before cancel#ReconciliationRun answers', async () => {
+    enterLiveRunRoute('RR_LIVE_CANCEL_NOW')
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', steps: [] })
+    cancelReconciliationRun.mockReturnValue(new Promise(() => {}))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+    getReconciliationRunStatus.mockClear()
+
+    await wrapper.get('[data-testid="run-result-cancel"]').trigger('click')
+    await wrapper.get('[data-testid="run-result-cancel-confirm-yes"]').trigger('click')
+
+    expect(cancelReconciliationRun).toHaveBeenCalledWith({ reconciliationRunResultId: 'RR_LIVE_CANCEL_NOW' })
+    expect(wrapper.find('[data-testid="run-result-cancel-confirm"]').exists()).toBe(false)
+    const cancel = wrapper.get('[data-testid="run-result-cancel"]')
+    expect(cancel.text()).toContain('Stopping run')
+    expect(cancel.attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="run-result-live-note"]').text()).toContain('Stopping this run')
+    // The poll confirms it; the click asks for no status read of its own.
+    expect(getReconciliationRunStatus).not.toHaveBeenCalled()
+  })
+
+  it('puts Cancel run back with the reason when the backend refuses to stop the run', async () => {
+    enterLiveRunRoute('RR_LIVE_CANCEL_REFUSED')
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', steps: [] })
+    let refuse: (error: unknown) => void = () => {}
+    cancelReconciliationRun.mockReturnValue(new Promise((_, reject) => { refuse = reject }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="run-result-cancel"]').trigger('click')
+    await wrapper.get('[data-testid="run-result-cancel-confirm-yes"]').trigger('click')
+    expect(wrapper.get('[data-testid="run-result-cancel"]').text()).toContain('Stopping run')
+
+    refuse(new ApiCallError('This run already finished.'))
+    await flushPromises()
+
+    const cancel = wrapper.get('[data-testid="run-result-cancel"]')
+    expect(cancel.text()).toContain('Cancel run')
+    expect(cancel.attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('.run-result-cancel').text()).toContain('This run already finished.')
+    expect(wrapper.get('[data-testid="run-result-live-note"]').text()).not.toContain('Stopping this run')
   })
 
   it('hides cancel from a viewer who cannot run reconciliations', async () => {

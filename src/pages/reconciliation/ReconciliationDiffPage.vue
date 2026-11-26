@@ -75,18 +75,6 @@
             <InlineValidation v-if="runError" tone="error" :message="runError" />
           </WorkflowStepForm>
 
-          <div v-if="pendingSubmittedRun" class="reconciliation-run-submitted-hint" data-testid="run-submitted-hint">
-            <p>Run submitted. This can take a while. You can leave this page and come back later from run history.</p>
-            <RouterLink
-              v-if="runHistoryRoute"
-              class="reconciliation-run-history-link"
-              data-testid="run-submitted-history-link"
-              :to="runHistoryRoute"
-            >
-              Open run history
-            </RouterLink>
-          </div>
-
           <section v-if="hasFeedbackMessages" class="workflow-feedback-board">
             <article v-if="validationErrors.length > 0" class="card workflow-panel">
               <p class="eyebrow">validation</p>
@@ -196,12 +184,12 @@ import type { RunSavedRunDiffPayload } from '../../lib/api/facadeTypes'
 import {
   clearPendingReconciliationRun,
   recordPendingReconciliationRun,
-  type PendingReconciliationRun,
 } from '../../lib/reconciliationPendingRuns'
 import {
+  buildReconciliationDiffRoute,
   buildReconciliationRunHistoryRoute,
-  buildReconciliationRunLiveRoute,
   buildReconciliationRunResultRoute,
+  buildReconciliationRunStartingRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import {
@@ -225,6 +213,7 @@ import {
 import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
+import { useRunSubmissionsStore, type RunSubmissionOutcome } from '../../stores/runSubmissions'
 
 interface UploadStep {
   id: 'run' | 'system-1' | 'api-window' | 'api-window-custom' | 'file-1' | 'system-2' | 'file-2'
@@ -272,7 +261,7 @@ const file2SystemEnumId = ref('')
 const file1 = ref<File | null>(null)
 const file2 = ref<File | null>(null)
 const apiWindowPreset = ref<RunWindowPreset | ''>('')
-const pendingSubmittedRun = ref<PendingReconciliationRun | null>(null)
+const runSubmissions = useRunSubmissionsStore()
 const currentStepIndex = ref(0)
 const inputResetKey = ref(0)
 const stepFocusRegion = ref<HTMLElement | null>(null)
@@ -543,13 +532,11 @@ const clearLatestSavedOutputState = diff.clearLatestSavedOutputState
 
 const pageAbortController = new AbortController()
 let latestOutputAbortController: AbortController | null = null
-let submitDiffAbortController: AbortController | null = null
 const submittingRun = ref(false)
 
 onBeforeUnmount(() => {
   pageAbortController.abort()
   latestOutputAbortController?.abort()
-  submitDiffAbortController?.abort()
 })
 
 function shouldKeepPendingRunAfterRunError(error: unknown): boolean {
@@ -806,9 +793,6 @@ async function runDiff(): Promise<void> {
     return
   }
 
-  pendingSubmittedRun.value = null
-  let pendingRun: PendingReconciliationRun | null = null
-
   // The system ids are an OVERRIDE of the saved run's defaults, and run#SavedRunDiff requires them
   // in a pair ("file1SystemEnumId and file2SystemEnumId must be provided together"). A single-sided
   // run has nothing to override and no second id to pair with, so it sends neither and lets the
@@ -858,69 +842,55 @@ async function runDiff(): Promise<void> {
   }
   uploadSourcePayloads.forEach((sourcePayload) => Object.assign(payload, sourcePayload.payload))
 
-  if (reconciliationRunRouteContext.value) {
-    pendingRun = recordPendingReconciliationRun(reconciliationRunRouteContext.value)
-    pendingSubmittedRun.value = pendingRun
+  // DAR-UI-156 (Aditi: "the transition from submission to the run detail page is 1-3 seconds, when it should be
+  // immediate"). The Starting page opens on the click; the submission and the look for its run live in the store,
+  // so leaving this page cancels nothing. The run row took ~2 s to exist on prod, and run#SavedRunDiff answers only
+  // when the run ends, so the store races the two and the Starting page follows whichever answers first.
+  const routeContext = reconciliationRunRouteContext.value
+  if (!routeContext) return
+  // A run of this saved run is still starting (Back from its Starting page, then Execute): open it, start no second one.
+  const alreadyStarting = runSubmissions.startingFor(routeContext.savedRunId)
+  if (alreadyStarting) {
+    await router.push(buildReconciliationRunStartingRoute(routeContext, alreadyStarting))
+    return
   }
+  const pendingRun = recordPendingReconciliationRun(routeContext)
+  const startingRoute = buildReconciliationRunStartingRoute(routeContext, pendingRun.pendingRunId)
+  runSubmissions.start({
+    pendingRunId: pendingRun.pendingRunId,
+    context: routeContext,
+    backRoute: buildReconciliationDiffRoute(routeContext),
+    backLabel: 'Back to setup',
+    register: (signal) => pollForRegisteredRunResultId(payload.savedRunId, signal),
+    submit: () => submitSavedRun(payload, pendingRun.pendingRunId),
+    reopen: () => void router.push(startingRoute),
+  })
+  await router.push(startingRoute)
+}
 
-  submitDiffAbortController?.abort()
-  submitDiffAbortController = new AbortController()
-  const submitSignal = submitDiffAbortController.signal
-
+/** The submission behind the Starting page: where it leads once it answers, and the pending marker kept or cleared. */
+async function submitSavedRun(payload: RunSavedRunDiffPayload, pendingRunId: string): Promise<RunSubmissionOutcome> {
   try {
-    // The run executes detached from the request transaction, so its RUNNING row is readable
-    // within moments of submission while this call is still in flight. Race the two: whichever
-    // resolves first decides where the user lands — the live progress view for a run long
-    // enough to still be running, or the saved result for one that finished first.
-    const submission = diff.submitDiff(payload, submitSignal)
-    const liveRunResultId = await Promise.race([
-      pollForRegisteredRunResultId(payload.savedRunId, submitSignal),
-      submission.then(() => '', () => ''),
-    ])
-
-    if (liveRunResultId && reconciliationRunRouteContext.value) {
-      // The submission stays in flight and owns the marker/error handling from here; this page
-      // unmounts on navigation, so its abort controller must not be what cancels the run.
-      submitDiffAbortController = null
-      void submission
-        .then(() => clearPendingReconciliationRun(pendingRun?.pendingRunId))
-        .catch((error) => {
-          if (!shouldKeepPendingRunAfterRunError(error)) clearPendingReconciliationRun(pendingRun?.pendingRunId)
-        })
-      await router.push(buildReconciliationRunLiveRoute(reconciliationRunRouteContext.value, liveRunResultId))
-      return
+    const response = await diff.submitDiff(payload)
+    const fileName = response?.runResult?.generatedOutput?.fileName?.trim()
+    // A resolved response without an output is a synchronous failure (JSON-RPC error envelopes resolve rather than
+    // throw): clear the marker, or the run ghosts as "Running" with no error shown anywhere.
+    clearPendingReconciliationRun(pendingRunId)
+    if (!fileName) {
+      return { error: response?.errors?.[0] ?? 'Diff did not return a saved result.', details: response?.runResult?.validationErrors ?? [] }
     }
-
-    const response = await submission
-    if (!response) return
-
-    const generatedOutput = response.runResult?.generatedOutput ?? null
-    if (!generatedOutput?.fileName?.trim()) {
-      // A resolved response without an output is a synchronous failure (JSON-RPC error envelopes
-      // resolve rather than throw): surface it and clear the optimistic marker, or the run ghosts
-      // as "Running" with no error shown anywhere. Only the thrown 503 keep-alive path below may
-      // keep the marker.
-      runError.value = response.errors?.[0] ?? 'Diff did not return a saved result.'
-      clearPendingReconciliationRun(pendingRun?.pendingRunId)
-      pendingSubmittedRun.value = null
-      return
-    }
-
-    clearPendingReconciliationRun(pendingRun?.pendingRunId)
-    pendingSubmittedRun.value = null
-
-    const resultRoute = buildRunResultRoute(generatedOutput.fileName)
-    if (!resultRoute) {
-      runError.value = 'Diff completed without a saved result route.'
-      return
-    }
-
-    await router.push(resultRoute)
+    const resultRoute = buildRunResultRoute(fileName)
+    return resultRoute ? { route: resultRoute } : { error: 'Diff completed without a saved result route.' }
   } catch (error) {
-    if ((error as { name?: string })?.name === 'AbortError') return
-    if (!shouldKeepPendingRunAfterRunError(error)) {
-      clearPendingReconciliationRun(pendingRun?.pendingRunId)
-      pendingSubmittedRun.value = null
+    // Only the thrown 503 keep-alive (the request dropped after the run started) keeps the marker. The run may be going,
+    // so the Starting page keeps looking for it and offers no Retry, which could start it twice.
+    if (shouldKeepPendingRunAfterRunError(error)) {
+      return { lost: error instanceof ApiCallError ? error.message : 'The connection dropped after the run was sent.' }
+    }
+    clearPendingReconciliationRun(pendingRunId)
+    return {
+      error: error instanceof ApiCallError ? error.message : 'The diff could not tell the difference. Not run.',
+      details: [...validationErrors.value],
     }
   }
 }
@@ -977,22 +947,6 @@ onMounted(() => {
 .workflow-step-shell {
   min-width: 0;
   max-width: 100%;
-}
-
-.reconciliation-run-submitted-hint {
-  width: min(var(--workflow-question-width), 100%);
-  display: grid;
-  gap: var(--space-2);
-  justify-items: start;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-soft);
-}
-
-.reconciliation-run-submitted-hint p {
-  margin: 0;
 }
 
 .reconciliation-run-history-board {
@@ -1081,18 +1035,6 @@ onMounted(() => {
 
 .reconciliation-run-actions > * {
   pointer-events: auto;
-}
-
-.reconciliation-run-history-link {
-  justify-self: start;
-  color: var(--text-muted);
-  text-decoration: none;
-  font-size: var(--type-muted-size);
-}
-
-.reconciliation-run-history-link:hover {
-  color: var(--text);
-  text-decoration: underline;
 }
 
 @media (max-width: 760px) {

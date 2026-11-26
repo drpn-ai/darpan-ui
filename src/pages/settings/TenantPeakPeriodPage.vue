@@ -650,10 +650,11 @@ function apply(response: GetPeakPeriodResponse): void {
 }
 
 /** Reads the period again. The draft starts over from it only when asked; a run-time change keeps unsaved edits. */
-async function read(peakPeriodId: string, restartDraft: boolean): Promise<void> {
+async function read(peakPeriodId: string, restartDraft: boolean, stillCurrent: () => boolean = () => true): Promise<void> {
   const response = await peakFacade.getPeakPeriod({ peakPeriodId })
   const refusal = refusalOf(response, 'Could not load the peak period.')
   if (refusal) throw new Error(refusal)
+  if (!stillCurrent()) return
   apply(response)
   if (restartDraft) resetDraft()
 }
@@ -871,9 +872,17 @@ async function deleteRunTime(): Promise<void> {
 }
 
 /** After a run-time change: its rows and the runs that wait, with this page's unsaved edits kept. */
+// DAR-UI-156: a save that went out while this read was out makes its answer older than the page; it is dropped, and
+// the period read again once that save has answered (reading sooner could fetch the old state again).
+let savesSent = 0
+let readOwed = ''
 async function refresh(peakPeriodId: string): Promise<void> {
+  const at = savesSent
   try {
-    await read(peakPeriodId, false)
+    await read(peakPeriodId, false, () => savesSent === at)
+    if (savesSent === at) return
+    if (saving.value) readOwed = peakPeriodId
+    else void refresh(peakPeriodId)
   } catch (error) {
     pageError.value = messageOf(error, 'Could not load the peak period.')
   }
@@ -901,12 +910,44 @@ async function deletePeriod(): Promise<void> {
   }
 }
 
-/** One Save: name, dates, peak hours and on/off together. Then the period is read again, so what waits is current. */
+/** The period as the page now shows it, laid over what was read: what an edit's save stores. */
+function savedFromDraft(period: PeakPeriod, current: Draft): PeakPeriod {
+  return {
+    ...period,
+    periodName: current.periodName.trim(),
+    fromDate: current.fromDate,
+    thruDate: current.thruDate,
+    peakHoursStart: current.peakHoursStart || null,
+    peakHoursEnd: current.peakHoursEnd || null,
+    hotwaxReadSharePct: current.hotwaxReadSharePct,
+    netsuiteSerial: current.netsuiteSerial ? 'Y' : 'N',
+    isActive: current.isActive ? 'Y' : 'N',
+  }
+}
+
+/** One Save: name, dates, peak hours and on/off together. A new period then moves to its own address and is read again. */
 async function save(): Promise<void> {
   const current = draft.value
   if (!current || busy.value || !canEdit.value || !canSave.value) return
   saving.value = true
   pageError.value = ''
+  savesSent += 1
+  // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). An edit shows as saved at
+  // once. A refusal puts back the edited mark, with the typed values still on the page and the reason above them.
+  const wasNew = !current.peakPeriodId
+  const was = { saved: saved.value, baseline: baseline.value }
+  // Which runs wait is the server's to work out from the dates, hours and on/off; only a change there reads it again.
+  const waitsMove = Boolean(was.saved) && ((['fromDate', 'thruDate', 'peakHoursStart', 'peakHoursEnd'] as const)
+    .some((key) => (was.saved?.[key] ?? '') !== current[key]) || (was.saved?.isActive !== 'N') !== current.isActive)
+  if (!wasNew && saved.value) {
+    saved.value = savedFromDraft(saved.value, current)
+    baseline.value = snapshot()
+  }
+  const putBack = () => {
+    if (wasNew) return
+    saved.value = was.saved
+    baseline.value = was.baseline
+  }
   try {
     const out = await peakFacade.savePeakPeriod({
       ...(current.peakPeriodId ? { peakPeriodId: current.peakPeriodId } : {}),
@@ -923,12 +964,17 @@ async function save(): Promise<void> {
     })
     const refusal = refusalOf(out, 'Could not save the peak period.')
     if (refusal) {
+      putBack()
       pageError.value = refusal
       return
     }
-    const wasNew = !current.peakPeriodId
+    if (!wasNew) {
+      // Behind the page, which already shows the save: the runs that wait, with any new edits kept.
+      if (waitsMove) void refresh(out.peakPeriodId)
+      return
+    }
     current.peakPeriodId = out.peakPeriodId
-    if (wasNew) void router.replace({ name: 'settings-tenant-peak-period', params: { peakPeriodId: out.peakPeriodId } })
+    void router.replace({ name: 'settings-tenant-peak-period', params: { peakPeriodId: out.peakPeriodId } })
     try {
       await read(out.peakPeriodId, true)
     } catch (error) {
@@ -937,9 +983,13 @@ async function save(): Promise<void> {
       pageError.value = messageOf(error, 'Could not load the peak period.')
     }
   } catch (error) {
+    putBack()
     pageError.value = messageOf(error, 'Could not save the peak period.')
   } finally {
     saving.value = false
+    const owed = readOwed
+    readOwed = ''
+    if (owed) void refresh(owed)
   }
 }
 

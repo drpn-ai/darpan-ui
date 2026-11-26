@@ -418,6 +418,71 @@ describe('TenantPeakPeriodPage', () => {
     expect(savePeakPeriod).toHaveBeenCalledWith(expect.objectContaining({ netsuiteSerial: true }))
   })
 
+  // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing").
+  it('shows an edit as saved before the backend answers and reads nothing again when no wait can move', async () => {
+    const wrapper = await mountPage()
+    let answer!: (value: unknown) => void
+    savePeakPeriod.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+    await wrapper.find('[data-testid="peak-fact-netsuite"]').trigger('click')
+    await choose(wrapper, 'peak-netsuite-select', 'serial')
+    await wrapper.find('[data-testid="peak-netsuite-save"]').trigger('click')
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(false)
+    expect(text(wrapper, 'peak-fact-netsuite')).toContain('One at a time')
+
+    answer({ ok: true, messages: [], errors: [], peakPeriodId: 'PP1' })
+    await flushPromises()
+    expect(getPeakPeriod).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="peak-page-error"]').exists()).toBe(false)
+  })
+
+  // Review: the read after an hours change could answer after a second save went out, putting older values back. Its
+  // answer is dropped, and the period is read again once that save has answered.
+  it('drops a read older than a save, and reads again once the save answers', async () => {
+    const wrapper = await mountPage()
+    let staleRead!: (value: unknown) => void
+    getPeakPeriod.mockReturnValueOnce(new Promise((resolve) => { staleRead = resolve }))
+    await wrapper.find('[data-testid="peak-fact-hours"]').trigger('click')
+    await wrapper.find('[data-testid="peak-hours-clear"]').trigger('click')
+    await wrapper.find('[data-testid="peak-hours-save"]').trigger('click')
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    await flushPromises()
+    expect(getPeakPeriod).toHaveBeenCalledTimes(2)
+
+    let secondSave!: (value: unknown) => void
+    savePeakPeriod.mockReturnValueOnce(new Promise((resolve) => { secondSave = resolve }))
+    await wrapper.find('[data-testid="peak-fact-netsuite"]').trigger('click')
+    await choose(wrapper, 'peak-netsuite-select', 'serial')
+    await wrapper.find('[data-testid="peak-netsuite-save"]').trigger('click')
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    // The read from before this save answers with the old hours: not put on the page.
+    staleRead(got({ peakPeriod: period(), heldRuns: [{ targetLabel: 'Stale audit', normalTime: '10:00', startsAt: '23:00', reason: 'old hours' }] }))
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Stale audit')
+    expect(getPeakPeriod).toHaveBeenCalledTimes(2)
+
+    secondSave({ ok: true, messages: [], errors: [], peakPeriodId: 'PP1' })
+    await flushPromises()
+    expect(getPeakPeriod).toHaveBeenCalledTimes(3)
+  })
+
+  it('puts the edited mark back on a refusal, with the typed value still on the page', async () => {
+    const wrapper = await mountPage()
+    let answer!: (value: unknown) => void
+    savePeakPeriod.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+    await wrapper.find('[data-testid="peak-on"]').trigger('click')
+    await wrapper.find('[data-testid="peak-save"]').trigger('click')
+    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(false)
+
+    answer({ ok: false, messages: [], errors: ['Black Friday sale overlaps Cyber week.'], peakPeriodId: null })
+    await flushPromises()
+    expect(text(wrapper, 'peak-page-error')).toBe('Black Friday sale overlaps Cyber week.')
+    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="peak-on"]').attributes('aria-checked')).toBe('false')
+    expect(getPeakPeriod).toHaveBeenCalledTimes(1)
+  })
+
   it('Parallel sends netsuiteSerial false', async () => {
     getPeakPeriod.mockResolvedValue(got({ peakPeriod: period({ netsuiteSerial: 'Y' }) }))
     const wrapper = await mountPage()

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { push, replace, route } = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
-  route: { params: { audit: 'month-close' }, query: { period: '2026-09' } as Record<string, string> },
+  route: { params: { audit: 'month-close' }, query: { period: '2026-09' } as Record<string, string>, fullPath: '/reconciliation/audits/month-close/run?period=2026-09' },
 }))
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push, replace }) }))
 vi.mock('../../../lib/api/facade', () => ({ auditFacade: { runAudit: vi.fn(), getAuditSettings: vi.fn() } }))
@@ -13,6 +13,7 @@ vi.mock('../../../stores/auth', () => ({ useAuthStore: () => session }))
 
 import { auditFacade } from '../../../lib/api/facade'
 import AuditRunStartPage from '../AuditRunStartPage.vue'
+import { useMascotStore } from '../../../stores/mascot'
 import { setDefaultDisplayTimeZone } from '../../../lib/utils/date'
 
 const f = vi.mocked(auditFacade)
@@ -23,6 +24,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 7, 17, 12))
   push.mockReset()
   replace.mockReset()
+  // As the router does: a navigation is a promise.
+  replace.mockResolvedValue(undefined)
   f.getAuditSettings.mockReset()
   f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: null } } as never)
   f.runAudit.mockReset()
@@ -135,15 +138,42 @@ describe('AuditRunStartPage', () => {
     expect(f.runAudit).toHaveBeenCalledWith({ audit: 'month-close', fromDate: '2026-08-03', thruDate: '2026-08-05' })
   })
 
-  it('shows a refusal in place and stays', async () => {
-    f.runAudit.mockRejectedValue(new Error('2026-07 ended on 2026-07-31 and is not extended to 2026-08-17; extend it to run its days.'))
+  // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). The audit opens on the
+  // click; a refusal is raised by the mascot, where it stays until read, with the way back to choose the window again.
+  it('opens the audit before run#Audit answers, and raises a refusal with the way back', async () => {
+    let refuse: (reason: unknown) => void = () => {}
+    f.runAudit.mockReturnValue(new Promise((_, reject) => { refuse = reject }) as never)
+    f.getAuditSettings.mockResolvedValue({ ok: true, settings: { playableFrom: null, audit: { id: 'month-close', name: 'Month close', period: '2026-09' } } } as never)
     const w = mount(AuditRunStartPage)
     await flushPromises()
     await pick(w, 'month-to-date')
     await submit(w)
-    expect(w.text()).toContain('2026-07 ended on 2026-07-31 and is not extended')
-    expect(replace).not.toHaveBeenCalled()
-    expect(form(w).props('submitDisabled')).toBe(false)
+    expect(replace).toHaveBeenCalledTimes(1)
+
+    refuse(new Error('2026-07 ended on 2026-07-31 and is not extended to 2026-08-17; extend it to run its days.'))
+    await flushPromises()
+    const [warning] = useMascotStore().warnings
+    // Named, as a run's refusal is: the warning may be read on another audit's page.
+    expect(warning).toMatchObject({ id: 'audit-start-month-close', title: 'An audit did not start', prompt: 'Month close did not start.' })
+    expect(warning!.body).toContain('2026-07 ended on 2026-07-31 and is not extended')
+    await warning!.actions[0]!.run()
+    expect(push).toHaveBeenCalledWith('/reconciliation/audits/month-close/run?period=2026-09')
+  })
+
+  // The mascot puts its warnings away on every page change: a refusal that beats the navigation waits for it.
+  it('raises a refusal that answers before the audit has opened only once it has', async () => {
+    f.runAudit.mockRejectedValue(new Error('2026-07 ended on 2026-07-31 and is not extended to 2026-08-17; extend it to run its days.'))
+    let land: () => void = () => {}
+    replace.mockReturnValueOnce(new Promise<void>((resolve) => { land = resolve }))
+    const w = mount(AuditRunStartPage)
+    await flushPromises()
+    await pick(w, 'month-to-date')
+    w.get('form').trigger('submit')
+    await flushPromises()
+    expect(useMascotStore().warnings).toEqual([])
+    land()
+    await flushPromises()
+    expect(useMascotStore().warnings[0]).toMatchObject({ id: 'audit-start-month-close' })
   })
 
   it('a double submit starts one run', async () => {

@@ -200,7 +200,6 @@
             :message="liveRunFailureText"
           />
           <div v-if="showRetryRun" class="run-result-cancel" data-testid="run-result-retry">
-            <InlineValidation v-if="retryError" tone="error" :message="retryError" />
             <button
               type="button"
               class="run-result-cancel__button"
@@ -226,7 +225,7 @@
               type="button"
               class="run-result-cancel__button"
               data-testid="run-result-cancel"
-              :disabled="cancelBusy || cancelRequested"
+              :disabled="cancelRequested"
               @click="cancelConfirming = true"
             >
               {{ cancelRequested ? 'Stopping run…' : 'Cancel run' }}
@@ -237,7 +236,6 @@
                 type="button"
                 class="run-result-cancel__button run-result-cancel__button--danger"
                 data-testid="run-result-cancel-confirm-yes"
-                :disabled="cancelBusy"
                 @click="void cancelRun()"
               >
                 Stop run
@@ -246,7 +244,6 @@
                 type="button"
                 class="run-result-cancel__button"
                 data-testid="run-result-cancel-confirm-no"
-                :disabled="cancelBusy"
                 @click="cancelConfirming = false"
               >
                 Keep running
@@ -852,17 +849,24 @@ const liveRunNote = computed(() => {
 
 // Cancelling is cooperative on the backend: the request is recorded and the run ends itself at
 // its next checkpoint, so the button reports "Stopping" until the poll shows a terminal status
-// rather than pretending the run stopped the instant the call returned.
-const cancelBusy = ref(false)
+// rather than pretending the run stopped. DAR-UI-156: "Stopping" shows the moment the person
+// confirms (cancelSent); the status poll confirms it through cancelRequestedDate, and only a
+// refusal puts the Cancel button back, with the reason above it.
+const cancelSent = ref(false)
 const cancelConfirming = ref(false)
 const cancelError = ref<string | null>(null)
-const cancelRequested = computed(() => Boolean(runStatus.value?.cancelRequestedDate))
+const cancelRequested = computed(() => cancelSent.value || Boolean(runStatus.value?.cancelRequestedDate))
+watch(liveRunResultId, () => {
+  cancelSent.value = false
+  cancelConfirming.value = false
+  cancelError.value = null
+})
 const showCancelRun = computed(() =>
   Boolean(liveRunResultId.value) && canRunActiveTenantReconciliation.value && liveRunActive.value)
 
 // DAR-BE-163: a failed run retries from the step it failed at; the steps that finished (a 17-minute
 // HotWax read) are reused, not run again.
-const { retrying, retryError, retry } = useRunRetry()
+const { retrying, retry } = useRunRetry()
 const showRetryRun = computed(() => liveRunFailed.value && canRunActiveTenantReconciliation.value && Boolean(savedRunId.value))
 const retryLabel = computed(() => {
   const failedStep = runStatusSteps.value.find((step) => step.statusEnumId === 'AUT_STAT_FAILED')
@@ -871,18 +875,17 @@ const retryLabel = computed(() => {
 
 async function cancelRun(): Promise<void> {
   const runId = liveRunResultId.value
-  if (!runId || cancelBusy.value) return
+  if (!runId || cancelRequested.value) return
 
-  cancelBusy.value = true
+  cancelConfirming.value = false
+  cancelSent.value = true
   cancelError.value = null
   try {
     await reconciliationFacade.cancelReconciliationRun({ reconciliationRunResultId: runId })
-    cancelConfirming.value = false
-    await runResultsStore.refreshRunStatus(runId)
   } catch (error) {
+    if (liveRunResultId.value !== runId) return
+    cancelSent.value = false
     cancelError.value = error instanceof ApiCallError ? error.message : 'This run refuses to stop. It is very committed.'
-  } finally {
-    cancelBusy.value = false
   }
 }
 

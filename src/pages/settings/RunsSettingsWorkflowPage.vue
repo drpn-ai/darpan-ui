@@ -162,7 +162,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, toRaw, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
@@ -180,6 +180,7 @@ import type {
   JsonSchemaSummary,
 } from '../../lib/api/types'
 import type { SaveRuleSetRunPayload } from '../../lib/api/facadeTypes'
+import { useMascotStore } from '../../stores/mascot'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import {
@@ -221,6 +222,7 @@ const route = useRoute()
 const router = useRouter()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
+const mascot = useMascotStore()
 const SOURCE_TYPE_API = 'AUT_SRC_API'
 // A side over a saved NetSuite SuiteQL query: the config IS the query, with no endpoint behind it (as in the run builder).
 const SOURCE_CONFIG_TYPE_SUITEQL = 'NETSUITE_SUITEQL'
@@ -940,11 +942,18 @@ async function save(): Promise<void> {
 
   try {
     if (ruleSetDraft.value) {
-      const response = await reconciliationFacade.saveRuleSetRun(buildRuleSetSavePayload())
-      const savedRunName = response.savedRun?.runName || form.mappingName.trim()
-      success.value = response.messages?.[0] ?? 'Saved run.'
-      draftStore.setRuleSetDraft(buildRuleSetDraftFromForm(savedRunName), 'ruleset-manager')
-      await router.push({ name: 'reconciliation-ruleset-manager' })
+      // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). The run's id is known,
+      // so the run details open on the click, already showing the edits (they read the draft); save#RuleSetRun runs
+      // behind, tied to nothing on this page.
+      const runId = ruleSetDraft.value.savedRunId ?? activeMappingId.value
+      const storedDraft = toRaw(ruleSetDraft.value)
+      const editedDraft = buildRuleSetDraftFromForm(form.mappingName.trim())
+      const payload = buildRuleSetSavePayload()
+      const saving = draftStore.afterRuleSetSaves(() => reconciliationFacade.saveRuleSetRun(payload))
+      draftStore.setRuleSetDraft(editedDraft, 'ruleset-manager')
+      const leaving = router.push({ name: 'reconciliation-ruleset-manager' })
+      void saving.catch((saveError: unknown) => raiseRefusedSave(leaving, saveError, runId, storedDraft, editedDraft))
+      await leaving
       return
     }
 
@@ -963,6 +972,38 @@ async function save(): Promise<void> {
   } finally {
     loading.value = false
   }
+}
+
+/**
+ * DAR-UI-156: a refused save, seen on whatever page the person is on. The run details go back to the stored run (only
+ * while they still hold this edit), and the mascot keeps the edit, with the way back into it.
+ */
+async function raiseRefusedSave(
+  leaving: Promise<unknown>,
+  saveError: unknown,
+  runId: string,
+  storedDraft: ReconciliationRuleSetDraft,
+  editedDraft: ReconciliationRuleSetDraft,
+): Promise<void> {
+  // The dock drops every warning on a route change: raise only once the page this left for has landed.
+  await leaving.catch(() => undefined)
+  await nextTick()
+  if (toRaw(draftStore.ruleSetDraftState?.draft) === editedDraft) draftStore.setRuleSetDraft(storedDraft, 'ruleset-manager')
+  const reason = saveError instanceof ApiCallError ? saveError.message : 'Run settings ran off before the save. Not saved.'
+  mascot.raise({
+    id: `run-settings-save-refused-${runId}`,
+    title: 'Run not saved',
+    prompt: 'Open the run settings again?',
+    body: `${reason} Your changes are still there.`,
+    actions: [{
+      label: 'Open run settings',
+      testId: 'mascot-warning-action-reopen-run-settings',
+      run: () => {
+        draftStore.setRuleSetDraft(editedDraft, 'ruleset-manager')
+        return router.push({ name: 'settings-runs-edit', params: { reconciliationMappingId: runId } }).then(() => undefined)
+      },
+    }],
+  })
 }
 
 async function cancelEdit(): Promise<void> {

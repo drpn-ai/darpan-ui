@@ -90,3 +90,22 @@ export function buildReconciliationRunLiveRoute(
     },
   }
 }
+
+/** DAR-UI-156. The Starting page of a run just submitted, before its run id is known. */
+export function buildReconciliationRunStartingRoute(
+  context: ReconciliationRunRouteContext,
+  pendingRunId: string,
+): RouteLocationRaw {
+  return {
+    name: 'reconciliation-run-starting',
+    params: {
+      savedRunId: context.savedRunId,
+      pendingRunId,
+    },
+    query: {
+      runName: context.runName,
+      file1SystemLabel: context.file1SystemLabel,
+      file2SystemLabel: context.file2SystemLabel,
+    },
+  }
+}

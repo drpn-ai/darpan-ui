@@ -131,6 +131,7 @@ export const LABEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'filters': 'exclusions',
   'filter': 'exclusions',
   'previous runs': 'previousRuns',
+  'read options': 'readOptions',
   // NOT previousRuns: the Automations page titles its list of saved automations
   // "Automation Runs", so this label sits over automation tiles, never over executions.
   'automation runs': 'automations',

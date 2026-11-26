@@ -244,6 +244,7 @@ import {
 import {
   buildReconciliationRunLiveRoute,
   buildReconciliationRunResultRoute,
+  buildReconciliationRunStartingRoute,
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { useListPagination } from '../../lib/listPagination'
@@ -255,6 +256,7 @@ import { describeTimeZone as describeZone, formatDateTime, getDefaultDisplayTime
 import { peakHoursUntilNotice } from '../../lib/peakPeriodWords'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { isActiveRunStatus } from '../../stores/runResults'
+import { newPendingRunId, useRunSubmissionsStore } from '../../stores/runSubmissions'
 
 const columns = [
   { key: 'status', label: 'Status', colStyle: { width: '16%' }, explain: 'runStatus' },
@@ -273,6 +275,7 @@ type AutomationExecutionTableRow = Record<string, unknown> & {
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const runSubmissions = useRunSubmissionsStore()
 const permissionsStore = usePermissionsStore()
 const draftStore = useReconciliationDraftStore()
 const automation = ref<AutomationRecord | null>(null)
@@ -648,15 +651,16 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
-async function pollForRegisteredExecutionRunResultId(signal: AbortSignal): Promise<string> {
-  const submittedAtMs = Date.now()
+// DAR-UI-156: takes the automation and the click's time rather than reading the page, because it runs on after the
+// page has gone (the Starting page waits on it).
+async function pollForRegisteredExecutionRunResultId(runAutomationId: string, submittedAtMs: number, signal: AbortSignal): Promise<string> {
   for (let attempt = 0; attempt < RUN_REGISTRATION_POLL_ATTEMPTS; attempt += 1) {
     await delay(RUN_REGISTRATION_POLL_INTERVAL_MS, signal)
     if (signal.aborted) return ''
 
     try {
       const response = await reconciliationFacade.listAutomationExecutions(
-        { automationId: automationId.value, pageIndex: 0, pageSize: 5 },
+        { automationId: runAutomationId, pageIndex: 0, pageSize: 5 },
         signal,
       )
       const registered = (response.executions ?? []).find((execution) => {
@@ -786,37 +790,49 @@ async function runNow(): Promise<void> {
       detail: { message: peakNotice, durationMs: 5000 },
     }))
   }
+  // DAR-UI-156 (Aditi: "the transition from submission to the run detail page is 1-3 seconds, when it should be
+  // immediate"). The Starting page opens on the click. The store sends run#AutomationNow (it answers only when the
+  // run ends) and looks for the execution it registered; the Starting page follows whichever answers first, and a
+  // run that finished before it was found leads back here, read fresh.
+  const routeContext = reconciliationRunRouteContext.value
+  const runAutomationId = automation.value.automationId
+  if (routeContext) {
+    // A run of this automation still starting (Back from its Starting page, then Run now): open it, start no second one.
+    const alreadyStarting = runSubmissions.startingFor(routeContext.savedRunId)
+    if (alreadyStarting) {
+      await router.push(buildReconciliationRunStartingRoute(routeContext, alreadyStarting))
+      return
+    }
+    const pendingRunId = newPendingRunId(routeContext.savedRunId)
+    const startingRoute = buildReconciliationRunStartingRoute(routeContext, pendingRunId)
+    const submittedAtMs = Date.now()
+    const dashboardPath = route.fullPath
+    runSubmissions.start({
+      pendingRunId,
+      context: routeContext,
+      backRoute: dashboardPath,
+      backLabel: 'Back to the automation',
+      register: (signal) => pollForRegisteredExecutionRunResultId(runAutomationId, submittedAtMs, signal),
+      submit: async () => {
+        try {
+          await reconciliationFacade.runAutomationNow({ automationId: runAutomationId })
+          return { route: dashboardPath }
+        } catch (runError) {
+          return { error: runError instanceof ApiCallError ? runError.message : 'The automation tripped at the starting line. Not run.' }
+        }
+      },
+      reopen: () => void router.push(startingRoute),
+    })
+    await router.push(startingRoute)
+    return
+  }
+
+  // No saved run to name a run page by: run in place and read the automation again.
   actionInFlight.value = true
   runNowInFlight.value = true
   actionError.value = null
-  const registrationController = new AbortController()
-  // Leaving the page ends the registration poll too; it would otherwise list executions for all its tries.
-  const stopRegistration = () => registrationController.abort()
-  pageAbortController.signal.addEventListener('abort', stopRegistration, { once: true })
   try {
-    // The run executes detached from the request transaction, so its PENDING/RUNNING row is
-    // readable within moments of submission while this call is still in flight. Race the two:
-    // whichever resolves first decides where the user lands -- the live progress view for a run
-    // long enough to still be running, or the in-place refresh for one that finished first.
-    const submission = reconciliationFacade.runAutomationNow({ automationId: automation.value.automationId })
-    const liveRunResultId = await Promise.race([
-      pollForRegisteredExecutionRunResultId(registrationController.signal),
-      submission.then(() => '', () => ''),
-    ])
-
-    const routeContext = reconciliationRunRouteContext.value
-    if (liveRunResultId && routeContext) {
-      // The submission stays in flight and owns the run from here; this page unmounts on
-      // navigation, so nothing here may cancel it.
-      void submission.catch(() => {
-        // A submission failure after the redirect surfaces on the live progress view, which is
-        // now the authoritative screen for this run.
-      })
-      await router.push(buildReconciliationRunLiveRoute(routeContext, liveRunResultId))
-      return
-    }
-
-    await submission
+    await reconciliationFacade.runAutomationNow({ automationId: runAutomationId })
     // Refetch (not just the runAutomationNow response) so Previous Run/Next Run and the
     // executions table all reflect the same, authoritative post-run state.
     const refreshedAutomation = await fetchAutomationAndExecutions()
@@ -828,8 +844,6 @@ async function runNow(): Promise<void> {
   } catch (runError) {
     actionError.value = runError instanceof ApiCallError ? runError.message : 'The automation tripped at the starting line. Not run.'
   } finally {
-    pageAbortController.signal.removeEventListener('abort', stopRegistration)
-    registrationController.abort()
     actionInFlight.value = false
     runNowInFlight.value = false
   }

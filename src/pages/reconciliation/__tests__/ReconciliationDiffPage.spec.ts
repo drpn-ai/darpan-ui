@@ -46,6 +46,13 @@ vi.mock('../../../stores/permissions', () => ({
 }))
 
 import ReconciliationDiffPage from '../ReconciliationDiffPage.vue'
+import { useRunSubmissionsStore } from '../../../stores/runSubmissions'
+
+/** DAR-UI-156. The submission Execute started, through the Starting page it opened. */
+function startedSubmission() {
+  const to = push.mock.calls.at(-1)?.[0] as { name?: string; params?: Record<string, string> } | undefined
+  return to?.name === 'reconciliation-run-starting' ? useRunSubmissionsStore().get(to.params!.pendingRunId!) : null
+}
 import { useReconciliationDraftStore } from '../../../stores/reconciliationDraft'
 
 const savedRunResponse = {
@@ -266,6 +273,8 @@ describe('ReconciliationDiffPage', () => {
   enableAutoUnmount(afterEach)
 
   afterEach(() => {
+    // DAR-UI-156: the look for a submitted run now lives in the store and outlives the page; end it here too.
+    useRunSubmissionsStore().resetForTests()
     vi.useRealTimers()
     vi.unstubAllGlobals()
     setDefaultDisplayTimeZone(undefined)
@@ -613,23 +622,30 @@ describe('ReconciliationDiffPage', () => {
         file2SystemEnumId: 'SHOPIFY',
         hasHeader: true,
       },
-      expect.any(AbortSignal),
+      undefined,
     )
-    expect(push).toHaveBeenCalledWith({
-      name: 'reconciliation-run-result',
-      params: {
-        savedRunId: 'RS_ORDER_CSV',
-        outputFileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-      },
-      query: {
-        runName: 'CSV Order Compare',
-        file1SystemLabel: 'OMS',
-        file2SystemLabel: 'SHOPIFY',
+    // DAR-UI-156: the Starting page opened on Execute; the run that finished first leads it to the saved result.
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(push.mock.calls[0]?.[0]).toMatchObject({ name: 'reconciliation-run-starting', params: { savedRunId: 'RS_ORDER_CSV' } })
+    expect(startedSubmission()?.state).toEqual({
+      phase: 'done',
+      route: {
+        name: 'reconciliation-run-result',
+        params: {
+          savedRunId: 'RS_ORDER_CSV',
+          outputFileName: 'CSV-Order-Compare-diff-20260331-063304.json',
+        },
+        query: {
+          runName: 'CSV Order Compare',
+          file1SystemLabel: 'OMS',
+          file2SystemLabel: 'SHOPIFY',
+        },
       },
     })
   })
 
-  it('shows a come-back-later hint and records the run as pending while execution is in progress', async () => {
+  // DAR-UI-156: the come-back-later words moved to the Starting page, which opens on Execute.
+  it('opens the Starting page on Execute and records the run as pending while execution is in progress', async () => {
     stubFileReader()
     route.query = {
       savedRunId: 'RS_ORDER_CSV',
@@ -664,20 +680,13 @@ describe('ReconciliationDiffPage', () => {
     await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
     await flushPromises()
 
-    const hint = wrapper.get('[data-testid="run-submitted-hint"]')
-    expect(hint.text()).toContain('Run submitted')
-    expect(hint.text()).toContain('You can leave this page and come back later from run history.')
-    expect(JSON.parse(wrapper.get('[data-testid="run-submitted-history-link"]').attributes('data-to') ?? '{}')).toEqual({
-      name: 'reconciliation-run-history',
-      params: {
-        savedRunId: 'RS_ORDER_CSV',
-      },
-      query: {
-        runName: 'CSV Order Compare',
-        file1SystemLabel: 'OMS',
-        file2SystemLabel: 'SHOPIFY',
-      },
+    expect(push.mock.calls[0]?.[0]).toEqual({
+      name: 'reconciliation-run-starting',
+      params: { savedRunId: 'RS_ORDER_CSV', pendingRunId: expect.any(String) },
+      query: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' },
     })
+    expect(startedSubmission()?.state).toEqual({ phase: 'starting' })
+    expect(startedSubmission()?.input.backRoute).toMatchObject({ name: 'reconciliation-diff', query: { savedRunId: 'RS_ORDER_CSV' } })
     expect(JSON.parse(window.localStorage.getItem('darpan.pendingReconciliationRuns') ?? '[]')).toEqual([
       expect.objectContaining({
         savedRunId: 'RS_ORDER_CSV',
@@ -760,8 +769,9 @@ describe('ReconciliationDiffPage', () => {
     await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
     await flushPromises()
 
-    // Nothing to show yet — the redirect waits until the backend has registered the run.
-    expect(push).not.toHaveBeenCalled()
+    // DAR-UI-156: the Starting page is already open; the run is found a look later.
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(startedSubmission()?.state).toEqual({ phase: 'starting' })
     expect(getActiveRunResult).toHaveBeenCalledTimes(1)
     expect(getActiveRunResult).toHaveBeenCalledWith({ savedRunId: 'RS_ORDER_CSV' }, expect.any(AbortSignal))
     const listCallsBeforeLookup = listGeneratedOutputs.mock.calls.length
@@ -772,15 +782,7 @@ describe('ReconciliationDiffPage', () => {
     // The lookup never pages the generated-outputs list, which reads result documents.
     expect(listGeneratedOutputs).toHaveBeenCalledTimes(listCallsBeforeLookup)
 
-    expect(push).toHaveBeenCalledWith({
-      name: 'reconciliation-run-live',
-      params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RR_SUBMITTED' },
-      query: {
-        runName: 'CSV Order Compare',
-        file1SystemLabel: 'OMS',
-        file2SystemLabel: 'SHOPIFY',
-      },
-    })
+    expect(startedSubmission()?.state).toEqual({ phase: 'live', runResultId: 'RR_SUBMITTED' })
     // The marker stays until the run itself ends — the live view is now what reports progress.
     expect(JSON.parse(window.localStorage.getItem('darpan.pendingReconciliationRuns') ?? '[]')).toHaveLength(1)
   })
@@ -871,7 +873,8 @@ describe('ReconciliationDiffPage', () => {
     await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Darpan stepped out for chai. Try again in a moment.')
+    // DAR-UI-156: the run may be going, so the Starting page keeps looking for it rather than offering a Retry.
+    expect(startedSubmission()?.state).toEqual({ phase: 'starting' })
     expect(JSON.parse(window.localStorage.getItem('darpan.pendingReconciliationRuns') ?? '[]')).toEqual([
       expect.objectContaining({
         savedRunId: 'RS_ORDER_CSV',
@@ -920,8 +923,7 @@ describe('ReconciliationDiffPage', () => {
     await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('HotWax: OMS REST request failed: Read timed out')
-    expect(wrapper.find('[data-testid="run-submitted-hint"]').exists()).toBe(false)
+    expect(startedSubmission()?.state).toEqual({ phase: 'failed', error: 'HotWax: OMS REST request failed: Read timed out', details: [], retryable: true })
     expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
   })
 
@@ -1284,9 +1286,13 @@ describe('ReconciliationDiffPage', () => {
     await wrapper.get('.workflow-step-shell').trigger('keydown.enter')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Schema validation failed. OMS: missing required property order_id')
-    expect(wrapper.text()).toContain('OMS: missing required property order_id')
-    expect(push).not.toHaveBeenCalled()
+    // DAR-UI-156: the refusal and its details show on the Starting page, which has Retry and Back to setup.
+    expect(startedSubmission()?.state).toEqual({
+      phase: 'failed',
+      error: 'Schema validation failed. OMS: missing required property order_id',
+      details: ['OMS: missing required property order_id'],
+      retryable: true,
+    })
   })
 
   it('blocks schema json uploads before calling the saved-run diff API', async () => {

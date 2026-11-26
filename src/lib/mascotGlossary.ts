@@ -473,6 +473,11 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'how often the pulse reads both systems for waiting orders. Off keeps the pair and its allowance but stops the pulse.',
     byDirectiveOnly: true,
   },
+  /* DAR-UI-148: a run's manager page lists each side's read options. */
+  readOptions: {
+    title: 'Read options',
+    body: 'narrow what each side reads before anything is compared. A switch changes the next run only; runs already done keep what they read.',
+  },
   syncPairAllowance: {
     title: 'Allowance',
     body: 'how long an order may wait for the other system before it counts as late. The daily check also starts this long after its window ends.',

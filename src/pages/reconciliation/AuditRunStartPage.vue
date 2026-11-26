@@ -19,16 +19,14 @@
           @choose="choose"
         />
         <WorkflowDateRangeCalendar v-else :calendar="calendar" test-id-prefix="audit-start-custom" />
-        <InlineValidation v-if="error" tone="error" :message="error" />
       </WorkflowStepForm>
     </div>
   </WorkflowPage>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowDateRangeCalendar from '../../components/workflow/WorkflowDateRangeCalendar.vue'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
@@ -46,6 +44,7 @@ import {
 import { addDays, formatDateInputValue, parseDateInput, todayInDisplayTimeZone } from '../../lib/utils/date'
 import { peakHoursUntilNotice } from '../../lib/peakPeriodWords'
 import { useAuthStore } from '../../stores/auth'
+import { useMascotStore } from '../../stores/mascot'
 
 // DAR-UI-063. An audit's play, asked as a lifecycle's play asks it (RunFlowchartStartPage): which days, with the run
 // cards and calendar. Every check of the audit then runs over them in the background, recording its findings as the
@@ -53,11 +52,11 @@ import { useAuthStore } from '../../stores/auth'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const mascot = useMascotStore()
 const auditCode = computed(() => String(route.params.audit ?? ''))
 const step = ref<'window' | 'custom'>('window')
 const preset = ref<RunWindowPreset | ''>('')
 const starting = ref(false)
-const error = ref<string | null>(null)
 
 const today = todayInDisplayTimeZone()
 // The earliest day a play can record (the first day of the period just ended, or go-live when later; DAR-BE-178), from
@@ -65,6 +64,8 @@ const today = todayInDisplayTimeZone()
 const playableFrom = ref<Date | null>(null)
 // DAR-BE-328: when peak hours end, while now is inside them. Play still starts; the audit says until when.
 const peakHoursUntil = ref<string | null>(null)
+// Names the audit in a refusal, which may be read on another page.
+const auditName = ref('')
 const calendar = useCalendarWidget({ lastPickableDate: () => today, firstPickableDate: () => playableFrom.value })
 const options = computed(() => runWindowPresetOptions(today).filter((option) =>
   option.value === 'custom' || !playableFrom.value || presetWindowRange(option.value, today).startDate >= playableFrom.value))
@@ -107,21 +108,32 @@ async function start() {
   const window = range.value
   if (!window) return
   starting.value = true
-  error.value = null
-  try {
-    // The window ends exclusive; the audit takes its last day.
-    await auditFacade.runAudit({
-      audit: auditCode.value,
-      fromDate: formatDateInputValue(window.startDate),
-      thruDate: formatDateInputValue(addDays(window.endExclusiveDate, -1)),
+  // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). The audit opens on the
+  // click, already watching its checks; run#Audit submits behind it. A refusal is raised by the mascot, where it stays
+  // until read (a pill would vanish), with the way back to choose the window again.
+  const audit = auditCode.value
+  const startPath = route.fullPath
+  // Replace, so Back from the audit does not land on a workflow that already ran.
+  const peakNotice = peakHoursUntilNotice(peakHoursUntil.value, authStore.sessionInfo?.tenantTimeZone)
+  const landed = router.replace({ ...auditRoute.value, state: { startedAudit: true, ...(peakNotice ? { peakNotice } : {}) } })
+  // The window ends exclusive; the audit takes its last day.
+  void auditFacade.runAudit({
+    audit,
+    fromDate: formatDateInputValue(window.startDate),
+    thruDate: formatDateInputValue(addDays(window.endExclusiveDate, -1)),
+  }).catch(async (caught: unknown) => {
+    // The mascot puts its warnings away on every page change, so a fast refusal waits for the audit to have opened.
+    await landed.catch(() => undefined)
+    await nextTick()
+    mascot.raise({
+      id: `audit-start-${audit}`,
+      title: 'An audit did not start',
+      prompt: `${auditName.value || 'This audit'} did not start.`,
+      body: caught instanceof Error && caught.message ? caught.message : String(caught),
+      actions: [{ label: 'Choose the window again', testId: 'audit-start-again', run: () => void router.push(startPath) }],
     })
-    // Replace, so Back from the audit does not land on a workflow that already ran.
-    const peakNotice = peakHoursUntilNotice(peakHoursUntil.value, authStore.sessionInfo?.tenantTimeZone)
-    await router.replace({ ...auditRoute.value, state: { startedAudit: true, ...(peakNotice ? { peakNotice } : {}) } })
-  } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught)
-    starting.value = false
-  }
+  })
+  await landed
 }
 
 // The cards only draw the A-D badges; each page wires the keys itself. Skipped while typing so the command palette
@@ -157,6 +169,7 @@ onMounted(async () => {
     const settings = (await auditFacade.getAuditSettings({ audit: auditCode.value })).settings
     playableFrom.value = settings?.playableFrom ? parseDateInput(settings.playableFrom) : null
     peakHoursUntil.value = settings?.peakHoursUntil ?? null
+    auditName.value = settings?.audit?.name ?? ''
   } catch {
     // The run itself still refuses days it cannot record, in place.
   }

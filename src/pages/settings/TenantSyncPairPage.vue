@@ -751,12 +751,45 @@ async function deletePair(): Promise<void> {
   }
 }
 
-/** One Save: every fact and the switch together. A new pair then moves to its own address; either way it is read again. */
+/**
+ * The pair as the page now shows it, laid over what was read: what an edit's save stores. A peak period's override
+ * of today's allowance or pulse stays, as only the next read can say what it now is.
+ */
+function savedFromDraft(pair: SyncPair, current: Draft): SyncPair {
+  return {
+    ...pair,
+    automationId: current.automationId,
+    upstreamSide: current.upstreamSide,
+    normalAllowanceMinutes: current.allowanceMinutes,
+    normalPulseEveryMinutes: current.pulseEveryMinutes,
+    ...(allowancePeriodActive.value ? {} : { allowanceMinutes: current.allowanceMinutes }),
+    ...(everyPeriodActive.value ? {} : { pulseEveryMinutes: current.pulseEveryMinutes }),
+    chatSpaceId: current.chatSpaceId || null,
+    hourlySummary: current.hourlySummary ? 'Y' : 'N',
+    isActive: current.isActive ? 'Y' : 'N',
+  }
+}
+
+/** One Save: every fact and the switch together. A new pair then moves to its own address and is read again. */
 async function save(): Promise<void> {
   const current = draft.value
   if (!current || busy.value || !canEdit.value || !canSave.value) return
   saving.value = true
   pageError.value = ''
+  // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). An edit shows as saved at
+  // once and is not read again; the minute's refresh brings the counts. A refusal puts back the edited mark and Save,
+  // with the typed values still on the page and the reason above them.
+  const wasNew = !current.syncPairId
+  const was = { saved: saved.value, baseline: baseline.value }
+  if (!wasNew && saved.value) {
+    saved.value = savedFromDraft(saved.value, current)
+    baseline.value = snapshot()
+  }
+  const putBack = () => {
+    if (wasNew) return
+    saved.value = was.saved
+    baseline.value = was.baseline
+  }
   try {
     const out = await pulseFacade.saveSyncPair({
       ...(current.syncPairId ? { syncPairId: current.syncPairId } : {}),
@@ -771,12 +804,13 @@ async function save(): Promise<void> {
     })
     const refusal = refusalOf(out, 'Could not save the sync pair.')
     if (refusal) {
+      putBack()
       pageError.value = refusal
       return
     }
-    const wasNew = !current.syncPairId
+    if (!wasNew) return
     current.syncPairId = out.syncPairId
-    if (wasNew) void router.replace({ name: 'settings-tenant-sync-pair', params: { syncPairId: out.syncPairId } })
+    void router.replace({ name: 'settings-tenant-sync-pair', params: { syncPairId: out.syncPairId } })
     try {
       apply(await fetchPair(out.syncPairId))
       resetDraft()
@@ -786,6 +820,7 @@ async function save(): Promise<void> {
       pageError.value = messageOf(error, 'Could not load the sync pair.')
     }
   } catch (error) {
+    putBack()
     pageError.value = messageOf(error, 'Could not save the sync pair.')
   } finally {
     saving.value = false

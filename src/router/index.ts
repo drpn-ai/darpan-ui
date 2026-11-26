@@ -60,6 +60,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run Result' },
   },
   {
+    // DAR-UI-156. Run, Retry and Run now land here on the click; it moves to the live run once the run exists.
+    path: '/reconciliation/run-live/:savedRunId/starting/:pendingRunId',
+    name: 'reconciliation-run-starting',
+    component: () => import('../pages/reconciliation/ReconciliationRunStartingPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run Progress' },
+  },
+  {
     path: '/reconciliation/run-live/:savedRunId/:runResultId',
     name: 'reconciliation-run-live',
     component: () => import('../pages/reconciliation/ReconciliationRunResultPage.vue'),

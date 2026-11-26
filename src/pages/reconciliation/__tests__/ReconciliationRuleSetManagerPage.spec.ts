@@ -78,16 +78,27 @@ vi.mock('../../../stores/permissions', () => ({
   usePermissionsStore: () => permissionState,
 }))
 
-const draftStoreState = vi.hoisted(() => ({
-  workflowOrigin: null as { label: string, path: string } | null,
-  ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
-  automationDraftState: null,
-  setWorkflowOrigin: vi.fn(),
-  setRuleSetDraft: vi.fn(),
-  clearRuleSetDraft: vi.fn(),
-  setAutomationDraft: vi.fn(),
-  clearAutomationDraft: vi.fn(),
-}))
+// Reactive like the real store, so a draft a test writes after mount (the read options' switches) shows.
+const draftStoreState = await vi.hoisted(async () => {
+  const { reactive } = await import('vue')
+  let queue: Promise<unknown> = Promise.resolve()
+  return reactive({
+    workflowOrigin: null as { label: string, path: string } | null,
+    ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
+    automationDraftState: null,
+    setWorkflowOrigin: vi.fn(),
+    setRuleSetDraft: vi.fn(),
+    // As the real store: a run's full saves go one at a time.
+    afterRuleSetSaves: <T>(work: () => Promise<T>): Promise<T> => {
+      const next = queue.then(work)
+      queue = next.catch(() => undefined)
+      return next
+    },
+    clearRuleSetDraft: vi.fn(),
+    setAutomationDraft: vi.fn(),
+    clearAutomationDraft: vi.fn(),
+  })
+})
 
 vi.mock('../../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => draftStoreState,
@@ -228,7 +239,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
     draftStoreState.ruleSetDraftState = null
     draftStoreState.automationDraftState = null
     draftStoreState.setWorkflowOrigin.mockClear()
-    draftStoreState.setRuleSetDraft.mockClear()
+    draftStoreState.setRuleSetDraft.mockReset()
     draftStoreState.setAutomationDraft.mockClear()
     window.history.replaceState({}, '', '/reconciliation/ruleset-manager')
 
@@ -676,6 +687,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
 
     it('saves the run with the side\'s options when a switch turns on, and keeps the other options', async () => {
       withOptions({ keepExchangeOrders: true })
+      storeWrites()
       saveRuleSetRun.mockResolvedValue({ ok: true, messages: [], errors: [] })
       const wrapper = mount(ReconciliationRuleSetManagerPage)
       await flushPromises()
@@ -690,6 +702,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
 
     it('sends an empty set when the last option on a side turns off, so the stored one clears', async () => {
       withOptions({ keepExchangeOrders: true })
+      storeWrites()
       saveRuleSetRun.mockResolvedValue({ ok: true, messages: [], errors: [] })
       const wrapper = mount(ReconciliationRuleSetManagerPage)
       await flushPromises()
@@ -699,16 +712,91 @@ describe('ReconciliationRuleSetManagerPage', () => {
       expect(draftStoreState.setRuleSetDraft).toHaveBeenLastCalledWith(expect.objectContaining({ file1ExtractOptions: undefined }), 'ruleset-manager')
     })
 
-    it('says why when the save fails and leaves the switch as it was', async () => {
+    // DAR-UI-156: the store setter writes the draft, as the real one does, so the switch on screen follows it.
+    function storeWrites() {
+      draftStoreState.setRuleSetDraft.mockImplementation((draft: unknown, resumeStepId: string | null) => {
+        draftStoreState.ruleSetDraftState = { draft, resumeStepId }
+      })
+    }
+    function deferred<T>() {
+      let resolve!: (value: T) => void
+      let reject!: (reason: unknown) => void
+      const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+      return { promise, resolve, reject }
+    }
+    const switchOf = (wrapper: ReturnType<typeof mount>, side: string, name: string) =>
+      wrapper.get(`[data-testid="ruleset-manager-read-option-${side}-${name}"]`)
+
+    it('says why when the save fails and puts the switch back', async () => {
       withOptions(undefined)
-      saveRuleSetRun.mockRejectedValue(new Error('network'))
+      storeWrites()
+      const save = deferred<unknown>()
+      saveRuleSetRun.mockReturnValue(save.promise)
       const wrapper = mount(ReconciliationRuleSetManagerPage)
       await flushPromises()
-      await wrapper.get('[data-testid="ruleset-manager-read-option-file2-withLineItems"]').trigger('click')
+      await switchOf(wrapper, 'file2', 'withLineItems').trigger('click')
+      // DAR-UI-156: on before the backend answers.
+      expect(switchOf(wrapper, 'file2', 'withLineItems').attributes('aria-checked')).toBe('true')
+      save.reject(new Error('network'))
       await flushPromises()
       expect(wrapper.get('[data-testid="ruleset-manager-read-option-error"]').text()).toContain('Order lines was not saved.')
-      expect(draftStoreState.setRuleSetDraft).not.toHaveBeenCalled()
-      expect(wrapper.get('[data-testid="ruleset-manager-read-option-file2-withLineItems"]').attributes('aria-checked')).toBe('false')
+      expect(switchOf(wrapper, 'file2', 'withLineItems').attributes('aria-checked')).toBe('false')
+      expect(draftStoreState.setRuleSetDraft).toHaveBeenLastCalledWith(expect.objectContaining({ file2ExtractOptions: undefined }), 'ruleset-manager')
+    })
+
+    it('shows the switch at once and saves behind it, one save after another, the last carrying both', async () => {
+      withOptions(undefined)
+      storeWrites()
+      const first = deferred<unknown>()
+      saveRuleSetRun.mockReturnValueOnce(first.promise).mockResolvedValue({ ok: true, messages: [], errors: [] })
+      const wrapper = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      await switchOf(wrapper, 'file1', 'withOrderItems').trigger('click')
+      await switchOf(wrapper, 'file1', 'keepExchangeOrders').trigger('click')
+      await flushPromises()
+      expect(switchOf(wrapper, 'file1', 'withOrderItems').attributes('aria-checked')).toBe('true')
+      expect(switchOf(wrapper, 'file1', 'keepExchangeOrders').attributes('aria-checked')).toBe('true')
+      // The second waits for the first.
+      expect(saveRuleSetRun).toHaveBeenCalledTimes(1)
+      first.resolve({ ok: true, messages: [], errors: [] })
+      await flushPromises()
+      expect(saveRuleSetRun).toHaveBeenCalledTimes(2)
+      expect(saveRuleSetRun.mock.calls[1]![0].file1ExtractOptions).toEqual({ withOrderItems: true, keepExchangeOrders: true })
+      expect(wrapper.find('[data-testid="ruleset-manager-read-option-error"]').exists()).toBe(false)
+    })
+
+    it('a refused first save puts back only its own switch, and the next save sends without it', async () => {
+      withOptions(undefined)
+      storeWrites()
+      const first = deferred<unknown>()
+      saveRuleSetRun.mockReturnValueOnce(first.promise).mockResolvedValue({ ok: true, messages: [], errors: [] })
+      const wrapper = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      await switchOf(wrapper, 'file1', 'withOrderItems').trigger('click')
+      await switchOf(wrapper, 'file1', 'keepExchangeOrders').trigger('click')
+      first.reject(new ApiCallError('Order items needs a newer connector.', 400))
+      await flushPromises()
+      expect(switchOf(wrapper, 'file1', 'withOrderItems').attributes('aria-checked')).toBe('false')
+      expect(switchOf(wrapper, 'file1', 'keepExchangeOrders').attributes('aria-checked')).toBe('true')
+      expect(wrapper.get('[data-testid="ruleset-manager-read-option-error"]').text()).toContain('Order items needs a newer connector.')
+      expect(saveRuleSetRun.mock.calls[1]![0].file1ExtractOptions).toEqual({ keepExchangeOrders: true })
+    })
+
+    // Review: a save still queued when another run's draft opens must not save that run (or its unsaved edits).
+    it('drops a queued switch save once another run\'s draft is open', async () => {
+      withOptions(undefined)
+      storeWrites()
+      const first = deferred<unknown>()
+      saveRuleSetRun.mockReturnValueOnce(first.promise).mockResolvedValue({ ok: true, messages: [], errors: [] })
+      const wrapper = mount(ReconciliationRuleSetManagerPage)
+      await flushPromises()
+      await switchOf(wrapper, 'file1', 'withOrderItems').trigger('click')
+      await switchOf(wrapper, 'file1', 'keepExchangeOrders').trigger('click')
+      const state = draftStoreState.ruleSetDraftState as { draft: Record<string, unknown>, resumeStepId: string | null }
+      draftStoreState.ruleSetDraftState = { ...state, draft: { ...state.draft, savedRunId: 'RS_OTHER' } }
+      first.resolve({ ok: true, messages: [], errors: [] })
+      await flushPromises()
+      expect(saveRuleSetRun).toHaveBeenCalledTimes(1)
     })
 
     it('shows no section when no side\'s connector declares an option, and no switch works for a viewer', async () => {
@@ -891,7 +979,7 @@ describe('ReconciliationRuleSetManagerPage', () => {
 
     for (const [testId, label] of [['ruleset-manager-edit-filters', 'Edit filters'], ['ruleset-manager-edit-rules', 'Edit rules']] as const) {
       routerPush.mockClear()
-      draftStoreState.setRuleSetDraft.mockClear()
+      draftStoreState.setRuleSetDraft.mockReset()
       const pencil = wrapper.get(`[data-testid="${testId}"]`)
       expect(pencil.attributes('aria-label')).toBe(label)
       expect(pencil.classes()).toEqual(expect.arrayContaining(['app-icon-action', 'ruleset-manager-section-edit']))

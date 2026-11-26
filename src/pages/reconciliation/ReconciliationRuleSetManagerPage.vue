@@ -82,10 +82,9 @@
           <AppToggleSwitch
             :model-value="row.on"
             :label="`${row.label}, ${row.system}`"
-            :busy="savingReadOption === row.key"
-            :disabled="!canEditTenantSettings || (Boolean(savingReadOption) && savingReadOption !== row.key)"
+            :disabled="!canEditTenantSettings"
             :test-id="`ruleset-manager-read-option-${row.side}-${row.name}`"
-            @update:model-value="(on: boolean) => void setReadOption(row, on)"
+            @update:model-value="(on: boolean) => setReadOption(row, on)"
           />
         </li>
       </ul>
@@ -593,7 +592,6 @@ interface ReadOptionRow {
   on: boolean
 }
 
-const savingReadOption = ref('')
 const readOptionError = ref('')
 
 function sideExtractOptions(draftValue: ReconciliationRuleSetDraft, side: SourceSide): SourceExtractOptions {
@@ -623,27 +621,42 @@ const readOptionRows = computed<ReadOptionRow[]>(() => {
   })
 })
 
-async function setReadOption(row: ReadOptionRow, on: boolean): Promise<void> {
-  const draftValue = draft.value
-  if (!draftValue || !canEditTenantSettings.value || savingReadOption.value) return
+/** The draft with one switch on a side set; the last one off leaves the side with no options. */
+function withReadOption(draftValue: ReconciliationRuleSetDraft, row: ReadOptionRow, on: boolean): ReconciliationRuleSetDraft {
   const options: SourceExtractOptions = { ...sideExtractOptions(draftValue, row.side) }
   if (on) options[row.name] = true
   else delete options[row.name]
   const kept = Object.keys(options).length ? options : undefined
-  const nextDraft: ReconciliationRuleSetDraft = row.side === 'file1'
-    ? { ...draftValue, file1ExtractOptions: kept }
-    : { ...draftValue, file2ExtractOptions: kept }
-  savingReadOption.value = row.key
+  return row.side === 'file1' ? { ...draftValue, file1ExtractOptions: kept } : { ...draftValue, file2ExtractOptions: kept }
+}
+
+// DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). The switch moves at once; the
+// saves run one after another, each sending the run as it then stands, so the last switch pressed is the one stored.
+// Only a refusal moves the switch again, back, with the reason above the list.
+function setReadOption(row: ReadOptionRow, on: boolean): void {
+  const draftValue = draft.value
+  if (!draftValue || !canEditTenantSettings.value) return
   readOptionError.value = ''
-  try {
-    // The run's own full save, as the rules editor sends it; the side's options go explicitly, so the last one off clears them.
-    await reconciliationFacade.saveRuleSetRun({ ...buildSaveRuleSetRunPayload(nextDraft), [`${row.side}ExtractOptions`]: options })
-    draftStore.setRuleSetDraft(nextDraft, draftState.value?.resumeStepId ?? null)
-  } catch (error) {
-    readOptionError.value = error instanceof ApiCallError ? error.message : `${row.label} was not saved.`
-  } finally {
-    savingReadOption.value = ''
-  }
+  // The run this switch was pressed on: a save still queued when another run's draft opens must not save that one.
+  const runId = draftValue.savedRunId
+  draftStore.setRuleSetDraft(withReadOption(draftValue, row, on), draftState.value?.resumeStepId ?? null)
+  void draftStore.afterRuleSetSaves(async () => {
+    const current = draft.value
+    if (!current || current.savedRunId !== runId) return
+    try {
+      // The run's own full save, as the rules editor sends it; the side's options go explicitly, so the last one off clears them.
+      await reconciliationFacade.saveRuleSetRun({
+        ...buildSaveRuleSetRunPayload(current), [`${row.side}ExtractOptions`]: sideExtractOptions(current, row.side),
+      })
+    } catch (error) {
+      // Put back only this switch, and only while it still shows what this save set, on the same run.
+      const now = draft.value
+      if (now && now.savedRunId === runId && (sideExtractOptions(now, row.side)[row.name] === true) === on) {
+        draftStore.setRuleSetDraft(withReadOption(now, row, !on), draftState.value?.resumeStepId ?? null)
+      }
+      readOptionError.value = error instanceof ApiCallError ? error.message : `${row.label} was not saved.`
+    }
+  })
 }
 
 function openFact(key: string): void {

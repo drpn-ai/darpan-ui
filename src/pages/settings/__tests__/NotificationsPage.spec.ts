@@ -86,6 +86,29 @@ async function click(wrapper: VueWrapper, testId: string): Promise<void> {
   await flushPromises()
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
+
+function spaceHead(wrapper: VueWrapper, spaceId: string) {
+  return wrapper.get(`[data-testid="notifications-space-column"][data-space-id="${spaceId}"]`)
+}
+
+async function openMenu(wrapper: VueWrapper, spaceId: string): Promise<void> {
+  await spaceHead(wrapper, spaceId).get('[data-testid="notifications-space-edit"]').trigger('click')
+  await flushPromises()
+}
+
+async function rename(wrapper: VueWrapper, spaceId: string, name: string): Promise<void> {
+  const title = wrapper.get(`[data-testid="notifications-space-name-${spaceId}"]`)
+  title.element.textContent = name
+  await title.trigger('keydown.enter')
+  await flushPromises()
+}
+
 const originalLocation = window.location
 
 describe('NotificationsPage', () => {
@@ -141,7 +164,22 @@ describe('NotificationsPage', () => {
     expect(checkedSpaceIds(wrapper, 'SCRIPT-DEP1')).toEqual(['CS1'])
   })
 
-  it('moves a row when a dot is clicked and says what the service said', async () => {
+  it('moves a row when a dot is clicked, before the save answers (DAR-UI-156)', async () => {
+    setNotificationRoute.mockReturnValue(new Promise(() => {}))
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await dot(wrapper, 'STREAKS-tenant', 'CS3').trigger('click')
+    await flushPromises()
+
+    // Streaks has no source id, so none is sent.
+    expect(setNotificationRoute).toHaveBeenCalledWith({ sourceType: 'STREAKS', chatSpaceId: 'CS3' })
+    expect(checkedSpaceIds(wrapper, 'STREAKS-tenant')).toEqual(['CS3'])
+    // The rest of the grid stays usable while it saves.
+    expect(dot(wrapper, 'AUTOMATION-AUT1', 'CS1').attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps the moved dot and says nothing more when the save takes', async () => {
     setNotificationRoute.mockResolvedValue({
       ok: true, messages: ['Posts to #alerts.'], errors: [],
       route: { ...ROUTES[0], chatSpaceId: 'CS3' },
@@ -152,10 +190,9 @@ describe('NotificationsPage', () => {
     await dot(wrapper, 'STREAKS-tenant', 'CS3').trigger('click')
     await flushPromises()
 
-    // Streaks has no source id, so none is sent.
-    expect(setNotificationRoute).toHaveBeenCalledWith({ sourceType: 'STREAKS', chatSpaceId: 'CS3' }, expect.any(AbortSignal))
     expect(checkedSpaceIds(wrapper, 'STREAKS-tenant')).toEqual(['CS3'])
-    expect(wrapper.get('[data-testid="notifications-status"]').text()).toBe('Posts to #alerts.')
+    expect(wrapper.find('[data-testid="notifications-status"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="notifications-page-error"]').exists()).toBe(false)
   })
 
   it('sends Nowhere as no space, with the source id', async () => {
@@ -170,20 +207,81 @@ describe('NotificationsPage', () => {
     await flushPromises()
 
     expect(setNotificationRoute).toHaveBeenCalledWith(
-      { sourceType: 'AUTOMATION', sourceId: 'AUT1', chatSpaceId: null }, expect.any(AbortSignal))
+      { sourceType: 'AUTOMATION', sourceId: 'AUT1', chatSpaceId: null })
     expect(checkedSpaceIds(wrapper, 'AUTOMATION-AUT1')).toEqual([''])
   })
 
-  it('shows a refusal in the service\'s words and leaves the dot where it was', async () => {
-    setNotificationRoute.mockRejectedValue(new ApiCallError('Only a tenant admin can move an audit update.', 400))
+  it('puts the dot back on a refusal and says why in the service\'s words', async () => {
+    const save = deferred<unknown>()
+    setNotificationRoute.mockReturnValue(save.promise)
     const wrapper = mount(NotificationsPage)
     await flushPromises()
 
     await dot(wrapper, 'AUDIT_UPDATE-month-close', 'CS1').trigger('click')
     await flushPromises()
+    expect(checkedSpaceIds(wrapper, 'AUDIT_UPDATE-month-close')).toEqual(['CS1'])
+
+    save.reject(new ApiCallError('Only a tenant admin can move an audit update.', 400))
+    await flushPromises()
 
     expect(wrapper.get('[data-testid="notifications-page-error"]').text()).toBe('Only a tenant admin can move an audit update.')
     expect(checkedSpaceIds(wrapper, 'AUDIT_UPDATE-month-close')).toEqual([''])
+  })
+
+  it('saves two quick moves of a row in order, and a refused first move does not undo the second', async () => {
+    const first = deferred<unknown>()
+    setNotificationRoute
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce({ ok: true, messages: [], errors: [], route: { ...ROUTES[2], chatSpaceId: null } })
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await dot(wrapper, 'AUTOMATION-AUT1', 'CS1').trigger('click')
+    await dot(wrapper, 'AUTOMATION-AUT1', '').trigger('click')
+    await flushPromises()
+    expect(checkedSpaceIds(wrapper, 'AUTOMATION-AUT1')).toEqual([''])
+    // The second waits for the first.
+    expect(setNotificationRoute).toHaveBeenCalledTimes(1)
+
+    first.reject(new ApiCallError('Not that space.', 400))
+    await flushPromises()
+
+    expect(setNotificationRoute).toHaveBeenCalledTimes(2)
+    expect(setNotificationRoute).toHaveBeenLastCalledWith(
+      { sourceType: 'AUTOMATION', sourceId: 'AUT1', chatSpaceId: null })
+    expect(checkedSpaceIds(wrapper, 'AUTOMATION-AUT1')).toEqual([''])
+    expect(wrapper.get('[data-testid="notifications-page-error"]').text()).toBe('Not that space.')
+  })
+
+  // Review: the page's signal used to go with these saves, so leaving it cancelled a change already shown as done.
+  it('sends every queued save after the page is left', async () => {
+    const first = deferred<unknown>()
+    setNotificationRoute
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce({ ok: true, messages: [], errors: [], route: { ...ROUTES[2], chatSpaceId: null } })
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+    await dot(wrapper, 'AUTOMATION-AUT1', 'CS1').trigger('click')
+    await dot(wrapper, 'AUTOMATION-AUT1', '').trigger('click')
+    wrapper.unmount()
+
+    first.resolve({ ok: true, messages: [], errors: [], route: { ...ROUTES[2], chatSpaceId: 'CS1' } })
+    await flushPromises()
+    expect(setNotificationRoute).toHaveBeenCalledTimes(2)
+    for (const call of setNotificationRoute.mock.calls) expect(call).toHaveLength(1)
+  })
+
+  it('puts a row back where the backend holds it when both quick moves are refused', async () => {
+    setNotificationRoute.mockRejectedValue(new ApiCallError('Not now.', 400))
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await dot(wrapper, 'AUTOMATION-AUT1', 'CS1').trigger('click')
+    await dot(wrapper, 'AUTOMATION-AUT1', 'CS3').trigger('click')
+    await flushPromises()
+
+    // Back to Finance, where it was saved, not to Ops, the refused first move.
+    expect(checkedSpaceIds(wrapper, 'AUTOMATION-AUT1')).toEqual(['CS2'])
   })
 
   it('gives a deployed script no Nowhere', async () => {
@@ -238,13 +336,153 @@ describe('NotificationsPage', () => {
     const wrapper = mount(NotificationsPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="notifications-space-column"][data-space-id="CS2"] [data-testid="notifications-space-edit"]').trigger('click')
-    await flushPromises()
+    await openMenu(wrapper, 'CS2')
     await click(wrapper, 'notifications-space-menu-activate')
 
-    expect(saveTenantChatSpace).toHaveBeenCalledWith({ chatSpaceId: 'CS2', spaceName: 'Finance', isActive: true }, expect.any(AbortSignal))
+    expect(saveTenantChatSpace).toHaveBeenCalledWith({ chatSpaceId: 'CS2', spaceName: 'Finance', isActive: true })
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(getNotificationRoutes).toHaveBeenCalledTimes(2)
+    expect(spaceHead(wrapper, 'CS2').text()).not.toContain('· off')
+    expect(dot(wrapper, 'STREAKS-tenant', 'CS2').attributes('disabled')).toBeUndefined()
+    // The answer is the row; the grid is not fetched again for it.
+    expect(getNotificationRoutes).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes the menu and switches a space off before the save answers (DAR-UI-156)', async () => {
+    saveTenantChatSpace.mockReturnValue(new Promise(() => {}))
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await openMenu(wrapper, 'CS1')
+    await click(wrapper, 'notifications-space-menu-deactivate')
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(spaceHead(wrapper, 'CS1').text()).toContain('Google Chat · off')
+    expect(dot(wrapper, 'AUTOMATION-AUT1', 'CS1').attributes('disabled')).toBeDefined()
+    expect(saveTenantChatSpace).toHaveBeenCalledWith({ chatSpaceId: 'CS1', spaceName: 'Ops', isActive: false })
+  })
+
+  it('switches a space back on when switching it off is refused, and says why', async () => {
+    const save = deferred<unknown>()
+    saveTenantChatSpace.mockReturnValue(save.promise)
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await openMenu(wrapper, 'CS1')
+    await click(wrapper, 'notifications-space-menu-deactivate')
+    expect(spaceHead(wrapper, 'CS1').text()).toContain('· off')
+
+    save.reject(new ApiCallError('Ops still has a script posting to it.', 400))
+    await flushPromises()
+
+    expect(spaceHead(wrapper, 'CS1').text()).not.toContain('· off')
+    expect(wrapper.get('[data-testid="notifications-page-error"]').text()).toBe('Ops still has a script posting to it.')
+    // The menu offers what the space is again.
+    await openMenu(wrapper, 'CS1')
+    expect(wrapper.find('[data-testid="notifications-space-menu-deactivate"]').exists()).toBe(true)
+  })
+
+  it('renames a space in its column before the save answers (DAR-UI-156)', async () => {
+    saveTenantChatSpace.mockReturnValue(new Promise(() => {}))
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await rename(wrapper, 'CS1', 'Ops room')
+
+    expect(saveTenantChatSpace).toHaveBeenCalledWith({ chatSpaceId: 'CS1', spaceName: 'Ops room', isActive: true })
+    expect(dot(wrapper, 'STREAKS-tenant', 'CS1').attributes('aria-label')).toBe('Post Streaks in Ops room')
+  })
+
+  it('puts the old name back when a rename is refused, and says why', async () => {
+    const save = deferred<unknown>()
+    saveTenantChatSpace.mockReturnValue(save.promise)
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await rename(wrapper, 'CS1', 'Finance')
+    expect(dot(wrapper, 'STREAKS-tenant', 'CS1').attributes('aria-label')).toBe('Post Streaks in Finance')
+
+    save.reject(new ApiCallError('A space named Finance already exists.', 400))
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="notifications-space-name-CS1"]').text()).toBe('Ops')
+    expect(wrapper.get('[data-testid="notifications-page-error"]').text()).toBe('A space named Finance already exists.')
+  })
+
+  it('sends a queued switch-off with the name the backend holds, not a rename it refused', async () => {
+    const renaming = deferred<unknown>()
+    saveTenantChatSpace
+      .mockReturnValueOnce(renaming.promise)
+      .mockResolvedValueOnce({ ok: true, messages: [], errors: [], chatSpace: fullSpace(SPACES[0]!, { isActive: 'N' }) })
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await rename(wrapper, 'CS1', 'Ops room')
+    await openMenu(wrapper, 'CS1')
+    await click(wrapper, 'notifications-space-menu-deactivate')
+    expect(saveTenantChatSpace).toHaveBeenCalledTimes(1)
+
+    renaming.reject(new ApiCallError('Not that name.', 400))
+    await flushPromises()
+
+    expect(saveTenantChatSpace).toHaveBeenLastCalledWith({ chatSpaceId: 'CS1', spaceName: 'Ops', isActive: false })
+    expect(wrapper.get('[data-testid="notifications-space-name-CS1"]').text()).toBe('Ops')
+    expect(spaceHead(wrapper, 'CS1').text()).toContain('· off')
+  })
+
+  it('keeps the webhook popup open until the backend checks the URL, then closes it without reloading', async () => {
+    const save = deferred<unknown>()
+    saveTenantChatSpace.mockReturnValue(save.promise)
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await openMenu(wrapper, 'CS1')
+    await click(wrapper, 'notifications-space-menu-webhook')
+    await wrapper.get('[data-testid="notifications-webhook-input"]').setValue('https://chat.googleapis.com/v1/spaces/BBB')
+    await click(wrapper, 'notifications-save-webhook')
+
+    expect(saveTenantChatSpace).toHaveBeenCalledWith(
+      { chatSpaceId: 'CS1', spaceName: 'Ops', isActive: true, webhookUrl: 'https://chat.googleapis.com/v1/spaces/BBB' })
+    expect(dialog(wrapper).get('[data-testid="notifications-save-webhook"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="notifications-webhook-input"]').attributes('disabled')).toBeDefined()
+
+    save.resolve({ ok: true, messages: ['Saved chat space.'], errors: [], chatSpace: fullSpace(SPACES[0]!, { webhookUrl: 'https://chat.googleapis.com/v1/spaces/BBB' }) })
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="notifications-status"]').text()).toBe('Saved chat space.')
+    expect(getNotificationRoutes).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps what was typed when the backend refuses a webhook URL', async () => {
+    saveTenantChatSpace.mockRejectedValue(new ApiCallError('That is not a Google Chat webhook.', 400))
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await openMenu(wrapper, 'CS1')
+    await click(wrapper, 'notifications-space-menu-webhook')
+    await wrapper.get('[data-testid="notifications-webhook-input"]').setValue('https://example.com/hook')
+    await click(wrapper, 'notifications-save-webhook')
+
+    expect(dialog(wrapper).text()).toContain('That is not a Google Chat webhook.')
+    expect((wrapper.get('[data-testid="notifications-webhook-input"]').element as HTMLInputElement).value).toBe('https://example.com/hook')
+  })
+
+  it('says a refused webhook on the page when its popup was cancelled while it saved', async () => {
+    const save = deferred<unknown>()
+    saveTenantChatSpace.mockReturnValue(save.promise)
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    await openMenu(wrapper, 'CS1')
+    await click(wrapper, 'notifications-space-menu-webhook')
+    await wrapper.get('[data-testid="notifications-webhook-input"]').setValue('https://example.com/hook')
+    await click(wrapper, 'notifications-save-webhook')
+    await click(wrapper, 'notifications-webhook-cancel')
+    save.reject(new ApiCallError('That is not a Google Chat webhook.', 400))
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="notifications-page-error"]').text()).toBe('That is not a Google Chat webhook.')
   })
 
   it('keeps edits away from a read-only user', async () => {

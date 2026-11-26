@@ -156,6 +156,9 @@ describe('every button in the app has an answer', () => {
     'pages/reconciliation/AuditReportPage.vue': 'a filter pill is named by its live count and its status label; Export report is entered',
     'pages/reconciliation/ReconciliationAutomationDashboardPage.vue': 'the running/paused toggle is named by activeToggleLabel — Automation is running / Automation is paused, both entered',
     'pages/reconciliation/AuditSettingsPage.vue': 'a level option in the priority popup is named by its level word (P0 today, Same as R11), a value not vocabulary; the cells that open it are answered by the priority patterns',
+    'components/audit/AuditFeedbackBubble.vue': 'the trigger is "Feedback" (entered) or "Feedback, N recent notes", a live count; Send is entered',
+    'components/audit/AuditAcknowledgePopover.vue': 'the reminder switch is named by the tenant\'s remind days ("Remind me in 5 days if still open"), a live setting',
+    'pages/reconciliation/ReconciliationRuleSetManagerPage.vue': 'a read-option switch is named by the option and its system ("Open orders only, HotWax"), which is data',
     'components/audit/AuditAgentPanel.vue': 'a question\'s option buttons are named by the agent\'s own options, which are data; Send to agent is entered',
   }
 

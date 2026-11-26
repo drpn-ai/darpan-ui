@@ -126,7 +126,17 @@ export const useReconciliationDraftStore = defineStore('reconciliationDraft', ()
     }
   }
 
+  // DAR-UI-156: a run's full save (rules editor, run settings, a read-option switch) runs behind the screen now, so two
+  // could be out at once, each sending the whole run, and rules with no id yet could be sent twice. They go one at a time.
+  let ruleSetSaves: Promise<unknown> = Promise.resolve()
+  function afterRuleSetSaves<T>(work: () => Promise<T>): Promise<T> {
+    const next = ruleSetSaves.then(work)
+    ruleSetSaves = next.catch(() => undefined)
+    return next
+  }
+
   return {
+    afterRuleSetSaves,
     automationDraftState,
     ruleSetDraftState,
     workflowOrigin,

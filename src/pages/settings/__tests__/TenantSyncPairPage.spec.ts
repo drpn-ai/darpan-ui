@@ -192,8 +192,32 @@ describe('TenantSyncPairPage', () => {
       syncPairId: 'SP1', automationId: 'A1', upstreamSide: 'FILE_1', allowanceMinutes: 480, pulseEveryMinutes: 120,
       chatSpaceId: 'CS1', hourlySummary: false, isActive: true,
     })
-    expect(getSyncPair).toHaveBeenCalledTimes(2)
+    // DAR-UI-156: an edit is not read again; what is on the page is what was saved.
+    expect(getSyncPair).toHaveBeenCalledTimes(1)
     expect(replace).not.toHaveBeenCalled()
+    expect(text(wrapper, 'sync-pair-fact-allowance')).toContain('8 hours')
+    expect(wrapper.find('[data-testid="sync-pair-edited"]').exists()).toBe(false)
+  })
+
+  // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing").
+  it('shows an edit as saved before the backend answers, and puts the edited mark back on a refusal', async () => {
+    const wrapper = await mountPage()
+    let answer!: (value: unknown) => void
+    saveSyncPair.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
+    await wrapper.find('[data-testid="sync-pair-on"]').trigger('click')
+    await wrapper.find('[data-testid="sync-pair-save"]').trigger('click')
+    expect(wrapper.find('[data-testid="sync-pair-edited"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sync-pair-save"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sync-pair-on"]').attributes('aria-checked')).toBe('false')
+
+    answer({ ok: false, messages: [], errors: ['Choose a chat space of this tenant.'], syncPairId: '' })
+    await flushPromises()
+    expect(text(wrapper, 'sync-pair-page-error')).toBe('Choose a chat space of this tenant.')
+    // The typed value stays; only the mark and Save come back, so it can be saved again.
+    expect(wrapper.find('[data-testid="sync-pair-on"]').attributes('aria-checked')).toBe('false')
+    expect(wrapper.find('[data-testid="sync-pair-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sync-pair-save"]').exists()).toBe(true)
+    expect(getSyncPair).toHaveBeenCalledTimes(1)
   })
 
   it('turns the pulse off with Every and the pair off with its switch', async () => {

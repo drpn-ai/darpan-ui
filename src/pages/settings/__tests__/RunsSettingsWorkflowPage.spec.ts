@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
@@ -78,6 +78,8 @@ const draftStoreState = vi.hoisted(() => ({
   automationDraftState: null,
   setWorkflowOrigin: vi.fn(),
   setRuleSetDraft: vi.fn(),
+  // The real store runs full saves one at a time; here each runs as it is queued.
+  afterRuleSetSaves: <T>(work: () => Promise<T>) => work(),
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),
   clearAutomationDraft: vi.fn(),
@@ -88,6 +90,8 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 }))
 
 import RunsSettingsWorkflowPage from '../RunsSettingsWorkflowPage.vue'
+import { ApiCallError } from '../../../lib/api/client'
+import { useMascotStore } from '../../../stores/mascot'
 
 async function chooseAppSelectOption(
   wrapper: ReturnType<typeof mount>,
@@ -510,6 +514,121 @@ describe('RunsSettingsWorkflowPage', () => {
     })
     expect(saveMapping).not.toHaveBeenCalled()
     expect(push).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
+  })
+
+  // DAR-UI-156: an existing run's id is known, so Save goes back on the click and save#RuleSetRun runs behind it.
+  describe('DAR-UI-156 navigate first', () => {
+    const savedDraft = () => ({
+      savedRunId: 'RS_ORDER_SYNC',
+      runName: 'Order Sync',
+      description: 'Compares orders across systems.',
+      file1SystemEnumId: 'DarSysOms',
+      file1SystemLabel: 'OMS',
+      file1FileTypeEnumId: 'DftJson',
+      file1JsonSchemaId: '100408',
+      file1SchemaFileName: 'Returns Feed',
+      file1PrimaryIdExpression: ['$.return_id'],
+      file2SystemEnumId: 'DarSysShopify',
+      file2SystemLabel: 'SHOPIFY',
+      file2FileTypeEnumId: 'DftJson',
+      file2JsonSchemaId: '100409',
+      file2SchemaFileName: 'Shopify Orders',
+      file2PrimaryIdExpression: ['$.id'],
+    })
+
+    beforeEach(() => {
+      route.params.reconciliationMappingId = 'RS_ORDER_SYNC'
+      draftStoreState.workflowOrigin = { label: 'Run Details', path: '/reconciliation/ruleset-manager' }
+      draftStoreState.ruleSetDraftState = { draft: savedDraft(), resumeStepId: 'ruleset-manager' }
+      // The real store: what is set is what the next page reads.
+      draftStoreState.setRuleSetDraft.mockImplementation((draft: unknown, resumeStepId: string | null = null) => {
+        draftStoreState.ruleSetDraftState = { draft, resumeStepId }
+      })
+      window.history.replaceState({}, '', '/settings/runs/edit/RS_ORDER_SYNC')
+    })
+
+    afterEach(() => {
+      draftStoreState.setRuleSetDraft.mockReset()
+      push.mockReset()
+      push.mockResolvedValue(undefined)
+    })
+
+    async function editAndSave() {
+      const wrapper = mount(RunsSettingsWorkflowPage)
+      await flushPromises()
+      await wrapper.find('input[name="mappingName"]').setValue('Order Sync Revised')
+      await removeWorkflowSelectChip(wrapper, 'run-source-1-row', 0)
+      await pickWorkflowSelectOption(wrapper, 'run-field-1', '$.return_ref')
+      await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
+      await flushPromises()
+      return wrapper
+    }
+
+    it('goes back to the run details before save#RuleSetRun answers, holding the edits', async () => {
+      saveRuleSetRun.mockReturnValue(new Promise(() => {}))
+
+      await editAndSave()
+
+      expect(saveRuleSetRun).toHaveBeenCalledTimes(1)
+      expect(push).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
+      const held = draftStoreState.ruleSetDraftState?.draft as Record<string, unknown>
+      expect(held.runName).toBe('Order Sync Revised')
+      expect(held.file1PrimaryIdExpression).toEqual(['$.return_ref'])
+      expect(useMascotStore().warnings).toEqual([])
+    })
+
+    it('a refusal puts the stored run back on the run details and the mascot reopens the edits', async () => {
+      saveRuleSetRun.mockRejectedValue(new ApiCallError('A run named Order Sync Revised already exists.'))
+
+      const first = await editAndSave()
+      first.unmount()
+
+      // The run details show what the backend still holds, not the refused edit.
+      expect((draftStoreState.ruleSetDraftState?.draft as Record<string, unknown>).runName).toBe('Order Sync')
+      const mascot = useMascotStore()
+      expect(mascot.warnings).toHaveLength(1)
+      const warning = mascot.warnings[0]!
+      expect(warning.title).toBe('Run not saved')
+      expect(warning.body).toContain('A run named Order Sync Revised already exists.')
+      expect(warning.actions).toHaveLength(1)
+
+      await warning.actions[0]!.run()
+      expect(push).toHaveBeenLastCalledWith({ name: 'settings-runs-edit', params: { reconciliationMappingId: 'RS_ORDER_SYNC' } })
+
+      // The editor opens again on the edits that were refused.
+      const reopened = mount(RunsSettingsWorkflowPage)
+      await flushPromises()
+      expect(reopened.find('input[name="mappingName"]').element).toHaveProperty('value', 'Order Sync Revised')
+      const chips = reopened.get('[data-testid="run-source-1-row"]').findAll('[data-testid="workflow-select-chip"]')
+      expect(chips.map((chip) => chip.text()).join(' ')).toContain('$.return_ref')
+    })
+
+    it('holds a refusal until the page it went to has landed, so the route change cannot wipe it', async () => {
+      let land: () => void = () => {}
+      push.mockReturnValue(new Promise<void>((resolve) => { land = resolve }))
+      saveRuleSetRun.mockRejectedValue(new ApiCallError('Refused.'))
+
+      await editAndSave()
+      expect(useMascotStore().warnings).toEqual([])
+
+      land()
+      await flushPromises()
+      expect(useMascotStore().warnings).toHaveLength(1)
+    })
+
+    it('leaves the run details alone when they moved on before the refusal came back', async () => {
+      let refuse: (reason: unknown) => void = () => {}
+      saveRuleSetRun.mockReturnValue(new Promise((_, reject) => { refuse = reject }))
+
+      await editAndSave()
+      // Another run opened on the run details in the meantime.
+      draftStoreState.ruleSetDraftState = { draft: { ...savedDraft(), savedRunId: 'RS_OTHER', runName: 'Other' }, resumeStepId: 'ruleset-manager' }
+      refuse(new ApiCallError('Refused.'))
+      await flushPromises()
+
+      expect((draftStoreState.ruleSetDraftState?.draft as Record<string, unknown>).savedRunId).toBe('RS_OTHER')
+      expect(useMascotStore().warnings).toHaveLength(1)
+    })
   })
 
   it('edits API run configuration with API config, endpoint, and primary ID controls', async () => {

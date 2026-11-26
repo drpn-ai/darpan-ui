@@ -11,8 +11,8 @@
         :on="settings.schedule.active"
         toggle-test-id="audit-settings-schedule-active"
         :toggle-disabled="saving"
-        @commit="void commitName($event)"
-        @update:on="void setScheduleActive($event)"
+        @commit="commitName($event)"
+        @update:on="setScheduleActive($event)"
       />
       <h1 v-else>Audit settings</h1>
     </template>
@@ -69,7 +69,7 @@
               :label="`Check statement ${statement.code}`"
               :test-id="`audit-settings-statement-active-${statement.id}`"
               :disabled="saving"
-              @update:model-value="void setStatementActive(statement, $event)"
+              @update:model-value="setStatementActive(statement, $event)"
             />
           </li>
         </ul>
@@ -129,7 +129,7 @@
           :cancel-disabled="saving"
           cancel-test-id="audit-settings-schedule-cancel"
           @cancel="closePopup"
-          @submit="void saveSchedule()"
+          @submit="saveSchedule"
         >
           <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="audit-settings-popup-error" />
           <div class="audit-popup-pair">
@@ -170,7 +170,7 @@
           :cancel-disabled="saving"
           cancel-test-id="audit-settings-run-email-cancel"
           @cancel="closePopup"
-          @submit="void saveEmail()"
+          @submit="saveEmail"
         >
           <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="audit-settings-popup-error" />
           <div class="audit-popup-toggle">
@@ -211,7 +211,7 @@
           :cancel-disabled="saving"
           cancel-test-id="audit-settings-chat-space-cancel"
           @cancel="closePopup"
-          @submit="void saveSpace()"
+          @submit="saveSpace"
         >
           <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="audit-settings-popup-error" />
           <label class="wizard-input-shell">
@@ -246,7 +246,7 @@
           :cancel-disabled="saving"
           cancel-test-id="audit-settings-statement-cancel"
           @cancel="closePopup"
-          @submit="void saveStatement()"
+          @submit="saveStatement"
         >
           <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="audit-settings-popup-error" />
           <textarea
@@ -256,7 +256,7 @@
             :aria-label="`${editingStatement.code} statement`"
             data-testid="audit-settings-statement-text"
             :disabled="saving"
-            @keydown.enter.exact.prevent="void saveStatement()"
+            @keydown.enter.exact.prevent="saveStatement"
           />
           <div class="audit-popup-checks">
             <span v-explain="'auditCheck'" class="workflow-context-label">Checks</span>
@@ -344,7 +344,7 @@
           :cancel-disabled="saving"
           :cancel-test-id="popup === 'priority' ? 'audit-settings-priority-cancel' : 'audit-settings-reason-priority-cancel'"
           @cancel="closePopup"
-          @submit="void saveLevel()"
+          @submit="saveLevel"
         >
           <InlineValidation v-if="popupError" tone="error" :message="popupError" data-testid="audit-settings-popup-error" />
           <!-- The shared lettered cards (fixed choices), full width like every popup's; the picked one is the active card. -->
@@ -624,14 +624,16 @@ function message(caught: unknown): string {
 }
 
 function show(next: AuditSettings) {
+  const nameWas = settings.value?.audit.name
   settings.value = { ...next, statements: next.statements.map((statement) => ({ ...statement, checks: [...statement.checks] })) }
-  nameDraft.value = next.audit.name
+  // Only when the name itself changed: a late answer to another save must not wipe a name being typed.
+  if (next.audit.name !== nameWas) nameDraft.value = next.audit.name
 }
 
-/** What a save changed, applied here when the answer carries no settings. */
-function applyLocally(change: Omit<SaveAuditSettingsPayload, 'audit'>) {
-  const was = settings.value
-  if (!was) return
+type SettingsChange = Omit<SaveAuditSettingsPayload, 'audit'>
+
+/** What a save changes, laid over the settings it changes. */
+function withChange(was: AuditSettings, change: SettingsChange): AuditSettings {
   const statements = was.statements.map((statement) => {
     const edit = change.statements?.find((candidate) => candidate.id === statement.id)
     const reasonEdits = change.reasons?.filter((candidate) => candidate.statement === statement.id) ?? []
@@ -644,66 +646,96 @@ function applyLocally(change: Omit<SaveAuditSettingsPayload, 'audit'>) {
     })
     return { ...next, reasons }
   })
-  show({
+  return {
     ...was,
     audit: change.name ? { ...was.audit, name: change.name } : was.audit,
     schedule: change.schedule ? { ...was.schedule, ...change.schedule } : was.schedule,
     runEmail: change.runEmail && was.runEmail ? { ...was.runEmail, ...change.runEmail } : was.runEmail,
     statements,
-  })
+  }
 }
 
-/** One save, scoped to what changed. A failure is said where it was made: in the popup, or on the page. */
-async function persist(change: Omit<SaveAuditSettingsPayload, 'audit'>, where: 'page' | 'popup'): Promise<boolean> {
-  if (saving.value || !settings.value) return false
-  saving.value = true
+// DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). A change shows at once and its
+// popup closes; save#AuditSettings runs behind it, one save after another. The screen is what the backend last said with
+// every change still saving laid over it, so an older answer never undoes a newer change. Only a refusal changes the
+// screen again: that change comes off, and the reason shows in the open popup, or on the page.
+let confirmed: AuditSettings | null = null
+const unsaved: SettingsChange[] = []
+let saves: Promise<unknown> = Promise.resolve()
+// Reads and adds that answer with the whole settings wait for the saves before them, so no answer is older than a save.
+function afterSaves<T>(work: () => Promise<T>): Promise<T> {
+  const next = saves.then(work)
+  saves = next.catch(() => undefined)
+  return next
+}
+// A popup opened or closed since a change was made is not where its refusal belongs.
+let popupSession = 0
+
+function redraw() {
+  if (confirmed) show(unsaved.reduce(withChange, confirmed))
+}
+
+/** What the backend says the settings are now. */
+function adopt(next: AuditSettings) {
+  confirmed = next
+  redraw()
+}
+
+/** One save, scoped to what changed; resolves false on a refusal. */
+function persist(change: SettingsChange): Promise<boolean> {
+  if (!confirmed) return Promise.resolve(false)
   error.value = null
   popupError.value = null
-  const fail = (text: string) => {
-    if (where === 'popup') popupError.value = text
-    else error.value = text
-  }
-  try {
-    const response = await auditFacade.saveAuditSettings({ audit: auditCode.value, ...change })
-    if (response?.ok === false) {
-      fail(response.errors?.[0] || 'The audit was not saved.')
-      return false
+  const session = popupSession
+  unsaved.push(change)
+  redraw()
+  const save = saves.then(async () => {
+    let refusal: string | null = null
+    let answer: AuditSettings | null | undefined
+    try {
+      const response = await auditFacade.saveAuditSettings({ audit: auditCode.value, ...change })
+      if (response?.ok === false) refusal = response.errors?.[0] || 'The audit was not saved.'
+      else answer = response?.settings
+    } catch (caught) {
+      refusal = message(caught)
     }
-    if (response?.settings) show(response.settings)
-    else applyLocally(change)
-    return true
-  } catch (caught) {
-    fail(message(caught))
-    return false
-  } finally {
-    saving.value = false
-  }
+    unsaved.splice(unsaved.indexOf(change), 1)
+    // An answer with no settings: the backend took the change as sent.
+    if (!refusal && confirmed) confirmed = answer ?? withChange(confirmed, change)
+    redraw()
+    if (refusal && popup.value && popupSession === session) popupError.value = refusal
+    else if (refusal) error.value = refusal
+    return !refusal
+  })
+  saves = save
+  return save
 }
 
-async function commitName(value: string) {
+function commitName(value: string) {
   const was = settings.value?.audit.name ?? ''
   const next = value.trim()
   if (!next || next === was) {
     nameDraft.value = was
     return
   }
-  if (!(await persist({ name: next }, 'page'))) nameDraft.value = settings.value?.audit.name ?? was
+  void persist({ name: next })
 }
 
-async function setScheduleActive(active: boolean) {
+function setScheduleActive(active: boolean) {
   const schedule = settings.value?.schedule
   if (!schedule) return
-  await persist({ schedule: { active, time: schedule.time, timeZone: schedule.timeZone } }, 'page')
+  void persist({ schedule: { active, time: schedule.time, timeZone: schedule.timeZone } })
 }
 
-async function setStatementActive(statement: AuditSettingsStatement, active: boolean) {
-  await persist({ statements: [{ id: statement.id, active }] }, 'page')
+function setStatementActive(statement: AuditSettingsStatement, active: boolean) {
+  void persist({ statements: [{ id: statement.id, active }] })
 }
 
 function openPopup(next: Popup) {
   if (saving.value) return
   popupError.value = null
   addressError.value = null
+  popupSession += 1
   popup.value = next
 }
 
@@ -715,6 +747,7 @@ function closePopup() {
     popupError.value = null
     return
   }
+  popupSession += 1
   popup.value = null
   popupError.value = null
   addressError.value = null
@@ -735,37 +768,35 @@ function openFact(key: string) {
   }
 }
 
-async function saveSchedule() {
+// DAR-UI-156: each popup closes first, then saves; a refusal lands on the page with the old value back.
+function saveSchedule() {
   const schedule = settings.value?.schedule
   const { time, timeZone } = scheduleForm.value
   if (!schedule || !time) return
-  if (time !== schedule.time || timeZone !== schedule.timeZone) {
-    if (!(await persist({ schedule: { active: schedule.active, time, timeZone } }, 'popup'))) return
-  }
   closePopup()
+  if (time !== schedule.time || timeZone !== schedule.timeZone) void persist({ schedule: { active: schedule.active, time, timeZone } })
 }
 
-async function saveEmail() {
+function saveEmail() {
   const email = settings.value?.runEmail
   if (!email || saving.value) return
   // An address still being typed joins the list, not dropped; one that is not an address stops the save.
   if (alsoSendToInput.value && !alsoSendToInput.value.commitPendingValue()) return
   const { active, alsoSendTo } = emailForm.value
-  if (active !== email.active || alsoSendTo.join('\n') !== email.alsoSendTo.join('\n')) {
-    const runEmail = { active, alsoSendTo: [...alsoSendTo], chatSpaceId: email.chatSpaceId || null }
-    if (!(await persist({ runEmail }, 'popup'))) return
-  }
   closePopup()
+  if (active !== email.active || alsoSendTo.join('\n') !== email.alsoSendTo.join('\n')) {
+    void persist({ runEmail: { active, alsoSendTo: [...alsoSendTo], chatSpaceId: email.chatSpaceId || null } })
+  }
 }
 
-async function saveSpace() {
+function saveSpace() {
   const email = settings.value?.runEmail
   if (!email) return
-  if (spaceForm.value !== (email.chatSpaceId ?? '')) {
-    const runEmail = { active: email.active, alsoSendTo: [...email.alsoSendTo], chatSpaceId: spaceForm.value || null }
-    if (!(await persist({ runEmail }, 'popup'))) return
-  }
+  const chatSpaceId = spaceForm.value || null
   closePopup()
+  if (chatSpaceId !== (email.chatSpaceId || null)) {
+    void persist({ runEmail: { active: email.active, alsoSendTo: [...email.alsoSendTo], chatSpaceId } })
+  }
 }
 
 function openStatement(statement: AuditSettingsStatement) {
@@ -774,12 +805,12 @@ function openStatement(statement: AuditSettingsStatement) {
   openPopup('statement')
 }
 
-async function saveStatement() {
+function saveStatement() {
   const statement = editingStatement.value
   const text = statementText.value.trim()
   if (!statement || !text || saving.value) return
-  if (text !== statement.text && !(await persist({ statements: [{ id: statement.id, text }] }, 'popup'))) return
   closePopup()
+  if (text !== statement.text) void persist({ statements: [{ id: statement.id, text }] })
 }
 
 // DAR-UI-140. A statement's level opens from its row; a reason's replaces the statement's popup and returns to it.
@@ -796,19 +827,21 @@ function openReasonPriority(reason: AuditSettingsReason) {
   openPopup('reasonPriority')
 }
 
-async function saveLevel() {
+// A reason's level returns to its statement's popup, so a refusal of it shows there.
+function saveLevel() {
   const statement = editingStatement.value
   if (!statement || saving.value) return
   if (popup.value === 'priority') {
     const level = levelDraft.value ?? 'P2'
-    if (level !== levelOf(statement) && !(await persist({ statements: [{ id: statement.id, priority: level }] }, 'popup'))) return
+    closePopup()
+    if (level !== levelOf(statement)) void persist({ statements: [{ id: statement.id, priority: level }] })
   } else {
     const reason = editingReason.value
     if (!reason) return
-    const change = { reasons: [{ statement: statement.id, conclusion: reason.conclusion, priority: levelDraft.value }] }
-    if (levelDraft.value !== reason.priority && !(await persist(change, 'popup'))) return
+    const priority = levelDraft.value
+    closePopup()
+    if (priority !== reason.priority) void persist({ reasons: [{ statement: statement.id, conclusion: reason.conclusion, priority }] })
   }
-  closePopup()
 }
 
 // DAR-UI-064: after a check is added, the settings are read again for its statement's list, and the statement's
@@ -816,8 +849,8 @@ async function saveLevel() {
 async function checkAdded() {
   popup.value = 'statement'
   try {
-    const response = await auditFacade.getAuditSettings({ audit: auditCode.value }, abort.signal)
-    if (response.settings) show(response.settings)
+    const response = await afterSaves(() => auditFacade.getAuditSettings({ audit: auditCode.value }, abort.signal))
+    if (response.settings) adopt(response.settings)
   } catch (caught) {
     if (!abort.signal.aborted) popupError.value = message(caught)
   }
@@ -837,14 +870,15 @@ async function addStatement() {
   saving.value = true
   popupError.value = null
   try {
-    const response = await auditFacade.addAuditStatement({ audit: auditCode.value, text,
-      category: newForm.value.category, weight: newForm.value.weight as 'firm' | 'derived' })
+    const response = await afterSaves(() => auditFacade.addAuditStatement({ audit: auditCode.value, text,
+      category: newForm.value.category, weight: newForm.value.weight as 'firm' | 'derived' }))
     const added = response.statement
     if (!added) {
       popupError.value = response.errors?.[0] || 'The statement was not added.'
       return
     }
-    settings.value = { ...current, statements: [...current.statements, { ...added, checks: [] }] }
+    // DAR-UI-156: joins what the backend said, so a save still running cannot drop it.
+    adopt({ ...(confirmed ?? current), statements: [...(confirmed ?? current).statements, { ...added, checks: [] }] })
     saving.value = false
     closePopup()
   } catch (caught) {
@@ -859,7 +893,7 @@ async function load() {
   try {
     const response = await auditFacade.getAuditSettings({ audit: auditCode.value }, abort.signal)
     if (response.settings) {
-      show(response.settings)
+      adopt(response.settings)
       if (response.settings.runEmail) void loadChatSpaces()
       if (!response.settings.statements.length) openNewStatement()
     } else error.value = response.errors?.[0] || 'Audit settings filed for an extension.'

@@ -529,6 +529,41 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Export finding',
     body: 'downloads this finding as JSON with its records. For an order, every line comes with it and the stuck line in full.',
   },
+  're-check all findings': {
+    title: 'Re-check all findings',
+    body: 'checks every open finding under this statement again now, in the background. What was fixed since the morning closes; the rest stay open.',
+  },
+  /* DAR-UI-144 / DAR-UI-155: acknowledging a finding shows at once and saves behind. */
+  'acknowledge': {
+    title: 'Acknowledge',
+    body: 'marks this row as known and moves it out of Open now. With the reminder on, it comes back if it is still wrong after the remind days.',
+  },
+  'edit acknowledgement': {
+    title: 'Edit acknowledgement',
+    body: 'changes the note or the reminder only. Who acknowledged it and when stay as they were.',
+  },
+  'reopen': {
+    title: 'Reopen',
+    body: 'takes the acknowledgement off, so the row is back under Open now and its note goes with it.',
+  },
+  'send': {
+    title: 'Send',
+    body: 'your note goes to the Darpan team with this finding attached. The answer comes by email, never into the app.',
+  },
+  'feedback': {
+    title: 'Feedback',
+    body: 'shows what your team told Darpan about this cause in the last two weeks, and takes one more note. Darpan replies by email.',
+  },
+  /* DAR-UI-156: the Starting page a run lands on. */
+  'retry': {
+    title: 'Retry',
+    body: 'sends the same run again with the same window and files. Nothing from the refused attempt is kept or counted.',
+  },
+  /* DAR-UI-153: the sync pair list's second group. */
+  'start allowance only': {
+    title: 'Start allowance only',
+    body: 'opens the pairs that never pulse: their allowance only sets how long the daily check waits after its window ends.',
+  },
   'export findings': {
     title: 'Export findings',
     body: 'downloads every finding under this statement for the period as JSON, with more ids and fields than the board shows.',

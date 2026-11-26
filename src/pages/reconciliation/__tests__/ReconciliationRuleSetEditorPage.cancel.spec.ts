@@ -47,6 +47,8 @@ const draftStoreState = vi.hoisted(() => ({
   automationDraftState: null,
   setWorkflowOrigin: vi.fn(),
   setRuleSetDraft: vi.fn(),
+  // The real store runs full saves one at a time; here each runs as it is queued.
+  afterRuleSetSaves: <T>(work: () => Promise<T>) => work(),
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),
   clearAutomationDraft: vi.fn(),

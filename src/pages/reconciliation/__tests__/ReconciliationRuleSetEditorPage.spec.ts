@@ -48,6 +48,8 @@ const draftStoreState = vi.hoisted(() => ({
   automationDraftState: null,
   setWorkflowOrigin: vi.fn(),
   setRuleSetDraft: vi.fn(),
+  // The real store runs full saves one at a time; here each runs as it is queued.
+  afterRuleSetSaves: <T>(work: () => Promise<T>) => work(),
   clearRuleSetDraft: vi.fn(),
   setAutomationDraft: vi.fn(),
   clearAutomationDraft: vi.fn(),
@@ -61,6 +63,8 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 }))
 
 import ReconciliationRuleSetEditorPage from '../ReconciliationRuleSetEditorPage.vue'
+import { ApiCallError } from '../../../lib/api/client'
+import { useMascotStore } from '../../../stores/mascot'
 
 function createDraftState(
   rules: ReconciliationRuleSetDraftRule[] = [],
@@ -811,7 +815,7 @@ describe('ReconciliationRuleSetEditorPage', () => {
           }),
         }),
       ],
-    }), expect.any(AbortSignal))
+    }))
 
     rectSpy.mockRestore()
   })
@@ -847,8 +851,114 @@ describe('ReconciliationRuleSetEditorPage', () => {
           ruleLogic: expect.stringContaining('RuleDiffSupport.applyPreActions'),
         }),
       ],
-    }), expect.any(AbortSignal))
+    }))
     expect(routerPush).toHaveBeenCalledWith({ path: '/reconciliation/ruleset-manager' })
+  })
+
+  // DAR-UI-156: the run's id is known, so Save goes back on the click and save#RuleSetRun runs behind it.
+  describe('DAR-UI-156 navigate first', () => {
+    const threeRules = () => [
+      { ruleId: 'rule-1', file1FieldPath: '$.orders[0].order_id', file2FieldPath: '$.data.orders.edges[0].node.id', operator: '=', sequenceNum: 1 },
+      { ruleId: 'rule-2', file1FieldPath: '$.orders[0].status', file2FieldPath: '$.data.orders.edges[0].node.displayFinancialStatus', operator: '=', sequenceNum: 2 },
+      { ruleId: 'rule-3', file1FieldPath: '$.orders[0].total', file2FieldPath: '$.data.orders.edges[0].node.currentTotalPrice', operator: '=', sequenceNum: 3 },
+    ]
+    const heldRules = () => ((draftStoreState.ruleSetDraftState?.draft as { rules?: Array<{ ruleId?: string }> }).rules ?? [])
+      .map((rule) => rule.ruleId)
+
+    beforeEach(() => {
+      routerPush.mockResolvedValue(undefined)
+      draftStoreState.ruleSetDraftState = createDraftState(threeRules())
+      // The real store: what is set is what the next page reads.
+      draftStoreState.setRuleSetDraft.mockImplementation((draft: unknown, resumeStepId: string | null = null) => {
+        draftStoreState.ruleSetDraftState = { draft, resumeStepId }
+      })
+    })
+
+    afterEach(() => {
+      draftStoreState.setRuleSetDraft.mockReset()
+    })
+
+    async function deleteRuleTwoAndSave() {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+      await wrapper.get('[data-testid="ruleset-rule-operator-rule-2"]').trigger('click')
+      await wrapper.get('[data-testid="ruleset-rule-delete"]').trigger('click')
+      await flushPromises()
+      await wrapper.get('[data-testid="save-ruleset-rules"]').trigger('click')
+      await flushPromises()
+      return wrapper
+    }
+
+    it('goes back to the run details before save#RuleSetRun answers, holding the edited rules', async () => {
+      saveRuleSetRun.mockReturnValue(new Promise(() => {}))
+
+      await deleteRuleTwoAndSave()
+
+      expect(saveRuleSetRun).toHaveBeenCalledTimes(1)
+      expect(routerPush).toHaveBeenCalledWith({ path: '/reconciliation/ruleset-manager' })
+      expect(heldRules()).toEqual(['rule-1', 'rule-3'])
+      expect(useMascotStore().warnings).toEqual([])
+    })
+
+    it('takes the stored rules (their new ids) from the answer while the rules are unchanged since', async () => {
+      await deleteRuleTwoAndSave()
+
+      const held = draftStoreState.ruleSetDraftState?.draft as { rules?: Array<{ ruleId?: string, sequenceNum?: number }> }
+      expect(held.rules?.map((rule) => rule.ruleId)).toEqual(['rule-1', 'rule-3'])
+      expect(held.rules?.map((rule) => rule.sequenceNum)).toEqual([1, 2])
+    })
+
+    it('a refusal puts the stored rules back on the run details and the mascot reopens the edited ones', async () => {
+      saveRuleSetRun.mockRejectedValue(new ApiCallError('Rule 2 is used by an automation.'))
+
+      const first = await deleteRuleTwoAndSave()
+      first.unmount()
+
+      expect(heldRules()).toEqual(['rule-1', 'rule-2', 'rule-3'])
+      const mascot = useMascotStore()
+      expect(mascot.warnings).toHaveLength(1)
+      const warning = mascot.warnings[0]!
+      expect(warning.title).toBe('Rules not saved')
+      expect(warning.body).toContain('Rule 2 is used by an automation.')
+
+      await warning.actions[0]!.run()
+      expect(routerPush).toHaveBeenLastCalledWith({ name: 'reconciliation-ruleset-editor' })
+      expect(heldRules()).toEqual(['rule-1', 'rule-3'])
+
+      // The board opens again on the rules that were refused.
+      const reopened = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+      expect(reopened.find('[data-testid="ruleset-rule-operator-rule-1"]').exists()).toBe(true)
+      expect(reopened.find('[data-testid="ruleset-rule-operator-rule-2"]').exists()).toBe(false)
+      expect(reopened.find('[data-testid="ruleset-rule-operator-rule-3"]').exists()).toBe(true)
+    })
+
+    it('holds a refusal until the page it went to has landed, so the route change cannot wipe it', async () => {
+      let land: () => void = () => {}
+      routerPush.mockReturnValue(new Promise<void>((resolve) => { land = resolve }))
+      saveRuleSetRun.mockRejectedValue(new ApiCallError('Refused.'))
+
+      await deleteRuleTwoAndSave()
+      expect(useMascotStore().warnings).toEqual([])
+
+      land()
+      await flushPromises()
+      expect(useMascotStore().warnings).toHaveLength(1)
+    })
+
+    it('leaves rules changed since the save alone, whatever the answer', async () => {
+      let refuse: (reason: unknown) => void = () => {}
+      saveRuleSetRun.mockReturnValue(new Promise((_, reject) => { refuse = reject }))
+
+      await deleteRuleTwoAndSave()
+      const newer = [{ ruleId: 'rule-9', file1FieldPath: '$.a', file2FieldPath: '$.b', operator: '=', sequenceNum: 1 }]
+      draftStoreState.ruleSetDraftState = createDraftState(newer)
+      refuse(new ApiCallError('Refused.'))
+      await flushPromises()
+
+      expect(heldRules()).toEqual(['rule-9'])
+      expect(useMascotStore().warnings).toHaveLength(1)
+    })
   })
 
   it('routes workflow cancel requests through the same path as the X action', async () => {
@@ -1179,7 +1289,6 @@ describe('ReconciliationRuleSetEditorPage', () => {
             },
           ],
         }),
-        expect.any(AbortSignal),
       )
     })
 
@@ -1279,7 +1388,6 @@ describe('ReconciliationRuleSetEditorPage', () => {
             { fieldExpression: EXCLUDED_FIELD_PATH, operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] },
           ],
         }),
-        expect.any(AbortSignal),
       )
     })
 
@@ -1348,7 +1456,6 @@ describe('ReconciliationRuleSetEditorPage', () => {
             { fieldExpression: EXCLUDED_FIELD_PATH, operator: 'INCLUDE_IN', values: ['WEB_SALES_CHANNEL'] },
           ],
         }),
-        expect.any(AbortSignal),
       )
     })
 
@@ -1392,7 +1499,6 @@ describe('ReconciliationRuleSetEditorPage', () => {
 
       expect(saveRuleSetRun).toHaveBeenCalledWith(
         expect.objectContaining({ file1ExcludeFilters: [] }),
-        expect.any(AbortSignal),
       )
     })
 
@@ -1454,7 +1560,6 @@ describe('ReconciliationRuleSetEditorPage', () => {
 
       expect(saveRuleSetRun).toHaveBeenCalledWith(
         expect.objectContaining({ file1ExcludeFilters: [] }),
-        expect.any(AbortSignal),
       )
     })
 
@@ -1539,7 +1644,6 @@ describe('ReconciliationRuleSetEditorPage', () => {
 
       expect(saveRuleSetRun).toHaveBeenCalledWith(
         expect.not.objectContaining({ file1ExcludeFilters: expect.anything() }),
-        expect.any(AbortSignal),
       )
     })
   })

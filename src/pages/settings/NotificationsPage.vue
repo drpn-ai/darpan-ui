@@ -88,7 +88,7 @@
                   :aria-label="`Post ${source.label} in ${space.spaceName}`"
                   data-testid="notifications-dot"
                   :data-space-id="space.chatSpaceId"
-                  :disabled="!canEdit || isOff(space) || savingKey !== null"
+                  :disabled="!canEdit || isOff(space)"
                   @click="setRoute(source, space.chatSpaceId)"
                   @keydown.left.prevent="moveFocus($event, -1)"
                   @keydown.right.prevent="moveFocus($event, 1)"
@@ -107,7 +107,7 @@
                   :aria-label="`Post ${source.label} nowhere`"
                   data-testid="notifications-dot"
                   data-space-id=""
-                  :disabled="!canEdit || savingKey !== null"
+                  :disabled="!canEdit"
                   @click="setRoute(source, null)"
                   @keydown.left.prevent="moveFocus($event, -1)"
                   @keydown.right.prevent="moveFocus($event, 1)"
@@ -337,7 +337,6 @@ const spaces = ref<NotificationRouteSpace[]>([])
 const routes = ref<NotificationRoute[]>([])
 /** The same spaces as list#TenantChatSpaces gives them: in use or not, and the webhook, for the space menu. */
 const chatSpaces = ref<TenantChatSpace[]>([])
-const savingKey = ref<string | null>(null)
 const testingSpaceId = ref<string | null>(null)
 const slackBusy = ref(false)
 const popupError = ref<string | null>(null)
@@ -417,26 +416,45 @@ function applyRoute(saved: NotificationRoute): void {
   addFlowChanged = true
 }
 
-async function setRoute(target: NotificationRoute, chatSpaceId: string | null): Promise<void> {
-  if (!canEdit.value || savingKey.value !== null) return
+// DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). A dot moves at once and the
+// saves run one after another behind it. Only a refusal moves it again: back to where the backend holds it, with why.
+let routeSaves: Promise<void> = Promise.resolve()
+let routeSeq = 0
+/** Which move each row shows now, and where the backend holds a row that has saves queued. */
+const routeShown = new Map<string, number>()
+const routeHeld = new Map<string, { chatSpaceId: string | null; pending: number }>()
+
+function setRoute(target: NotificationRoute, chatSpaceId: string | null): void {
+  if (!canEdit.value) return
   if ((target.chatSpaceId ?? null) === chatSpaceId) return
-  savingKey.value = routeKey(target)
+  const key = routeKey(target)
+  const seq = ++routeSeq
+  routeShown.set(key, seq)
+  const held = routeHeld.get(key) ?? { chatSpaceId: target.chatSpaceId ?? null, pending: 0 }
+  held.pending += 1
+  routeHeld.set(key, held)
   pageError.value = null
   statusMessage.value = null
-  try {
-    const response = await settingsFacade.setNotificationRoute({
-      sourceType: target.sourceType,
-      ...(target.sourceId ? { sourceId: target.sourceId } : {}),
-      chatSpaceId,
-    }, pageAbortController.signal)
-    applyRoute(response.route ?? { ...target, chatSpaceId })
-    statusMessage.value = response.messages?.[0] ?? 'Saved.'
-  } catch (error) {
-    if (isAbort(error)) return
-    pageError.value = describeError(error, `${target.label} did not move.`)
-  } finally {
-    savingKey.value = null
-  }
+  applyRoute({ ...target, chatSpaceId })
+  const stillShown = () => routeShown.get(key) === seq
+  // No page signal: the dot already shows the change, so leaving the page must not cancel the save behind it.
+  routeSaves = routeSaves.then(async () => {
+    try {
+      const response = await settingsFacade.setNotificationRoute({
+        sourceType: target.sourceType,
+        ...(target.sourceId ? { sourceId: target.sourceId } : {}),
+        chatSpaceId,
+      })
+      held.chatSpaceId = response.route ? response.route.chatSpaceId : chatSpaceId
+      if (stillShown() && response.route) applyRoute(response.route)
+    } catch (error) {
+      if (stillShown()) applyRoute({ ...target, chatSpaceId: held.chatSpaceId })
+      pageError.value = describeError(error, `${target.label} did not move.`)
+    } finally {
+      held.pending -= 1
+      if (held.pending === 0) routeHeld.delete(key)
+    }
+  })
 }
 
 /** Left and right walk a row's dots; Enter or Space picks one, as for any button. */
@@ -463,27 +481,76 @@ async function sendTest(space: NotificationRouteSpace): Promise<void> {
   }
 }
 
-async function saveSpace(space: NotificationRouteSpace, changes: { spaceName?: string; isActive?: boolean; webhookUrl?: string }): Promise<boolean> {
-  try {
-    const response = await settingsFacade.saveTenantChatSpace({
-      chatSpaceId: space.chatSpaceId,
-      spaceName: changes.spaceName ?? space.spaceName,
-      isActive: changes.isActive ?? !isOff(space),
-      ...(changes.webhookUrl ? { webhookUrl: changes.webhookUrl } : {}),
-    }, pageAbortController.signal)
-    statusMessage.value = response.messages?.[0] ?? 'Saved chat space.'
-    await loadAll()
-    return true
-  } catch (error) {
-    if (isAbort(error)) return false
-    const message = describeError(error, 'The chat space did not take the hint. Not saved.')
-    if (isPopupOpen.value) popupError.value = message
-    else pageError.value = message
-    return false
+// DAR-UI-156. Rename and switch on/off show at once; the saves run one after another behind them, each sending only its
+// own change over what the backend holds. Only a refusal changes the column again: back as the backend holds it, with why.
+type SpaceChange = { spaceName?: string; isActive?: boolean; webhookUrl?: string }
+type SpaceField = 'spaceName' | 'isActive'
+let spaceSaves: Promise<void> = Promise.resolve()
+let spaceSeq = 0
+/** Which change each space's name and on/off show now (`<id>:<field>`), and what the backend holds while saves queue. */
+const spaceShown = new Map<string, number>()
+const spaceHeld = new Map<string, { spaceName: string; isActive: boolean; pending: number }>()
+
+function patchSpace(chatSpaceId: string, fields: { spaceName?: string; isActive?: boolean }): void {
+  const patch = {
+    ...(fields.spaceName !== undefined ? { spaceName: fields.spaceName } : {}),
+    ...(fields.isActive !== undefined ? { isActive: fields.isActive ? 'Y' : 'N' } : {}),
   }
+  spaces.value = spaces.value.map((space) => (space.chatSpaceId === chatSpaceId ? { ...space, ...patch } : space))
+  chatSpaces.value = chatSpaces.value.map((space) => (space.chatSpaceId === chatSpaceId ? { ...space, ...patch } : space))
 }
 
-async function renameSpace(space: NotificationRouteSpace, typed: string): Promise<void> {
+/** Resolves to null once saved, or to why it was refused. A webhook is not drawn on the grid, so it shows nothing early. */
+function saveSpace(space: NotificationRouteSpace, changes: SpaceChange): Promise<string | null> {
+  const id = space.chatSpaceId
+  const held = spaceHeld.get(id) ?? { spaceName: space.spaceName, isActive: !isOff(space), pending: 0 }
+  held.pending += 1
+  spaceHeld.set(id, held)
+  const fields = (['spaceName', 'isActive'] as SpaceField[]).filter((field) => changes[field] !== undefined)
+  const seq = ++spaceSeq
+  for (const field of fields) spaceShown.set(`${id}:${field}`, seq)
+  const shown = (field: SpaceField) => spaceShown.get(`${id}:${field}`) === seq
+  patchSpace(id, { spaceName: changes.spaceName, isActive: changes.isActive })
+  let refusal: string | null = null
+  // No page signal, for the same reason as a route's save: what shows as done must still be sent after leaving.
+  spaceSaves = spaceSaves.then(async () => {
+    try {
+      const response = await settingsFacade.saveTenantChatSpace({
+        chatSpaceId: id,
+        spaceName: changes.spaceName ?? held.spaceName,
+        isActive: changes.isActive ?? held.isActive,
+        ...(changes.webhookUrl ? { webhookUrl: changes.webhookUrl } : {}),
+      })
+      const saved = response.chatSpace
+      held.spaceName = saved?.spaceName ?? changes.spaceName ?? held.spaceName
+      held.isActive = saved ? saved.isActive !== 'N' : changes.isActive ?? held.isActive
+      if (saved) {
+        chatSpaces.value = chatSpaces.value.map((candidate) => (candidate.chatSpaceId === id ? { ...candidate, ...saved } : candidate))
+        patchSpace(id, { spaceName: shown('spaceName') ? held.spaceName : undefined, isActive: shown('isActive') ? held.isActive : undefined })
+      }
+      if (changes.webhookUrl) statusMessage.value = response.messages?.[0] ?? 'Saved chat space.'
+    } catch (error) {
+      refusal = describeError(error, 'The chat space did not take the hint. Not saved.')
+      const nameBack = fields.includes('spaceName') && shown('spaceName')
+      patchSpace(id, {
+        spaceName: nameBack ? held.spaceName : undefined,
+        isActive: fields.includes('isActive') && shown('isActive') ? held.isActive : undefined,
+      })
+      if (nameBack) titleRedraw.value += 1
+      // The webhook popup shows its own refusal; the others say it on the page, and in this space's menu if it is open.
+      if (!changes.webhookUrl) {
+        pageError.value = refusal
+        if (activePopup.value?.type === 'space-menu' && menuSpaceId.value === id) popupError.value = refusal
+      }
+    } finally {
+      held.pending -= 1
+      if (held.pending === 0) spaceHeld.delete(id)
+    }
+  })
+  return spaceSaves.then(() => refusal)
+}
+
+function renameSpace(space: NotificationRouteSpace, typed: string): void {
   const spaceName = normalizeStringOrEmpty(typed)
   if (!spaceName || spaceName === space.spaceName || !canEdit.value) {
     titleRedraw.value += 1
@@ -491,7 +558,7 @@ async function renameSpace(space: NotificationRouteSpace, typed: string): Promis
   }
   pageError.value = null
   statusMessage.value = null
-  if (!(await saveSpace(space, { spaceName }))) titleRedraw.value += 1
+  void saveSpace(space, { spaceName })
 }
 
 function openAdd(startAt: 'where' | 'channel'): void {
@@ -527,10 +594,16 @@ async function chooseSpaceMenu(value: string): Promise<void> {
     openPopup({ type: 'space-webhook', chatSpaceId: space.chatSpaceId })
     return
   }
-  popupSaving.value = true
   if (value === 'activate' || value === 'deactivate') {
-    if (await saveSpace(space, { isActive: value === 'activate' })) closePopup()
-  } else if (value === 'delete') {
+    // DAR-UI-156: the popup closes and the column changes at once.
+    closePopup()
+    pageError.value = null
+    statusMessage.value = null
+    void saveSpace(space, { isActive: value === 'activate' })
+    return
+  }
+  popupSaving.value = true
+  if (value === 'delete') {
     try {
       const response = await settingsFacade.deleteTenantChatSpace({ chatSpaceId: space.chatSpaceId }, pageAbortController.signal)
       statusMessage.value = response.messages?.[0] ?? 'Deleted chat space.'
@@ -549,8 +622,17 @@ async function saveWebhook(): Promise<void> {
   if (!space || !webhookUrl || popupSaving.value) return
   popupSaving.value = true
   popupError.value = null
-  if (await saveSpace(space, { webhookUrl })) closePopup()
+  statusMessage.value = null
+  // DAR-UI-156 leaves this one waiting: the backend pins the URL's host, nothing on the grid shows a webhook, and the
+  // popup holds what was typed so a refused URL can be fixed rather than pasted again.
+  const refusal = await saveSpace(space, { webhookUrl })
+  if (activePopup.value?.type !== 'space-webhook') {
+    if (refusal) pageError.value = refusal
+    return
+  }
   popupSaving.value = false
+  if (refusal) popupError.value = refusal
+  else closePopup()
 }
 
 function openSlackToken(): void {

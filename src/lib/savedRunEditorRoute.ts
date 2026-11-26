@@ -1,5 +1,7 @@
 import type { RouteLocationRaw } from 'vue-router'
 import { reconciliationFacade } from './api/facade'
+import { homeSavedRuns } from './api/queries'
+import { readQueryOnce } from './api/readCache'
 import type { SourceExtractOptions } from './api/authoringTypes'
 import type { SavedRunSummary, SavedRunSystemOption } from './api/types'
 import {
@@ -12,6 +14,13 @@ import { resolveRecordLabel } from './utils/recordLabel'
 import { normalizeStringOrEmpty } from './utils/strings'
 
 const SAVED_RUN_EDITOR_LOOKUP_PAGE_SIZE = 100
+
+// DAR-UI-156: Home's first page of runs, under its cache key, so the copy Home and the session preload keep
+// warm answers this lookup. The same call, made without an abort signal as this lookup's callers expect.
+const editorLookupFirstPage: typeof homeSavedRuns = {
+  key: homeSavedRuns.key,
+  fetch: () => reconciliationFacade.listSavedRuns({ pageIndex: 0, pageSize: SAVED_RUN_EDITOR_LOOKUP_PAGE_SIZE, query: '' }),
+}
 
 export function savedRunName(row: SavedRunSummary): string {
   return resolveRecordLabel({
@@ -182,9 +191,21 @@ export function buildSavedRunEditorRoute(row: SavedRunSummary): RouteLocationRaw
   }
 }
 
+/**
+ * DAR-UI-156: opening a run's settings is immediate. The first page is the same list#SavedRuns read Home and
+ * the session preload keep warm (editorLookupFirstPage), so a click within a minute of that read navigates without waiting;
+ * any write in this tab drops that copy. A run the copy does not hold (made since, or past the first page)
+ * falls back to paging the network, so a stale copy can never answer "not found".
+ */
 export async function resolveSavedRunEditorTarget(targetId: string): Promise<SavedRunSummary | null> {
   const normalizedTargetId = normalizeStringOrEmpty(targetId)
   if (!normalizedTargetId) return null
+
+  // readQueryOnce's own 60 s, not the cache's 15 min: the editor is seeded from this row, and an older copy could
+  // miss an edit made since in another tab or by another person, which a save here would then overwrite.
+  const firstPage = await readQueryOnce(editorLookupFirstPage)
+  const cachedRun = findSavedRunEditorTarget(firstPage.savedRuns ?? [], normalizedTargetId)
+  if (cachedRun) return cachedRun
 
   let pageIndex = 0
   let pageCount = 1
