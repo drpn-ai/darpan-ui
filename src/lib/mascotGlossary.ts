@@ -460,7 +460,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   // DAR-BE-328: the Sync pulse list, its Tenant Settings row and the pair page's title.
   syncPulse: {
     title: 'Sync pulse',
-    body: 'watches orders that reached HotWax but not the other system yet, and tells you which ones waited longer than the allowance. Open a pair to see today.',
+    body: 'watches orders that reached one system but not the next one yet, and tells you which ones waited longer than the allowance. Open a pair to see today.',
   },
   // DAR-BE-328: one sync pair's page (its title, facts, Today charts and past-allowance list).
   syncPairName: {
@@ -500,7 +500,7 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   },
   syncPairUpstream: {
     title: 'Upstream side',
-    body: 'the system orders reach first, which the pulse reads for orders still missing on the other side. It must be HotWax.',
+    body: 'the system orders reach first, which the pulse reads for orders still missing on the other side. It must be HotWax or Shopify orders.',
     byDirectiveOnly: true,
   },
   syncPairChatSpace: {

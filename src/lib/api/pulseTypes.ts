@@ -1,4 +1,4 @@
-// DAR-BE-328. Sync pulse (facade.SyncPulseFacadeServices): a pair is one daily check whose upstream side (HotWax) is
+// DAR-BE-328. Sync pulse (facade.SyncPulseFacadeServices): a pair is one daily check whose upstream side (HotWax or Shopify orders, DAR-BE-377) is
 // watched for orders still waiting to reach the other system, with an allowance (minutes) before one counts as late.
 
 interface PulseEnvelope {
