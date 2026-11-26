@@ -219,7 +219,7 @@
             :key="item.id"
             type="button"
             class="audit-row audit-row--statement"
-            :class="{ 'audit-row--picked': item.id === statement, 'audit-row--quiet': item.tone === 'clean' || item.tone === 'notChecked' }"
+            :class="{ 'audit-row--picked': item.id === statement, 'audit-row--quiet': item.tone === 'clean' }"
             :aria-current="item.id === statement ? 'true' : undefined"
             :aria-label="agentBeside ? `${item.id}, ${item.text}, ${item.badge}` : undefined"
             :title="agentBeside ? item.text : undefined"
@@ -1521,7 +1521,7 @@ function statementText(id: string): string {
   color: var(--text-dim);
 }
 
-/* Open = a filled count, clean = a quiet number, not checked = dashed: the same marks as the canvas. */
+/* Open = a filled count, clean = a quiet number. A check that has not run today still shows its count (DAR-UI-149). */
 .audit-count {
   flex: none;
   display: inline-flex;
@@ -1541,12 +1541,6 @@ function statementText(id: string): string {
 }
 
 .audit-count--clean {
-  color: var(--text-dim);
-}
-
-.audit-count--notChecked {
-  border-style: dashed;
-  border-color: var(--text-dim);
   color: var(--text-dim);
 }
 

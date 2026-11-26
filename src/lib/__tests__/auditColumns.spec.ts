@@ -101,14 +101,17 @@ describe('auditColumns', () => {
     expect(categoryItems(report({ complete: false, notCovered: [] }))[0]).toMatchObject({ sub: 'not complete', attention: true })
   })
 
-  it('filters a category\'s statements, and badges each by open, else clean, else a dash', () => {
+  it('filters a category\'s statements, and badges each by its count, run today or not (DAR-UI-149)', () => {
     const orders = report().categories.orders
     expect(statementItems(orders, 'all').map((item) => [item.id, item.badge, item.tone])).toEqual([
       ['R1', '1', 'open'], ['R2', '0', 'clean'], ['R19', '0', 'clean'],
     ])
     expect(statementItems(orders, 'open').map((item) => item.id)).toEqual(['R1'])
     expect(statementItems(report().categories.refunds, 'notChecked').map((item) => [item.id, item.badge, item.tone]))
-      .toEqual([['R5', '–', 'notChecked']])
+      .toEqual([['R5', '0', 'clean']])
+    // Gorjana R7 on a held morning: not run today, one finding still open.
+    const held = category('Orders', [statement('R7', 1, 'notRun')], 1)
+    expect(statementItems(held, 'all').map((item) => [item.id, item.badge, item.tone])).toEqual([['R7', '1', 'open']])
   })
 
   // DAR-BE-206. A finding is open or fixed: every column counts the open findings, and a pending pill is gone.

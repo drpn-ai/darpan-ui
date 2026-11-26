@@ -52,9 +52,9 @@ export interface StatementItem {
   id: string
   text: string
   open: number
-  /** What the row's count shows: its open findings; a dash when nothing checked it. */
+  /** What the row's count shows: its findings under the filter, whether or not its check ran today (DAR-UI-149). */
   badge: string
-  tone: 'open' | 'clean' | 'notChecked'
+  tone: 'open' | 'clean'
 }
 
 export interface SourceItem {
@@ -189,14 +189,7 @@ export function statementItems(category: AuditCategory | null | undefined, filte
   return statementsOf(category).filter((statement) => keepStatement(statement, filter)).map((statement) => {
     // DAR-UI-144. What the pill keeps: under acknowledged its acknowledged rows, under all its open and acknowledged.
     const open = countFor(statement.counts, filter)
-    const notChecked = statement.status === 'notRun'
-    return {
-      id: statement.id,
-      text: statement.text,
-      open,
-      badge: notChecked ? '–' : String(open),
-      tone: notChecked ? 'notChecked' : open ? 'open' : 'clean',
-    }
+    return { id: statement.id, text: statement.text, open, badge: String(open), tone: open ? 'open' : 'clean' }
   })
 }
 
@@ -206,16 +199,9 @@ export function statementItems(category: AuditCategory | null | undefined, filte
 export function statementItemsByPriority(report: AuditReport, level: AuditLevel, filter: AuditFilter): StatementItem[] {
   return Object.values(report.categories ?? {}).flatMap(statementsOf).map((statement) => {
     const open = statement.counts?.byPriority?.[level] ?? 0
-    const notChecked = statement.status === 'notRun'
     return {
       statement,
-      item: {
-        id: statement.id,
-        text: statement.text,
-        open,
-        badge: notChecked ? '–' : String(open),
-        tone: notChecked ? 'notChecked' : open ? 'open' : 'clean',
-      } satisfies StatementItem,
+      item: { id: statement.id, text: statement.text, open, badge: String(open), tone: open ? 'open' : 'clean' } satisfies StatementItem,
     }
   }).filter(({ statement, item }) => filter === 'notChecked'
     ? statement.status === 'notRun' && (statement.priority ?? 'P2') === level
