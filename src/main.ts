@@ -9,6 +9,7 @@ import { clearStoredReads, invalidateReadCache } from './lib/api/readCache'
 import { useAuthStore } from './stores/auth'
 import { useReferenceDataStore } from './stores/referenceData'
 import { useRunResultsStore } from './stores/runResults'
+import { useRunSubmissionsStore } from './stores/runSubmissions'
 import { useReconciliationDraftStore } from './stores/reconciliationDraft'
 import { reportError } from './lib/observability/report'
 import { vExplain } from './directives/vExplain'
@@ -33,6 +34,7 @@ setApiCacheReset(() => {
   clearStoredReads() // DAR-UI-057: finished runs too — login, logout and tenant switch start with nothing stored
   useReferenceDataStore(pinia).reset()
   useRunResultsStore(pinia).reset()
+  useRunSubmissionsStore(pinia).reset() // DAR-UI-156: a run still starting is the last tenant's
   useReconciliationDraftStore(pinia).resetAll() // setup-style store: explicit reset; clears its sessionStorage too
   clearAgentConversations() // DAR-UI-104: the agent panel's conversation ids are per user and tenant
   try {

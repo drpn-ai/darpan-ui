@@ -138,4 +138,23 @@ describe('runSubmissions', () => {
     store.forget('P1')
     expect(store.get('P1')).toBeNull()
   })
+
+  // Login, logout and a tenant switch reset it (main.ts, setApiCacheReset): a run still starting for the last tenant is
+  // never raised to whoever is in the tab now, by name or by its refusal, and its look ends.
+  it('reset forgets every submission, ends its look, and drops its late refusal', async () => {
+    const store = useRunSubmissionsStore()
+    const call = deferred<RunSubmissionOutcome>()
+    let looked: AbortSignal | null = null
+    store.start(input(() => call.promise, (signal) => { looked = signal; return new Promise(() => {}) }))
+    store.watch('P1', false)
+    store.reset()
+    expect(store.get('P1')).toBeNull()
+    expect(store.startingFor('RS_1')).toBeNull()
+    expect(looked!.aborted).toBe(true)
+
+    call.resolve({ error: 'Schema validation failed' })
+    await flushPromises()
+    expect(store.get('P1')).toBeNull()
+    expect(useMascotStore().warnings).toEqual([])
+  })
 })

@@ -140,14 +140,18 @@ export const useRunSubmissionsStore = defineStore('runSubmissions', () => {
     submissions.value = next
   }
 
-  function resetForTests(): void {
+  /**
+   * Login, logout and a tenant switch (main.ts, setApiCacheReset): every submission is the last tenant's. Their looks
+   * end, and a late answer finds no entry, so set() drops it: no refusal names another tenant's run to this tab.
+   */
+  function reset(): void {
     lookups.forEach((lookup) => lookup.abort())
     lookups.clear()
     watched.clear()
     submissions.value = {}
   }
 
-  return { submissions, get, startingFor, start, retry, watch, forget, resetForTests }
+  return { submissions, get, startingFor, start, retry, watch, forget, reset }
 })
 
 /** A new id for a submission that records no pending-run marker of its own (Retry, Run now). */

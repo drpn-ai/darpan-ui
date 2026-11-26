@@ -274,7 +274,7 @@ describe('ReconciliationDiffPage', () => {
 
   afterEach(() => {
     // DAR-UI-156: the look for a submitted run now lives in the store and outlives the page; end it here too.
-    useRunSubmissionsStore().resetForTests()
+    useRunSubmissionsStore().reset()
     vi.useRealTimers()
     vi.unstubAllGlobals()
     setDefaultDisplayTimeZone(undefined)

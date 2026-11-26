@@ -226,7 +226,7 @@ describe('ReconciliationAutomationDashboardPage', () => {
 
   afterEach(() => {
     // DAR-UI-156: a run's look outlives its page; end it so it never answers a later test's mocks.
-    useRunSubmissionsStore().resetForTests()
+    useRunSubmissionsStore().reset()
     setDefaultDisplayTimeZone(undefined)
   })
 
