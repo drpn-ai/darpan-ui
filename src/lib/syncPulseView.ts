@@ -98,6 +98,12 @@ export function nextPulsePeriods(periods: PeakPeriodSummary[], periodRows: PeakS
   return out
 }
 
+/** The periods whose sync rows turn at least one pulse on: the ones worth naming on the Pulses page. */
+export function pulsingPeriods(periods: PeakPeriodSummary[], periodRows: PeakSyncRow[][]): Set<string> {
+  return new Set(periods.filter((_, i) => (periodRows[i] ?? []).some((row) => Boolean(row.periodPulseMinutes)))
+    .map((p) => p.peakPeriodId))
+}
+
 /** Pairs that pulse (normally, or in a coming or current peak period) first; the allowance-only pairs apart. */
 export function buildSyncPulseView(pairs: SyncPairSummary[], automations: SyncAutomationOption[],
   periodPulse: Map<string, number>): SyncPulseView {
@@ -141,13 +147,15 @@ export interface LoadedSyncPulseView {
   periods: PeakPeriodSummary[]
   /** By pair: the next coming period that turns its pulse on. */
   nextPulse: Map<string, string>
+  /** The live periods that turn at least one pulse on (a sale period with every pulse off is not one). */
+  pulsingPeriodIds: Set<string>
 }
 
 export async function loadSyncPulseView(signal?: AbortSignal): Promise<LoadedSyncPulseView> {
   const response = await pulseFacade.listSyncPairs(signal)
   if (response.ok === false) throw new Error(response.errors?.[0] ?? 'Could not load the sync pairs.')
   const pairs = response.syncPairs ?? []
-  if (pairs.length === 0) return { pairs, view: { pulsing: [], allowanceOnly: [] }, periods: [], nextPulse: new Map() }
+  if (pairs.length === 0) return { pairs, view: { pulsing: [], allowanceOnly: [] }, periods: [], nextPulse: new Map(), pulsingPeriodIds: new Set() }
   const [form, periods] = await Promise.allSettled([
     (async () => (await pulseFacade.getSyncPair({}, signal)).automations ?? [])(),
     (async () => {
@@ -161,7 +169,7 @@ export async function loadSyncPulseView(signal?: AbortSignal): Promise<LoadedSyn
   const live = periods.status === 'fulfilled' ? periods.value.live : []
   const rows = periods.status === 'fulfilled' ? periods.value.rows : []
   return { pairs, view: buildSyncPulseView(pairs, automations, periodPulseMinutes(rows)), periods: live,
-    nextPulse: nextPulsePeriods(live, rows) }
+    nextPulse: nextPulsePeriods(live, rows), pulsingPeriodIds: pulsingPeriods(live, rows) }
 }
 
 /** "last 18:17", "last pulse skipped 18:17", "last pulse failed 18:17", or "no pulse yet". */
@@ -193,6 +201,7 @@ export function pulseWatchFacts(pair: SyncPair, samples: SyncSample[], pastOrder
     .reduce<SyncSample | null>((last, s) => (!last || at(s) >= at(last) ? s : last), null)
   const oldest = latestRead?.oldestWaitingMinutes ?? pastOrders[0]?.waitingMinutes ?? null
   const period = pair.periodName ?? ''
+  // The period is named under Allowance when it changes the allowance (held: Aditi's pick on hiding it while the pulse is off).
   const allowanceFromPeriod = Boolean(period && pair.normalAllowanceMinutes != null && pair.allowanceMinutes !== pair.normalAllowanceMinutes)
   return [
     // A pulse that only peak periods turn on reads "Off today · next: PEAK Nov 27" on the days between them.
@@ -210,4 +219,19 @@ export function pulseWatchFacts(pair: SyncPair, samples: SyncSample[], pastOrder
     { key: 'past', label: 'Past allowance', value: (pair.pastAllowanceCount ?? 0).toLocaleString('en-US'),
       sub: 'findings', explain: 'syncPairPastAllowance' },
   ]
+}
+
+/**
+ * DAR-UI-154. When the Waiting / Oldest / Past allowance figures were read: "as of 18:32" (the last read pulse today, on
+ * the display clock). With the pulse off today they are the last known ones: "Last known · as of 18:32", or
+ * "Last known figures" when nothing was read today.
+ */
+export function pulseAsOfWords(pair: Pick<SyncPair, 'pulseEveryMinutes'>, samples: SyncSample[],
+  clock: (value: string) => string): string {
+  const at = (s: SyncSample) => new Date(s.sampleStamp).getTime()
+  const latestRead = samples.filter((s) => s.statusEnumId === 'SPS_OK')
+    .reduce<SyncSample | null>((last, s) => (!last || at(s) >= at(last) ? s : last), null)
+  const asOf = latestRead ? `as of ${clock(latestRead.sampleStamp)}` : ''
+  if (pair.pulseEveryMinutes) return asOf || 'No pulse read today yet'
+  return asOf ? `Last known · ${asOf}` : 'Last known figures'
 }

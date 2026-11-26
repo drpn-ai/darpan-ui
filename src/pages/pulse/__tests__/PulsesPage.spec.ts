@@ -105,14 +105,31 @@ describe('PulsesPage', () => {
     expect(getSyncPair).not.toHaveBeenCalledWith({ syncPairId: '100001' }, expect.anything())
   })
 
-  it('names the peak period that is on, with its dates, linked to its page', async () => {
+  it('names no period at the top on a sale day whose periods turn no pulse on', async () => {
     gorjana()
+    const wrapper = await mountPage()
+    expect(wrapper.findAll('[data-testid="pulses-period"]')).toHaveLength(0)
+  })
+
+  it('names a period that is on and turns a pulse on, with its dates, linked to its page', async () => {
+    gorjana()
+    listPeakPeriods.mockResolvedValue({ ...envelope, peakPeriods: [
+      { peakPeriodId: 'P2', periodName: 'PEAK Nov 27', fromDate: '2026-11-27', thruDate: '2026-11-27', isActive: 'Y', state: 'on' },
+    ] })
     const wrapper = await mountPage()
     const periods = wrapper.findAll('[data-testid="pulses-period"]')
     expect(periods).toHaveLength(1)
-    expect(periods[0]!.text()).toContain('Sale Nov 24-26')
-    expect(periods[0]!.text()).toContain('24 Nov – 26 Nov')
-    expect(periods[0]!.get('a').attributes('data-to')).toContain('"peakPeriodId":"P1"')
+    expect(periods[0]!.text()).toContain('PEAK Nov 27')
+    expect(periods[0]!.text()).toContain('27 Nov')
+    expect(periods[0]!.get('a').attributes('data-to')).toContain('"peakPeriodId":"P2"')
+  })
+
+  it('says when the figures were read, and marks them last known with the pulse off today', async () => {
+    gorjana()
+    const wrapper = await mountPage()
+    const asOf = wrapper.findAll('[data-testid="pulse-card-as-of"]').map((p) => p.text())
+    expect(asOf[0]).toMatch(/^Last known · as of \d\d:\d\d$/)
+    expect(asOf[1]).toBe('Last known figures')
   })
 
   it('opens the pair page from a card, for a view-role user too, and shows the settings link to editors only', async () => {

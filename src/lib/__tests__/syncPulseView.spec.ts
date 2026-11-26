@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SyncAutomationOption, SyncPairSummary } from '../api/pulseTypes'
-import { buildSyncPulseView, lastPulseWords, nextPulsePeriods, pairSidesLabel, periodPulseMinutes, plainPairLabel, pulseWatchFacts, syncPulseSettingsValue } from '../syncPulseView'
+import { buildSyncPulseView, lastPulseWords, nextPulsePeriods, pairSidesLabel, periodPulseMinutes, plainPairLabel, pulseAsOfWords, pulseWatchFacts, pulsingPeriods, syncPulseSettingsValue } from '../syncPulseView'
 
 const pair = (over: Partial<SyncPairSummary>): SyncPairSummary => ({
   syncPairId: 'SP1', label: 'HotWax → NetSuite orders', automationId: 'A1', automationName: 'Daily check', allowanceMinutes: 120,
@@ -177,5 +177,26 @@ describe('nextPulsePeriods', () => {
     const off = { ...pair({ pulseEveryMinutes: null, lastPulseStamp: '2026-11-26T12:47:32Z' }), lastPulseStatusEnumId: 'SPS_SKIPPED' }
     expect(pulseWatchFacts(off, [], [], clock, 'PEAK Nov 27')[0]).toMatchObject({ value: 'Off today', sub: 'next: PEAK Nov 27' })
     expect(pulseWatchFacts(off, [], [], clock)[0]).toMatchObject({ value: 'Off today', sub: 'last pulse skipped 12:47' })
+  })
+})
+
+describe('pulsingPeriods', () => {
+  const period = (id: string) => ({ peakPeriodId: id, periodName: id, fromDate: '2026-11-24', thruDate: '2026-11-26', isActive: 'Y', state: 'on' as const })
+  const row = (pulse: number | null) => ({ syncPairId: 'P', label: '', normalAllowanceMinutes: 120, periodAllowanceMinutes: 360, normalPulseMinutes: null, periodPulseMinutes: pulse })
+  it('keeps only periods that turn a pulse on (a sale at 0 or no override is not one)', () => {
+    expect([...pulsingPeriods([period('SALE'), period('PEAK'), period('NONE')], [[row(0)], [row(0), row(60)], [row(null)]])]).toEqual(['PEAK'])
+  })
+})
+
+describe('pulseAsOfWords', () => {
+  const clock = (v: string) => v.slice(11, 16)
+  const read = (stamp: string, status = 'SPS_OK') => ({ sampleStamp: stamp, waitingCount: 1, oldestWaitingMinutes: 5, pastAllowanceCount: 0, statusEnumId: status })
+  it('says when the figures were read: the last read pulse today, not a skipped one', () => {
+    expect(pulseAsOfWords({ pulseEveryMinutes: 60 }, [read('2026-11-26T11:03:13Z'), read('2026-11-26T12:02:32Z', 'SPS_SKIPPED')], clock)).toBe('as of 11:03')
+    expect(pulseAsOfWords({ pulseEveryMinutes: 60 }, [], clock)).toBe('No pulse read today yet')
+  })
+  it('marks them last known when the pulse is off today', () => {
+    expect(pulseAsOfWords({ pulseEveryMinutes: null }, [read('2026-11-26T11:03:13Z')], clock)).toBe('Last known · as of 11:03')
+    expect(pulseAsOfWords({ pulseEveryMinutes: null }, [], clock)).toBe('Last known figures')
   })
 })

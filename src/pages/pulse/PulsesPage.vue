@@ -34,6 +34,7 @@
           <span class="pulse-card__check">{{ card.checkName }}</span>
         </template>
         <StaticFactStrip :facts="card.facts" test-id="pulse-card-facts" />
+        <p v-if="card.asOf" class="pulse-card__as-of" data-testid="pulse-card-as-of">{{ card.asOf }}</p>
         <InlineValidation v-if="card.error" tone="error" :message="card.error" />
       </StaticPageSection>
     </template>
@@ -72,7 +73,7 @@ import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { pulseFacade } from '../../lib/api/facade'
 import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
 import { settingsIconPath } from '../../lib/iconPaths'
-import { loadSyncPulseView, pulseWatchFacts, type SyncPulseRow } from '../../lib/syncPulseView'
+import { loadSyncPulseView, pulseAsOfWords, pulseWatchFacts, type SyncPulseRow } from '../../lib/syncPulseView'
 import { formatClockTime } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'
 
@@ -81,6 +82,8 @@ interface PulseCard {
   label: string
   checkName: string
   facts: StaticFact[]
+  /** When the waiting figures were read: "as of 18:32", or "Last known · as of 18:32" with the pulse off today. */
+  asOf: string
   error: string
 }
 
@@ -90,11 +93,13 @@ const canEdit = computed(() => permissionsStore.canEditTenantSettings)
 
 const cards = ref<PulseCard[]>([])
 const periods = ref<PeakPeriodSummary[]>([])
+const pulsingPeriodIds = ref<Set<string>>(new Set())
 const loading = ref(false)
 const pageError = ref('')
 const controller = new AbortController()
 
-const onPeriods = computed(() => periods.value.filter((p) => p.state === 'on'))
+// Only a period that is on AND turns a pulse on is named: "Sale Nov 24-26" with every pulse off is not news here.
+const onPeriods = computed(() => periods.value.filter((p) => p.state === 'on' && pulsingPeriodIds.value.has(p.peakPeriodId)))
 
 /** "27 Nov" or "24 – 25 Dec": calendar dates, the same in every zone. */
 function periodDates(period: PeakPeriodSummary): string {
@@ -112,14 +117,15 @@ async function cardFor(row: SyncPulseRow, nextPulse: Map<string, string>): Promi
   try {
     const response = await pulseFacade.getSyncPair({ syncPairId: row.syncPairId }, controller.signal)
     if (response.ok === false || !response.syncPair) {
-      return { ...base, facts: [], error: response.errors?.[0] ?? 'Could not load this pulse.' }
+      return { ...base, facts: [], asOf: '', error: response.errors?.[0] ?? 'Could not load this pulse.' }
     }
     const facts = pulseWatchFacts(response.syncPair, response.samplesToday ?? [], response.pastOrders ?? [],
       (value) => formatClockTime(value), nextPulse.get(row.syncPairId))
-    return { ...base, facts: facts.map((f) => ({ ...f, testId: `pulse-fact-${f.key}` })), error: '' }
+    const asOf = pulseAsOfWords(response.syncPair, response.samplesToday ?? [], (value) => formatClockTime(value))
+    return { ...base, facts: facts.map((f) => ({ ...f, testId: `pulse-fact-${f.key}` })), asOf, error: '' }
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') throw error
-    return { ...base, facts: [], error: 'Could not load this pulse.' }
+    return { ...base, facts: [], asOf: '', error: 'Could not load this pulse.' }
   }
 }
 
@@ -129,6 +135,7 @@ async function load(): Promise<void> {
   try {
     const loaded = await loadSyncPulseView(controller.signal)
     periods.value = loaded.periods
+    pulsingPeriodIds.value = loaded.pulsingPeriodIds
     cards.value = await Promise.all(loaded.view.pulsing.map((row) => cardFor(row, loaded.nextPulse)))
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
@@ -167,6 +174,12 @@ onBeforeUnmount(() => controller.abort())
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.pulse-card__as-of {
+  margin: var(--space-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--static-tile-text-size);
 }
 
 .pulse-card__check {
