@@ -214,6 +214,15 @@ const staticCommandActions: CommandAction[] = [
     aliases: ['home', 'dashboard', 'start', 'main page', 'overview'],
   },
   {
+    // DAR-UI-154. Tara opens Ask Darpan; this is how a client finds the pulses on a sale day.
+    id: 'navigate-pulses',
+    label: 'Go to Pulses',
+    description: 'Watch the sync pulses: orders waiting for the next system and the ones past the allowance.',
+    group: 'Navigate',
+    to: '/pulses',
+    aliases: ['pulses', 'pulse', 'sync pulse', 'sync', 'waiting orders', 'late orders', 'past allowance', 'black friday', 'peak', 'sale'],
+  },
+  {
     id: 'navigate-user-settings',
     label: 'Open User Settings',
     description: 'Manage account display name, active tenant, and user preferences.',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SyncAutomationOption, SyncPairSummary } from '../api/pulseTypes'
-import { buildSyncPulseView, pairSidesLabel, periodPulseMinutes, syncPulseSettingsValue } from '../syncPulseView'
+import { buildSyncPulseView, lastPulseWords, nextPulsePeriods, pairSidesLabel, periodPulseMinutes, pulseWatchFacts, syncPulseSettingsValue } from '../syncPulseView'
 
 const pair = (over: Partial<SyncPairSummary>): SyncPairSummary => ({
   syncPairId: 'SP1', label: 'HotWax → NetSuite orders', automationId: 'A1', automationName: 'Daily check', allowanceMinutes: 120,
@@ -87,5 +87,78 @@ describe('buildSyncPulseView', () => {
     expect(syncPulseSettingsValue(buildSyncPulseView(pairs, automations, new Map([['100000', 60]]))))
       .toBe('HotWax orders → NetSuite SuiteQL · every 1h in peak periods · 1 more')
     expect(syncPulseSettingsValue(buildSyncPulseView([pairs[1]!], automations, new Map()))).toBe('None')
+  })
+})
+
+describe('lastPulseWords', () => {
+  const clock = (v: string) => v.slice(11, 16)
+  it('says when the last pulse ran and how it ended', () => {
+    expect(lastPulseWords(null, null, clock)).toBe('no pulse yet')
+    expect(lastPulseWords('2026-11-26T12:47:32Z', 'SPS_OK', clock)).toBe('last 12:47')
+    expect(lastPulseWords('2026-11-26T12:47:32Z', 'SPS_SKIPPED', clock)).toBe('last pulse skipped 12:47')
+    expect(lastPulseWords('2026-11-26T12:47:32Z', 'SPS_FAILED', clock)).toBe('last pulse failed 12:47')
+  })
+})
+
+describe('pulseWatchFacts', () => {
+  const clock = (v: string) => v.slice(11, 16)
+  // GORJANA 100000 on 2026-11-26: a sale period sets 6h and the hourly pulse; normal is 2h, pulse off.
+  const detail = {
+    ...pair({ syncPairId: '100000', allowanceMinutes: 360, pulseEveryMinutes: 60, waitingCount: 1234, pastAllowanceCount: 12,
+      lastPulseStamp: '2026-11-26T12:02:32Z' }),
+    normalAllowanceMinutes: 120, normalPulseEveryMinutes: null, periodName: 'Sale Nov 24-26', lastPulseStatusEnumId: 'SPS_SKIPPED',
+  }
+  const samples = [
+    { sampleStamp: '2026-11-26T10:03:13Z', waitingCount: 3, oldestWaitingMinutes: 1241, pastAllowanceCount: 24, statusEnumId: 'SPS_OK' },
+    { sampleStamp: '2026-11-26T11:03:13Z', waitingCount: 4, oldestWaitingMinutes: 1301, pastAllowanceCount: 12, statusEnumId: 'SPS_OK' },
+    { sampleStamp: '2026-11-26T12:02:32Z', waitingCount: 0, oldestWaitingMinutes: null, pastAllowanceCount: 12, statusEnumId: 'SPS_SKIPPED' },
+  ]
+  const past = [{ recordKey: 'K', orderName: '#GOR1', otherSystemId: null, sourceCreatedStamp: null, waitingMinutes: 1400,
+    reportedInRunId: null, reportedInSavedRunId: null }]
+
+  it('shows today\'s effective cadence and allowance, the last pulse and what the last read pulse found', () => {
+    const facts = pulseWatchFacts(detail, samples, past, clock)
+    expect(facts.map((f) => [f.key, f.value, f.sub])).toEqual([
+      ['every', 'Hour', 'last pulse skipped 12:02'],
+      ['allowance', '6 hours', 'Sale Nov 24-26'],
+      ['waiting', '1,234', 'orders'],
+      ['oldest', '21h 41m', '#GOR1'],
+      ['past', '12', 'findings'],
+    ])
+  })
+
+  it('says normal when no period changes the allowance, and None when nothing waits', () => {
+    const facts = pulseWatchFacts({ ...detail, allowanceMinutes: 120, periodName: null }, [], [], clock)
+    expect(facts.find((f) => f.key === 'allowance')).toMatchObject({ value: '2 hours', sub: 'normal' })
+    expect(facts.find((f) => f.key === 'oldest')).toMatchObject({ value: 'None', sub: '' })
+  })
+
+  it('shows the period name only when the period really changes the allowance (Shopify → HotWax at 2h in a sale)', () => {
+    const facts = pulseWatchFacts({ ...detail, allowanceMinutes: 120 }, [], [], clock)
+    expect(facts.find((f) => f.key === 'allowance')).toMatchObject({ value: '2 hours', sub: 'normal' })
+  })
+})
+
+describe('nextPulsePeriods', () => {
+  const period = (id: string, name: string, from: string, state: 'on' | 'upcoming') =>
+    ({ peakPeriodId: id, periodName: name, fromDate: from, thruDate: from, isActive: 'Y', state })
+  const row = (pairId: string, pulse: number | null) =>
+    ({ syncPairId: pairId, label: '', normalAllowanceMinutes: 120, periodAllowanceMinutes: null, normalPulseMinutes: null, periodPulseMinutes: pulse })
+
+  it('names the first coming period that turns each pair\'s pulse on; a sale period at 0 (off) does not count', () => {
+    const map = nextPulsePeriods(
+      [period('S', 'Sale Nov 28-29', '2026-11-28', 'upcoming'), period('P2', 'PEAK Nov 30', '2026-11-30', 'upcoming'),
+        period('NOW', 'Sale Nov 24-26', '2026-11-24', 'on'), period('P1', 'PEAK Nov 27', '2026-11-27', 'upcoming')],
+      [[row('100000', 0)], [row('100000', 60), row('100102', 60)], [row('100000', 60)], [row('100102', 60)]],
+    )
+    expect(map.get('100000')).toBe('PEAK Nov 30')
+    expect(map.get('100102')).toBe('PEAK Nov 27')
+  })
+
+  it('reads "Off today · next" on a day the pulse is off, the last pulse otherwise', () => {
+    const clock = (v: string) => v.slice(11, 16)
+    const off = { ...pair({ pulseEveryMinutes: null, lastPulseStamp: '2026-11-26T12:47:32Z' }), lastPulseStatusEnumId: 'SPS_SKIPPED' }
+    expect(pulseWatchFacts(off, [], [], clock, 'PEAK Nov 27')[0]).toMatchObject({ value: 'Off today', sub: 'next: PEAK Nov 27' })
+    expect(pulseWatchFacts(off, [], [], clock)[0]).toMatchObject({ value: 'Off today', sub: 'last pulse skipped 12:47' })
   })
 })

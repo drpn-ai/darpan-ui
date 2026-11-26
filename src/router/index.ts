@@ -326,6 +326,13 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak period' },
   },
   {
+    // DAR-UI-154. Pulses to watch, outside Settings; Tara's Ask Darpan opens it ("Go to Pulses").
+    path: '/pulses',
+    name: 'pulses',
+    component: () => import('../pages/pulse/PulsesPage.vue'),
+    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Pulses' },
+  },
+  {
     // DAR-BE-328. The active tenant's sync pairs: daily checks whose upstream orders are watched on a pulse.
     path: '/settings/tenant/sync-pulse',
     name: 'settings-tenant-sync-pairs',
