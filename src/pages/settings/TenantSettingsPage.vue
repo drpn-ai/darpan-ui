@@ -368,11 +368,11 @@ import WorkflowSelect, { type WorkflowSelectOption } from '../../components/work
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError } from '../../lib/api/client'
-import { peakFacade, pulseFacade, settingsFacade } from '../../lib/api/facade'
+import { peakFacade, settingsFacade } from '../../lib/api/facade'
 import type { SyncPairSummary } from '../../lib/api/pulseTypes'
 import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
 import { peakSettingsValue } from '../../lib/peakPeriodWords'
-import { pulseSettingsValue } from '../../lib/pulseWords'
+import { loadSyncPulseView, syncPulseSettingsValue, type SyncPulseView } from '../../lib/syncPulseView'
 import type { LlmSettings, TenantChatSpace, TenantSettings } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -913,15 +913,19 @@ watch(
 )
 
 const syncPairs = ref<SyncPairSummary[]>([])
-const syncValue = computed(() => pulseSettingsValue(syncPairs.value))
+const syncView = ref<SyncPulseView>({ pulsing: [], allowanceOnly: [] })
+// DAR-UI-153: the pairs that pulse, not the allowance-only ones a peak period uses.
+const syncValue = computed(() => syncPulseSettingsValue(syncView.value))
 
 // Same as the peak row: "None" until the list arrives, and after a failed load.
 async function loadSyncPairs(): Promise<void> {
   try {
-    const response = await pulseFacade.listSyncPairs(pageAbortController.signal)
-    syncPairs.value = response.syncPairs ?? []
+    const loaded = await loadSyncPulseView(pageAbortController.signal)
+    syncPairs.value = loaded.pairs
+    syncView.value = loaded.view
   } catch {
     syncPairs.value = []
+    syncView.value = { pulsing: [], allowanceOnly: [] }
   }
 }
 

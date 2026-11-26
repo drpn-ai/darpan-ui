@@ -8,15 +8,41 @@
     <InlineValidation v-else-if="pageError" tone="error" :message="pageError" />
     <EmptyState v-else-if="pairs.length === 0" title="No sync pairs." />
 
-    <ul v-else class="pair-rows" data-testid="sync-pair-rows">
-      <li v-for="row in rows" :key="row.syncPairId">
-        <button type="button" class="pair-row" :aria-label="`Open sync pair ${row.label}`" data-testid="sync-pair-row" @click="open(row.syncPairId)">
-          <span class="pair-row__name">{{ row.label }}</span>
-          <span class="pair-row__cadence">{{ row.cadence }}</span>
-          <span class="pair-row__counts">{{ row.counts }}</span>
+    <template v-else>
+      <ul v-if="view.pulsing.length" class="pair-rows" data-testid="sync-pair-rows">
+        <li v-for="row in view.pulsing" :key="row.syncPairId">
+          <button type="button" class="pair-row" :aria-label="`Open sync pair ${row.label}`" data-testid="sync-pair-row" @click="open(row.syncPairId)">
+            <span class="pair-row__name">{{ row.label }}<span class="pair-row__check">{{ row.checkName }}</span></span>
+            <span class="pair-row__cadence">{{ row.cadence }}</span>
+            <span class="pair-row__counts">{{ row.counts }}</span>
+          </button>
+        </li>
+      </ul>
+      <EmptyState v-else title="No pair pulses." />
+
+      <section v-if="view.allowanceOnly.length" class="allowance-group" data-testid="sync-allowance-group">
+        <button
+          type="button"
+          class="allowance-group__toggle"
+          :aria-expanded="showAllowanceOnly"
+          aria-controls="sync-allowance-rows"
+          data-testid="sync-allowance-toggle"
+          @click="showAllowanceOnly = !showAllowanceOnly"
+        >
+          <span v-explain="'syncPairAllowance'">Start allowance only</span>
+          <span class="pair-row__counts">{{ view.allowanceOnly.length }}</span>
         </button>
-      </li>
-    </ul>
+        <ul v-if="showAllowanceOnly" id="sync-allowance-rows" class="pair-rows" data-testid="sync-allowance-rows">
+          <li v-for="row in view.allowanceOnly" :key="row.syncPairId">
+            <button type="button" class="pair-row" :aria-label="`Open sync pair ${row.label}`" data-testid="sync-allowance-row" @click="open(row.syncPairId)">
+              <span class="pair-row__name">{{ row.label }}<span class="pair-row__check">{{ row.checkName }}</span></span>
+              <span class="pair-row__cadence">{{ row.cadence }}</span>
+              <span class="pair-row__counts">{{ row.counts }}</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+    </template>
 
     <template #actions>
       <div class="action-row">
@@ -49,18 +75,17 @@
 </template>
 
 <script setup lang="ts">
-// DAR-BE-328. The active tenant's sync pairs as one list: label, how often it pulses, and what is waiting.
-// Each row opens its own page.
+// DAR-BE-328, DAR-UI-153. The active tenant's sync pairs: the ones that pulse (normally or in a coming peak period) as the
+// list, the ones that only carry a peak period's start allowance in a closed group below. Each row opens its own page.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
-import { pulseFacade } from '../../lib/api/facade'
 import type { SyncPairSummary } from '../../lib/api/pulseTypes'
 import { backIconPath, plusIconPath } from '../../lib/iconPaths'
-import { pulseCadence } from '../../lib/pulseWords'
+import { loadSyncPulseView, type SyncPulseView } from '../../lib/syncPulseView'
 import { usePermissionsStore } from '../../stores/permissions'
 
 const router = useRouter()
@@ -68,16 +93,11 @@ const permissionsStore = usePermissionsStore()
 const canEdit = computed(() => permissionsStore.canEditTenantSettings)
 
 const pairs = ref<SyncPairSummary[]>([])
+const view = ref<SyncPulseView>({ pulsing: [], allowanceOnly: [] })
+const showAllowanceOnly = ref(false)
 const loading = ref(false)
 const pageError = ref('')
 const controller = new AbortController()
-
-const rows = computed(() => pairs.value.map((pair) => ({
-  syncPairId: pair.syncPairId,
-  label: pair.label,
-  cadence: pulseCadence(pair.pulseEveryMinutes),
-  counts: `${pair.waitingCount} waiting · ${pair.pastAllowanceCount} past`,
-})))
 
 function open(syncPairId: string): void {
   void router.push({ name: 'settings-tenant-sync-pair', params: { syncPairId } })
@@ -87,12 +107,9 @@ async function load(): Promise<void> {
   loading.value = true
   pageError.value = ''
   try {
-    const response = await pulseFacade.listSyncPairs(controller.signal)
-    if (response.ok === false) {
-      pageError.value = response.errors?.[0] ?? 'Could not load the sync pairs.'
-      return
-    }
-    pairs.value = response.syncPairs ?? []
+    const loaded = await loadSyncPulseView(controller.signal)
+    pairs.value = loaded.pairs
+    view.value = loaded.view
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     pageError.value = error instanceof Error && error.message ? error.message : 'Could not load the sync pairs.'
@@ -146,6 +163,32 @@ onBeforeUnmount(() => controller.abort())
 .pair-row__counts {
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
+}
+
+.pair-row__check {
+  display: block;
+  color: var(--text-dim);
+}
+
+.allowance-group {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+/* The group heading is the toggle; closed by default. */
+.allowance-group__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--static-tile-text-size);
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {

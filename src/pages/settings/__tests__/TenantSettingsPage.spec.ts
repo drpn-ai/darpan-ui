@@ -383,13 +383,15 @@ describe('TenantSettingsPage', () => {
     expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-sync-pairs' })
   })
 
-  it('shows the first sync pair with its cadence, the rest as a count, and Open', async () => {
+  it('shows the first pulsing pair with its cadence, the other pulsing ones as a count, and Open', async () => {
     const pair = (over: Record<string, unknown>) => ({ syncPairId: '1', label: 'Approved orders', pulseEveryMinutes: 120, ...over })
-    listSyncPairs.mockResolvedValue({ ok: true, errors: [], messages: [], syncPairs: [pair({}), pair({ syncPairId: '2', label: 'Returns' }), pair({ syncPairId: '3', label: 'Exchanges' })] })
+    // DAR-UI-153: a pair that only carries a start allowance (no pulse, no peak period pulse) is not counted.
+    listSyncPairs.mockResolvedValue({ ok: true, errors: [], messages: [], syncPairs: [pair({}), pair({ syncPairId: '2', label: 'Returns' }),
+      pair({ syncPairId: '3', label: 'Exchanges', pulseEveryMinutes: null })] })
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(rowValue(wrapper, 'tenant-module-sync-pulse')).toBe('Approved orders · every 2h · 2 more')
+    expect(rowValue(wrapper, 'tenant-module-sync-pulse')).toBe('Approved orders · every 2h · 1 more')
     expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').text()).toBe('Open →')
   })
 
