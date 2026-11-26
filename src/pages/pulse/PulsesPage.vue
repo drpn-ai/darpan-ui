@@ -73,7 +73,7 @@ import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { pulseFacade } from '../../lib/api/facade'
 import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
 import { settingsIconPath } from '../../lib/iconPaths'
-import { loadSyncPulseView, pulseAsOfWords, pulseWatchFacts, type SyncPulseRow } from '../../lib/syncPulseView'
+import { calendarDayWords, loadSyncPulseView, pulseAsOfWords, pulseWatchFacts, type NextPulse, type SyncPulseRow } from '../../lib/syncPulseView'
 import { formatClockTime } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'
 
@@ -101,18 +101,18 @@ const controller = new AbortController()
 // Only a period that is on AND turns a pulse on is named: "Sale Nov 24-26" with every pulse off is not news here.
 const onPeriods = computed(() => periods.value.filter((p) => p.state === 'on' && pulsingPeriodIds.value.has(p.peakPeriodId)))
 
-/** "27 Nov" or "24 – 25 Dec": calendar dates, the same in every zone. */
+/** "27 Nov" or "24 Nov – 25 Dec": calendar dates, the same in every zone. */
 function periodDates(period: PeakPeriodSummary): string {
-  const day = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
-    .format(new Date(`${iso}T00:00:00Z`))
-  return period.fromDate === period.thruDate ? day(period.fromDate) : `${day(period.fromDate)} – ${day(period.thruDate)}`
+  return period.fromDate === period.thruDate
+    ? calendarDayWords(period.fromDate)
+    : `${calendarDayWords(period.fromDate)} – ${calendarDayWords(period.thruDate)}`
 }
 
 function open(syncPairId: string): void {
   void router.push({ name: 'settings-tenant-sync-pair', params: { syncPairId } })
 }
 
-async function cardFor(row: SyncPulseRow, nextPulse: Map<string, string>): Promise<PulseCard> {
+async function cardFor(row: SyncPulseRow, nextPulse: Map<string, NextPulse>): Promise<PulseCard> {
   const base = { syncPairId: row.syncPairId, label: row.label, checkName: row.checkName }
   try {
     const response = await pulseFacade.getSyncPair({ syncPairId: row.syncPairId }, controller.signal)

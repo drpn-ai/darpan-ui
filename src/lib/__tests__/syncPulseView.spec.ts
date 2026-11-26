@@ -137,22 +137,28 @@ describe('pulseWatchFacts', () => {
     const facts = pulseWatchFacts(detail, samples, past, clock)
     expect(facts.map((f) => [f.key, f.value, f.sub])).toEqual([
       ['every', 'Hour', 'last pulse skipped 12:02'],
-      ['allowance', '6 hours', 'Sale Nov 24-26'],
+      ['allowance', '6 hours', ''],
       ['waiting', '1,234', 'orders'],
       ['oldest', '21h 41m', '#GOR1'],
       ['past', '12', 'findings'],
     ])
   })
 
-  it('says normal when no period changes the allowance, and None when nothing waits', () => {
+  it('shows None when nothing waits', () => {
     const facts = pulseWatchFacts({ ...detail, allowanceMinutes: 120, periodName: null }, [], [], clock)
-    expect(facts.find((f) => f.key === 'allowance')).toMatchObject({ value: '2 hours', sub: 'normal' })
     expect(facts.find((f) => f.key === 'oldest')).toMatchObject({ value: 'None', sub: '' })
   })
 
-  it('shows the period name only when the period really changes the allowance (Shopify → HotWax at 2h in a sale)', () => {
-    const facts = pulseWatchFacts({ ...detail, allowanceMinutes: 120 }, [], [], clock)
-    expect(facts.find((f) => f.key === 'allowance')).toMatchObject({ value: '2 hours', sub: 'normal' })
+  // Aditi 2026-11-26 19:22 IST: "just the pulse window", no period names anywhere on the card.
+  it('shows the pulse window: today\'s allowance when it pulses today, the next pulsing period\'s when it is off', () => {
+    const off = { ...detail, pulseEveryMinutes: null, allowanceMinutes: 360, periodName: 'Sale Nov 24-26' }
+    const next = { periodName: 'PEAK Nov 27', fromDate: '2026-11-27', allowanceMinutes: 360 }
+    const facts = pulseWatchFacts(off, [], [], clock, next)
+    expect(facts.find((f) => f.key === 'allowance')).toMatchObject({ value: '6 hours', sub: '' })
+    expect(facts.find((f) => f.key === 'every')).toMatchObject({ value: 'Off today', sub: 'next: 27 Nov' })
+    const shopify = pulseWatchFacts({ ...off, allowanceMinutes: 120 }, [], [], clock, { ...next, allowanceMinutes: 120 })
+    expect(shopify.find((f) => f.key === 'allowance')).toMatchObject({ value: '2 hours', sub: '' })
+    for (const f of [...facts, ...shopify]) expect(`${f.value} ${f.sub}`).not.toMatch(/Sale|PEAK/)
   })
 })
 
@@ -168,14 +174,15 @@ describe('nextPulsePeriods', () => {
         period('NOW', 'Sale Nov 24-26', '2026-11-24', 'on'), period('P1', 'PEAK Nov 27', '2026-11-27', 'upcoming')],
       [[row('100000', 0)], [row('100000', 60), row('100102', 60)], [row('100000', 60)], [row('100102', 60)]],
     )
-    expect(map.get('100000')).toBe('PEAK Nov 30')
-    expect(map.get('100102')).toBe('PEAK Nov 27')
+    expect(map.get('100000')).toMatchObject({ periodName: 'PEAK Nov 30', fromDate: '2026-11-30', allowanceMinutes: 120 })
+    expect(map.get('100102')).toMatchObject({ periodName: 'PEAK Nov 27', fromDate: '2026-11-27' })
   })
 
   it('reads "Off today · next" on a day the pulse is off, the last pulse otherwise', () => {
     const clock = (v: string) => v.slice(11, 16)
     const off = { ...pair({ pulseEveryMinutes: null, lastPulseStamp: '2026-11-26T12:47:32Z' }), lastPulseStatusEnumId: 'SPS_SKIPPED' }
-    expect(pulseWatchFacts(off, [], [], clock, 'PEAK Nov 27')[0]).toMatchObject({ value: 'Off today', sub: 'next: PEAK Nov 27' })
+    expect(pulseWatchFacts(off, [], [], clock, { periodName: 'PEAK Nov 27', fromDate: '2026-11-27', allowanceMinutes: 120 })[0])
+      .toMatchObject({ value: 'Off today', sub: 'next: 27 Nov' })
     expect(pulseWatchFacts(off, [], [], clock)[0]).toMatchObject({ value: 'Off today', sub: 'last pulse skipped 12:47' })
   })
 })

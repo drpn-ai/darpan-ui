@@ -83,19 +83,33 @@ export function periodPulseMinutes(periodRows: PeakSyncRow[][]): Map<string, num
   return out
 }
 
-/** The first coming (not yet on) period whose sync rows turn the pulse on, by pair: "PEAK Nov 27". */
-export function nextPulsePeriods(periods: PeakPeriodSummary[], periodRows: PeakSyncRow[][]): Map<string, string> {
-  const out = new Map<string, string>()
+/** The next coming period that turns a pair's pulse on: its first day and the allowance (the pulse window) it uses. */
+export interface NextPulse {
+  periodName: string
+  fromDate: string
+  allowanceMinutes: number
+}
+
+/** By pair, the first coming (not yet on) period whose sync rows turn the pulse on. */
+export function nextPulsePeriods(periods: PeakPeriodSummary[], periodRows: PeakSyncRow[][]): Map<string, NextPulse> {
+  const out = new Map<string, NextPulse>()
   periods
     .map((period, i) => ({ period, rows: periodRows[i] ?? [] }))
     .filter(({ period }) => period.state === 'upcoming')
     .sort((a, b) => a.period.fromDate.localeCompare(b.period.fromDate))
     .forEach(({ period, rows }) => {
       for (const row of rows) {
-        if (row.periodPulseMinutes && !out.has(row.syncPairId)) out.set(row.syncPairId, period.periodName)
+        if (!row.periodPulseMinutes || out.has(row.syncPairId)) continue
+        out.set(row.syncPairId, { periodName: period.periodName, fromDate: period.fromDate,
+          allowanceMinutes: row.periodAllowanceMinutes ?? row.normalAllowanceMinutes })
       }
     })
   return out
+}
+
+/** "27 Nov": a calendar date, the same in every zone. */
+export function calendarDayWords(iso: string): string {
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`))
 }
 
 /** The periods whose sync rows turn at least one pulse on: the ones worth naming on the Pulses page. */
@@ -146,7 +160,7 @@ export interface LoadedSyncPulseView {
   /** The coming and current peak periods; empty when they failed to load. */
   periods: PeakPeriodSummary[]
   /** By pair: the next coming period that turns its pulse on. */
-  nextPulse: Map<string, string>
+  nextPulse: Map<string, NextPulse>
   /** The live periods that turn at least one pulse on (a sale period with every pulse off is not one). */
   pulsingPeriodIds: Set<string>
 }
@@ -191,28 +205,27 @@ export interface PulseWatchFact {
 }
 
 /**
- * DAR-UI-154. One pulse on the Pulses page, from get#SyncPair: how often and how late it is allowed today (a peak
- * period's values when one overrides), when it last pulsed and how that ended, and what the last read pulse found.
+ * DAR-UI-154. One pulse on the Pulses page, from get#SyncPair. No period names on the card (Aditi 2026-11-26 19:22 IST):
+ * Every is today's cadence, or "Off today · next: 27 Nov" for a pulse only peak periods turn on; Allowance is the pulse
+ * window, the allowance the pulse uses when it pulses (today's when it pulses today, else the next pulsing period's).
+ * Waiting, Oldest and Past allowance are what the last read pulse found.
  */
 export function pulseWatchFacts(pair: SyncPair, samples: SyncSample[], pastOrders: SyncPastOrder[],
-  clock: (value: string) => string, nextPulsePeriod?: string): PulseWatchFact[] {
+  clock: (value: string) => string, next?: NextPulse): PulseWatchFact[] {
   const at = (s: SyncSample) => new Date(s.sampleStamp).getTime()
   const latestRead = samples.filter((s) => s.statusEnumId === 'SPS_OK')
     .reduce<SyncSample | null>((last, s) => (!last || at(s) >= at(last) ? s : last), null)
   const oldest = latestRead?.oldestWaitingMinutes ?? pastOrders[0]?.waitingMinutes ?? null
-  const period = pair.periodName ?? ''
-  // The period is named under Allowance when it changes the allowance (held: Aditi's pick on hiding it while the pulse is off).
-  const allowanceFromPeriod = Boolean(period && pair.normalAllowanceMinutes != null && pair.allowanceMinutes !== pair.normalAllowanceMinutes)
+  const pulsesToday = Boolean(pair.pulseEveryMinutes)
+  const window = pulsesToday ? pair.allowanceMinutes : next?.allowanceMinutes ?? pair.normalAllowanceMinutes ?? pair.allowanceMinutes
   return [
-    // A pulse that only peak periods turn on reads "Off today · next: PEAK Nov 27" on the days between them.
-    pair.pulseEveryMinutes
+    pulsesToday
       ? { key: 'every', label: 'Every', value: pulseEveryWords(pair.pulseEveryMinutes),
         sub: lastPulseWords(pair.lastPulseStamp, pair.lastPulseStatusEnumId, clock), explain: 'syncPairEvery' }
       : { key: 'every', label: 'Every', value: 'Off today',
-        sub: nextPulsePeriod ? `next: ${nextPulsePeriod}` : lastPulseWords(pair.lastPulseStamp, pair.lastPulseStatusEnumId, clock),
+        sub: next ? `next: ${calendarDayWords(next.fromDate)}` : lastPulseWords(pair.lastPulseStamp, pair.lastPulseStatusEnumId, clock),
         explain: 'syncPairEvery' },
-    { key: 'allowance', label: 'Allowance', value: allowanceWords(pair.allowanceMinutes),
-      sub: allowanceFromPeriod ? period : 'normal', explain: 'syncPairAllowance' },
+    { key: 'allowance', label: 'Allowance', value: allowanceWords(window), sub: '', explain: 'syncPairAllowance' },
     { key: 'waiting', label: 'Waiting', value: (pair.waitingCount ?? 0).toLocaleString('en-US'), sub: 'orders', explain: 'syncPairWaiting' },
     { key: 'oldest', label: 'Oldest', value: oldest ? durationWords(oldest) : 'None',
       sub: oldest ? pastOrders[0]?.orderName ?? '' : '', explain: 'syncPairOldest' },
