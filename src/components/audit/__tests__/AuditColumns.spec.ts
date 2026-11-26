@@ -139,6 +139,13 @@ describe('AuditColumns acknowledgement', () => {
     expect(w.get('[data-testid="audit-ack-remind-label"]').text()).toBe('Remind me in 5 days if still open')
   })
 
+  // DAR-UI-152: acknowledged with no note, the card says who and when and shows no empty note line.
+  it('shows an acknowledgement with no note without a note line', () => {
+    const card = mountColumns({ ...ACK, note: null }).get('[data-testid="audit-ack-card"]')
+    expect(card.text()).toContain('Sam R.')
+    expect(card.find('[data-testid="audit-ack-note"]').exists()).toBe(false)
+  })
+
   it('shows an acknowledged finding\'s badge, note card, pencil and Reopen', async () => {
     reopenAcknowledgement.mockResolvedValue({ ok: true })
     const w = mountColumns(ACK)

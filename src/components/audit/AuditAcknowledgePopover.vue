@@ -17,7 +17,7 @@
         <AppToggleSwitch v-model="remind" :label="remindLabel" test-id="audit-ack-remind" />
       </div>
       <InlineValidation v-if="error" tone="error" :message="error" data-testid="audit-ack-error" />
-      <button type="submit" class="btn-primary audit-ack-submit" :disabled="!note.trim() || saving" data-testid="audit-ack-submit">
+      <button type="submit" class="btn-primary audit-ack-submit" :disabled="saving" data-testid="audit-ack-submit">
         {{ initial ? 'Save' : 'Acknowledge' }}
       </button>
     </form>
@@ -52,8 +52,9 @@ const root = ref<HTMLElement | null>(null)
 const input = ref<HTMLTextAreaElement | null>(null)
 
 async function save(): Promise<void> {
+  // DAR-UI-152 (Aditi: "typing something doesnt need to be required"): a blank note acknowledges too.
   const text = note.value.trim()
-  if (!text || saving.value) return
+  if (saving.value) return
   saving.value = true
   error.value = ''
   try {

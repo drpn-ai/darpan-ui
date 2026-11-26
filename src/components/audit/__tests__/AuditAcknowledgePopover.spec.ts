@@ -32,12 +32,17 @@ beforeEach(() => {
 })
 
 describe('AuditAcknowledgePopover', () => {
-  it('needs a note, reminds by default and reads the remind days', async () => {
+  // DAR-UI-152 (Aditi: "typing something doesnt need to be required").
+  it('acknowledges with no note, reminds by default and reads the remind days', async () => {
+    acknowledgeFinding.mockResolvedValue({ ok: true, acknowledgement: { ...ACK, note: null } })
     const w = mountPopover()
     const submit = w.get('[data-testid="audit-ack-submit"]')
-    expect(submit.attributes('disabled')).toBeDefined()
+    expect(submit.attributes('disabled')).toBeUndefined()
     await w.get('[data-testid="audit-ack-note-input"]').setValue('   ')
-    expect(submit.attributes('disabled')).toBeDefined()
+    await w.get('form').trigger('submit')
+    await flushPromises()
+    expect(acknowledgeFinding).toHaveBeenCalledWith('F-1', '', true)
+    expect(w.emitted('saved')).toEqual([[{ ...ACK, note: null }]])
     expect(w.get('[data-testid="audit-ack-remind"]').attributes('aria-checked')).toBe('true')
     expect(w.get('[data-testid="audit-ack-remind-label"]').text()).toBe('Remind me in 5 days if still open')
     expect(mountPopover({ remindDays: 1 }).get('[data-testid="audit-ack-remind-label"]').text()).toBe('Remind me in 1 day if still open')

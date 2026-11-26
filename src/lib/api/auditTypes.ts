@@ -81,7 +81,8 @@ export interface AuditFindingCounts {
 
 /** DAR-UI-144. A row taken with a note; reminded once remindOn has passed and the row reads open again. */
 export interface AuditAcknowledgement {
-  note: string
+  /** Why it is known; null or empty when none was written (DAR-UI-152: the note is optional). */
+  note: string | null
   by: { id: string; label: string | null }
   at: string
   remindOn: string | null

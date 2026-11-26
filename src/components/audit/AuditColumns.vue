@@ -355,7 +355,7 @@
                       <button v-if="!acknowledgement.reminded" type="button" class="audit-more" data-testid="audit-ack-reopen" :disabled="reopening" @click="reopenAck">Reopen</button>
                     </span>
                   </div>
-                  <p class="audit-body audit-ack-note" data-testid="audit-ack-note">{{ acknowledgement.note }}</p>
+                  <p v-if="acknowledgement.note" class="audit-body audit-ack-note" data-testid="audit-ack-note">{{ acknowledgement.note }}</p>
                   <InlineValidation v-if="reopenError" tone="error" :message="reopenError" data-testid="audit-ack-reopen-error" />
                 </div>
 
@@ -1004,7 +1004,7 @@ function rowAcknowledged(item: AuditFindingSummary): boolean {
   return item.state === 'open' && Boolean(item.acknowledgement && !item.acknowledgement.reminded)
 }
 function ackRowLine(ack: AuditAcknowledgement): string {
-  return [ackWho(ack), shortDate(ack.at.slice(0, 10)), ack.note.split('\n')[0]!.trim()].filter(Boolean).join(' · ')
+  return [ackWho(ack), shortDate(ack.at.slice(0, 10)), (ack.note ?? '').split('\n')[0]!.trim()].filter(Boolean).join(' · ')
 }
 function toggleAck(kind: 'new' | 'edit'): void {
   ackEditing.value = ackEditing.value === kind ? null : kind
