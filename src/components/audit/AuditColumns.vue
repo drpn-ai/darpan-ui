@@ -432,26 +432,6 @@
                     </span>
                   </li>
                 </ol>
-                <!-- DAR-UI-081. Each system's record and its status: the fix's system outlined, a record with no status dashed. -->
-                <ul v-else-if="cards.length" class="audit-systems" aria-label="Each system">
-                  <li
-                    v-for="card in cards"
-                    :key="card.key"
-                    class="audit-system"
-                    :class="{ 'audit-system--attention': card.attention, 'audit-system--unread': !card.status }"
-                    data-testid="audit-record-row"
-                  >
-                    <!-- DAR-UI-088. The system, then what its id is (two HotWax cards: a return and an order). -->
-                    <span class="audit-row-sub" data-testid="audit-card-kind">{{ card.label }} · {{ card.kind }}</span>
-                    <!-- DAR-UI-081 (Aditi: "order - status as heading type text", "SKU - status in one line in subheading text"). -->
-                    <span>{{ card.id }}<template v-if="card.status"> · {{ card.status }}</template></span>
-                    <span v-if="card.sub" class="audit-row-sub">{{ card.sub }}</span>
-                    <span v-if="!card.status && !card.items.length" class="audit-row-sub">No status read</span>
-                    <span v-for="item in card.items" :key="item.key" class="audit-row-sub audit-nowrap" data-testid="audit-card-item">
-                      {{ item.sku || item.id }}<template v-if="item.status"> · {{ item.status }}</template>
-                    </span>
-                  </li>
-                </ul>
 
                 <!-- DAR-UI-075. An order's lines: the one holding it up outlined. DAR-UI-081 (Aditi: "all info needed is already
                    available, remove the click"): each line says what it is in place, so it opens nothing. -->
@@ -630,7 +610,6 @@ import {
   shortRange,
   sourceReadBadge,
   splitHeadline,
-  systemCards,
   systemLabel,
   typeDetails,
   orderLineRows,
@@ -931,17 +910,16 @@ const lead = computed(() => {
   const rest = splitHeadline(headline.value).rest
   return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : headline.value
 })
-const cards = computed(() => systemCards(records.value, fixWhere.value))
 const chain = computed(() => heldChain(records.value))
-const details = computed(() => typeDetails(records.value))
+const details = computed(() => typeDetails(records.value, kind.value))
 // DAR-BE-368. The order's lines across its systems, from the records that carry them.
-const recordLines = computed(() => orderLineRows(records.value))
-// DAR-UI-139. The systems the finding's check compared this morning (the report's keys, in read order), so a system that
+const recordLines = computed(() => orderLineRows(records.value, comparedSystems.value))
+// DAR-UI-139. The systems the finding's check compares (DAR-BE-371: named whether or not it ran today), so a system that
 // holds no record of it still has its cell.
 const comparedSystems = computed(() => {
   const checkId = props.findingDoc?.finding.check.id
   const check = statementDoc.value?.checks?.find((item) => item.id === checkId)
-  return Object.keys(check?.compared ?? {})
+  return check?.systems?.length ? check.systems : Object.keys(check?.compared ?? {})
 })
 const basics = computed(() => basicFacts(records.value, comparedSystems.value))
 // DAR-UI-145. What the Agent tab pins: the open finding's badge, lead and basics. None beside (the finding is in view).
@@ -1752,41 +1730,6 @@ function statementText(id: string): string {
 .audit-verdict-do {
   display: grid;
   gap: var(--space-00);
-}
-
-/* Each system's record: the fix's system solid (attention), a record with no status read dashed (empty). */
-/* Each card as wide as its lines, so an item reads on one line (Aditi: the box must not grow with its items). */
-.audit-systems {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--space-1-5);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.audit-system {
-  flex: 1 1 auto;
-  min-width: 9rem;
-  display: grid;
-  align-content: start;
-  gap: var(--space-00);
-  padding: var(--space-1-5) var(--space-2);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  font-size: var(--type-label-size);
-  overflow-wrap: anywhere;
-}
-
-.audit-system--attention {
-  border-color: var(--text-soft);
-  background: var(--surface-3);
-}
-
-.audit-system--unread {
-  border-style: dashed;
-  border-color: var(--border);
 }
 
 /* A return held behind another: one step per record, joined by a rule; a missing record dashed, the record holding it

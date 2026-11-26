@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { basicFacts, checkStatusBadge, eventLabel, findingStateBadge, heldChain, orderLineRows, orderNameOf, periodOptions, recordDetails, recordKind, typeDetails, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemCards, systemLabel } from '../auditReport'
+import { basicFacts, checkStatusBadge, eventLabel, findingStateBadge, heldChain, orderLineRows, orderNameOf, periodOptions, recordDetails, recordKind, typeDetails, recordLabel, recordRows, recordTypeLabel, shortDate, shortRange, splitHeadline, systemLabel } from '../auditReport'
 
 // DAR-UI-058. The audit view's words for the report JSON's codes, and rows for its keyed objects.
 describe('auditReport', () => {
@@ -42,65 +42,19 @@ describe('auditReport', () => {
     expect(rows.map((row) => recordLabel(row, rows))).toEqual(['HotWax', 'NetSuite RMA', 'NetSuite credit memo'])
   })
 
-  // DAR-UI-081. Each system's record as a card; the fix's system outlined, a record with no status read marked so.
-  // DAR-BE-125: a HotWax order reads by its name, its HotWax id under it.
-  it('lays each system\'s record out as a card, the fix\'s system needing attention', () => {
+  // DAR-BE-125: a finding's order reads by its HotWax order name.
+  it('names the order a finding is about by its HotWax order name', () => {
     const rows = recordRows({
       Shopify: { order: [{ id: '18957262782595', internalId: null, status: null }] },
       OMS: { order: [{ id: '#GOR197395235', internalId: 'M1173432', status: 'Completed' }] },
-      NetSuite: { salesOrder: [{ id: 'SO1', internalId: null, status: 'Pending Billing' }] },
     })
-    expect(systemCards(rows, 'NetSuite').map((c) => [c.label, c.kind, c.id, c.sub, c.status, c.attention])).toEqual([
-      ['Shopify', 'Order ID', '18957262782595', '', '', false],
-      ['HotWax', 'Order name', '#GOR197395235', 'Order ID M1173432', 'Completed', false],
-      ['NetSuite', 'Sales order', 'SO1', '', 'Pending Billing', true],
-    ])
     expect(orderNameOf(rows)).toBe('#GOR197395235')
-  })
-
-  // DAR-UI-088 (Aditi: "there are 2 hotwax ids.. for all ids add a subheading to show what they are").
-  it('says what each card\'s id is, so two cards of one system tell apart', () => {
-    const rows = recordRows({
-      NetSuite: { rma: [{ id: 'RMA341549', internalId: null, status: 'Return Authorization : Pending Refund' }] },
-      OMS: { return: [{ id: 'GR1793159', internalId: null, status: null }], order: [{ id: 'M247005', internalId: null, status: null }] },
-      Shopify: { order: [{ id: '6469595889795', internalId: null, status: null }] },
-    })
-    expect(systemCards(rows, 'NetSuite').map((c) => [c.label, c.kind, c.id])).toEqual([
-      ['NetSuite', 'RMA', 'RMA341549'],
-      ['HotWax', 'Return ID', 'GR1793159'],
-      ['HotWax', 'Order ID', 'M247005'],
-      ['Shopify', 'Order ID', '6469595889795'],
-    ])
-  })
-
-  // DAR-UI-081 (Aditi: "group the boxes by system and order, and show item as a subheading with SKU").
-  it('groups an order\'s items into one card under it, each by SKU, the order\'s status on the card', () => {
-    const rows = recordRows({
-      OMS: { orderItem: [
-        { id: 'M1168118/01', internalId: null, status: 'Completed', orderStatus: 'Completed', sku: '263-203-186-G' },
-        { id: 'M1168118/02', internalId: null, status: 'Completed', orderStatus: 'Completed' },
-      ] },
-      NetSuite: { salesOrderLine: [{ id: 'SO7330628', internalId: null, status: 'Pending Fulfillment' }, { id: 'SO7330628', internalId: null, status: 'Pending Fulfillment' }] },
-    })
-    const cards = systemCards(rows, 'NetSuite')
-    expect(cards.map((c) => [c.label, c.id, c.status, c.attention, c.items.length])).toEqual([
-      ['HotWax', 'M1168118', 'Completed', false, 2],
-      ['NetSuite', 'SO7330628', 'Pending Fulfillment', true, 0],
-    ])
-    expect(cards[0]!.items.map((item) => [item.sku, item.id, item.status])).toEqual([
-      ['263-203-186-G', 'M1168118/01', 'Completed'], ['', 'M1168118/02', 'Completed'],
-    ])
-    // One product on two items of one order: each names its item too.
-    const twins = systemCards(recordRows({ OMS: { orderItem: [
-      { id: 'M1168149/01', internalId: null, status: 'Completed', sku: '259-118-G' },
-      { id: 'M1168149/02', internalId: null, status: 'Completed', sku: '259-118-G' }] } }), '')
-    expect(twins[0]!.items.map((item) => item.sku)).toEqual(['259-118-G · 01', '259-118-G · 02'])
   })
 
   // DAR-UI-080 (Aditi: "add return channel ... warranty ID when available ... order total or return total"; "add order
   // name ... status of order"; "customer deposit info from NS"); DAR-UI-081 ("add customer name", "add order date and
-  // return date"). The facts under the cards, only when known.
-  it('lists what explains a record under the cards, only when known', () => {
+  // return date"). The facts, only when known.
+  it('lists what explains a record, only when known', () => {
     const rows = recordRows({
       OMS: {
         orderItem: [{ id: 'M1167975/01', internalId: null, status: 'Completed', orderName: '#GOR195470263', orderStatus: 'Completed',
@@ -221,6 +175,14 @@ describe('auditReport', () => {
     expect(basicFacts(paid, ['OMS', 'Shopify']).slice(0, 2).map((f) => [f.label, f.value])).toEqual([
       ['HotWax', 'Completed · Settled, Refunded'], ['Shopify', 'Paid'],
     ])
+    // DAR-BE-371 (Gorjana R7 F-126390). A HotWax-to-NetSuite check shows HotWax and NetSuite, never the Shopify record
+    // beside them; a one-system check shows its one system.
+    const r7 = recordRows({
+      OMS: { order: [{ id: '#GOR197449616', internalId: 'M1237624', status: 'Approved' }] },
+      Shopify: { order: [{ id: '18997506769027', internalId: null, status: null }] },
+    })
+    expect(basicFacts(r7, ['OMS', 'NetSuite']).slice(0, 2).map((f) => [f.label, f.value])).toEqual([['HotWax', 'Approved'], ['NetSuite', 'None']])
+    expect(basicFacts(r7, ['NetSuite']).map((f) => f.label)).toEqual(['NetSuite', 'Total', 'Day'])
   })
 
   // DAR-UI-139. What kind of record the finding is about, from its category, else its records.
@@ -239,7 +201,14 @@ describe('auditReport', () => {
       OMS: { order: [{ id: 'O1', internalId: null, status: 'Approved', customer: 'Ada Lovelace', orderDate: '2026-11-16', salesChannel: 'Web',
         orderTotal: { amount: '486.53', currency: 'USD' } }] },
     })
-    expect(typeDetails(rows).map((f) => [f.label, f.value])).toEqual([['Customer', 'Ada Lovelace'], ['Sales channel', 'Web']])
+    // DAR-UI-151. Every order finding shows the same rows, a dash where its reads gave none.
+    expect(typeDetails(rows, 'Order').map((f) => [f.label, f.value])).toEqual([
+      ['Customer', 'Ada Lovelace'], ['Sales channel', 'Web'], ['Ship method', '—'],
+    ])
+    const exchange = recordRows({ OMS: { order: [{ id: 'O2', internalId: null, status: null, shipMethod: 'POS_COMPLETED' }] } })
+    expect(typeDetails(exchange, 'Exchange').map((f) => [f.label, f.value])).toEqual([
+      ['Customer', '—'], ['Sales channel', '—'], ['Warranty ID', '—'], ['Ship method', 'POS_COMPLETED'],
+    ])
   })
 
   it('says a history code in words', () => {
@@ -263,5 +232,9 @@ describe('auditReport', () => {
       { key: '00103', label: 'SKU-C', quantity: '1', statuses: [{ system: 'HotWax', status: 'Cancelled' }] },
     ])
     expect(orderLineRows(recordRows({ OMS: { order: [{ id: 'M1', internalId: null, status: null }] } }))).toEqual([])
+    // DAR-BE-371. A HotWax-to-NetSuite check lists only HotWax's and NetSuite's lines.
+    expect(orderLineRows(rows, ['OMS', 'NetSuite']).map((line) => [line.key, line.statuses.map((x) => x.system)])).toEqual([
+      ['71', ['HotWax']], ['00103', ['HotWax']],
+    ])
   })
 })

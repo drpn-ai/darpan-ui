@@ -101,71 +101,6 @@ export interface RecordFact {
   status: string
 }
 
-/**
- * DAR-UI-081 (Aditi: "group the boxes by system and order, and show item as a subheading with SKU"). One card per system
- * and order: its id and status (an item's order's status, else the record's), the system the fix is in outlined
- * (attention), no status read shown as such; a HotWax order lists its items under it, each by SKU. DAR-BE-125: a HotWax
- * order reads by its name, its HotWax id under it. DAR-UI-088 (Aditi: "for all ids add a subheading to show what they
- * are"): each card says what its id is, so two cards of one system tell apart.
- */
-export interface SystemCardItem {
-  key: string
-  sku: string
-  id: string
-  status: string
-}
-
-export interface SystemCard {
-  key: string
-  label: string
-  kind: string
-  id: string
-  sub: string
-  status: string
-  attention: boolean
-  items: SystemCardItem[]
-}
-
-/** DAR-UI-088. What a card's id is: an order's or return's id, a HotWax order's name, else its record type. */
-export function cardKind(row: RecordRow): string {
-  if (row.recordType === 'order') return row.system === 'HotWax' && row.internalId ? 'Order name' : 'Order ID'
-  if (row.recordType === 'orderItem') return 'Order ID'
-  if (row.recordType === 'return') return 'Return ID'
-  if (row.recordType === 'salesOrderLine') return 'Sales order'
-  const type = recordTypeLabel(row.recordType)
-  return type.charAt(0).toUpperCase() + type.slice(1)
-}
-
-export function systemCards(rows: RecordRow[], fixWhere: string): SystemCard[] {
-  const cards = new Map<string, SystemCard>()
-  rows.forEach((row) => {
-    const item = row.recordType === 'orderItem'
-    const id = item ? (row.id.split('/')[0] ?? row.id) : row.id
-    const key = `${row.system}|${id}`
-    let card = cards.get(key)
-    if (!card) {
-      card = {
-        key,
-        label: row.system,
-        kind: cardKind(row),
-        id,
-        sub: row.recordType === 'order' && row.system === 'HotWax' && row.internalId ? `Order ID ${row.internalId}` : '',
-        status: item ? row.orderStatus : row.status,
-        attention: Boolean(fixWhere) && row.system === fixWhere,
-        items: [],
-      }
-      cards.set(key, card)
-    }
-    if (item) card.items.push({ key: row.key, sku: row.sku, id: row.id, status: row.status })
-  })
-  // A SKU on two items of one order names each item too (gorjana M1168149: one product on three lines).
-  cards.forEach((card) => {
-    const repeated = new Set(card.items.map((item) => item.sku).filter((sku, index, skus) => sku && skus.indexOf(sku) !== index))
-    card.items.forEach((item) => { if (repeated.has(item.sku)) item.sku = `${item.sku} · ${item.id.split('/').pop() ?? item.id}` })
-  })
-  return [...cards.values()]
-}
-
 /** DAR-UI-081. The order a finding is about, by name: a record's order name, else a HotWax order's own. */
 export function orderNameOf(rows: RecordRow[]): string {
   return rows.find((row) => row.orderName)?.orderName
@@ -209,11 +144,14 @@ const DETAIL_ORDER = ['Customer', 'Order date', 'Sales channel', 'Ship method', 
 /**
  * DAR-UI-139 (Aditi: "all finding have the basix details row"). The same four cells on every finding: each of the two
  * systems the check compared (report keys, in read order) and its record's status, "None" when that system holds no
- * record of it, with its payment status beside (DAR-BE-360); the amount (a return's total, else its order's); the day (a return's, else its order's). A check that has
- * not run names no systems, so the records' own systems stand in. A fact nobody read is a dash, so every row is even.
+ * record of it, with its payment status beside (DAR-BE-360); the amount (a return's total, else its order's); the day (a return's, else its order's). The
+ * check names its systems whether or not it ran (DAR-BE-371). A fact nobody read is a dash, so every row is even.
  */
 export function basicFacts(rows: RecordRow[], compared: string[]): StaticFact[] {
-  const systems = [...new Set([...compared.map(systemLabel), ...rows.map((row) => row.system)])].slice(0, 2)
+  // DAR-BE-371 (Aditi: "if we are looking at HW to NS then the info should be HW to NS"): only the compared systems; a
+  // one-system check gets one cell. The records' own systems stand in only when the check names none.
+  const systems = compared.length ? [...new Set(compared.map(systemLabel))].slice(0, 2)
+    : [...new Set(rows.map((row) => row.system))].slice(0, 2)
   const side = (index: number): StaticFact => {
     const system = systems[index]
     if (!system) return { key: `system${index}`, label: 'Other system', value: '—' }
@@ -230,7 +168,7 @@ export function basicFacts(rows: RecordRow[], compared: string[]): StaticFact[] 
   const ordered = rows.find((row) => row.orderDate)?.orderDate
   return [
     side(0),
-    side(1),
+    ...(compared.length && systems.length === 1 ? [] : [side(1)]),
     total ? { key: 'amount', label: 'Return total', value: total }
       : orderTotal ? { key: 'amount', label: 'Order total', value: orderTotal } : { key: 'amount', label: 'Total', value: '—' },
     returned?.returnDate ? { key: 'day', label: 'Returned', value: shortDate(returned.returnDate) }
@@ -251,8 +189,18 @@ export function recordKind(category: string, rows: RecordRow[]): RecordKind {
 
 /** DAR-UI-139. The record's facts under its kind, less what the basics already say (its total and day). */
 const BASIC_LABELS = ['Order date', 'Return date', 'Order total', 'Return total']
-export function typeDetails(rows: RecordRow[]): RecordFact[] {
-  return recordDetails(rows).filter((fact) => !BASIC_LABELS.includes(fact.label))
+/** DAR-UI-151 (Aditi: "can we standardize this info across all finding detail cards"). The rows every finding of a kind
+ *  shows, in this order, a dash when its reads gave none; anything else known (a deposit) follows. */
+const KIND_DETAILS: Record<RecordKind, string[]> = {
+  Order: ['Customer', 'Sales channel', 'Ship method'],
+  Return: ['Customer', 'Sales channel', 'Channel'],
+  Exchange: ['Customer', 'Sales channel', 'Warranty ID'],
+}
+export function typeDetails(rows: RecordRow[], kind: RecordKind): RecordFact[] {
+  const known = recordDetails(rows).filter((fact) => !BASIC_LABELS.includes(fact.label))
+  const standard = KIND_DETAILS[kind].map((label) =>
+    known.find((fact) => fact.label === label) ?? { key: `standard|${label}`, label, value: '—', status: '' })
+  return [...standard, ...known.filter((fact) => !KIND_DETAILS[kind].includes(fact.label))]
 }
 
 /** DAR-BE-368. One line of the order across its systems: what it is, how many, and each system's word for it. */
@@ -268,7 +216,10 @@ export interface OrderLineRow {
  * from every record that carries them, one row per line: a Shopify line and the HotWax item that keeps its id pair into
  * one, labelled by SKU (else its name, else its id), each system's status in record order.
  */
-export function orderLineRows(rows: RecordRow[]): OrderLineRow[] {
+export function orderLineRows(rows: RecordRow[], compared: string[] = []): OrderLineRow[] {
+  // DAR-BE-371. Only the compared systems' lines, when the check names them.
+  const inContext = compared.map(systemLabel)
+  if (inContext.length) rows = rows.filter((row) => inContext.includes(row.system))
   const byKey = new Map<string, OrderLineRow & { sku: string; name: string }>()
   rows.forEach((row) => row.lines.forEach((line, index) => {
     const key = line.id ?? `${row.key}#${index}`

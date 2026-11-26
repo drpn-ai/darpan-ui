@@ -123,6 +123,8 @@ export interface AuditStatementCheck {
   reason: string | null
   matchedBy: string | null
   compared: Record<string, number> | null
+  /** DAR-BE-371. The systems the check compares (report keys, FILE_1 then FILE_2), whether or not it ran this morning. */
+  systems?: string[]
   /** DAR-UI-063. The days this morning's run read: the period to date, or the days a person played. */
   window?: { from: string; thru: string } | null
 }

@@ -510,27 +510,25 @@ describe('AuditReportPage', () => {
     expect(w.get('[data-testid="audit-columns"]').classes()).toContain('audit-columns--rail')
     expect(w.get('[data-testid="audit-columns"]').attributes('data-level')).toBe('4')
     expect(w.get('[data-testid="audit-finding-headline"]').text()).toBe('Invoice INV1 has no Etail id')
-    const records = w.findAll('[data-testid="audit-record-row"]').map((row) => row.text())
-    expect(records[0]).toContain('NetSuite')
-    expect(records[0]).toContain('Invoice : Open')
-    expect(records[1]).toContain('HotWax')
+    // DAR-UI-150 (Aditi: "we can get rid of this then.. because that is covered in the top"): each system's status is in
+    // the basics row; there are no per-system cards under the fix.
+    const basics = w.get('[data-testid="audit-finding-basics"]').text()
+    expect(basics).toContain('NetSuite')
+    expect(basics).toContain('Invoice : Open')
+    expect(w.find('[data-testid="audit-record-row"]').exists()).toBe(false)
     // A finding its cause explains needs no evidence: the fix and the records say it.
     expect(w.find('[data-testid="audit-evidence-row"]').exists()).toBe(false)
     expect(w.get('[data-testid="audit-finding-fix"]').text()).toBe('Enter the Shopify order id on invoice INV1.')
     expect(w.findAll('[data-testid="audit-history-row"]')).toHaveLength(1)
-    // DAR-UI-081. Verdict first: what is wrong, then the fix, then each system's record and its status.
-    const order = ['audit-finding-headline', 'audit-finding-fix', 'audit-record-row']
+    // DAR-UI-081. Verdict first: what is wrong, then the fix.
+    const order = ['audit-finding-headline', 'audit-finding-fix']
       .map((id) => w.get('[data-testid="audit-columns"]').html().indexOf(`data-testid="${id}"`))
     expect(order).toEqual([...order].sort((a, b) => a - b))
     expect(w.find('.audit-record-id').exists()).toBe(false)
     // Half the words: the fix is written per cause, so the cause, "done when", the internal id and the sighting count go.
     const detail = w.get('[aria-label="Detail"]').text()
     for (const gone of ['No Shopify order id', 'Done when', '801', 'seen']) expect(detail).not.toContain(gone)
-    // DAR-UI-081. The fix's system leads the cards (solid), a record whose read gave no status is dashed; nothing is stuck
-    // beyond what the headline says, so the verdict holds the fix alone.
-    const cards = w.findAll('[data-testid="audit-record-row"]')
-    expect(cards[0]!.classes()).toContain('audit-system--attention')
-    expect(cards[1]!.classes()).toContain('audit-system--unread')
+    // Nothing is stuck beyond what the headline says, so the verdict holds the fix alone.
     expect(w.find('[data-testid="audit-finding-stuck"]').exists()).toBe(false)
 
     // The path steps back up: the statement drops the finding.
@@ -682,12 +680,13 @@ describe('AuditReportPage', () => {
     const w = mount(AuditReportPage)
     await flushPromises()
 
-    // The check compared NetSuite (the report's statement R2); the finding holds no NetSuite record, so its cell says None.
+    // The check compares NetSuite alone (the report's statement R2); the finding holds no NetSuite record, so its cell says
+    // None. DAR-BE-371: only the compared system, never the HotWax record beside it.
     const cells = w.get('[data-testid="audit-finding-basics"]').findAll('.static-fact')
-    expect(cells.map((cell) => cell.text())).toEqual(['NetSuiteNone', 'HotWaxApproved', 'Order total486.53 USD', 'OrderedNov 16'])
+    expect(cells.map((cell) => cell.text())).toEqual(['NetSuiteNone', 'Order total486.53 USD', 'OrderedNov 16'])
     expect(w.get('[data-testid="audit-record-kind"]').text()).toBe('Order')
     // Said once: the total and day sit in the basics, not again under the order.
-    expect(w.findAll('[data-testid="audit-record-detail"]').map((row) => row.text())).toEqual(['CustomerAda Lovelace', 'Sales channelWeb'])
+    expect(w.findAll('[data-testid="audit-record-detail"]').map((row) => row.text())).toEqual(['CustomerAda Lovelace', 'Sales channelWeb', 'Ship method—'])
     const html = w.get('[data-testid="audit-columns"]').html()
     const at = (id: string) => html.indexOf(`data-testid="${id}"`)
     expect(at('audit-finding-headline')).toBeLessThan(at('audit-finding-basics'))
@@ -1243,11 +1242,12 @@ describe('AuditReportPage', () => {
     expect(replace).toHaveBeenLastCalledWith({ query: { category: 'orders', statement: 'R2', finding: 'F-1', tab: undefined } })
   })
 
-  // DAR-BE-368 (Aditi: "include the line item details, expecially the SKU", "show both shopify and HW").
-  it("lists an order finding's lines by SKU with each system's word for them, and no Lines when the records carry none", async () => {
+  // DAR-BE-368 (Aditi: "include the line item details, expecially the SKU", "show both shopify and HW"). DAR-BE-371: the
+  // lines of the systems the check compares only (R2 compares NetSuite), so the Shopify line beside it is left out.
+  it("lists an order finding's lines by SKU with each compared system's word for them, and no Lines when the records carry none", async () => {
     const withLines = { ...findingDocument, finding: { ...findingDocument.finding, records: {
       Shopify: { order: [{ id: '19007848448310', internalId: null, status: 'Unfulfilled', lines: [{ id: '71', sku: 'SKU-A', name: 'Anorak', quantity: 2, status: 'Unfulfilled' }] }] },
-      OMS: { order: [{ id: '#9281CAN', internalId: '167426', status: 'Completed', lines: [{ id: '71', sku: 'SKU-A', name: null, quantity: 2, status: 'Completed' }] }] },
+      NetSuite: { salesOrder: [{ id: 'SO1', internalId: null, status: 'Pending Fulfillment', lines: [{ id: '71', sku: 'SKU-A', name: null, quantity: 2, status: 'Pending Fulfillment' }] }] },
     } } }
     f.getAuditFinding.mockResolvedValue({ ok: true, finding: withLines } as never)
     liveRoute.query = { category: 'orders', statement: 'R2', finding: 'F-1' }
@@ -1256,7 +1256,8 @@ describe('AuditReportPage', () => {
     const lines = w.findAll('[data-testid="audit-record-line"]')
     expect(lines).toHaveLength(1)
     expect(lines[0]!.text()).toContain('SKU-A')
-    expect(lines[0]!.text()).toContain('Shopify Unfulfilled · HotWax Completed')
+    expect(lines[0]!.text()).toContain('NetSuite Pending Fulfillment')
+    expect(lines[0]!.text()).not.toContain('Shopify')
     expect(lines[0]!.text()).toContain('× 2')
 
     f.getAuditFinding.mockResolvedValue({ ok: true, finding: findingDocument } as never)
