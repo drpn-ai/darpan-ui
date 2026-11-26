@@ -71,7 +71,7 @@
         <!-- DAR-BE-328. Busy windows that move runs out of the way. -->
         <li class="tenant-settings-row">
           <span class="tenant-settings-row__label">Peak periods</span>
-          <span class="tenant-settings-row__value" :class="{ 'tenant-settings-row__dim': !peakPeriods.length }" data-testid="tenant-peak-value">{{ peakLoaded ? peakValue : '' }}</span>
+          <span class="tenant-settings-row__value" :class="{ 'tenant-settings-row__dim': !peakPeriods.length }" data-testid="tenant-peak-value">{{ peakLoaded ? peakValue : 'Loading…' }}</span>
           <span class="tenant-settings-row__actions">
             <button
               v-if="peakLoaded"
@@ -88,7 +88,7 @@
         <!-- DAR-BE-328. Orders waiting to reach the other system, watched on a pulse. -->
         <li class="tenant-settings-row">
           <span class="tenant-settings-row__label">Sync pulse</span>
-          <span class="tenant-settings-row__value" :class="{ 'tenant-settings-row__dim': !syncPairs.length }" data-testid="tenant-sync-value">{{ syncLoaded ? syncValue : '' }}</span>
+          <span class="tenant-settings-row__value" :class="{ 'tenant-settings-row__dim': !syncPairs.length }" data-testid="tenant-sync-value">{{ syncLoaded ? syncValue : 'Loading…' }}</span>
           <span class="tenant-settings-row__actions">
             <button
               v-if="syncLoaded"
@@ -742,7 +742,7 @@ async function loadChatSpaces(): Promise<void> {
 
 const peakPeriods = ref<PeakPeriodSummary[]>([])
 const peakValue = computed(() => peakSettingsValue(peakPeriods.value))
-// DAR-UI-154: the row is blank, with no button, until the list arrives (it read "None · Set up" for a moment first).
+// DAR-UI-154: the row reads "Loading…", with no button, until the list arrives (it read "None · Set up" for a moment first).
 const peakLoaded = ref(false)
 
 // A failed load reads "None".
@@ -923,7 +923,7 @@ const syncView = ref<SyncPulseView>({ pulsing: [], allowanceOnly: [] })
 // DAR-UI-153: the pairs that pulse, not the allowance-only ones a peak period uses.
 const syncValue = computed(() => syncPulseSettingsValue(syncView.value))
 
-// Same as the peak row: blank with no button until the reads return, "None" after a failed load.
+// Same as the peak row: "Loading…" with no button until the reads return, "None" after a failed load.
 const syncLoaded = ref(false)
 async function loadSyncPairs(): Promise<void> {
   try {

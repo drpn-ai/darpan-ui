@@ -72,7 +72,7 @@ describe('TenantSyncPairsPage', () => {
     expect(getPeakPeriod).toHaveBeenCalledWith({ peakPeriodId: 'P1' }, expect.anything())
     const rows = wrapper.findAll('[data-testid="sync-pair-row"]')
     expect(rows.map((r) => r.attributes('aria-label'))).toEqual([
-      'Open sync pair HotWax orders → NetSuite SuiteQL', 'Open sync pair Shopify → HotWax orders'])
+      'Open sync pair HotWax → NetSuite', 'Open sync pair Shopify → HotWax'])
     expect(rows[0]!.text()).toContain('Daily Order Reconciliation - NetSuite')
     expect(rows[0]!.text()).toContain('Every 1h in peak periods')
     const toggle = wrapper.get('[data-testid="sync-allowance-toggle"]')
@@ -83,7 +83,7 @@ describe('TenantSyncPairsPage', () => {
     await toggle.trigger('click')
     const hidden = wrapper.findAll('[data-testid="sync-allowance-row"]')
     expect(hidden.map((r) => r.attributes('aria-label'))).toEqual([
-      'Open sync pair HotWax returns → NetSuite SuiteQL', 'Open sync pair NetSuite SuiteQL only'])
+      'Open sync pair HotWax → NetSuite returns', 'Open sync pair NetSuite only'])
   })
 
   it('keeps the backend label and the pair\'s own cadence when the checks and periods fail to load', async () => {

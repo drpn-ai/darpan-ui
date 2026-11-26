@@ -24,23 +24,50 @@ export interface SyncPulseView {
   allowanceOnly: SyncPulseRow[]
 }
 
+/** The record type a side reads when it is not orders: "returns", "order lines"; '' for orders or unknown. */
+function recordTypeOf(endpointLabel: string | undefined): string {
+  const words = (endpointLabel ?? '').toLowerCase()
+  if (words.endsWith('order lines')) return 'order lines'
+  if (words.endsWith('returns')) return 'returns'
+  return ''
+}
+
 /**
- * "<upstream side> → <other side>" from the check's own sides; "<side> only" for a one-sided check. list#SyncPairs has no
- * upstreamSide, so the upstream is the side whose label starts with the system the backend label names first
- * ("Shopify → …" picks the "Shopify" side), FILE_1 when none does.
+ * Systems in list#SyncPairs' label: "<upstream> → <target> orders". The backend names each side's SYSTEM (HotWax,
+ * NetSuite, Shopify; never the endpoint), but says "Target" for a one-sided check and "orders" for every record type.
  */
-export function pairSidesLabel(pair: Pick<SyncPairSummary, 'automationId' | 'automationName' | 'label'> & { upstreamSide?: string | null },
+function backendSystems(label: string | undefined): { up: string, target: string } | null {
+  const match = /^(.+?) → (.+?)(?: orders)?$/.exec((label ?? '').trim())
+  if (!match) return null
+  return { up: match[1]!.trim(), target: match[2]!.trim() }
+}
+
+/**
+ * DAR-UI-153/154. A pair's label in product system names only, never an endpoint or protocol (no SuiteQL, no GraphQL):
+ * "HotWax → NetSuite", "Shopify → HotWax", "HotWax → NetSuite returns" (a record type only when it is not orders),
+ * "NetSuite only" for a one-sided check. The systems come from the backend label; one-sidedness and the record type
+ * from the check's sides in the pair form (upstreamOptions), whose labels are endpoint names.
+ */
+export function pairSidesLabel(pair: Pick<SyncPairSummary, 'automationId' | 'automationName' | 'label'>,
   automations: SyncAutomationOption[]): string {
   const options = automations.find((a) => a.automationId === pair.automationId)?.upstreamOptions ?? []
-  const named = (pair.label ?? '').split(' → ')[0]?.trim().toLowerCase() ?? ''
-  const side = pair.upstreamSide
-    ?? options.find((o) => named && o.label.toLowerCase().startsWith(named))?.upstreamSide
-    ?? 'FILE_1'
-  const up = options.find((o) => o.upstreamSide === side)
-  const other = options.find((o) => o.upstreamSide !== side)
-  if (up && other) return `${up.label} → ${other.label}`
-  if (up) return `${up.label} only`
-  return pair.automationName || pair.label
+  const systems = backendSystems(pair.label)
+  if (!systems || systems.up === 'Source') return pair.automationName || pair.label
+  const upKey = systems.up.toLowerCase()
+  const upOption = options.find((o) => o.label.toLowerCase().startsWith(upKey)) ?? options[0]
+  const otherOption = options.find((o) => o !== upOption)
+  const oneSided = systems.target === 'Target' || (options.length === 1)
+  const recordType = recordTypeOf(upOption?.label) || recordTypeOf(otherOption?.label)
+  const suffix = recordType ? ` ${recordType}` : ''
+  if (oneSided) return `${systems.up} only${suffix}`
+  return `${systems.up} → ${systems.target}${suffix}`
+}
+
+/** The backend label in system names alone, where the check's sides are not at hand (a peak period's sync rows). */
+export function plainPairLabel(label: string): string {
+  const systems = backendSystems(label)
+  if (!systems || systems.up === 'Source') return label
+  return systems.target === 'Target' ? `${systems.up} only` : `${systems.up} → ${systems.target}`
 }
 
 /** The pairs that pulse in a peak period that has not ended, from each period's sync rows. */

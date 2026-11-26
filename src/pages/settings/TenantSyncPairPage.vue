@@ -323,6 +323,7 @@ import {
 } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import { formatClockTime } from '../../lib/utils/date'
+import { pairSidesLabel } from '../../lib/syncPulseView'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -427,7 +428,8 @@ const lastPulseFailed = computed(() => saved.value?.lastPulseStatusEnumId === 'S
 
 const chosenAutomation = computed(() => automations.value.find((automation) => automation.automationId === draft.value?.automationId) ?? null)
 
-const title = computed(() => saved.value?.label || chosenAutomation.value?.label || 'New sync pair')
+// DAR-UI-154: system names only ("HotWax → NetSuite returns"), as on the Sync pulse list and the Pulses page.
+const title = computed(() => (saved.value ? pairSidesLabel(saved.value, automations.value) : '') || chosenAutomation.value?.label || 'New sync pair')
 
 const upstreamLabel = computed(() => chosenAutomation.value?.upstreamOptions
   .find((option) => option.upstreamSide === draft.value?.upstreamSide)?.label ?? '')

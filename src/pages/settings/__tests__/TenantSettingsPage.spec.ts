@@ -384,14 +384,14 @@ describe('TenantSettingsPage', () => {
   })
 
   // DAR-UI-154 (prod-roll look 2026-11-26): no "None · Set up" flash while the reads are in flight.
-  it('leaves the peak and sync rows blank, with no button, until their reads return', async () => {
+  it('shows Loading… with no button on the peak and sync rows until their reads return', async () => {
     listPeakPeriods.mockReturnValue(new Promise(() => {}))
     listSyncPairs.mockReturnValue(new Promise(() => {}))
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="tenant-peak-value"]').text()).toBe('')
-    expect(wrapper.get('[data-testid="tenant-sync-value"]').text()).toBe('')
+    expect(wrapper.get('[data-testid="tenant-peak-value"]').text()).toBe('Loading…')
+    expect(wrapper.get('[data-testid="tenant-sync-value"]').text()).toBe('Loading…')
     expect(wrapper.find('[data-testid="tenant-module-peak-periods"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tenant-module-sync-pulse"]').exists()).toBe(false)
   })

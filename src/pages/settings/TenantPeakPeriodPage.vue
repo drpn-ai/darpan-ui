@@ -43,12 +43,12 @@
             :type="canEdit ? 'button' : undefined"
             class="peak-row"
             :class="{ 'peak-row--button': canEdit }"
-            :aria-label="canEdit ? `${row.label}: ${row.periodAllowanceMinutes === null ? 'Normal' : allowanceWords(row.periodAllowanceMinutes)}` : undefined"
+            :aria-label="canEdit ? `${plainPairLabel(row.label)}: ${row.periodAllowanceMinutes === null ? 'Normal' : allowanceWords(row.periodAllowanceMinutes)}` : undefined"
             :disabled="canEdit && busy ? true : undefined"
             data-testid="peak-sync-lag-row"
             @click="canEdit && openSync('allowance', row)"
           >
-            <span>{{ row.label }}</span>
+            <span>{{ plainPairLabel(row.label) }}</span>
             <span class="peak-row__soft">{{ allowanceWords(row.normalAllowanceMinutes) }}</span>
             <span>{{ row.periodAllowanceMinutes === null ? 'Normal' : allowanceWords(row.periodAllowanceMinutes) }}</span>
           </component>
@@ -72,12 +72,12 @@
             :type="canEdit ? 'button' : undefined"
             class="peak-row"
             :class="{ 'peak-row--button': canEdit }"
-            :aria-label="canEdit ? `${row.label}: ${row.periodPulseMinutes === null ? 'Normal' : pulseCadence(row.periodPulseMinutes)}` : undefined"
+            :aria-label="canEdit ? `${plainPairLabel(row.label)}: ${row.periodPulseMinutes === null ? 'Normal' : pulseCadence(row.periodPulseMinutes)}` : undefined"
             :disabled="canEdit && busy ? true : undefined"
             data-testid="peak-sync-pulse-row"
             @click="canEdit && openSync('pulse', row)"
           >
-            <span>{{ row.label }}</span>
+            <span>{{ plainPairLabel(row.label) }}</span>
             <span class="peak-row__soft">{{ pulseCadence(row.normalPulseMinutes) }}</span>
             <span>{{ row.periodPulseMinutes === null ? 'Normal' : pulseCadence(row.periodPulseMinutes) }}</span>
           </component>
@@ -423,6 +423,7 @@ import { peakDateRange, peakDay } from '../../lib/peakPeriodWords'
 import { ALLOWANCE_CHOICES, PULSE_EVERY_CHOICES, allowanceWords, pulseCadence } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import { addDays, startOfLocalDay, startOfMonth } from '../../lib/utils/date'
+import { plainPairLabel } from '../../lib/syncPulseView'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -774,7 +775,7 @@ function openRunTime(runTime: PeakRunTime | null): void {
 function openSync(kind: 'allowance' | 'pulse', row: PeakSyncRow): void {
   if (!draft.value?.peakPeriodId) return
   const current = kind === 'allowance' ? row.periodAllowanceMinutes : row.periodPulseMinutes
-  syncForm.value = { kind, syncPairId: row.syncPairId, label: row.label, value: current === null ? NORMAL : String(current) }
+  syncForm.value = { kind, syncPairId: row.syncPairId, label: plainPairLabel(row.label), value: current === null ? NORMAL : String(current) }
   openPopup('sync')
 }
 

@@ -123,7 +123,7 @@ describe('TenantSyncPairPage', () => {
   it('shows the label, the switch, the five facts, today’s charts and the orders past the allowance', async () => {
     const wrapper = await mountPage()
     expect(getSyncPair).toHaveBeenCalledWith({ syncPairId: 'SP1' })
-    expect(text(wrapper, 'sync-pair-name')).toBe('HotWax → NetSuite orders')
+    expect(text(wrapper, 'sync-pair-name')).toBe('HotWax → NetSuite')
     expect(wrapper.find('[data-testid="sync-pair-name"] input').exists()).toBe(false)
     expect(wrapper.find('[data-testid="sync-pair-on"]').attributes('aria-checked')).toBe('true')
 
