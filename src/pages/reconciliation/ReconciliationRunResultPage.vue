@@ -803,13 +803,13 @@ const runSettingsId = computed(() =>
 )
 const canOpenRunSettings = computed(() => canEditTenantSettings.value && Boolean(runSettingsId.value))
 
-// Step timeline (recon observability Phase 4). In live mode the run id comes straight from
-// the route; on the saved-result route the differences payload does not carry the run-result
-// id, so it is resolved from the run-results cache descriptor for this file. The store poll
-// self-terminates once the run status is terminal.
+// Step timeline (recon observability Phase 4). In live mode the run id comes straight from the route; on the saved-result
+// route from the run the result names (DAR-BE-384), else the recent-results cache when it already holds this file (a
+// backend before DAR-BE-384). The store poll self-terminates once the run status is terminal.
+const resultRunId = ref('')
 const polledTimelineRunIds = new Set<string>()
 const timelineRunResultId = computed(() =>
-  routeRunResultId.value ||
+  routeRunResultId.value || resultRunId.value ||
   normalizeDisplayText(runResultsStore.getByFileName(outputFileName.value)?.reconciliationRunResultId),
 )
 // Sync pulse (DAR-BE-328): the orders the pulse had already flagged when this run started, read once per run.
@@ -1073,8 +1073,6 @@ watch(timelineRunResultId, (runResultId) => {
   void runResultsStore.startRunStatusPoll(runResultId)
 }, { immediate: true })
 
-// Warm the cache so a deep link into this page can still resolve the file's run id.
-void runResultsStore.ensureLoaded()
 
 const STEP_STATUS_LABELS: Record<string, string> = {
   AUT_STAT_PENDING: 'Pending',
@@ -1329,6 +1327,7 @@ async function openRunEditor(pendingExclusion: RunConclusionSuggestedFilter | nu
 
 function resetDiffDetailsState(): void {
   savedOutput.value = null
+  resultRunId.value = ''
   resetRunSourceDetails()
   resetDownloadState()
   resetRunNameState()
@@ -1414,6 +1413,7 @@ async function loadSavedResult(): Promise<void> {
       if (savedRunId.value !== requestedSavedRunId || outputFileName.value !== requestedOutputFileName) return
 
       const metadata = response.metadata ?? {}
+      resultRunId.value = normalizeDisplayText(metadata.reconciliationRunResultId)
       const summary = response.summary ?? {}
       const descriptor = buildGeneratedOutputFromSummary(requestedOutputFileName, metadata, summary)
 
@@ -1443,7 +1443,7 @@ async function loadSavedResult(): Promise<void> {
       drawnTableQuery = tableQuery()
       loading.value = false
     })
-    void shortenAddress(requestedSavedRunId, requestedOutputFileName)
+    void shortenAddress(requestedSavedRunId, requestedOutputFileName, resultRunId.value)
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return
     if (savedRunId.value !== requestedSavedRunId || outputFileName.value !== requestedOutputFileName) return
@@ -1463,18 +1463,11 @@ async function loadSavedResult(): Promise<void> {
   }
 }
 
-// DAR-UI-157. The long address (chat cards, emails and search still send it) becomes the run's short one, but only once
-// the run's own status names this same file: a short address that could not find its result would be worse.
-async function shortenAddress(requestedSavedRunId: string, file: string): Promise<void> {
-  if (route.name !== 'reconciliation-run-result') return
-  let runId = normalizeDisplayText(runResultsStore.getByFileName(file)?.reconciliationRunResultId)
-  if (!runId) {
-    const response = await reconciliationFacade.listGeneratedOutputs({ pageIndex: 0, pageSize: 5, query: file }).catch(() => null)
-    const found = response?.generatedOutputs?.find((output) => output.fileName === file)
-    if (found) runResultsStore.upsertOutput(found)
-    runId = normalizeDisplayText(found?.reconciliationRunResultId)
-  }
-  if (!runId) return
+// DAR-UI-157. The long address (links already sent in chat cards and emails) becomes the run's short one, but only once
+// the run's own status names this same file: a short address that could not find its result would be worse. The run is
+// the one the result names (DAR-BE-384); a result no run names keeps its long address.
+async function shortenAddress(requestedSavedRunId: string, file: string, runId: string): Promise<void> {
+  if (route.name !== 'reconciliation-run-result' || !runId) return
   await runResultsStore.refreshRunStatus(runId).catch(() => undefined)
   const status = runResultsStore.getRunStatus(runId)
   const stillHere = route.name === 'reconciliation-run-result' && savedRunId.value === requestedSavedRunId && outputFileName.value === file

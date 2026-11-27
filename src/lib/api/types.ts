@@ -1144,6 +1144,8 @@ export interface GeneratedOutputDifferencesMetadata {
   reconciliationMappingName?: string
   ruleSetId?: string
   compareScopeId?: string
+  /** DAR-BE-384: the run this result belongs to, when a run row names it. */
+  reconciliationRunResultId?: string
 }
 
 // DAR-UI-044. What the run concluded about each finding, written once at run time by STAGE_CONCLUDE.

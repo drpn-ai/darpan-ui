@@ -445,6 +445,13 @@ function useConclusionDocument(options: { rows?: number; withQuestion?: boolean 
   getGeneratedOutputDifferences.mockImplementation(simulateDifferences(conclusionDocument(options)))
 }
 
+/** DAR-BE-384: the result names the run it belongs to. */
+function resultNamesRun(runId: string): void {
+  getGeneratedOutputDifferences.mockImplementation(simulateDifferences(
+    { ...defaultDiffDetails, metadata: { ...defaultDiffDetails.metadata, reconciliationRunResultId: runId } },
+    { sourceDetails: defaultSourceDetails }))
+}
+
 const singleSidedDiffDetails = {
   metadata: {
     timestamp: '2026-09-29 15:22:34.662',
@@ -1510,16 +1517,7 @@ describe('ReconciliationRunResultPage', () => {
 
   describe('sync pulse flags (DAR-BE-328)', () => {
     function withRunId(): void {
-      listGeneratedOutputs.mockResolvedValue({
-        ok: true, messages: [], errors: [],
-        pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-        generatedOutputs: [{
-          fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-          reconciliationRunResultId: 'RR_PULSE',
-          sourceFormat: 'json', availableFormats: ['json'], savedRunId: 'RS_ORDER_CSV',
-          statusEnumId: 'AUT_STAT_SUCCESS', resultAvailable: true, createdDate: new Date().toISOString(),
-        }],
-      })
+      resultNamesRun('RR_PULSE')
     }
 
     it('a flagged row says when the pulse flagged it, in the tenant zone, and links to the pair', async () => {
@@ -1558,22 +1556,7 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('renders the step timeline for a run with recorded steps', async () => {
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-        reconciliationRunResultId: 'RR_TIMELINE',
-        sourceFormat: 'json',
-        availableFormats: ['json'],
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_SUCCESS',
-        resultAvailable: true,
-        createdDate: new Date().toISOString(),
-      }],
-    })
+    resultNamesRun('RR_TIMELINE')
     getReconciliationRunStatus.mockResolvedValue({
       ok: true,
       statusEnumId: 'AUT_STAT_SUCCESS',
@@ -1609,22 +1592,7 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('shows the legacy empty state when a run has no recorded steps', async () => {
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-        reconciliationRunResultId: 'RR_LEGACY',
-        sourceFormat: 'json',
-        availableFormats: ['json'],
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_SUCCESS',
-        resultAvailable: true,
-        createdDate: new Date().toISOString(),
-      }],
-    })
+    resultNamesRun('RR_LEGACY')
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
@@ -1634,22 +1602,7 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('subscribes via notify-me while the run is active', async () => {
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-        reconciliationRunResultId: 'RR_NOTIFY',
-        sourceFormat: 'json',
-        availableFormats: ['json'],
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_RUNNING',
-        resultAvailable: false,
-        createdDate: new Date().toISOString(),
-      }],
-    })
+    resultNamesRun('RR_NOTIFY')
     getReconciliationRunStatus
       .mockResolvedValueOnce({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
       .mockResolvedValueOnce({
@@ -1677,22 +1630,7 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('prompts for a default space when subscribe reports needsDefaultChatSpace, then retries after picking one', async () => {
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-        reconciliationRunResultId: 'RR_NEEDS_DEFAULT',
-        sourceFormat: 'json',
-        availableFormats: ['json'],
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_RUNNING',
-        resultAvailable: false,
-        createdDate: new Date().toISOString(),
-      }],
-    })
+    resultNamesRun('RR_NEEDS_DEFAULT')
     getReconciliationRunStatus
       .mockResolvedValueOnce({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
       .mockResolvedValueOnce({
@@ -1750,22 +1688,7 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('shows an empty-state line when a tenant has no active chat spaces to pick from', async () => {
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-        reconciliationRunResultId: 'RR_NO_SPACES',
-        sourceFormat: 'json',
-        availableFormats: ['json'],
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_RUNNING',
-        resultAvailable: false,
-        createdDate: new Date().toISOString(),
-      }],
-    })
+    resultNamesRun('RR_NO_SPACES')
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
     subscribeRunNotification.mockRejectedValue(new ApiCallError('Set a default chat space first.', 200, {
       method: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
@@ -1783,22 +1706,7 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('surfaces a plain subscribe failure through the page error affordance instead of swallowing it', async () => {
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-        reconciliationRunResultId: 'RR_SUBSCRIBE_FAIL',
-        sourceFormat: 'json',
-        availableFormats: ['json'],
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_RUNNING',
-        resultAvailable: false,
-        createdDate: new Date().toISOString(),
-      }],
-    })
+    resultNamesRun('RR_SUBSCRIBE_FAIL')
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
     subscribeRunNotification.mockRejectedValue(new ApiCallError('Google Chat webhook rejected the request.', 200, {
       method: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
@@ -1816,22 +1724,7 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('surfaces a save-default failure inside the picker instead of hiding it behind the popup', async () => {
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-        reconciliationRunResultId: 'RR_SAVE_DEFAULT_FAIL',
-        sourceFormat: 'json',
-        availableFormats: ['json'],
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_RUNNING',
-        resultAvailable: false,
-        createdDate: new Date().toISOString(),
-      }],
-    })
+    resultNamesRun('RR_SAVE_DEFAULT_FAIL')
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING', mySubscription: false, steps: [] })
     subscribeRunNotification.mockRejectedValue(new ApiCallError('Set a default chat space first.', 200, {
       method: 'facade.ReconciliationFacadeServices.subscribe#RunNotification',
@@ -2149,21 +2042,21 @@ describe('ReconciliationRunResultPage', () => {
     }
   })
 
-  // Chat cards, emails and search still send the long address. It opens as before, then becomes the short one, but
-  // only once the run's own status names this same file: a short address that could not find its result is worse.
-  it('moves an old long address to the short one once the run is known to have this result', async () => {
+  // Links already sent (chat cards, emails) carry the long address. It opens as before, then becomes the short one,
+  // but only once the run's own status names this same file: a short address that could not find its result is worse.
+  // DAR-BE-384: the result names its run; the page never lists every output the tenant has to find it (10-20 s on prod).
+  it('moves an old long address to the run the result names, once the run is known to have this result', async () => {
     const at = route as unknown as { name?: string }
     at.name = 'reconciliation-run-result'
     ;(route.query as Record<string, string>).tenantId = 'ACME'
     const file = 'CSV-Order-Compare-diff-20260331-063304.json'
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true, messages: [], errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{ fileName: file, reconciliationRunResultId: 'RR_9', savedRunId: 'RS_ORDER_CSV', createdDate: 1 }],
-    })
+    const namedRun = (runId?: string) => simulateDifferences(
+      { ...defaultDiffDetails, metadata: { ...defaultDiffDetails.metadata, ...(runId ? { reconciliationRunResultId: runId } : {}) } },
+      { sourceDetails: defaultSourceDetails })
+    getGeneratedOutputDifferences.mockImplementation(namedRun('RR_9'))
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', resultFileName: file, steps: [] })
     try {
-      mount(ReconciliationRunResultPage)
+      let wrapper = mount(ReconciliationRunResultPage)
       await flushPromises()
       expect(routerReplace).toHaveBeenCalledWith({
         name: 'reconciliation-run-live',
@@ -2171,13 +2064,27 @@ describe('ReconciliationRunResultPage', () => {
         query: { tenantId: 'ACME' },
         state: { runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY', resultFileName: file },
       })
+      expect(listGeneratedOutputs).not.toHaveBeenCalled()
 
       routerReplace.mockReset()
       getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', resultFileName: 'another.json', steps: [] })
+      wrapper.unmount()
       useRunResultsStore().reset()
-      mount(ReconciliationRunResultPage)
+      wrapper = mount(ReconciliationRunResultPage)
       await flushPromises()
       expect(routerReplace).not.toHaveBeenCalled()
+
+      // A result its run does not name (a backend before DAR-BE-384, a legacy output) keeps its long address.
+      getGeneratedOutputDifferences.mockImplementation(namedRun())
+      wrapper.unmount()
+      getReconciliationRunStatus.mockClear()
+      useRunResultsStore().reset()
+      invalidateReadCache()
+      wrapper = mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(routerReplace).not.toHaveBeenCalled()
+      expect(getReconciliationRunStatus).not.toHaveBeenCalled()
+      expect(listGeneratedOutputs).not.toHaveBeenCalled()
     } finally {
       delete at.name
       delete (route.query as Record<string, string>).tenantId
@@ -2355,22 +2262,7 @@ describe('ReconciliationRunResultPage', () => {
   })
 
   it('hides notify-me once the run is terminal', async () => {
-    listGeneratedOutputs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 25, totalCount: 1, pageCount: 1 },
-      generatedOutputs: [{
-        fileName: 'CSV-Order-Compare-diff-20260331-063304.json',
-        reconciliationRunResultId: 'RR_TERMINAL',
-        sourceFormat: 'json',
-        availableFormats: ['json'],
-        savedRunId: 'RS_ORDER_CSV',
-        statusEnumId: 'AUT_STAT_SUCCESS',
-        resultAvailable: true,
-        createdDate: new Date().toISOString(),
-      }],
-    })
+    resultNamesRun('RR_TERMINAL')
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', mySubscription: false, steps: [] })
 
     const wrapper = mount(ReconciliationRunResultPage)
