@@ -22,6 +22,7 @@ vi.mock('../../../lib/api/facade', () => ({
   auditFacade: { getAuditSettings: vi.fn(), saveAuditSettings: vi.fn(), addAuditStatement: vi.fn() },
   settingsFacade: { listTenantChatSpaces: vi.fn() },
 }))
+vi.mock('../../../lib/api/authoringFacade', () => ({ auditCheckFacade: { remove: vi.fn() } }))
 vi.mock('../../../stores/auth', () => ({ useAuthStore: () => ({ sessionInfo: { activeTenantLabel: 'Gorjana' } }) }))
 vi.mock('../../../lib/savedRunEditorRoute', () => ({
   resolveSavedRunEditorTarget: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('../../../lib/savedRunEditorRoute', () => ({
 }))
 
 import { auditFacade, settingsFacade } from '../../../lib/api/facade'
+import { auditCheckFacade } from '../../../lib/api/authoringFacade'
 import { buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../../lib/savedRunEditorRoute'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../../lib/uiEvents'
 import type { AuditSettings } from '../../../lib/api/auditTypes'
@@ -57,6 +59,7 @@ beforeEach(() => {
   f.getAuditSettings.mockReset()
   f.saveAuditSettings.mockReset()
   f.addAuditStatement.mockReset()
+  vi.mocked(auditCheckFacade.remove).mockReset()
   vi.mocked(resolveSavedRunEditorTarget).mockReset()
   f.getAuditSettings.mockResolvedValue({ ok: true, settings: settings() } as never)
   // No settings in the answer: the page applies what it sent, as it does for a backend that answers without them.
@@ -286,6 +289,30 @@ describe('AuditSettingsPage', () => {
     expect(buildSavedRunEditorRoute).toHaveBeenCalled()
     expect(push).toHaveBeenCalledWith({ name: 'settings-runs-edit', params: { reconciliationMappingId: 'S1' } })
     w.unmount()
+  })
+
+  // DAR-BE-395: a check comes off the audit at once (DAR-UI-156); a refusal puts it back with the reason.
+  it('removes a check from the statement at once, and puts it back with the reason when refused', async () => {
+    vi.mocked(auditCheckFacade.remove).mockResolvedValueOnce({ ok: true, removedCheck: { id: 'C1' } } as never)
+    const w = await mountPage()
+    await click(w, 'audit-settings-statement-open-ST1')
+    const remove = get(w, 'audit-settings-check-remove-C1')
+    expect(remove.attributes('aria-label')).toBe('Remove Invoices with no Etail id from the audit')
+    await remove.trigger('click')
+    expect(has(w, 'audit-settings-check-C1')).toBe(false)
+    await flushPromises()
+    expect(auditCheckFacade.remove).toHaveBeenCalledWith('month-close', 'C1')
+    expect(has(w, 'audit-settings-check-C1')).toBe(false)
+    expect(get(w, 'audit-settings-statement-ST1').text()).toContain('No checks')
+    w.unmount()
+
+    vi.mocked(auditCheckFacade.remove).mockResolvedValueOnce({ ok: false, errors: ["Check 'C2' has 3 open findings; close or acknowledge them before removing it."] } as never)
+    const again = await mountPage()
+    await click(again, 'audit-settings-statement-open-ST2')
+    await click(again, 'audit-settings-check-remove-C2')
+    expect(has(again, 'audit-settings-check-C2')).toBe(true)
+    expect(get(again, 'audit-settings-popup-error').text()).toBe("Check 'C2' has 3 open findings; close or acknowledge them before removing it.")
+    again.unmount()
   })
 
   it('shows a check whose run is unknown with nowhere to go', async () => {

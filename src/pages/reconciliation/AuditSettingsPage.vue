@@ -289,6 +289,16 @@
                 >
                   Rules <span aria-hidden="true">→</span>
                 </button>
+                <button
+                  type="button"
+                  class="app-table__icon-action app-table__icon-action--danger"
+                  :aria-label="`Remove ${check.label} from the audit`"
+                  :data-testid="`audit-settings-check-remove-${check.id}`"
+                  :disabled="saving"
+                  @click="void removeCheck(check)"
+                >
+                  <AppIcon name="trash" />
+                </button>
               </li>
               <li v-if="!editingStatement.checks.length" class="audit-check audit-check--none">No checks yet.</li>
               <li class="audit-check audit-check--add">
@@ -439,6 +449,7 @@ import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import { auditFacade, settingsFacade } from '../../lib/api/facade'
+import { auditCheckFacade } from '../../lib/api/authoringFacade'
 import type { TenantChatSpace } from '../../lib/api/types'
 import { auditMorningQuery } from '../../lib/auditReport'
 import {
@@ -861,6 +872,34 @@ async function checkAdded() {
     if (response.settings) adopt(response.settings)
   } catch (caught) {
     if (!abort.signal.aborted) popupError.value = message(caught)
+  }
+}
+
+// DAR-BE-395: a check comes off the audit at once (DAR-UI-156) and remove#AuditCheck runs behind it. The backend takes it
+// off every statement of this audit; a refusal (open findings) puts it back where it was, with the reason in the popup.
+async function removeCheck(check: AuditSettingsCheck) {
+  const before = confirmed
+  if (!before) return
+  popupError.value = null
+  const holders = before.statements.map((statement) => statement.checks.findIndex((candidate) => candidate.id === check.id))
+  adopt({ ...before, statements: before.statements.map((statement) =>
+    ({ ...statement, checks: statement.checks.filter((candidate) => candidate.id !== check.id) })) })
+  const putBack = (reason: string) => {
+    const now = confirmed ?? before
+    adopt({ ...now, statements: now.statements.map((statement) => {
+      const at = holders[before.statements.findIndex((candidate) => candidate.id === statement.id)] ?? -1
+      if (at < 0 || statement.checks.some((candidate) => candidate.id === check.id)) return statement
+      const checks = [...statement.checks]
+      checks.splice(Math.min(at, checks.length), 0, check)
+      return { ...statement, checks }
+    }) })
+    popupError.value = reason
+  }
+  try {
+    const response = await afterSaves(() => auditCheckFacade.remove(auditCode.value, check.id))
+    if (!response.removedCheck) putBack(response.errors?.[0] || 'The check was not removed.')
+  } catch (caught) {
+    if (!abort.signal.aborted) putBack(message(caught))
   }
 }
 

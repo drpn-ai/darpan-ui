@@ -94,11 +94,15 @@ admin.UserAdminServices.reset#Password
 admin.UserAdminServices.reset#TwoFactor
 admin.UserAdminServices.update#UserAccount
 facade.AgentChangeFacadeServices.apply#AuditChange
+facade.AgentChangeFacadeServices.get#AuditChangeProposal
+facade.AgentChangeFacadeServices.list#AuditChangeProposals
 facade.AgentChangeFacadeServices.list#BrainChangeTickets
 facade.AgentChangeFacadeServices.plan#AuditChange
+facade.AgentChangeFacadeServices.propose#AuditChange
 facade.AgentChangeFacadeServices.reject#AuditChange
 facade.AgentChangeFacadeServices.revert#AuditChange
 facade.AgentFacadeServices.list#AgentQueryLogs
+facade.AgentReadFacadeServices.find#AuditFindingLookalikes
 facade.AgentReadFacadeServices.get#AgentAuditScope
 facade.AgentTurnFacadeServices.get#AgentConversation
 facade.AgentTurnFacadeServices.get#AgentStatus
@@ -120,6 +124,7 @@ facade.AuditFacadeServices.get#AuditRecheckProgress
 facade.AuditFacadeServices.get#AuditReport
 facade.AuditFacadeServices.get#AuditSettings
 facade.AuditFacadeServices.get#Audits
+facade.AuditFacadeServices.remove#AuditCheck
 facade.AuditFacadeServices.retry#AuditCheck
 facade.AuditFacadeServices.run#Audit
 facade.AuditFacadeServices.save#AuditCheck
@@ -177,6 +182,10 @@ facade.HotWaxOmsFacadeServices.get#OmsGraphqlSchema
 facade.HotWaxOmsFacadeServices.list#HotWaxOmsRestSourceConfigs
 facade.HotWaxOmsFacadeServices.run#OmsGraphqlAgentQuery
 facade.HotWaxOmsFacadeServices.save#HotWaxOmsRestSourceConfig
+facade.IdIndexFacadeServices.delete#TenantIdIndexField
+facade.IdIndexFacadeServices.get#IdIndexStatus
+facade.IdIndexFacadeServices.save#TenantIdIndexField
+facade.IdIndexFacadeServices.search#RecordIds
 facade.JsonSchemaFacadeServices.delete#JsonSchema
 facade.JsonSchemaFacadeServices.flatten#JsonSchema
 facade.JsonSchemaFacadeServices.get#JsonSchema
@@ -186,6 +195,7 @@ facade.JsonSchemaFacadeServices.list#JsonSchemas
 facade.JsonSchemaFacadeServices.save#JsonSchemaText
 facade.JsonSchemaFacadeServices.save#RefinedSchema
 facade.JsonSchemaFacadeServices.validate#JsonTextAgainstSchema
+facade.LookupFacadeServices.lookup#Order
 facade.NetSuiteLifecycleFacadeServices.get#LifecycleOptions
 facade.NetSuiteLifecycleFacadeServices.get#LifecycleRuleOptions
 facade.NetSuiteQueryFacadeServices.get#NsSuiteQlQueryOptions

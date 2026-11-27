@@ -7,6 +7,7 @@ import type {
   GetAuditCheckOptionsResponse,
   GetRunConclusionsResponse,
   RunConclusionNode,
+  RemoveAuditCheckResponse,
   SaveAuditCheckResponse,
   SaveRunConclusionsResponse,
   GetNsSuiteQlQueryOptionsResponse,
@@ -71,6 +72,7 @@ export const runConclusionFacade = {
 export const AUDIT_CHECK = {
   getOptions: 'facade.AuditFacadeServices.get#AuditCheckOptions',
   save: 'facade.AuditFacadeServices.save#AuditCheck',
+  remove: 'facade.AuditFacadeServices.remove#AuditCheck',
 } as const
 
 export const auditCheckFacade = {
@@ -80,5 +82,9 @@ export const auditCheckFacade = {
   /** Creates or updates check.id and replaces its links to this audit's statements. */
   save(audit: string, check: AuditCheckDraft, statements: AuditCheckStatementLink[], signal?: AbortSignal): Promise<SaveAuditCheckResponse> {
     return callService<SaveAuditCheckResponse>(AUDIT_CHECK.save, { audit, check, statements }, signal)
+  },
+  /** DAR-BE-395. Takes check (its id) off this audit's statements; refused with the reason while it has open findings. */
+  remove(audit: string, check: string, signal?: AbortSignal): Promise<RemoveAuditCheckResponse> {
+    return callService<RemoveAuditCheckResponse>(AUDIT_CHECK.remove, { audit, check }, signal)
   },
 }

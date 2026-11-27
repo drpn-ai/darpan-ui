@@ -242,3 +242,8 @@ export interface GetAuditCheckOptionsResponse extends ApiEnvelope {
 export interface SaveAuditCheckResponse extends ApiEnvelope {
   savedCheck?: AuditCheckDetail | null
 }
+
+/** DAR-BE-395. remove#AuditCheck: the check taken off the audit, and whether its own automation stopped. */
+export interface RemoveAuditCheckResponse extends ApiEnvelope {
+  removedCheck?: { id: string, automationId?: string | null, automationStopped?: boolean } | null
+}
