@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SyncAutomationOption, SyncPairSummary } from '../api/pulseTypes'
-import { buildSyncPulseView, lastPulseWords, nextPulsePeriods, pairSidesLabel, periodPulseMinutes, plainPairLabel, pulseAsOfWords, pulseWatchFacts, pulsingPeriods, syncPulseSettingsValue } from '../syncPulseView'
+import { buildSyncPulseView, distinctCheckWords, labelWithCheckWords, lastPulseWords, nextPulsePeriods, pairSidesLabel, periodPulseMinutes, plainPairLabel, pulseAsOfWords, pulseWatchFacts, pulsingPeriods, syncPulseSettingsValue } from '../syncPulseView'
 
 const pair = (over: Partial<SyncPairSummary>): SyncPairSummary => ({
   syncPairId: 'SP1', label: 'HotWax → NetSuite orders', automationId: 'A1', automationName: 'Daily check', allowanceMinutes: 120,
@@ -98,6 +98,20 @@ describe('buildSyncPulseView', () => {
   it('puts a period-only pulser with the allowance-only pairs when no live period turns it on', () => {
     const view = buildSyncPulseView(pairs, automations, new Map())
     expect(view.pulsing.map((r) => r.syncPairId)).toEqual(['100102'])
+  })
+
+  it('names the store when pulsing pairs share a label (RAILS: one Shopify → HotWax pulse per store)', () => {
+    const stores = ['Canada', 'EU', 'Outlet', 'UK', 'USA'].map((store, i) => pair({ syncPairId: `10015${4 + i}`, automationId: `S${i}`,
+      label: 'Shopify → HotWax orders', automationName: `Daily Order Reconciliation ${store}`, pulseEveryMinutes: 60 }))
+    const netsuite = pair({ syncPairId: '100160', automationName: 'Daily Order Reconciliation - NetSuite', pulseEveryMinutes: 60 })
+    const view = buildSyncPulseView([netsuite, ...stores], [], new Map())
+    expect(view.pulsing.map((r) => r.label)).toEqual(['HotWax → NetSuite', 'Shopify Canada → HotWax', 'Shopify EU → HotWax',
+      'Shopify Outlet → HotWax', 'Shopify UK → HotWax', 'Shopify USA → HotWax'])
+  })
+
+  it('leaves look-alike allowance-only pairs as they are, and a lone pulse with its plain label', () => {
+    const view = buildSyncPulseView(pairs, automations, new Map([['100000', 60]]))
+    expect(view.pulsing.map((r) => r.label)).toEqual(['HotWax → NetSuite', 'Shopify → HotWax'])
   })
 
   it('says the pulsing pairs on the Tenant Settings row, "None" when nothing pulses', () => {
@@ -205,5 +219,25 @@ describe('pulseAsOfWords', () => {
   it('marks them last known when the pulse is off today', () => {
     expect(pulseAsOfWords({ pulseEveryMinutes: null }, [read('2026-11-26T11:03:13Z')], clock)).toBe('Last known · as of 11:03')
     expect(pulseAsOfWords({ pulseEveryMinutes: null }, [], clock)).toBe('Last known figures')
+  })
+})
+
+describe('distinctCheckWords', () => {
+  it('cuts the words every look-alike starts and ends with', () => {
+    expect(distinctCheckWords('Daily Order Reconciliation Canada', ['Daily Order Reconciliation EU', 'Daily Order Reconciliation USA'])).toBe('Canada')
+    expect(distinctCheckWords('Orders EU - daily', ['Orders UK - daily'])).toBe('EU')
+    expect(distinctCheckWords('Month close: Returns', ['Month close: Completed', 'Month close: Approved'])).toBe('Returns')
+  })
+
+  it('keeps a whole name with nothing shared, and says nothing with no look-alike', () => {
+    expect(distinctCheckWords('Canada orders', ['USA'])).toBe('Canada orders')
+    expect(distinctCheckWords('Daily', [])).toBe('')
+    expect(distinctCheckWords('Daily', ['Daily'])).toBe('')
+  })
+
+  it('puts the words beside the upstream system', () => {
+    expect(labelWithCheckWords('Shopify → HotWax', 'Canada')).toBe('Shopify Canada → HotWax')
+    expect(labelWithCheckWords('NetSuite only', 'Warranty')).toBe('NetSuite only · Warranty')
+    expect(labelWithCheckWords('Shopify → HotWax', '')).toBe('Shopify → HotWax')
   })
 })

@@ -118,6 +118,38 @@ export function pulsingPeriods(periods: PeakPeriodSummary[], periodRows: PeakSyn
     .map((p) => p.peakPeriodId))
 }
 
+/**
+ * DAR-UI-154. The words that tell a check apart from look-alikes that share its label: what is left of its name once the
+ * words all of them start and end with are cut ("Canada" of "Daily Order Reconciliation Canada" beside EU, UK, USA).
+ */
+export function distinctCheckWords(name: string, others: string[]): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  const rest = others.map((o) => o.trim()).filter((o) => o && o !== name.trim()).map((o) => o.split(/\s+/))
+  if (words.length === 0 || rest.length === 0) return ''
+  let head = 0
+  while (head < words.length - 1 && rest.every((o) => o[head] === words[head])) head++
+  let tail = 0
+  while (tail < words.length - head - 1
+    && rest.every((o) => o.length - 1 - tail > head && o[o.length - 1 - tail] === words[words.length - 1 - tail])) tail++
+  return words.slice(head, words.length - tail).join(' ').replace(/^[-–·:]\s*/, '')
+}
+
+/** "Shopify Canada → HotWax": the distinct words beside the upstream system; "<label> · <words>" with no arrow. */
+export function labelWithCheckWords(label: string, words: string): string {
+  if (!words) return label
+  const arrow = label.indexOf(' → ')
+  return arrow < 0 ? `${label} · ${words}` : `${label.slice(0, arrow)} ${words}${label.slice(arrow)}`
+}
+
+/** Pulsing pairs that share a label (RAILS: five Shopify stores → HotWax) get their check's distinct words in it. */
+function tellApart(rows: SyncPulseRow[]): SyncPulseRow[] {
+  return rows.map((row) => {
+    const alike = rows.filter((r) => r.label === row.label && r.syncPairId !== row.syncPairId)
+    if (alike.length === 0) return row
+    return { ...row, label: labelWithCheckWords(row.label, distinctCheckWords(row.checkName, alike.map((r) => r.checkName))) }
+  })
+}
+
 /** Pairs that pulse (normally, or in a coming or current peak period) first; the allowance-only pairs apart. */
 export function buildSyncPulseView(pairs: SyncPairSummary[], automations: SyncAutomationOption[],
   periodPulse: Map<string, number>): SyncPulseView {
@@ -136,7 +168,7 @@ export function buildSyncPulseView(pairs: SyncPairSummary[], automations: SyncAu
       pulses,
     }
   })
-  return { pulsing: rows.filter((r) => r.pulses), allowanceOnly: rows.filter((r) => !r.pulses) }
+  return { pulsing: tellApart(rows.filter((r) => r.pulses)), allowanceOnly: rows.filter((r) => !r.pulses) }
 }
 
 /** "Shopify → HotWax orders · every 1h · 1 more" over the pulsing pairs, or "None". */

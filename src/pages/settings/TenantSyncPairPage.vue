@@ -323,7 +323,7 @@ import {
 } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 import { formatClockTime } from '../../lib/utils/date'
-import { pairSidesLabel } from '../../lib/syncPulseView'
+import { loadSyncPulseView, pairSidesLabel } from '../../lib/syncPulseView'
 import { usePermissionsStore } from '../../stores/permissions'
 
 interface Draft {
@@ -432,7 +432,9 @@ const lastPulseFailed = computed(() => saved.value?.lastPulseStatusEnumId === 'S
 const chosenAutomation = computed(() => automations.value.find((automation) => automation.automationId === draft.value?.automationId) ?? null)
 
 // DAR-UI-154: system names only ("HotWax → NetSuite returns"), as on the Sync pulse list and the Pulses page.
-const title = computed(() => (saved.value ? pairSidesLabel(saved.value, automations.value) : '') || chosenAutomation.value?.label || 'New sync pair')
+// A pulse that shares its label with others (RAILS: one per Shopify store) is named as the Pulses page names it.
+const pulseViewLabel = ref('')
+const title = computed(() => pulseViewLabel.value || (saved.value ? pairSidesLabel(saved.value, automations.value) : '') || chosenAutomation.value?.label || 'New sync pair')
 
 const upstreamLabel = computed(() => chosenAutomation.value?.upstreamOptions
   .find((option) => option.upstreamSide === draft.value?.upstreamSide)?.label ?? '')
@@ -833,7 +835,9 @@ async function save(): Promise<void> {
 // A first Save on /new moves the URL to the pair's own; that is this page already, so it does not reload.
 watch(routePairId, (id) => {
   if (id && id === draft.value?.syncPairId) return
+  pulseViewLabel.value = ''
   void load(id)
+  void loadPulseViewLabel(id)
 })
 
 // Esc closes a popup; the delete popup has no cancel of WorkflowStepForm's own to catch it.
@@ -846,8 +850,20 @@ function handleCancelRequest(event: Event): void {
 onMounted(() => {
   document.addEventListener(WORKFLOW_CANCEL_REQUEST_EVENT, handleCancelRequest)
   void load(routePairId.value)
+  void loadPulseViewLabel(routePairId.value)
   scheduleRefresh()
 })
+
+async function loadPulseViewLabel(syncPairId: string): Promise<void> {
+  if (!syncPairId) return
+  try {
+    const loaded = await loadSyncPulseView()
+    const row = loaded.view.pulsing.find((r) => r.syncPairId === syncPairId)
+    if (!unmounted && routePairId.value === syncPairId && row) pulseViewLabel.value = row.label
+  } catch {
+    // Best effort: the pair's own label stands.
+  }
+}
 
 onBeforeUnmount(() => {
   unmounted = true

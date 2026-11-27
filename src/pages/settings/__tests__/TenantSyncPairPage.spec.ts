@@ -19,6 +19,11 @@ const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 vi.mock('../../../lib/api/facade', () => ({
   pulseFacade: { getSyncPair, saveSyncPair, deleteSyncPair },
 }))
+const loadSyncPulseView = vi.hoisted(() => vi.fn())
+vi.mock('../../../lib/syncPulseView', async (original) => ({
+  ...(await original<typeof import('../../../lib/syncPulseView')>()),
+  loadSyncPulseView,
+}))
 vi.mock('../../../stores/permissions', () => ({
   usePermissionsStore: () => permissions,
 }))
@@ -94,6 +99,7 @@ describe('TenantSyncPairPage', () => {
     permissions.canEditTenantSettings = true
     route.name = 'pulse'
     route.params = { syncPairId: 'SP1' }
+    loadSyncPulseView.mockRejectedValue(new Error('not in this test'))
     document.body.replaceChildren()
     getSyncPair.mockResolvedValue(got())
     saveSyncPair.mockResolvedValue({ ok: true, messages: [], errors: [], syncPairId: 'SP1' })
@@ -363,6 +369,13 @@ describe('TenantSyncPairPage', () => {
     await flushPromises()
     expect(text(wrapper, 'sync-pair-popup-error')).toBe('Sync pair SP1 not found.')
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it('names the store as the Pulses page does when other pulses share its label (RAILS)', async () => {
+    loadSyncPulseView.mockResolvedValue({ view: { pulsing: [{ syncPairId: 'SP1', label: 'Shopify Canada → HotWax' }], allowanceOnly: [] } })
+    const wrapper = await mountPage()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sync-pair-name"]').text()).toContain('Shopify Canada → HotWax')
   })
 
   it('is read-only without tenant-settings edit', async () => {
