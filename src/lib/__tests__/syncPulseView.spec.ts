@@ -114,10 +114,16 @@ describe('buildSyncPulseView', () => {
     expect(view.pulsing.map((r) => r.label)).toEqual(['HotWax → NetSuite', 'Shopify → HotWax'])
   })
 
-  it('says the pulsing pairs on the Tenant Settings row, "None" when nothing pulses', () => {
-    expect(syncPulseSettingsValue(buildSyncPulseView(pairs, automations, new Map([['100000', 60]]))))
-      .toBe('HotWax → NetSuite · every 1h in peak periods · 1 more')
+  // DAR-UI-159: a count, not the first pair and "N more"; the cadence only when every pulsing pair shares it.
+  it('counts the pulsing pairs on the Tenant Settings row, "None" when nothing pulses', () => {
+    expect(syncPulseSettingsValue(buildSyncPulseView(pairs, automations, new Map([['100000', 60]])))).toBe('2 pairs')
+    expect(syncPulseSettingsValue(buildSyncPulseView(pairs, automations, new Map()))).toBe('1 pair · every 1h')
     expect(syncPulseSettingsValue(buildSyncPulseView([pairs[1]!], automations, new Map()))).toBe('None')
+  })
+
+  it('gives the shared cadence when every pulsing pair has the same one (RAILS: six hourly pulses)', () => {
+    const six = ['A', 'B', 'C', 'D', 'E', 'F'].map((k, i) => pair({ syncPairId: `20000${i}`, automationId: k, pulseEveryMinutes: 60 }))
+    expect(syncPulseSettingsValue(buildSyncPulseView(six, [], new Map()))).toBe('6 pairs · every 1h')
   })
 })
 

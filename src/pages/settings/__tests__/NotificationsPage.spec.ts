@@ -20,6 +20,7 @@ const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
 vi.mock('vue-router', () => ({
   useRoute: () => route,
   useRouter: () => ({ replace, push: vi.fn() }),
+  RouterLink: { name: 'RouterLink', props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' },
 }))
 
 vi.mock('../../../lib/api/facade', () => ({
@@ -132,6 +133,16 @@ describe('NotificationsPage', () => {
 
   afterEach(() => {
     Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
+  })
+
+  // DAR-UI-159 (Aditi 2026-11-27: "there is no back button on notifications list page").
+  it('goes back to Tenant Settings from the footer back icon', async () => {
+    const wrapper = mount(NotificationsPage)
+    await flushPromises()
+
+    const back = wrapper.get('[data-testid="notifications-back"]')
+    expect(JSON.parse(back.attributes('data-to')!)).toEqual({ name: 'settings-tenant' })
+    expect(back.attributes('aria-label')).toBe('Back to tenant settings')
   })
 
   it('draws one row per thing that posts and one column per space, plus Nowhere', async () => {

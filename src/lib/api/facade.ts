@@ -141,7 +141,6 @@ import type {
   ListSourceConfigEndpointsResponse,
   ListTenantChatSpacesResponse,
   LoginSessionResponse,
-  LlmSettingsResponse,
   LogoutSessionResponse,
   RevokeConfigTenantAccessResponse,
   GetCliLoginRequestResponse,
@@ -158,7 +157,6 @@ import type {
   ResumeAutomationResponse,
   SaveAutomationResponse,
   SaveJsonSchemaTextResponse,
-  SaveLlmSettingsResponse,
   SaveNsAuthConfigResponse,
   SaveOmsRestSourceConfigResponse,
   SaveDashboardPinnedSavedRunsResponse,
@@ -240,7 +238,6 @@ import type {
   GetGeneratedOutputPayload,
   GetGeneratedOutputDifferencesPayload,
   GetJsonSchemaPayload,
-  GetLlmSettingsPayload,
   GetMappingPayload,
   GetShopifyAuthConfigPayload,
   InferJsonSchemaFromCsvTextPayload,
@@ -264,7 +261,6 @@ import type {
   SaveAutomationPayload,
   SaveDashboardPinnedSavedRunsPayload,
   SaveJsonSchemaTextPayload,
-  SaveLlmSettingsPayload,
   SaveMappingPayload,
   SaveNsAuthConfigPayload,
   SaveNsRestletConfigPayload,
@@ -357,8 +353,6 @@ const AUTH = {
 
 const SETTINGS = {
   listEnumOptions: 'facade.SettingsFacadeServices.list#EnumOptions',
-  getLlmSettings: 'facade.SettingsFacadeServices.get#LlmSettings',
-  saveLlmSettings: 'facade.SettingsFacadeServices.save#LlmSettings',
   getTenantSettings: 'facade.SettingsFacadeServices.get#TenantSettings',
   saveTenantSettings: 'facade.SettingsFacadeServices.save#TenantSettings',
   listTenantChatSpaces: 'facade.SettingsFacadeServices.list#TenantChatSpaces',
@@ -586,12 +580,6 @@ export const authFacade = {
 export const settingsFacade = {
   listEnumOptions(enumTypeId: string, signal?: AbortSignal): Promise<ListEnumOptionsResponse> {
     return callService<ListEnumOptionsResponse>(SETTINGS.listEnumOptions, { enumTypeId }, signal)
-  },
-  getLlmSettings(payload?: GetLlmSettingsPayload, signal?: AbortSignal): Promise<LlmSettingsResponse> {
-    return callService<LlmSettingsResponse>(SETTINGS.getLlmSettings, payload ?? {}, signal)
-  },
-  saveLlmSettings(payload: SaveLlmSettingsPayload, signal?: AbortSignal): Promise<SaveLlmSettingsResponse> {
-    return callService<SaveLlmSettingsResponse>(SETTINGS.saveLlmSettings, payload, signal)
   },
   getTenantSettings(signal?: AbortSignal): Promise<GetTenantSettingsResponse> {
     return callService<GetTenantSettingsResponse>(SETTINGS.getTenantSettings, {}, signal)

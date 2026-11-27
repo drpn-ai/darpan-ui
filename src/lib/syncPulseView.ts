@@ -171,12 +171,16 @@ export function buildSyncPulseView(pairs: SyncPairSummary[], automations: SyncAu
   return { pulsing: tellApart(rows.filter((r) => r.pulses)), allowanceOnly: rows.filter((r) => !r.pulses) }
 }
 
-/** "Shopify → HotWax orders · every 1h · 1 more" over the pulsing pairs, or "None". */
+/**
+ * DAR-UI-159. The Tenant Settings value over the pulsing pairs: "6 pairs · every 1h in peak periods" when they share a
+ * cadence, "6 pairs" when not, else "None". It named the first pair and "5 more" of the rest.
+ */
 export function syncPulseSettingsValue(view: SyncPulseView): string {
-  const first = view.pulsing[0]
-  if (!first) return 'None'
-  const more = view.pulsing.length > 1 ? ` · ${view.pulsing.length - 1} more` : ''
-  return `${first.label} · ${first.cadence.toLowerCase()}${more}`
+  const count = view.pulsing.length
+  if (!count) return 'None'
+  const pairs = count === 1 ? '1 pair' : `${count} pairs`
+  const cadences = new Set(view.pulsing.map((row) => row.cadence))
+  return cadences.size === 1 ? `${pairs} · ${view.pulsing[0]!.cadence.toLowerCase()}` : pairs
 }
 
 const LIVE_STATES = new Set<PeakPeriodSummary['state']>(['upcoming', 'on'])

@@ -64,11 +64,11 @@
     <template #actions>
       <div class="action-row">
         <RouterLink
-          :to="{ name: 'settings-tenant' }"
+          :to="backRoute"
           class="app-icon-action app-icon-action--large"
           data-testid="config-history-back"
-          aria-label="Back to Tenant Settings"
-          title="Back to Tenant Settings"
+          :aria-label="fromAudit ? 'Back to audit settings' : 'Back to runs'"
+          :title="fromAudit ? 'Back to audit settings' : 'Back to runs'"
         >
           <AppIcon name="back" />
         </RouterLink>
@@ -132,7 +132,7 @@ import AppIcon from '../../components/ui/AppIcon.vue'
 // older one through the plan the backend previews, applied exactly as shown (planHash). DAR-UI-125: the newest version
 // as a facts strip, the earlier ones by day with what changed against the one before, paged.
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import AppListPager from '../../components/ui/AppListPager.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -152,6 +152,13 @@ const PAGE_SIZE = 10
 
 const permissionsStore = usePermissionsStore()
 const canEdit = computed(() => permissionsStore.canEditTenantSettings)
+
+// DAR-UI-159. Opened from an audit's settings (?audit=<code>), back goes there; else to the audits and runs list.
+const route = useRoute()
+const fromAudit = computed(() => (typeof route.query.audit === 'string' ? route.query.audit : ''))
+const backRoute = computed(() => (fromAudit.value
+  ? { name: 'audit-settings', params: { audit: fromAudit.value } }
+  : { name: 'settings-runs' }))
 
 const versions = ref<ConfigVersion[]>([])
 const loading = ref(false)

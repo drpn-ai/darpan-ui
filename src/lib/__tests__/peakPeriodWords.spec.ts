@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { PeakPeriodSummary } from '../api/peakTypes'
-import { peakHoursUntilNotice, peakWhen } from '../peakPeriodWords'
+import { peakDateRange, peakHoursUntilNotice, peakSettingsValue, peakWhen } from '../peakPeriodWords'
 import { setDefaultDisplayTimeZone } from '../utils/date'
 
 const upcoming = (fromDate: string): PeakPeriodSummary => ({
@@ -20,6 +20,36 @@ describe('peakWhen', () => {
     expect(peakWhen(upcoming('2026-11-29'), today)).toBe('Starts in 5 days')
     expect(peakWhen(upcoming('2026-12-24'), today)).toBe('Starts in 30 days')
     expect(peakWhen(upcoming('2026-12-25'), today)).toBe('Starts Dec 25')
+  })
+})
+
+// DAR-UI-159: RAILS 2026-11-27, a one-day period named for its day read "PEAK Nov 27 · Nov 27 – Nov 27".
+describe('peakDateRange', () => {
+  const today = new Date(2026, 10, 27, 9, 0)
+
+  it('gives a one-day period its one date, and a longer one both ends', () => {
+    expect(peakDateRange('2026-11-27', '2026-11-27', today)).toBe('Nov 27')
+    expect(peakDateRange('2026-11-24', '2026-12-01', today)).toBe('Nov 24 – Dec 1')
+  })
+
+  it('adds the year when the period is not in the current year', () => {
+    expect(peakDateRange('2027-11-26', '2027-11-26', today)).toBe('Nov 26, 2027')
+    expect(peakDateRange('2026-12-30', '2027-01-02', today)).toBe('Dec 30, 2026 – Jan 2, 2027')
+  })
+})
+
+describe('peakSettingsValue', () => {
+  const today = new Date(2026, 10, 27, 9, 0)
+  const on: PeakPeriodSummary = { peakPeriodId: 'PP2', periodName: 'PEAK Nov 27', fromDate: '2026-11-27', thruDate: '2026-11-27',
+    isActive: 'Y', state: 'on' }
+
+  it('names the period on now and says so, without repeating its dates', () => {
+    expect(peakSettingsValue([upcoming('2026-11-30'), on], today)).toBe('PEAK Nov 27 · on now')
+  })
+
+  it('names the soonest coming period and when it starts, else None', () => {
+    expect(peakSettingsValue([upcoming('2026-12-24'), upcoming('2026-11-30')], today)).toBe('Black Friday sale · starts in 3 days')
+    expect(peakSettingsValue([{ ...on, state: 'ended' }], today)).toBe('None')
   })
 })
 

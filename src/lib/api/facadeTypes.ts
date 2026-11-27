@@ -58,19 +58,6 @@ export interface SaveRecoveryEmailPayload {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
-export interface GetLlmSettingsPayload {
-  llmProvider?: string
-}
-
-export interface SaveLlmSettingsPayload {
-  llmProvider: string
-  llmModel?: string
-  llmBaseUrl?: string
-  llmTimeoutSeconds?: string
-  llmEnabled?: string
-  llmApiKey?: string
-}
-
 export interface SaveTenantSettingsPayload {
   timeZone?: string
   /** Absent leaves it unchanged; '' clears it. */

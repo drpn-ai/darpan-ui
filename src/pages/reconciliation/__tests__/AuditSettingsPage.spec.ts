@@ -115,6 +115,14 @@ describe('AuditSettingsPage', () => {
     w.unmount()
   })
 
+  // DAR-UI-159: Config history left Tenant Settings for here; back from it returns to this audit.
+  it('opens config history from the footer, saying which audit it came from', async () => {
+    const w = await mountPage()
+    expect(JSON.parse(get(w, 'audit-settings-config-history').attributes('data-to')!))
+      .toEqual({ name: 'settings-tenant-config-history', query: { audit: 'month-close' } })
+    w.unmount()
+  })
+
   it('has no page Save or Cancel, no form and no textarea until a popup opens', async () => {
     const w = await mountPage()
     expect(w.find('form').exists()).toBe(false)

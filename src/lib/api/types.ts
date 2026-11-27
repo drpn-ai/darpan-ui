@@ -233,24 +233,6 @@ export interface ListEnumOptionsResponse extends ApiEnvelope {
   options: EnumOption[]
 }
 
-export interface LlmSettings {
-  activeProvider: string
-  llmProvider: string
-  llmModel: string
-  llmBaseUrl: string
-  llmTimeoutSeconds: string
-  llmEnabled: string
-  hasStoredLlmApiKey?: boolean
-  hasFallbackLlmApiKey?: boolean
-  fallbackLlmKeyEnvName?: string
-}
-
-export interface LlmSettingsResponse extends ApiEnvelope {
-  llmSettings?: LlmSettings
-}
-
-export type SaveLlmSettingsResponse = Schemas['SaveLlmSettingsResult']
-
 export interface TenantSettings {
   companyUserGroupId?: string | null
   companyLabel?: string | null

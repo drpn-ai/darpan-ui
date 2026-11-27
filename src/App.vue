@@ -233,10 +233,10 @@ const staticCommandActions: CommandAction[] = [
   {
     id: 'navigate-tenant-settings',
     label: 'Open Tenant Settings',
-    description: 'Manage tenant connections, timezone, notifications, runs, and AI provider settings.',
+    description: 'Timezone, notifications, peak periods and sync pulse for this tenant.',
     group: 'Navigate',
     to: '/settings/tenant',
-    aliases: ['tenant settings', 'settings', 'timezone', 'time zone', 'ai', 'llm', 'openai', 'gemini', 'api key', 'model settings', 'change api key', 'connections'],
+    aliases: ['tenant settings', 'settings', 'timezone', 'time zone', 'peak periods', 'sync pulse', 'connections'],
   },
   {
     id: 'navigate-sftp',

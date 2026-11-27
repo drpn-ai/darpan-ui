@@ -9,6 +9,7 @@ const getTenantConfigVersions = vi.hoisted(() => vi.fn())
 const previewTenantConfigRestore = vi.hoisted(() => vi.fn())
 const restoreTenantConfigVersion = vi.hoisted(() => vi.fn())
 const permissions = vi.hoisted(() => ({ canEditTenantSettings: true }))
+const routeQuery = vi.hoisted(() => ({ value: {} as Record<string, string> }))
 
 vi.mock('../../../lib/api/facade', () => ({
   configFacade: { snapshotTenantConfig, getTenantConfigVersions, previewTenantConfigRestore, restoreTenantConfigVersion },
@@ -18,6 +19,10 @@ vi.mock('../../../stores/auth', () => ({
 }))
 vi.mock('../../../stores/permissions', () => ({
   usePermissionsStore: () => permissions,
+}))
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
+  useRoute: () => ({ query: routeQuery.value }),
 }))
 
 import TenantConfigHistoryPage from '../TenantConfigHistoryPage.vue'
@@ -141,11 +146,24 @@ describe('TenantConfigHistoryPage', () => {
     expect(wrapper.text()).toContain('Page 3 of 3')
   })
 
-  it('goes back to Tenant Settings from the footer', async () => {
+  // DAR-UI-159: it opens from an audit's settings now, not Tenant Settings.
+  it('goes back to the runs list from the footer when no audit opened it', async () => {
     const wrapper = await mountPage()
     const back = wrapper.findComponent(RouterLinkStub)
-    expect(back.props('to')).toEqual({ name: 'settings-tenant' })
-    expect(back.attributes('aria-label')).toBe('Back to Tenant Settings')
+    expect(back.props('to')).toEqual({ name: 'settings-runs' })
+    expect(back.attributes('aria-label')).toBe('Back to runs')
+  })
+
+  it('goes back to the audit settings it was opened from', async () => {
+    routeQuery.value = { audit: 'month-close' }
+    try {
+      const wrapper = await mountPage()
+      const back = wrapper.findComponent(RouterLinkStub)
+      expect(back.props('to')).toEqual({ name: 'audit-settings', params: { audit: 'month-close' } })
+      expect(back.attributes('aria-label')).toBe('Back to audit settings')
+    } finally {
+      routeQuery.value = {}
+    }
   })
 
   it('says Keeping… while a version is being kept', async () => {

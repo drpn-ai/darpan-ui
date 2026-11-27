@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
-const getLlmSettings = vi.hoisted(() => vi.fn())
-const saveLlmSettings = vi.hoisted(() => vi.fn())
 const getTenantSettings = vi.hoisted(() => vi.fn())
 const saveTenantSettings = vi.hoisted(() => vi.fn())
 const listTenantChatSpaces = vi.hoisted(() => vi.fn())
@@ -48,8 +46,6 @@ vi.mock('../../../lib/api/facade', () => ({
   peakFacade: { listPeakPeriods },
   pulseFacade: { listSyncPairs },
   settingsFacade: {
-    getLlmSettings,
-    saveLlmSettings,
     getTenantSettings,
     listTenantChatSpaces,
     getSlackInstall,
@@ -107,10 +103,15 @@ vi.mock('../../../stores/reconciliationDraft', () => ({
 
 import TenantSettingsPage from '../TenantSettingsPage.vue'
 
-/** The value column of the row that holds this action button. */
+/** The value of a Schedule row (the row is its own button). */
 function rowValue(wrapper: ReturnType<typeof mount>, testId: string): string {
   const row = wrapper.get(`[data-testid="${testId}"]`).element.closest('.tenant-settings-row')
   return row?.querySelector('.tenant-settings-row__value')?.textContent?.trim() ?? ''
+}
+
+/** The value of a header fact. */
+function factValue(wrapper: ReturnType<typeof mount>, testId: string): string {
+  return wrapper.get(`[data-testid="${testId}"]`).get('.static-fact__value').text()
 }
 
 describe('TenantSettingsPage', () => {
@@ -136,8 +137,6 @@ describe('TenantSettingsPage', () => {
     push.mockResolvedValue(undefined)
     replace.mockReset()
     replace.mockResolvedValue(undefined)
-    getLlmSettings.mockReset()
-    saveLlmSettings.mockReset()
     getTenantSettings.mockReset()
     saveTenantSettings.mockReset()
     listTenantChatSpaces.mockReset()
@@ -151,22 +150,6 @@ describe('TenantSettingsPage', () => {
     listSyncPairs.mockReset()
     listSyncPairs.mockResolvedValue({ ok: true, errors: [], messages: [], syncPairs: [] })
 
-    getLlmSettings.mockImplementation(async (payload?: { llmProvider?: string }) => ({
-      ok: true,
-      messages: [],
-      errors: [],
-      llmSettings: {
-        activeProvider: 'GEMINI',
-        llmProvider: payload?.llmProvider ?? 'OPENAI',
-        llmModel: payload?.llmProvider === 'GEMINI' ? 'gemini-2.5-flash' : 'gpt-4.1-mini',
-        llmBaseUrl: payload?.llmProvider === 'GEMINI'
-          ? 'https://generativelanguage.googleapis.com'
-          : 'https://api.openai.com',
-        llmTimeoutSeconds: '45',
-        llmEnabled: 'Y',
-        hasStoredLlmApiKey: true,
-      },
-    }))
     getTenantSettings.mockResolvedValue({
       ok: true,
       messages: [],
@@ -264,7 +247,7 @@ describe('TenantSettingsPage', () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(rowValue(wrapper, 'tenant-module-notifications')).toBe('—')
+    expect(factValue(wrapper, 'tenant-module-notifications')).toBe('—')
 
     releaseChatSpaces({
       ok: true,
@@ -277,34 +260,20 @@ describe('TenantSettingsPage', () => {
     })
     await flushPromises()
 
-    expect(rowValue(wrapper, 'tenant-module-notifications')).toBe('2 spaces')
+    expect(factValue(wrapper, 'tenant-module-notifications')).toBe('2 spaces')
   })
 
-  it('renders one tenant settings surface as groups of rows, with no tiles left', async () => {
+  // DAR-UI-159 (RAILS 2026-11-27, "this page needs help"): the settings header, then one Schedule group.
+  it('opens with the tenant name and a facts strip of Timezone and Notifications', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(wrapper.find('.static-page-frame').exists()).toBe(true)
-    expect(wrapper.find('h1').text()).toBe('Krewe Settings')
-    expect(wrapper.text()).not.toContain('Active Tenant')
-    expect(wrapper.find('.tenant-settings-summary-grid').exists()).toBe(false)
-    expect(wrapper.find('.static-page-list-tile').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('AI Configuration')
-    expect(wrapper.text()).not.toContain('Localization')
-    expect(wrapper.text()).not.toContain('Operations')
-    expect(rowValue(wrapper, 'tenant-module-notifications')).toBe('2 spaces')
-    expect(rowValue(wrapper, 'tenant-module-timezone')).toBe('America/Los_Angeles')
-    expect(rowValue(wrapper, 'tenant-ai-provider-tile')).toBe('Gemini · gemini-2.5-flash · Primary · Enabled · Key stored')
-    expect(wrapper.text()).not.toContain('OpenAI')
-    expect(wrapper.text()).not.toContain('Connections')
-    expect(wrapper.find('[data-testid="tenant-module-sftp"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="tenant-module-netsuite"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="tenant-module-shopify"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="tenant-module-oms"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="tenant-module-runs"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Run Editor')
-    expect(getLlmSettings).toHaveBeenNthCalledWith(1, { llmProvider: 'OPENAI' }, expect.any(AbortSignal))
-    expect(getLlmSettings).toHaveBeenNthCalledWith(2, { llmProvider: 'GEMINI' }, expect.any(AbortSignal))
+    expect(wrapper.get('[data-testid="tenant-settings-name"]').text()).toBe('Krewe')
+    expect(wrapper.get('[data-testid="tenant-settings-name"]').attributes('contenteditable')).toBe('false')
+    expect(wrapper.findAll('[data-testid="tenant-settings-facts"] .static-page-summary-label').map((l) => l.text()))
+      .toEqual(['Timezone', 'Notifications'])
+    expect(factValue(wrapper, 'tenant-module-timezone')).toBe('America/Los_Angeles')
+    expect(factValue(wrapper, 'tenant-module-notifications')).toBe('2 spaces')
     expect(getTenantSettings).toHaveBeenCalledTimes(1)
     expect(listTenantChatSpaces).toHaveBeenCalledTimes(1)
     expect(listSftpServers).not.toHaveBeenCalled()
@@ -312,79 +281,73 @@ describe('TenantSettingsPage', () => {
     expect(listNsRestletConfigs).not.toHaveBeenCalled()
     expect(listShopifyAuthConfigs).not.toHaveBeenCalled()
     expect(listOmsRestSourceConfigs).not.toHaveBeenCalled()
-    expect(wrapper.html()).not.toContain('/settings/ai')
   })
 
-  it('orders the groups Chat, Time, Audit, AI, each one list of rows', async () => {
+  it('says Tenant Settings when no tenant is active', async () => {
+    authState.sessionInfo = { ...authState.sessionInfo, activeTenantUserGroupId: '' }
+    const wrapper = mount(TenantSettingsPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="tenant-settings-name"]').text()).toBe('Tenant Settings')
+  })
+
+  it('groups Peak periods and Sync pulse under Schedule, with no Audit or AI group and no Open buttons', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
     const sections = wrapper.findAll('.static-page-section')
-    expect(sections.map((section) => section.attributes('data-testid'))).toEqual([
-      'tenant-section-chat', 'tenant-section-time', 'tenant-section-audit', 'tenant-section-ai',
-    ])
-    expect(sections.map((section) => section.get('h2').text())).toEqual(['Chat', 'Time', 'Audit', 'AI'])
-    for (const section of sections) expect(section.findAll('.tenant-settings-rows')).toHaveLength(1)
-    expect(wrapper.findAll('.tenant-settings-row__label').map((label) => label.text())).toEqual([
-      'Notifications', 'Timezone', 'Config history', 'Peak periods', 'Sync pulse', 'Provider',
-    ])
+    expect(sections.map((section) => section.get('h2').text())).toEqual(['Schedule'])
+    expect(wrapper.findAll('.tenant-settings-row__label').map((label) => label.text())).toEqual(['Peak periods', 'Sync pulse'])
+    for (const row of wrapper.findAll('.tenant-settings-row')) expect(row.element.tagName).toBe('BUTTON')
+    expect(wrapper.text()).not.toContain('Open')
+    // DAR-UI-159: Config history is on Audit settings; AI provider settings are not in the app.
+    expect(wrapper.find('[data-testid="tenant-module-config-history"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Config history')
+    expect(wrapper.text()).not.toContain('Provider')
+    expect(wrapper.text()).not.toContain('OpenAI')
+    expect(wrapper.html()).not.toContain('/settings/ai')
     // DAR-UI-138: Queries are a page of their own (/queries), not a setting.
     expect(wrapper.find('[data-testid="tenant-module-scripts"]').exists()).toBe(false)
   })
 
-  it('names popups with a verb and pages with Open', async () => {
-    const wrapper = mount(TenantSettingsPage)
-    await flushPromises()
-
-    expect(wrapper.get('[data-testid="tenant-module-notifications"]').text()).toBe('Open →')
-    expect(wrapper.find('[data-testid="tenant-module-streaks-space"]').exists()).toBe(false)
-    // DAR-UI-129: edit buttons are icons; the words are the accessible name.
-    expect(wrapper.get('[data-testid="tenant-module-timezone"]').attributes('aria-label')).toBe('Change tenant timezone')
-    expect(wrapper.get('[data-testid="tenant-module-timezone"]').text()).toBe('')
-    expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').attributes('aria-label')).toBe('Edit AI provider')
-    expect(wrapper.get('[data-testid="tenant-ai-provider-tile"]').text()).toBe('')
-    expect(wrapper.get('[data-testid="tenant-module-config-history"]').text()).toBe('Open →')
-    expect(rowValue(wrapper, 'tenant-module-config-history')).toBe('Versions and restores')
-  })
-
-  // DAR-BE-328. The Peak periods row: None + Set up, else the current or next period + Open.
-  it('shows None and Set up when there are no peak periods', async () => {
+  // DAR-BE-328. The Peak periods row: None, else the period on now or the next one, with when it is.
+  it('reads None and opens the page to set one up when there are no peak periods', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
     expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('None')
-    expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').text()).toBe('Set up')
+    expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').attributes('aria-label')).toBe('Set up peak periods')
     await wrapper.get('[data-testid="tenant-module-peak-periods"]').trigger('click')
     expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-peak-periods' })
   })
 
-  it('shows the next peak period with its dates and Open', async () => {
+  it('names the period on now and says so, not its dates again (RAILS read "PEAK Nov 27 · Nov 27 – Nov 27")', async () => {
     const year = new Date().getFullYear()
     listPeakPeriods.mockResolvedValue({ ok: true, errors: [], messages: [], peakPeriods: [
       { peakPeriodId: '2', periodName: 'Later sale', fromDate: `${year}-12-20`, thruDate: `${year}-12-22`, isActive: 'Y', state: 'upcoming' },
-      { peakPeriodId: '1', periodName: 'Black Friday sale', fromDate: `${year}-11-24`, thruDate: `${year}-12-01`, isActive: 'Y', state: 'upcoming' },
+      { peakPeriodId: '1', periodName: 'PEAK Nov 27', fromDate: `${year}-11-27`, thruDate: `${year}-11-27`, isActive: 'Y', state: 'on' },
       { peakPeriodId: '3', periodName: 'Old sale', fromDate: `${year}-01-01`, thruDate: `${year}-01-03`, isActive: 'Y', state: 'ended' },
     ] })
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('Black Friday sale · Nov 24 – Dec 1')
-    expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').text()).toBe('Open →')
+    expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('PEAK Nov 27 · on now')
+    expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').attributes('aria-label')).toBe('Open peak periods')
   })
 
-  // DAR-BE-328. The Sync pulse row: None + Set up, else the first pair, its cadence and how many more + Open.
-  it('shows None and Set up when there are no sync pairs', async () => {
+  // DAR-BE-328. The Sync pulse row: None, else how many pairs pulse (and their cadence when they share one).
+  it('reads None and opens the page to set one up when there are no sync pairs', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
     expect(rowValue(wrapper, 'tenant-module-sync-pulse')).toBe('None')
-    expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').text()).toBe('Set up')
+    expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').attributes('aria-label')).toBe('Set up sync pulse')
     await wrapper.get('[data-testid="tenant-module-sync-pulse"]').trigger('click')
     expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-sync-pairs' })
   })
 
-  // DAR-UI-154 (prod-roll look 2026-11-26): no "None · Set up" flash while the reads are in flight.
-  it('shows Loading… with no button on the peak and sync rows until their reads return', async () => {
+  // DAR-UI-154 (prod-roll look 2026-11-26): no "None" flash while the reads are in flight.
+  it('shows Loading… on the peak and sync rows, not pressable, until their reads return', async () => {
     listPeakPeriods.mockReturnValue(new Promise(() => {}))
     listSyncPairs.mockReturnValue(new Promise(() => {}))
     const wrapper = mount(TenantSettingsPage)
@@ -392,11 +355,11 @@ describe('TenantSettingsPage', () => {
 
     expect(wrapper.get('[data-testid="tenant-peak-value"]').text()).toBe('Loading…')
     expect(wrapper.get('[data-testid="tenant-sync-value"]').text()).toBe('Loading…')
-    expect(wrapper.find('[data-testid="tenant-module-peak-periods"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="tenant-module-sync-pulse"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').attributes('disabled')).toBeDefined()
   })
 
-  it('shows the first pulsing pair with its cadence, the other pulsing ones as a count, and Open', async () => {
+  it('counts the pulsing pairs, with the cadence they share', async () => {
     const pair = (over: Record<string, unknown>) => ({ syncPairId: '1', label: 'Approved orders', pulseEveryMinutes: 120, ...over })
     // DAR-UI-153: a pair that only carries a start allowance (no pulse, no peak period pulse) is not counted.
     listSyncPairs.mockResolvedValue({ ok: true, errors: [], messages: [], syncPairs: [pair({}), pair({ syncPairId: '2', label: 'Returns' }),
@@ -404,12 +367,12 @@ describe('TenantSettingsPage', () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(rowValue(wrapper, 'tenant-module-sync-pulse')).toBe('Approved orders · every 2h · 1 more')
-    expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').text()).toBe('Open →')
+    expect(rowValue(wrapper, 'tenant-module-sync-pulse')).toBe('2 pairs · every 2h')
+    expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').attributes('aria-label')).toBe('Open sync pulse')
   })
 
-  // DAR-UI-123. The spaces, streaks among the things that post, moved to Notifications; one row opens it.
-  it('opens Notifications from its row, with a count of spaces and no chat popups left here', async () => {
+  // DAR-UI-123. The spaces, streaks among the things that post, moved to Notifications; its fact opens it.
+  it('opens Notifications from its fact, with no chat popups left here', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
@@ -428,35 +391,19 @@ describe('TenantSettingsPage', () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    expect(rowValue(wrapper, 'tenant-module-notifications')).toBe('1 space')
+    expect(factValue(wrapper, 'tenant-module-notifications')).toBe('1 space')
   })
 
-  it('opens the timezone popup from its Change', async () => {
+  it('edits tenant timezone from its fact\'s popup', async () => {
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="tenant-module-timezone"]').trigger('click')
-    await flushPromises()
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Set the tenant timezone.')
-  })
-
-  it('opens the config history page from its row', async () => {
-    const wrapper = mount(TenantSettingsPage)
-    await flushPromises()
-
-    await wrapper.get('[data-testid="tenant-module-config-history"]').trigger('click')
-    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-config-history' })
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-  })
-
-  it('edits tenant timezone from the Tenant Settings popup', async () => {
-    const wrapper = mount(TenantSettingsPage)
-    await flushPromises()
-
+    expect(wrapper.get('[data-testid="tenant-module-timezone"]').attributes('aria-label')).toBe('Change tenant timezone: America/Los_Angeles')
     await wrapper.get('[data-testid="tenant-module-timezone"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="dialog"]').text()).toContain('Set the tenant timezone.')
+    expect(wrapper.get('.static-page-frame').classes()).toContain('static-page-frame--popup-open')
     expect(wrapper.get('[data-testid="tenant-timezone-select"]').text()).toContain('America/Los_Angeles')
     await wrapper.get('[data-testid="tenant-timezone-select"]').trigger('click')
     await wrapper.get('[data-testid="app-select-search"]').setValue('Europe/London')
@@ -467,87 +414,18 @@ describe('TenantSettingsPage', () => {
     expect(saveTenantSettings).toHaveBeenCalledWith({ timeZone: 'Europe/London' })
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Saved tenant settings.')
-    expect(rowValue(wrapper, 'tenant-module-timezone')).toContain('Europe/London')
+    expect(factValue(wrapper, 'tenant-module-timezone')).toBe('Europe/London')
   })
 
-  it('opens AI edits as a popup workflow and saves through the settings facade', async () => {
-    saveLlmSettings.mockResolvedValue({
-      ok: true,
-      messages: ['Saved LLM settings.'],
-      errors: [],
-      llmSettings: {
-        activeProvider: 'OPENAI',
-        llmProvider: 'OPENAI',
-        llmModel: 'gpt-4.1-mini',
-        llmBaseUrl: 'https://api.openai.com',
-        llmTimeoutSeconds: '45',
-        llmEnabled: 'Y',
-      },
-    })
-
-    const wrapper = mount(TenantSettingsPage)
+  it('opens the timezone popup from ?workflow=timezone, and ignores the old AI workflows', async () => {
+    route.query = { workflow: 'timezone' }
+    const timezone = mount(TenantSettingsPage)
     await flushPromises()
+    expect(timezone.get('[role="dialog"]').text()).toContain('Set the tenant timezone.')
 
-    await wrapper.get('[data-testid="tenant-ai-provider-tile"]').trigger('click')
+    route.query = { workflow: 'ai-edit', llmProvider: 'OPENAI' }
+    const ai = mount(TenantSettingsPage)
     await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('What do you want to do with the AI provider?')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Update Gemini')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Change selected provider')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Add provider settings')
-    await wrapper.get('[data-testid="tenant-ai-provider-workflow-update"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Update the AI provider settings.')
-    expect(wrapper.get('.static-page-frame').classes()).toContain('static-page-frame--popup-open')
-    await wrapper.get('input[name="llmModel"]').setValue('gemini-2.5-pro')
-    await wrapper.get('[data-testid="save-tenant-llm-settings"]').trigger('click')
-    await flushPromises()
-
-    expect(saveLlmSettings).toHaveBeenCalledWith({
-      llmProvider: 'GEMINI',
-      llmModel: 'gemini-2.5-pro',
-      llmBaseUrl: 'https://generativelanguage.googleapis.com',
-      llmTimeoutSeconds: '45',
-      llmEnabled: 'Y',
-      llmApiKey: '',
-    })
-    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Saved LLM settings.')
-  })
-
-  it('starts add/change provider setup from the selected AI provider workflow', async () => {
-    const wrapper = mount(TenantSettingsPage)
-    await flushPromises()
-
-    await wrapper.get('[data-testid="tenant-ai-provider-tile"]').trigger('click')
-    await flushPromises()
-    await wrapper.get('[data-testid="tenant-ai-provider-workflow-change"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Which AI provider should Darpan configure?')
-    expect(wrapper.find('[data-testid="tenant-llm-provider"]').exists()).toBe(true)
-  })
-
-  it('leaves the AI group out for super-admins without Darpan-admin access', async () => {
-    authState.sessionInfo = {
-      userId: 'super-admin',
-      activeTenantUserGroupId: 'KREWE',
-      activeTenantLabel: 'Krewe',
-      timeZone: 'America/Los_Angeles',
-      availableTenants: [{ userGroupId: 'KREWE', label: 'Krewe' }],
-      canEditActiveTenantData: true,
-      isSuperAdmin: true,
-      canManageDarpanCore: false,
-    }
-
-    const wrapper = mount(TenantSettingsPage)
-    await flushPromises()
-
-    expect(getLlmSettings).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="tenant-section-ai"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="tenant-ai-provider-tile"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Darpan admin only')
-    expect(wrapper.findAll('.static-page-section h2').map((heading) => heading.text())).toEqual(['Chat', 'Time', 'Audit'])
+    expect(ai.find('[role="dialog"]').exists()).toBe(false)
   })
 })

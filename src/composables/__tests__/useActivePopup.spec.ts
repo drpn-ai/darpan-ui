@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { useActivePopup, useTenantSettingsPopup } from '../useActivePopup'
+import { useActivePopup } from '../useActivePopup'
 
 describe('useActivePopup', () => {
   it('opens and closes a typed popup', () => {
@@ -9,27 +9,5 @@ describe('useActivePopup', () => {
     expect(popup.isPopupOpen.value).toBe(true)
     popup.close()
     expect(popup.activePopup.value).toBeNull()
-  })
-})
-
-describe('useTenantSettingsPopup', () => {
-  it('exposes one open helper per popup variant', () => {
-    const popup = useTenantSettingsPopup()
-    popup.openTimezone()
-    expect(popup.activePopup.value).toEqual({ type: 'timezone' })
-
-    popup.openAiMenu()
-    expect(popup.activePopup.value).toEqual({ type: 'ai-menu' })
-
-    popup.openAiCreate()
-    expect(popup.activePopup.value).toEqual({ type: 'ai', mode: 'create' })
-    expect(popup.isAiEditing.value).toBe(false)
-
-    popup.openAiEdit()
-    expect(popup.activePopup.value).toEqual({ type: 'ai', mode: 'edit' })
-    expect(popup.isAiEditing.value).toBe(true)
-
-    popup.close()
-    expect(popup.isPopupOpen.value).toBe(false)
   })
 })

@@ -6,10 +6,6 @@ describe('router release scope', () => {
   const expectedRoutes = [
     { name: 'cli-login', path: '/cli-login', surfaceMode: 'static', staticPageLabel: 'Approve CLI' },
     { name: 'settings-tenant', path: '/settings/tenant', surfaceMode: 'static', staticPageLabel: 'Tenant Settings' },
-    { name: 'settings-ai', path: '/settings/ai', redirect: true },
-    { name: 'connections-llm', path: '/connections/llm', redirect: true },
-    { name: 'settings-ai-create', path: '/settings/ai/create', redirect: true },
-    { name: 'settings-ai-edit', path: '/settings/ai/edit/:llmProvider', redirect: true },
     { name: 'settings-sftp', path: '/settings/sftp', surfaceMode: 'static' },
     { name: 'settings-notifications', path: '/settings/notifications', surfaceMode: 'static', staticPageLabel: 'Notifications' },
     { name: 'settings', path: '/settings', redirect: true },

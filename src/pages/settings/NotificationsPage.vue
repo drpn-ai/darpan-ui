@@ -163,6 +163,16 @@
 
     <template #actions>
       <div class="action-row">
+        <!-- DAR-UI-159: the way back is the footer back icon, as on Peak periods and Sync pulse. -->
+        <RouterLink
+          :to="{ name: 'settings-tenant' }"
+          class="app-icon-action app-icon-action--large"
+          aria-label="Back to tenant settings"
+          title="Back to tenant settings"
+          data-testid="notifications-back"
+        >
+          <AppIcon name="back" />
+        </RouterLink>
         <button
           v-if="canEdit"
           type="button"
@@ -292,7 +302,7 @@
 <script setup lang="ts">
 import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AddChatSpaceFlow from '../../components/settings/AddChatSpaceFlow.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'

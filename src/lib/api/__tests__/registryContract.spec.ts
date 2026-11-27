@@ -130,7 +130,6 @@ async function driveAllMethods(facade: Record<string, unknown>): Promise<void> {
           fileSide: 'FILE1',
           sourceTypeEnumId: 'ST1',
           nsRestletConfigId: 'nsr-x',
-          llmProvider: 'openai',
         })
       } catch {
         // If both attempts fail, the method was never reached — skip.
@@ -253,8 +252,6 @@ describe('registry contract — exported wrapper presence', () => {
     expect(typeof sf.deleteTenantChatSpace).toBe('function')
     expect(typeof sf.getUserNotificationDefault).toBe('function')
     expect(typeof sf.saveUserNotificationDefault).toBe('function')
-    expect(typeof sf.getLlmSettings).toBe('function')
-    expect(typeof sf.saveLlmSettings).toBe('function')
     expect(typeof sf.listEnumOptions).toBe('function')
     expect(typeof sf.listSftpServers).toBe('function')
     expect(typeof sf.saveSftpServer).toBe('function')
@@ -349,8 +346,6 @@ describe('registry contract — known method string values', () => {
     await driveAllMethods(settingsFacade as Record<string, unknown>)
 
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.list#EnumOptions')
-    expect(capturedMethods).toContain('facade.SettingsFacadeServices.get#LlmSettings')
-    expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#LlmSettings')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.get#TenantSettings')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#TenantSettings')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.list#TenantChatSpaces')

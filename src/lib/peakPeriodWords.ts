@@ -16,10 +16,14 @@ export function peakDay(date: string): string {
   return `${MONTHS[m - 1] ?? ''} ${d}`
 }
 
-/** "Nov 24 – Dec 1"; the year is added to each end only when the period is not in the current year. */
+/**
+ * "Nov 24 – Dec 1", or "Nov 27" for a one-day period (DAR-UI-159: it read "Nov 27 – Nov 27"); the year is added to
+ * each end only when the period is not in the current year.
+ */
 export function peakDateRange(fromDate: string, thruDate: string, today: Date = new Date()): string {
   const year = today.getFullYear()
   const end = (date: string) => (parts(date).y === year ? peakDay(date) : `${peakDay(date)}, ${parts(date).y}`)
+  if (fromDate === thruDate) return end(fromDate)
   const start = (date: string) => (parts(fromDate).y === year && parts(thruDate).y === year ? peakDay(date) : `${peakDay(date)}, ${parts(date).y}`)
   return `${start(fromDate)} – ${end(thruDate)}`
 }
@@ -68,10 +72,16 @@ export function peakHoursUntilNotice(until: unknown, tenantTimeZone?: string): s
   return `Peak hours until ${clock}${code ? ` ${code}` : ''}.`
 }
 
-/** The Tenant Settings value: the period on now, else the soonest upcoming one, else "None". */
+/**
+ * The Tenant Settings value: the period on now, else the soonest upcoming one, with when it is ("PEAK Nov 27 · on now",
+ * "Cyber Monday · starts in 3 days"), else "None". DAR-UI-159: its dates are on the period's own page; names usually
+ * carry them already ("PEAK Nov 27 · Nov 27 – Nov 27").
+ */
 export function peakSettingsValue(periods: PeakPeriodSummary[], today: Date = new Date()): string {
   const on = periods.find((period) => period.state === 'on')
   const upcoming = periods.filter((period) => period.state === 'upcoming').sort((a, b) => a.fromDate.localeCompare(b.fromDate))[0]
   const pick = on ?? upcoming
-  return pick ? `${pick.periodName} · ${peakDateRange(pick.fromDate, pick.thruDate, today)}` : 'None'
+  if (!pick) return 'None'
+  const when = peakWhen(pick, today)
+  return `${pick.periodName} · ${when.charAt(0).toLowerCase()}${when.slice(1)}`
 }

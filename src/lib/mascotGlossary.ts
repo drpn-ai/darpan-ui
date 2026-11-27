@@ -458,6 +458,12 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     body: 'peak periods whose last day has passed. Kept for the record; they change nothing now.',
   },
   // DAR-BE-328: the Sync pulse list, its Tenant Settings row and the pair page's title.
+  // DAR-UI-159: Tenant Settings' Schedule group. Only where the heading asks for it (automationSchedule owns the word).
+  tenantSchedule: {
+    title: 'Schedule',
+    body: 'this tenant’s busy days and how closely its orders are watched on them. Peak periods move runs out of the way; the sync pulse counts orders still waiting.',
+    byDirectiveOnly: true,
+  },
   syncPulse: {
     title: 'Sync pulse',
     body: 'watches orders that reached one system but not the next one yet, and tells you which ones waited longer than the allowance. Open a pair to see today.',
@@ -740,23 +746,6 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   endpointAccess: {
     title: 'Available Endpoints',
     body: 'which calls runs may make through this connection. Untick one and any run needing it stops as not enabled. New ones start ticked.',
-  },
-  aiConfiguration: {
-    title: 'AI Configuration',
-    body: 'one setting for every tenant on this Darpan, not just this one. Only a Darpan admin can save it.',
-  },
-  aiApiKey: {
-    title: 'API Key',
-    body: 'stored encrypted and never shown back, only whether one exists. Blank keeps the current key; this form cannot clear it.',
-    byDirectiveOnly: true,
-  },
-  aiProvider: {
-    title: 'Provider',
-    body: 'which AI company Darpan asks, OpenAI or Gemini. Saving a provider’s settings makes it the active one for the whole instance.',
-  },
-  aiModel: {
-    title: 'Model',
-    body: 'which model this provider is asked for. Left blank, the last saved model stays, or the provider default if none was saved.',
   },
   slackBotToken: {
     title: 'Bot user OAuth token',

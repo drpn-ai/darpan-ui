@@ -324,33 +324,6 @@ describe('TenantPeakPeriodPage', () => {
     expect(wrapper.text()).not.toContain('Waits for peak hours')
   })
 
-  it('starts a new period with the plus disabled; the first Save moves to its own address', async () => {
-    route.params = {}
-    savePeakPeriod.mockResolvedValue({ ok: true, messages: [], errors: [], peakPeriodId: 'PP9' })
-    getPeakPeriod.mockResolvedValue(got({ peakPeriod: period({ peakPeriodId: 'PP9', periodName: 'New peak period' }), runTimes: [], heldRuns: [] }))
-    const wrapper = await mountPage()
-    expect(getPeakPeriod).not.toHaveBeenCalled()
-    expect(text(wrapper, 'peak-name')).toBe('New peak period')
-    expect(wrapper.find('[data-testid="peak-run-time-add"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.find('[data-testid="peak-delete"]').exists()).toBe(false)
-    // No dates yet, so nothing to save.
-    expect(wrapper.find('[data-testid="peak-save"]').attributes('disabled')).toBeDefined()
-
-    await wrapper.find('[data-testid="peak-fact-dates"]').trigger('click')
-    await wrapper.find('[data-testid="peak-dates-day-2026-11-24"]').trigger('click')
-    await wrapper.find('[data-testid="peak-dates-day-2026-12-01"]').trigger('click')
-    await wrapper.find('[data-testid="peak-dates-save"]').trigger('click')
-    await wrapper.find('[data-testid="peak-save"]').trigger('click')
-    await flushPromises()
-
-    expect(savePeakPeriod).toHaveBeenCalledWith({
-      periodName: 'New peak period', fromDate: '2026-11-24', thruDate: '2026-12-01', peakHoursStart: '', peakHoursEnd: '', hotwaxReadSharePct: null, netsuiteSerial: false, isActive: true,
-    })
-    expect(replace).toHaveBeenCalledWith({ name: 'settings-tenant-peak-period', params: { peakPeriodId: 'PP9' } })
-    expect(getPeakPeriod).toHaveBeenCalledWith({ peakPeriodId: 'PP9' })
-    expect(wrapper.find('[data-testid="peak-run-time-add"]').attributes('disabled')).toBeUndefined()
-  })
-
   it('deletes only after the popup confirms, then goes back to the list', async () => {
     const wrapper = await mountPage()
     await wrapper.find('[data-testid="peak-delete"]').trigger('click')
@@ -606,15 +579,12 @@ describe('TenantPeakPeriodPage', () => {
       expect(text(wrapper, 'peak-popup-error')).toBe('Allowance must be 15 minutes to 48 hours.')
     })
 
-    it('rows are plain without edit rights, and wait on a new unsaved period', async () => {
+    it('rows are plain without edit rights', async () => {
       getPeakPeriod.mockResolvedValue(got({ syncRows: syncRows() }))
       permissions.canEditTenantSettings = false
       const readOnly = await mountPage()
       expect(readOnly.find('[data-testid="peak-sync-lag-row"]').element.tagName).toBe('DIV')
       permissions.canEditTenantSettings = true
-      route.params = {}
-      const fresh = await mountPage()
-      expect(fresh.find('[data-testid="peak-sync-lag"]').exists()).toBe(false)
     })
   })
 })

@@ -285,6 +285,19 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Daily schedule',
     body: 'pauses or resumes every check of this audit, saved on the click. A paused check keeps its findings; it just stops looking for new ones.',
   },
+  // DAR-UI-159. Config history moved here from Tenant Settings: it versions the audit setup, and only audits have one.
+  'config history': {
+    title: 'Config history',
+    body: 'every saved version of this tenant’s audit setup, all its audits together. Restore one to put it back; finished runs keep their results.',
+  },
+  'back to audit settings': {
+    title: 'Back to audit settings',
+    body: 'the audit you came from. Keeping or restoring a version here was saved when you did it.',
+  },
+  'back to runs': {
+    title: 'Back to runs',
+    body: 'the saved runs and audits on this tenant. Keeping or restoring a version here was saved when you did it.',
+  },
   // DAR-UI-127.
   'back to the audit': {
     title: 'Back to the audit',
@@ -863,10 +876,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Disconnect',
     body: 'drops the workspace now. Its spaces stay on the grid but post nothing until a workspace is connected again.',
   },
-  'edit ai provider': {
-    title: 'AI provider',
-    body: 'which model answers Ask Darpan for this tenant. Nothing else on the product depends on it.',
-  },
   '+ add tenant': {
     title: 'Add tenant',
     body: 'shares this config with another tenant. They can run against it; they cannot edit or delete it.',
@@ -944,7 +953,7 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   },
   'back to tenant settings': {
     title: 'Back to Tenant Settings',
-    body: 'chat, time, audit and AI settings for this tenant. Nothing on this page is saved or discarded on the way.',
+    body: 'timezone, notifications and the schedule for this tenant. Nothing on this page is saved or discarded on the way.',
   },
   'back to run editor': {
     title: 'Back to Run Editor',

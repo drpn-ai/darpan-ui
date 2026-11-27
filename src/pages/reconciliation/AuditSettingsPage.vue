@@ -96,6 +96,16 @@
         >
           <AppIcon name="back" />
         </RouterLink>
+        <!-- DAR-UI-159. The tenant's audit config versions; it was a Tenant Settings row, shown to clients with no audits. -->
+        <RouterLink
+          :to="{ name: 'settings-tenant-config-history', query: { audit: auditCode } }"
+          class="app-icon-action app-icon-action--large"
+          aria-label="Config history"
+          title="Config history"
+          data-testid="audit-settings-config-history"
+        >
+          <AppIcon name="clock" />
+        </RouterLink>
       </div>
     </template>
   </StaticPageFrame>

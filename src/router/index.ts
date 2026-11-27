@@ -231,11 +231,6 @@ export const routes: RouteRecordRaw[] = [
     redirect: { name: 'settings-tenant' },
   },
   {
-    path: '/connections/llm',
-    name: 'connections-llm',
-    redirect: { name: 'settings-tenant' },
-  },
-  {
     path: '/connections/sftp',
     name: 'connections-sftp',
     redirect: (to) => {
@@ -334,10 +329,11 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak periods' },
   },
   {
+    // DAR-UI-161. A new period is a workflow (name, then days); its own page opens once it is made.
     path: '/settings/tenant/peak-periods/new',
     name: 'settings-tenant-peak-period-new',
-    component: () => import('../pages/settings/TenantPeakPeriodPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak period' },
+    component: () => import('../pages/settings/TenantPeakPeriodCreatePage.vue'),
+    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-tenant-peak-periods', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/tenant/peak-periods/:peakPeriodId',
@@ -377,27 +373,6 @@ export const routes: RouteRecordRaw[] = [
     path: '/settings/tenant/sync-pulse/:syncPairId',
     name: 'settings-tenant-sync-pair',
     redirect: (to) => ({ name: 'pulse', params: { syncPairId: to.params.syncPairId } }),
-  },
-  {
-    path: '/settings/ai',
-    name: 'settings-ai',
-    redirect: { name: 'settings-tenant' },
-  },
-  {
-    path: '/settings/ai/create',
-    name: 'settings-ai-create',
-    redirect: { name: 'settings-tenant', query: { workflow: 'ai-create' } },
-  },
-  {
-    path: '/settings/ai/edit/:llmProvider',
-    name: 'settings-ai-edit',
-    redirect: (to) => ({
-      name: 'settings-tenant',
-      query: {
-        workflow: 'ai-edit',
-        llmProvider: String(to.params.llmProvider ?? ''),
-      },
-    }),
   },
   {
     path: '/settings/netsuite',
@@ -707,19 +682,6 @@ router.beforeEach(async (to) => {
           authStore.sessionInfo?.activeTenantLabel ?? linkTenantId,
         )
       }
-    }
-
-    // AI provider settings workflow is a global-admin surface; gate it on the destination route
-    // because the source routes (settings-ai-create / settings-ai-edit) are redirect-only and Vue
-    // Router skips beforeEnter on redirect routes. Without this check, the only gate was an
-    // in-page string check in TenantSettingsPage, which a redirect chain bypasses for a moment.
-    if (
-      to.name === 'settings-tenant' &&
-      typeof to.query.workflow === 'string' &&
-      (to.query.workflow === 'ai-create' || to.query.workflow === 'ai-edit') &&
-      !permissions.canManageGlobalSettings
-    ) {
-      return { name: 'settings-tenant' }
     }
 
     if (to.meta.requiresReconciliationRun === true && !permissions.canRunActiveTenantReconciliation) {
