@@ -82,9 +82,7 @@
                     data-testid="conclusions-editor-new-code"
                     @click="toggleNewCode"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                      <path :d="plusIconPath" fill="currentColor" />
-                    </svg>
+                    <AppIcon name="plus" />
                   </button>
                 </div>
                 <div v-if="newCodeOpen" class="concl-part__picker" data-testid="conclusions-editor-new-code-row">
@@ -108,9 +106,7 @@
                     data-testid="conclusions-editor-new-code-add"
                     @click="void addCode(node.uid)"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                      <path :d="plusIconPath" fill="currentColor" />
-                    </svg>
+                    <AppIcon name="plus" />
                   </button>
                 </div>
                 <InlineValidation
@@ -129,9 +125,7 @@
                 :disabled="saving"
                 @click="done"
               >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                  <path d="M4 10l4 4 8-8" />
-                </svg>
+                <AppIcon name="check" />
               </button>
             </div>
             <button
@@ -169,9 +163,7 @@
                 :disabled="saving"
                 @click="done"
               >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                  <path d="M4 10l4 4 8-8" />
-                </svg>
+                <AppIcon name="check" />
               </button>
             </div>
             <button
@@ -215,9 +207,7 @@
                     data-testid="conclusions-editor-add-line"
                     @click="addLineTo(node)"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                      <path :d="plusIconPath" fill="currentColor" />
-                    </svg>
+                    <AppIcon name="plus" />
                   </button>
                 </div>
               </div>
@@ -248,9 +238,7 @@
                 :disabled="saving"
                 @click="done"
               >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                  <path d="M4 10l4 4 8-8" />
-                </svg>
+                <AppIcon name="check" />
               </button>
             </div>
             <button
@@ -290,9 +278,7 @@
                 :disabled="saving"
                 @click="done"
               >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                  <path d="M4 10l4 4 8-8" />
-                </svg>
+                <AppIcon name="check" />
               </button>
             </div>
             <button
@@ -334,9 +320,7 @@
                 :disabled="saving"
                 @click="done"
               >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                  <path d="M4 10l4 4 8-8" />
-                </svg>
+                <AppIcon name="check" />
               </button>
             </div>
             <button
@@ -364,9 +348,7 @@
                 data-testid="conclusions-editor-move-up"
                 @click="moveOpen(node, -1)"
               >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                  <path d="M10 15V5M5 10l5-5 5 5" />
-                </svg>
+                <AppIcon name="arrowUp" />
               </button>
               <button
                 type="button"
@@ -377,9 +359,7 @@
                 data-testid="conclusions-editor-move-down"
                 @click="moveOpen(node, 1)"
               >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                  <path d="M10 5v10M5 10l5 5 5-5" />
-                </svg>
+                <AppIcon name="arrowDown" />
               </button>
               <button
                 type="button"
@@ -390,9 +370,7 @@
                 data-testid="conclusions-editor-delete"
                 @click="removeOpen(node)"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-                </svg>
+                <AppIcon name="trash" />
               </button>
             </div>
           </div>
@@ -444,9 +422,7 @@
                 :disabled="saving"
                 @click="done"
               >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-                  <path d="M4 10l4 4 8-8" />
-                </svg>
+                <AppIcon name="check" />
               </button>
             </div>
             <button
@@ -477,9 +453,7 @@
           data-testid="conclusions-editor-add"
           @click="addAndOpen"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="plusIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="plus" />
         </button>
       </div>
 
@@ -508,9 +482,7 @@
           data-testid="conclusions-editor-back"
           @click="void back()"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </button>
       </footer>
     </div>
@@ -528,6 +500,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { RouterLink, onBeforeRouteLeave, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
@@ -540,7 +513,6 @@ import ConclusionLine from '../../components/reconciliation/ConclusionLine.vue'
 import { outcomeLabel, useRunConclusions, type ConclusionDraft } from '../../composables/useRunConclusions'
 import { loadConclusionFields, lookupFields, type CatalogResult } from '../../lib/conclusionFieldCatalog'
 import { OUTCOME_GLOSS, explainsLabel } from '../../lib/conclusionLines'
-import { backIconPath, plusIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
   formatReconciliationFieldKey,
   reconciliationSystemTitle,

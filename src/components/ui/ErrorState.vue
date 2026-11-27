@@ -1,7 +1,6 @@
 <template>
   <div class="error-state" role="alert">
-    <!-- eslint-disable-next-line vue/no-v-html -->
-    <span v-if="icon" class="error-state__icon" aria-hidden="true" v-html="errorStateIcons[icon]" />
+    <span v-if="icon" class="error-state__icon" aria-hidden="true"><AppIcon :name="icon" /></span>
     <h3 class="error-state__title">{{ title }}</h3>
     <p v-if="message" class="error-state__msg">{{ message }}</p>
     <a v-if="action?.href" class="btn-primary" :href="action.href">{{ action.label }}</a>
@@ -10,11 +9,12 @@
 </template>
 
 <script setup lang="ts">
-import { errorStateIcons } from './errorStateIcons'
+import AppIcon from './AppIcon.vue'
+import type { StateIconName } from './errorVariants'
 defineProps<{
   title: string
   message?: string
-  icon?: keyof typeof errorStateIcons
+  icon?: StateIconName
   action?: { label: string; onClick?: () => void; href?: string }
 }>()
 </script>

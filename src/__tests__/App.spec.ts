@@ -897,8 +897,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const omsSource = readFileSync('src/pages/settings/OmsRestSourceWorkflowPage.vue', 'utf8')
 
     expect(cancelActionSource).toContain('class="app-icon-action app-icon-action--large"')
-    expect(cancelActionSource).toContain('<line x1="5" y1="5" x2="15" y2="15"')
-    expect(cancelActionSource).toContain('<line x1="15" y1="5" x2="5" y2="15"')
+    expect(cancelActionSource).toContain('<AppIcon name="cancel" />')
     expect(workflowStepFormSource).toContain('<AppCancelAction')
     expect(workflowStepFormSource).toContain("showCancelAction: false")
     expect(runsWorkflowSource).toContain(':show-cancel-action="true"')

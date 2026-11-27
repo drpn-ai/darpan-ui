@@ -124,12 +124,7 @@
               :aria-pressed="showClientId ? 'true' : 'false'"
               @click="showClientId = !showClientId"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path
-                  d="M10 4.5c4.56 0 7.5 4.2 8.27 5.5-.77 1.3-3.7 5.5-8.27 5.5S2.5 11.3 1.73 10C2.5 8.7 5.44 4.5 10 4.5Z"
-                />
-                <circle cx="10" cy="10" r="2.4" />
-              </svg>
+              <AppIcon name="eye" />
             </button>
           </div>
         </label>
@@ -268,12 +263,7 @@
               :aria-pressed="showClientId ? 'true' : 'false'"
               @click="showClientId = !showClientId"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path
-                  d="M10 4.5c4.56 0 7.5 4.2 8.27 5.5-.77 1.3-3.7 5.5-8.27 5.5S2.5 11.3 1.73 10C2.5 8.7 5.44 4.5 10 4.5Z"
-                />
-                <circle cx="10" cy="10" r="2.4" />
-              </svg>
+              <AppIcon name="eye" />
             </button>
           </div>
         </label>
@@ -343,6 +333,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
 import { useRoute, useRouter } from 'vue-router'
@@ -834,10 +825,5 @@ watch(() => route.fullPath, () => {
 .workflow-secret-field__toggle svg {
   width: 1.05rem;
   height: 1.05rem;
-  stroke: currentColor;
-  stroke-width: 1.75;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: none;
 }
 </style>

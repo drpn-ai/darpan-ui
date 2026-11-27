@@ -22,9 +22,7 @@
               aria-label="Edit NetSuite Auth"
               @click="draftStore.setWorkflowOrigin(heroTitle, route.fullPath || `/settings/netsuite/auth/${configId}`)"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="editIconPath" />
-              </svg>
+              <AppIcon name="edit" />
             </RouterLink>
           </div>
         </template>
@@ -94,9 +92,7 @@
           data-testid="back-netsuite-auth"
           aria-label="Back to NetSuite Settings"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
 
         <!-- The probe tests OAuth2 profiles only (DAR-BE-114). -->
@@ -110,16 +106,7 @@
           :disabled="diagnostics.running.value"
           @click="runDiagnostics"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path
-              :d="diagnosticsIconPath"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <AppIcon name="diagnostics" />
         </button>
 
         <button
@@ -131,9 +118,7 @@
           :disabled="deletingConfig"
           @click="deleteConfig"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -151,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ConnectionDiagnosticsPopup from '../../components/settings/ConnectionDiagnosticsPopup.vue'
@@ -165,13 +151,6 @@ import type { NsAuthConfigRecord, NsRestletConfigRecord } from '../../lib/api/ty
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import {
-  backIconPath,
-  diagnosticsIconPath,
-  editIconPath,
-  trashIconPath,
-  trashIconTransform,
-} from '../../lib/iconPaths'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 import SettingsRecordListSection from './SettingsRecordListSection.vue'

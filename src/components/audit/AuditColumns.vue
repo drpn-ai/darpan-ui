@@ -246,10 +246,10 @@
               <span data-testid="audit-findings-count">{{ findingsTotal.toLocaleString('en-US') }}</span>
               <!-- DAR-UI-147. Re-check every open finding of this statement now; what was fixed since the morning closes. -->
               <button v-if="canResolve && statement" type="button" class="app-icon-action" aria-label="Re-check all findings" title="Re-check all findings" data-testid="audit-recheck-statement" :disabled="rechecking" @click="emit('recheck', statement)">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="recheckIconPath" /></svg>
+                <AppIcon name="recheck" />
               </button>
               <button v-if="rows.length" type="button" class="app-icon-action" aria-label="Export findings" title="Export findings" data-testid="audit-export-findings" :disabled="exporting" @click="emit('export', 'statement')">
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
+                <AppIcon name="download" />
               </button>
             </span>
           </h2>
@@ -323,7 +323,7 @@
                     <!-- DAR-UI-144. Acknowledge the row with a note: an open one with none, or one its reminder brought back. -->
                     <span v-if="canAcknowledge" class="audit-ack-anchor" @keydown.esc="closeAck">
                       <button ref="ackButton" type="button" class="app-icon-action" aria-label="Acknowledge" title="Acknowledge" data-testid="audit-acknowledge" aria-haspopup="dialog" :aria-expanded="ackEditing === 'new' ? 'true' : 'false'" @click="toggleAck('new')">
-                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="acknowledgeIconPath" /></svg>
+                        <AppIcon name="acknowledge" />
                       </button>
                       <Transition name="audit-ack-pop">
                         <AuditAcknowledgePopover v-if="ackEditing === 'new'" :initial="null" :remind-days="remindDays" @submit="(note: string, remind: boolean) => submitAck('new', note, remind)" @close="closeAck" />
@@ -331,10 +331,10 @@
                     </span>
                     <!-- DAR-BE-123. Re-checks this finding's record now; it closes if the problem is gone. -->
                     <button v-if="canResolve && findingDoc.finding.status.state !== 'fixed'" type="button" class="app-icon-action" aria-label="Resolve finding" title="Resolve finding" data-testid="audit-verify-finding" :disabled="verifying" @click="emit('verify')">
-                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="resolveIconPath" /></svg>
+                      <AppIcon name="resolve" />
                     </button>
                     <button type="button" class="app-icon-action" aria-label="Export finding" title="Export finding" data-testid="audit-export-finding" @click="emit('export', 'finding')">
-                      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
+                      <AppIcon name="download" />
                     </button>
                   </span>
                 </div>
@@ -346,7 +346,7 @@
                     <span class="audit-col-head-end">
                       <span class="audit-ack-anchor" @keydown.esc="closeAck">
                         <button ref="ackEditButton" type="button" class="app-icon-action" aria-label="Edit acknowledgement" title="Edit acknowledgement" data-testid="audit-ack-edit" aria-haspopup="dialog" :aria-expanded="ackEditing === 'edit' ? 'true' : 'false'" @click="toggleAck('edit')">
-                          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="editIconPath" fill="currentColor" /></svg>
+                          <AppIcon name="edit" />
                         </button>
                         <Transition name="audit-ack-pop">
                           <AuditAcknowledgePopover v-if="ackEditing === 'edit'" :initial="acknowledgement" :remind-days="remindDays" @submit="(note: string, remind: boolean) => submitAck('edit', note, remind)" @close="closeAck" />
@@ -546,7 +546,7 @@
                     <span class="audit-bar-track"><span class="audit-bar-fill" :style="{ width: bar.share }" /></span>
                     <span>{{ bar.count }}</span>
                     <button type="button" class="app-icon-action" :aria-label="`Export ${bar.system} extract`" :title="`Export ${bar.system} extract`" :data-testid="`audit-extract-${bar.key}`" :disabled="exporting" @click="emit('extract', check.id, bar.key)">
-                      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
+                      <AppIcon name="download" />
                     </button>
                   </div>
                 </div>
@@ -575,6 +575,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import AuditAcknowledgePopover from './AuditAcknowledgePopover.vue'
@@ -582,7 +583,6 @@ import AuditFeedbackBubble from './AuditFeedbackBubble.vue'
 import type { AgentFindingCard } from './AuditAgentPanel.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import StaticFactStrip from '../ui/StaticFactStrip.vue'
-import { acknowledgeIconPath, downloadIconPath, editIconPath, recheckIconPath, resolveIconPath } from '../../lib/iconPaths'
 import { auditFacade } from '../../lib/api/facade'
 import type {
   AuditAcknowledgement,

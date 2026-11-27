@@ -1,7 +1,6 @@
 <template>
   <div :class="['empty-state', { 'empty-state--cta': isCentered }]">
-    <!-- eslint-disable-next-line vue/no-v-html -->
-    <span v-if="icon" class="empty-state__icon" aria-hidden="true" v-html="emptyStateIcons[icon]" />
+    <span v-if="icon" class="empty-state__icon" aria-hidden="true"><AppIcon :name="icon" /></span>
     <h3>{{ title }}</h3>
     <p v-if="description">
       {{ description }}
@@ -17,12 +16,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
-import { emptyStateIcons } from './emptyStateIcons'
+import AppIcon from './AppIcon.vue'
 
 const props = defineProps<{
   title: string
   description?: string
-  icon?: keyof typeof emptyStateIcons
+  icon?: 'inbox'
   action?: { label: string; to?: RouteLocationRaw; href?: string; onClick?: () => void }
 }>()
 

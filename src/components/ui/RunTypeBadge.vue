@@ -5,14 +5,13 @@
     :data-run-type="type"
     :data-testid="testId ?? `run-type-${type}`"
   >
-    <svg class="run-type-badge__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path :d="definition.iconPath" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-    </svg>
+    <AppIcon :name="definition.icon" class="run-type-badge__icon" />
     <span>{{ detail ? `${definition.label} · ${detail}` : definition.label }}</span>
   </span>
 </template>
 
 <script setup lang="ts">
+import AppIcon from './AppIcon.vue'
 import { computed } from 'vue'
 import { RUN_TYPES, type RunTypeId } from '../../lib/runTypes'
 

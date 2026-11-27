@@ -86,9 +86,7 @@
                 data-testid="script-read-json-toggle"
                 @click="showReadJson = !showReadJson"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="CODE_ICON_PATH" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <AppIcon name="code" />
               </button>
               <button
                 v-if="canEdit"
@@ -100,9 +98,7 @@
                 :disabled="busy || !readParse.ok || readInputs.length >= MAX_INPUTS"
                 @click="openData(null)"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="plusIconPath" fill="currentColor" />
-                </svg>
+                <AppIcon name="plus" />
               </button>
             </span>
           </div>
@@ -141,9 +137,7 @@
               :disabled="busy"
               @click="removeInput(index)"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-              </svg>
+              <AppIcon name="trash" />
             </button>
           </li>
           <li v-if="!readRows.length" class="query-read query-read--empty" data-testid="script-read-empty">Reads nothing: script only</li>
@@ -225,10 +219,7 @@
                 :disabled="busy"
                 @click="openPreview"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="EYE_ICON_PATH" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  <circle cx="10" cy="10" r="2.25" fill="currentColor" />
-                </svg>
+                <AppIcon name="eye" />
               </button>
               <button
                 type="button"
@@ -240,9 +231,7 @@
                 :disabled="!canEdit || busy || !draft.scriptBody.trim()"
                 @click="runDraft"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
-                </svg>
+                <AppIcon name="play" />
               </button>
             </span>
           </div>
@@ -314,9 +303,7 @@
           title="Back to queries"
           data-testid="script-back"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
         <!-- Pressable without a name, so pressing it can say what is missing (the mascot reads this anchor). -->
         <span v-if="canEdit && draft" class="script-save" :data-testid="nameMissing ? 'script-save-blocked' : undefined">
@@ -331,9 +318,7 @@
           :disabled="busy"
           @click="openPopup('delete')"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -448,9 +433,7 @@
               :disabled="popupBusy"
               @click="deleteQuery"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-              </svg>
+              <AppIcon name="trash" />
             </button>
             <AppCancelAction test-id="script-delete-cancel" :disabled="popupBusy" @click="closePopup" />
           </div>
@@ -471,6 +454,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-BE-334 (was DAR-UI-124's script page), DAR-UI-138. One tenant query on a page of its own, read top to bottom as a
 // notebook: its name and schedule facts, the ask box, then 1 Data (each input as a sentence by name; a part opens the
 // Data popup; the raw read JSON one icon away), 2 Script, 3 Result (this visit's runs, each file with a 20-row preview).
@@ -496,7 +480,6 @@ import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue
 import { agentFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
 import type { QueryError, QueryRun, QueryScheduleOutcome, TenantQuery, TenantQuerySchedule } from '../../lib/api/scriptTypes'
 import type { TenantChatSpace } from '../../lib/api/types'
-import { backIconPath, playIconPath, playIconTransform, plusIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
   MAX_INPUTS,
   describeInput,
@@ -562,8 +545,6 @@ interface DataEdit {
 
 const FUNCTIONS_DOCS_URL = 'https://developers.drpn.ai/tenant-queries/functions'
 // Stroked on the 20-unit viewBox: angle brackets (the read as JSON) and an eye (preview what it would send).
-const CODE_ICON_PATH = 'M7.5 5.5 3 10l4.5 4.5M12.5 5.5 17 10l-4.5 4.5'
-const EYE_ICON_PATH = 'M2.5 10s2.75-5 7.5-5 7.5 5 7.5 5-2.75 5-7.5 5-7.5-5-7.5-5Z'
 const MAX_RUNS = 3
 /** A new query's name starts blank and shows this, muted, as its placeholder: it still has to be given. */
 const NEW_NAME = 'New query'

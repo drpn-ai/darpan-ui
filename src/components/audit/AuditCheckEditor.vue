@@ -89,9 +89,7 @@
               :disabled="busy || links.length < 2"
               @click="removeLink(index)"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-              </svg>
+              <AppIcon name="trash" />
             </button>
           </div>
           <div v-if="showRules(row)" class="audit-check-link-row audit-check-link-row--detail">
@@ -117,9 +115,7 @@
           :disabled="busy"
           @click="addLink"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="plusIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="plus" />
         </button>
       </div>
 
@@ -255,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppCancelAction from '../ui/AppCancelAction.vue'
@@ -272,7 +269,6 @@ import type {
   AuditDiffType,
 } from '../../lib/api/authoringTypes'
 import { FIX_WHERE_LABELS } from '../../lib/auditReport'
-import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 
 // The run builder; scope=EVALUATE builds a run that reads one system.
 const NEW_RUN_LINK = { path: '/reconciliation/create' }
@@ -308,8 +304,6 @@ const FORM_FIELDS = [
 type CheckForm = Record<(typeof FORM_FIELDS)[number], string>
 
 const CODE_MAX_LENGTH = 60
-const plusIconPath =
-  'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'
 
 // DAR-UI-078: a side is named by its system once a run is picked ("Missing in HotWax"), as "file 1" means nothing to a reader.
 const DIFF_TYPE_LABELS: Record<AuditDiffType, (side: (s: 'FILE_1' | 'FILE_2') => string) => string> = {

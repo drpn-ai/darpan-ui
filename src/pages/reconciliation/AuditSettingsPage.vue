@@ -94,9 +94,7 @@
           title="Back to the audit"
           data-testid="audit-settings-back"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
       </div>
     </template>
@@ -415,6 +413,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AuditCheckEditor from '../../components/audit/AuditCheckEditor.vue'
@@ -436,7 +435,6 @@ import {
   AUDIT_LEVELS, LEVEL_LABEL, LEVEL_WORD,
   type AuditLevel, type AuditSettings, type AuditSettingsCheck, type AuditSettingsReason, type AuditSettingsStatement, type SaveAuditSettingsPayload,
 } from '../../lib/api/auditTypes'
-import { backIconPath } from '../../lib/iconPaths'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { twelveHourTime } from '../../lib/scriptDeployment'
 import { buildTimezoneOptions } from '../../lib/timezones'

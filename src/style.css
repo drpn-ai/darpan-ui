@@ -812,10 +812,6 @@ button:disabled {
   min-height: 2.2rem;
 }
 
-.static-page-section-edit-action svg path {
-  fill: currentColor;
-}
-
 .user-settings-control {
   min-height: 2.35rem;
   border: 1px solid var(--border);

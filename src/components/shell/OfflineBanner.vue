@@ -1,20 +1,18 @@
 <template>
   <div v-if="isOffline" class="offline-banner" role="status" aria-live="assertive" aria-atomic="true">
-    <!-- eslint-disable-next-line vue/no-v-html -->
-    <span class="offline-banner__icon" aria-hidden="true" v-html="offlineIcon" />
+    <span class="offline-banner__icon" aria-hidden="true"><AppIcon name="offline" /></span>
     <span class="offline-banner__text">You're offline. Check your connection.</span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { errorStateIcons } from '../ui/errorStateIcons'
+import AppIcon from '../../components/ui/AppIcon.vue'
 
 const emit = defineEmits<{
   reconnect: []
 }>()
 
-const offlineIcon = errorStateIcons.offline
 const isOffline = ref(!navigator.onLine)
 
 function handleOnline(): void {

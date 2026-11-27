@@ -33,9 +33,7 @@
             aria-label="Edit filters"
             @click="openRuleEditWorkflow"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="editIconPath" fill="currentColor" />
-            </svg>
+            <AppIcon name="edit" />
           </button>
         </div>
       </template>
@@ -102,9 +100,7 @@
             aria-label="Edit rules"
             @click="openRuleEditWorkflow"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="editIconPath" fill="currentColor" />
-            </svg>
+            <AppIcon name="edit" />
           </button>
         </div>
       </template>
@@ -181,9 +177,7 @@
             :aria-label="conclusions.list.value.length ? 'Edit conclusions' : 'Set up conclusions'"
             @click="openConclusionEditWorkflow"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="editIconPath" fill="currentColor" />
-            </svg>
+            <AppIcon name="edit" />
           </button>
         </div>
       </template>
@@ -199,9 +193,7 @@
           aria-label="Back to Run Editor"
           title="Back to Run Editor"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
         <button
           v-if="draft && canRunActiveTenantReconciliation"
@@ -211,9 +203,7 @@
           aria-label="Run ruleset"
           @click="openRunWorkflow"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="play" />
         </button>
         <RouterLink
           v-if="canViewRunHistory"
@@ -223,9 +213,7 @@
           title="View previous runs"
           :to="runHistoryRoute"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="listIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="list" />
         </RouterLink>
         <button
           v-if="draft && canEditTenantSettings"
@@ -236,9 +224,7 @@
           :disabled="deletingSavedRun"
           @click="deleteSavedRun"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -263,9 +249,7 @@
           title="Open full config dashboard"
           :to="authInfoPopup.dashboardRoute"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="ellipsisIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="ellipsis" />
         </RouterLink>
       </header>
 
@@ -304,6 +288,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
@@ -330,7 +315,6 @@ import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { backIconPath, editIconPath, listIconPath, playIconPath, playIconTransform, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
   buildSaveRuleSetRunPayload,
   formatReconciliationFieldKey,
@@ -391,8 +375,6 @@ interface AuthInfoPopupState {
 }
 
 const SOURCE_TYPE_API = 'AUT_SRC_API'
-const ellipsisIconPath =
-  'M5 8.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm5 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm5 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z'
 
 const draftState = computed(() => draftStore.ruleSetDraftState)
 const draft = computed<ReconciliationRuleSetDraft | null>(() => draftState.value?.draft ?? null)

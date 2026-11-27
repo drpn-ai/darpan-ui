@@ -75,12 +75,7 @@
               :disabled="!schemaText.trim()"
               @click="downloadSchema"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path
-                  d="M10 2.5a.75.75 0 0 1 .75.75v7.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V3.25A.75.75 0 0 1 10 2.5Zm-5 11a.75.75 0 0 1 .75.75v1.5c0 .14.11.25.25.25h8c.14 0 .25-.11.25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 14 17.5H6A1.75 1.75 0 0 1 4.25 15.75v-1.5A.75.75 0 0 1 5 13.5Z"
-                  fill="currentColor"
-                />
-              </svg>
+              <AppIcon name="download" />
             </button>
           </template>
 
@@ -114,9 +109,7 @@
                 aria-label="Remove field row"
                 @click="removeFieldRow(index)"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="trashIconPath" fill="currentColor" />
-                </svg>
+                <AppIcon name="trash" />
               </button>
             </div>
           </template>
@@ -132,12 +125,7 @@
                     aria-label="Add field row"
                     @click="addFieldRow"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                      <path
-                        d="M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z"
-                        fill="currentColor"
-                      />
-                    </svg>
+                    <AppIcon name="plus" />
                   </button>
                 </div>
               </td>
@@ -168,9 +156,7 @@
           :disabled="footerActionsDisabled"
           @click="deleteSchema"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="footerTrashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -178,6 +164,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppTableFrame from '../../components/ui/AppTableFrame.vue'
@@ -193,7 +180,6 @@ import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, settingsFacade } from '../../lib/api/facade'
 import type { EnumOption, JsonSchemaField } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
-import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { formatDateTime } from '../../lib/utils/date'
 import { downloadTextFile } from '../../lib/utils/download'
 
@@ -208,7 +194,6 @@ const fieldTypeOptions: AppSelectOption[] = fieldTypes.map((fieldType) => ({ val
 const rowDeleteActionClass = 'app-table__icon-action app-table__icon-action--danger schema-editor-row-delete-action'
 const footerDeleteActionClass =
   'app-icon-action app-icon-action--large app-icon-action--danger schema-editor-footer-action'
-const footerTrashIconTransform = trashIconTransform
 
 const props = defineProps<{
   jsonSchemaId?: string

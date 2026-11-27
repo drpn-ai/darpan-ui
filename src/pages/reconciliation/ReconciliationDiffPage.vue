@@ -134,9 +134,7 @@
           title="View previous runs"
           :to="runHistoryRoute"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="listIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="list" />
         </RouterLink>
         <button
           v-if="canOpenRunSettings"
@@ -147,19 +145,7 @@
           title="Run settings"
           @click="void openRunSettings()"
         >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            focusable="false"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path :d="settingsIconPath" />
-          </svg>
+          <AppIcon name="settings" />
         </button>
       </div>
     </template>
@@ -167,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
@@ -199,7 +186,6 @@ import {
   todayInDisplayTimeZone,
 } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
-import { listIconPath, settingsIconPath } from '../../lib/iconPaths'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { useCalendarWidget } from '../../composables/useCalendarWidget'
 import {

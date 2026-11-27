@@ -22,9 +22,7 @@
           data-testid="flowchart-editor-cancel"
           @click="emit('cancel')"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="CLOSE_ICON_PATH" fill="currentColor" />
-          </svg>
+          <AppIcon name="close" />
         </button>
       </header>
 
@@ -54,9 +52,7 @@
           data-testid="flowchart-editor-delete"
           @click="emit('delete')"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </section>
@@ -64,9 +60,9 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, reactive, watch } from 'vue'
 import type { SavedRunSummary } from '../../lib/api/types'
-import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import AppSaveAction from '../ui/AppSaveAction.vue'
 import AppSelect from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
@@ -76,8 +72,6 @@ import InlineValidation from '../ui/InlineValidation.vue'
 // WorkflowSelect): the chart page is a static board, and the design system never blends surfaces.
 export interface FlowchartQuestionDraft { ruleSetId: string; runName: string; noOutcomeLabel: string }
 
-const CLOSE_ICON_PATH =
-  'M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z'
 
 const props = defineProps<{
   rules: SavedRunSummary[]

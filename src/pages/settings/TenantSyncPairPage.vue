@@ -76,9 +76,7 @@
           :title="isNewRoute ? 'Back to sync pulse' : 'Back to pulses'"
           data-testid="sync-pair-back"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
         <AppSaveAction
           v-if="canEdit && draft && (!draft.syncPairId || dirty)"
@@ -96,9 +94,7 @@
           :disabled="busy"
           @click="openPopup('delete')"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -271,9 +267,7 @@
               :disabled="popupBusy"
               @click="deletePair"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-              </svg>
+              <AppIcon name="trash" />
             </button>
             <AppCancelAction test-id="sync-pair-delete-cancel" :disabled="popupBusy" @click="closePopup" />
           </div>
@@ -284,6 +278,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-BE-328. One sync pair on a page of its own: which daily check it watches, how often it pulses, how long an order
 // may wait, and today's pulses as two charts with the orders now past the allowance. The switch and the facts change
 // only this page until Save. While the page is open and untouched, it reads the pair again every minute. On /new the
@@ -313,7 +308,6 @@ import type {
   SyncPastOrder,
   SyncSample,
 } from '../../lib/api/pulseTypes'
-import { backIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
   ALLOWANCE_CHOICES,
   allowanceWords,

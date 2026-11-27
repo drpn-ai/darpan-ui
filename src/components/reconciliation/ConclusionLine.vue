@@ -101,7 +101,7 @@
             :disabled="disabled"
             @click="removeValue(value)"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5 5l10 10M15 5L5 15" /></svg>
+            <AppIcon name="close" />
           </button>
         </span>
         <input
@@ -144,9 +144,7 @@
         title="Done with this line"
         @click="emit('done')"
       >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false">
-          <path d="M4 10l4 4 8-8" />
-        </svg>
+        <AppIcon name="check" />
       </button>
       <button
         type="button"
@@ -156,21 +154,19 @@
         :disabled="disabled"
         @click="emit('remove')"
       >
-        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-          <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-        </svg>
+        <AppIcon name="trash" />
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, ref, watch } from 'vue'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import type { ConclusionOperator, RunConclusionCondition } from '../../lib/api/authoringTypes'
 import type { CatalogField } from '../../lib/conclusionFieldCatalog'
 import { conditionIncomplete, describeCondition, isListOperator, type LineContext } from '../../lib/conclusionLines'
-import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 
 const props = defineProps<{
   condition: RunConclusionCondition
@@ -600,9 +596,6 @@ function emitNumber(event: Event): void {
 .conclusion-line-tag__remove svg {
   width: 0.7rem;
   height: 0.7rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
 }
 
 .conclusion-line-tags__input {

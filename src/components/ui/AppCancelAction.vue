@@ -7,14 +7,12 @@
     :disabled="disabled"
     @click="emit('click')"
   >
-    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      <line x1="5" y1="5" x2="15" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-      <line x1="15" y1="5" x2="5" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-    </svg>
+    <AppIcon name="cancel" />
   </button>
 </template>
 
 <script setup lang="ts">
+import AppIcon from './AppIcon.vue'
 withDefaults(
   defineProps<{
     label?: string

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ICONS } from '../icons'
 import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { RUN_TYPES, RUN_TYPE_ORDER, questionCountLabel } from '../runTypes'
 
@@ -10,7 +11,7 @@ describe('run types', () => {
   })
 
   it('gives each type its own icon, so a monochrome tile can still be told apart', () => {
-    const paths = RUN_TYPE_ORDER.map((id) => RUN_TYPES[id].iconPath)
+    const paths = RUN_TYPE_ORDER.map((id) => ICONS[RUN_TYPES[id].icon].paths.join(' '))
     paths.forEach((path) => expect(path.length).toBeGreaterThan(0))
     expect(new Set(paths).size).toBe(paths.length)
   })

@@ -13,7 +13,7 @@
       :aria-expanded="open ? 'true' : 'false'"
       @click="toggle"
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="feedbackIconPath" /></svg>
+      <AppIcon name="feedback" />
       <span v-if="shownCount > 0" class="audit-feedback-badge" data-testid="audit-feedback-badge" aria-hidden="true">{{ shownCount }}</span>
     </button>
     <Transition name="audit-feedback-pop">
@@ -40,10 +40,10 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import { auditFacade } from '../../lib/api/facade'
-import { feedbackIconPath } from '../../lib/iconPaths'
 import type { AuditFeedbackNote } from '../../lib/api/auditTypes'
 
 const props = defineProps<{

@@ -173,9 +173,7 @@
           aria-label="Back to run"
           data-testid="flowchart-back"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
         <!-- Play, settings and delete act on the run itself, so they live on its own page; a result has only back. -->
         <RouterLink
@@ -186,14 +184,10 @@
           title="Open run"
           data-testid="flowchart-run-button"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="play" />
         </RouterLink>
         <button v-else-if="!isResult" type="button" class="app-icon-action app-icon-action--large" aria-label="Open run" title="Open run" disabled data-testid="flowchart-run-button">
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="play" />
         </button>
         <!-- DAR-UI-050. As a Sync run's page: settings beside play. Rules are set up there, never on this page. -->
         <RouterLink
@@ -204,10 +198,7 @@
           title="Run settings"
           data-testid="flowchart-settings"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path :d="settingsIconPath" />
-          </svg>
+          <AppIcon name="settings" />
         </RouterLink>
         <!-- As an automation's delete: the run is archived, so it leaves Home and cannot run again; its past results
              stay readable. -->
@@ -221,9 +212,7 @@
           :disabled="deleting || running"
           @click="void deleteRun()"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -246,6 +235,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import FlowchartQuestionEditor, { type FlowchartQuestionDraft } from '../../components/reconciliation/FlowchartQuestionEditor.vue'
@@ -270,7 +260,6 @@ import { walkableQuestionIds } from '../../lib/flowchart/flowchartLayout'
 import {
   isExecutionDone, isExecutionFinal, POLL_INTERVAL_MS, questionStates, shouldKeepPolling,
 } from '../../lib/flowchart/flowchartRunState'
-import { backIconPath, playIconPath, playIconTransform, settingsIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { buildReconciliationRunLiveRoute, buildReconciliationRunResultRoute } from '../../lib/reconciliationRoutes'
 import { isFindingPlace, lifecycleBoard, notFindingPlacesOf, type LifecyclePlace } from '../../lib/lifecycleBoard'
 import { accountLabelOf } from '../../lib/nsAccountLabel'

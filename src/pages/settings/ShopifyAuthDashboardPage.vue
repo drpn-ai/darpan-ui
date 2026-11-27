@@ -22,9 +22,7 @@
               aria-label="Edit Shopify Config"
               @click="draftStore.setWorkflowOrigin(heroTitle, route.fullPath || `/settings/shopify/auth/${configId}`)"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="editIconPath" />
-              </svg>
+              <AppIcon name="edit" />
             </RouterLink>
           </div>
         </template>
@@ -74,9 +72,7 @@
           data-testid="back-shopify-auth"
           aria-label="Back to Shopify Settings"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
 
         <button
@@ -89,16 +85,7 @@
           :disabled="diagnostics.running.value"
           @click="runDiagnostics"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path
-              :d="diagnosticsIconPath"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <AppIcon name="diagnostics" />
         </button>
 
         <button
@@ -110,9 +97,7 @@
           :disabled="deletingConfig"
           @click="deleteConfig"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -130,6 +115,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ConnectionDiagnosticsPopup from '../../components/settings/ConnectionDiagnosticsPopup.vue'
@@ -145,13 +131,6 @@ import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import {
-  backIconPath,
-  diagnosticsIconPath,
-  editIconPath,
-  trashIconPath,
-  trashIconTransform,
-} from '../../lib/iconPaths'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 import SourceConfigEndpointsSection from './SourceConfigEndpointsSection.vue'

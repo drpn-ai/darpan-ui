@@ -70,9 +70,7 @@
           aria-label="Back to Tenant Settings"
           title="Back to Tenant Settings"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
       </div>
     </template>
@@ -129,6 +127,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-BE-160. The active tenant's audit config versions (whole tenant, not one audit): keep one now, and restore an
 // older one through the plan the backend previews, applied exactly as shown (planHash). DAR-UI-125: the newest version
 // as a facts strip, the earlier ones by day with what changed against the one before, paged.
@@ -144,7 +143,6 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { configFacade } from '../../lib/api/facade'
 import type { ConfigVersion, PreviewTenantConfigRestoreResponse } from '../../lib/api/configTypes'
 import { countsDelta, countsSummary, groupVersionsByDay, restoreChangesNothing, restoreSections, sourceLabel, versionTime } from '../../lib/configHistory'
-import { backIconPath } from '../../lib/iconPaths'
 import { useListPagination } from '../../lib/listPagination'
 import { formatDateTime } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'

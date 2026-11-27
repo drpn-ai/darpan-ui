@@ -39,9 +39,7 @@
             data-testid="user-rename"
             @click="startRename"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="editIconPath" fill="currentColor" />
-            </svg>
+            <AppIcon name="edit" />
           </button>
           <button
             v-if="availableTenants.length > 1"
@@ -74,9 +72,7 @@
               data-testid="user-timezone-change"
               @click="openTimezoneWorkflow"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="editIconPath" fill="currentColor" />
-              </svg>
+              <AppIcon name="edit" />
             </button>
           </div>
         </article>
@@ -94,9 +90,7 @@
               data-testid="user-notification-default-change"
               @click="openNotificationDefaultWorkflow"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="editIconPath" fill="currentColor" />
-              </svg>
+              <AppIcon name="edit" />
             </button>
           </div>
         </article>
@@ -160,9 +154,7 @@
               data-testid="user-password-change"
               @click="openPasswordWorkflow"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="editIconPath" fill="currentColor" />
-              </svg>
+              <AppIcon name="edit" />
             </button>
           </div>
         </article>
@@ -237,9 +229,7 @@
               data-testid="recovery-email-change"
               @click="openRecoveryEmailWorkflow"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="authStore.emailAddressMasked ? editIconPath : plusIconPath" fill="currentColor" />
-              </svg>
+              <AppIcon :name="authStore.emailAddressMasked ? 'edit' : 'plus'" />
             </button>
           </div>
         </article>
@@ -542,6 +532,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
@@ -577,7 +568,6 @@ import {
   type CommandPaletteOpenRequestDetail,
 } from '../../lib/uiEvents'
 import { formatDateTime, formatShortDate } from '../../lib/utils/date'
-import { editIconPath, plusIconPath } from '../../lib/iconPaths'
 
 const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()

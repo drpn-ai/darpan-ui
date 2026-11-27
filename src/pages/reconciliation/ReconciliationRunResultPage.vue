@@ -51,16 +51,11 @@
         :aria-expanded="ruleSelectorCollapsed ? 'false' : 'true'"
         @click="toggleRuleSelectorCollapsed"
       >
-        <svg
+        <AppIcon
+          name="chevronsLeft"
           class="run-result-rule-selector__toggle-icon"
           :class="{ 'run-result-rule-selector__toggle-icon--collapsed': ruleSelectorCollapsed }"
-          viewBox="0 0 20 20"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <path d="M12.3 4.8 7.1 10l5.2 5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M16 4.8 10.8 10l5.2 5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
+        />
       </button>
     </aside>
 
@@ -121,12 +116,7 @@
                   :disabled="downloadingSourceFilePath === sourceFile.filePath"
                   @click="downloadRunSourceFile(sourceFile)"
                 >
-                  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                    <path
-                      :d="downloadIconPath"
-                      fill="currentColor"
-                    />
-                  </svg>
+                  <AppIcon name="download" />
                 </button>
               </div>
             </div>
@@ -160,15 +150,11 @@
             >
               <span class="run-result-step-timeline__label micro-label">Run steps</span>
               <span v-if="displayedRunSteps.length > 0" class="run-result-step-timeline__count">{{ displayedRunSteps.length }}</span>
-              <svg
+              <AppIcon
+                name="chevronLeft"
                 class="run-result-step-timeline__toggle-icon"
                 :class="{ 'run-result-step-timeline__toggle-icon--collapsed': stepTimelineCollapsed }"
-                viewBox="0 0 20 20"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <path d="M12.3 4.8 7.1 10l5.2 5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
+              />
             </button>
             <p
               v-if="!stepTimelineCollapsed && displayedRunSteps.length === 0"
@@ -372,12 +358,7 @@
                 :disabled="downloadingSavedResult"
                 @click="void downloadSavedResult()"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path
-                    :d="downloadIconPath"
-                    fill="currentColor"
-                  />
-                </svg>
+                <AppIcon name="download" />
               </button>
             </template>
 
@@ -439,9 +420,7 @@
                 :aria-label="isExpanded(row) ? 'Hide evidence' : 'Show evidence'"
                 @click="toggleExpanded(row)"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path d="M5 7.5 10 12.5l5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <AppIcon name="chevronDown" />
               </button>
               <span v-else aria-hidden="true"></span>
             </template>
@@ -472,9 +451,7 @@
             title="Back to run"
             :to="lifecycleBackRoute"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="backIconPath" fill="currentColor" />
-            </svg>
+            <AppIcon name="back" />
           </RouterLink>
         </div>
         <div v-else class="action-row">
@@ -487,9 +464,7 @@
             :to="workflowRoute"
             @click="draftStore.setWorkflowOrigin('Run Result', route.fullPath)"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
-            </svg>
+            <AppIcon name="play" />
           </RouterLink>
           <RouterLink
             class="app-icon-action app-icon-action--large"
@@ -498,9 +473,7 @@
             title="View previous runs"
             :to="runHistoryRoute"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="listIconPath" fill="currentColor" />
-            </svg>
+            <AppIcon name="list" />
           </RouterLink>
           <button
             v-if="canOpenRunSettings"
@@ -512,19 +485,7 @@
             :disabled="openingRunSettings"
             @click="void openRunSettings()"
           >
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              focusable="false"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path :d="settingsIconPath" />
-            </svg>
+            <AppIcon name="settings" />
           </button>
         </div>
       </template>
@@ -576,6 +537,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import AppTableFrame from '../../components/ui/AppTableFrame.vue'
@@ -627,7 +589,6 @@ import {
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget, savedRunSystemLabel } from '../../lib/savedRunEditorRoute'
-import { backIconPath, downloadIconPath, listIconPath, playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { formatClockTime, formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { countLabel } from '../../lib/utils/strings'

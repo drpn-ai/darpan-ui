@@ -17,9 +17,7 @@
           aria-label="Close diagnostics"
           @click="requestClose"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="closeIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="close" />
         </button>
       </header>
 
@@ -80,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount } from 'vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 import type { ConnectionCheck, ConnectionCheckStatus } from '../../lib/api/types'
@@ -94,8 +93,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (event: 'close'): void }>()
 
-const closeIconPath =
-  'M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z'
 
 // The popup never dismisses itself, on any outcome. A passing result is still something an
 // operator reads, so it waits to be closed.

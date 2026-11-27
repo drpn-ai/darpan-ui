@@ -98,9 +98,7 @@
               :disabled="!draft.peakPeriodId || busy || datesDirty"
               @click="openRunTime(null)"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="plusIconPath" fill="currentColor" />
-              </svg>
+              <AppIcon name="plus" />
             </button>
           </div>
         </template>
@@ -159,9 +157,7 @@
           title="Back to peak periods"
           data-testid="peak-back"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
         <AppSaveAction
           v-if="canEdit && draft"
@@ -179,9 +175,7 @@
           :disabled="busy"
           @click="openPopup('delete')"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -338,9 +332,7 @@
               :disabled="popupBusy"
               @click="deleteRunTime"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-              </svg>
+              <AppIcon name="trash" />
             </button>
             <AppCancelAction test-id="peak-run-time-cancel" :disabled="popupBusy" @click="closePopup" />
           </div>
@@ -384,9 +376,7 @@
               :disabled="popupBusy"
               @click="deletePeriod"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-              </svg>
+              <AppIcon name="trash" />
             </button>
             <AppCancelAction test-id="peak-delete-cancel" :disabled="popupBusy" @click="closePopup" />
           </div>
@@ -397,6 +387,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-BE-328. One peak period on a page of its own: its name and on/off, its dates and peak hours, the runs it moves
 // and the runs that wait for its peak hours. The title, the switch and the four facts only change this page until
 // Save; a run time saves from its own popup, once the period exists. The backend validates every save and its
@@ -418,7 +409,6 @@ import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue
 import { useCalendarWidget } from '../../composables/useCalendarWidget'
 import { peakFacade } from '../../lib/api/facade'
 import type { GetPeakPeriodResponse, PeakHeldRun, PeakPeriod, PeakRunTime, PeakSyncRow, PeakTarget } from '../../lib/api/peakTypes'
-import { backIconPath, plusIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { peakDateRange, peakDay } from '../../lib/peakPeriodWords'
 import { ALLOWANCE_CHOICES, PULSE_EVERY_CHOICES, allowanceWords, pulseCadence } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'

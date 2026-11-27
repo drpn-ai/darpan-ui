@@ -120,9 +120,7 @@
                 data-testid="netsuite-query-remove-match-rule"
                 @click="removeMatchRule(index)"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="trashIconPath" fill="currentColor" />
-                </svg>
+                <AppIcon name="trash" />
               </button>
             </div>
           </template>
@@ -137,9 +135,7 @@
                     data-testid="netsuite-query-add-match-rule"
                     @click="addMatchRule"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                      <path :d="plusIconPath" fill="currentColor" />
-                    </svg>
+                    <AppIcon name="plus" />
                   </button>
                 </div>
               </td>
@@ -165,9 +161,7 @@
                 data-testid="netsuite-query-remove-field"
                 @click="removeField(index)"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="trashIconPath" fill="currentColor" />
-                </svg>
+                <AppIcon name="trash" />
               </button>
             </div>
           </template>
@@ -182,9 +176,7 @@
                     data-testid="netsuite-query-add-field"
                     @click="addField"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                      <path :d="plusIconPath" fill="currentColor" />
-                    </svg>
+                    <AppIcon name="plus" />
                   </button>
                 </div>
               </td>
@@ -232,6 +224,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkflowStepMachine } from '../../composables/useWorkflowStepMachine'
@@ -251,7 +244,6 @@ import type {
   NsSuiteQlQueryOptions,
   NsSuiteQlQueryPreview,
 } from '../../lib/api/authoringTypes'
-import { trashIconPath } from '../../lib/iconPaths'
 import { resolveInternalRedirectTarget } from '../../lib/navigation'
 import { usePermissionsStore } from '../../stores/permissions'
 
@@ -312,8 +304,6 @@ const OP_LABELS: Record<string, string> = {
   NOT_EMPTY: 'has a value',
   STARTS_WITH: 'starts with',
 }
-const plusIconPath =
-  'M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z'
 const rowDeleteActionClass = 'app-table__icon-action app-table__icon-action--danger'
 const actionColumn = {
   key: 'actions',

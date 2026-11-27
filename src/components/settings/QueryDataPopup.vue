@@ -92,9 +92,7 @@
                 data-testid="query-data-condition-remove"
                 @click="removeCondition(row.key)"
               >
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                  <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-                </svg>
+                <AppIcon name="trash" />
               </button>
             </div>
             <button
@@ -105,9 +103,7 @@
               data-testid="query-data-condition-add"
               @click="addCondition"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="plusIconPath" fill="currentColor" />
-              </svg>
+              <AppIcon name="plus" />
             </button>
           </div>
 
@@ -168,6 +164,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-UI-138. One input of a query's read, picked by name: what it reads (an audit's findings, a saved run's newest
 // result, a dataset's kept records), which one, only the rows that meet some conditions, a window of the last N days,
 // the fields to keep, and the name the script calls it. Saving hands the input back with every key it does not touch
@@ -180,7 +177,6 @@ import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowChipTextInput from '../workflow/WorkflowChipTextInput.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
-import { plusIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { vExplain } from '../../directives/vExplain'
 import {
   CONDITION_OPS,

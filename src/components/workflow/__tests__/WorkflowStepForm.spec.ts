@@ -58,8 +58,7 @@ describe('WorkflowStepForm', () => {
     expect(cancelButton.attributes('aria-label')).toBe('Cancel')
     expect(cancelButton.classes()).toContain('app-icon-action')
     expect(cancelButton.classes()).toContain('app-icon-action--large')
-    expect(cancelActionSource).toContain('<line x1="5" y1="5" x2="15" y2="15"')
-    expect(cancelActionSource).toContain('<line x1="15" y1="5" x2="5" y2="15"')
+    expect(cancelActionSource).toContain('<AppIcon name="cancel" />')
     expect(source).toContain('<AppCancelAction')
     expect(source.indexOf('<AppSaveAction')).toBeLessThan(source.indexOf('<AppCancelAction'))
     expect(wrapper.findAll('.wizard-actions > *').map((node) => node.attributes('data-testid') || node.classes().join(' '))).toEqual([

@@ -49,19 +49,7 @@
           title="Open sync pulse"
           data-testid="pulses-settings"
         >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            focusable="false"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path :d="settingsIconPath" />
-          </svg>
+          <AppIcon name="settings" />
         </RouterLink>
       </div>
     </template>
@@ -69,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-UI-154. Pulses to watch, outside Settings and reachable from Tara (Ask Darpan → Go to Pulses): every pair that
 // pulses (DAR-UI-153's filter) with its effective cadence and allowance today, its last pulse and how it ended, and
 // what the last read found. Read-only; a card opens the pair's own page (Today charts), editors get the settings list.
@@ -82,7 +71,6 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { pulseFacade } from '../../lib/api/facade'
 import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
-import { settingsIconPath } from '../../lib/iconPaths'
 import { calendarDayWords, loadSyncPulseView, pulseAsOfWords, pulseWatchFacts, type NextPulse, type SyncPulseRow } from '../../lib/syncPulseView'
 import { formatClockTime } from '../../lib/utils/date'
 import { usePermissionsStore } from '../../stores/permissions'

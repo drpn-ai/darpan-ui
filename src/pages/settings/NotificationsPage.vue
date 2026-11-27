@@ -56,9 +56,7 @@
                       :disabled="!canEdit"
                       @click="openSpaceMenu(space.chatSpaceId)"
                     >
-                      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                        <path :d="editIconPath" fill="currentColor" />
-                      </svg>
+                      <AppIcon name="edit" />
                     </button>
                   </span>
                 </span>
@@ -174,9 +172,7 @@
           data-testid="notifications-add-space"
           @click="openAdd('where')"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="plusIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="plus" />
         </button>
       </div>
     </template>
@@ -294,6 +290,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AddChatSpaceFlow from '../../components/settings/AddChatSpaceFlow.vue'
@@ -309,7 +306,6 @@ import { forgetPendingAddSpace, takePendingAddSpace, useSlackWorkspace } from '.
 import { ApiCallError } from '../../lib/api/client'
 import { settingsFacade } from '../../lib/api/facade'
 import type { NotificationRoute, NotificationRouteSpace, TenantChatSpace } from '../../lib/api/types'
-import { editIconPath, plusIconPath } from '../../lib/iconPaths'
 import { normalizeStringOrEmpty } from '../../lib/utils/strings'
 import { usePermissionsStore } from '../../stores/permissions'
 

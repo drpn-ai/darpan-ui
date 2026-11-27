@@ -1,5 +1,5 @@
 import type { RouteLocationRaw } from 'vue-router'
-import { auditIconPath, lifecycleIconPath, syncIconPath } from './iconPaths'
+import type { IconName } from './icons'
 
 /**
  * DAR-UI-049. Everything is a run; the type tells the two apart.
@@ -22,8 +22,7 @@ export interface RunTypeDefinition {
   label: string
   /** One line for the create flow's choice card. */
   description: string
-  /** Stroked, 24-unit viewBox. */
-  iconPath: string
+  icon: IconName
   glossaryTerm: string
   createRoute?: RouteLocationRaw
 }
@@ -33,7 +32,7 @@ export const RUN_TYPES: Readonly<Record<RunTypeId, RunTypeDefinition>> = Object.
     id: 'sync',
     label: 'Sync',
     description: 'Do two systems hold the same records?',
-    iconPath: syncIconPath,
+    icon: 'sync',
     glossaryTerm: 'runTypeSync',
     createRoute: { name: 'reconciliation-create' },
   },
@@ -41,7 +40,7 @@ export const RUN_TYPES: Readonly<Record<RunTypeId, RunTypeDefinition>> = Object.
     id: 'lifecycle',
     label: 'Lifecycle',
     description: 'Where do records stall on their way through?',
-    iconPath: lifecycleIconPath,
+    icon: 'lifecycle',
     glossaryTerm: 'runTypeLifecycle',
     createRoute: { name: 'reconciliation-run-flowchart-create' },
   },
@@ -49,7 +48,7 @@ export const RUN_TYPES: Readonly<Record<RunTypeId, RunTypeDefinition>> = Object.
     id: 'audit',
     label: 'Audit',
     description: 'Is what must be true still true?',
-    iconPath: auditIconPath,
+    icon: 'audit',
     glossaryTerm: 'runTypeAudit',
     createRoute: { name: 'audit-create' },
   },

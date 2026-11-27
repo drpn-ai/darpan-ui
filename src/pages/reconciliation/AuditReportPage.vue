@@ -22,9 +22,7 @@
             title="Run audit"
             data-testid="audit-run-button"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
-            </svg>
+            <AppIcon name="play" />
           </RouterLink>
           <button
             v-if="report"
@@ -35,7 +33,7 @@
             data-testid="audit-export-report"
             @click="exportReport"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="downloadIconPath" fill="currentColor" /></svg>
+            <AppIcon name="download" />
           </button>
           <!-- DAR-UI-147. Re-check every open finding of the audit now; what was fixed since the morning closes. -->
           <button
@@ -48,7 +46,7 @@
             :disabled="rechecking"
             @click="recheckAll()"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="recheckIconPath" /></svg>
+            <AppIcon name="recheck" />
           </button>
           <RouterLink
             :to="{ name: 'audit-settings', params: { audit: auditCode }, query: carriedQuery }"
@@ -57,10 +55,7 @@
             title="Audit settings"
             data-testid="audit-settings-button"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path :d="settingsIconPath" />
-            </svg>
+            <AppIcon name="settings" />
           </RouterLink>
         </div>
       </div>
@@ -186,6 +181,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
@@ -202,7 +198,6 @@ import { useMascotStore } from '../../stores/mascot'
 import type { GetAgentStatusResponse } from '../../lib/api/agentTypes'
 import { boardDrafts, type DraftPreview } from '../../lib/agentDrafts'
 import { ApiCallError } from '../../lib/api/client'
-import { downloadIconPath, playIconPath, playIconTransform, recheckIconPath, settingsIconPath } from '../../lib/iconPaths'
 import { downloadTextFile } from '../../lib/utils/download'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
 import { AUDIT_LEVELS, type AuditAcknowledgement, type AuditFindingDocument, type AuditFindingListItem, type AuditLevel, type AuditProgress, type AuditReport } from '../../lib/api/auditTypes'

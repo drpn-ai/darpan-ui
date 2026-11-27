@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
  * DAR-UI-129. Edit buttons are icons, everywhere.
  *
  * A control that edits, changes or renames something is the pencil `app-icon-action`
- * (`editIconPath`) with its words in `aria-label` / `title`; an "add" on the same control
+ * (`<AppIcon name="edit" />`) with its words in `aria-label` / `title`; an "add" on the same control
  * is the plus icon. It is never a text button reading "Edit", "Change", "Rename",
  * "Change rules →" and the like (docs/ui/page-surface-playbook.md, "Shared controls").
  *
@@ -69,7 +69,7 @@ describe('edit buttons are icons', () => {
   <button type="button" @click="a > b && go()">Change</button>
   <RouterLink :to="x">Change rules →</RouterLink>
   <button type="button">{{ saved ? 'Change' : 'Add' }}</button>
-  <button class="app-icon-action" aria-label="Change timezone" title="Change timezone"><svg><path :d="editIconPath" /></svg></button>
+  <button class="app-icon-action" aria-label="Change timezone" title="Change timezone"><AppIcon name="edit" /></button>
   <WorkflowStepForm primary-label="Change" />
   <a href="/x">Changelog</a>
   <button type="button">Save</button>

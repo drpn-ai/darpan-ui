@@ -53,9 +53,7 @@
           title="Back to tenant settings"
           data-testid="sync-pair-back"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
         <RouterLink
           v-if="canEdit"
@@ -65,9 +63,7 @@
           title="Add sync pair"
           data-testid="sync-pair-add"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="plusIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="plus" />
         </RouterLink>
       </div>
     </template>
@@ -75,6 +71,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-BE-328, DAR-UI-153. The active tenant's sync pairs: the ones that pulse (normally or in a coming peak period) as the
 // list, the ones that only carry a peak period's start allowance in a closed group below. Each row opens its own page.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -84,7 +81,6 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import type { SyncPairSummary } from '../../lib/api/pulseTypes'
-import { backIconPath, plusIconPath } from '../../lib/iconPaths'
 import { loadSyncPulseView, type SyncPulseView } from '../../lib/syncPulseView'
 import { usePermissionsStore } from '../../stores/permissions'
 

@@ -144,9 +144,7 @@
           :to="workflowRoute"
           @click="draftStore.setWorkflowOrigin('Run History', route.fullPath)"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="playIconPath" :transform="playIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="play" />
         </RouterLink>
         <button
           v-if="canOpenRunSettings"
@@ -158,19 +156,7 @@
           :disabled="openingRunSettings"
           @click="void openRunSettings()"
         >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            focusable="false"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path :d="settingsIconPath" />
-          </svg>
+          <AppIcon name="settings" />
         </button>
       </div>
     </template>
@@ -178,6 +164,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
@@ -208,7 +195,6 @@ import {
   type ReconciliationRunRouteContext,
 } from '../../lib/reconciliationRoutes'
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
-import { playIconPath, playIconTransform, settingsIconPath } from '../../lib/iconPaths'
 import { formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 

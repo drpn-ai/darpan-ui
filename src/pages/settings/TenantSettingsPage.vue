@@ -41,9 +41,7 @@
               data-testid="tenant-module-timezone"
               @click="openTimezoneWorkflow"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="editIconPath" fill="currentColor" />
-              </svg>
+              <AppIcon name="edit" />
             </button>
           </span>
         </li>
@@ -123,9 +121,7 @@
               data-testid="tenant-ai-provider-tile"
               @click="openAiProviderWorkflow"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="editIconPath" fill="currentColor" />
-              </svg>
+              <AppIcon name="edit" />
             </button>
           </span>
         </li>
@@ -359,6 +355,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
@@ -380,7 +377,6 @@ import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReferenceDataStore } from '../../stores/referenceData'
 import { buildTimezoneOptions } from '../../lib/timezones'
-import { editIconPath } from '../../lib/iconPaths'
 import { normalizeStringOrEmpty } from '../../lib/utils/strings'
 import { useTenantSettingsPopup } from '../../composables/useActivePopup'
 

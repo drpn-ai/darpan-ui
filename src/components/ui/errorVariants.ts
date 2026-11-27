@@ -1,6 +1,9 @@
-import type { errorStateIcons } from './errorStateIcons'
+import type { IconName } from '../../lib/icons'
 
-type Variant = { title: string; message?: string; icon?: keyof typeof errorStateIcons; action?: { label: string; onClick?: () => void; href?: string } }
+/** The icons a blocking error state draws. */
+export type StateIconName = Extract<IconName, 'lock' | 'alert' | 'clock' | 'offline'>
+
+type Variant = { title: string; message?: string; icon?: StateIconName; action?: { label: string; onClick?: () => void; href?: string } }
 
 export const errorVariants = {
   accessDenied: (onHome?: () => void): Variant => ({

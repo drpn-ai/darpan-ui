@@ -42,9 +42,7 @@
           title="Back to tenant settings"
           data-testid="peak-back"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
         <RouterLink
           v-if="canEdit"
@@ -54,9 +52,7 @@
           title="Add peak period"
           data-testid="peak-add"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="plusIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="plus" />
         </RouterLink>
       </div>
     </template>
@@ -64,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-BE-328. The active tenant's peak periods as one list: name, dates and when. Each row opens its own page.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
@@ -73,7 +70,6 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import { peakFacade } from '../../lib/api/facade'
 import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
-import { backIconPath, plusIconPath } from '../../lib/iconPaths'
 import { peakDateRange, peakWhen } from '../../lib/peakPeriodWords'
 import { usePermissionsStore } from '../../stores/permissions'
 

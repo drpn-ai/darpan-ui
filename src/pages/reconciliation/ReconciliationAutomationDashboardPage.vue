@@ -32,9 +32,7 @@
               aria-label="Edit automation"
               @click="setAutomationOrigin"
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <path :d="editIconPath" />
-              </svg>
+              <AppIcon name="edit" />
             </RouterLink>
           </div>
         </template>
@@ -167,9 +165,7 @@
           data-testid="back-automations"
           aria-label="Back to Automations"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="backIconPath" fill="currentColor" />
-          </svg>
+          <AppIcon name="back" />
         </RouterLink>
 
         <button
@@ -181,9 +177,7 @@
           :disabled="actionInFlight"
           @click="runNow"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path d="M6 4.5v11l9-5.5-9-5.5Z" fill="currentColor" />
-          </svg>
+          <AppIcon name="play" />
         </button>
 
         <!-- DAR-BE-061. The trash can is back, and it ARCHIVES. Nothing is deleted: the
@@ -201,9 +195,7 @@
           :disabled="actionInFlight"
           @click="archiveAutomation"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </template>
@@ -211,6 +203,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import AppListPager from '../../components/ui/AppListPager.vue'
@@ -250,7 +243,6 @@ import {
 import { useListPagination } from '../../lib/listPagination'
 import { fileNameFromPath, humanizeToken, normalizeDisplayText } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
-import { backIconPath, editIconPath, trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
 import { describeTimeZone as describeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { peakHoursUntilNotice } from '../../lib/peakPeriodWords'

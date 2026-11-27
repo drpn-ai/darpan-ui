@@ -62,9 +62,7 @@
                     data-testid="lifecycle-settings-add-rule"
                     @click="addRule"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                      <path :d="row.rule ? editIconPath : plusIconPath" fill="currentColor" />
-                    </svg>
+                    <AppIcon :name="row.rule ? 'edit' : 'plus'" />
                   </button>
                   <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
                 </div>
@@ -98,7 +96,7 @@
                   test-id="lifecycle-settings-detail-field"
                 />
                 <button type="button" class="app-icon-action" aria-label="Show this field" title="Show this field" :disabled="!newDetail" data-testid="lifecycle-settings-add-detail" @click="addDetail">
-                  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="plusIconPath" fill="currentColor" /></svg>
+                  <AppIcon name="plus" />
                 </button>
                 <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
               </div>
@@ -165,9 +163,7 @@
                     data-testid="lifecycle-settings-add-exception"
                     @click="addException(stage)"
                   >
-                    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                      <path :d="row.exception ? editIconPath : plusIconPath" fill="currentColor" />
-                    </svg>
+                    <AppIcon :name="row.exception ? 'edit' : 'plus'" />
                   </button>
                   <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
                 </div>
@@ -251,7 +247,7 @@
                   test-id="lifecycle-settings-finding-value"
                 />
                 <button type="button" class="app-icon-action" aria-label="Add this finding" title="Add this finding" :disabled="!fdField || !fdValue" data-testid="lifecycle-settings-add-written" @click="addWritten(stage)">
-                  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path :d="plusIconPath" fill="currentColor" /></svg>
+                  <AppIcon name="plus" />
                 </button>
                 <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
               </div>
@@ -274,6 +270,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSelect from '../../components/ui/AppSelect.vue'
@@ -287,7 +284,6 @@ import { accountLabelOf } from '../../lib/nsAccountLabel'
 import { lifecycleChart } from '../../lib/api/queries'
 import { readQueryOnce } from '../../lib/api/readCache'
 import { useLifecycleRuleOptions, type LifecycleRuleSource } from '../../lib/useLifecycleRuleOptions'
-import { editIconPath, plusIconPath } from '../../lib/iconPaths'
 
 // DAR-UI-050. A lifecycle's settings as one line that grows downward (research: funnel builders put an exclusion
 // between the two steps it affects; progressive disclosure shows only the next action). The starting records, with

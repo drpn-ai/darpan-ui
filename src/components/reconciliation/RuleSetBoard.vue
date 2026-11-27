@@ -274,9 +274,7 @@
             aria-label="Delete pre-action"
             @click="deletePreActionRow(preAction.id)"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-            </svg>
+            <AppIcon name="trash" />
           </button>
         </div>
       </section>
@@ -329,9 +327,7 @@
           aria-label="Delete rule"
           @click="deleteEditingRule"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-          </svg>
+          <AppIcon name="trash" />
         </button>
       </div>
     </div>
@@ -404,9 +400,7 @@
             aria-label="Delete filter"
             @click="deleteEditingExclusion"
           >
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path :d="trashIconPath" :transform="trashIconTransform" fill="currentColor" />
-            </svg>
+            <AppIcon name="trash" />
           </button>
         </div>
       </section>
@@ -415,6 +409,7 @@
 </template>
 
 <script setup lang="ts">
+import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import AppSaveAction from '../ui/AppSaveAction.vue'
@@ -429,7 +424,6 @@ import type {
   JsonSchemaField,
 } from '../../lib/api/types'
 import { darpanSystemIdsMatch } from '../../lib/utils/darpanSystems'
-import { trashIconPath, trashIconTransform } from '../../lib/iconPaths'
 import {
   EXCLUDE_FILTER_OPERATOR,
   INCLUDE_FILTER_OPERATOR,
