@@ -2091,6 +2091,33 @@ describe('ReconciliationRunResultPage', () => {
     }
   })
 
+  // Prod 2026-11-27, RAILS: the address now turns short before the saved run has answered; handing over the placeholder made
+  // the short page keep "Selected Run" for good. A name not known yet is not handed over, so the short page asks the saved run.
+  it('never hands the placeholder name to the short address', async () => {
+    const at = route as unknown as { name?: string }
+    at.name = 'reconciliation-run-result'
+    const query = route.query
+    route.query = { tenantId: 'RAILS' } as unknown as typeof route.query
+    const file = 'CSV-Order-Compare-diff-20260331-063304.json'
+    listSavedRuns.mockReturnValue(new Promise(() => {}))
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences(
+      { ...defaultDiffDetails, metadata: { ...(defaultDiffDetails.metadata as Record<string, unknown>), savedRunName: undefined, reconciliationMappingName: undefined, reconciliationRunResultId: 'RR_9' } },
+      { sourceDetails: defaultSourceDetails }))
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_SUCCESS', resultFileName: file, steps: [] })
+    try {
+      mount(ReconciliationRunResultPage)
+      await flushPromises()
+      expect(routerReplace).toHaveBeenCalledTimes(1)
+      const next = routerReplace.mock.calls[0]?.[0] as { params: unknown, state: Record<string, unknown> }
+      expect(next.params).toEqual({ savedRunId: 'RS_ORDER_CSV', runResultId: 'RR_9' })
+      expect(next.state.runName).toBe('')
+      expect(next.state.resultFileName).toBe(file)
+    } finally {
+      delete at.name
+      route.query = query
+    }
+  })
+
   it('cancels a running run and reports that it is stopping until the run ends', async () => {
     enterLiveRunRoute('RR_LIVE_CANCEL')
     getReconciliationRunStatus.mockResolvedValue({

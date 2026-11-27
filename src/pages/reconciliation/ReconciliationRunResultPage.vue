@@ -1433,7 +1433,10 @@ async function shortenAddress(requestedSavedRunId: string, file: string, runId: 
   const status = runResultsStore.getRunStatus(runId)
   const stillHere = route.name === 'reconciliation-run-result' && savedRunId.value === requestedSavedRunId && outputFileName.value === file
   if (!stillHere || status?.statusEnumId !== 'AUT_STAT_SUCCESS' || normalizeDisplayText(status.resultFileName) !== file) return
-  const next = buildReconciliationRunLiveRoute(reconciliationRunRouteContext.value, runId, file) as Exclude<RouteLocationRaw, string>
+  // A name not known yet is not handed over: the short page then asks the saved run, never keeping the placeholder.
+  const context = reconciliationRunRouteContext.value
+  const known = { ...context, runName: context.runName === PLACEHOLDER_RUN_NAME ? '' : context.runName }
+  const next = buildReconciliationRunLiveRoute(known, runId, file) as Exclude<RouteLocationRaw, string>
   void router.replace({ ...next, query: shortRunQuery(route.query) })
 }
 
