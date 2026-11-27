@@ -14,9 +14,7 @@
         :toggle-disabled="!canEdit || busy"
         @update:model-value="renameDraft"
         @update:on="setActive"
-      >
-        <span v-if="dirty" class="peak-edited-mark" data-testid="peak-edited">• edited</span>
-      </StaticRecordTitle>
+      />
       <h1 v-else v-explain="'peakPeriods'">Peak period</h1>
     </template>
 
@@ -163,6 +161,7 @@
           v-if="canEdit && draft"
           label="Save peak period"
           test-id="peak-save"
+          :dirty="dirty"
           :disabled="busy || !canSave"
           @click="save"
         />
@@ -923,7 +922,7 @@ async function save(): Promise<void> {
   pageError.value = ''
   savesSent += 1
   // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). An edit shows as saved at
-  // once. A refusal puts back the edited mark, with the typed values still on the page and the reason above them.
+  // once. A refusal puts back the unsaved Save, with the typed values still on the page and the reason above them.
   const was = { saved: saved.value, baseline: baseline.value }
   // Which runs wait is the server's to work out from the dates, hours and on/off; only a change there reads it again.
   const waitsMove = Boolean(was.saved) && ((['fromDate', 'thruDate', 'peakHoursStart', 'peakHoursEnd'] as const)
@@ -993,10 +992,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.peak-edited-mark {
-  color: var(--text-muted);
-  font-size: var(--type-note-size);
-}
 
 .peak-section-head {
   display: flex;

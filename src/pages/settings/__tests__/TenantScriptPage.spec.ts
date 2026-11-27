@@ -149,7 +149,7 @@ describe('TenantScriptPage (query)', () => {
 
   it('a part of the sentence opens the Data popup, and its save changes the read and marks it edited', async () => {
     const wrapper = await mountPage()
-    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="script-save"]').classes('app-icon-action--dirty')).toBe(false)
     await wrapper.findAll('[data-testid="script-read-part"]')[0]!.trigger('click')
     expect(wrapper.find('[data-testid="query-data-popup"]').exists()).toBe(true)
     expect(wrapper.find('.static-page-frame--popup-open').exists()).toBe(true)
@@ -157,7 +157,7 @@ describe('TenantScriptPage (query)', () => {
     await wrapper.find('[data-testid="query-data-window"]').setValue('7')
     await wrapper.find('[data-testid="query-data-save"]').trigger('click')
     expect(wrapper.find('[data-testid="query-data-popup"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="script-save"]').classes('app-icon-action--dirty')).toBe(true)
     expect(text(wrapper, 'script-read-sentence').replace(/\s+/g, ' ')).toBe('Records of HotWax DS_ORDERS, orderDate in the last 7 days. Keeps id status qty')
 
     await wrapper.find('[data-testid="script-run"]').trigger('click')
@@ -248,7 +248,7 @@ describe('TenantScriptPage (query)', () => {
     expect((json.element as HTMLTextAreaElement).value).toBe(READ)
     await json.setValue(READ.replace('"status"', '"qty"'))
     expect(text(wrapper, 'script-read-sentence').replace(/\s+/g, ' ')).toBe('Records of HotWax DS_ORDERS. Keeps id qty')
-    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="script-save"]').classes('app-icon-action--dirty')).toBe(true)
     await toggle.trigger('click')
     expect(wrapper.find('[data-testid="script-read"]').exists()).toBe(false)
   })
@@ -266,7 +266,7 @@ describe('TenantScriptPage (query)', () => {
     expect(text(wrapper, 'script-ask-reply')).toBe('It lists open backorders.')
     expect((wrapper.find('[data-testid="script-body"]').element as HTMLTextAreaElement).value).toBe("{'summary': 'new'}")
     expect(text(wrapper, 'script-run-summary')).toBe('from the agent')
-    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="script-save"]').classes('app-icon-action--dirty')).toBe(true)
     expect(saveTenantQuery).not.toHaveBeenCalled()
 
     await wrapper.find('[data-testid="script-ask-undo"]').trigger('click')
@@ -365,7 +365,7 @@ describe('TenantScriptPage (query)', () => {
     const wrapper = await mountPage()
     landCatalog(CATALOG)
     await flushPromises()
-    expect(wrapper.find('[data-testid="script-edited"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="script-save"]').classes('app-icon-action--dirty')).toBe(false)
     await wrapper.find('[data-testid="script-run"]').trigger('click')
     await flushPromises()
     const sent = runTenantQuery.mock.calls[0]?.[0] as { readSpecJson: string; scriptBody: string }

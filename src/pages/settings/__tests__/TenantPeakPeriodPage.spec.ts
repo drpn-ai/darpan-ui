@@ -134,7 +134,7 @@ describe('TenantPeakPeriodPage', () => {
     expect(held[0]!.text()).toContain('Weekly returns audit')
     expect(held[0]!.text()).toContain('23:00')
     expect(held[0]!.text()).toContain('10:00 is in peak hours')
-    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(false)
   })
 
   it('reads None for peak hours that are not set', async () => {
@@ -155,7 +155,7 @@ describe('TenantPeakPeriodPage', () => {
     await wrapper.find('[data-testid="peak-hours-save"]').trigger('click')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(text(wrapper, 'peak-fact-hours')).toContain('07:30 – 22:00')
-    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(true)
     expect(savePeakPeriod).not.toHaveBeenCalled()
 
     await wrapper.find('[data-testid="peak-save"]').trigger('click')
@@ -255,7 +255,7 @@ describe('TenantPeakPeriodPage', () => {
     const wrapper = await mountPage()
     await wrapper.find('[data-testid="peak-on"]').trigger('click')
     expect(savePeakPeriod).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(true)
 
     await wrapper.find('[data-testid="peak-save"]').trigger('click')
     await flushPromises()
@@ -356,7 +356,7 @@ describe('TenantPeakPeriodPage', () => {
     await wrapper.find('[data-testid="peak-hotwax-save"]').trigger('click')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(text(wrapper, 'peak-fact-hotwax')).toContain('25%')
-    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(true)
     expect(savePeakPeriod).not.toHaveBeenCalled()
 
     await wrapper.find('[data-testid="peak-save"]').trigger('click')
@@ -400,13 +400,13 @@ describe('TenantPeakPeriodPage', () => {
     await choose(wrapper, 'peak-netsuite-select', 'serial')
     await wrapper.find('[data-testid="peak-netsuite-save"]').trigger('click')
     await wrapper.find('[data-testid="peak-save"]').trigger('click')
-    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(false)
     expect(text(wrapper, 'peak-fact-netsuite')).toContain('One at a time')
 
     answer({ ok: true, messages: [], errors: [], peakPeriodId: 'PP1' })
     await flushPromises()
     expect(getPeakPeriod).toHaveBeenCalledTimes(1)
-    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(false)
     expect(wrapper.find('[data-testid="peak-page-error"]').exists()).toBe(false)
   })
 
@@ -440,18 +440,18 @@ describe('TenantPeakPeriodPage', () => {
     expect(getPeakPeriod).toHaveBeenCalledTimes(3)
   })
 
-  it('puts the edited mark back on a refusal, with the typed value still on the page', async () => {
+  it('puts the unsaved Save back on a refusal, with the typed value still on the page', async () => {
     const wrapper = await mountPage()
     let answer!: (value: unknown) => void
     savePeakPeriod.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
     await wrapper.find('[data-testid="peak-on"]').trigger('click')
     await wrapper.find('[data-testid="peak-save"]').trigger('click')
-    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(false)
 
     answer({ ok: false, messages: [], errors: ['Black Friday sale overlaps Cyber week.'], peakPeriodId: null })
     await flushPromises()
     expect(text(wrapper, 'peak-page-error')).toBe('Black Friday sale overlaps Cyber week.')
-    expect(wrapper.find('[data-testid="peak-edited"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(true)
     expect(wrapper.find('[data-testid="peak-on"]').attributes('aria-checked')).toBe('false')
     expect(getPeakPeriod).toHaveBeenCalledTimes(1)
   })

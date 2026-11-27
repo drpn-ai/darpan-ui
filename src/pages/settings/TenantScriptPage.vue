@@ -16,9 +16,7 @@
         :toggle-disabled="!schedule || !canSchedule || busy"
         @update:model-value="renameDraft"
         @update:on="setOnSchedule"
-      >
-        <span v-if="dirty" class="script-edited-mark" data-testid="script-edited">• edited</span>
-      </StaticRecordTitle>
+      />
       <h1 v-else>Query</h1>
     </template>
 
@@ -307,7 +305,7 @@
         </RouterLink>
         <!-- Pressable without a name, so pressing it can say what is missing (the mascot reads this anchor). -->
         <span v-if="canEdit && draft" class="script-save" :data-testid="nameMissing ? 'script-save-blocked' : undefined">
-          <AppSaveAction label="Save query" test-id="script-save" :disabled="busy" @click="save" />
+          <AppSaveAction label="Save query" test-id="script-save" :dirty="dirty" :disabled="busy" @click="save" />
         </span>
         <button
           v-if="canEdit && draft?.tenantQueryId"
@@ -1104,10 +1102,6 @@ onBeforeUnmount(() => {
   display: contents;
 }
 
-.script-edited-mark {
-  color: var(--text-muted);
-  font-size: var(--type-note-size);
-}
 
 /* The ask box: one line to the queries agent, its Ask beside it. */
 .script-ask {

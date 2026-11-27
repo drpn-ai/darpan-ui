@@ -12,9 +12,7 @@
         toggle-test-id="sync-pair-on"
         :toggle-disabled="!canEdit || busy"
         @update:on="setActive"
-      >
-        <span v-if="dirty" class="sync-pair-edited-mark" data-testid="sync-pair-edited">• edited</span>
-      </StaticRecordTitle>
+      />
       <h1 v-else v-explain="'syncPulse'">Sync pair</h1>
     </template>
 
@@ -82,6 +80,7 @@
           v-if="canEdit && draft && (!draft.syncPairId || dirty)"
           label="Save sync pair"
           test-id="sync-pair-save"
+          :dirty="dirty"
           :disabled="busy || !canSave"
           @click="save"
         />
@@ -776,7 +775,7 @@ async function save(): Promise<void> {
   saving.value = true
   pageError.value = ''
   // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). An edit shows as saved at
-  // once and is not read again; the minute's refresh brings the counts. A refusal puts back the edited mark and Save,
+  // once and is not read again; the minute's refresh brings the counts. A refusal puts back the unsaved Save,
   // with the typed values still on the page and the reason above them.
   const wasNew = !current.syncPairId
   const was = { saved: saved.value, baseline: baseline.value }
@@ -867,10 +866,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sync-pair-edited-mark {
-  color: var(--text-muted);
-  font-size: var(--type-note-size);
-}
 
 .sync-pair-charts {
   display: grid;
