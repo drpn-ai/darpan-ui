@@ -37,6 +37,27 @@ describe('useCalendarWidget', () => {
     expect(calendar.range.value?.endExclusiveDate.getDate()).toBe(13)
   })
 
+  // DAR-UI-162 (Aditi 2026-11-27: "the UI is off here"): a day standing alone, a start with no end yet or a one-day
+  // range, is a circle only; the band between days belongs to a range of two days or more.
+  it('marks a day standing alone as solo, so no band reaches out of its circle', () => {
+    const calendar = useCalendarWidget()
+    const april = calendar.calendarMonths.value[0]!
+    const day = (n: number) => april.cells.find((cell) => cell.isCurrentMonth && cell.day === n)!
+    const solo = 'wizard-api-calendar-day--range-solo'
+
+    calendar.selectCell(day(17))
+    expect(calendar.cellClasses(day(17))).toMatchObject({ 'wizard-api-calendar-day--range-start': true, [solo]: true })
+
+    calendar.selectCell(day(17))
+    expect(calendar.endDate.value).toBe('2026-04-17')
+    expect(calendar.cellClasses(day(17))[solo]).toBe(true)
+
+    calendar.selectCell(day(10))
+    calendar.selectCell(day(12))
+    expect(calendar.cellClasses(day(10))[solo]).toBe(false)
+    expect(calendar.cellClasses(day(12))[solo]).toBe(false)
+  })
+
   it('disables future dates and the cell-disabled helper agrees', () => {
     const calendar = useCalendarWidget()
     const mayMonth = calendar.calendarMonths.value[1]!

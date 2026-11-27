@@ -157,8 +157,8 @@ export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCa
     const endTime = end?.getTime()
     const isRangeStart = !disabled && startTime === cellTime
     const isRangeEnd = !disabled && endTime === cellTime
-    const isInRange =
-      !disabled && startTime !== undefined && endTime !== undefined && startTime < cellTime && cellTime < endTime
+    const spans = startTime !== undefined && endTime !== undefined && startTime < endTime
+    const isInRange = !disabled && spans && startTime < cellTime && cellTime < endTime
 
     return {
       'wizard-api-calendar-day--outside': !cell.isCurrentMonth,
@@ -166,6 +166,8 @@ export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCa
       'wizard-api-calendar-day--range-start': isRangeStart,
       'wizard-api-calendar-day--range-end': isRangeEnd,
       'wizard-api-calendar-day--in-range': isInRange,
+      // A start with no end yet, or a one-day range: a circle with no band (DAR-UI-162).
+      'wizard-api-calendar-day--range-solo': (isRangeStart || isRangeEnd) && !spans,
     }
   }
 

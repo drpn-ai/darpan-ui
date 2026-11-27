@@ -318,11 +318,13 @@ function formatDateInputLabel(value: string): string {
   pointer-events: none;
 }
 
+/* The band between picked days is the circle's height, so it runs out of the circle's sides, not past them. */
 .wizard-api-calendar-day::before {
-  top: 0.18rem;
+  top: 50%;
   right: 0;
-  bottom: 0.18rem;
   left: 0;
+  height: 1.95rem;
+  transform: translateY(-50%);
   background: transparent;
   z-index: 0;
 }
@@ -353,7 +355,7 @@ function formatDateInputLabel(value: string): string {
   right: 50%;
 }
 
-.wizard-api-calendar-day--range-start.wizard-api-calendar-day--range-end::before {
+.wizard-api-calendar-day--range-solo::before {
   background: transparent;
 }
 
