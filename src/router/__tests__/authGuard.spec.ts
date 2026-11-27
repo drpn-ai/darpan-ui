@@ -462,7 +462,7 @@ describe('router auth guard', () => {
     })
   })
 
-  it('redirects old AI settings routes into tenant settings for authenticated users', async () => {
+  it('has no AI settings routes since DAR-UI-159 removed them', async () => {
     ensureAuthenticated.mockResolvedValue(true)
     authState.status = 'authenticated'
     authState.sessionInfo = {
@@ -474,16 +474,7 @@ describe('router auth guard', () => {
 
     await router.push('/settings/ai')
 
-    expect(router.currentRoute.value.name).toBe('settings-tenant')
-
-    authState.sessionInfo = {
-      userId: '100000',
-      username: 'admin.customer',
-      canEditActiveTenantData: false,
-      isSuperAdmin: true,
-    }
-    await router.push('/settings/ai')
-
-    expect(router.currentRoute.value.name).toBe('settings-tenant')
+    expect(router.currentRoute.value.name).toBe('not-found')
+    expect(router.hasRoute('settings-ai')).toBe(false)
   })
 })
