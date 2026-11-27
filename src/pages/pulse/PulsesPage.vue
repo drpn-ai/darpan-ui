@@ -19,7 +19,7 @@
     <EmptyState v-else-if="cards.length === 0" title="No pair pulses." />
 
     <template v-else>
-      <StaticPageSection v-for="card in cards" :key="card.syncPairId" data-testid="pulse-card">
+      <StaticPageSection v-for="card in cards" :key="card.syncPairId" class="pulse-card" data-testid="pulse-card">
         <template #header>
           <h2 class="static-page-section-heading pulse-card__title">
             <button
@@ -161,9 +161,26 @@ onBeforeUnmount(() => controller.abort())
   color: var(--text-dim);
 }
 
-/* The section's title opens the pair's own page. */
+/* The whole card opens the pair's own page: the title's button stretches over it (one tab stop, one name). */
+.pulse-card {
+  position: relative;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+
+.pulse-card:hover {
+  border-color: var(--text-dim);
+}
+
 .pulse-card__title {
   margin: 0;
+}
+
+.pulse-card__title button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
 }
 
 .pulse-card__title button {

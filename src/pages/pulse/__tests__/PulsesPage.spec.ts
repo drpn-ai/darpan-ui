@@ -143,6 +143,14 @@ describe('PulsesPage', () => {
     expect(wrapper.get('[data-testid="pulses-settings"]').attributes('data-to')).toContain('settings-tenant-sync-pairs')
   })
 
+  it('makes the whole card one target: its title button is the only control in it', async () => {
+    const wrapper = await mountPage()
+    for (const card of wrapper.findAll('[data-testid="pulse-card"]')) {
+      expect(card.classes()).toContain('pulse-card')
+      expect(card.findAll('button, a').map((el) => el.attributes('data-testid'))).toEqual(['pulse-card-open'])
+    }
+  })
+
   it('says so when nothing pulses, and shows the error when the pairs fail to load', async () => {
     listSyncPairs.mockResolvedValue({ ...envelope, syncPairs: [summary({})] })
     getSyncPair.mockResolvedValue({ ...envelope, automations: [], chatSpaces: [], samplesToday: [], pastOrders: [] })
