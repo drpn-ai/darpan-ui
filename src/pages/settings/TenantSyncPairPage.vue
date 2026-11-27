@@ -298,6 +298,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
+import { ApiCallError } from '../../lib/api/client'
 import { pulseFacade } from '../../lib/api/facade'
 import type {
   GetSyncPairResponse,
@@ -592,8 +593,17 @@ function apply(response: GetSyncPairResponse): void {
 async function fetchPair(syncPairId: string): Promise<GetSyncPairResponse> {
   const response = await pulseFacade.getSyncPair(syncPairId ? { syncPairId } : {})
   const refusal = refusalOf(response, 'Could not load the sync pair.')
-  if (refusal) throw new Error(refusal)
+  if (refusal) throw new ApiCallError(refusal)
   return response
+}
+
+/**
+ * The server answered no (not found, another tenant's pair, signed out), not "could not answer" (unreachable, 5xx, a
+ * dropped connection). Asking again a minute later gets the same no: the active tenant is shared by every tab, so a
+ * pulse tab left open after another tab switched company asked as the wrong tenant all night (DAR-UI-164).
+ */
+function refusedOutright(error: unknown): boolean {
+  return error instanceof ApiCallError && (error.status === undefined || error.status < 500)
 }
 
 async function load(syncPairId: string): Promise<void> {
@@ -647,6 +657,8 @@ async function refreshTick(): Promise<void> {
       }
     } catch (error) {
       if (!unmounted) pageError.value = messageOf(error, 'Could not load the sync pair.')
+      // The page shows the no and reads no more; reopening it asks again.
+      if (refusedOutright(error)) return
     }
   }
   scheduleRefresh()

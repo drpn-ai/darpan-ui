@@ -428,6 +428,55 @@ describe('TenantSyncPairPage', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  // DAR-UI-164: the active tenant is shared by every tab, so a pulse tab left open after another tab switched company
+  // asked for its pair as the other tenant every minute all night (1,206 "Sync pair '100102' was not found" log errors).
+  it('stops reading again once the server refuses the pair, signed out included', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const wrapper = await mountPage()
+
+    getSyncPair.mockResolvedValue({ ok: false, messages: [], errors: ["Sync pair 'SP1' was not found."] })
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flushPromises()
+    expect(getSyncPair).toHaveBeenCalledTimes(2)
+    expect(text(wrapper, 'sync-pair-page-error')).toBe("Sync pair 'SP1' was not found.")
+    expect(vi.getTimerCount()).toBe(0)
+    await vi.advanceTimersByTimeAsync(600_000)
+    expect(getSyncPair).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+
+    getSyncPair.mockReset()
+    getSyncPair.mockResolvedValue(got())
+    const signedOut = await mountPage()
+    getSyncPair.mockRejectedValue(new ApiCallError('User must be logged in.', 401))
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flushPromises()
+    expect(vi.getTimerCount()).toBe(0)
+    await vi.advanceTimersByTimeAsync(600_000)
+    expect(getSyncPair).toHaveBeenCalledTimes(2)
+    signedOut.unmount()
+  })
+
+  it('keeps reading every minute through an outage', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const wrapper = await mountPage()
+
+    getSyncPair.mockRejectedValueOnce(new ApiCallError('Darpan could not be reached.', 503))
+    getSyncPair.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flushPromises()
+    expect(text(wrapper, 'sync-pair-page-error')).toBe('Failed to fetch')
+
+    getSyncPair.mockResolvedValue(got({ syncPair: pair({ waitingCount: 1300 }) }))
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flushPromises()
+    expect(getSyncPair).toHaveBeenCalledTimes(4)
+    expect(wrapper.find('[data-testid="sync-pair-page-error"]').exists()).toBe(false)
+    expect(text(wrapper, 'sync-pair-fact-waiting')).toContain('1,300')
+    wrapper.unmount()
+  })
+
   describe('a new pair', () => {
     beforeEach(() => {
       route.name = 'settings-tenant-sync-pair-new'
