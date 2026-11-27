@@ -49,8 +49,18 @@
           title="Open sync pulse"
           data-testid="pulses-settings"
         >
-          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path :d="settingsIconPath" fill="currentColor" />
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path :d="settingsIconPath" />
           </svg>
         </RouterLink>
       </div>
