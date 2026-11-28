@@ -109,7 +109,7 @@ export function setAuthRequiredHandler(handler: AuthRequiredHandler | null): voi
   authRequiredHandler = handler
 }
 
-const AUTH_REQUIRED_MESSAGE = 'Your session has ended. Sign in again to continue.'
+export const AUTH_REQUIRED_MESSAGE = 'Your session has ended. Sign in again to continue.'
 const UNREACHABLE_MESSAGE = 'Darpan stepped out for chai. Try again in a moment.'
 const UNEXPECTED_RESPONSE_MESSAGE = 'Darpan answered in interpretive dance. Try again in a moment.'
 const EMPTY_RESULT_MESSAGE = 'Darpan opened its mouth and nothing came out.'

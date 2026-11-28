@@ -367,7 +367,7 @@
         </WorkflowStepForm>
       </template>
 
-      <InlineValidation v-if="errorText" tone="error" :message="errorText" />
+      <InlineValidation v-if="errorText" :tone="errorTone" :message="errorText" />
     </section>
   </main>
 </template>
@@ -382,10 +382,15 @@ import TwoFactorEnrolSteps from '../components/auth/TwoFactorEnrolSteps.vue'
 import PasskeyAddSteps from '../components/auth/PasskeyAddSteps.vue'
 import { formatShortDate } from '../lib/utils/date'
 import { authFacade } from '../lib/api/facade'
-import type { TwoFactorChallengePurpose } from '../stores/auth'
+import { AUTH_REQUIRED_MESSAGE } from '../lib/api/client'
 import type { PasswordResetRequestOutcome } from '../lib/api/types'
 import WorkflowStepForm from '../components/workflow/WorkflowStepForm.vue'
-import { useAuthStore, type PasskeyFirstBeginOutcome } from '../stores/auth'
+import {
+  PASSWORD_CHANGED_SIGN_IN_AGAIN,
+  useAuthStore,
+  type PasskeyFirstBeginOutcome,
+  type TwoFactorChallengePurpose,
+} from '../stores/auth'
 import { conditionalMediationAvailable, getPasskeyAssertion, passkeysSupported } from '../lib/passkeys'
 import { keepAccount, keptAccount, passkeyKeptFor } from '../lib/passkeyHint'
 import { resolveInternalRedirectTarget } from '../lib/navigation'
@@ -585,6 +590,10 @@ const errorText = computed(() => {
   if (authStore.status === 'unauthenticated' && authStore.error === INITIAL_UNAUTHENTICATED_MESSAGE) return null
   return authStore.error
 })
+
+// D17 (OC90): a session ended on purpose (a changed password, an ended session) is a notice, not a refusal.
+const SIGNED_OUT_NOTICES: ReadonlySet<string> = new Set([PASSWORD_CHANGED_SIGN_IN_AGAIN, AUTH_REQUIRED_MESSAGE])
+const errorTone = computed(() => (errorText.value && SIGNED_OUT_NOTICES.has(errorText.value) ? 'info' : 'error'))
 
 function hasRedirectQuery(): boolean {
   return Object.prototype.hasOwnProperty.call(route.query, 'redirect')

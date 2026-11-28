@@ -37,7 +37,8 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
-vi.mock('../../stores/auth', () => ({
+vi.mock('../../stores/auth', async (importOriginal) => ({
+  PASSWORD_CHANGED_SIGN_IN_AGAIN: (await importOriginal<typeof import('../../stores/auth')>()).PASSWORD_CHANGED_SIGN_IN_AGAIN,
   buildAuthRedirect: (redirect: string) => ({ name: 'login', query: { redirect } }),
   useAuthStore: () => ({
     get error() {
@@ -273,8 +274,24 @@ describe('LoginPage', () => {
     await signInWith(wrapper, 'john.doe', 'wrong-password')
 
     expect(wrapper.text()).toContain('Login failed')
+    expect(wrapper.get('.login-panel .inline-validation:not(.sr-only)').classes()).toContain('error')
     expect(wrapper.text()).toContain('Password for john.doe?')
     expect(replace).not.toHaveBeenCalled()
+  })
+
+  // D17 (OC90): a session ended on purpose (a changed password, an ended session) is said as a notice, not a refusal.
+  it.each([
+    ['Password changed. Sign in with your new password.'],
+    ['Your session has ended. Sign in again to continue.'],
+  ])('a deliberate sign-out line reads as a neutral notice: %s', (line) => {
+    authState.error = line
+
+    const wrapper = mount(LoginPage)
+
+    const notice = wrapper.get('.login-panel .inline-validation:not(.sr-only)')
+    expect(notice.text()).toBe(line)
+    expect(notice.classes()).toContain('info')
+    expect(notice.classes()).not.toContain('error')
   })
 
   it('cleans up login self-redirects on entry', async () => {
