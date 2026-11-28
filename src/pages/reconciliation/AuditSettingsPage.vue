@@ -126,15 +126,11 @@
       <div class="workflow-step-wrapper">
         <WorkflowStepForm
           v-if="popup === 'schedule'"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          v-bind="savePopup"
           question="Change the schedule."
           primary-label="Save"
-          primary-action-variant="save"
           primary-test-id="audit-settings-schedule-save"
           :submit-disabled="saving || !scheduleForm.time"
-          :show-enter-hint="false"
-          show-cancel-action
-          :cancel-disabled="saving"
           cancel-test-id="audit-settings-schedule-cancel"
           @cancel="closePopup"
           @submit="saveSchedule"
@@ -166,16 +162,12 @@
              turns the email and the chat card off together. -->
         <WorkflowStepForm
           v-else-if="popup === 'email' && settings.runEmail"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          v-bind="savePopup"
           data-testid="audit-settings-run-email"
           question="Who gets the update?"
           primary-label="Save"
-          primary-action-variant="save"
           primary-test-id="audit-settings-run-email-save"
           :submit-disabled="saving"
-          :show-enter-hint="false"
-          show-cancel-action
-          :cancel-disabled="saving"
           cancel-test-id="audit-settings-run-email-cancel"
           @cancel="closePopup"
           @submit="saveEmail"
@@ -208,15 +200,11 @@
         <!-- DAR-UI-111: the chat space that gets the run's summary card; None sends none. -->
         <WorkflowStepForm
           v-else-if="popup === 'space'"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          v-bind="savePopup"
           question="Where does the card post?"
           primary-label="Save"
-          primary-action-variant="save"
           primary-test-id="audit-settings-chat-space-save"
           :submit-disabled="saving"
-          :show-enter-hint="false"
-          show-cancel-action
-          :cancel-disabled="saving"
           cancel-test-id="audit-settings-chat-space-cancel"
           @cancel="closePopup"
           @submit="saveSpace"
@@ -243,15 +231,11 @@
 
         <WorkflowStepForm
           v-else-if="popup === 'statement' && editingStatement"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          v-bind="savePopup"
           question="What must be true?"
           primary-label="Save"
-          primary-action-variant="save"
           primary-test-id="audit-settings-statement-save"
           :submit-disabled="saving || !statementText.trim()"
-          :show-enter-hint="false"
-          show-cancel-action
-          :cancel-disabled="saving"
           cancel-test-id="audit-settings-statement-cancel"
           @cancel="closePopup"
           @submit="saveStatement"
@@ -351,15 +335,11 @@
         <!-- DAR-UI-140: how soon a broken statement must be fixed, or (from its popup) one reason's own level. -->
         <WorkflowStepForm
           v-else-if="(popup === 'priority' || (popup === 'reasonPriority' && editingReason)) && editingStatement"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          v-bind="savePopup"
           :question="levelQuestion"
           primary-label="Save"
-          primary-action-variant="save"
           :primary-test-id="popup === 'priority' ? 'audit-settings-priority-save' : 'audit-settings-reason-priority-save'"
           :submit-disabled="saving"
-          :show-enter-hint="false"
-          show-cancel-action
-          :cancel-disabled="saving"
           :cancel-test-id="popup === 'priority' ? 'audit-settings-priority-cancel' : 'audit-settings-reason-priority-cancel'"
           @cancel="closePopup"
           @submit="saveLevel"
@@ -392,16 +372,12 @@
         <!-- DAR-UI-078: a new statement, saved on its own so a check can be added to it. -->
         <WorkflowStepForm
           v-else-if="popup === 'newStatement'"
-          class="workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup"
+          v-bind="savePopup"
           data-testid="audit-settings-new-statement"
           question="What must be true?"
           primary-label="Save"
-          primary-action-variant="save"
           primary-test-id="audit-settings-new-save"
           :submit-disabled="saving || !newForm.text.trim()"
-          :show-enter-hint="false"
-          show-cancel-action
-          :cancel-disabled="saving"
           cancel-test-id="audit-settings-new-cancel"
           @cancel="closePopup"
           @submit="void addStatement()"
@@ -498,7 +474,7 @@ const statementText = ref('')
 const editingReasonConclusion = ref<string | null>(null)
 // The level picked in the priority popups; null is a reason's "Same as" its statement.
 const levelDraft = ref<AuditLevel | null>(null)
-const newForm = ref({ text: '', category: 'orders', weight: 'derived' })
+const newForm = ref<{ text: string; category: string; weight: 'firm' | 'derived' }>({ text: '', category: 'orders', weight: 'derived' })
 
 const categoryOptions = [
   { value: 'orders', label: 'Orders' },
@@ -510,6 +486,15 @@ const weightOptions = [
   { value: 'derived', label: 'Derived' },
   { value: 'firm', label: 'Firm' },
 ]
+
+// What every popup that saves shares: the compact dense popup form, Save, no Enter hint, Cancel held while saving.
+const savePopup = computed(() => ({
+  class: 'workflow-form--popup-compact workflow-form--edit-single-page workflow-form--dense-popup',
+  primaryActionVariant: 'save' as const,
+  showEnterHint: false,
+  showCancelAction: true,
+  cancelDisabled: saving.value,
+}))
 
 const timezoneOptions = computed(() => buildTimezoneOptions(scheduleForm.value.timeZone))
 const editingStatement = computed(() => settings.value?.statements.find((statement) => statement.id === editingStatementId.value) ?? null)
@@ -918,7 +903,7 @@ async function addStatement() {
   popupError.value = null
   try {
     const response = await afterSaves(() => auditFacade.addAuditStatement({ audit: auditCode.value, text,
-      category: newForm.value.category, weight: newForm.value.weight as 'firm' | 'derived' }))
+      category: newForm.value.category, weight: newForm.value.weight }))
     const added = response.statement
     if (!added) {
       popupError.value = response.errors?.[0] || 'The statement was not added.'

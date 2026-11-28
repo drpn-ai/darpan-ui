@@ -214,6 +214,37 @@ describe('AuditSettingsPage', () => {
     w.unmount()
   })
 
+  // DAR-OPS-029 U05c. A new audit starts paused (create#Audit writes no scheduleActive; each check's automation takes the
+  // audit's, DAR-BE-199). Its first steps here (a statement, a check, the time) never switch it on: only the title switch does.
+  it('keeps a new audit paused through its first steps; only the switch turns it on', async () => {
+    const paused = settings({ active: false, automations: 0 })
+    const added = { id: 'ST9', code: 'R1', text: 'Every order is billed.', active: true, checks: [] }
+    f.getAuditSettings.mockResolvedValueOnce({ ok: true, settings: { ...paused, statements: [] } } as never)
+    // The read after the check is saved: its automation was made paused, as the audit is.
+    f.getAuditSettings.mockResolvedValueOnce({ ok: true, settings: { ...paused, schedule: { ...paused.schedule, automations: 1 },
+      statements: [{ ...added, checks: [{ id: 'C9', label: 'Orders not billed', savedRunId: 'S9', runName: 'Billing' }] }] } } as never)
+    f.addAuditStatement.mockResolvedValue({ ok: true, statement: added } as never)
+    const w = await mountPage()
+    expect(w.get('#audit-settings-popup-title').text()).toBe('New statement')
+    await get(w, 'audit-settings-new-text').setValue('Every order is billed.')
+    await click(w, 'audit-settings-new-save')
+    await click(w, 'audit-settings-statement-open-ST9')
+    await click(w, 'audit-settings-add-check')
+    w.findComponent({ name: 'AuditCheckEditor' }).vm.$emit('saved')
+    await flushPromises()
+    await click(w, 'audit-settings-statement-cancel')
+    await click(w, 'audit-settings-fact-schedule')
+    w.findComponent({ name: 'WorkflowTimeSelect' }).vm.$emit('update:modelValue', '07:30')
+    await flushPromises()
+    await click(w, 'audit-settings-schedule-save')
+    const sent = f.saveAuditSettings.mock.calls.map(([payload]) => payload)
+    expect(sent).toEqual([{ audit: 'month-close', schedule: { active: false, time: '07:30', timeZone: 'America/Los_Angeles' } }])
+    expect(get(w, 'audit-settings-schedule-active').attributes('aria-checked')).toBe('false')
+    await click(w, 'audit-settings-schedule-active')
+    expect(f.saveAuditSettings).toHaveBeenLastCalledWith({ audit: 'month-close', schedule: { active: true, time: '07:30', timeZone: 'America/Los_Angeles' } })
+    w.unmount()
+  })
+
   it('says in the schedule popup when the checks run at different times', async () => {
     f.getAuditSettings.mockResolvedValue({ ok: true, settings: settings({ mixed: true }) } as never)
     const w = await mountPage()

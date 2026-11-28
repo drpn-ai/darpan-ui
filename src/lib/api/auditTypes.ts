@@ -1,6 +1,11 @@
 // DAR-UI-058. The audit run's JSON (darpan.audit.report/v1, darpan.audit.finding/v1) as the backend assembler writes
 // it and facade.AuditFacadeServices hands it over unchanged: keyed objects, codes not ids. The contract and every
 // key's meaning: darpan-master docs/superpowers/specs/2026-10-21-audit-run-json-contract.md.
+// Flat payloads and envelopes are aliases into the generated contract; the report, finding, settings and progress
+// documents stay hand-written, because the contract types a nested map as Record<string, never> and a list of maps as
+// string[] (DAR-OPS-029 U05c).
+
+import type { Schemas } from './generated'
 
 export type AuditFindingState = 'open' | 'fixed'
 export type AuditCheckStatus = 'ran' | 'partial' | 'notRun'
@@ -517,22 +522,14 @@ export interface AddAuditStatementResponse extends AuditEnvelope {
   statement?: AuditSettingsStatement | null
 }
 
-export interface RunAuditPayload {
-  audit: string
-  /** First day, YYYY-MM-DD. */
-  fromDate: string
-  /** Last day, YYYY-MM-DD, inclusive. */
-  thruDate: string
-}
+export type RunAuditPayload = Schemas['RunAuditParams']
 
 export interface RunAuditResponse extends AuditEnvelope {
   runs?: Array<{ automationId: string | null; savedRunId: string | null; submitted: boolean; error: string | null }>
 }
 
 // DAR-BE-123. Resolve: one finding re-checked in the background; get#AuditFinding shows it once lastChecked moves.
-export interface VerifyAuditFindingResponse extends AuditEnvelope {
-  submitted?: boolean
-}
+export type VerifyAuditFindingResponse = Schemas['VerifyAuditFindingResult']
 
 // DAR-BE-369. Re-check all: every open finding of a statement (or of the audit) re-checked in the background, one run per
 // automation; get#AuditRecheckProgress counts the ones checked since checkedSince.
@@ -543,7 +540,4 @@ export interface VerifyAuditFindingsResponse extends AuditEnvelope {
   checkedSince?: string
 }
 
-export interface GetAuditRecheckProgressResponse extends AuditEnvelope {
-  checked?: number
-  closed?: number
-}
+export type GetAuditRecheckProgressResponse = Schemas['GetAuditRecheckProgressResult']
