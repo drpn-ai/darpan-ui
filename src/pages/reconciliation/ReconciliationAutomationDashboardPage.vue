@@ -203,6 +203,7 @@
 </template>
 
 <script setup lang="ts">
+import { delay } from '../../lib/runRegistration'
 import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
@@ -612,23 +613,6 @@ const RUN_REGISTRATION_POLL_ATTEMPTS = 12
 // scheduled fire a few seconds ago) and must never win the redirect, no matter how long ago it
 // started -- accepting it sends the user to watch someone else's run believing it is theirs.
 const RUN_REGISTRATION_CLOCK_SKEW_MS = 5000
-
-// Ends early on abort; the listener goes when the wait does, so twelve waits leave none behind on the signal.
-function delay(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal.aborted) {
-      resolve()
-      return
-    }
-    const finish = () => {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', finish)
-      resolve()
-    }
-    const timer = setTimeout(finish, ms)
-    signal.addEventListener('abort', finish, { once: true })
-  })
-}
 
 // DAR-UI-156: takes the automation and the click's time rather than reading the page, because it runs on after the
 // page has gone (the Starting page waits on it).

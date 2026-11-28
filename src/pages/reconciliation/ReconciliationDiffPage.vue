@@ -193,7 +193,7 @@ import {
 } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 import { isSingleSidedOutput, uncleanRunOutcome } from '../../lib/reconciliationDisplay'
-import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
+import { useSavedRunEditor } from '../../composables/useSavedRunEditor'
 import { useCalendarWidget } from '../../composables/useCalendarWidget'
 import {
   customWindowRange,
@@ -205,7 +205,6 @@ import {
 } from '../../lib/runWindow'
 import { useReconciliationDiff } from '../../composables/useReconciliationDiff'
 import { usePermissionsStore } from '../../stores/permissions'
-import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { useRunSubmissionsStore, type RunSubmissionOutcome } from '../../stores/runSubmissions'
 import { SOURCE_TYPE_API } from '../../lib/reconciliationRuleSetDraft'
 import { toEnumSelectOption } from '../../lib/enumOptions'
@@ -230,7 +229,6 @@ interface UploadSourceInput {
 const route = useRoute()
 const router = useRouter()
 const permissionsStore = usePermissionsStore()
-const draftStore = useReconciliationDraftStore()
 
 const diff = useReconciliationDiff()
 const {
@@ -614,19 +612,13 @@ async function loadSavedRuns(): Promise<void> {
   syncSelectedSystems(selectedSavedRun.value)
 }
 
-// The selected run is already the full saved-run summary, so unlike Run Result there is no
-// lookup to wait on before handing the editor its draft.
+// The selected run is already the full saved-run summary, so unlike Run Result there is no lookup to wait on before
+// handing the editor its draft (S99-110: useSavedRunEditor.open).
+const { open: openSavedRunEditor } = useSavedRunEditor('Run')
 async function openRunSettings(): Promise<void> {
   const savedRun = selectedSavedRun.value
   if (!canOpenRunSettings.value || !savedRun) return
-
-  draftStore.setWorkflowOrigin('Run', route.fullPath)
-  if (savedRun.runType === 'ruleset') {
-    const draft = buildRuleSetDraft(savedRun)
-    if (draft) draftStore.setRuleSetDraft(draft, 'ruleset-manager')
-  }
-
-  await router.push(buildSavedRunEditorRoute(savedRun))
+  await openSavedRunEditor(savedRun)
 }
 
 function loadLatestSavedOutput(savedRunId: string): Promise<void> {
