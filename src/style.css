@@ -735,21 +735,6 @@ button:disabled {
   text-wrap: balance;
 }
 
-.static-page-module-grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.static-page-module-tile {
-  width: 100%;
-  min-height: 0;
-  gap: var(--space-2);
-}
-
-.static-page-module-tile--active {
-  border-color: color-mix(in oklab, var(--static-tile-border) 58%, var(--accent));
-  background: color-mix(in oklab, var(--static-tile-bg) 76%, var(--accent));
-}
-
 .static-page-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -915,36 +900,6 @@ button:disabled {
     grid-column: 1 / -1;
     justify-content: flex-start;
   }
-}
-
-.tenant-settings-list-grid {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: var(--space-2);
-}
-
-.tenant-settings-list-grid .static-page-list-tile {
-  padding: var(--space-2) var(--space-3);
-}
-
-.tenant-settings-list-row {
-  width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.tenant-settings-list-main {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-00);
-}
-
-.tenant-settings-list-status {
-  color: var(--text-soft);
-  font-size: var(--type-label-size);
-  text-align: right;
-  overflow-wrap: anywhere;
 }
 
 .popup-workflow-overlay {
@@ -1131,15 +1086,6 @@ button:disabled {
   min-width: 0;
 }
 
-.tenant-notification-current-webhook {
-  max-width: 100%;
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--type-summary-label-size);
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
 .workflow-form-grid--compact {
   grid-template-columns: minmax(0, 2fr) minmax(7rem, 0.8fr) minmax(9rem, 0.9fr);
   align-items: start;
@@ -1321,20 +1267,6 @@ label > span {
   align-items: center;
 }
 
-.row-between,
-.static-page-list-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.row-between h3,
-.static-page-list-toolbar h3 {
-  margin: 0;
-  font-size: var(--type-tile-size);
-}
-
 .static-page-pager {
   display: flex;
   align-items: center;
@@ -1342,15 +1274,6 @@ label > span {
   color: var(--text-muted);
   font-size: var(--type-meta-size);
   font-variant-numeric: tabular-nums;
-}
-
-.card-grid {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.card-grid.two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .card {
@@ -2109,33 +2032,6 @@ label > span {
   color: var(--text);
 }
 
-/* Two warnings can stand at once, so each is its own block inside the one bubble. */
-.mascot-say-warning {
-  display: block;
-}
-
-.mascot-say-warning + .mascot-say-warning {
-  margin-top: var(--space-1-5);
-}
-
-.mascot-say-actions {
-  display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-1-5);
-}
-
-/* The product's plain-text button, as the Saved Run row's Sync control uses. */
-.mascot-say-action {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: var(--text);
-  text-decoration: underline;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 .mascot-key {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -2323,12 +2219,6 @@ label > span {
     width: calc((100% - var(--space-3)) / 2);
   }
 
-  .card-grid.two {
-    grid-template-columns: 1fr;
-  }
-
-  .row-between,
-  .static-page-list-toolbar,
   .command-head {
     flex-direction: column;
     align-items: flex-start;
@@ -2350,14 +2240,6 @@ label > span {
 
   .static-page-summary-card--wide {
     grid-column: auto;
-  }
-
-  .tenant-settings-list-row {
-    grid-template-columns: 1fr;
-  }
-
-  .tenant-settings-list-status {
-    text-align: left;
   }
 
   .static-page-hero,

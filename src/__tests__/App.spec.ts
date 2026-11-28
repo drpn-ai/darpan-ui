@@ -1011,12 +1011,9 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const browseSource = readFileSync('src/pages/jsonschema/JsonSchemaBrowsePage.vue', 'utf8')
     const editorSource = readFileSync('src/pages/jsonschema/JsonSchemaEditorPage.vue', 'utf8')
 
-    expect(styleSource).toContain('.static-page-list-toolbar')
     expect(styleSource).toContain('.static-page-pager')
     expect(styleSource).toContain('.static-page-list-tile')
     expect(styleSource).toContain('.static-page-list-tile__meta')
-    expect(styleSource).toContain('.static-page-module-grid')
-    expect(styleSource).toContain('.static-page-module-tile')
     expect(styleSource).toContain('.static-page-summary-grid')
     expect(styleSource).toMatch(/\.static-page-summary-grid\s*\{[^}]*align-items: start;/)
     expect(styleSource).toContain('.static-page-summary-card')
