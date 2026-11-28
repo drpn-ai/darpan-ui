@@ -51,12 +51,12 @@ import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { useCalendarWidget } from '../../composables/useCalendarWidget'
 import { peakFacade } from '../../lib/api/facade'
-import { addDays, startOfLocalDay, startOfMonth } from '../../lib/utils/date'
+import { addDays, startOfMonth, todayInDisplayTimeZone } from '../../lib/utils/date'
 
 // DAR-UI-161 (Aditi 2026-11-27: "creating a new peak period should be a workflow like anything else"). As an audit is
 // made (DAR-UI-078): one question per step, its name, then its days. It is made on the second, switched on, and its
 // own page opens, where peak hours, reads, sync allowances and run times are set.
-// A period is planned ahead, so the calendar runs two years forward rather than stopping at today.
+// A period is planned ahead, so the calendar runs two years forward rather than stopping at today (the tenant's day).
 const PICKABLE_DAYS_AHEAD = 730
 
 const router = useRouter()
@@ -64,13 +64,13 @@ const step = ref<'name' | 'dates'>('name')
 const name = ref('')
 const saving = ref(false)
 const error = ref<string | null>(null)
-const calendar = useCalendarWidget({ lastPickableDate: () => addDays(startOfLocalDay(new Date()), PICKABLE_DAYS_AHEAD) })
+const calendar = useCalendarWidget({ lastPickableDate: () => addDays(todayInDisplayTimeZone(), PICKABLE_DAYS_AHEAD) })
 
 function backToList() { void router.push({ name: 'settings-tenant-peak-periods' }) }
 
 function toDates() {
   if (!name.value.trim()) return
-  if (!calendar.startDate.value) calendar.visibleMonth.value = startOfMonth(new Date())
+  if (!calendar.startDate.value) calendar.visibleMonth.value = startOfMonth(todayInDisplayTimeZone())
   step.value = 'dates'
 }
 

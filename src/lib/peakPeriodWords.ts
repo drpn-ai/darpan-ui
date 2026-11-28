@@ -1,7 +1,7 @@
 // DAR-BE-328. Words for a peak period on a list: its dates, when it starts or ends, and the Tenant Settings value.
-// Dates are "YYYY-MM-DD" in the tenant's zone; "today" is the browser's local date, which is close enough for a list.
+// Dates are "YYYY-MM-DD" in the tenant's zone, and so is "today": the display zone's day, never the browser's.
 import type { PeakPeriodSummary } from './api/peakTypes'
-import { formatClockTime, getDefaultDisplayTimeZone, timeZoneCode } from './utils/date'
+import { formatClockTime, getDefaultDisplayTimeZone, timeZoneCode, todayInDisplayTimeZone } from './utils/date'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -20,7 +20,7 @@ export function peakDay(date: string): string {
  * "Nov 24 – Dec 1", or "Nov 27" for a one-day period (DAR-UI-159: it read "Nov 27 – Nov 27"); the year is added to
  * each end only when the period is not in the current year.
  */
-export function peakDateRange(fromDate: string, thruDate: string, today: Date = new Date()): string {
+export function peakDateRange(fromDate: string, thruDate: string, today: Date = todayInDisplayTimeZone()): string {
   const year = today.getFullYear()
   const end = (date: string) => (parts(date).y === year ? peakDay(date) : `${peakDay(date)}, ${parts(date).y}`)
   if (fromDate === thruDate) return end(fromDate)
@@ -35,12 +35,12 @@ function daysUntil(date: string, today: Date): number {
 }
 
 /** The "When" column: On now, Off, Ended, Starts today, Starts tomorrow, Starts in N days (N <= 30), else Starts MMM d. */
-export function peakWhen(period: PeakPeriodSummary, today: Date = new Date()): string {
+export function peakWhen(period: PeakPeriodSummary, today: Date = todayInDisplayTimeZone()): string {
   if (period.state === 'on') return 'On now'
   if (period.state === 'off') return 'Off'
   if (period.state === 'ended') return 'Ended'
   const days = daysUntil(period.fromDate, today)
-  // The server says upcoming by the tenant's date; the browser's date can already be the start day, or past it.
+  // The server says upcoming by its own clock; a read that crossed the tenant's midnight can already be the start day.
   if (days <= 0) return 'Starts today'
   if (days === 1) return 'Starts tomorrow'
   if (days <= 30) return `Starts in ${days} days`
@@ -77,7 +77,7 @@ export function peakHoursUntilNotice(until: unknown, tenantTimeZone?: string): s
  * "Cyber Monday · starts in 3 days"), else "None". DAR-UI-159: its dates are on the period's own page; names usually
  * carry them already ("PEAK Nov 27 · Nov 27 – Nov 27").
  */
-export function peakSettingsValue(periods: PeakPeriodSummary[], today: Date = new Date()): string {
+export function peakSettingsValue(periods: PeakPeriodSummary[], today: Date = todayInDisplayTimeZone()): string {
   const on = periods.find((period) => period.state === 'on')
   const upcoming = periods.filter((period) => period.state === 'upcoming').sort((a, b) => a.fromDate.localeCompare(b.fromDate))[0]
   const pick = on ?? upcoming

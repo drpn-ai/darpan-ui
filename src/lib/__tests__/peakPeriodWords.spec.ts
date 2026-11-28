@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PeakPeriodSummary } from '../api/peakTypes'
 import { peakDateRange, peakHoursUntilNotice, peakSettingsValue, peakWhen } from '../peakPeriodWords'
 import { setDefaultDisplayTimeZone } from '../utils/date'
@@ -20,6 +20,33 @@ describe('peakWhen', () => {
     expect(peakWhen(upcoming('2026-11-29'), today)).toBe('Starts in 5 days')
     expect(peakWhen(upcoming('2026-12-24'), today)).toBe('Starts in 30 days')
     expect(peakWhen(upcoming('2026-12-25'), today)).toBe('Starts Dec 25')
+  })
+})
+
+// DAR-OPS-029 U10a: "today" is the tenant's day (the display zone), never the browser's. At 20:00 UTC on Nov 26 it is
+// already Nov 27 in Kolkata and still Nov 26 in Los Angeles, whatever zone the browser runs in.
+describe('the day a period is counted from', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    setDefaultDisplayTimeZone(undefined)
+  })
+
+  it('is the tenant’s day, not the browser’s', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-26T20:00:00Z'))
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    expect(peakWhen(upcoming('2026-11-27'))).toBe('Starts today')
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    expect(peakWhen(upcoming('2026-11-27'))).toBe('Starts tomorrow')
+  })
+
+  it('names the year by the tenant’s year', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-31T20:00:00Z'))
+    setDefaultDisplayTimeZone('Asia/Kolkata')
+    expect(peakDateRange('2027-01-02', '2027-01-02')).toBe('Jan 2')
+    setDefaultDisplayTimeZone('America/Los_Angeles')
+    expect(peakDateRange('2027-01-02', '2027-01-02')).toBe('Jan 2, 2027')
   })
 })
 

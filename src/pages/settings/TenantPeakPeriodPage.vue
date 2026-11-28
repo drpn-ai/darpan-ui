@@ -411,7 +411,7 @@ import type { GetPeakPeriodResponse, PeakHeldRun, PeakPeriod, PeakRunTime, PeakS
 import { peakDateRange, peakDay } from '../../lib/peakPeriodWords'
 import { ALLOWANCE_CHOICES, PULSE_EVERY_CHOICES, allowanceWords, pulseCadence } from '../../lib/pulseWords'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
-import { addDays, startOfLocalDay, startOfMonth } from '../../lib/utils/date'
+import { addDays, todayInDisplayTimeZone } from '../../lib/utils/date'
 import { plainPairLabel } from '../../lib/syncPulseView'
 import { usePermissionsStore } from '../../stores/permissions'
 
@@ -456,7 +456,7 @@ const NETSUITE_OPTIONS = [
 ]
 
 const EVERY_DAY = 'every'
-// A period is planned ahead, so the calendar runs two years forward rather than stopping at today.
+// A period is planned ahead, so the calendar runs two years forward rather than stopping at today (the tenant's day).
 const PICKABLE_DAYS_AHEAD = 730
 
 const route = useRoute()
@@ -489,7 +489,7 @@ const syncForm = ref<{ kind: 'allowance' | 'pulse'; syncPairId: string; label: s
 })
 const runForm = ref({ runTimeId: '', target: '', onDate: EVERY_DAY, runTime: '' })
 
-const calendar = useCalendarWidget({ lastPickableDate: () => addDays(startOfLocalDay(new Date()), PICKABLE_DAYS_AHEAD) })
+const calendar = useCalendarWidget({ lastPickableDate: () => addDays(todayInDisplayTimeZone(), PICKABLE_DAYS_AHEAD) })
 
 const busy = computed(() => saving.value || popupBusy.value)
 const timeZone = computed(() => saved.value?.timeZone ?? '')
@@ -693,8 +693,8 @@ function openDates(): void {
   calendar.startDate.value = current.fromDate
   calendar.endDate.value = current.thruDate
   calendar.selecting.value = 'start'
-  if (current.fromDate) calendar.focusVisibleMonthAroundStart()
-  else calendar.visibleMonth.value = startOfMonth(new Date())
+  // A saved period always has its dates (the server refuses one without), so the calendar opens on them.
+  calendar.focusVisibleMonthAroundStart()
   openPopup('dates')
 }
 

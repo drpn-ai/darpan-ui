@@ -5,6 +5,7 @@ const { push, savePeakPeriod } = vi.hoisted(() => ({ push: vi.fn(), savePeakPeri
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }), useRoute: () => ({ query: {}, params: {} }) }))
 vi.mock('../../../lib/api/facade', () => ({ peakFacade: { savePeakPeriod } }))
 
+import { setDefaultDisplayTimeZone } from '../../../lib/utils/date'
 import TenantPeakPeriodCreatePage from '../TenantPeakPeriodCreatePage.vue'
 
 function form(w: ReturnType<typeof mount>) { return w.findComponent({ name: 'WorkflowStepForm' }) }
@@ -67,6 +68,23 @@ describe('TenantPeakPeriodCreatePage', () => {
     expect(w.text()).toContain('Which days?')
     expect(w.get('[data-testid="peak-create-error"]').text()).toBe('These days overlap Cyber Monday.')
     expect(push).not.toHaveBeenCalled()
+  })
+
+  // DAR-OPS-029 U10a: the calendar opens on the tenant's month. At 20:00 UTC on Nov 30 it is already December in
+  // Kolkata and still November in Los Angeles, whatever zone the browser runs in.
+  it.each([
+    ['Asia/Kolkata', ['December 2026', 'January 2027']],
+    ['America/Los_Angeles', ['November 2026', 'December 2026']],
+  ])('opens the days on the tenant’s month (%s)', async (zone, months) => {
+    vi.setSystemTime(new Date('2026-11-30T20:00:00Z'))
+    setDefaultDisplayTimeZone(zone)
+    try {
+      const w = mount(TenantPeakPeriodCreatePage)
+      await toDates(w)
+      expect(w.findAll('.wizard-api-calendar-month h3').map((month) => month.text())).toEqual(months)
+    } finally {
+      setDefaultDisplayTimeZone(undefined)
+    }
   })
 
   it('goes back to the list from the name and on cancel, and back to the name from the days with it kept', async () => {
