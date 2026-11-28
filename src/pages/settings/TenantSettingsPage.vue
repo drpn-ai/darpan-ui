@@ -307,9 +307,9 @@ async function loadSyncPairs(): Promise<void> {
 }
 
 onMounted(() => {
-  // Reference data is prefetched at login; ensureLoaded() returns the
+  // Reference data is prefetched at login; hydrate() returns the
   // in-flight promise (or resolves immediately if hydration already finished).
-  void referenceDataStore.ensureLoaded()
+  void referenceDataStore.hydrate()
   void loadChatSpaces()
   void loadPeakPeriods()
   void loadSyncPairs()

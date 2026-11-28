@@ -406,7 +406,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function _hydrateReferenceData(): void {
-    // Fire-and-forget — pages await ensureLoaded() if they arrive before the
+    // Fire-and-forget — pages await hydrate() if they arrive before the
     // fan-out resolves, so we don't block the post-login redirect here.
     try {
       void useReferenceDataStore().hydrate()

@@ -16,9 +16,9 @@ import { vExplain } from './directives/vExplain'
 import './style.css'
 import { clearAgentConversations } from './components/audit/AuditAgentPanel.vue'
 import { clearRecentCommands } from './lib/commandSearch'
-
 // DAR-UI-140. The audit board's remembered By choice (record type or priority) is the person's own.
-const AUDIT_BY_STORAGE_KEY = 'darpan.audit.by'
+import { AUDIT_BY_STORAGE_KEY } from './lib/auditReport'
+
 
 initTheme()
 

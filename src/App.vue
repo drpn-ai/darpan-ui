@@ -391,7 +391,7 @@ async function handleLogout(): Promise<void> {
 async function executeCommand(action: CommandAction): Promise<void> {
   commandPalette.close()
   commandPalette.recordExecution(action.id)
-  if (action.to === route.fullPath) return
+  if (router.resolve(action.to).fullPath === route.fullPath) return
   const staticPageLabel = resolveStaticPageLabel(route)
   if (staticPageLabel && router.resolve(action.to).meta.surfaceMode === 'workflow') {
     draftStore.setWorkflowOrigin(staticPageLabel, route.fullPath)

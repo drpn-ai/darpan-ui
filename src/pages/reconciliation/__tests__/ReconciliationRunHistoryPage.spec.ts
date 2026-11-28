@@ -353,7 +353,8 @@ describe('ReconciliationRunHistoryPage', () => {
     await wrapper.get('[data-testid="run-history-more"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.findAll('[data-testid="run-history-result-tile"]').length).toBeGreaterThan(0)
+    // DAR-OPS-029 S99-227: the older page's two results, not 'any'.
+    expect(wrapper.findAll('[data-testid="run-history-result-tile"]').length).toBe(2)
   })
 
   // Prod's Returns run compares two endpoint-level sources, so the labels stamped into its output
@@ -637,7 +638,8 @@ describe('ReconciliationRunHistoryPage', () => {
     // and the page must show it without a remount or manual reload.
     const wrapper = mount(ReconciliationRunHistoryPage)
     await flushPromises()
-    expect(wrapper.findAll('[data-testid="run-history-result-tile"]').length).toBeGreaterThan(0)
+    // DAR-OPS-029 S99-227: the fixture's five results before the run completes, not 'any'.
+    expect(wrapper.findAll('[data-testid="run-history-result-tile"]').length).toBe(5)
     const freshOutput = {
       ...buildGeneratedOutput(31),
       fileName: 'CSV-Order-Compare-diff-20260331-091500.json',

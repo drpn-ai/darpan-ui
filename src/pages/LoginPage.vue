@@ -324,7 +324,7 @@
 
       <template v-else-if="isChangingPasswordMode">
         <WorkflowStepForm
-          :question="passwordStepQuestion"
+          :question="passwordStep.question"
           :primary-label="passwordPrimaryLabel"
           :submit-disabled="isPasswordStepBlocked"
           :show-back="true"
@@ -334,11 +334,11 @@
           @back="goBackPasswordStep"
           @submit="submitPasswordStep"
         >
-          <label class="workflow-context-block" :aria-label="passwordStepLabel">
+          <label class="workflow-context-block" :aria-label="passwordStep.label">
             <input
               v-model="passwordStepValue"
               class="wizard-answer-control"
-              :name="passwordStepName"
+              :name="passwordStep.name"
               type="password"
               autocomplete="new-password"
               required
@@ -498,9 +498,6 @@ const passwordSteps = [
 ] as const
 
 const passwordStep = computed(() => passwordSteps[passwordStepIndex.value] ?? passwordSteps[0])
-const passwordStepQuestion = computed(() => passwordStep.value.question)
-const passwordStepLabel = computed(() => passwordStep.value.label)
-const passwordStepName = computed(() => passwordStep.value.name)
 const passwordPrimaryLabel = computed(() => {
   if (passwordStepIndex.value < passwordSteps.length - 1) return 'OK'
   return isSubmittingPasswordChange.value ? 'Changing' : 'Change'

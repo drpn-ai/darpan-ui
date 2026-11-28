@@ -22,16 +22,9 @@ function buildActionId(prefix: string, values: string[]): string {
   return [prefix, normalizedValues || 'record'].join('-')
 }
 
-function appendQueryParams(path: string, params: Record<string, string | undefined>): string {
-  const query = new URLSearchParams()
-
-  Object.entries(params).forEach(([key, value]) => {
-    const trimmedValue = value?.trim()
-    if (trimmedValue) query.set(key, trimmedValue)
-  })
-
-  const queryText = query.toString()
-  return queryText ? `${path}?${queryText}` : path
+/** The query a named route takes: trimmed values, blanks left out. */
+function nonBlankQuery(params: Record<string, string | undefined>): Record<string, string> {
+  return Object.fromEntries(Object.entries(params).flatMap(([key, value]) => (value?.trim() ? [[key, value.trim()]] : [])))
 }
 
 function compactAliases(values: Array<string | number | undefined>): string[] {
@@ -111,18 +104,21 @@ export function buildGeneratedOutputCommandActions(
     .slice(0, limit)
     .map((output) => {
       const label = resolveOutputLabel(output)
-      const resultPath = `/reconciliation/run-result/${encodePathSegment(output.savedRunId ?? '')}/${encodePathSegment(output.fileName)}`
 
       return {
         id: buildActionId('data-run-result', [output.savedRunId ?? '', output.fileName]),
         label: `Open Result: ${label}`,
         description: describeGeneratedOutput(output),
         group: 'Data',
-        to: appendQueryParams(resultPath, {
-          runName: output.savedRunName || output.mappingName,
-          file1SystemLabel: output.file1Label,
-          file2SystemLabel: output.file2Label,
-        }),
+        to: {
+          name: 'reconciliation-run-result',
+          params: { savedRunId: (output.savedRunId ?? '').trim(), outputFileName: output.fileName.trim() },
+          query: nonBlankQuery({
+            runName: output.savedRunName || output.mappingName,
+            file1SystemLabel: output.file1Label,
+            file2SystemLabel: output.file2Label,
+          }),
+        },
         aliases: compactAliases([
           label,
           output.fileName,

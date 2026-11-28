@@ -208,6 +208,7 @@ import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { useRunSubmissionsStore, type RunSubmissionOutcome } from '../../stores/runSubmissions'
 import { SOURCE_TYPE_API } from '../../lib/reconciliationRuleSetDraft'
+import { toEnumSelectOption } from '../../lib/enumOptions'
 
 interface UploadStep {
   id: 'run' | 'system-1' | 'api-window' | 'api-window-custom' | 'file-1' | 'system-2' | 'file-2'
@@ -280,12 +281,7 @@ const savedRunOptions = computed(() =>
   savedRuns.value.map((savedRun) => ({ value: savedRun.savedRunId, label: savedRun.runName })),
 )
 const selectedSystemOptions = computed<SavedRunSystemOption[]>(() => selectedSavedRun.value?.systemOptions ?? [])
-const systemSelectOptions = computed(() =>
-  selectedSystemOptions.value.map((option) => ({
-    value: option.enumId,
-    label: option.label || option.description || option.enumCode || option.enumId,
-  })),
-)
+const systemSelectOptions = computed(() => selectedSystemOptions.value.map(toEnumSelectOption))
 const file1SystemOption = computed(() => resolveSystemOptionForFileSide('FILE_1', file1SystemEnumId.value))
 const file2SystemOption = computed(() => resolveSystemOptionForFileSide('FILE_2', file2SystemEnumId.value))
 const file1UsesApi = computed(() => isApiSource(file1SystemOption.value))

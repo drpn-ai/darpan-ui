@@ -113,7 +113,7 @@ describe('PulseWaitingChart', () => {
   afterEach(() => setDefaultDisplayTimeZone(undefined))
 
   it('draws one bar per hour, at the same x as the oldest chart’s points, the latest in full ink', () => {
-    const wrapper = mount(PulseWaitingChart, { props: { samples, allowanceMinutes: 360 } })
+    const wrapper = mount(PulseWaitingChart, { props: { samples } })
     const bars = wrapper.findAll('[data-testid="pulse-waiting-bar"]')
     expect(bars).toHaveLength(3)
 
@@ -132,7 +132,7 @@ describe('PulseWaitingChart', () => {
   })
 
   it('puts the pointed-at hour in full ink and tells the page which one', async () => {
-    const wrapper = mount(PulseWaitingChart, { props: { samples, allowanceMinutes: 360, active: 0 } })
+    const wrapper = mount(PulseWaitingChart, { props: { samples, active: 0 } })
     expect(wrapper.findAll('[data-testid="pulse-waiting-bar"]').map((bar) => bar.classes().includes('pulse-chart__bar--active')))
       .toEqual([true, false, false])
     await wrapper.findAll('[data-testid="pulse-hour-hit"]')[2]!.trigger('mouseenter')
@@ -142,14 +142,14 @@ describe('PulseWaitingChart', () => {
   })
 
   it('marks the scale in whole orders only', () => {
-    const wrapper = mount(PulseWaitingChart, { props: { samples: [ok('2026-11-21T09:00:00Z', 3, 10)], allowanceMinutes: 360 } })
+    const wrapper = mount(PulseWaitingChart, { props: { samples: [ok('2026-11-21T09:00:00Z', 3, 10)] } })
     const ticks = wrapper.findAll('.pulse-chart__tick').map((tick) => tick.text()).filter((text) => text !== '09')
     expect(ticks).toEqual(['0', '2', '4'])
     expect(wrapper.find('[data-testid="pulse-waiting-plot"]').attributes('aria-label')).toBe('Orders waiting by hour. Arrow keys move between hours.')
   })
 
   it('summarises the day for a screen reader', () => {
-    const wrapper = mount(PulseWaitingChart, { props: { samples, allowanceMinutes: 360 } })
+    const wrapper = mount(PulseWaitingChart, { props: { samples } })
     expect(wrapper.find('svg').attributes('role')).toBe('img')
     expect(wrapper.find('svg').attributes('aria-label')).toBe(
       'Orders waiting by hour today: 40 at 08:00, 1,240 at 11:00, highest 1,610 at 09:00.',

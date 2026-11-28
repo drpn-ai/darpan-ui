@@ -5,13 +5,11 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { passwordRulesFor } from '../lib/passwordPolicy'
-import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../lib/uiEvents'
+import { requestWorkflowHint } from '../lib/uiEvents'
 import { useAuthStore } from '../stores/auth'
 
 function warn(message: string): void {
-  document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, {
-    detail: { message, tone: 'warning', durationMs: 5000 },
-  }))
+  requestWorkflowHint({ message, tone: 'warning', durationMs: 5000 })
 }
 
 const PASSWORD_STEPS = [

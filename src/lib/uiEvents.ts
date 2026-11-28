@@ -16,3 +16,8 @@ export interface WorkflowHintRequestDetail {
 export interface CommandPaletteOpenRequestDetail {
   initialQuery?: string
 }
+
+/** DAR-OPS-029 S99-117. Asks the shell (App.vue) for a transient workflow hint; every page and composable says it this way. */
+export function requestWorkflowHint(detail: WorkflowHintRequestDetail): void {
+  document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, { detail }))
+}

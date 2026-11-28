@@ -49,10 +49,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
     return _hydrationPromise
   }
 
-  function ensureLoaded(): Promise<void> {
-    return hydrate()
-  }
-
   function setTenantSettings(value: TenantSettings | null | undefined): void {
     _tenantSettings.value = value ?? null
     _tenantSettingsState.value = emptyLoadState()
@@ -71,7 +67,6 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
     tenantSettingsLoading,
     tenantSettingsError,
     hydrate,
-    ensureLoaded,
     setTenantSettings,
     reset,
   }

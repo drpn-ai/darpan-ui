@@ -1,6 +1,9 @@
 import type { AuditCheckStatus, AuditFindingState, AuditMoney, AuditRecordLine, AuditRecords, AuditSourceRead } from './api/auditTypes'
 import type { StaticFact } from '../components/ui/StaticFactStrip.vue'
 
+/** DAR-UI-140. Where the audit board remembers the person's By choice (record type or priority); cleared at sign-out (main.ts). */
+export const AUDIT_BY_STORAGE_KEY = 'darpan.audit.by'
+
 // DAR-UI-058. What the audit view derives from the report JSON: words and tones for its codes, rows for its keyed
 // objects. Pure, so the page carries no logic of its own.
 

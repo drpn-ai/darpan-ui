@@ -387,6 +387,7 @@ import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
 import { addDays, displayCalendarDayOf, displayDayStart, formatDateInputValue, parseDateInput } from '../../lib/utils/date'
 import { useCronExpression, SCHEDULE_WEEKDAY_OPTIONS, type SchedulePreset } from '../../composables/useCronExpression'
 import { useAutomationSourceDraft, type ApiSourceSelectOption } from '../../composables/useAutomationSourceDraft'
+import { enumOptionLabel } from '../../lib/enumOptions'
 
 interface WizardStep {
   id: ReconciliationAutomationStepId
@@ -682,7 +683,7 @@ const inputModeOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
       ]
   return options.filter((option) => supportedInputModeIds.includes(option.enumId)).map((option, index) => ({
     value: option.enumId,
-    label: inputModeLabel(option.enumId, option.label || option.description || option.enumCode || option.enumId),
+    label: inputModeLabel(option.enumId, enumOptionLabel(option)),
     shortcutKey: ['A', 'B', 'C', 'D'][index] ?? String(index + 1),
   }))
 })
@@ -718,7 +719,7 @@ const relativeWindowOptions = computed<WorkflowSelectOption[]>(() => {
       ]
   return options.map((option) => ({
     value: option.enumId,
-    label: relativeWindowLabel(option.enumId, option.label || option.description || option.enumCode || option.enumId),
+    label: relativeWindowLabel(option.enumId, enumOptionLabel(option)),
   }))
 })
 const dateWindowNeedsCount = computed(() => automationWindowNeedsCount(relativeWindowTypeEnumId.value))

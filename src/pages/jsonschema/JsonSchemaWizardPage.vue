@@ -118,6 +118,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
+import { toEnumSelectOption } from '../../lib/enumOptions'
 import { useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, {
@@ -131,7 +132,7 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { jsonSchemaFacade, settingsFacade } from '../../lib/api/facade'
 import { invokePrimaryActionOnEnter } from '../../lib/keyboard'
-import type { EnumOption, JsonSchemaField } from '../../lib/api/types'
+import type { JsonSchemaField } from '../../lib/api/types'
 import { isRecord } from '../../lib/utils/objects'
 import { usePermissionsStore } from '../../stores/permissions'
 
@@ -539,13 +540,6 @@ function handleNameInputEnter(event: KeyboardEvent): void {
   })
 }
 
-function toSystemOption(option: EnumOption): AppSelectOption {
-  return {
-    value: option.enumId,
-    label: option.label || option.description || option.enumCode || option.enumId,
-  }
-}
-
 const pageAbortController = new AbortController()
 
 onBeforeUnmount(() => {
@@ -555,7 +549,7 @@ onBeforeUnmount(() => {
 async function loadSystemOptions(): Promise<void> {
   try {
     const response = await settingsFacade.listEnumOptions('DarpanSystemSource', pageAbortController.signal)
-    systemOptions.value = (response.options ?? []).map(toSystemOption)
+    systemOptions.value = (response.options ?? []).map(toEnumSelectOption)
     systemOptionsLoaded.value = true
   } catch (loadError) {
     if (isAbortError(loadError)) return

@@ -57,9 +57,12 @@ describe('command data search actions', () => {
         requiresQuery: true,
       }),
     ])
-    expect(actions[0]?.to).toBe(
-      '/reconciliation/run-result/RS_ORDER_MATCH/Order-Match-diff-20260424.json?runName=Order+Match&file1SystemLabel=OMS&file2SystemLabel=Shopify',
-    )
+    // DAR-OPS-029 S99-126: the result route by name, not a hand-built URL; the router encodes it.
+    expect(actions[0]?.to).toEqual({
+      name: 'reconciliation-run-result',
+      params: { savedRunId: 'RS_ORDER_MATCH', outputFileName: 'Order-Match-diff-20260424.json' },
+      query: { runName: 'Order Match', file1SystemLabel: 'OMS', file2SystemLabel: 'Shopify' },
+    })
     expect(rankCommandActions(actions, 'order result')[0]?.id).toBe(
       'data-run-result-rs-order-match-order-match-diff-20260424-json',
     )

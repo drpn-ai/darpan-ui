@@ -9,18 +9,16 @@
     <StaticPageSection title="Pinned Runs">
       <div class="static-page-drop-zone" data-testid="pinned-runs" @dragover.prevent @drop="handleDrop('pinned', $event)">
         <div v-if="pinnedFlowCards.length > 0" class="static-page-tile-grid">
-          <RouterLink
+          <StaticPageTile
             v-for="flow in pinnedFlowCards"
             :key="flow.id"
-            class="static-page-tile"
             :data-flow-id="flow.id"
             :to="flow.to"
-            :draggable="flow.pinnable ? 'true' : 'false'"
+            :title="flow.title"
+            :draggable="flow.pinnable"
             @click="setDashboardOrigin"
             @dragstart="handleDragStart(flow.id, $event)"
-          >
-            <span class="static-page-tile-title">{{ flow.title }}</span>
-          </RouterLink>
+          />
         </div>
         <div v-else class="static-page-drop-hint" data-testid="pinned-empty-state">drag and drop runs to pin</div>
       </div>
@@ -39,18 +37,16 @@
         @drop="handleDrop('other', $event)"
       >
         <div class="static-page-tile-grid">
-          <RouterLink
+          <StaticPageTile
             v-for="flow in group.visible"
             :key="flow.id"
-            class="static-page-tile"
             :data-flow-id="flow.id"
             :to="flow.to"
-            :draggable="flow.pinnable ? 'true' : 'false'"
+            :title="flow.title"
+            :draggable="flow.pinnable"
             @click="setDashboardOrigin"
             @dragstart="handleDragStart(flow.id, $event)"
-          >
-            <span class="static-page-tile-title">{{ flow.title }}</span>
-          </RouterLink>
+          />
           <button
             v-if="group.hidden > 0"
             type="button"
@@ -112,6 +108,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import StaticPageFrame from '../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../components/ui/StaticPageSection.vue'
+import StaticPageTile from '../components/ui/StaticPageTile.vue'
 import InlineValidation from '../components/ui/InlineValidation.vue'
 import { useAuthStore, buildAuthRedirect } from '../stores/auth'
 import { useReconciliationDraftStore } from '../stores/reconciliationDraft'

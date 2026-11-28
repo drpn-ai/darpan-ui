@@ -177,10 +177,11 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { jsonSchemaFacade, settingsFacade } from '../../lib/api/facade'
-import type { EnumOption, JsonSchemaField } from '../../lib/api/types'
+import type { JsonSchemaField } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { formatDateTime } from '../../lib/utils/date'
 import { downloadTextFile } from '../../lib/utils/download'
+import { toEnumSelectOption } from '../../lib/enumOptions'
 
 interface EditableFieldRow {
   fieldPath: string
@@ -281,13 +282,6 @@ function formatDate(value: unknown): string {
   return formatDateTime(value, { locale: 'en-US' })
 }
 
-function toSystemOption(option: EnumOption): AppSelectOption {
-  return {
-    value: option.enumId,
-    label: option.label || option.description || option.enumCode || option.enumId,
-  }
-}
-
 function setEditableTitle(value: string): void {
   if (editableTitleTarget.value === 'description') {
     description.value = value
@@ -376,7 +370,7 @@ async function loadSchema(signal?: AbortSignal): Promise<void> {
 async function loadSystemOptions(signal?: AbortSignal): Promise<void> {
   try {
     const response = await settingsFacade.listEnumOptions('DarpanSystemSource', signal)
-    const resolvedOptions = (response.options ?? []).map(toSystemOption)
+    const resolvedOptions = (response.options ?? []).map(toEnumSelectOption)
     if (systemEnumId.value && !resolvedOptions.some((option) => option.value === systemEnumId.value)) {
       resolvedOptions.unshift({
         value: systemEnumId.value,

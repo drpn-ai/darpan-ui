@@ -14,17 +14,15 @@
       <StaticPageSection title="Pinned Queries">
         <div class="static-page-drop-zone" data-testid="pinned-queries" @dragover.prevent @drop="handleDrop('pinned', $event)">
           <div v-if="pinnedQueries.length > 0" class="static-page-tile-grid">
-            <RouterLink
+            <StaticPageTile
               v-for="query in pinnedQueries"
               :key="query.tenantQueryId"
-              class="static-page-tile"
               :data-query-id="query.tenantQueryId"
               :to="queryRoute(query.tenantQueryId)"
-              draggable="true"
+              :title="query.queryName"
+              :draggable="true"
               @dragstart="handleDragStart(query.tenantQueryId, $event)"
-            >
-              <span class="static-page-tile-title">{{ query.queryName }}</span>
-            </RouterLink>
+            />
           </div>
           <div v-else class="static-page-drop-hint" data-testid="pinned-empty-state">drag and drop queries to pin</div>
         </div>
@@ -33,17 +31,15 @@
       <StaticPageSection v-for="group in queryGroups" :key="group.key" :title="group.title">
         <div class="static-page-drop-zone" :data-testid="`query-group-${group.key}`" @dragover.prevent @drop="handleDrop('other', $event)">
           <div class="static-page-tile-grid">
-            <RouterLink
+            <StaticPageTile
               v-for="query in group.visible"
               :key="query.tenantQueryId"
-              class="static-page-tile"
               :data-query-id="query.tenantQueryId"
               :to="queryRoute(query.tenantQueryId)"
-              draggable="true"
+              :title="query.queryName"
+              :draggable="true"
               @dragstart="handleDragStart(query.tenantQueryId, $event)"
-            >
-              <span class="static-page-tile-title">{{ query.queryName }}</span>
-            </RouterLink>
+            />
             <button
               v-if="group.hidden > 0"
               type="button"
@@ -75,6 +71,7 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import StaticPageTile from '../../components/ui/StaticPageTile.vue'
 import { scriptFacade } from '../../lib/api/facade'
 import { errorMessage } from '../../lib/api/client'
 import type { TenantQuery } from '../../lib/api/scriptTypes'

@@ -243,7 +243,7 @@ import {
 import { useListPagination } from '../../lib/listPagination'
 import { fileNameFromPath, humanizeToken, normalizeDisplayText, runStatusTone } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
-import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
+import { requestWorkflowHint } from '../../lib/uiEvents'
 // describeTimeZone: the zone sentence for one timestamp, handed to the mascot rather than printed.
 import { describeTimeZone, formatDateTime, getDefaultDisplayTimeZone } from '../../lib/utils/date'
 import { peakHoursUntilNotice } from '../../lib/peakPeriodWords'
@@ -765,9 +765,7 @@ async function runNow(): Promise<void> {
   // tenant's clock (the one its peak hours are set in).
   const peakNotice = peakHoursUntilNotice(automation.value.peakHoursUntil, authStore.sessionInfo?.tenantTimeZone)
   if (peakNotice) {
-    document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, {
-      detail: { message: peakNotice, durationMs: 5000 },
-    }))
+    requestWorkflowHint({ message: peakNotice, durationMs: 5000 })
   }
   // DAR-UI-156 (Aditi: "the transition from submission to the run detail page is 1-3 seconds, when it should be
   // immediate"). The Starting page opens on the click. The store sends run#AutomationNow (it answers only when the

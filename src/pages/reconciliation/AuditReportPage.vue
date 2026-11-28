@@ -199,9 +199,9 @@ import type { GetAgentStatusResponse } from '../../lib/api/agentTypes'
 import { boardDrafts, type DraftPreview } from '../../lib/agentDrafts'
 import { ApiCallError } from '../../lib/api/client'
 import { downloadTextFile } from '../../lib/utils/download'
-import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../../lib/uiEvents'
+import { requestWorkflowHint } from '../../lib/uiEvents'
 import { AUDIT_LEVELS, type AuditAcknowledgement, type AuditFindingDocument, type AuditFindingListItem, type AuditLevel, type AuditProgress, type AuditReport } from '../../lib/api/auditTypes'
-import { auditMorningQuery, periodOptions, shortRange, systemLabel } from '../../lib/auditReport'
+import { AUDIT_BY_STORAGE_KEY, auditMorningQuery, periodOptions, shortRange, systemLabel } from '../../lib/auditReport'
 import {
   HEALTH,
   defaultCategory,
@@ -290,11 +290,10 @@ const filter = computed<AuditFilter>(() => {
 // link must not change the reader's own default); the switch remembers the person's pick. In priority mode ?category=
 // holds the level.
 type AuditBy = 'type' | 'priority'
-const BY_STORAGE_KEY = 'darpan.audit.by'
 const isAuditBy = (value: unknown): value is AuditBy => value === 'type' || value === 'priority'
 function readStoredBy(): AuditBy {
   try {
-    const value = window.localStorage.getItem(BY_STORAGE_KEY)
+    const value = window.localStorage.getItem(AUDIT_BY_STORAGE_KEY)
     return isAuditBy(value) ? value : 'type'
   } catch {
     return 'type'
@@ -675,9 +674,7 @@ async function recheckAll(statement?: string): Promise<void> {
 }
 
 function say(message: string): void {
-  document.dispatchEvent(new CustomEvent<WorkflowHintRequestDetail>(WORKFLOW_HINT_REQUEST_EVENT, {
-    detail: { message, durationMs: 5000 },
-  }))
+  requestWorkflowHint({ message, durationMs: 5000 })
 }
 
 // DAR-UI-070. The report lists 50 findings a statement; the rest are read in one call. DAR-UI-091 (Aditi: "all results
@@ -930,7 +927,7 @@ function chooseBy(next: AuditBy): void {
   const current = by.value
   storedBy.value = next
   try {
-    window.localStorage.setItem(BY_STORAGE_KEY, next)
+    window.localStorage.setItem(AUDIT_BY_STORAGE_KEY, next)
   } catch {
     // Storage may be unavailable; the URL still carries the pick.
   }

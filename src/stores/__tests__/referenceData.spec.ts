@@ -17,7 +17,7 @@ describe('reference data store', () => {
     getTenantSettings.mockResolvedValue({ tenantSettings: { companyUserGroupId: 'RAILS', timeZone: 'Europe/London' } })
     const store = useReferenceDataStore()
 
-    await Promise.all([store.hydrate(), store.ensureLoaded(), store.ensureLoaded()])
+    await Promise.all([store.hydrate(), store.hydrate(), store.hydrate()])
 
     expect(getTenantSettings).toHaveBeenCalledTimes(1)
     expect(store.tenantSettings?.timeZone).toBe('Europe/London')

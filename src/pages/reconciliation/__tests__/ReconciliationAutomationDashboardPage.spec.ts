@@ -13,7 +13,6 @@ const route = vi.hoisted(() => ({
 const getAutomation = vi.hoisted(() => vi.fn())
 const listAutomationExecutions = vi.hoisted(() => vi.fn())
 const runAutomationNow = vi.hoisted(() => vi.fn())
-const deleteAutomation = vi.hoisted(() => vi.fn())
 const archiveAutomation = vi.hoisted(() => vi.fn())
 const pauseAutomation = vi.hoisted(() => vi.fn())
 const resumeAutomation = vi.hoisted(() => vi.fn())
@@ -43,7 +42,6 @@ vi.mock('../../../lib/api/facade', () => ({
     getAutomation,
     listAutomationExecutions,
     runAutomationNow,
-    deleteAutomation,
     archiveAutomation,
     pauseAutomation,
     resumeAutomation,
@@ -199,7 +197,6 @@ describe('ReconciliationAutomationDashboardPage', () => {
     getAutomation.mockReset()
     listAutomationExecutions.mockReset()
     runAutomationNow.mockReset()
-    deleteAutomation.mockReset()
     archiveAutomation.mockReset()
     pauseAutomation.mockReset()
     resumeAutomation.mockReset()
@@ -218,7 +215,6 @@ describe('ReconciliationAutomationDashboardPage', () => {
       pagination: { pageIndex: 0, pageSize: 200, totalCount: 2, pageCount: 1 },
     })
     runAutomationNow.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation() })
-    deleteAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], deleted: true, deletedAutomationId: 'AUT_ACTIVE_API' })
     archiveAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automationId: 'AUT_ACTIVE_API', isArchived: true })
     pauseAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation(false) })
     resumeAutomation.mockResolvedValue({ ok: true, messages: [], errors: [], automation: mockAutomation(true) })
@@ -871,14 +867,14 @@ describe('ReconciliationAutomationDashboardPage', () => {
     expect(wrapper.find('[data-testid="automation-run-now-action"]').exists()).toBe(true)
 
     // DAR-BE-061. The bin reads as a delete and behaves as one — confirm, gone from the page —
-    // but it ARCHIVES. The two assertions that matter are that the hard delete is never called
-    // and that the operator still ends up back on the list.
+    // but it ARCHIVES (there is no hard delete: deleteAutomation is gone from the facade). The assertions that matter
+    // are that it archives exactly once and that the operator still ends up back on the list.
     await wrapper.get('[data-testid="automation-delete-action"]').trigger('click')
     await flushPromises()
 
     expect(confirmSpy).toHaveBeenCalledWith('Delete automation "Daily API orders"?')
     expect(archiveAutomation).toHaveBeenCalledWith({ automationId: 'AUT_ACTIVE_API' })
-    expect(deleteAutomation).not.toHaveBeenCalled()
+    expect(archiveAutomation).toHaveBeenCalledTimes(1)
     expect(push).toHaveBeenCalledWith('/reconciliation/automations')
   })
 
@@ -1320,7 +1316,8 @@ describe('ReconciliationAutomationDashboardPage', () => {
 
     expect(push).not.toHaveBeenCalled()
     expect(getAutomation).toHaveBeenCalledTimes(2)
-    expect(listAutomationExecutions.mock.calls.length).toBeGreaterThanOrEqual(2)
+    // DAR-OPS-029 S99-227: exactly the page's first read and the one after the run, not 'at least two'.
+    expect(listAutomationExecutions).toHaveBeenCalledTimes(2)
   })
 
   it('shows an in-place run-now refusal on the page', async () => {

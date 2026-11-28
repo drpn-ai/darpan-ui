@@ -145,6 +145,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
+import { toEnumSelectOption } from '../../lib/enumOptions'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, {
@@ -1644,10 +1645,7 @@ async function loadOptions(): Promise<void> {
       parentEnumId: option.parentEnumId || undefined,
       ...(option.extractable === false ? { extractable: false } : {}),
     }))
-    fileTypeOptions.value = (automationSourceOptionsResponse.fileTypes ?? []).map((option) => ({
-      value: option.enumId,
-      label: option.label || option.description || option.enumCode || option.enumId,
-    }))
+    fileTypeOptions.value = (automationSourceOptionsResponse.fileTypes ?? []).map(toEnumSelectOption)
     jsonSchemas.value = schemasResponse.schemas ?? []
     sourceConfigs.value = automationSourceOptionsResponse.sourceConfigs ?? []
     systemRemotes.value = automationSourceOptionsResponse.systemRemotes ?? []
