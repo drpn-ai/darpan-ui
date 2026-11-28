@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   describeTimeZone,
   displayCalendarDayOf,
@@ -28,9 +28,12 @@ describe('display timezone default', () => {
     expect(getDefaultDisplayTimeZone()).toBeUndefined()
   })
 
-  it('ignores timezone ids the browser cannot format', () => {
+  it('ignores timezone ids the browser cannot format, and says so', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     setDefaultDisplayTimeZone('Not/AZone')
     expect(getDefaultDisplayTimeZone()).toBeUndefined()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"Not/AZone"'))
+    warn.mockRestore()
     expect(() => formatDateTime('2026-07-28T18:30:00Z', { locale: 'en-US' })).not.toThrow()
   })
 })

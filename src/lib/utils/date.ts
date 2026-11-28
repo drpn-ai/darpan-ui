@@ -3,11 +3,13 @@ let defaultDisplayTimeZone: string | undefined
 export function setDefaultDisplayTimeZone(timeZone: string | undefined): void {
   let normalized = timeZone?.trim() || undefined
 
-  // Validate that the browser can format with this timezone
+  // A zone this browser cannot format with falls back to the browser's own, and says so: otherwise every time on the
+  // page reads in the wrong zone with nothing to show why.
   if (normalized) {
     try {
       new Intl.DateTimeFormat(undefined, { timeZone: normalized })
     } catch {
+      console.warn(`Display timezone "${normalized}" is not one this browser knows; times show in the browser's own zone.`)
       normalized = undefined
     }
   }
@@ -28,6 +30,7 @@ export function getDefaultDisplayTimeZone(): string | undefined {
 const ZONE_CODE_LOCALE = 'en-US'
 // A real abbreviation, as opposed to the "GMT+5:30" / "GMT-7" offsets Intl falls back to.
 const ZONE_CODE_PATTERN = /^[A-Z]{2,5}$/
+const ZERO_OFFSET = /^GMT[+-]0(?::?00)?$/
 // Only where initialising the long name is provably WRONG, not merely unfamiliar. "Central
 // European Standard Time" initialises to CEST, which asserts summer time in January — a wrong code
 // is worse than an unfamiliar one. Deliberately tiny: the derivation below handles new zones
@@ -56,6 +59,8 @@ export function timeZoneCode(date: Date, timeZone?: string): string {
   try {
     const short = zoneNamePart(date, timeZone, 'short')
     if (ZONE_CODE_PATTERN.test(short)) return short
+    // Some ICU builds name a zero offset "GMT+0" (London in January, under Node 26) where a browser says GMT.
+    if (ZERO_OFFSET.test(short)) return 'GMT'
 
     const long = zoneNamePart(date, timeZone, 'long')
     if (ZONE_CODE_OVERRIDES[long]) return ZONE_CODE_OVERRIDES[long]

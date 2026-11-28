@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 // Contract-drift guard (MACH P0, API management). The backend generates
 // docs/api-contract/methods.txt from the facade service XML — the single source of
 // truth for the remote API. A copy is committed here (src/lib/api/contract/methods.txt,
 // refresh with `npm run sync-contract`) so this spec can fail the UI build whenever
-// facade.ts references a method the contract does not define.
+// a hand-written API module (facade.ts, authoringFacade.ts, client.ts, …) references a method the contract does not define.
 const contractPath = resolve(__dirname, '../contract/methods.txt')
-const facadePath = resolve(__dirname, '../facade.ts')
+const apiDir = resolve(__dirname, '..')
 
 const contractMethods = new Set(
   readFileSync(contractPath, 'utf-8')
@@ -17,14 +17,17 @@ const contractMethods = new Set(
     .filter(Boolean),
 )
 
-const facadeSource = readFileSync(facadePath, 'utf-8')
+// Every hand-written module in lib/api; generated/ and contract/ are folders, so readdir's .ts files leave them out.
+const apiModules = readdirSync(apiDir).filter((name) => name.endsWith('.ts'))
 const facadeMethods = [
-  ...new Set(facadeSource.match(/facade\.[A-Za-z]+FacadeServices\.[a-zA-Z]+#[A-Za-z0-9]+/g) ?? []),
+  ...new Set(apiModules.flatMap((name) =>
+    readFileSync(resolve(apiDir, name), 'utf-8').match(/facade\.[A-Za-z]+FacadeServices\.[a-zA-Z]+#[A-Za-z0-9]+/g) ?? [])),
 ]
 
 describe('API contract drift', () => {
   it('has a non-trivial committed contract and facade method map', () => {
     expect(contractMethods.size).toBeGreaterThanOrEqual(60)
+    expect(apiModules, 'the sweep must reach beyond facade.ts').toEqual(expect.arrayContaining(['facade.ts', 'authoringFacade.ts']))
     expect(facadeMethods.length).toBeGreaterThanOrEqual(55)
   })
 
@@ -32,7 +35,7 @@ describe('API contract drift', () => {
     const unknown = facadeMethods.filter((method) => !contractMethods.has(method))
     expect(
       unknown,
-      `facade.ts references methods missing from the backend contract. Either the method name ` +
+      `lib/api references methods missing from the backend contract. Either the method name ` +
         `is wrong, or the backend contract changed — refresh the committed copy with ` +
         `\`npm run sync-contract\` (regenerate first via ` +
         `./gradlew :runtime:component:darpan:generateApiContract in darpan-backend).`,

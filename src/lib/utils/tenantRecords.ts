@@ -1,3 +1,5 @@
+import { normalizeString } from './strings'
+
 interface TenantOwnedRecord {
   companyUserGroupId?: string | null
   /** DAR-BE-005: set by list#OmsRestSourceConfigs / list#ShopifyAuthConfigs / list#NsAuthConfigs /
@@ -10,19 +12,14 @@ interface TenantOwnedRecord {
   isShared?: boolean
 }
 
-function normalizeTenantId(value: string | null | undefined): string | null {
-  const normalized = value?.trim()
-  return normalized ? normalized : null
-}
-
 export function filterRecordsForActiveTenant<T extends TenantOwnedRecord>(
   records: T[],
   activeTenantUserGroupId?: string | null,
 ): T[] {
-  const activeTenantId = normalizeTenantId(activeTenantUserGroupId)
+  const activeTenantId = normalizeString(activeTenantUserGroupId)
   if (!activeTenantId) return records
 
   return records.filter(
-    (record) => record.isShared === true || normalizeTenantId(record.companyUserGroupId) === activeTenantId,
+    (record) => record.isShared === true || normalizeString(record.companyUserGroupId) === activeTenantId,
   )
 }

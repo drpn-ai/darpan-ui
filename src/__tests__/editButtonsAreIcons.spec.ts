@@ -82,7 +82,7 @@ describe('edit buttons are icons', () => {
   })
 
   it('has no text edit, change or rename button in any component', () => {
-    const files = glob(['src/**/*.vue'], { ignore: ['**/__tests__/**'] })
+    const files = glob(['src/**/*.vue'], { ignore: ['**/__tests__/**', '**/.claude/**'] })
     expect(files.length, 'nothing was swept — the glob is wrong').toBeGreaterThan(30)
 
     const offenders = files

@@ -85,6 +85,8 @@ export function reportError(error: unknown, context: ErrorContext = {}): void {
       count: 1,
     }
 
+    // Forget signatures whose window has passed, so a long session's map holds only the last 30 seconds.
+    for (const [seen, entry] of recentBySignature) if (now - entry.lastSeenAtMs >= DEDUPE_WINDOW_MS) recentBySignature.delete(seen)
     recentBySignature.set(signature, { report, lastSeenAtMs: now })
     buffer.push(report)
     if (buffer.length > MAX_BUFFERED_REPORTS) buffer.shift()

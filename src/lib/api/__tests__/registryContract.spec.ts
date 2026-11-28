@@ -242,7 +242,7 @@ describe('registry contract — exported wrapper presence', () => {
     expect(typeof rf.unsubscribeRunNotification).toBe('function')
   })
 
-  it('settingsFacade covers the tenant and LLM settings operations', () => {
+  it('settingsFacade covers the tenant, notification and connection settings operations', () => {
     const sf = settingsFacade as Record<string, unknown>
     expect(typeof sf.getTenantSettings).toBe('function')
     expect(typeof sf.saveTenantSettings).toBe('function')
