@@ -131,7 +131,7 @@
             />
           </label>
           <template #links>
-            <!-- Scoped to the username: a security key that holds no discoverable passkey, or a passkey on a phone. -->
+            <!-- The browser lists this site's passkeys (D16: discoverable-only): a security key, or a passkey on a phone. -->
             <button
               v-if="passkeysOffered"
               type="button"
@@ -625,8 +625,8 @@ function signedInName(): string {
 }
 
 /** Next on the username step. Whether the account has a passkey is never asked of the server (begin#PasskeyFirstSignIn
- *  answers a decoy for an unknown username, DAR-BE-301): only this browser's note opens the prompt (DAR-UI-132), so a
- *  new device, or another person on this one, gets the password. */
+ *  takes no username, D16): only this browser's note opens the prompt (DAR-UI-132), so a new device, or another person
+ *  on this one, gets the password. */
 function submitUsername(): void {
   if (loading.value) return
   localError.value = null
@@ -713,21 +713,19 @@ function leavePasskeyPrompt(): void {
 }
 
 // DAR-UI-132: Safari opens the passkey prompt only inside a click, and a click that first waits on begin#PasskeyFirstSignIn
-// has spent it. So options for the one name the note says has a passkey are begun ahead (as Welcome back shows, and as
-// the username field is left holding that name), held, and begun again before their 300 s run out. One name at a time;
-// begins are rate-limited (10 a minute an address), so a name already held or on its way is not begun again.
+// has spent it. So options are begun ahead where the note says a passkey proved that name here (as Welcome back shows,
+// and as the username field is left holding that name), held, and begun again before their 300 s run out. The options
+// name no account (D16: discoverable-only), so one set serves any name; begins are rate-limited (10 a minute an
+// address), so a set held or on its way is not begun again.
 const PREBEGIN_MARGIN_MS = 30_000
-let prebegun: { name: string; pending: Promise<PasskeyFirstBeginOutcome>; begun: PasskeyFirstBeginOutcome | null } | null = null
+type HeldOptions = { pending: Promise<PasskeyFirstBeginOutcome>; begun: PasskeyFirstBeginOutcome | null }
+let prebegun: HeldOptions | null = null
 let prebeginRenewal: ReturnType<typeof setTimeout> | null = null
 
-const nameKey = (name: string) => name.trim().toLowerCase()
-
-function prebegin(who: string): void {
-  const name = nameKey(who)
-  if (!passkeysOffered || !name || prebegun?.name === name) return
-  dropPrebegun()
-  const pending = authStore.beginPasskeyFirstSignIn(who)
-  const held: NonNullable<typeof prebegun> = { name, pending, begun: null }
+function prebegin(): void {
+  if (!passkeysOffered || prebegun) return
+  const pending = authStore.beginPasskeyFirstSignIn()
+  const held: HeldOptions = { pending, begun: null }
   prebegun = held
   void pending.then((begun) => {
     if (prebegun !== held) return
@@ -739,14 +737,14 @@ function prebegin(who: string): void {
     const lifeMs = (begun.expiresInSeconds ?? 300) * 1000
     prebeginRenewal = setTimeout(() => {
       dropPrebegun()
-      prebegin(who)
+      prebegin()
     }, Math.max(0, lifeMs - PREBEGIN_MARGIN_MS))
   })
 }
 
-/** The options begun ahead for `who`, taken (each challenge is used once): in hand, on their way, or null. */
-function takePrebegun(who: string): { begun: PasskeyFirstBeginOutcome | null; pending: Promise<PasskeyFirstBeginOutcome> } | null {
-  const held = prebegun?.name === nameKey(who) ? prebegun : null
+/** The options begun ahead, taken (each challenge is used once): in hand, on their way, or null. */
+function takePrebegun(): HeldOptions | null {
+  const held = prebegun
   dropPrebegun()
   return held
 }
@@ -758,10 +756,10 @@ function dropPrebegun(): void {
 }
 
 function prebeginTyped(): void {
-  if (passkeysOffered && passkeyKeptFor(username.value)) prebegin(username.value)
+  if (passkeyKeptFor(username.value)) prebegin()
 }
 
-/** The browser's passkey prompt, scoped to the username typed (a security key with no discoverable passkey needs that).
+/** The browser's passkey prompt over this site's passkeys (D16: discoverable-only; the browser lists what it holds).
  *  The password is never read. From the passkey step any way it fails goes to the password quietly; from the password
  *  step's link a failure says why. Either way the note now says password: the passkey did not prove them here. */
 async function signInWithPasskey(): Promise<void> {
@@ -770,7 +768,7 @@ async function signInWithPasskey(): Promise<void> {
   stopAutofill()
   const who = username.value
   const step = signInStep.value
-  const scoped = step === 'passkey'
+  const fromPasskeyStep = step === 'passkey'
   const controller = new AbortController()
   passkeyPrompt = controller
   // Left by Back or Use password instead while it ran: however it ends is not said.
@@ -779,12 +777,12 @@ async function signInWithPasskey(): Promise<void> {
   localError.value = null
   try {
     // Options in hand open the prompt with no wait between the click and it.
-    const held = takePrebegun(who)
-    const begun = held?.begun ?? (await (held?.pending ?? authStore.beginPasskeyFirstSignIn(who)))
+    const held = takePrebegun()
+    const begun = held?.begun ?? (await (held?.pending ?? authStore.beginPasskeyFirstSignIn()))
     if (left()) return
     if (begun.outcome !== 'begun') {
       // Nothing was asked of the passkey, so the note stays.
-      if (scoped) passkeyUnavailable()
+      if (fromPasskeyStep) passkeyUnavailable()
       else localError.value = begun.message
       return
     }
@@ -792,11 +790,11 @@ async function signInWithPasskey(): Promise<void> {
     if (left()) return
     if (asserted.outcome !== 'ok') {
       keepAccount(who, 'password')
-      if (scoped) passkeyUnavailable()
+      if (fromPasskeyStep) passkeyUnavailable()
       else if (asserted.outcome === 'failed') localError.value = asserted.message
       return
     }
-    await finishPasskeySignIn(begun.challengeToken, asserted.json, who, scoped)
+    await finishPasskeySignIn(begun.challengeToken, asserted.json, who, fromPasskeyStep)
   } finally {
     if (passkeyPrompt === controller) {
       passkeyPrompt = null
@@ -805,9 +803,9 @@ async function signInWithPasskey(): Promise<void> {
   }
 }
 
-/** Every passkey-first sign-in ends here. `typed` is the username the prompt was scoped to; the autofill has none.
- *  True when signed in. */
-async function finishPasskeySignIn(challengeToken: string, assertion: string, typed: string | null, scoped = false): Promise<boolean> {
+/** Every passkey-first sign-in ends here. `typed` is the username on the card when the prompt opened; the autofill has
+ *  none. True when signed in. */
+async function finishPasskeySignIn(challengeToken: string, assertion: string, typed: string | null, fromPasskeyStep = false): Promise<boolean> {
   const finished = await authStore.finishPasskeyFirstSignIn(challengeToken, assertion)
   if (finished.outcome === 'signedIn') {
     const who = authStore.username || typed
@@ -826,7 +824,7 @@ async function finishPasskeySignIn(challengeToken: string, assertion: string, ty
   if (typed && finished.reason === 'PASSKEY_REFUSED') {
     // Not that account's passkey (or not one at all): the password, here and next time.
     keepAccount(typed, 'password')
-    if (scoped) {
+    if (fromPasskeyStep) {
       passkeyUnavailable()
       return false
     }
@@ -856,7 +854,7 @@ async function startAutofill(): Promise<void> {
   autofill = controller
   if (!(await conditionalMediationAvailable()) || controller.signal.aborted) return
   autofillRenewal = setTimeout(() => { void startAutofill() }, AUTOFILL_RENEW_MS)
-  const begun = await authStore.beginPasskeyFirstSignIn('')
+  const begun = await authStore.beginPasskeyFirstSignIn()
   if (begun.outcome !== 'begun' || controller.signal.aborted) return
   const asserted = await getPasskeyAssertion(begun.publicKeyOptions, controller.signal, 'conditional')
   if (asserted.outcome !== 'ok' || controller.signal.aborted) return
@@ -885,7 +883,7 @@ watch(
 )
 onMounted(() => {
   if (showsUsernameStep.value) void startAutofill()
-  if (signInStep.value === 'welcome' && kept && welcomeByPasskey) prebegin(kept.username)
+  if (signInStep.value === 'welcome' && kept && welcomeByPasskey) prebegin()
 })
 onBeforeUnmount(() => {
   stopAutofill()

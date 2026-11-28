@@ -1,5 +1,5 @@
-// DAR-UI-132: the device note. The server never says whether an account has a passkey (begin#PasskeyFirstSignIn
-// answers a decoy for an unknown username, DAR-BE-301), and a website cannot see which passkeys a device holds, so this
+// DAR-UI-132: the device note. The server never says whether an account has a passkey (begin#PasskeyFirstSignIn takes
+// no username and names no credentials, D16), and a website cannot see which passkeys a device holds, so this
 // browser keeps one account: its username in plain text and how it last proved that person here. The sign-in page opens
 // on "Welcome back." for it, and goes to the passkey only when the note says a passkey proved them on this browser.
 // Anything that fails (blocked storage, a value from elsewhere) reads as no note: a new device.

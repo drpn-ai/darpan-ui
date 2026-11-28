@@ -569,11 +569,12 @@ export const useAuthStore = defineStore('auth', () => {
     return _twoFactorCall(challenge, () => authFacade.beginPasskeySignIn({ challengeToken: challenge.token }), passkeyOptionsOf, PASSKEY_REFUSAL_TEXT)
   }
 
-  /** DAR-BE-301 begin#PasskeyFirstSignIn: options for signing in with a passkey alone. No challenge yet: the reply
-   *  carries its own token, held by the caller until finish. */
-  async function beginPasskeyFirstSignIn(usernameTyped: string): Promise<PasskeyFirstBeginOutcome> {
+  /** DAR-BE-301 begin#PasskeyFirstSignIn: options for signing in with a passkey alone. Discoverable-only (D16): no
+   *  username is sent and the options list no credentials, so the browser offers the passkeys it holds for this site.
+   *  No challenge yet: the reply carries its own token, held by the caller until finish. */
+  async function beginPasskeyFirstSignIn(): Promise<PasskeyFirstBeginOutcome> {
     try {
-      const reply = await authFacade.beginPasskeyFirstSignIn(usernameTyped.trim() ? { username: usernameTyped.trim() } : {})
+      const reply = await authFacade.beginPasskeyFirstSignIn({})
       const begun = passkeyOptionsOf(reply)
       const challengeToken = reply.challengeToken?.toString()?.trim()
       if (begun && begun.outcome === 'begun' && challengeToken) return { ...begun, challengeToken }

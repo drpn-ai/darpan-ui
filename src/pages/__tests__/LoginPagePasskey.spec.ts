@@ -567,7 +567,8 @@ describe('LoginPage passkeys', () => {
 
       expect(wrapper.text()).toContain('Password for ada?')
       expect(modalCalls(webauthn)).toHaveLength(0)
-      expect(beginPasskeyFirstSignIn).not.toHaveBeenCalledWith({ username: 'ada' })
+      // Only the arrival begin for grace's Welcome back: nothing more is begun for ada.
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledTimes(1)
     })
 
     it('Welcome back, passkey: begun on arrival, so the row opens the prompt with no begin of its own, and signs in', async () => {
@@ -580,7 +581,8 @@ describe('LoginPage passkeys', () => {
       expect(wrapper.get('[data-testid="login-welcome-method"]').text()).toBe('Passkey')
       expect(wrapper.get('[data-testid="login-welcome-row"]').attributes('aria-label')).toBe('Sign in with your passkey')
       expect(beginPasskeyFirstSignIn).toHaveBeenCalledTimes(1)
-      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({ username: 'ada' })
+      // D16: discoverable-only, so no username is ever sent; the browser offers the passkeys it holds.
+      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({})
       expect(webauthn?.get).not.toHaveBeenCalled()
 
       // Safari's click window: the prompt is asked for in the same turn as the click.
@@ -642,7 +644,7 @@ describe('LoginPage passkeys', () => {
       await wrapper.get('#login-username').setValue('ada ')
       await wrapper.get('#login-username').trigger('blur')
       await settle()
-      expect(beginPasskeyFirstSignIn).toHaveBeenLastCalledWith({ username: 'ada' })
+      expect(beginPasskeyFirstSignIn).toHaveBeenLastCalledWith({})
       // Left again with the same name: already held, not begun twice.
       await wrapper.get('#login-username').trigger('blur')
       await click(wrapper, 'login-username-next')
@@ -731,7 +733,7 @@ describe('LoginPage passkeys', () => {
       wrapper.unmount()
     })
 
-    it('the password step\'s link runs the prompt for that username; a close says nothing, a failure says why', async () => {
+    it('the password step\'s link runs the passkey prompt; a close says nothing, a failure says why', async () => {
       finishPasskeyFirstSignIn.mockResolvedValue(signedIn('key-link'))
       webauthn?.get.mockRejectedValueOnce(notAllowed()).mockRejectedValueOnce(new DOMException('x', 'SecurityError'))
       const wrapper = mount(LoginPage)
@@ -744,7 +746,7 @@ describe('LoginPage passkeys', () => {
       expect(wrapper.text()).toContain("Passkeys don't work on this address.")
 
       await click(wrapper, 'login-use-passkey')
-      expect(beginPasskeyFirstSignIn).toHaveBeenCalledWith({ username: 'ada' })
+      expect(beginPasskeyFirstSignIn.mock.calls).toEqual([[{}], [{}], [{}]])
       expect(loginSession).not.toHaveBeenCalled()
       expect(getAuthToken()).toBe('key-link')
       expect(keptAccount()).toEqual({ username: 'ada', method: 'passkey' })
