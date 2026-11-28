@@ -1724,15 +1724,11 @@ onBeforeUnmount(() => {
   stroke: var(--text);
 }
 
-/* Fainter than a draft line: this one is not being drawn by anybody, it is showing what to draw. */
+/* Fainter than a draft line: this one is not being drawn by anybody, it is showing what to draw. It stays still:
+   motion confirms, never decorates (Aditi 2026-11-28 retired the crawl). */
 .ruleset-editor-line--ghost {
   stroke-dasharray: 7 7;
   stroke: color-mix(in oklab, var(--text) 34%, transparent);
-  animation: ruleset-ghost-crawl 1.5s linear infinite;
-}
-
-@keyframes ruleset-ghost-crawl {
-  to { stroke-dashoffset: -28; }
 }
 
 /* Bare text under the line, not a bordered box centred on it. A box with a background sat exactly
@@ -1750,12 +1746,6 @@ onBeforeUnmount(() => {
   text-align: center;
   max-width: min(15rem, 90%);
   pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ruleset-editor-line--ghost {
-    animation: none;
-  }
 }
 
 .ruleset-field-column {

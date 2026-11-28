@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 
@@ -417,5 +419,17 @@ describe('RuleSetBoard rule names', () => {
 
     expect(ruleById('r1')?.ruleName).toBe('')
     expect(ruleById('r3')).not.toHaveProperty('ruleName')
+  })
+})
+
+// Aditi 2026-11-28 (DAR-OPS-029 U08): the ghost rule is a still dashed line. Motion confirms, never decorates, so the
+// board runs no animation of its own; its transitions answer hover and selection only.
+describe('RuleSetBoard motion', () => {
+  it('runs no animation and defines no keyframes', () => {
+    const source = readFileSync(resolve(__dirname, '../RuleSetBoard.vue'), 'utf8')
+    const style = source.slice(source.indexOf('<style'))
+    expect(style).not.toMatch(/(?<![\w-])animation(-name)?\s*:/)
+    expect(style).not.toMatch(/@keyframes\b/)
+    expect(style).toMatch(/\.ruleset-editor-line--ghost\s*\{[^}]*stroke-dasharray/)
   })
 })
