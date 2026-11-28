@@ -63,7 +63,8 @@
         </div>
         <dl class="run-history-metrics run-history-metrics--featured">
           <div>
-            <dt>{{ isSingleSidedOutput(featuredOutput) ? 'Findings' : 'Total differences' }}</dt>
+            <dt v-if="isSingleSidedOutput(featuredOutput)">Findings</dt>
+            <dt v-else>Total differences</dt>
             <dd>{{ featuredOutput.totalDifferences ?? 0 }}</dd>
           </div>
           <!-- A single-sided run has no second system: its findings sit in totalDifferences and BOTH
@@ -106,7 +107,8 @@
           </div>
           <dl class="run-history-metrics">
             <div>
-              <dt>{{ isSingleSidedOutput(output) ? 'Findings' : 'Total differences' }}</dt>
+              <dt v-if="isSingleSidedOutput(output)">Findings</dt>
+              <dt v-else>Total differences</dt>
               <dd>{{ output.totalDifferences ?? 0 }}</dd>
             </div>
             <template v-if="!isSingleSidedOutput(output)">

@@ -109,7 +109,8 @@
               </div>
               <dl class="reconciliation-run-history-card__metrics">
                 <div>
-                  <dt>{{ latestSavedOutputSingleSided ? 'Findings' : 'Total differences' }}</dt>
+                  <dt v-if="latestSavedOutputSingleSided">Findings</dt>
+                  <dt v-else>Total differences</dt>
                   <dd>{{ latestSavedOutput.totalDifferences ?? 0 }}</dd>
                 </div>
                 <!-- A single-sided run has no second system and writes neither Missing count: one population, one figure. -->
