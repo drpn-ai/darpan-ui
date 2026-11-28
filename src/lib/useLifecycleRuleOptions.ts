@@ -1,3 +1,4 @@
+import { errorMessage } from './api/client'
 import { reactive, ref } from 'vue'
 import { reconciliationFacade } from './api/facade'
 import { lifecycleRuleFields } from './api/queries'
@@ -78,7 +79,7 @@ export function useLifecycleRuleOptions(scope?: Scope) {
   const error = ref<string | null>(null)
   let fieldsFor = ''
 
-  function message(caught: unknown) { return caught instanceof Error ? caught.message : String(caught) }
+  function message(caught: unknown) { return errorMessage(caught, 'Could not read this account. Try again.') }
 
   async function loadFields(source: LifecycleRuleSource) {
     const key = `${source.nsAuthConfigId}/${source.recordType}`

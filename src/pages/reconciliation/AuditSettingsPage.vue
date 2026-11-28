@@ -409,6 +409,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../../lib/api/client'
 import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -624,7 +625,7 @@ const abort = new AbortController()
 const auditRoute = computed(() => ({ name: 'audit-report', params: { audit: auditCode.value }, query: auditMorningQuery(route.query) }))
 
 function message(caught: unknown): string {
-  return caught instanceof Error ? caught.message : String(caught)
+  return errorMessage(caught, 'Something went wrong. Try again.')
 }
 
 function show(next: AuditSettings) {

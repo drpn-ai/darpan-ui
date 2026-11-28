@@ -6,6 +6,7 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push }), useRoute: () => ({ q
 vi.mock('../../../lib/api/facade', () => ({ auditFacade: { createAudit: vi.fn() } }))
 
 import { auditFacade } from '../../../lib/api/facade'
+import { ApiCallError } from '../../../lib/api/client'
 import AuditCreatePage from '../AuditCreatePage.vue'
 
 const f = vi.mocked(auditFacade)
@@ -34,7 +35,7 @@ describe('AuditCreatePage', () => {
   })
 
   it('takes a refused name back to the name step, says why there, and clears it on the next keystroke', async () => {
-    f.createAudit.mockRejectedValue(new Error('There is already an audit by that name.'))
+    f.createAudit.mockRejectedValue(new ApiCallError('There is already an audit by that name.'))
     const w = mount(AuditCreatePage)
     await w.get('[data-testid="audit-create-name"]').setValue('Month close')
     await form(w).vm.$emit('submit')
@@ -45,6 +46,17 @@ describe('AuditCreatePage', () => {
     expect(push).not.toHaveBeenCalled()
     await w.get('[data-testid="audit-create-name"]').setValue('Month close 2')
     expect(w.find('[data-testid="audit-create-error"]').exists()).toBe(false)
+  })
+
+  // S99-105: a script error showed its raw text; it is the page's own line now.
+  it('says its own line, never a raw script error, when create breaks', async () => {
+    f.createAudit.mockRejectedValue(new TypeError("Cannot read properties of undefined (reading 'audit')"))
+    const w = mount(AuditCreatePage)
+    await w.get('[data-testid="audit-create-name"]').setValue('Month close')
+    await form(w).vm.$emit('submit')
+    await form(w).vm.$emit('submit')
+    await flushPromises()
+    expect(w.get('[data-testid="audit-create-error"]').text()).toBe('The audit was not made.')
   })
 
   it('goes back to the run types from the name, and back to the name from the period', async () => {

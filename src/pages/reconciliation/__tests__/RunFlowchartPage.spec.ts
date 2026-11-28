@@ -20,6 +20,7 @@ import { reconciliationFacade, settingsFacade } from '../../../lib/api/facade'
 import RunFlowchartPage from '../RunFlowchartPage.vue'
 import { clearStoredReads, invalidateReadCache, setReadCacheScope } from '../../../lib/api/readCache'
 import { installLocalStorageStub } from '../../../test/localStorage'
+import { ApiCallError } from '../../../lib/api/client'
 
 const f = vi.mocked(reconciliationFacade)
 const run = { reconciliationId: 'R1', reconciliationName: 'Order chain', defaultTimeWindow: '3d' }
@@ -93,7 +94,7 @@ describe('RunFlowchartPage', () => {
   })
 
   it('a refused save shows the reason and keeps the editor open', async () => {
-    f.saveReconciliationQuestion.mockRejectedValue(new Error('Question B builds its key differently.'))
+    f.saveReconciliationQuestion.mockRejectedValue(new ApiCallError('Question B builds its key differently.'))
     const w = mount(RunFlowchartPage)
     await flushPromises()
     await w.get('[data-testid="flowchart-add-why-A"]').trigger('click')
@@ -104,7 +105,7 @@ describe('RunFlowchartPage', () => {
   })
 
   it('a refused delete leaves the chart as it was', async () => {
-    f.deleteReconciliationQuestion.mockRejectedValue(new Error('Remove the questions under it first.'))
+    f.deleteReconciliationQuestion.mockRejectedValue(new ApiCallError('Remove the questions under it first.'))
     const w = mount(RunFlowchartPage)
     await flushPromises()
     await w.get('[data-testid="flowchart-box-A"]').trigger('click')

@@ -64,6 +64,7 @@ vi.mock('../../lib/api/facade', () => ({
 
 import HomePage from '../HomePage.vue'
 import { invalidateReadCache } from '../../lib/api/readCache'
+import { ApiCallError } from '../../lib/api/client'
 
 const GROUP = '[data-testid="run-group-oms-shopify"]'
 const GROUP_MORE = '[data-testid="run-group-oms-shopify-more"]'
@@ -542,7 +543,7 @@ describe('HomePage', () => {
 
     it('a refused import shows why', async () => {
       listSavedRuns.mockResolvedValue({ pinnedSavedRunIds: [], savedRuns: [netsuiteCheck()] })
-      importNetSuiteChecksAsRuns.mockRejectedValue(new Error('Your active tenant only has view access for runs.'))
+      importNetSuiteChecksAsRuns.mockRejectedValue(new ApiCallError('Your active tenant only has view access for runs.'))
       const wrapper = mount(HomePage)
       await flushPromises()
       await wrapper.get('[data-testid="dashboard-import-netsuite-checks"]').trigger('click')

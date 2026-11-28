@@ -1,6 +1,6 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { WorkflowShortcutChoiceOption } from '../components/workflow/WorkflowShortcutChoiceCards.vue'
-import { ApiCallError } from '../lib/api/client'
+import { ApiCallError, refusedResult } from '../lib/api/client'
 import { reconciliationFacade, settingsFacade } from '../lib/api/facade'
 import type { GetReconciliationRunStatusResponse, TenantChatSpace } from '../lib/api/types'
 import { isActiveRunStatus } from '../stores/runResults'
@@ -31,9 +31,7 @@ export interface UseRunNotifyMe {
 // so the backend's needsDefaultChatSpace signal (sent alongside ok:false) can only be read off the thrown error's
 // details.result.
 function readNeedsDefaultChatSpace(error: unknown): boolean {
-  if (!(error instanceof ApiCallError)) return false
-  const details = (error.details ?? {}) as { result?: { needsDefaultChatSpace?: unknown } }
-  return details.result?.needsDefaultChatSpace === true
+  return refusedResult<{ needsDefaultChatSpace?: unknown }>(error)?.needsDefaultChatSpace === true
 }
 
 /**

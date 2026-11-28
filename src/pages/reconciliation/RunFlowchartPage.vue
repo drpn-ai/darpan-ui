@@ -232,6 +232,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../../lib/api/client'
 import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
@@ -488,7 +489,7 @@ const summary = computed(() => {
   }
 })
 
-function message(error: unknown): string { return error instanceof Error ? error.message : String(error) }
+function message(error: unknown): string { return errorMessage(error, 'Something went wrong. Try again.') }
 
 // Delete takes the run off Home for good: it is archived (and turned off), never removed, so its results stay.
 const deleting = ref(false)

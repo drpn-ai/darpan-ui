@@ -86,6 +86,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../../lib/api/client'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -136,7 +137,7 @@ const progress = computed(() => ({ account: 0, records: 25, stages: 50, late: 75
 function backToTypeChoice() { void router.push({ name: 'run-create' }) }
 function backFromRecords() { if (skippedAccount.value) backToTypeChoice(); else step.value = 'account' }
 function cancel() { void router.push({ name: 'hub' }) }
-function message(caught: unknown) { return caught instanceof Error ? caught.message : String(caught) }
+function message(caught: unknown) { return errorMessage(caught, 'Something went wrong. Try again.') }
 
 async function goToRecords() {
   error.value = null

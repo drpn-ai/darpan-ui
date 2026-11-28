@@ -10,6 +10,7 @@ vi.mock('../../../lib/api/facade', () => ({
 
 import { reconciliationFacade, settingsFacade } from '../../../lib/api/facade'
 import RunFlowchartCreatePage from '../RunFlowchartCreatePage.vue'
+import { ApiCallError } from '../../../lib/api/client'
 
 const f = vi.mocked(reconciliationFacade)
 const settings = vi.mocked(settingsFacade)
@@ -127,7 +128,7 @@ describe('RunFlowchartCreatePage (lifecycle builder)', () => {
   })
 
   it('shows the backend refusal in place', async () => {
-    f.getLifecycleOptions.mockRejectedValue(new Error("Could not read NetSuite account 'gorjana_prod': NetSuite token endpoint returned 500."))
+    f.getLifecycleOptions.mockRejectedValue(new ApiCallError("Could not read NetSuite account 'gorjana_prod': NetSuite token endpoint returned 500."))
     const w = mount(RunFlowchartCreatePage)
     await flushPromises()
     expect(w.text()).toContain('NetSuite token endpoint returned 500')

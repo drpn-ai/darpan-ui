@@ -270,6 +270,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../../lib/api/client'
 import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -504,7 +505,7 @@ function removeException(exception: LifecycleStageException) {
 }
 
 function back() { void router.push({ name: 'reconciliation-run-flowchart', params: { reconciliationId: reconciliationId.value } }) }
-function message(caught: unknown) { return caught instanceof Error ? caught.message : String(caught) }
+function message(caught: unknown) { return errorMessage(caught, 'Something went wrong. Try again.') }
 const same = (a: { fieldId: string; value: string }, b: { fieldId: string; value: string }) => a.fieldId === b.fieldId && a.value === b.value
 const sameException = (a: LifecycleStageException, b: LifecycleStageException) =>
   a.stageRecordType === b.stageRecordType && a.fieldId === b.fieldId && a.value === b.value

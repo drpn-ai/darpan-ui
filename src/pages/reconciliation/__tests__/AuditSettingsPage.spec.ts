@@ -36,6 +36,7 @@ import { buildSavedRunEditorRoute, resolveSavedRunEditorTarget } from '../../../
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../../lib/uiEvents'
 import type { AuditSettings } from '../../../lib/api/auditTypes'
 import AuditSettingsPage from '../AuditSettingsPage.vue'
+import { ApiCallError } from '../../../lib/api/client'
 
 const f = vi.mocked(auditFacade)
 const back = { name: 'audit-report', params: { audit: 'month-close' }, query: { period: '2026-09' } }
@@ -173,7 +174,7 @@ describe('AuditSettingsPage', () => {
   })
 
   it('shows a refused rename on the page and keeps the saved name', async () => {
-    f.saveAuditSettings.mockRejectedValue(new Error('Your active tenant only has view access for audit changes.'))
+    f.saveAuditSettings.mockRejectedValue(new ApiCallError('Your active tenant only has view access for audit changes.'))
     const w = await mountPage()
     const title = get(w, 'audit-settings-name')
     await title.trigger('focus')
@@ -443,7 +444,7 @@ describe('AuditSettingsPage', () => {
   })
 
   it('says so when the audit cannot be read', async () => {
-    f.getAuditSettings.mockRejectedValue(new Error('Audit month-close was not found'))
+    f.getAuditSettings.mockRejectedValue(new ApiCallError('Audit month-close was not found'))
     const w = await mountPage()
     expect(get(w, 'audit-settings-error').text()).toBe('Audit month-close was not found')
     expect(has(w, 'audit-settings-facts')).toBe(false)
@@ -532,7 +533,7 @@ describe('AuditSettingsPage after each run', () => {
   })
 
   it('takes back an address the backend refuses and names it on the page', async () => {
-    f.saveAuditSettings.mockRejectedValue(new Error('Not an email address: cfo@gorjana.con'))
+    f.saveAuditSettings.mockRejectedValue(new ApiCallError('Not an email address: cfo@gorjana.con'))
     const w = await mountPage()
     await click(w, 'audit-settings-fact-after-run')
     await address(w).setValue('cfo@gorjana.con')
@@ -794,7 +795,7 @@ describe('AuditSettingsPage priorities', () => {
 
   // DAR-UI-156: back in the statement's popup at once; a refusal puts the level back and says why there.
   it('aRefusedReasonLevelGoesBackAndSaysWhyInTheStatementPopup', async () => {
-    f.saveAuditSettings.mockRejectedValue(new Error('Reason CONC_X closes on every check of R5, so it takes no level.'))
+    f.saveAuditSettings.mockRejectedValue(new ApiCallError('Reason CONC_X closes on every check of R5, so it takes no level.'))
     const w = await mountPage()
     await click(w, 'audit-settings-statement-open-R5')
     await click(w, 'audit-settings-reason-priority-CONC_X')
@@ -931,7 +932,7 @@ describe('AuditSettingsPage saves behind the screen', () => {
   })
 
   it('puts a refused switch back and says why on the page', async () => {
-    f.saveAuditSettings.mockRejectedValue(new Error('Your active tenant only has view access for audit changes.'))
+    f.saveAuditSettings.mockRejectedValue(new ApiCallError('Your active tenant only has view access for audit changes.'))
     const w = await mountPage()
     await click(w, 'audit-settings-schedule-active')
     expect(get(w, 'audit-settings-schedule-active').attributes('aria-checked')).toBe('true')

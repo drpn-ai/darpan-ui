@@ -234,7 +234,7 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import AppTableFrame from '../../components/ui/AppTableFrame.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
-import { ApiCallError, isAbortError, serviceErrors } from '../../lib/api/client'
+import { isAbortError, refusedResult, serviceErrors } from '../../lib/api/client'
 import { netSuiteQueryFacade } from '../../lib/api/authoringFacade'
 import type {
   NsMatchOp,
@@ -588,8 +588,8 @@ async function runPreview(): Promise<void> {
     if (isAbortError(previewError)) return
     previewErrors.value = serviceErrors(previewError, 'Preview failed.')
     // NetSuite refusing the query still answers the SuiteQL that was sent, which is what explains the refusal.
-    const refused = (previewError as ApiCallError)?.details as { result?: { preview?: NsSuiteQlQueryPreview } } | undefined
-    if (refused?.result?.preview?.sql) preview.value = { ...refused.result.preview, records: [], more: false }
+    const refused = refusedResult<{ preview?: NsSuiteQlQueryPreview }>(previewError)
+    if (refused?.preview?.sql) preview.value = { ...refused.preview, records: [], more: false }
   } finally {
     previewing.value = false
   }

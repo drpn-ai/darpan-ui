@@ -26,6 +26,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../../lib/api/client'
 import { computed, onMounted, ref } from 'vue'
 import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
 import { useRoute, useRouter } from 'vue-router'
@@ -111,7 +112,7 @@ async function start() {
     await router.replace({ name: 'reconciliation-run-flowchart', params: { reconciliationId: reconciliationId.value, reconciliationExecutionId },
       state: { startedRun: reconciliationExecutionId } })
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught)
+    error.value = errorMessage(caught, 'The workflow did not start. Try again.')
     starting.value = false
   }
 }
@@ -124,7 +125,7 @@ onMounted(async () => {
   try {
     await cachedRead(chart.key, chart.fetch, ({ got }) => { run.value = got.reconciliation })
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught)
+    error.value = errorMessage(caught, 'Could not load the workflow.')
   }
 })
 </script>

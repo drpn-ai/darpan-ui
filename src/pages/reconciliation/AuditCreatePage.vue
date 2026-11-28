@@ -44,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+import { errorMessage } from '../../lib/api/client'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -90,7 +91,7 @@ async function create() {
     }
     await router.push({ name: 'audit-settings', params: { audit } })
   } catch (caught) {
-    refused(caught instanceof Error ? caught.message : String(caught))
+    refused(errorMessage(caught, 'The audit was not made.'))
   } finally {
     saving.value = false
   }

@@ -116,7 +116,7 @@ import InlineValidation from '../components/ui/InlineValidation.vue'
 import { useAuthStore, buildAuthRedirect } from '../stores/auth'
 import { useReconciliationDraftStore } from '../stores/reconciliationDraft'
 import { usePermissionsStore } from '../stores/permissions'
-import { isAbortError } from '../lib/api/client'
+import { errorMessage, isAbortError } from '../lib/api/client'
 import { auditFacade, reconciliationFacade } from '../lib/api/facade'
 import { cachedRead } from '../lib/api/readCache'
 import { homeReconciliations, homeSavedRuns } from '../lib/api/queries'
@@ -416,7 +416,7 @@ async function importNetSuiteChecks(): Promise<void> {
     await loadLifecycleRuns()
   } catch (error) {
     if (isAbortError(error)) return
-    importError.value = error instanceof Error ? error.message : String(error)
+    importError.value = errorMessage(error, 'The import did not finish. Try again.')
   } finally {
     importing.value = false
   }
