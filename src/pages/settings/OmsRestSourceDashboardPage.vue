@@ -22,6 +22,8 @@
     ]"
     :edit-route="{ name: 'settings-oms-edit', params: { omsRestSourceConfigId: configId } }"
     edit-aria-label="Edit HotWax Auth"
+    delete-aria-label="Delete HotWax source"
+    back-aria-label="Back to HotWax Settings"
     :remove="(omsRestSourceConfigId) => settingsFacade.deleteOmsRestSourceConfig({ omsRestSourceConfigId })"
     delete-failed-message="The HotWax source refuses to leave. Still here."
     diagnostics-system-enum-id="OMS_GQL"

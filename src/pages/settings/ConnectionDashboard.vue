@@ -60,7 +60,7 @@
           :to="listPath"
           class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
           :data-testid="testIds.back"
-          :aria-label="`Back to ${system} Settings`"
+          :aria-label="backAriaLabel"
         >
           <AppIcon name="back" />
         </RouterLink>
@@ -83,7 +83,7 @@
           type="button"
           class="app-icon-action app-icon-action--large app-icon-action--danger settings-dashboard-footer-action"
           :data-testid="testIds.delete"
-          :aria-label="`Delete ${deleteNoun}`"
+          :aria-label="deleteAriaLabel"
           :disabled="deleting"
           @click="deleteRecord"
         >
@@ -140,12 +140,19 @@ export interface ConnectionFact {
  * the shared catalog tiles (endpointList) or the page's own #endpoints slot.
  */
 const props = defineProps<{
-  /** The system's name: the title before the record loads, and the back link's "Back to … Settings". */
+  /** The system's name: the title before the record loads. */
   system: string
   /** What the record is called while loading and when it is missing, e.g. "Shopify config". */
   noun: string
-  /** What delete calls it, e.g. "Shopify config" in "Delete Shopify config". */
+  /** What the delete confirmation calls it, e.g. "Shopify config". */
   deleteNoun: string
+  /**
+   * The three buttons' names, written as literals by each page so the mascot guard (mascotActions.spec WRAPPERS)
+   * checks every one has an answer.
+   */
+  editAriaLabel: string
+  deleteAriaLabel: string
+  backAriaLabel: string
   listPath: string
   configId: string
   /** The cached read the record comes from, and how its rows are listed; the active tenant's row with this id wins. */
@@ -155,7 +162,6 @@ const props = defineProps<{
   loadFailedMessage: string
   facts: (record: T) => ConnectionFact[]
   editRoute: RouteLocationRaw
-  editAriaLabel: string
   remove: (configId: string) => Promise<unknown>
   deleteFailedMessage: string
   /** A SourceSystemConnector id whose health check probes this record. */

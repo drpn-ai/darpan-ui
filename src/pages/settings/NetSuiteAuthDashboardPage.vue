@@ -17,6 +17,8 @@
     :facts="facts"
     :edit-route="{ name: 'settings-netsuite-auth-edit', params: { nsAuthConfigId: configId } }"
     edit-aria-label="Edit NetSuite Auth"
+    delete-aria-label="Delete NetSuite auth profile"
+    back-aria-label="Back to NetSuite Settings"
     :remove="(nsAuthConfigId) => settingsFacade.deleteNsAuthConfig({ nsAuthConfigId })"
     delete-failed-message="The NetSuite auth profile clung to the doorframe. Still here."
     diagnostics-system-enum-id="NETSUITE"

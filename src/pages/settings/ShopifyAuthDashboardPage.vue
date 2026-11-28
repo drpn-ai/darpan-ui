@@ -24,6 +24,8 @@
     ]"
     :edit-route="{ name: 'settings-shopify-edit', params: { shopifyAuthConfigId: configId } }"
     edit-aria-label="Edit Shopify Config"
+    delete-aria-label="Delete Shopify config"
+    back-aria-label="Back to Shopify Settings"
     :remove="(shopifyAuthConfigId) => settingsFacade.deleteShopifyAuthConfig({ shopifyAuthConfigId })"
     delete-failed-message="The Shopify config would not check out. Still here."
     diagnostics-system-enum-id="SHOPIFY"

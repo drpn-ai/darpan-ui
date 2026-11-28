@@ -130,6 +130,7 @@ describe('every button in the app has an answer', () => {
    * somebody decides which kind it is.
    */
   const COMPUTED_NAMES: Readonly<Record<string, string>> = {
+    'pages/settings/ConnectionDashboard.vue': 'edit/delete/back names are props; each page\'s literal names are swept with the wrappers below (DAR-OPS-029 U11)',
     'components/ui/AppCancelAction.vue': "label prop, default 'Cancel' — the entry answers it",
     'components/ui/AppSaveAction.vue': "label prop, default 'Save'; callers pass Save rule / Save exclusion",
     'components/ui/AppToggleSwitch.vue': 'label prop; the automation running/paused pair is entered',
@@ -336,9 +337,12 @@ describe('every button in the app has an answer', () => {
     return answered
   }
 
-  const WRAPPERS: Readonly<Record<string, string | null>> = { AppSaveAction: 'Save', AppCancelAction: 'Cancel', AppToggleSwitch: null, StaticRecordTitle: null, AuditPopover: null }
-  /** The prop each wrapper names its button by: the settings-page title (DAR-UI-126) names its switch by toggle-label. */
-  const NAME_PROP: Readonly<Record<string, string>> = { StaticRecordTitle: 'toggle-label' }
+  const WRAPPERS: Readonly<Record<string, string | null>> = { AppSaveAction: 'Save', AppCancelAction: 'Cancel', AppToggleSwitch: null, StaticRecordTitle: null, AuditPopover: null, ConnectionDashboard: null }
+  /** The prop(s) each wrapper names its buttons by: the settings-page title (DAR-UI-126) names its switch by toggle-label. */
+  const NAME_PROP: Readonly<Record<string, string | readonly string[]>> = {
+    StaticRecordTitle: 'toggle-label',
+    ConnectionDashboard: ['edit-aria-label', 'delete-aria-label', 'back-aria-label'],
+  }
 
   function wrapperTags(source: string): { component: string, tag: string }[] {
     const found: { component: string, tag: string }[] = []
@@ -371,7 +375,7 @@ describe('every button in the app has an answer', () => {
       const source = readFileSync(file, 'utf-8').match(/<template>([\s\S]*)<\/template>/)?.[1] ?? ''
       for (const { component, tag } of wrapperTags(source)) {
         swept += 1
-        const prop = NAME_PROP[component] ?? 'label'
+        for (const prop of [NAME_PROP[component] ?? 'label'].flat()) {
         const literal = tag.match(new RegExp(`(?<![\\w:-])${prop}="([^"]*)"`))?.[1]
         const bound = tag.match(new RegExp(`(?<![\\w-]):${prop}="([^"]*)"`))?.[1]
         let names: string[]
@@ -386,6 +390,7 @@ describe('every button in the app has an answer', () => {
         if (names.length === 0 && literal === undefined && bound === undefined && !NAME_PROP[component]) unanswered.push(`${relative}: <${component}> with no label`)
         for (const name of names) {
           if (!lookupAction(normalize(name)) || !answersAtRuntime(name)) unanswered.push(`${relative}: <${component}> "${name}"`)
+        }
         }
       }
     }
