@@ -1647,4 +1647,203 @@ describe('ReconciliationRuleSetEditorPage', () => {
       )
     })
   })
+  // Cancel discards what the board wrote in place: RuleSetBoard mutates the draft's rules and both exclusion lists
+  // continuously, so only the page's snapshot keeps them off the next unrelated save.
+  describe('Cancel', () => {
+    beforeEach(() => {
+      draftStoreState.setRuleSetDraft.mockReset()
+    })
+
+    it('discards a rule drawn on the board', async () => {
+      vi.useFakeTimers()
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-file1-1"]').trigger('pointerdown', { pointerId: 1, button: 0 })
+      await vi.advanceTimersByTimeAsync(340)
+      await wrapper.get('[data-testid="ruleset-field-file2-1"]').trigger('pointerup', { pointerId: 1, button: 0 })
+      await flushPromises()
+      expect(wrapper.findAll('.ruleset-operator-box')).toHaveLength(1)
+
+      await wrapper.get('[data-testid="cancel-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      expect(routerPush).toHaveBeenCalledWith({ path: '/reconciliation/ruleset-manager' })
+      expect(saveRuleSetRun).not.toHaveBeenCalled()
+      const [persistedDraft] = draftStoreState.setRuleSetDraft.mock.calls.at(-1) as [{ rules?: unknown[] }, string]
+      expect(persistedDraft.rules).toEqual([])
+    })
+
+    it('discards an exclusion added on the board', async () => {
+      // Exclusions show only on a side whose connector declares a filter parameter: the API-backed OMS side.
+      listAutomationSourceOptions.mockResolvedValue(apiSourceOptionsResponse())
+      draftStoreState.ruleSetDraftState = createApiDraftState()
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+
+      await wrapper.get('[data-testid="ruleset-field-file1-6"]').trigger('dblclick')
+      const input = wrapper.get('[data-testid="ruleset-exclusion-value-input"]')
+      await input.setValue('POS_SALES_CHANNEL')
+      await input.trigger('keydown', { key: 'Enter' })
+      await wrapper.get('[data-testid="ruleset-exclusion-apply"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="ruleset-field-exclude-file1-6"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="cancel-ruleset-rules"]').trigger('click')
+      await flushPromises()
+
+      const [persistedDraft] = draftStoreState.setRuleSetDraft.mock.calls.at(-1) as [{ file1ExcludeFilters?: unknown[] }, string]
+      expect(persistedDraft.file1ExcludeFilters ?? []).toEqual([])
+    })
+  })
+
+  describe('help affordances', () => {
+    const RULE_ONE: ReconciliationRuleSetDraftRule = {
+      ruleId: 'rule-1',
+      file1FieldPath: '$.orders[0].order_id',
+      file2FieldPath: '$.data.orders.edges[0].node.id',
+      operator: '=',
+      sequenceNum: 1,
+    }
+
+    async function mountEditor() {
+      const wrapper = mount(ReconciliationRuleSetEditorPage)
+      await flushPromises()
+      return wrapper
+    }
+
+    describe('ghost rule on arrival', () => {
+      it('draws a ghost rule and its caption when the rule set has no rules', async () => {
+        const wrapper = await mountEditor()
+
+        const ghost = wrapper.find('[data-testid="ruleset-ghost-rule"]')
+        expect(ghost.exists()).toBe(true)
+        expect(ghost.attributes('d')).toBeTruthy()
+        expect(wrapper.get('[data-testid="ruleset-ghost-caption"]').text()).toBe('Drag a field onto one on the right to compare them')
+      })
+
+      it('hides the ghost rule once the rule set has a rule', async () => {
+        draftStoreState.ruleSetDraftState = createDraftState([RULE_ONE])
+        const wrapper = await mountEditor()
+
+        expect(wrapper.find('[data-testid="ruleset-ghost-rule"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="ruleset-ghost-caption"]').exists()).toBe(false)
+      })
+
+      // sequenceNum 0 is the hidden basic-diff row: a rule set carrying only it has no rule a person can see.
+      it('still draws the ghost when the only stored rule is the hidden basic-diff row', async () => {
+        draftStoreState.ruleSetDraftState = createDraftState([
+          { ruleId: 'basic-diff', file1FieldPath: '$.hidden', file2FieldPath: '$.hidden', operator: '=', sequenceNum: 0 },
+        ])
+        const wrapper = await mountEditor()
+
+        expect(wrapper.find('[data-testid="ruleset-ghost-rule"]').exists()).toBe(true)
+      })
+
+      it('keys the ghost to this rule set rather than to a seen-it flag on the user', async () => {
+        const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+        const first = await mountEditor()
+        expect(first.find('[data-testid="ruleset-ghost-rule"]').exists()).toBe(true)
+        first.unmount()
+
+        // Someone who learnt the board months ago and opens a fresh rule set deserves the reminder.
+        const second = await mountEditor()
+        expect(second.find('[data-testid="ruleset-ghost-rule"]').exists()).toBe(true)
+        expect(setItem.mock.calls.filter(([key]) => String(key).includes('ghost'))).toEqual([])
+        setItem.mockRestore()
+      })
+
+      it('keeps the caption clear of the line it captions', async () => {
+        const wrapper = await mountEditor()
+
+        // A caption centred on the midpoint sat on top of the ghost and hid it. It has to sit below.
+        const midY = Number(/M [\d.]+ ([\d.]+)/.exec(wrapper.get('[data-testid="ruleset-ghost-rule"]').attributes('d') ?? '')?.[1])
+        const captionTop = Number(/top:\s*([\d.]+)px/.exec(wrapper.get('[data-testid="ruleset-ghost-caption"]').attributes('style') ?? '')?.[1])
+
+        expect(Number.isFinite(midY)).toBe(true)
+        expect(captionTop).toBeGreaterThan(midY)
+      })
+
+      it('costs zero clicks to dismiss - the ghost carries no control of its own', async () => {
+        const wrapper = await mountEditor()
+
+        expect(wrapper.get('[data-testid="ruleset-ghost-caption"]').findAll('button')).toHaveLength(0)
+        expect(wrapper.find('[data-testid="ruleset-ghost-rule"]').element.tagName.toLowerCase()).toBe('path')
+      })
+    })
+
+    describe('term definitions on hover', () => {
+      const TERMS = ['pre-actions', 'operator', 'sequence']
+
+      async function openRulePopover() {
+        draftStoreState.ruleSetDraftState = createDraftState([RULE_ONE])
+        const wrapper = await mountEditor()
+        await wrapper.get('[data-testid="ruleset-rule-operator-rule-1"]').trigger('click')
+        expect(wrapper.find('[data-testid="ruleset-rule-popover"]').exists()).toBe(true)
+        return wrapper
+      }
+
+      it('defines each of the three terms in the rule popover', async () => {
+        const wrapper = await openRulePopover()
+
+        for (const key of TERMS) {
+          expect(wrapper.get(`[data-testid="ruleset-term-${key}"]`).attributes('type')).toBe('button')
+          expect(wrapper.get(`[data-testid="ruleset-term-definition-${key}"]`).text().length).toBeGreaterThan(20)
+        }
+      })
+
+      it('writes the sequence definition from the operator side rather than the schema side', async () => {
+        const wrapper = await openRulePopover()
+
+        const definition = wrapper.get('[data-testid="ruleset-term-definition-sequence"]').text()
+        expect(definition).toContain('uniquely identifies a row')
+        expect(definition).not.toContain('sequenceNum')
+      })
+
+      it('points each term at its own definition for assistive technology', async () => {
+        const wrapper = await openRulePopover()
+
+        for (const key of TERMS) {
+          const describedBy = wrapper.get(`[data-testid="ruleset-term-${key}"]`).attributes('aria-describedby')
+          expect(describedBy).toBeTruthy()
+          expect(wrapper.get(`[data-testid="ruleset-term-definition-${key}"]`).attributes('id')).toBe(describedBy)
+        }
+      })
+
+      it('caps the popover width so a wide board cannot stretch it across the screen', async () => {
+        // Pill centres 1100px apart: the uncapped span is wider than the form needs and leaves no room beside it for
+        // the definition shelf.
+        const rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function rect(this: Element) {
+          const element = this as HTMLElement
+          if (element.getAttribute('data-testid') === 'ruleset-editor-board') return testRect(0, 0, 1400, 430)
+          if (element.dataset.ruleSide === 'file1') return testRect(0, 100, 280, 44)
+          if (element.dataset.ruleSide === 'file2') return testRect(1120, 100, 280, 44)
+          return testRect(0, 0, 0, 0)
+        })
+
+        const wrapper = await openRulePopover()
+        const width = Number(/width:\s*([\d.]+)px/.exec(wrapper.get('[data-testid="ruleset-rule-popover"]').attributes('style') ?? '')?.[1])
+
+        expect(width).toBeLessThanOrEqual(544)
+        rectSpy.mockRestore()
+      })
+
+      it('adds no question-mark icons to carry the help', async () => {
+        const wrapper = await openRulePopover()
+
+        const popover = wrapper.get('[data-testid="ruleset-rule-popover"]')
+        expect(popover.findAll('button').filter((button) => button.text().trim() === '?')).toHaveLength(0)
+      })
+
+      it('does not operate the control it sits above when the term is pressed', async () => {
+        const wrapper = await openRulePopover()
+
+        // The term is reachable by keyboard, but pressing it must not open the select it sits above.
+        await wrapper.get('[data-testid="ruleset-term-operator"]').trigger('click')
+
+        expect(wrapper.findAll('[data-testid="app-select-option"]')).toHaveLength(0)
+      })
+    })
+  })
 })
