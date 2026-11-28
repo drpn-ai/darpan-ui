@@ -9,14 +9,14 @@
  * hidden) are never written, so reloading the seed cannot undo an edit.
  */
 import { createHash } from 'node:crypto'
-import { MASCOT_ACTIONS, ACTION_PATTERNS } from './mascotActions'
+import { MASCOT_ACTIONS, ACTION_PATTERNS, actionPatternKey } from './mascotActions'
 import { MASCOT_GLOSSARY } from './mascotGlossary'
 import { MASCOT_HINTS } from './mascotHints'
 import { LABEL_ALIASES, LABEL_PATTERNS, normalizeLabel } from './mascotTargets'
 import { routeAnchors } from './mascotRouteAnchors'
-import { actionPatternKey, hintKey, type AppContentKind } from './mascotContent'
+import { hintKey, type AppContentKind } from './mascotContent'
 
-export { actionPatternKey, hintKey, type AppContentKind }
+type RouteAnchors = ReturnType<typeof routeAnchors>
 
 export interface SeedRow {
   contentKind: AppContentKind
@@ -67,8 +67,7 @@ function actionRows(): SeedRow[] {
   return [...named, ...patterned]
 }
 
-function hintRows(): SeedRow[] {
-  const paths = routeAnchors()
+function hintRows(paths: RouteAnchors): SeedRow[] {
   return Object.entries(MASCOT_HINTS).flatMap(([route, hints]) =>
     hints.map((hint, index) => {
       const anchor = hint.when?.match(ANCHOR_SELECTOR)?.[1]
@@ -82,8 +81,9 @@ function hintRows(): SeedRow[] {
   )
 }
 
-export function mascotSeedRows(): SeedRow[] {
-  return [...glossaryRows(), ...actionRows(), ...hintRows()]
+/** Every route file is read once per generation: the anchors feed the hint rows, the mark and the route rows. */
+export function mascotSeedRows(anchors: RouteAnchors = routeAnchors()): SeedRow[] {
+  return [...glossaryRows(), ...actionRows(), ...hintRows(anchors)]
     .sort((a, b) => a.contentKind.localeCompare(b.contentKind) || a.contentKey.localeCompare(b.contentKey))
 }
 
@@ -119,14 +119,19 @@ function attrs(pairs: [string, string | number | undefined][]): string {
  * carries the current one, so a SEED row a later release no longer generates (an old mark) is retired: the backend
  * stops serving it and stops letting it shadow a new alias, and the admin list can delete it.
  */
-export function mascotSeedMark(): string {
-  const routes = Object.entries(routeAnchors()).sort(([a], [b]) => a.localeCompare(b))
-  return createHash('sha256').update(JSON.stringify([mascotSeedRows(), routes])).digest('hex').slice(0, 16)
+export function mascotSeedMark(anchors: RouteAnchors = routeAnchors(), rows: SeedRow[] = mascotSeedRows(anchors)): string {
+  return createHash('sha256').update(JSON.stringify([rows, sortedRoutes(anchors)])).digest('hex').slice(0, 16)
+}
+
+function sortedRoutes(anchors: RouteAnchors): [string, RouteAnchors[string]][] {
+  return Object.entries(anchors).sort(([a], [b]) => a.localeCompare(b))
 }
 
 export function mascotSeedXml(): string {
-  const routes = Object.entries(routeAnchors()).sort(([a], [b]) => a.localeCompare(b))
-  const seedMark = mascotSeedMark()
+  const anchors = routeAnchors()
+  const routes = sortedRoutes(anchors)
+  const seedRows = mascotSeedRows(anchors)
+  const seedMark = mascotSeedMark(anchors, seedRows)
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!-- No copyright or license for configuration file, details here are not considered a creative work. -->',
@@ -135,7 +140,6 @@ export function mascotSeedXml(): string {
     '         Sets only the default* columns, matchLabels, matchRegex, the hint binding, whereShown and seedMark (always all of them, empty as ""), so a release never overwrites an admin edit (title, body, aliases, hidden). -->',
   ]
   lines.push(`    <darpan.content.AppContentSeed ${attrs([['seedId', 'CURRENT'], ['seedMark', seedMark]])}/>`)
-  const seedRows = mascotSeedRows()
   assertMatchLabelsFit(seedRows)
   assertMatchRegexFit(seedRows)
   for (const row of seedRows) {

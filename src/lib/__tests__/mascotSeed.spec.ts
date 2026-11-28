@@ -1,11 +1,12 @@
 import { writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ACTION_PATTERNS, MASCOT_ACTIONS } from '../mascotActions'
+import { ACTION_PATTERNS, MASCOT_ACTIONS, actionPatternKey } from '../mascotActions'
 import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { MASCOT_HINTS } from '../mascotHints'
 import { anchorsIn, routeAnchors } from '../mascotRouteAnchors'
 import { LABEL_ALIASES, LABEL_PATTERNS, normalizeLabel } from '../mascotTargets'
-import { actionPatternKey, assertMatchLabelsFit, assertMatchRegexFit, hintKey, mascotSeedMark, mascotSeedRows, mascotSeedXml, xmlAttr, type SeedRow } from '../mascotSeed'
+import { assertMatchLabelsFit, assertMatchRegexFit, mascotSeedMark, mascotSeedRows, mascotSeedXml, xmlAttr, type SeedRow } from '../mascotSeed'
+import { hintKey } from '../mascotContent'
 
 const rows = mascotSeedRows()
 const ofKind = (kind: string) => rows.filter((row) => row.contentKind === kind)

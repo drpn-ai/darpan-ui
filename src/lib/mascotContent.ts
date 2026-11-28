@@ -10,7 +10,7 @@
  * know, and edits the words (never the recognition) of what it does. If the read fails or returns nothing, nothing
  * here changes and the bundle answers exactly as before.
  */
-import { ACTION_PATTERNS, MASCOT_ACTIONS, lookupBundledAction } from './mascotActions'
+import { ACTION_PATTERNS, MASCOT_ACTIONS, actionPatternKey, lookupBundledAction } from './mascotActions'
 import {
   emptyContentState,
   matchWildcard,
@@ -46,11 +46,6 @@ export function hintKey(route: string, hint: { id: string }): string {
   return `${route}.${hint.id}`
 }
 
-/** A bundled regex action's seed key. */
-export function actionPatternKey(re: RegExp): string {
-  return `pattern:${re.source}`
-}
-
 const MAX_TITLE = 60
 const MAX_ENTRY = 200
 const MAX_HINT = 160
@@ -65,12 +60,15 @@ const ANCHOR_ID = /^[a-z0-9-]{1,80}$/
 const ROUTE_NAME = /^[a-z0-9-]{1,80}$/
 const TOKEN = /\{[A-Za-z0-9_]+\}/g
 
-/** Copied verbatim from mascotVoice.spec.ts PERFORMED_FLAVOUR and BUZZWORDS (and `AppContentRules`). */
-const PERFORMED_FLAVOUR: readonly RegExp[] = [
+/**
+ * Mood performed at the reader, and VOICE_GUIDE.md's hard-fail buzzwords. One list for an admin's words (here) and the
+ * bundle's (mascotVoice.spec.ts); the server's `AppContentRules` holds the same two lists.
+ */
+export const PERFORMED_FLAVOUR: readonly RegExp[] = [
   /\bsorry\b/i, /\bawkward\b/i, /\bdisappointing\b/i, /\bhappily\b/i, /\bhoarding\b/i,
   /\balas\b/i, /\boops\b/i, /\bunfortunately\b/i, /\bI will know\b/, /\bI’ll know\b/,
 ]
-const BUZZWORDS: readonly RegExp[] = [
+export const BUZZWORDS: readonly RegExp[] = [
   /\bleverage[sd]?\b/i, /\brobust\b/i, /\bseamless(ly)?\b/i, /\bbest-in-class\b/i,
   /\bmission-critical\b/i, /\beffortless(ly)?\b/i, /\bcutting-edge\b/i,
 ]

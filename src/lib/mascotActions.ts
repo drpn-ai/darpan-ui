@@ -152,7 +152,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Run audit',
     body: 'asks which days, then runs every check of this audit over them. Findings land as each check finishes; nothing waits for the morning run.',
   },
-  // DAR-UI-064. The audit authoring editors.
   // DAR-UI-138: the query page's Data step and its popup.
   'add data': {
     title: 'Add data',
@@ -170,6 +169,7 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Closed findings too',
     body: 'reads findings already closed as well as open ones. Off, the read keeps only the findings still open.',
   },
+  // DAR-UI-064. The audit authoring editors.
   'add statement': {
     title: 'Add statement',
     body: 'links this check to one more statement. One run often proves several: returns against credit memos covers R4, R7 and R8 at once.',
@@ -336,10 +336,6 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   // Keyed on the words themselves rather than on a control name, because the same two phrases
   // appear in three places: the mode dropdown's trigger, its options, and the sr-only text on a
   // pill that already carries a filter. One answer serves all three.
-  'next ›': {
-    title: 'Next',
-    body: 'moves to the next thing standing. It does not answer this one — the warning you are on is still there when you come back round.',
-  },
   'exclude these values': {
     title: 'Exclude these values',
     body: 'the source leaves out records whose value is one you listed. A record carrying no value for this field is kept.',
@@ -481,6 +477,11 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
   dismiss: {
     title: 'Dismiss',
     body: 'quiets the warning for this visit only. Nothing is fixed and nothing is remembered — it comes back next time the page loads.',
+  },
+  // The warning popup's pager, beside its Dismiss.
+  'next ›': {
+    title: 'Next',
+    body: 'moves to the next thing standing. It does not answer this one — the warning you are on is still there when you come back round.',
   },
   sync: {
     title: 'Sync',
@@ -1290,39 +1291,41 @@ export const ACTION_PATTERNS: readonly (readonly [RegExp, ActionEntry])[] = Obje
   }],
 ] as const)
 
-/** The registries only: no data, no edits. What the bundle itself answers, which is what a data entry may never shadow. */
-export function lookupBundledAction(name: string | null | undefined): ActionEntry | null {
+/** A bundled regex action's seed key: what an admin's edit of it is stored under. */
+export function actionPatternKey(re: RegExp): string {
+  return `pattern:${re.source}`
+}
+
+/** The bundled entry that answers a control name, with the key its edits are stored under: a direct name, then a pattern. */
+function bundledMatch(name: string | null | undefined): { key: string; entry: ActionEntry } | null {
   if (!name) return null
   const direct = MASCOT_ACTIONS[name]
-  if (direct) return direct
-  for (const [pattern, entry] of ACTION_PATTERNS) if (pattern.test(name)) return entry
+  if (direct) return { key: name, entry: direct }
+  for (const [pattern, entry] of ACTION_PATTERNS) if (pattern.test(name)) return { key: actionPatternKey(pattern), entry }
   return null
 }
 
-/** An admin's edit of a bundled entry replaces its words; hiding it makes the control unknown (silent, not stumped). */
-function edited(key: string, entry: ActionEntry): ActionEntry | null {
-  const edit = editFor('MASCOT_ACTION', key)
-  if (!edit) return entry
-  if (edit.hidden) return null
-  return { title: edit.title ?? entry.title, body: edit.body ?? entry.body }
+/** The registries only: no data, no edits. What the bundle itself answers, which is what a data entry may never shadow. */
+export function lookupBundledAction(name: string | null | undefined): ActionEntry | null {
+  return bundledMatch(name)?.entry ?? null
 }
 
 /**
  * Bundled direct name, then the bundled patterns, then data names, then data wildcards (DAR-BE-313), so data can
- * only answer a control the bundle does not. Edits and hiding apply to the bundled entry that answered.
+ * only answer a control the bundle does not. An admin's edit replaces the words of the bundled entry that answered;
+ * hiding it makes the control unknown (silent, not stumped).
  */
 export function lookupAction(name: string | null | undefined): ActionEntry | null {
-  if (!name) return null
-  const direct = MASCOT_ACTIONS[name]
-  if (direct) return edited(name, direct)
-  for (const [pattern, entry] of ACTION_PATTERNS) if (pattern.test(name)) return edited(`pattern:${pattern.source}`, entry)
-  return dataAction(name)
+  const match = bundledMatch(name)
+  if (!match) return name ? dataAction(name) : null
+  const edit = editFor('MASCOT_ACTION', match.key)
+  if (!edit) return match.entry
+  if (edit.hidden) return null
+  return { title: edit.title ?? match.entry.title, body: edit.body ?? match.entry.body }
 }
 
 /** True when an admin hid the bundled control entry that answers this name: a hidden control is silent, not "stumped". */
 export function isHiddenAction(name: string | null | undefined): boolean {
-  if (!name) return false
-  if (MASCOT_ACTIONS[name]) return editFor('MASCOT_ACTION', name)?.hidden === true
-  for (const [pattern] of ACTION_PATTERNS) if (pattern.test(name)) return editFor('MASCOT_ACTION', `pattern:${pattern.source}`)?.hidden === true
-  return false
+  const match = bundledMatch(name)
+  return match !== null && editFor('MASCOT_ACTION', match.key)?.hidden === true
 }

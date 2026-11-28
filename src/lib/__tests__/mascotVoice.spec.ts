@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { MASCOT_GLOSSARY } from '../mascotGlossary'
 import { MASCOT_ACTIONS } from '../mascotActions'
 import { MASCOT_HINTS } from '../mascotHints'
+// One list for the bundle and for an admin's words (mascotContent re-checks every data row against it).
+import { BUZZWORDS, PERFORMED_FLAVOUR } from '../mascotContent'
 
 /**
  * The mascot's voice, guarded across all THREE registries at once.
@@ -22,31 +24,6 @@ import { MASCOT_HINTS } from '../mascotHints'
  * list only ever grows for whatever was last edited. Judgement still writes the line;
  * this only stops a fixed one from silently coming back.
  */
-
-/** Mood performed at the reader. Every one of these could end any entry in either file. */
-const PERFORMED_FLAVOUR: readonly RegExp[] = [
-  /\bsorry\b/i,
-  /\bawkward\b/i,
-  /\bdisappointing\b/i,
-  /\bhappily\b/i,
-  /\bhoarding\b/i,
-  /\balas\b/i,
-  /\boops\b/i,
-  /\bunfortunately\b/i,
-  /\bI will know\b/,
-  /\bI’ll know\b/,
-]
-
-/** VOICE_GUIDE.md's hard-fail list. Enforced nowhere else in darpan-ui. */
-const BUZZWORDS: readonly RegExp[] = [
-  /\bleverage[sd]?\b/i,
-  /\brobust\b/i,
-  /\bseamless(ly)?\b/i,
-  /\bbest-in-class\b/i,
-  /\bmission-critical\b/i,
-  /\beffortless(ly)?\b/i,
-  /\bcutting-edge\b/i,
-]
 
 interface Line {
   readonly where: string

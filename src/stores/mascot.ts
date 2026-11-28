@@ -3,10 +3,9 @@ import { defineStore } from 'pinia'
 import { isHiddenTerm, lookupGlossary, type GlossaryEntry } from '../lib/mascotGlossary'
 
 /**
- * What the mascot is currently doing. There are deliberately only three modes: a
+ * What the mascot is currently doing: idle, or one of three modes. Deliberately only three: a
  * fourth is a fourth thing to draw, test and keep consistent across every surface.
- */
-/**
+ *
  * `hint` is the mascot's own label when you look at it. `explain` is an answer you asked
  * for by resting on something. `tip` is the only one it offers unprompted, after a page
  * has sat untouched — kept separate because an offer must never outrank an answer.
@@ -49,7 +48,7 @@ export interface MascotWarning {
 }
 
 /** How long a nudge stays up unless it is clicked away (Aditi 2026-11-24, DAR-UI-138). */
-export const NUDGE_MS = 10_000
+const NUDGE_MS = 10_000
 
 export const useMascotStore = defineStore('mascot', () => {
   const mode = ref<MascotMode>('idle')
