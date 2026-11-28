@@ -27,6 +27,8 @@ const buildDataActions = vi.mocked(buildDataCommandActions)
 describe('useCommandPalette', () => {
   beforeEach(() => {
     listSftp.mockReset()
+    // Every open() loads the SFTP list; a reset mock returns undefined, and `undefined.then` rejected unhandled (exit 1).
+    listSftp.mockResolvedValue({ servers: [] })
     buildDataActions.mockReset()
     buildDataActions.mockReturnValue([
       { id: 'data-x', label: 'X', group: 'Data', to: '/x', description: '', aliases: [] },
