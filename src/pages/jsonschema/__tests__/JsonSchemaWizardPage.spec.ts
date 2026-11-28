@@ -273,6 +273,40 @@ describe('JsonSchemaWizardPage', () => {
     wrapper.unmount()
   })
 
+  // The command palette's search sits over the page: letters typed there are not card shortcuts.
+  it('does not take a letter typed into another field as a card shortcut', async () => {
+    const wrapper = mount(JsonSchemaWizardPage, { attachTo: document.body })
+    await flushPromises()
+    const other = document.createElement('input')
+    document.body.appendChild(other)
+    other.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+    await flushPromises()
+    expect(wrapper.text()).toContain('Are you uploading a schema file or a sample file?')
+    other.remove()
+    wrapper.unmount()
+  })
+
+  it('does not leave the system step on a submit before a system is chosen', async () => {
+    const wrapper = mount(JsonSchemaWizardPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="upload-intent-sample"]').trigger('click')
+    await flushPromises()
+    const fileInput = wrapper.get('input[type="file"]')
+    Object.defineProperty(fileInput.element, 'files', {
+      value: [new File(['{"orderId":"1001"}'], 'orders.json', { type: 'application/json' })],
+      configurable: true,
+    })
+    await fileInput.trigger('change')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Assign the system')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(inferFromText).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Assign the system')
+  })
+
   it('advances from the upload step when Enter is pressed after selecting a file', async () => {
     const wrapper = mount(JsonSchemaWizardPage, {
       attachTo: document.body,

@@ -127,7 +127,7 @@ import AppTableFrame from '../../components/ui/AppTableFrame.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
-import { ApiCallError } from '../../lib/api/client'
+import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { jsonSchemaFacade, settingsFacade } from '../../lib/api/facade'
 import { invokePrimaryActionOnEnter } from '../../lib/keyboard'
 import type { EnumOption, JsonSchemaField } from '../../lib/api/types'
@@ -259,6 +259,7 @@ function looksLikeCsvFile(file: File): boolean {
   return file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv'
 }
 
+/** A file or a slice of one, as text. */
 function readBlobAsText(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -379,15 +380,6 @@ function applyRequiredFlagsToSchemaText(rawSchemaText: string): string {
   return JSON.stringify(parsedSchema)
 }
 
-function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result ?? ''))
-    reader.onerror = () => reject(new Error('This file speaks a language we do not read'))
-    reader.readAsText(file)
-  })
-}
-
 function selectUploadIntent(uploadIntent: SchemaUploadIntent): void {
   const previousFileName = selectedFileName.value
   const shouldResetDerivedName = previousFileName
@@ -439,7 +431,7 @@ async function prepareSchemaFileUpload(): Promise<boolean> {
   pageError.value = null
 
   try {
-    const jsonText = await readFileAsText(selectedFile.value)
+    const jsonText = await readBlobAsText(selectedFile.value)
     JSON.parse(jsonText)
     schemaTextToSave.value = jsonText
     return true
@@ -465,7 +457,7 @@ async function inferSchemaFromSampleUpload(): Promise<boolean> {
         csvText: await readBlobAsText(file.slice(0, CSV_HEADER_SLICE_LIMIT)),
         isCompleteFile: file.size <= CSV_HEADER_SLICE_LIMIT,
       })
-      : await jsonSchemaFacade.inferFromText({ jsonText: await readFileAsText(file) })
+      : await jsonSchemaFacade.inferFromText({ jsonText: await readBlobAsText(file) })
 
     schemaTextToSave.value = response.jsonSchemaString ?? ''
     fieldRows.value = response.fieldList ?? []
@@ -491,12 +483,6 @@ async function inferSchemaFromSampleUpload(): Promise<boolean> {
 }
 
 async function saveSchema(): Promise<void> {
-  if (!canEditTenantSettings.value) {
-    pageError.value = 'You do not have permission to save schemas for the active tenant.'
-    return
-  }
-  if (!schemaName.value.trim() || !systemEnumId.value || !schemaTextToSave.value.trim()) return
-
   saving.value = true
   pageError.value = null
 
@@ -518,7 +504,9 @@ async function saveSchema(): Promise<void> {
   }
 }
 
+// WorkflowStepForm emits submit on Enter whether or not its button is disabled, so every step is held here.
 async function handlePrimarySubmit(): Promise<void> {
+  if (submitDisabled.value) return
   if (currentStep.value.id === 'name') {
     await saveSchema()
     return
@@ -539,10 +527,17 @@ async function handlePrimarySubmit(): Promise<void> {
   currentStepIndex.value = Math.min(currentStepIndex.value + 1, workflowSteps.value.length - 1)
 }
 
+// Skipped while typing anywhere (the command palette's search too), so its letters stay letters.
+function isTypingTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+}
+
 function handleUploadIntentKeydown(event: KeyboardEvent): void {
   if (currentStep.value.id !== 'upload-intent') return
   if (event.defaultPrevented || event.repeat || event.isComposing) return
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+  if (isTypingTarget(event.target)) return
 
   const matchedUploadIntent = resolveUploadIntentByKey(event.key)
   if (!matchedUploadIntent) return
@@ -581,7 +576,7 @@ async function loadSystemOptions(): Promise<void> {
     systemOptions.value = (response.options ?? []).map(toSystemOption)
     systemOptionsLoaded.value = true
   } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
+    if (isAbortError(loadError)) return
     pageError.value = loadError instanceof ApiCallError ? loadError.message : 'The reconciliation systems are not reconciling with us.'
   }
 }

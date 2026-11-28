@@ -41,6 +41,10 @@
         </button>
       </div>
 
+      <p v-if="totalSchemaCount > schemaCards.length" class="section-note">
+        Showing {{ schemaCards.length }} of {{ totalSchemaCount }} schemas.
+      </p>
+
       <RouterLink
         v-if="canEditTenantSettings && schemaCards.length === 0 && !loading && !error"
         :to="createSchemaRoute"
@@ -70,7 +74,7 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
-import { ApiCallError } from '../../lib/api/client'
+import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { jsonSchemaFacade } from '../../lib/api/facade'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
@@ -84,14 +88,13 @@ const draftStore = useReconciliationDraftStore()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const schemaCards = ref<JsonSchemaSummary[]>([])
+const totalSchemaCount = ref(0)
 const showAllSchemas = ref(false)
 const canEditTenantSettings = computed(() => permissionsStore.canEditTenantSettings)
 
 const visibleSchemaCards = computed(() => (showAllSchemas.value ? schemaCards.value : schemaCards.value.slice(0, 5)))
 const hasMoreSchemas = computed(() => schemaCards.value.length > 5 && !showAllSchemas.value)
-const createSchemaRoute = computed(() => ({
-  path: '/schemas/create',
-}))
+const createSchemaRoute = { name: 'schemas-create' }
 
 function resolveSchemaCardTitle(schema: JsonSchemaSummary): string {
   return resolveRecordLabel({
@@ -114,13 +117,14 @@ async function loadSchemas(): Promise<void> {
   try {
     const response = await jsonSchemaFacade.list({
       pageIndex: 0,
-      pageSize: 12,
+      pageSize: 100,
       query: '',
     }, pageAbortController.signal)
     schemaCards.value = response.schemas ?? []
+    totalSchemaCount.value = response.pagination?.totalCount ?? schemaCards.value.length
     showAllSchemas.value = false
   } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
+    if (isAbortError(loadError)) return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'The schemas are off scheming somewhere.'
   } finally {
     loading.value = false

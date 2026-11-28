@@ -137,6 +137,16 @@ describe('JsonSchemaEditorPage', () => {
     expect(wrapper.text()).toContain('Retry Loading Schema')
     expect(wrapper.text()).toContain('Darpan stepped out for chai. Try again in a moment.')
     expect(wrapper.find('textarea').exists()).toBe(false)
+
+    // Retry asks again and, once it answers, shows the schema.
+    get.mockResolvedValue({ schemaData: { jsonSchemaId: 'test-schema', schemaName: 'orders', description: 'Orders schema',
+      systemEnumId: 'DarSysOms', systemLabel: 'OMS', lastUpdatedStamp: '2026-04-08T10:00:00Z', schemaText: '{"type":"object"}' } })
+    flatten.mockResolvedValue({ fieldList: [{ fieldPath: '$.orderId', type: 'string', required: true }] })
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('This schema is having a moment')
+    expect(wrapper.findAll('.static-page-summary-label').map((item) => item.text())).toEqual(['Schema ID', 'System', 'Updated'])
   })
 
   it('renders static schema metadata, hides raw schema text, and saves refined fields only', async () => {

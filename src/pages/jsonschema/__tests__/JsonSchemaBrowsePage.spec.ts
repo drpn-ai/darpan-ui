@@ -107,7 +107,7 @@ describe('JsonSchemaBrowsePage', () => {
     expect(wrapper.findAll('[data-testid="schema-library-tile"]')).toHaveLength(5)
     expect(wrapper.get('[data-testid="schema-library-more"]').text()).toBe('More...')
     expect(JSON.parse(wrapper.get('[data-testid="schema-library-create"]').attributes('data-to') ?? '{}')).toEqual({
-      path: '/schemas/create'
+      name: 'schemas-create',
     })
     expect(JSON.parse(wrapper.get('[data-testid="schema-library-tile"]').attributes('data-to') ?? '{}')).toEqual({
       name: 'schemas-editor',
@@ -122,6 +122,25 @@ describe('JsonSchemaBrowsePage', () => {
     expect(wrapper.text()).toContain('Description 6')
     expect(wrapper.text()).toContain('Description 7')
     expect(wrapper.findAll('[data-testid="schema-library-tile"]')).toHaveLength(7)
+  })
+
+  // A list cut short says so: a schema past the page would otherwise be missing without a word.
+  it('says so when it holds fewer schemas than the tenant has', async () => {
+    list.mockResolvedValueOnce({
+      schemas: [{ jsonSchemaId: 'schema-1', schemaName: 'Schema 1', description: 'Description 1', systemEnumId: 'DarSysOms',
+        systemLabel: 'OMS', statusId: 'Active', lastUpdatedStamp: '2026-04-08T10:00:00Z' }],
+      pagination: { pageIndex: 0, pageSize: 100, totalCount: 140, pageCount: 2 },
+    })
+    const wrapper = mount(JsonSchemaBrowsePage)
+    await flushPromises()
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 100 }), expect.any(AbortSignal))
+    expect(wrapper.get('.section-note').text()).toBe('Showing 1 of 140 schemas.')
+  })
+
+  it('stays quiet when every schema is on the page', async () => {
+    const wrapper = mount(JsonSchemaBrowsePage)
+    await flushPromises()
+    expect(wrapper.find('.section-note').exists()).toBe(false)
   })
 
   it('falls back to schemaName when description is missing or blank', async () => {
@@ -159,7 +178,7 @@ describe('JsonSchemaBrowsePage', () => {
     expect(wrapper.text()).toContain('No schemas saved yet')
     expect(wrapper.find('[data-testid="schema-library-create"]').exists()).toBe(false)
     expect(JSON.parse(wrapper.get('[data-testid="schema-library-empty-create"]').attributes('data-to') ?? '{}')).toEqual({
-      path: '/schemas/create'
+      name: 'schemas-create',
     })
   })
 

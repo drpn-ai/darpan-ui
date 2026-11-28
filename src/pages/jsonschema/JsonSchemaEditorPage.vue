@@ -24,7 +24,7 @@
         />
 
         <div class="action-row">
-          <button type="button" @click="reload" :disabled="loading">Retry Loading Schema</button>
+          <button type="button" :disabled="loading" @click="initializeEditor">Retry Loading Schema</button>
         </div>
       </template>
 
@@ -136,7 +136,6 @@
     </StaticPageSection>
 
     <InlineValidation v-if="error && !showInitialLoadFailureState" tone="error" :message="error" />
-    <p v-if="success" class="success-copy">{{ success }}</p>
 
     <template v-if="canEditTarget" #actions>
       <div class="action-row schema-editor-footer-row">
@@ -176,7 +175,7 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticEditableTitle from '../../components/ui/StaticEditableTitle.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
-import { ApiCallError } from '../../lib/api/client'
+import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { jsonSchemaFacade, settingsFacade } from '../../lib/api/facade'
 import type { EnumOption, JsonSchemaField } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
@@ -217,7 +216,6 @@ const loading = ref(false)
 const savingRefined = ref(false)
 const deletingSchema = ref(false)
 const error = ref<string | null>(null)
-const success = ref<string | null>(null)
 const initialLoadCompleted = ref(false)
 const initialLoadSucceeded = ref(false)
 
@@ -261,7 +259,6 @@ function resetEditorState(nextSchemaId: string): void {
   fieldRows.value = []
   editableTitleTarget.value = 'schemaName'
   error.value = null
-  success.value = null
   initialLoadCompleted.value = false
   initialLoadSucceeded.value = false
 }
@@ -368,22 +365,12 @@ async function loadSchema(signal?: AbortSignal): Promise<void> {
     await loadFlattenedRows(signal)
     initialLoadSucceeded.value = true
   } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
+    if (isAbortError(loadError)) return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'The schema tripped over its own fields.'
   } finally {
     initialLoadCompleted.value = true
     loading.value = false
   }
-}
-
-async function reload(): Promise<void> {
-  initialLoadCompleted.value = false
-  initialLoadSucceeded.value = false
-  initializeController?.abort()
-  initializeController = new AbortController()
-  const signal = initializeController.signal
-  await loadSchema(signal)
-  await loadSystemOptions(signal)
 }
 
 async function loadSystemOptions(signal?: AbortSignal): Promise<void> {
@@ -398,7 +385,7 @@ async function loadSystemOptions(signal?: AbortSignal): Promise<void> {
     }
     systemOptions.value = resolvedOptions
   } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
+    if (isAbortError(loadError)) return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'The reconciliation systems are not reconciling with us.'
   }
 }
@@ -408,10 +395,9 @@ async function saveRefinedFields(): Promise<void> {
 
   savingRefined.value = true
   error.value = null
-  success.value = null
 
   try {
-    const response = await jsonSchemaFacade.saveRefined({
+    await jsonSchemaFacade.saveRefined({
       jsonSchemaId: currentSchemaId.value,
       schemaName: schemaName.value,
       description: description.value,
@@ -422,7 +408,7 @@ async function saveRefinedFields(): Promise<void> {
         required: row.required,
       })),
     })
-    success.value = response.messages?.[0] ?? `Saved refined schema ${schemaName.value}.`
+    // The library is where a saved schema shows, so the save leaves this page at once.
     await router.push({ name: 'schemas-library' })
   } catch (saveError) {
     error.value = saveError instanceof ApiCallError ? saveError.message : 'The refined fields need more refining. Not saved.'
@@ -439,7 +425,6 @@ async function deleteSchema(): Promise<void> {
 
   deletingSchema.value = true
   error.value = null
-  success.value = null
 
   try {
     await jsonSchemaFacade.delete({ jsonSchemaId: currentSchemaId.value })
@@ -482,5 +467,4 @@ watch(() => [props.jsonSchemaId, route.fullPath], () => {
 .schema-editor-summary-select {
   margin-top: 0.1rem;
 }
-
 </style>
