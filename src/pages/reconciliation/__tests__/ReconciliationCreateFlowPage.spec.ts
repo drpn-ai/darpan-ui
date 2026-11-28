@@ -53,19 +53,26 @@ vi.mock('../../../lib/api/facade', () => ({
   },
 }))
 
-const draftStoreState = vi.hoisted(() => ({
-  workflowOrigin: null as { label: string, path: string } | null,
-  ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
-  automationDraftState: null as null | { draft: unknown, resumeStepId: string | null, savedRun: unknown | null },
-  setWorkflowOrigin: vi.fn(),
-  setRuleSetDraft: vi.fn(),
-  clearRuleSetDraft: vi.fn(),
-  setAutomationDraft: vi.fn(),
-  clearAutomationDraft: vi.fn(),
-  // DAR-UI-044: RuleSetBoard takes the run result page's pending exclusion on load.
-  setPendingExclusion: vi.fn(),
-  takePendingExclusion: vi.fn(() => null),
-}))
+// Stateful, as the real store is: a write is what a later read sees. A no-op mock let a test pass while the
+// component read a slot it had already cleared (or never wrote).
+const draftStoreState = vi.hoisted(() => {
+  const state = {
+    workflowOrigin: null as { label: string, path: string } | null,
+    ruleSetDraftState: null as null | { draft: unknown, resumeStepId: string | null },
+    automationDraftState: null as null | { draft: unknown, resumeStepId: string | null, savedRun: unknown | null },
+    setWorkflowOrigin: vi.fn((label: string, path: string) => { state.workflowOrigin = { label, path } }),
+    setRuleSetDraft: vi.fn((draft: unknown, resumeStepId: string | null = null) => { state.ruleSetDraftState = { draft, resumeStepId } }),
+    clearRuleSetDraft: vi.fn(() => { state.ruleSetDraftState = null }),
+    setAutomationDraft: vi.fn((draft: unknown, resumeStepId: string | null = null, savedRun: unknown = null) => {
+      state.automationDraftState = { draft, resumeStepId, savedRun }
+    }),
+    clearAutomationDraft: vi.fn(() => { state.automationDraftState = null }),
+    // DAR-UI-044: RuleSetBoard takes the run result page's pending exclusion on load.
+    setPendingExclusion: vi.fn(),
+    takePendingExclusion: vi.fn(() => null),
+  }
+  return state
+})
 
 vi.mock('../../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => draftStoreState,
@@ -143,7 +150,10 @@ async function advanceToLastStep(wrapper: ReturnType<typeof mount>): Promise<voi
   await flushPromises()
   while (!wrapper.find('[data-testid="ruleset-editor-board"]').exists()) {
     const nextButton = wrapper.find('[data-testid="wizard-next"]')
-    if (!nextButton.exists() || nextButton.attributes('disabled') !== undefined) break
+    // Stopping short is a failure, never a silent pass: callers go on to assert things about the board.
+    if (!nextButton.exists() || nextButton.attributes('disabled') !== undefined) {
+      throw new Error('advanceToLastStep stopped before the rules board')
+    }
     await nextButton.trigger('click')
     await flushPromises()
   }
@@ -155,8 +165,6 @@ async function advanceToFinalPrimaryIdStep(wrapper: ReturnType<typeof mount>): P
 
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-  // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
   await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -191,8 +199,6 @@ async function advanceToFile1PrimaryIdStep(
 
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-  // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
   await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
   await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -209,6 +215,33 @@ async function advanceToFile1PrimaryIdStep(
     await flushPromises()
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
   }
+}
+
+// From the second side's system card: a CSV side with no column list, its key typed (Entered or not), then OK onto
+// the rules board and Save. Source 1 in advanceToFile1PrimaryIdStep is Shopify, so source 2 is OMS.
+async function answerCsvFile2AndSave(
+  wrapper: ReturnType<typeof mount>,
+  key: string,
+  options: { pressEnter: boolean },
+): Promise<void> {
+  await chooseWorkflowOption(wrapper, 'file2-system-select', 'OMS')
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+  await chooseWorkflowChoice(wrapper, 'file2-source-choice-file')
+  await chooseWorkflowChoice(wrapper, 'file2-filetype-choice-DftCsv')
+  await flushPromises()
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+  const input = wrapper.get('[data-testid="workflow-chip-text-input"]')
+  await input.setValue(key)
+  if (options.pressEnter) await input.trigger('keydown.enter')
+  await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+  await flushPromises()
+  expect(wrapper.find('[data-testid="ruleset-editor-board"]').exists()).toBe(true)
+  await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+  await flushPromises()
+}
+
+function lastSavedPayload(): Record<string, unknown> {
+  return createRuleSetRun.mock.calls.at(-1)?.[0] as Record<string, unknown>
 }
 
 function createDraftState(): ReconciliationRuleSetDraftState {
@@ -439,7 +472,7 @@ describe('ReconciliationCreateFlowPage', () => {
     })
   })
 
-  it('asks for one value per step and creates directly after the basics are defined', async () => {
+  it('asks one value per card and loads the fields of each chosen schema', async () => {
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()
 
@@ -452,17 +485,7 @@ describe('ReconciliationCreateFlowPage', () => {
     expect(flattenJsonSchema).toHaveBeenCalledWith({ jsonSchemaId: 'schema-oms-orders' }, expect.any(AbortSignal))
     expect(flattenJsonSchema).toHaveBeenCalledWith({ jsonSchemaId: 'schema-shopify-orders' }, expect.any(AbortSignal))
     expect(wrapper.text()).toContain('Which field identifies each record in Shopify orders')
-    expect(wrapper.text()).not.toContain('Create JSON Order Compare now, or open the Ruleset Manager first?')
-    expect(wrapper.text()).not.toContain(RULESET_MANAGER_HELPER_COPY)
-    expect(wrapper.text()).not.toContain('Open the Ruleset Manager')
-    expect(wrapper.find('[data-testid="ruleset-manager-handoff"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="open-ruleset-manager"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('sketched operator set')
-    expect(wrapper.text()).not.toContain('Normalizers stay separate for now.')
     expect(wrapper.findAll('textarea')).toHaveLength(0)
-    await chooseWorkflowOption(wrapper, 'file2-field-select', '$.data.orders.edges[0].node.id')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    expect(wrapper.get('[data-testid="create-run-submit"]').text()).toBe('Save run')
   })
 
   // DAR-UI-054: Create a run already asked "What kind of run?" (Sync = two systems), so the wizard
@@ -538,8 +561,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('input[name="description"]').setValue('HotWax API against Shopify upload')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -595,8 +616,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -678,8 +697,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -766,8 +783,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -798,8 +813,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -889,8 +902,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'NETSUITE')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -966,8 +977,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'NETSUITE')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1003,8 +1012,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1012,8 +1019,8 @@ describe('ReconciliationCreateFlowPage', () => {
     await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
 
     expect(wrapper.find('[data-testid="file1-filetype-select"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('A')
-    expect(wrapper.text()).toContain('B')
+    expect(wrapper.get('[data-testid="file1-filetype-choice-DftCsv"] .workflow-shortcut-choice-card__key').text()).toBe('A')
+    expect(wrapper.get('[data-testid="file1-filetype-choice-DftJson"] .workflow-shortcut-choice-card__key').text()).toBe('B')
     expect(wrapper.text()).not.toContain('press Enter')
     expect(wrapper.find('[data-testid="wizard-next"]').exists()).toBe(false)
 
@@ -1056,8 +1063,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1097,8 +1102,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1130,8 +1133,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
@@ -1189,8 +1190,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1217,8 +1216,6 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1294,10 +1291,17 @@ describe('ReconciliationCreateFlowPage', () => {
     // "called" alone doesn't prove the original seed was actually consumed rather than merely
     // overwritten in place. Proving the clear fired *before* that re-seed is what shows the
     // original is genuinely gone, not just shadowed.
-    expect(draftStoreState.setRuleSetDraft).toHaveBeenCalled()
     const clearOrder = draftStoreState.clearRuleSetDraft.mock.invocationCallOrder[0]!
     const lastReseedOrder = draftStoreState.setRuleSetDraft.mock.invocationCallOrder.at(-1)!
     expect(clearOrder).toBeLessThan(lastReseedOrder)
+
+    // The later visit itself: leaving clears the board's copy, so the next mount starts at card one.
+    wrapper.unmount()
+    expect(draftStoreState.ruleSetDraftState).toBeNull()
+    const nextVisit = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+    expect(nextVisit.text()).toContain('What should this run be called?')
+    expect(nextVisit.find('[data-testid="ruleset-editor-board"]').exists()).toBe(false)
   })
 
   it('never resumes an existing run\'s draft — "Create new run" always starts at card one', async () => {
@@ -1341,6 +1345,8 @@ describe('ReconciliationCreateFlowPage', () => {
     // Card one publishes nothing, so any setRuleSetDraft here would mean the foreign draft was
     // adopted as the wizard's own rather than thrown away.
     expect(draftStoreState.setRuleSetDraft).not.toHaveBeenCalled()
+    // What boardDraftExtras() would read from on Save: nothing is left there.
+    expect(draftStoreState.ruleSetDraftState).toBeNull()
   })
 
   it('discards all draft state when the user exits mid-creation', async () => {
@@ -1370,8 +1376,6 @@ describe('ReconciliationCreateFlowPage', () => {
 
     await wrapper.get('input[name="runName"]').setValue('Automation run')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-    // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
@@ -1407,23 +1411,26 @@ describe('ReconciliationCreateFlowPage', () => {
     await flushPromises()
 
     expect(push).toHaveBeenCalledWith({ path: '/reconciliation/automation/create' })
-    expect(draftStoreState.setAutomationDraft).toHaveBeenCalled()
+    expect(draftStoreState.setAutomationDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ intent: 'new-run', savedRunId: 'RS_JSON_ORDER_COMPARE', savedRunType: 'ruleset' }),
+      'input-mode',
+      expect.objectContaining({ savedRunId: 'RS_JSON_ORDER_COMPARE' }),
+    )
     // The board step seeded a ruleset draft into the store so RuleSetBoard had something to
-    // read/write (seedRuleSetBoardDraft). continuingFlowElsewhere protects the *automation*
+    // read/write (publishDraft). continuingFlowElsewhere protects the *automation*
     // handoff draft from onUnmounted's cleanup here, but the ruleset draft is unrelated and must
     // still be cleared — left in place, a later /reconciliation/create visit would resume
     // straight onto the board with this just-created run's answers and a live "Save run".
     expect(draftStoreState.clearRuleSetDraft).toHaveBeenCalled()
   })
 
-  it('continues automation setup from the pending option-B handoff when history state is lost', async () => {
-    route.query = { automationFlow: 'new-run' }
+  // The handoff is read from the draft store's intent alone, with no ?automationFlow on the route.
+  it('hands the saved run to automation setup from the draft intent alone', async () => {
     draftStoreState.automationDraftState = {
       draft: { intent: 'new-run' },
       resumeStepId: 'input-mode',
       savedRun: null,
     }
-    window.history.replaceState({}, '', '/reconciliation/create?automationFlow=new-run')
 
     const wrapper = mount(ReconciliationCreateFlowPage)
     await flushPromises()
@@ -1435,7 +1442,11 @@ describe('ReconciliationCreateFlowPage', () => {
     await flushPromises()
 
     expect(push).toHaveBeenCalledWith({ path: '/reconciliation/automation/create' })
-    expect(draftStoreState.setAutomationDraft).toHaveBeenCalled()
+    expect(draftStoreState.setAutomationDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ savedRunId: 'RS_JSON_ORDER_COMPARE', returnPath: '/reconciliation/automations' }),
+      'input-mode',
+      expect.objectContaining({ savedRunId: 'RS_JSON_ORDER_COMPARE' }),
+    )
   })
 
   it('lets the user pick two fields for a composite primary key on a JSON source and submits both', async () => {
@@ -1453,6 +1464,12 @@ describe('ReconciliationCreateFlowPage', () => {
     const chipTexts = wrapper.findAll('[data-testid="workflow-select-chip"]').map((chip) => chip.text())
     expect(chipTexts.some((text) => text.includes('$.returns[0].return_id'))).toBe(true)
     expect(chipTexts.some((text) => text.includes('$.returns[0].product_id'))).toBe(true)
+
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await answerCsvFile2AndSave(wrapper, 'order_id', { pressEnter: true })
+    expect(lastSavedPayload()).toEqual(expect.objectContaining({
+      file1PrimaryIdExpressions: ['$.returns[0].return_id', '$.returns[0].product_id'],
+    }))
   })
 
   it('CSV primary-id step renders a chip-text-input and accepts multiple typed column names', async () => {
@@ -1466,7 +1483,24 @@ describe('ReconciliationCreateFlowPage', () => {
     await input.setValue('product_id')
     await input.trigger('keydown.enter')
 
-    expect(wrapper.findAll('[data-testid="workflow-chip-text-chip"]')).toHaveLength(2)
+    expect(wrapper.findAll('[data-testid="workflow-chip-text-chip"]').map((chip) => chip.text()))
+      .toEqual([expect.stringContaining('return_id'), expect.stringContaining('product_id')])
+  })
+
+  it('keeps a committed column and the one still typed when OK is pressed, and saves both', async () => {
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+    await advanceToFile1PrimaryIdStep(wrapper, 'DftCsv')
+
+    const input = wrapper.get('[data-testid="workflow-chip-text-input"]')
+    await input.setValue('return_id')
+    await input.trigger('keydown.enter')
+    await input.setValue('product_id')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+
+    await answerCsvFile2AndSave(wrapper, 'order_id', { pressEnter: true })
+    expect(lastSavedPayload()).toEqual(expect.objectContaining({ file1PrimaryIdExpressions: ['return_id', 'product_id'] }))
   })
 
   it('advances the step when a primary id is typed but never Enter-ed', async () => {
@@ -1486,7 +1520,26 @@ describe('ReconciliationCreateFlowPage', () => {
     await wrapper.get('[data-testid="wizard-next"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="workflow-chip-text-input"]').exists()).toBe(false)
+    // Moving on is not enough (pending text alone lets OK through): the key must be what is saved.
+    expect(wrapper.text()).toContain('Which system provides the second source?')
+    await answerCsvFile2AndSave(wrapper, 'order_id', { pressEnter: true })
+    expect(lastSavedPayload()).toEqual(expect.objectContaining({ file1PrimaryIdExpression: 'return_id' }))
+  })
+
+  it('saves the second side\'s key when it is typed and never Entered', async () => {
+    const wrapper = mount(ReconciliationCreateFlowPage)
+    await flushPromises()
+    await advanceToFile1PrimaryIdStep(wrapper, 'DftCsv')
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').setValue('return_id')
+    await wrapper.get('[data-testid="workflow-chip-text-input"]').trigger('keydown.enter')
+    await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+    await flushPromises()
+
+    await answerCsvFile2AndSave(wrapper, 'order_id', { pressEnter: false })
+    expect(lastSavedPayload()).toEqual(expect.objectContaining({
+      file1PrimaryIdExpression: 'return_id',
+      file2PrimaryIdExpression: 'order_id',
+    }))
   })
 
   describe('rules board as the final step', () => {
@@ -1516,7 +1569,8 @@ describe('ReconciliationCreateFlowPage', () => {
       expect(wrapper.get('.wizard-question-shell').classes()).toContain('workflow-form--board-stage')
     })
 
-    it('saves a run with rules and exclusions drawn on the final step', async () => {
+    // The draft is cleared on mount; the board's copy is rebuilt from what restore kept, so these must survive it.
+    it('saves the rules and exclusions a resumed draft carries', async () => {
       const wrapper = await mountCreateFlow({
         draft: {
           ...apiToApiDraft,
@@ -1606,8 +1660,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="file1-system-select"]').trigger('click')
       const optionValues = wrapper
         .findAll('[data-testid="workflow-select-option"]')
@@ -1625,8 +1677,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1654,8 +1704,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
@@ -1684,8 +1732,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1722,8 +1768,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1765,8 +1809,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1812,8 +1854,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -1959,8 +1999,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('input[name="runName"]').setValue('Items Config Test')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2004,8 +2042,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -2076,8 +2112,6 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSourceOptions()
       const wrapper = await startFlow('Ordering Test')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -2089,8 +2123,6 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSourceOptions()
       const wrapper = await startFlow('File Branch Wording')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
@@ -2103,8 +2135,6 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSourceOptions()
       const wrapper = await startFlow('Shopify No Config')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2126,8 +2156,6 @@ describe('ReconciliationCreateFlowPage', () => {
       mockSourceOptions()
       const wrapper = await startFlow('HotWax No Config')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2145,8 +2173,6 @@ describe('ReconciliationCreateFlowPage', () => {
       })
       const wrapper = await startFlow('Shopify With Config')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2159,8 +2185,6 @@ describe('ReconciliationCreateFlowPage', () => {
     it('keeps the answers so far when leaving to build a schema', async () => {
       const wrapper = await startFlow('Schema Detour')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowChoice(wrapper, 'file1-source-choice-file')
@@ -2203,8 +2227,6 @@ describe('ReconciliationCreateFlowPage', () => {
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       readings.push(readProgress(wrapper))
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       readings.push(readProgress(wrapper))
@@ -2250,8 +2272,6 @@ describe('ReconciliationCreateFlowPage', () => {
         mockSourceOptions(TWO_CONFIG_FIXTURE)
         const wrapper = await startFlow('Config First')
 
-        // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2264,8 +2284,6 @@ describe('ReconciliationCreateFlowPage', () => {
         mockSourceOptions(TWO_CONFIG_FIXTURE)
         const wrapper = await startFlow('Scoped Endpoints')
 
-        // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2284,8 +2302,6 @@ describe('ReconciliationCreateFlowPage', () => {
         mockSourceOptions(TWO_CONFIG_FIXTURE)
         const wrapper = await startFlow('Sole Endpoint')
 
-        // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2343,8 +2359,6 @@ describe('ReconciliationCreateFlowPage', () => {
         })
         const wrapper = await startFlow('Returns Type')
 
-        // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-        await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowOption(wrapper, 'file1-system-select', 'OMS')
         await wrapper.get('[data-testid="wizard-next"]').trigger('click')
         await chooseWorkflowChoice(wrapper, 'file1-source-choice-api')
@@ -2421,8 +2435,6 @@ describe('ReconciliationCreateFlowPage', () => {
 
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
-      // DAR-BE-058: the run-kind card, defaulted to comparing two systems.
-      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
       await chooseWorkflowOption(wrapper, 'file1-system-select', 'SHOPIFY')
       await wrapper.get('[data-testid="wizard-next"]').trigger('click')
 
@@ -2626,6 +2638,13 @@ describe('ReconciliationCreateFlowPage', () => {
 
       const checkbox = wrapper.get('[data-testid="file1-option-includeReturnsWithoutShopifyRef"]').element as HTMLInputElement
       expect(checkbox.checked).toBe(false)
+
+      // And the save sends none: the box unticked on screen is not enough if the old value still rode the draft.
+      await wrapper.get('[data-testid="wizard-next"]').trigger('click')
+      await answerCsvFile2(wrapper)
+      await wrapper.get('[data-testid="create-run-submit"]').trigger('click')
+      await flushPromises()
+      expect(lastCreatePayload()).not.toHaveProperty('file1ExtractOptions')
     })
 
     it('offers a New query link on the NetSuite config card that returns to this wizard', async () => {

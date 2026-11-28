@@ -209,10 +209,10 @@ const STAGES = ['name', 'file1', 'file2', 'rules'] as const
 // stage is computed against a constant. A stage that finishes in fewer cards jumps to the next
 // stage's floor, which is forwards -- never backwards.
 const STAGE_MAX_CARDS: Record<(typeof STAGES)[number], number> = {
-  // 3 since DAR-BE-058 added the run-kind card. This is the hardcoded-count half of the pattern:
-  // adding a card to a stage without raising its ceiling is silent, because Math.min caps the
-  // fraction at 1 — the bar simply stops moving for the last card of the stage instead of failing.
-  name: 3,
+  // Name and description (the run-kind card is gone: Create a run asks the kind first, DAR-UI-054). This is the
+  // hardcoded-count half of the pattern: adding a card to a stage without raising its ceiling is silent, because
+  // Math.min caps the fraction at 1 — the bar simply stops moving for the last card of the stage instead of failing.
+  name: 2,
   // 7: an API side's system, source, endpoint, config, API, key and extract options.
   file1: 7,
   file2: 7,
