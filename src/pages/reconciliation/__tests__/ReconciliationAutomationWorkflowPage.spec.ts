@@ -784,6 +784,63 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.find('[data-testid="automation-edit-active-field"]').exists()).toBe(true)
   })
 
+  function editWithWindow(relativeWindowTypeEnumId: string, relativeWindowCount?: number) {
+    route.name = 'reconciliation-automation-edit'
+    route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+    route.params = { automationId: 'AUT_ORDER_SYNC' }
+    getAutomation.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        automationId: 'AUT_ORDER_SYNC',
+        automationName: 'Daily order sync',
+        savedRunId: 'RS_ORDER_SYNC',
+        savedRunType: 'ruleset',
+        savedRun: optionsResponse().savedRuns[0],
+        inputModeEnumId: 'AUT_IN_API_RANGE',
+        scheduleExpr: '0 0 6 * * ?',
+        timezone: 'UTC',
+        relativeWindowTypeEnumId,
+        relativeWindowCount,
+        active: true,
+        sources: [
+          { fileSide: 'FILE_1', sourceTypeEnumId: 'AUT_SRC_API', systemEnumId: 'OMS', systemMessageRemoteId: 'OMS_REMOTE' },
+          { fileSide: 'FILE_2', sourceTypeEnumId: 'AUT_SRC_API', systemEnumId: 'SHOPIFY', systemMessageRemoteId: 'SHOPIFY_REMOTE' },
+        ],
+      },
+    })
+  }
+
+  it('keeps Save disabled on the edit form until the date window is complete', async () => {
+    editWithWindow('AUT_WIN_LAST_DAYS', 3)
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="save-automation"]').attributes('disabled')).toBeUndefined()
+    await wrapper.get('[data-testid="automation-window-count-input"]').setValue('')
+    expect(wrapper.get('[data-testid="save-automation"]').attributes('disabled')).toBeDefined()
+  })
+
+  // S06 F-A4: the backend refuses the retired state window. An automation still holding one opens
+  // with the window blank, so it is re-picked rather than silently saved back.
+  it('opens an automation stored with the retired state window with no window chosen', async () => {
+    editWithWindow('AUT_WIN_STATE')
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="automation-window-select"]').text()).toContain('Select date window')
+    expect(wrapper.get('[data-testid="save-automation"]').attributes('disabled')).toBeDefined()
+    await chooseWorkflowOption(wrapper, 'automation-window-select', 'AUT_WIN_PREV_DAY')
+    await wrapper.get('[data-testid="save-automation"]').trigger('click')
+    await flushPromises()
+
+    expect(saveAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({ relativeWindowTypeEnumId: 'AUT_WIN_PREV_DAY' }),
+      expect.any(AbortSignal),
+    )
+  })
+
   // An automation keeps its own filter copy; only sync#Automation changes it (DAR-BE-338). A save
   // that sent filters back would overwrite that copy, so the payload never carries the key.
   it('never sends exclusion filters on save, even when the loaded automation has them', async () => {

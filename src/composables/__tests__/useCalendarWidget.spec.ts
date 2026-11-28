@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCalendarWidget } from '../useCalendarWidget'
-import { buildCalendarMonth, formatDateInputValue, parseDateInput } from '../../lib/utils/date'
+import { buildCalendarMonth, formatDateInputValue, parseDateInput, setDefaultDisplayTimeZone } from '../../lib/utils/date'
 
 describe('useCalendarWidget', () => {
   beforeEach(() => {
@@ -99,6 +99,22 @@ describe('useCalendarWidget', () => {
     calendar.startDate.value = '2026-05-02'
     calendar.focusVisibleMonthAroundStart()
     expect(calendar.calendarMonths.value[0]!.label).toBe('April 2026')
+  })
+
+  // Today is the tenant's day, never the browser's. 10:30Z on May 11 is already May 12 in Kiritimati
+  // (UTC+14) while it is still May 11 in any browser zone a test runs in.
+  it('takes today in the display (tenant) timezone, not the browser clock', () => {
+    vi.setSystemTime(new Date(Date.UTC(2026, 4, 11, 10, 30)))
+    setDefaultDisplayTimeZone('Pacific/Kiritimati')
+    try {
+      const calendar = useCalendarWidget()
+      const may = calendar.calendarMonths.value[1]!
+      const day = (n: number) => may.cells.find((cell) => cell.isCurrentMonth && cell.day === n)!
+      expect(calendar.isCellDisabled(day(12))).toBe(false)
+      expect(calendar.isCellDisabled(day(13))).toBe(true)
+    } finally {
+      setDefaultDisplayTimeZone(undefined)
+    }
   })
 
   it('emits onRangeConfirmed when both dates land', () => {

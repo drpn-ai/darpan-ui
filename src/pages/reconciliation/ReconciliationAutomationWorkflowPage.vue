@@ -723,6 +723,13 @@ const relativeWindowOptions = computed<WorkflowSelectOption[]>(() => {
 })
 const dateWindowNeedsCount = computed(() => automationWindowNeedsCount(relativeWindowTypeEnumId.value))
 const dateWindowUsesCustomRange = computed(() => automationWindowUsesCustomRange(relativeWindowTypeEnumId.value))
+/** One answer for the wizard step and the edit form's Save: a window type, plus its count or its range. */
+const dateWindowReady = computed(() => {
+  if (!relativeWindowTypeEnumId.value) return false
+  if (dateWindowNeedsCount.value) return Number(relativeWindowCount.value) > 0
+  if (dateWindowUsesCustomRange.value) return Boolean(customWindowStartDate.value && customWindowEndDate.value && customWindowStartDate.value <= customWindowEndDate.value)
+  return true
+})
 
 const activeChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() => {
   switch (currentStep.value.id) {
@@ -985,10 +992,7 @@ const canProceed = computed(() => {
     case 'file2-api':
       return (!!sourceDrafts.value.FILE_2.nsRestletConfigId || !!sourceDrafts.value.FILE_2.systemMessageRemoteId) && !activeSelectError.value
     case 'date-window':
-      if (!relativeWindowTypeEnumId.value) return false
-      if (dateWindowNeedsCount.value) return Number(relativeWindowCount.value) > 0
-      if (dateWindowUsesCustomRange.value) return Boolean(customWindowStartDate.value && customWindowEndDate.value && customWindowStartDate.value <= customWindowEndDate.value)
-      return true
+      return dateWindowReady.value
     case 'schedule':
       return scheduleExpr.value.trim().length > 0
     case 'chat-space-select':
@@ -1015,7 +1019,7 @@ const canSave = computed(() => {
     )
   }
   if (usesApi.value) {
-    return Boolean(
+    return dateWindowReady.value && Boolean(
       (sourceDrafts.value.FILE_1.nsRestletConfigId || sourceDrafts.value.FILE_1.systemMessageRemoteId) &&
       (sourceDrafts.value.FILE_2.nsRestletConfigId || sourceDrafts.value.FILE_2.systemMessageRemoteId),
     )
@@ -1342,6 +1346,12 @@ function sourceDraftsFromAutomation(automation: AutomationRecord): Record<Reconc
   return drafts
 }
 
+/** A window type the form no longer offers (the retired AUT_WIN_STATE, S06 F-A4) opens blank, to be re-picked. */
+function offeredWindowTypeOr(windowTypeEnumId: string | undefined, fallback: string): string {
+  if (!windowTypeEnumId) return fallback
+  return relativeWindowOptions.value.some((option) => option.value === windowTypeEnumId) ? windowTypeEnumId : ''
+}
+
 function hydrateAutomation(automation: AutomationRecord): void {
   automationId.value = automation.automationId
   intent.value = 'existing-run'
@@ -1352,7 +1362,7 @@ function hydrateAutomation(automation: AutomationRecord): void {
   inputModeEnumId.value = automation.inputModeEnumId ?? ''
   scheduleExpr.value = automation.scheduleExpr ?? ''
   cron.syncFromExpression(scheduleExpr.value)
-  relativeWindowTypeEnumId.value = automation.relativeWindowTypeEnumId ?? relativeWindowTypeEnumId.value
+  relativeWindowTypeEnumId.value = offeredWindowTypeOr(automation.relativeWindowTypeEnumId, relativeWindowTypeEnumId.value)
   relativeWindowCount.value = automation.relativeWindowCount ?? relativeWindowCount.value
   customWindowStartDate.value = dateInputValue(automation.customWindowStartDate)
   customWindowEndDate.value = automation.customWindowEndDate ? previousDateValue(automation.customWindowEndDate) : ''

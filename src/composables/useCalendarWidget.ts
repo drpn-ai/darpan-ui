@@ -7,6 +7,7 @@ import {
   parseDateInput,
   startOfLocalDay,
   startOfMonth,
+  todayInDisplayTimeZone,
   type CalendarCell,
   type CalendarMonth,
 } from '../lib/utils/date'
@@ -46,8 +47,10 @@ export interface UseCalendarWidget {
   focusVisibleMonthAroundStart: () => void
 }
 
+// Today is the tenant's calendar day (the display zone), never the browser's: a viewer abroad, or
+// one just past midnight, must not be able to pick a day the tenant has not reached.
 function getDefaultVisibleMonth(): Date {
-  return addMonths(startOfMonth(new Date()), -1)
+  return addMonths(startOfMonth(todayInDisplayTimeZone()), -1)
 }
 
 export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCalendarWidget {
@@ -56,7 +59,7 @@ export function useCalendarWidget(options: UseCalendarWidgetOptions = {}): UseCa
   const endDate = ref('')
   const selecting = ref<CalendarSelectionSide>('start')
   const visibleMonth = ref<Date>(getDefaultVisibleMonth())
-  const lastPickableTime = () => startOfLocalDay(options.lastPickableDate?.() ?? new Date()).getTime()
+  const lastPickableTime = () => startOfLocalDay(options.lastPickableDate?.() ?? todayInDisplayTimeZone()).getTime()
   const firstPickableTime = () => {
     const first = options.firstPickableDate?.()
     return first ? startOfLocalDay(first).getTime() : Number.NEGATIVE_INFINITY
