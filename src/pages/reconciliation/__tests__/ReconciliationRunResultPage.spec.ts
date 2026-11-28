@@ -206,6 +206,8 @@ function sResolveMissingBucket(record: Rec, file1Label: string, file2Label: stri
 }
 function sIsMissing(record: Rec): boolean {
   const typeToken = sNormalizeToken(sResolveDiffType(record))
+  // DAR-BE-063: a duplicate-key row carries presentIn but nothing is missing; it falls to the rule bucket.
+  if (typeToken.startsWith('duplicate_in_')) return false
   return Boolean(record.missingIn || record.presentIn || typeToken.startsWith('missing_in_'))
 }
 function sResolveBucket(record: Rec, file1Label: string, file2Label: string): string {
@@ -2286,6 +2288,105 @@ describe('ReconciliationRunResultPage', () => {
     expect(timeline.text()).toContain('Failed')
     expect(timeline.text()).not.toContain('Pending')
     expect(wrapper.find('[data-testid="run-result-live-note"]').exists()).toBe(false)
+  })
+
+  // No hollow green. A run whose rules did not fully evaluate ends FAILED after it wrote its result
+  // (runSavedRunDiff: failRun with no open step, so every step reads Done). Run history links it as a
+  // result, so the page opens on the file: its counts must not read as a clean run.
+  it('says a run failed even when it is opened on the result file it wrote', async () => {
+    resultNamesRun('RR_RULES_FAILED')
+    getReconciliationRunStatus.mockResolvedValue({
+      ok: true,
+      statusEnumId: 'AUT_STAT_FAILED',
+      errorMessage: 'rule execution failed',
+      steps: [
+        { stageCode: 'COMPARE', stageSequence: 5, statusEnumId: 'AUT_STAT_SUCCESS' },
+        { stageCode: 'WRITE_OUTPUT', stageSequence: 10, statusEnumId: 'AUT_STAT_SUCCESS' },
+      ],
+    })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-result-live-failed"]').text()).toContain('rule execution failed')
+    expect(wrapper.findAll('[data-testid="diff-details-row"]').length).toBeGreaterThan(0)
+    // The live-only controls stay live-only: nothing to cancel, and the retry offer belongs to a run with no result.
+    expect(wrapper.find('[data-testid="run-result-cancel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-result-retry"]').exists()).toBe(false)
+  })
+
+  it('says a failed run\'s result may be incomplete when the run gave no reason', async () => {
+    resultNamesRun('RR_FAILED_NO_REASON')
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_FAILED', steps: [] })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    const failed = wrapper.get('[data-testid="run-result-live-failed"]').text()
+    expect(failed).not.toContain('before any results were produced')
+    expect(failed).toContain('may be incomplete')
+  })
+
+  it.each([
+    ['AUT_STAT_CANCELLED', 'Run cancelled.'],
+    ['AUT_STAT_NO_DATA', 'Run finished with no data to compare.'],
+  ])('says a %s run is not a clean result when opened on its file', async (statusEnumId, note) => {
+    resultNamesRun(`RR_${statusEnumId}`)
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId, steps: [] })
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="run-result-live-note"]').text()).toBe(note)
+  })
+
+  it('a successful run opened on its file shows no failure and no status note', async () => {
+    resultNamesRun('RR_OK')
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="run-result-live-failed"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-result-live-note"]').exists()).toBe(false)
+  })
+
+  // Every tile is the number of rows its click shows. The run summary's ruleDifferenceCount leaves out
+  // duplicate-id rows, which the rule bucket holds (DiffDetailClassifier, DAR-BE-063), so the tiles read the
+  // whole-document facets instead.
+  it('counts duplicate-id rows in the Rule differences tile the rows it filters to include', async () => {
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
+      ...defaultDiffDetails,
+      summary: { totalDifferences: 4, onlyInFile1Count: 1, onlyInFile2Count: 1, ruleDifferenceCount: 1 },
+      differences: [
+        ...defaultDiffDetails.differences,
+        { type: 'RULE_TOTAL', id: '1005', ruleId: 'RS_ORDER_CSV_RULE_1', field: 'total', file1Value: 10, file2Value: 12 },
+        { type: 'DUPLICATE_IN_FILE_1', id: '1007', presentIn: 'OMS', data: '{"order_id":"1007"}' },
+      ],
+    }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    const ruleTile = wrapper.get('[data-testid="diff-bucket-rule"]')
+    expect(ruleTile.text()).toContain('2')
+    expect(wrapper.get('[data-testid="diff-bucket-file-1"]').text()).toContain('1')
+    expect(wrapper.get('[data-testid="diff-bucket-file-2"]').text()).toContain('1')
+  })
+
+  it('shows the Rule differences tile when a run\'s only non-missing rows are duplicate ids', async () => {
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
+      ...defaultDiffDetails,
+      summary: { totalDifferences: 3, onlyInFile1Count: 1, onlyInFile2Count: 1, ruleDifferenceCount: 0 },
+      differences: [
+        ...defaultDiffDetails.differences,
+        { type: 'DUPLICATE_IN_FILE_2', id: '1009', presentIn: 'SHOPIFY', data: '{"order_id":"1009"}' },
+      ],
+    }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="diff-bucket-rule"]').text()).toContain('1')
   })
 
   it('hides notify-me once the run is terminal', async () => {

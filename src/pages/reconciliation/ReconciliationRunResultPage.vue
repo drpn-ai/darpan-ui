@@ -178,12 +178,13 @@
             </ol>
           </section>
 
+          <!-- The testid keeps its shipped name: the mascot's hint is keyed to it (mascotHints.ts). -->
           <InlineValidation
-            v-if="liveRunFailed"
+            v-if="runFailed"
             tone="error"
             class="run-result-failure"
             data-testid="run-result-live-failed"
-            :message="liveRunFailureText"
+            :message="runFailureText"
           />
           <div v-if="showRetryRun" class="run-result-cancel" data-testid="run-result-retry">
             <button
@@ -197,11 +198,11 @@
             </button>
           </div>
           <p
-            v-else-if="!savedOutput && liveRunNote"
+            v-else-if="runNote"
             class="section-note"
             data-testid="run-result-live-note"
           >
-            {{ liveRunNote }}
+            {{ runNote }}
           </p>
 
           <div v-if="showCancelRun" class="run-result-cancel">
@@ -578,7 +579,6 @@ import {
   BASE_RULE_FILTER_KEY,
   isJsonCollapseValue,
   type DiffBucketKey,
-  type DiffDetailsMetadata,
   type DiffDetailsSummary,
 } from '../../lib/runResultDiffDetails'
 import {
@@ -636,10 +636,9 @@ const loadError = ref<string | null>(null)
 const openingRunSettings = ref(false)
 const runSettingsError = ref<string | null>(null)
 const savedOutput = ref<GeneratedOutput | null>(null)
-const diffDetailsMeta = ref<DiffDetailsMetadata>({})
 // Captured from the RAW response metadata, before buildGeneratedOutputFromSummary launders it. That
 // builder falls back file2Label -> route query -> 'File 2', so a single-sided run's null second side
-// is already gone by the time it reaches diffDetailsMeta, and the fallback happens to resolve to the
+// is already gone by the time it reaches savedOutput, and the fallback happens to resolve to the
 // route's "System 2" placeholder — which is how 4 findings came to be captioned "Missing from
 // System 2". null = not loaded yet, and is deliberately NOT the same as false.
 const documentHasSecondSide = ref<boolean | null>(null)
@@ -727,10 +726,10 @@ const heroDescription = computed(() => {
   return savedOutput.value?.createdDate ? formatSavedResultDateTime(savedOutput.value.createdDate) : 'Review the saved reconciliation output for this run.'
 })
 const diffDetailsFile1Label = computed(
-  () => diffDetailsMeta.value.file1Label || savedOutput.value?.file1Label || file1SystemLabel.value || 'File 1',
+  () => savedOutput.value?.file1Label || file1SystemLabel.value || 'File 1',
 )
 const diffDetailsFile2Label = computed(
-  () => diffDetailsMeta.value.file2Label || savedOutput.value?.file2Label || file2SystemLabel.value || 'File 2',
+  () => savedOutput.value?.file2Label || file2SystemLabel.value || 'File 2',
 )
 // Difference counts are per SYSTEM, so the bucket cards name the system rather than the endpoint
 // the run extracted ("Shopify Order Return References"). The stage timeline and the compared-files
@@ -805,12 +804,14 @@ const stepTimelineCollapsed = ref(!liveRunResultId.value)
 // A run that finishes here shows its result in place: the steps fold away, as they open on a finished result.
 watch(liveRunResultId, (id, was) => { if (was && !id) stepTimelineCollapsed.value = true })
 
-const liveRunStatusEnumId = computed(() => normalizeDisplayText(runStatus.value?.statusEnumId))
-const liveRunFailed = computed(() => Boolean(liveRunResultId.value) && liveRunStatusEnumId.value === 'AUT_STAT_FAILED')
+const runStatusEnumId = computed(() => normalizeDisplayText(runStatus.value?.statusEnumId))
+// Read in both modes. A run whose rules did not fully evaluate ends FAILED after it wrote its result
+// (runSavedRunDiff), so the page can open on the file of a failed run: its counts must not read as clean.
+const runFailed = computed(() => runStatusEnumId.value === 'AUT_STAT_FAILED')
 // Active until the first poll response proves otherwise — synthesized pending steps only make
 // sense while the run can still reach them.
 const liveRunActive = computed(() =>
-  Boolean(liveRunResultId.value) && (runStatus.value == null || isActiveRunStatus(liveRunStatusEnumId.value)))
+  Boolean(liveRunResultId.value) && (runStatus.value == null || isActiveRunStatus(runStatusEnumId.value)))
 
 // Clock for the running step's elapsed time. A paged API extract is the longest stage of a run
 // and reports no record count until it ends, so without this the whole timeline sits visually
@@ -837,11 +838,16 @@ watch(liveRunActive, (active) => {
   }, 1000)
 }, { immediate: true })
 
-const liveRunNote = computed(() => {
-  if (!liveRunResultId.value || liveRunFailed.value) return ''
-  if (liveRunStatusEnumId.value === 'AUT_STAT_CANCELLED') return 'Run cancelled.'
-  if (liveRunStatusEnumId.value === 'AUT_STAT_NO_DATA') return 'Run finished with no data to compare.'
-  if (liveRunStatusEnumId.value === 'AUT_STAT_SKIP_DUP') return 'Run skipped — this window was already processed.'
+// A terminal status that is not a clean finish is said in both modes; the rest is live progress.
+const TERMINAL_RUN_NOTES: Record<string, string> = {
+  AUT_STAT_CANCELLED: 'Run cancelled.',
+  AUT_STAT_NO_DATA: 'Run finished with no data to compare.',
+  AUT_STAT_SKIP_DUP: 'Run skipped — this window was already processed.',
+}
+const runNote = computed(() => {
+  const terminalNote = TERMINAL_RUN_NOTES[runStatusEnumId.value]
+  if (terminalNote) return terminalNote
+  if (!liveRunResultId.value || runFailed.value) return ''
   if (!liveRunActive.value) return 'Run finished. Open run history to view the saved result.'
   if (cancelRequested.value) return 'Stopping this run — it ends at the next step boundary.'
   return 'Results will appear here when this reconciliation finishes.'
@@ -867,7 +873,8 @@ const showCancelRun = computed(() =>
 // DAR-BE-163: a failed run retries from the step it failed at; the steps that finished (a 17-minute
 // HotWax read) are reused, not run again.
 const { retrying, retry } = useRunRetry()
-const showRetryRun = computed(() => liveRunFailed.value && canRunActiveTenantReconciliation.value && Boolean(savedRunId.value))
+const showRetryRun = computed(() =>
+  runFailed.value && Boolean(liveRunResultId.value) && canRunActiveTenantReconciliation.value && Boolean(savedRunId.value))
 const retryLabel = computed(() => {
   const failedStep = runStatusSteps.value.find((step) => step.statusEnumId === 'AUT_STAT_FAILED')
   return failedStep ? `Retry from ${stepStageLabel(failedStep)}` : 'Retry'
@@ -893,10 +900,10 @@ async function cancelRun(): Promise<void> {
 // Spark/service errors off mid-sentence — routinely losing the half that names the fix (the
 // "Did you mean [...]" suggestion sat just past the cut). The run row already stores the full text
 // in `errorDetail`, so prefer it and keep the truncated copy only as a fallback for older rows.
-const liveRunFailureText = computed(() => (
+const runFailureText = computed(() => (
   normalizeDisplayText(runStatus.value?.errorDetail)
   || normalizeDisplayText(runStatus.value?.errorMessage)
-  || 'Run failed before any results were produced.'
+  || (liveRunResultId.value ? 'Run failed before any results were produced.' : 'Run failed. These results may be incomplete.')
 ))
 
 // Timeline rows for display: the actual step rows, plus — while the run is live — a synthesized
@@ -1176,10 +1183,14 @@ function toggleExpanded(row: Record<string, unknown>): void {
   expandedRowKeys.value = isExpanded(row) ? [] : [String(row.rowKey)]
 }
 
+// A tile's number is the number of rows its click shows, so the clickable tiles read the server's
+// whole-document bucket facets, never the run summary: the summary's ruleDifferenceCount leaves out the
+// duplicate-id rows the rule bucket holds (DAR-BE-063), and a HIDE conclusion takes rows out of the
+// document without lowering it. "Missing from <file 1 system>" = facet file-1 (rows only the second
+// side has), "Missing from <file 2 system>" = facet file-2, "Rule differences" = facet rule (one row per
+// rule a matched pair failed, plus duplicate-id rows). Their sum is the All count (totalDifferences).
 const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
-  const ruleDifferenceCount =
-    diffDetailsSummary.value.ruleDifferenceCount ??
-    diffDetailBucketCounts.value.rule
+  const ruleDifferenceCount = diffDetailBucketCounts.value.rule
 
   // One population, one tile. No "screened out" count beside it: the rows that did not survive the
   // extractor's own gate are not findings, and putting them back on screen re-opens the question the
@@ -1198,18 +1209,14 @@ const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
       key: 'file-1',
       bucketKey: 'file-1',
       label: `Missing from ${diffDetailsSystemNames.value.file1}`,
-      count:
-        diffDetailsSummary.value.onlyInFile2Count ??
-        diffDetailBucketCounts.value['file-1'],
+      count: diffDetailBucketCounts.value['file-1'],
       testId: 'diff-bucket-file-1',
     },
     {
       key: 'file-2',
       bucketKey: 'file-2',
       label: `Missing from ${diffDetailsSystemNames.value.file2}`,
-      count:
-        diffDetailsSummary.value.onlyInFile1Count ??
-        diffDetailBucketCounts.value['file-2'],
+      count: diffDetailBucketCounts.value['file-2'],
       testId: 'diff-bucket-file-2',
     },
     ...(ruleDifferenceCount > 0
@@ -1292,7 +1299,6 @@ function resetDiffDetailsState(): void {
   resetRunSourceDetails()
   resetDownloadState()
   resetRunNameState()
-  diffDetailsMeta.value = {}
   documentHasSecondSide.value = null
   diffDetailsSummary.value = {}
   resetDifferencesState()
@@ -1385,18 +1391,9 @@ async function loadSavedResult(): Promise<void> {
       const nextRunName = descriptor.savedRunName || routeRunName.value
       if (editableRunName.value === persistedRunName.value) editableRunName.value = nextRunName
       persistedRunName.value = nextRunName
-      diffDetailsMeta.value = {
-        file1Label: descriptor.file1Label,
-        file2Label: descriptor.file2Label,
-        timestamp: metadata.timestamp,
-      }
       documentHasSecondSide.value = Boolean(normalizeDisplayText(metadata.file2Label))
       diffDetailsSummary.value = {
         totalDifferences: descriptor.totalDifferences,
-        onlyInFile1Count: descriptor.onlyInFile1Count,
-        onlyInFile2Count: descriptor.onlyInFile2Count,
-        ruleDifferenceCount: summary.ruleDifferenceCount ?? undefined,
-        missingObjectDifferenceCount: summary.missingObjectDifferenceCount ?? undefined,
         conclusions: summary.conclusions,
       }
       if (!diffControlsReady.value || tableQuery() === drawnTableQuery) applyDifferencesResponse(response, true)

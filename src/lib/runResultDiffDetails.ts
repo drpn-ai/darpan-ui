@@ -9,25 +9,9 @@ export const DIFF_BUCKET_ORDER: DiffBucketKey[] = ['file-1', 'file-2', 'rule']
 export const ALL_RULE_FILTER_KEY = 'all'
 export const BASE_RULE_FILTER_KEY = 'base-diff'
 
-export interface DiffDetailsMetadata {
-  file1Label?: string
-  file2Label?: string
-  timestamp?: string
-  savedRunId?: string
-  savedRunName?: string
-  savedRunType?: string
-  reconciliationMappingId?: string
-  reconciliationMappingName?: string
-  ruleSetId?: string
-  compareScopeId?: string
-}
-
+/** What the page reads off the run summary. The tile counts are not here: they are the server's facets. */
 export interface DiffDetailsSummary {
   totalDifferences?: number
-  onlyInFile1Count?: number
-  onlyInFile2Count?: number
-  missingObjectDifferenceCount?: number
-  ruleDifferenceCount?: number
   /** DAR-UI-044: present only when the run's scope had conclusion rules. */
   conclusions?: { enabled: boolean; counts: RunConclusionCount[] }
 }
