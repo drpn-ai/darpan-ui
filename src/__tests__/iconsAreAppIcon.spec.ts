@@ -49,6 +49,14 @@ describe('icons are AppIcon', () => {
     expect(stale).toEqual([])
   })
 
+  // DAR-OPS-029 U16a/U16b. An icon typed as a character (× ‹ › ↑ ✓) is a drawn icon too: its size, weight and baseline
+  // come from the font, not the design system, and it sat beside AppIcon close on the same kind of control (U08).
+  it('draws no button as a typed glyph', () => {
+    const glyphButton = /<button\b[^>]*>\s*(&times;|&lsaquo;|&rsaquo;|&larr;|&rarr;|[×✕✖✓✔✗✘‹›←→↑↓▾▸▴▶◀⌄])\s*<\/button>/
+    const offenders = components.filter((file) => glyphButton.test(readFileSync(file, 'utf8')))
+    expect(offenders, 'name the icon: <AppIcon name="close" />, "chevronLeft", "arrowUp"…').toEqual([])
+  })
+
   it('carries no svg as a string', () => {
     expect(modules.filter((file) => SVG_STRING.test(readFileSync(file, 'utf8')))).toEqual([])
   })

@@ -47,19 +47,19 @@
               :data-testid="`${testIdPrefix}-previous-month`"
               @click="calendar.shiftMonth(-1)"
             >
-              ‹
+              <AppIcon name="chevronLeft" />
             </button>
             <span v-else class="wizard-api-calendar-nav-spacer" aria-hidden="true"></span>
             <h3>{{ month.label }}</h3>
             <button
               v-if="monthIndex === calendarMonths.length - 1 && calendar.canShiftMonth(1)"
               type="button"
-              class="wizard-api-calendar-nav"
+              class="wizard-api-calendar-nav wizard-api-calendar-nav--next"
               aria-label="Show next month"
               :data-testid="`${testIdPrefix}-next-month`"
               @click="calendar.shiftMonth(1)"
             >
-              ›
+              <AppIcon name="chevronLeft" />
             </button>
             <span v-else class="wizard-api-calendar-nav-spacer" aria-hidden="true"></span>
           </div>
@@ -90,6 +90,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppIcon from '../ui/AppIcon.vue'
 import type { UseCalendarWidget } from '../../composables/useCalendarWidget'
 
 // The Sync run's Custom Dates calendar: Start and End fields over two months. DAR-UI-060 lifted it out of
@@ -232,11 +233,17 @@ function formatDateInputLabel(value: string): string {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
-  /* Sizes an icon glyph, not text. */
-  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
-  font-size: 1.45rem;
-  line-height: 1;
   cursor: pointer;
+}
+
+.wizard-api-calendar-nav svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Next is the previous chevron turned to face right: one drawing, no second icon. */
+.wizard-api-calendar-nav--next svg {
+  transform: scaleX(-1);
 }
 
 .wizard-api-calendar-nav:hover,

@@ -119,7 +119,7 @@
                 :data-testid="`lifecycle-settings-up-${stage.recordType}`"
                 @click="moveStage(stageIndex, -1)"
               >
-                ↑
+                <AppIcon name="arrowUp" />
               </button>
               <button
                 type="button"
@@ -129,7 +129,7 @@
                 :data-testid="`lifecycle-settings-down-${stage.recordType}`"
                 @click="moveStage(stageIndex, 1)"
               >
-                ↓
+                <AppIcon name="arrowDown" />
               </button>
             </div>
             <div class="lifecycle-spine-gap">
