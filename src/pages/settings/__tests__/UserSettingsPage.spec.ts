@@ -90,6 +90,9 @@ const authState = vi.hoisted<{ sessionInfo: TestSessionInfo; error: string | nul
   error: null,
 }))
 
+const routerReplace = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+vi.mock('vue-router', () => ({ useRouter: () => ({ replace: routerReplace }) }))
+
 vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: {
     getUserNotificationDefault,
@@ -188,6 +191,7 @@ describe('UserSettingsPage', () => {
     verifyOwnPassword.mockReset()
     verifyOwnPassword.mockResolvedValue(true)
     changeOwnPassword.mockClear()
+    routerReplace.mockClear()
     saveUserSettings.mockClear()
     getUserNotificationDefault.mockReset()
     getUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [], userNotificationDefault: undefined })
@@ -442,6 +446,10 @@ describe('UserSettingsPage', () => {
       newPassword: 'new-password',
       newPasswordVerify: 'new-password',
     })
+    // D17: the change ended this session (the store says why on the sign-in page), so the page goes there at once
+    // instead of announcing "Password changed." over a session that is gone.
+    expect(routerReplace).toHaveBeenCalledWith({ name: 'login' })
+    expect(wrapper.text()).not.toContain('Password changed.')
   })
 
   it('keeps the current password step open and shows a five-second warning when verification fails', async () => {
@@ -498,6 +506,7 @@ describe('UserSettingsPage', () => {
       await step('newPasswordVerify', 'new-password')
       expect(warnings.map((event) => event.detail.message)).toEqual(['New passwords do not match.', 'Password was used recently.'])
       expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+      expect(routerReplace).not.toHaveBeenCalled()
     } finally {
       document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, capture)
     }

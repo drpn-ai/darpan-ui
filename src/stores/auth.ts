@@ -195,6 +195,9 @@ export function buildUiPermissionPolicy(sessionInfo: SessionInfo | null | undefi
   }
 }
 
+/** What the sign-in page says after a password change ended the session (D17). */
+export const PASSWORD_CHANGED_SIGN_IN_AGAIN = 'Password changed. Sign in with your new password.'
+
 export function buildAuthRedirect(redirectTarget: unknown): RouteLocationRaw {
   const redirect = resolveInternalRedirectTarget(redirectTarget)
   if (redirect === '/') return { name: 'login' }
@@ -789,8 +792,14 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const response: ChangeOwnPasswordResponse = await authFacade.changeOwnPassword(payload)
-      return _applyAccountReply(response, response.ok, 'Unable to change password.', 'Authentication required to change password.')
-        && response.passwordUpdated === true
+      // D17 (Aditi, 2026-11-28): a changed password signs the person in again everywhere, this tab included. The backend
+      // ends every session (OC86), so the session the reply carries is not kept: this one ends now, with the reason.
+      if (response.ok && response.passwordUpdated === true) {
+        _endSession(PASSWORD_CHANGED_SIGN_IN_AGAIN)
+        return true
+      }
+      _applyAccountReply(response, false, 'Unable to change password.', 'Authentication required to change password.')
+      return false
     } catch (err) {
       _applyAccountCallFailure(err)
       return false

@@ -3,6 +3,7 @@
 // so a session token alone cannot redirect reset codes). Each popup stays open on a refusal, so refusals go to the
 // workflow hint on top of it: a page-level note would sit behind the popup's scrim.
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../lib/uiEvents'
 import { useAuthStore } from '../stores/auth'
 
@@ -30,13 +31,12 @@ const emptyRecoveryForm = () => ({ currentPassword: '', emailAddress: '' })
 
 export function usePasswordChange() {
   const authStore = useAuthStore()
+  const router = useRouter()
   const isOpen = ref(false)
   const stepIndex = ref(0)
   const form = ref(emptyPasswordForm())
   const isVerifying = ref(false)
   const isChanging = ref(false)
-  /** The page-level line once the popup has closed ("Password changed."). */
-  const message = ref<string | null>(null)
 
   const step = computed(() => PASSWORD_STEPS[stepIndex.value] ?? PASSWORD_STEPS[0])
   const stepValue = computed({
@@ -52,13 +52,11 @@ export function usePasswordChange() {
   function open(): void {
     isOpen.value = true
     stepIndex.value = 0
-    message.value = null
   }
 
   function close(): void {
     isOpen.value = false
     stepIndex.value = 0
-    message.value = null
     form.value = emptyPasswordForm()
   }
 
@@ -85,15 +83,15 @@ export function usePasswordChange() {
       return
     }
     isChanging.value = true
-    message.value = null
     try {
       const changed = await authStore.changeOwnPassword({ ...form.value })
       if (!changed) {
         warn(authStore.error || 'Unable to change password.')
         return
       }
+      // D17: the change ended this session everywhere, this tab included; the sign-in page says why.
       close()
-      message.value = 'Password changed.'
+      await router.replace({ name: 'login' })
     } finally {
       isChanging.value = false
     }
@@ -108,7 +106,7 @@ export function usePasswordChange() {
     await change()
   }
 
-  return { isOpen, stepIndex, step, stepValue, primaryLabel, isStepBlocked, message, open, close, back, submit }
+  return { isOpen, stepIndex, step, stepValue, primaryLabel, isStepBlocked, open, close, back, submit }
 }
 
 export function useRecoveryEmail() {

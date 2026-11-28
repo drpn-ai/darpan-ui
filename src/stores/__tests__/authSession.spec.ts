@@ -323,7 +323,10 @@ describe('auth state', () => {
     expect(useAuthStore().sessionInfo?.timeZone).toBe('Europe/London')
   })
 
-  it('changes the current user password through the authenticated auth facade', async () => {
+  // D17 (Aditi, 2026-11-28): a password change signs the person in again everywhere, this tab included. The backend ends
+  // every session (OC86); the store ends this one at once with the reason, rather than keeping the session the reply
+  // carried and letting the next call 401 into the generic "Your session has ended".
+  it('a changed password ends this session with the reason, discarding the session the reply carried', async () => {
     changeOwnPasswordRpc.mockResolvedValue({
       ok: true,
       messages: ['Password updated for user backend'],
@@ -354,8 +357,32 @@ describe('auth state', () => {
       newPassword: 'new-password',
       newPasswordVerify: 'new-password',
     })
+    expect(useAuthStore().status).toBe('unauthenticated')
+    expect(useAuthStore().authenticated).toBe(false)
+    expect(useAuthStore().userId).toBeNull()
+    expect(useAuthStore().error).toBe('Password changed. Sign in with your new password.')
+    expect(clearApiResponseCache).toHaveBeenCalled()
+  })
+
+  it('a reply that says the password did not change keeps the session', async () => {
+    changeOwnPasswordRpc.mockResolvedValue({
+      ok: false,
+      messages: [],
+      errors: ['New password was used in the last 5 passwords.'],
+      authenticated: true,
+      passwordUpdated: false,
+      sessionInfo: { userId: 'backend-user', username: 'backend', availableTenants: [], isSuperAdmin: false },
+    })
+    const { useAuthStore } = await import('../auth')
+
+    await expect(useAuthStore().changeOwnPassword({
+      currentPassword: 'old-password',
+      newPassword: 'reused-password',
+      newPasswordVerify: 'reused-password',
+    })).resolves.toBe(false)
     expect(useAuthStore().status).toBe('authenticated')
-    expect(useAuthStore().error).toBeNull()
+    expect(useAuthStore().error).toBe('New password was used in the last 5 passwords.')
+    expect(clearApiResponseCache).not.toHaveBeenCalled()
   })
 
   // DAR-BE-264: change#OwnPassword refuses a wrong current password as a JSON-RPC error. The person stays signed in and

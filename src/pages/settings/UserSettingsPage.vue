@@ -245,7 +245,6 @@
           </div>
         </article>
       </div>
-      <p v-if="passwordFlow.message" class="section-note">{{ passwordFlow.message }}</p>
       <p v-if="twoFactorLoadError" class="section-note" role="alert" data-testid="two-factor-load-error">{{ twoFactorLoadError }}</p>
       <p v-if="twoFactorStatus?.codesLocked" class="section-note" role="alert" data-testid="two-factor-locked">
         Codes are locked after too many wrong tries. A password reset unlocks them.
