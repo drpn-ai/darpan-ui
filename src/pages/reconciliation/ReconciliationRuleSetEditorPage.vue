@@ -50,11 +50,10 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import RuleSetBoard from '../../components/reconciliation/RuleSetBoard.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { reconciliationFacade } from '../../lib/api/facade'
-import type { SaveRuleSetRunResponse, SavedRunRule } from '../../lib/api/types'
+import type { SaveRuleSetRunResponse } from '../../lib/api/types'
 import {
   buildSaveRuleSetRunPayload,
-  normalizePreActions,
-  readReconciliationRuleExpressionPreActions,
+  savedRunRuleToDraftRule,
   type ReconciliationRuleSetDraft,
   type ReconciliationRuleSetDraftRule,
 } from '../../lib/reconciliationRuleSetDraft'
@@ -78,34 +77,6 @@ const draft = computed<ReconciliationRuleSetDraft | null>(() => draftState.value
 const originalRules = draft.value?.rules
 const originalFile1ExcludeFilters = draft.value?.file1ExcludeFilters
 const originalFile2ExcludeFilters = draft.value?.file2ExcludeFilters
-
-function savedRunRuleToDraftRule(rule: SavedRunRule, index: number): ReconciliationRuleSetDraftRule | null {
-  const file1FieldPath = rule.file1FieldPath?.trim()
-  const file2FieldPath = rule.file2FieldPath?.trim()
-  if (!file1FieldPath || !file2FieldPath) return null
-
-  const preActions = normalizePreActions(rule.preActions)
-  return {
-    ruleId: rule.ruleId,
-    file1FieldPath,
-    file2FieldPath,
-    // buildRuleSetRulePayloads (the single point of truth whenever this draft is next submitted)
-    // re-validates/defaults the operator on every save, so a plain trim-or-default here is enough
-    // — no need to duplicate the board's full RuleOperator allow-list check.
-    operator: rule.operator?.trim() || '=',
-    sequenceNum: rule.sequenceNum ?? index + 1,
-    preActions: preActions.length
-      ? preActions
-      : readReconciliationRuleExpressionPreActions(rule.expression),
-    ruleName: rule.ruleName ?? undefined,
-    ruleText: rule.ruleText,
-    ruleLogic: rule.ruleLogic,
-    ruleType: rule.ruleType,
-    expression: rule.expression,
-    enabled: rule.enabled,
-    severity: rule.severity,
-  }
-}
 
 type BoardEdits = [
   ReconciliationRuleSetDraft['rules'],

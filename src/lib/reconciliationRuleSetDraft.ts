@@ -3,6 +3,7 @@
 
 import type { CreateRuleSetRunPayload, RuleSetRulePayload, SaveRuleSetRunPayload } from './api/facadeTypes'
 import type { SourceExtractOptions } from './api/authoringTypes'
+import type { SavedRunRule } from './api/types'
 import { excludeFilterPayloadFields, type SourceExcludeFilter } from './sourceExcludeFilters'
 import { normalizeString } from './utils/strings'
 
@@ -194,6 +195,33 @@ function readRuleExpression(value: unknown): Partial<ReconciliationRuleSetDraftR
 
 export function readReconciliationRuleExpressionPreActions(expression: string | undefined): ReconciliationRulePreActionEntry[] {
   return readRuleExpression(expression).preActions ?? []
+}
+
+/** A stored rule as the board edits it; a rule missing either field path is left out. */
+export function savedRunRuleToDraftRule(rule: SavedRunRule, index: number): ReconciliationRuleSetDraftRule | null {
+  const file1FieldPath = rule.file1FieldPath?.trim()
+  const file2FieldPath = rule.file2FieldPath?.trim()
+  if (!file1FieldPath || !file2FieldPath) return null
+
+  const preActions = normalizePreActions(rule.preActions)
+  return {
+    ruleId: rule.ruleId,
+    file1FieldPath,
+    file2FieldPath,
+    // buildRuleSetRulePayloads re-checks the operator on every save, so trim-or-default is enough here.
+    operator: rule.operator?.trim() || '=',
+    sequenceNum: rule.sequenceNum ?? index + 1,
+    preActions: preActions.length
+      ? preActions
+      : readReconciliationRuleExpressionPreActions(rule.expression),
+    ruleName: rule.ruleName ?? undefined,
+    ruleText: rule.ruleText,
+    ruleLogic: rule.ruleLogic,
+    ruleType: rule.ruleType,
+    expression: rule.expression,
+    enabled: rule.enabled,
+    severity: rule.severity,
+  }
 }
 
 export function buildCreateRuleSetRunPayload(draft: ReconciliationRuleSetDraft): CreateRuleSetRunPayload {
