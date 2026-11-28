@@ -101,7 +101,6 @@ type ChipEntry = { tenantUserGroupId: string; label: string; removed: boolean }
 
 const root = ref<HTMLElement | null>(null)
 const sharing = ref<ConfigSharing | null>(null)
-const loading = ref(false)
 const error = ref<string | null>(null)
 const liveMessage = ref('')
 const picking = ref(false)
@@ -209,7 +208,6 @@ async function load(): Promise<void> {
   const controller = new AbortController()
   loadController = controller
 
-  loading.value = true
   error.value = null
   try {
     const response = await settingsFacade.listConfigTenantAccess({
@@ -225,9 +223,21 @@ async function load(): Promise<void> {
     if (controller.signal.aborted || isAbortError(loadError)) return
     error.value = loadError instanceof ApiCallError ? loadError.message : 'Sharing state refuses to share itself.'
   } finally {
-    if (!controller.signal.aborted) loading.value = false
     if (loadController === controller) loadController = null
   }
+}
+
+/**
+ * Grants the tenant access to this config, for a pick and for an undo alike: the refusal's sentence (or `fallback`
+ * when it gives none), '' once granted. A thrown failure is the caller's to show.
+ */
+async function grantTo(targetTenantUserGroupId: string, signal: AbortSignal, fallback: string): Promise<string> {
+  const response = await settingsFacade.grantConfigTenantAccess({
+    configTypeEnumId: props.configType,
+    configId: props.configId,
+    targetTenantUserGroupId,
+  }, signal)
+  return !response.ok || (response.errors?.length ?? 0) > 0 ? response.errors?.[0] ?? fallback : ''
 }
 
 async function grantAccess(targetTenantUserGroupId: string): Promise<void> {
@@ -240,14 +250,10 @@ async function grantAccess(targetTenantUserGroupId: string): Promise<void> {
   granting.value = true
   error.value = null
   try {
-    const response = await settingsFacade.grantConfigTenantAccess({
-      configTypeEnumId: props.configType,
-      configId: props.configId,
-      targetTenantUserGroupId,
-    }, controller.signal)
+    const refusal = await grantTo(targetTenantUserGroupId, controller.signal, 'The configuration got shy about sharing. Not shared.')
     if (controller.signal.aborted) return
-    if (!response.ok || (response.errors?.length ?? 0) > 0) {
-      error.value = response.errors?.[0] ?? 'The configuration got shy about sharing. Not shared.'
+    if (refusal) {
+      error.value = refusal
       return
     }
     picking.value = false
@@ -320,15 +326,11 @@ async function undoRemove(tenantUserGroupId: string): Promise<void> {
   granting.value = true
   error.value = null
   try {
-    const response = await settingsFacade.grantConfigTenantAccess({
-      configTypeEnumId: props.configType,
-      configId: props.configId,
-      targetTenantUserGroupId: tenantUserGroupId,
-    }, controller.signal)
+    const refusal = await grantTo(tenantUserGroupId, controller.signal, 'The undo button blinked first. Access not restored.')
     if (controller.signal.aborted) return
-    if (!response.ok || (response.errors?.length ?? 0) > 0) {
+    if (refusal) {
       // Slot deliberately survives a failed undo so the gesture can be retried.
-      error.value = response.errors?.[0] ?? 'The undo button blinked first. Access not restored.'
+      error.value = refusal
       resumeUndoTimer(tenantUserGroupId)
       return
     }

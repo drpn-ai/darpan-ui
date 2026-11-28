@@ -140,6 +140,7 @@ import StaticFactStrip, { type StaticFact } from '../../components/ui/StaticFact
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
+import { serviceErrors } from '../../lib/api/client'
 import { configFacade } from '../../lib/api/facade'
 import type { ConfigVersion, PreviewTenantConfigRestoreResponse } from '../../lib/api/configTypes'
 import { countsDelta, countsSummary, groupVersionsByDay, restoreChangesNothing, restoreSections, sourceLabel, versionTime } from '../../lib/configHistory'
@@ -210,8 +211,9 @@ function reasonOf(version: ConfigVersion): string {
   return version.reason && version.reason !== AUTOMATIC_REASON ? version.reason : ''
 }
 
+/** Every sentence a refusal gave; a script error shows the fallback, never its raw text. */
 function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
+  return serviceErrors(error, fallback).join(' ')
 }
 
 async function loadVersions(): Promise<void> {
@@ -294,23 +296,20 @@ onMounted(loadVersions)
 
 /* The Tenant Settings row pattern (DAR-UI-122): one bordered list, every row the same minimum height. */
 .config-history-rows {
+  display: grid;
   margin: 0;
   padding: 0;
+  list-style: none;
   border: 1px solid var(--static-tile-border);
   border-radius: var(--static-surface-radius);
   background: var(--static-tile-bg);
+  overflow: hidden;
   font-size: var(--static-tile-text-size);
 }
 
 .config-history-day {
   margin: var(--space-2) 0 0;
   font-weight: 400;
-}
-
-.config-history-rows {
-  display: grid;
-  list-style: none;
-  overflow: hidden;
 }
 
 .config-history-rows > li + li {
