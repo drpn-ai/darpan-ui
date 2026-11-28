@@ -244,7 +244,6 @@ export const useRunResultsStore = defineStore('runResults', () => {
     startRunStatusPoll,
     refreshRunStatus,
     stopRunStatusPoll,
-    stopAllRunStatusPolls,
     upsertOutput,
     upsertOutputs,
     reset,

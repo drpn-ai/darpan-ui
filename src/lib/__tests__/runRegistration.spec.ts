@@ -6,7 +6,7 @@ vi.mock('../api/facade', () => ({
   reconciliationFacade: { getActiveRunResult },
 }))
 
-import { pollForRegisteredRunResultId } from '../runRegistration'
+import { delay, pollForRegisteredRunResultId } from '../runRegistration'
 
 describe('pollForRegisteredRunResultId', () => {
   beforeEach(() => {
@@ -60,5 +60,32 @@ describe('pollForRegisteredRunResultId', () => {
 
     await expect(found).resolves.toBe('')
     expect(getActiveRunResult).toHaveBeenCalledTimes(1)
+  })
+})
+
+// S99-111: one delay for the run-registration polls (this file and the automation dashboard had a copy each).
+describe('delay', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('waits the time, and ends early when the signal aborts', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    let done = false
+    void delay(1000, controller.signal).then(() => { done = true })
+    await vi.advanceTimersByTimeAsync(999)
+    expect(done).toBe(false)
+    controller.abort()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(done).toBe(true)
+  })
+
+  it('ends at once on a signal that has already aborted, rather than waiting it out', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    controller.abort()
+    let done = false
+    void delay(1000, controller.signal).then(() => { done = true })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(done).toBe(true)
   })
 })

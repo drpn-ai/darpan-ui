@@ -63,7 +63,8 @@ export function fileNameFromPath(value: unknown): string {
 // (darpan.reconciliation.ReconciliationRunStep.stageCode). Extract stages take the
 // run's own system labels so operators read "Extracting SHOPIFY", not a code.
 
-// Canonical stage order, mirroring RunObservability.STAGE_SEQUENCE. Step rows are created
+// Canonical stage order. RunObservability.STAGE_SEQUENCE numbers the same stages; only the ORDER must match (this list
+// holds it by position), so change both together. Step rows are created
 // lazily as stages start, so a live view synthesizes the not-yet-started remainder from this
 // list; conditional stages (VERIFY, file-mode extracts) simply drop out as real rows arrive.
 export const RUN_STAGE_SEQUENCE: readonly string[] = [

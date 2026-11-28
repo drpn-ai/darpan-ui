@@ -635,7 +635,10 @@ const loading = ref(false)
 const loadError = ref<string | null>(null)
 const openingRunSettings = ref(false)
 const runSettingsError = ref<string | null>(null)
-const savedOutput = ref<GeneratedOutput | null>(null)
+// S99-111: what this page reads of a saved result; the summary read gives no more, so nothing else is made up.
+type SavedResultView = Pick<GeneratedOutput,
+  'savedRunId' | 'savedRunName' | 'ruleSetId' | 'reconciliationMappingId' | 'file1Label' | 'file2Label' | 'totalDifferences' | 'createdDate'>
+const savedOutput = ref<SavedResultView | null>(null)
 // Captured from the RAW response metadata, before buildGeneratedOutputFromSummary launders it. That
 // builder falls back file2Label -> route query -> 'File 2', so a single-sided run's null second side
 // is already gone by the time it reaches savedOutput, and the fallback happens to resolve to the
@@ -1129,31 +1132,21 @@ function resetDiffDetailsState(): void {
   resetDifferencesState()
 }
 
-function buildGeneratedOutputFromSummary(
-  fileName: string,
+function buildSavedResultView(
   metadata: GeneratedOutputDifferencesMetadata,
   summary: GeneratedOutputDifferencesSummary,
-): GeneratedOutput {
+): SavedResultView {
   const file1LabelValue = normalizeDisplayText(metadata.file1Label) || normalizeDisplayText(file1SystemLabel.value) || 'File 1'
   const file2LabelValue = normalizeDisplayText(metadata.file2Label) || normalizeDisplayText(file2SystemLabel.value) || 'File 2'
 
   return {
-    fileName,
-    sourceFormat: 'json',
-    availableFormats: ['json', 'csv'],
-    preferredDownloadFormat: 'csv',
     savedRunId: metadata.savedRunId || metadata.reconciliationMappingId || metadata.ruleSetId || savedRunId.value,
     savedRunName: metadata.savedRunName || metadata.reconciliationMappingName || runName.value,
-    savedRunType: metadata.savedRunType || (metadata.ruleSetId ? 'ruleset' : 'mapping'),
     reconciliationMappingId: metadata.reconciliationMappingId,
-    mappingName: metadata.reconciliationMappingName,
     ruleSetId: metadata.ruleSetId,
-    compareScopeId: metadata.compareScopeId,
     file1Label: file1LabelValue,
     file2Label: file2LabelValue,
     totalDifferences: summary.totalDifferences ?? 0,
-    onlyInFile1Count: summary.onlyInFile1Count ?? 0,
-    onlyInFile2Count: summary.onlyInFile2Count ?? 0,
     // The instant first: metadata.timestamp is a zone-less wall clock, and parsing it against the
     // browser's zone put a 09:10 UTC run at "Aug 25, 4:40 PM" for an IST viewer on an
     // America/Los_Angeles tenant — wrong by browser-offset + host-offset, so wrong by a different
@@ -1206,7 +1199,7 @@ async function loadSavedResult(): Promise<void> {
       const metadata = response.metadata ?? {}
       resultRunId.value = normalizeDisplayText(metadata.reconciliationRunResultId)
       const summary = response.summary ?? {}
-      const descriptor = buildGeneratedOutputFromSummary(requestedOutputFileName, metadata, summary)
+      const descriptor = buildSavedResultView(metadata, summary)
 
       savedOutput.value = descriptor
       downloadableOutputFile.value = response.outputFile ? { ...response.outputFile } : null
