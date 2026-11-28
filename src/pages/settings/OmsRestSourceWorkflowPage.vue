@@ -232,7 +232,6 @@ interface OmsForm {
   username: string
   password: string
   apiToken: string
-  headersJson: string
   connectTimeoutSeconds: number
   readTimeoutSeconds: number
   isActive: string
@@ -248,7 +247,6 @@ function createDefaultOmsForm(): OmsForm {
     username: '',
     password: '',
     apiToken: '',
-    headersJson: '',
     connectTimeoutSeconds: 30,
     readTimeoutSeconds: 60,
     isActive: 'Y',
@@ -358,7 +356,6 @@ function applyRecord(record: OmsRestSourceConfigRecord): void {
   form.username = ''
   form.password = ''
   form.apiToken = ''
-  form.headersJson = ''
   form.connectTimeoutSeconds = record.connectTimeoutSeconds ?? 30
   form.readTimeoutSeconds = record.readTimeoutSeconds ?? 60
   form.isActive = record.isActive ?? 'Y'
@@ -383,7 +380,7 @@ async function save(): Promise<ConnectionSaveOutcome> {
     username: isBasicAuth.value ? form.username.trim() : '',
     password: isBasicAuth.value ? form.password.trim() : '',
     apiToken: isApiTokenAuth.value ? form.apiToken.trim() : '',
-    headersJson: form.headersJson.trim(),
+    // No headersJson: this form has no headers field, and an edit without it keeps the stored ones (OC172).
     connectTimeoutSeconds: form.connectTimeoutSeconds,
     readTimeoutSeconds: form.readTimeoutSeconds,
     isActive: form.isActive === 'Y',

@@ -262,12 +262,13 @@ describe('OmsRestSourceWorkflowPage', () => {
       username: '',
       password: '',
       apiToken: 'oms-api-key',
-      headersJson: '',
       connectTimeoutSeconds: 30,
       readTimeoutSeconds: 60,
       isActive: true,
       canReadOrders: true,
     })
+    // The form has no headers field, so it never sends headersJson.
+    expect(saveOmsRestSourceConfig.mock.calls[0]?.[0]).not.toHaveProperty('headersJson')
     expect(push).toHaveBeenCalledWith('/settings/hotwax')
   })
 
@@ -404,7 +405,7 @@ describe('OmsRestSourceWorkflowPage', () => {
     expect(wrapper.text()).not.toContain('Orders Path')
   })
 
-  it('returns to the selected HotWax source dashboard after saving an edit', async () => {
+  it('keeps stored custom headers when saving an edit (sends no headersJson) and returns to the dashboard', async () => {
     route.params = { omsRestSourceConfigId: 'dev_oms' }
     route.name = 'settings-oms-edit'
     route.fullPath = '/settings/hotwax/edit/dev_oms'
@@ -422,7 +423,7 @@ describe('OmsRestSourceWorkflowPage', () => {
           hasUsername: false,
           hasPassword: false,
           hasApiToken: false,
-          customHeaderNames: [],
+          customHeaderNames: ['X-Tenant'],
           connectTimeoutSeconds: 10,
           readTimeoutSeconds: 20,
           timeZone: 'America/Chicago',
@@ -464,12 +465,13 @@ describe('OmsRestSourceWorkflowPage', () => {
       username: '',
       password: '',
       apiToken: '',
-      headersJson: '',
       connectTimeoutSeconds: 10,
       readTimeoutSeconds: 20,
       isActive: true,
       canReadOrders: true,
     })
+    // OC172 (darpan-hotwax 9d00289): an edit without headersJson keeps the stored custom headers.
+    expect(saveOmsRestSourceConfig.mock.calls[0]?.[0]).not.toHaveProperty('headersJson')
     expect(push).toHaveBeenCalledWith({
       name: 'settings-oms-auth',
       params: { omsRestSourceConfigId: 'dev_oms' },

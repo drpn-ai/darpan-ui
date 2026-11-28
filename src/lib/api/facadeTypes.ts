@@ -160,7 +160,6 @@ export interface SaveOmsRestSourceConfigPayload {
   username?: string
   password?: string
   apiToken?: string
-  headersJson?: string
   connectTimeoutSeconds: number
   readTimeoutSeconds: number
   isActive?: boolean
