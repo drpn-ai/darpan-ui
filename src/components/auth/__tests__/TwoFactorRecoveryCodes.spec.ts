@@ -22,6 +22,7 @@ function stubExecCommand(result: boolean) {
 describe('TwoFactorRecoveryCodes', () => {
   afterEach(() => {
     stubClipboard(undefined)
+    vi.useRealTimers()
   })
 
   it('copies every code, one per line, with the async clipboard', async () => {
@@ -46,7 +47,6 @@ describe('TwoFactorRecoveryCodes', () => {
     expect(wrapper.get('[data-testid="two-factor-codes-copy-note"]').text()).toBe('Copied.')
     await vi.advanceTimersByTimeAsync(2000)
     expect(wrapper.get('[data-testid="two-factor-codes-copy-note"]').text()).toBe('')
-    vi.useRealTimers()
   })
 
   it('falls back to a textarea copy when the clipboard refuses', async () => {
