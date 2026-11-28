@@ -17,8 +17,8 @@
         </p>
       </div>
     </div>
-    <div v-for="(stage, index) in stages" :key="stage.recordType" class="lifecycle-outline-group">
-      <div class="lifecycle-outline-node" :class="{ 'lifecycle-outline-node--last': index === stages.length - 1 }">
+    <div v-for="stage in stages" :key="stage.recordType" class="lifecycle-outline-group">
+      <div class="lifecycle-outline-node">
         <span class="lifecycle-outline-name">{{ stage.label }}</span>
       </div>
       <div v-if="exceptionsFor(stage.recordType).length || placesAt(stage.label).length" class="lifecycle-outline-gap">

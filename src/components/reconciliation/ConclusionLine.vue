@@ -494,6 +494,7 @@ function emitNumber(event: Event): void {
 
 .conclusion-line__conn--edit {
   grid-area: conn;
+  padding-top: var(--space-2);
 }
 
 .conclusion-line-edit__subject {
@@ -513,10 +514,6 @@ function emitNumber(event: Event): void {
   grid-area: actions;
   gap: var(--space-1);
   justify-content: flex-end;
-}
-
-.conclusion-line__conn--edit {
-  padding-top: var(--space-2);
 }
 
 .conclusion-line-edit__subject,
@@ -618,7 +615,6 @@ function emitNumber(event: Event): void {
   align-items: center;
   min-height: 2.55rem;
 }
-
 
 @media (max-width: 640px) {
   .conclusion-line-edit {

@@ -56,7 +56,7 @@ import { isFindingPlace, type LifecycleBoard, type LifecyclePlace } from '../../
 // with how many reached it, the places a record stopped at listed under the stage where it stopped, the complete
 // place last. Monochrome; an empty place is dimmed; a place with records opens them, underlined on approach.
 // A place a person said is not a finding still shows its records, quietly, and says so.
-const props = defineProps<{ board: LifecycleBoard; narrow?: boolean; canOpen: (place: LifecyclePlace) => boolean; notFinding?: string[] }>()
+const props = defineProps<{ board: LifecycleBoard; canOpen: (place: LifecyclePlace) => boolean; notFinding?: string[] }>()
 const emit = defineEmits<{ open: [place: LifecyclePlace] }>()
 const countFormat = new Intl.NumberFormat('en-US')
 

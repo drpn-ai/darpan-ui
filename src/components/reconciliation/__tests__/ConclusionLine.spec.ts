@@ -1,5 +1,5 @@
-import { mount, type VueWrapper } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { enableAutoUnmount, mount, type VueWrapper } from '@vue/test-utils'
+import { afterEach, describe, expect, it } from 'vitest'
 import ConclusionLine from '../ConclusionLine.vue'
 import type { RunConclusionCondition } from '../../../lib/api/authoringTypes'
 import type { CatalogField } from '../../../lib/conclusionFieldCatalog'
@@ -38,6 +38,9 @@ async function pick(wrapper: VueWrapper, testId: string, value: string) {
   await wrapper.get(`[data-testid="${testId}"]`).trigger('click')
   await wrapper.get(`[data-option-value="${value}"]`).trigger('click')
 }
+// Lines mount into document.body so their select menus can open; unmount each one so no menu outlives its test.
+enableAutoUnmount(afterEach)
+
 const last = (wrapper: VueWrapper) => (wrapper.emitted('update') ?? []).at(-1)?.[0] as RunConclusionCondition
 
 describe('ConclusionLine', () => {
@@ -172,7 +175,6 @@ describe('ConclusionLine', () => {
     const known = { ...bare, nonListPaths: new Set(['items']) }
     expect(mount(ConclusionLine, { props: { condition: every, context: known, fields, connector: 'when', editing: true } })
       .find('[data-testid="conclusion-line-quantifier"]').exists()).toBe(false)
-    edit.unmount()
   })
 
   it('offers "no" only over a list test', async () => {
