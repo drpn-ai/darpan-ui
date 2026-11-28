@@ -470,8 +470,6 @@ describe('run#SavedRunDiff → RunSavedRunDiffResponse', () => {
       ok: true,
       messages: [],
       errors: [],
-      validationErrors: [],
-      processingWarnings: ['File2 has 0 extra rows'],
       runResult: {
         savedRunId: 'sr-001',
         runName: 'Orders vs NetSuite',
@@ -528,10 +526,9 @@ describe('run#SavedRunDiff → RunSavedRunDiffResponse', () => {
     expect(Array.isArray(result.messages)).toBe(true)
     expect(Array.isArray(result.errors)).toBe(true)
 
-    // RunSavedRunDiffResponse own fields
-    expect(Array.isArray(result.validationErrors)).toBe(true)
-    expect(Array.isArray(result.processingWarnings)).toBe(true)
-    expect(result.processingWarnings).toContain('File2 has 0 extra rows')
+    // DAR-OPS-029 U13b: the top level is the envelope alone; run#SavedRunDiff declares the two lists only in runResult.
+    expect(result).not.toHaveProperty('validationErrors')
+    expect(result).not.toHaveProperty('processingWarnings')
 
     // runResult: RunSavedRunDiffResult
     expect(result.runResult).toBeDefined()
@@ -550,7 +547,7 @@ describe('run#SavedRunDiff → RunSavedRunDiffResponse', () => {
     expect(typeof rr.file2SystemEnumId).toBe('string')
     expect(typeof rr.file2SystemLabel).toBe('string')
     expect(Array.isArray(rr.validationErrors)).toBe(true)
-    expect(Array.isArray(rr.processingWarnings)).toBe(true)
+    expect(rr.processingWarnings).toContain('File2 has 0 extra rows')
 
     // generatedOutput: GeneratedOutput
     expect(rr.generatedOutput).toBeDefined()

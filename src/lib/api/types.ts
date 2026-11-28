@@ -1050,9 +1050,8 @@ export type SaveSavedRunNameResponse = Schemas['SaveSavedRunNameResult']
 
 export type DeleteSavedRunResponse = Schemas['DeleteSavedRunResult']
 
+/** validationErrors and processingWarnings ride inside runResult; the top level is the envelope alone. */
 export interface RunSavedRunDiffResponse extends ApiEnvelope {
-  validationErrors?: string[]
-  processingWarnings?: string[]
   runResult?: RunSavedRunDiffResult
 }
 
