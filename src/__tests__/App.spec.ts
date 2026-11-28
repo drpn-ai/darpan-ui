@@ -7,7 +7,6 @@ import { COMMAND_PALETTE_OPEN_REQUEST_EVENT, DISMISS_INLINE_MENUS_EVENT, WORKFLO
 
 const ensureAuthenticated = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const logoutSession = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const saveActiveTenant = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const switchActiveTenant = vi.hoisted(() => vi.fn().mockResolvedValue('switched'))
 const clearDeepLinkTenantSwitch = vi.hoisted(() => vi.fn())
 const listSftpServers = vi.hoisted(() => vi.fn())
@@ -181,7 +180,6 @@ vi.mock('../stores/auth', () => ({
     ...authState,
     ensureAuthenticated,
     logoutSession,
-    saveActiveTenant,
     switchActiveTenant,
     clearDeepLinkTenantSwitch,
   }),
@@ -245,7 +243,6 @@ describe('App shell logout', () => {
     installLocalStorageStub()
     ensureAuthenticated.mockClear()
     logoutSession.mockClear()
-    saveActiveTenant.mockClear()
     switchActiveTenant.mockClear()
     switchActiveTenant.mockResolvedValue('switched')
     listSftpServers.mockReset()

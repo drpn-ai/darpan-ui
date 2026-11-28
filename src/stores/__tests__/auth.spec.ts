@@ -32,7 +32,7 @@ vi.mock('../../lib/api/facade', () => ({
 
 import { resolveEffectiveTimeZone, useAuthStore } from '../auth'
 import { getDefaultDisplayTimeZone, setDefaultDisplayTimeZone } from '../../lib/utils/date'
-import { ApiCallError, clearAuthToken } from '../../lib/api/client'
+import { ApiCallError } from '../../lib/api/client'
 import { useReferenceDataStore } from '../referenceData'
 
 describe('resolveEffectiveTimeZone', () => {
@@ -180,28 +180,6 @@ describe('auth store display-timezone sync', () => {
     expect(getDefaultDisplayTimeZone()).toBe('America/New_York')
 
     await store.logoutSession()
-    expect(getDefaultDisplayTimeZone()).toBeUndefined()
-  })
-
-  it('clears the display timezone when an external auth change detects no token', async () => {
-    saveUserSettingsMock.mockResolvedValue({
-      ok: true,
-      authenticated: true,
-      messages: [],
-      errors: [],
-      sessionInfo: { userId: 'M100000', userTimeZone: 'America/New_York' },
-    })
-
-    const store = useAuthStore()
-    await store.saveUserSettings({ timeZone: 'America/New_York' })
-    expect(getDefaultDisplayTimeZone()).toBe('America/New_York')
-
-    // No bearer token present (e.g. another tab logged out) — drive the same
-    // no-token branch handleExternalAuthChange takes on a storage event.
-    clearAuthToken()
-    store.handleExternalAuthChange()
-
-    expect(store.status).toBe('unauthenticated')
     expect(getDefaultDisplayTimeZone()).toBeUndefined()
   })
 })

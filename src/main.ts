@@ -16,7 +16,6 @@ import { vExplain } from './directives/vExplain'
 import './style.css'
 import { clearAgentConversations } from './components/audit/AuditAgentPanel.vue'
 
-const RECONCILIATION_DRAFT_SESSION_KEY = 'darpan.reconciliationDraftStore'
 const RECENT_COMMANDS_STORAGE_KEY = 'darpan-ui-recent-commands'
 // DAR-UI-140. The audit board's remembered By choice (record type or priority) is the person's own.
 const AUDIT_BY_STORAGE_KEY = 'darpan.audit.by'
@@ -38,9 +37,6 @@ setApiCacheReset(() => {
   useReconciliationDraftStore(pinia).resetAll() // setup-style store: explicit reset; clears its sessionStorage too
   clearAgentConversations() // DAR-UI-104: the agent panel's conversation ids are per user and tenant
   try {
-    // resetAll already removes the draft sessionStorage key; clear it again defensively in case
-    // the store has not been instantiated yet (no-op if absent).
-    window.sessionStorage.removeItem(RECONCILIATION_DRAFT_SESSION_KEY)
     window.localStorage.removeItem(RECENT_COMMANDS_STORAGE_KEY)
     window.localStorage.removeItem(AUDIT_BY_STORAGE_KEY)
   } catch {

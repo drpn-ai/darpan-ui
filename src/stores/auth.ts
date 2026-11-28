@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { RouteLocationRaw } from 'vue-router'
-import { ApiCallError, clearAuthToken, getAuthToken, setAuthTokenContract } from '../lib/api/client'
+import { ApiCallError, clearAuthToken, setAuthTokenContract } from '../lib/api/client'
 import { authFacade, clearApiResponseCache, settingsFacade } from '../lib/api/facade'
 import type { SaveTenantSettingsPayload } from '../lib/api/facadeTypes'
 import { setReadCacheScope } from '../lib/api/readCache'
@@ -201,9 +201,10 @@ export function buildAuthRedirect(redirectTarget: unknown): RouteLocationRaw {
   return { name: 'login', query: { redirect } }
 }
 
-function buildContractViolationError(error: unknown): string {
-  const message = error instanceof Error ? error.message : 'Invalid auth contract'
-  return `Unable to verify authentication. ${message}`
+/** What a failed auth call says: the backend's own sentence, or why the reply broke the auth contract. */
+function errorTextOf(err: unknown): string {
+  if (err instanceof ApiCallError) return err.message
+  return `Unable to verify authentication. ${err instanceof Error ? err.message : 'Invalid auth contract'}`
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -361,20 +362,44 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
+  /** The session is over: its key, every cached read and the signed-in state go together. */
+  function _endSession(error: string | null = null): void {
+    clearAuthToken()
+    clearApiResponseCache()
+    _applyAuthState({ status: 'unauthenticated', error })
+  }
+
   /** A signed-in account call that threw: a 401 ends the session; anything else keeps the current
-   *  session and surfaces the error. Unlike a tenant switch, this leaves the response cache alone. */
+   *  session and surfaces the error. */
   function _applyAccountCallFailure(err: unknown): void {
     if (err instanceof ApiCallError && err.status === 401) {
-      clearAuthToken()
-      _applyAuthState({ status: 'unauthenticated', error: err.message })
+      _endSession(err.message)
       return
     }
 
     _applyAuthState({
       status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-      error: err instanceof ApiCallError ? err.message : buildContractViolationError(err),
+      error: errorTextOf(err),
       sessionInfo: _sessionInfo.value,
     })
+  }
+
+  /**
+   * A signed-in account call's reply. Still signed in: its session is applied, with the refusal as the error unless
+   * `succeeded`. Signed out: the session ends. Answers `succeeded` only while still signed in.
+   */
+  function _applyAccountReply(
+    response: { authenticated?: boolean; errors?: string[]; sessionInfo?: SessionInfo | null },
+    succeeded: boolean,
+    refusedText: string,
+    signedOutText: string,
+  ): boolean {
+    if (response.authenticated) {
+      _applyAuthenticatedSession(response.sessionInfo, succeeded ? null : response.errors?.[0] ?? refusedText)
+      return succeeded
+    }
+    _endSession(response.errors?.[0] ?? signedOutText)
+    return false
   }
 
   function _hydrateReferenceData(): void {
@@ -395,24 +420,19 @@ export const useAuthStore = defineStore('auth', () => {
       return true
     }
 
-    clearAuthToken()
-    clearApiResponseCache()
-    _applyAuthState({
-      status: 'unauthenticated',
-      error: response.errors?.[0] ?? unauthenticatedMessage,
-    })
+    _endSession(response.errors?.[0] ?? unauthenticatedMessage)
     return false
   }
 
+  /** VITE_DARPAN_AUTH_BYPASS (dev server only): every check and sign-in is the local-dev user. */
+  function _signInBypass(): boolean {
+    _applyAuthState({ status: 'authenticated', sessionInfo: { userId: 'local-dev', username: 'local-dev' } })
+    _hydrateReferenceData()
+    return true
+  }
+
   async function ensureAuthenticated(force = false): Promise<boolean> {
-    if (authBypass) {
-      _applyAuthState({
-        status: 'authenticated',
-        sessionInfo: { userId: 'local-dev', username: 'local-dev' },
-      })
-      _hydrateReferenceData()
-      return true
-    }
+    if (authBypass) return _signInBypass()
 
     if (_checked.value && !force) return _status.value === 'authenticated'
 
@@ -426,15 +446,8 @@ export const useAuthStore = defineStore('auth', () => {
         if (isAuthenticated) _hydrateReferenceData()
         return isAuthenticated
       } catch (err) {
-        if (err instanceof ApiCallError && err.status === 401) {
-          clearAuthToken()
-          clearApiResponseCache()
-          _applyAuthState({ status: 'unauthenticated', error: err.message })
-          return false
-        }
-
-        const formattedError = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
-        _applyAuthState({ status: 'verification-failed', error: formattedError })
+        if (err instanceof ApiCallError && err.status === 401) _endSession(err.message)
+        else _applyAuthState({ status: 'verification-failed', error: errorTextOf(err) })
         return false
       } finally {
         _ensureAuthInFlight = null
@@ -444,31 +457,8 @@ export const useAuthStore = defineStore('auth', () => {
     return inFlight
   }
 
-  // Called by App.vue on a storage event. The bearer token now lives in this tab's sessionStorage
-  // (audit #10), so cross-tab token sync no longer applies — sessions are per-tab. We still react
-  // defensively: if this tab's own token is gone we treat it as a logout (clear local state +
-  // caches, no server call); if a token is present we force-revalidate so a rotated user is picked
-  // up rather than rendering the previous user's UI.
-  function handleExternalAuthChange(): void {
-    const storedToken = getAuthToken()
-    if (!storedToken) {
-      clearApiResponseCache()
-      _applyAuthState({ status: 'unauthenticated' })
-      return
-    }
-    // Token present but may belong to a different user — force a fresh server check.
-    void ensureAuthenticated(true)
-  }
-
   async function loginWithCredentials(usernameArg: string, password: string): Promise<boolean> {
-    if (authBypass) {
-      _applyAuthState({
-        status: 'authenticated',
-        sessionInfo: { userId: 'local-dev', username: 'local-dev' },
-      })
-      _hydrateReferenceData()
-      return true
-    }
+    if (authBypass) return _signInBypass()
 
     _passwordChangeReason.value = null
     _setTwoFactorChallenge(null)
@@ -518,7 +508,7 @@ export const useAuthStore = defineStore('auth', () => {
       clearAuthToken()
       _applyAuthState({
         status: 'unauthenticated',
-        error: err instanceof ApiCallError ? err.message : buildContractViolationError(err),
+        error: errorTextOf(err),
       })
       return false
     }
@@ -650,32 +640,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logoutSession(): Promise<boolean> {
     if (authBypass) {
-      clearApiResponseCache()
-      _applyAuthState({ status: 'unauthenticated' })
+      _endSession()
       return true
     }
 
     try {
       const response = await authFacade.logoutSession()
-      clearAuthToken()
-      clearApiResponseCache()
-      if (!response.authenticated) {
-        _applyAuthState({ status: 'unauthenticated' })
-        return true
-      }
-
-      _applyAuthState({
-        status: 'unauthenticated',
-        error: response.errors?.[0] ?? 'Logout failed',
-      })
-      return false
+      _endSession(response.authenticated ? response.errors?.[0] ?? 'Logout failed' : null)
+      return !response.authenticated
     } catch (err) {
-      clearAuthToken()
-      clearApiResponseCache()
-      _applyAuthState({
-        status: 'unauthenticated',
-        error: err instanceof ApiCallError ? err.message : 'Logout failed',
-      })
+      _endSession(err instanceof ApiCallError ? err.message : 'Logout failed')
       return false
     }
   }
@@ -705,33 +679,13 @@ export const useAuthStore = defineStore('auth', () => {
         return response.ok ? 'switched' : 'refused'
       }
 
-      clearAuthToken()
-      clearApiResponseCache()
-      _applyAuthState({
-        status: 'unauthenticated',
-        error: response.errors?.[0] ?? 'Authentication required to change the active tenant.',
-      })
+      _endSession(response.errors?.[0] ?? 'Authentication required to change the active tenant.')
       return 'failed'
     } catch (err) {
-      if (err instanceof ApiCallError && err.status === 401) {
-        clearAuthToken()
-        clearApiResponseCache()
-        _applyAuthState({ status: 'unauthenticated', error: err.message })
-        return 'failed'
-      }
-
-      _applyAuthState({
-        status: _status.value === 'authenticated' ? 'authenticated' : 'verification-failed',
-        error: err instanceof ApiCallError ? err.message : buildContractViolationError(err),
-        sessionInfo: _sessionInfo.value,
-      })
+      _applyAccountCallFailure(err)
       // The call never reached a verdict. Never render this as access-denied.
       return 'failed'
     }
-  }
-
-  async function saveActiveTenant(activeTenantUserGroupId: string): Promise<boolean> {
-    return (await switchActiveTenant(activeTenantUserGroupId)) === 'switched'
   }
 
   async function saveUserSettings(payload: { displayName?: string; timeZone?: string }): Promise<boolean> {
@@ -753,18 +707,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const response: SaveUserSettingsResponse = await authFacade.saveUserSettings(payload)
-      if (response.authenticated) {
-        const errorMessage = response.ok ? null : response.errors?.[0] ?? 'Your settings had second thoughts. Not saved.'
-        _applyAuthenticatedSession(response.sessionInfo, errorMessage)
-        return response.ok
-      }
-
-      clearAuthToken()
-      _applyAuthState({
-        status: 'unauthenticated',
-        error: response.errors?.[0] ?? 'Authentication required to save user settings.',
-      })
-      return false
+      return _applyAccountReply(response, response.ok, 'Your settings had second thoughts. Not saved.', 'Authentication required to save user settings.')
     } catch (err) {
       _applyAccountCallFailure(err)
       return false
@@ -846,18 +789,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const response: ChangeOwnPasswordResponse = await authFacade.changeOwnPassword(payload)
-      if (response.authenticated) {
-        const errorMessage = response.ok ? null : response.errors?.[0] ?? 'Unable to change password.'
-        _applyAuthenticatedSession(response.sessionInfo, errorMessage)
-        return response.ok && response.passwordUpdated === true
-      }
-
-      clearAuthToken()
-      _applyAuthState({
-        status: 'unauthenticated',
-        error: response.errors?.[0] ?? 'Authentication required to change password.',
-      })
-      return false
+      return _applyAccountReply(response, response.ok, 'Unable to change password.', 'Authentication required to change password.')
+        && response.passwordUpdated === true
     } catch (err) {
       _applyAccountCallFailure(err)
       return false
@@ -883,7 +816,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (err) {
       // The backend reports a rejected new password as a service error rather than an envelope, so the
       // policy text ("shorter than 12 characters", "was used in last 5 passwords") arrives here.
-      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
+      _error.value = errorTextOf(err)
       return false
     }
   }
@@ -898,7 +831,7 @@ export const useAuthStore = defineStore('auth', () => {
       _error.value = null
       return { outcome: response.outcome ?? 'sent', emailAddressMasked: response.emailAddressMasked ?? null }
     } catch (err) {
-      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
+      _error.value = errorTextOf(err)
       return null
     }
   }
@@ -910,7 +843,7 @@ export const useAuthStore = defineStore('auth', () => {
       _error.value = verified ? null : response.errors?.[0] ?? "That code didn't work. Request a new one."
       return verified
     } catch (err) {
-      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
+      _error.value = errorTextOf(err)
       return false
     }
   }
@@ -928,7 +861,7 @@ export const useAuthStore = defineStore('auth', () => {
       return updated
     } catch (err) {
       // A refused new password arrives as a service error, as in changeExpiredPassword.
-      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
+      _error.value = errorTextOf(err)
       return false
     }
   }
@@ -952,7 +885,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       return true
     } catch (err) {
-      _error.value = err instanceof ApiCallError ? err.message : buildContractViolationError(err)
+      _error.value = errorTextOf(err)
       return false
     }
   }
@@ -971,18 +904,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const response: VerifyOwnPasswordResponse = await authFacade.verifyOwnPassword({ currentPassword })
-      if (response.authenticated) {
-        const errorMessage = response.ok && response.passwordVerified === true ? null : response.errors?.[0] ?? 'Password incorrect.'
-        _applyAuthenticatedSession(response.sessionInfo, errorMessage)
-        return response.ok && response.passwordVerified === true
-      }
-
-      clearAuthToken()
-      _applyAuthState({
-        status: 'unauthenticated',
-        error: response.errors?.[0] ?? 'Authentication required to verify password.',
-      })
-      return false
+      return _applyAccountReply(response, response.ok && response.passwordVerified === true, 'Password incorrect.', 'Authentication required to verify password.')
     } catch (err) {
       _applyAccountCallFailure(err)
       return false
@@ -1000,13 +922,11 @@ export const useAuthStore = defineStore('auth', () => {
     passwordChangeReason,
     deepLinkTenantSwitch,
     ensureAuthenticated,
-    handleExternalAuthChange,
     loginWithCredentials,
     logoutSession,
     switchActiveTenant,
     noteDeepLinkTenantSwitch,
     clearDeepLinkTenantSwitch,
-    saveActiveTenant,
     saveUserSettings,
     saveTenantSettings,
     changeOwnPassword,

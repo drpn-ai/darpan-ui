@@ -160,7 +160,7 @@ describe('auth state', () => {
 
     const { useAuthStore } = await import('../auth')
 
-    await expect(useAuthStore().saveActiveTenant('GORJANA')).resolves.toBe(true)
+    await expect(useAuthStore().switchActiveTenant('GORJANA')).resolves.toBe('switched')
     expect(saveActiveTenantRpc).toHaveBeenCalledWith('GORJANA')
     expect(useAuthStore().status).toBe('authenticated')
     expect(useAuthStore().sessionInfo?.activeTenantUserGroupId).toBe('GORJANA')
@@ -204,20 +204,6 @@ describe('auth state', () => {
     const { useAuthStore } = await import('../auth')
 
     await expect(useAuthStore().switchActiveTenant('TENANT_B')).resolves.toBe('switched')
-  })
-
-  it('keeps saveActiveTenant returning a boolean for existing callers', async () => {
-    saveActiveTenantRpc.mockResolvedValue({
-      ok: false,
-      messages: [],
-      errors: ['nope'],
-      authenticated: true,
-      sessionInfo: { userId: 'backend-user', username: 'backend' },
-    })
-
-    const { useAuthStore } = await import('../auth')
-
-    await expect(useAuthStore().saveActiveTenant('TENANT_B')).resolves.toBe(false)
   })
 
   it('starts with no deep-link tenant switch to announce', async () => {

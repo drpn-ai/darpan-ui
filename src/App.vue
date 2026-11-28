@@ -135,21 +135,10 @@ const slashContext = computed<SlashCommandContext>(() => ({
   availableTenants: authStore.sessionInfo?.availableTenants ?? [],
   activeTenantUserGroupId: activeTenantUserGroupId.value,
 }))
-const activeTenantName = computed<string | null>(() => {
-  const sessionInfo = authStore.sessionInfo
-  const activeTenantId = sessionInfo?.activeTenantUserGroupId?.toString().trim()
-  if (!activeTenantId) return null
-
-  const activeTenantLabel = sessionInfo?.activeTenantLabel?.toString().trim()
-  if (activeTenantLabel) return activeTenantLabel
-
-  const activeTenant = Array.isArray(sessionInfo?.availableTenants)
-    ? sessionInfo.availableTenants.find((tenant) => tenant.userGroupId === activeTenantId)
-    : null
-  const activeTenantOptionLabel = activeTenant?.label?.toString().trim()
-
-  return activeTenantOptionLabel || activeTenantId
-})
+// The store's session already names the active tenant: its label, else its option's label, else its id.
+const activeTenantName = computed<string | null>(() => (
+  activeTenantUserGroupId.value ? authStore.sessionInfo?.activeTenantLabel || activeTenantUserGroupId.value : null
+))
 const userStatusText = computed<string | null>(() => {
   if (isLoggingOut.value) return 'Signing out'
   if (authStore.authenticated) return null
@@ -159,8 +148,6 @@ const userStatusText = computed<string | null>(() => {
   return 'Checking session'
 })
 
-const canEditTenantSettings = computed(() => permissions.canEditTenantSettings)
-const canRunActiveTenantReconciliation = computed(() => permissions.canRunActiveTenantReconciliation)
 /**
  * What is left of the floating user menu. Signing out and switching theme became /logout,
  * /light and /dark — a search list should hold the places you can go, not the two things
@@ -189,18 +176,18 @@ const accountCommandActions = computed<CommandAction[]>(() => [
 const commandActions = computed<CommandAction[]>(() => [
   ...accountCommandActions.value,
   ...staticCommandActions.filter((action) => {
-    if (action.id === 'navigate-run-reconciliation') return canRunActiveTenantReconciliation.value
+    if (action.id === 'navigate-run-reconciliation') return permissions.canRunActiveTenantReconciliation
     if (
       action.id === 'navigate-schema-infer'
       || action.id === 'navigate-create-reconciliation'
       || action.id === 'navigate-create-run-flowchart'
     ) {
-      return canEditTenantSettings.value
+      return permissions.canEditTenantSettings
     }
     return true
   }),
   ...dataCommandActions.value.filter((action) => (
-    canEditTenantSettings.value || !action.id.startsWith('data-sftp-server-')
+    permissions.canEditTenantSettings || !action.id.startsWith('data-sftp-server-')
   )),
 ])
 
@@ -211,7 +198,8 @@ const staticCommandActions: CommandAction[] = [
     description: 'See the main workspace, setup areas, and reconciliation entry points.',
     group: 'Navigate',
     to: '/',
-    aliases: ['home', 'dashboard', 'start', 'main page', 'overview'],
+    // DAR-UI-049: Home lists the Sync and Lifecycle runs (the separate Runs list retired).
+    aliases: ['home', 'dashboard', 'start', 'main page', 'overview', 'runs', 'lifecycle runs', 'flowchart'],
   },
   {
     // DAR-UI-154. Tara opens Ask Darpan; this is how a client finds the pulses on a sale day.
@@ -311,14 +299,6 @@ const staticCommandActions: CommandAction[] = [
     aliases: ['new reconciliation', 'create compare flow', 'new workflow', 'match setup'],
   },
   {
-    id: 'navigate-run-flowcharts',
-    label: 'Runs',
-    description: 'Charts of yes/no questions over your rules.',
-    group: 'Navigate',
-    to: '/reconciliation/runs',
-    aliases: ['flowchart', 'chart', 'question chart', 'runs'],
-  },
-  {
     id: 'navigate-create-run-flowchart',
     label: 'Create Run',
     description: 'Start a chart of yes/no questions.',
@@ -386,7 +366,7 @@ function clearActiveElementFocus(): void {
 async function goToWorkflowOrigin(options: { clearFocus?: boolean } = {}): Promise<void> {
   const targetPath = workflowEscapeOriginPath.value || '/'
 
-  isCommandPaletteOpen.value = false
+  commandPalette.close()
   if (options.clearFocus) clearActiveElementFocus()
   if (route.fullPath === targetPath) return
   await router.push(targetPath)
@@ -399,7 +379,7 @@ async function goToWorkflowOrigin(options: { clearFocus?: boolean } = {}): Promi
 async function handleLogout(): Promise<void> {
   if (isLoggingOut.value) return
 
-  isCommandPaletteOpen.value = false
+  commandPalette.close()
   isLoggingOut.value = true
   try {
     const loggedOut = await authStore.logoutSession()
@@ -420,11 +400,8 @@ async function executeCommand(action: CommandAction): Promise<void> {
   }
   if (!action.to || action.to === route.fullPath) return
   const staticPageLabel = resolveStaticPageLabel(route)
-  const targetRoute = router.resolve(action.to)
-  if (staticPageLabel && targetRoute.meta.surfaceMode === 'workflow') {
+  if (staticPageLabel && router.resolve(action.to).meta.surfaceMode === 'workflow') {
     draftStore.setWorkflowOrigin(staticPageLabel, route.fullPath)
-    await router.push(action.to)
-    return
   }
   await router.push(action.to)
 }
@@ -489,7 +466,7 @@ function handleKeyboard(event: KeyboardEvent): void {
 
   if (key === 'escape' && isCommandPaletteOpen.value) {
     event.preventDefault()
-    isCommandPaletteOpen.value = false
+    commandPalette.close()
     return
   }
 
@@ -512,7 +489,7 @@ function handleKeyboard(event: KeyboardEvent): void {
 async function redirectToAuthBoundary(): Promise<void> {
   if (isShelllessRoute.value) return
 
-  isCommandPaletteOpen.value = false
+  commandPalette.close()
   handleAuthExpiry(route.fullPath, { push: (to) => router.replace(to as Parameters<typeof router.replace>[0]), build: buildAuthRedirect })
 }
 
@@ -637,19 +614,11 @@ watch(activeTenantUserGroupId, () => {
   }
 })
 
+// The router guard checks the session on every navigation; the shell only closes the launcher.
 watch(
   () => route.fullPath,
   () => {
-    isCommandPaletteOpen.value = false
-    if (!isShelllessRoute.value) {
-      void authStore.ensureAuthenticated()
-    }
-  },
-)
-
-watch(
-  () => route.fullPath,
-  () => {
+    commandPalette.close()
     syncWorkflowEscapeOrigin()
     // After, never before: syncWorkflowEscapeOrigin clears the pill on any non-workflow surface, so
     // announcing first would show the tenant notice and wipe it in the same tick. The router guard
@@ -673,35 +642,17 @@ watch(
   { immediate: true },
 )
 
-// Audit #10: the bearer token now lives in this tab's sessionStorage, so sessions are per-tab and
-// cross-tab token sync via localStorage no longer applies. This listener is kept defensively: it
-// still fires for a full localStorage clear or the one-time legacy-token purge on upgrade.
-// handleExternalAuthChange re-checks this tab's own (sessionStorage) token authoritatively, so a
-// legacy localStorage event never logs out a tab that still holds a valid session.
-const AUTH_TOKEN_STORAGE_KEY = 'darpan.authToken'
-function handleAuthStorageEvent(event: StorageEvent) {
-  if (event.storageArea !== window.localStorage) return
-  if (event.key !== AUTH_TOKEN_STORAGE_KEY && event.key !== null) return
-  void authStore.handleExternalAuthChange()
-}
-
 onMounted(() => {
   commandPalette.loadRecentFromStorage()
   window.addEventListener('keydown', handleKeyboard)
-  window.addEventListener('storage', handleAuthStorageEvent)
   setAuthRequiredHandler((detail) => handleAuthRequired(detail))
   document.addEventListener(WORKFLOW_HINT_REQUEST_EVENT, handleWorkflowHintRequest)
   document.addEventListener(COMMAND_PALETTE_OPEN_REQUEST_EVENT, handleCommandPaletteOpenRequest)
-  syncBodySurfaceMode(surfaceMode.value)
-  if (!isShelllessRoute.value) {
-    void authStore.ensureAuthenticated()
-  }
 })
 
 onBeforeUnmount(() => {
   hideWorkflowEscapeHint()
   window.removeEventListener('keydown', handleKeyboard)
-  window.removeEventListener('storage', handleAuthStorageEvent)
   setAuthRequiredHandler(null)
   document.removeEventListener(WORKFLOW_HINT_REQUEST_EVENT, handleWorkflowHintRequest)
   document.removeEventListener(COMMAND_PALETTE_OPEN_REQUEST_EVENT, handleCommandPaletteOpenRequest)
