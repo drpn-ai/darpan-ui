@@ -30,7 +30,7 @@ export function routeComponents(): Record<string, { path: string; component: str
 /** The page plus the components and composables it imports directly. */
 export function sourceFor(entry: string): string {
   const page = readFileSync(entry, 'utf-8')
-  const imports = Array.from(page.matchAll(/from '(\.[^']+(?:\.vue|\/use[A-Za-z]+))'/g)).flatMap((match) => {
+  const imports = Array.from(page.matchAll(/from '(\.[^']*(?:\.vue|\/use[A-Za-z]+))'/g)).flatMap((match) => {
     if (!match[1]) return []
     const path = resolve(dirname(entry), match[1])
     return [path.endsWith('.vue') ? path : `${path}.ts`]

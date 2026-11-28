@@ -21,13 +21,13 @@
     back-aria-label="Back to NetSuite Settings"
     :remove="(nsAuthConfigId) => settingsFacade.deleteNsAuthConfig({ nsAuthConfigId })"
     delete-failed-message="The NetSuite auth profile clung to the doorframe. Still here."
-    diagnostics-system-enum-id="NETSUITE"
+    :diagnostics="diagnostics"
     :can-diagnose="(config) => config.authType === 'OAUTH2_M2M_JWT'"
     :test-ids="{
-      edit: 'netsuite-auth-edit-action',
-      back: 'back-netsuite-auth',
-      diagnose: 'diagnose-netsuite-auth',
-      delete: 'delete-netsuite-auth',
+      editTestId: 'netsuite-auth-edit-action',
+      backTestId: 'back-netsuite-auth',
+      diagnoseTestId: 'diagnose-netsuite-auth',
+      deleteTestId: 'delete-netsuite-auth',
     }"
   >
     <!-- The RESTlet endpoints signing in with this profile. The backend refuses a delete while any still use it. -->
@@ -54,6 +54,15 @@
       />
     </template>
   </ConnectionDashboard>
+  <ConnectionDiagnosticsPopup
+    v-if="diagnostics.open.value"
+    :running="diagnostics.running.value"
+    :available="diagnostics.available.value"
+    :connection-ok="diagnostics.connectionOk.value"
+    :checks="diagnostics.checks.value"
+    :error="diagnostics.error.value"
+    @close="diagnostics.close"
+  />
 </template>
 
 <script setup lang="ts">
@@ -67,6 +76,8 @@ import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
+import ConnectionDiagnosticsPopup from '../../components/settings/ConnectionDiagnosticsPopup.vue'
+import { useConnectionDiagnostics } from './useConnectionDiagnostics'
 import ConnectionDashboard, { type ConnectionFact } from './ConnectionDashboard.vue'
 import SettingsRecordListSection from './SettingsRecordListSection.vue'
 
@@ -82,6 +93,7 @@ const SCOPE_LABELS: Record<string, string> = {
 }
 
 const route = useRoute()
+const diagnostics = useConnectionDiagnostics('NETSUITE')
 const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
 

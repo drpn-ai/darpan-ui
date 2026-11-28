@@ -18,7 +18,7 @@
               v-if="canManageConnections"
               :to="editRoute"
               class="app-icon-action static-page-section-edit-action"
-              :data-testid="testIds.edit"
+              :data-testid="testIds.editTestId"
               :aria-label="editAriaLabel"
               @click="draftStore.setWorkflowOrigin(title, route.fullPath || `${listPath}/auth/${configId}`)"
             >
@@ -59,7 +59,7 @@
         <RouterLink
           :to="listPath"
           class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
-          :data-testid="testIds.back"
+          :data-testid="testIds.backTestId"
           :aria-label="backAriaLabel"
         >
           <AppIcon name="back" />
@@ -69,7 +69,7 @@
           v-if="canManageConnections && (canDiagnose?.(record) ?? true)"
           type="button"
           class="app-icon-action app-icon-action--large settings-dashboard-footer-action"
-          :data-testid="testIds.diagnose"
+          :data-testid="testIds.diagnoseTestId"
           aria-label="Run connection diagnostics"
           title="Run connection diagnostics"
           :disabled="diagnostics.running.value"
@@ -82,7 +82,7 @@
           v-if="canManageConnections"
           type="button"
           class="app-icon-action app-icon-action--large app-icon-action--danger settings-dashboard-footer-action"
-          :data-testid="testIds.delete"
+          :data-testid="testIds.deleteTestId"
           :aria-label="deleteAriaLabel"
           :disabled="deleting"
           @click="deleteRecord"
@@ -92,22 +92,11 @@
       </div>
     </template>
   </StaticPageFrame>
-
-  <ConnectionDiagnosticsPopup
-    v-if="diagnostics.open.value"
-    :running="diagnostics.running.value"
-    :available="diagnostics.available.value"
-    :connection-ok="diagnostics.connectionOk.value"
-    :checks="diagnostics.checks.value"
-    :error="diagnostics.error.value"
-    @close="diagnostics.close"
-  />
 </template>
 
 <script setup lang="ts" generic="T extends { description?: string | null; companyUserGroupId?: string | null; isShared?: boolean }">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
-import ConnectionDiagnosticsPopup from '../../components/settings/ConnectionDiagnosticsPopup.vue'
 import AppIcon from '../../components/ui/AppIcon.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
@@ -120,7 +109,7 @@ import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import SourceConfigEndpointsSection from './SourceConfigEndpointsSection.vue'
-import { useConnectionDiagnostics } from './useConnectionDiagnostics'
+import type { useConnectionDiagnostics } from './useConnectionDiagnostics'
 import { findTenantRecord } from './useSettingsPagedList'
 import { useSourceConfigEndpoints } from './useSourceConfigEndpoints'
 
@@ -164,11 +153,15 @@ const props = defineProps<{
   editRoute: RouteLocationRaw
   remove: (configId: string) => Promise<unknown>
   deleteFailedMessage: string
-  /** A SourceSystemConnector id whose health check probes this record. */
-  diagnosticsSystemEnumId: string
+  /**
+   * The page's diagnostics (useConnectionDiagnostics with the connector id that probes this record). The page renders
+   * ConnectionDiagnosticsPopup itself: the popup's test ids are mascot anchors, read from the route's direct imports.
+   */
+  diagnostics: ReturnType<typeof useConnectionDiagnostics>
   canDiagnose?: (record: T) => boolean
   endpointList?: { configType: SharedConfigType; cacheKeyPrefix: string; listTestId: string; tileTestId: string }
-  testIds: { edit: string; back: string; diagnose: string; delete: string }
+  /** Named …TestId so the mascot anchor reader (mascotRouteAnchors) sees each caller's literal ids. */
+  testIds: { editTestId: string; backTestId: string; diagnoseTestId: string; deleteTestId: string }
 }>()
 
 defineSlots<{ endpoints?: () => unknown }>()
@@ -199,11 +192,10 @@ const endpoints = props.endpointList
     signal: pageAbortController.signal,
   })
   : null
-const diagnostics = useConnectionDiagnostics(props.diagnosticsSystemEnumId)
 
 onBeforeUnmount(() => {
   pageAbortController.abort()
-  diagnostics.dispose()
+  props.diagnostics.dispose()
 })
 
 async function load(): Promise<void> {

@@ -26,7 +26,7 @@
     back-aria-label="Back to HotWax Settings"
     :remove="(omsRestSourceConfigId) => settingsFacade.deleteOmsRestSourceConfig({ omsRestSourceConfigId })"
     delete-failed-message="The HotWax source refuses to leave. Still here."
-    diagnostics-system-enum-id="OMS_GQL"
+    :diagnostics="diagnostics"
     :endpoint-list="{
       configType: SHARED_CONFIG_TYPES.hotwaxOms,
       cacheKeyPrefix: 'omsRestSourceDashboard.endpoints',
@@ -34,11 +34,20 @@
       tileTestId: 'oms-endpoint-tile',
     }"
     :test-ids="{
-      edit: 'oms-auth-edit-action',
-      back: 'back-oms-rest-source',
-      diagnose: 'diagnose-oms-rest-source',
-      delete: 'delete-oms-rest-source',
+      editTestId: 'oms-auth-edit-action',
+      backTestId: 'back-oms-rest-source',
+      diagnoseTestId: 'diagnose-oms-rest-source',
+      deleteTestId: 'delete-oms-rest-source',
     }"
+  />
+  <ConnectionDiagnosticsPopup
+    v-if="diagnostics.open.value"
+    :running="diagnostics.running.value"
+    :available="diagnostics.available.value"
+    :connection-ok="diagnostics.connectionOk.value"
+    :checks="diagnostics.checks.value"
+    :error="diagnostics.error.value"
+    @close="diagnostics.close"
   />
 </template>
 
@@ -47,9 +56,13 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { settingsFacade } from '../../lib/api/facade'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
+import ConnectionDiagnosticsPopup from '../../components/settings/ConnectionDiagnosticsPopup.vue'
+import { useConnectionDiagnostics } from './useConnectionDiagnostics'
 import ConnectionDashboard from './ConnectionDashboard.vue'
 
 const route = useRoute()
+// A SourceSystemConnector registry id: the REST 'OMS' row is gone (DAR-BE-052); OMS_GQL carries the HotWax probe.
+const diagnostics = useConnectionDiagnostics('OMS_GQL')
 const configId = computed(() => String(route.params.omsRestSourceConfigId ?? '').trim())
 const missingMessage = computed(() => `HotWax auth config "${configId.value}" is nowhere to be found. We asked twice.`)
 </script>

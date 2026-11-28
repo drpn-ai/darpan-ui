@@ -103,6 +103,14 @@ describe('every hint names a control that exists', () => {
     expect(source).toContain('run-result-cancel')
     expect(source).not.toContain('a-testid-nobody-wrote')
   })
+
+  it('follows a same-folder composable (./useX), not only ../../composables ones', () => {
+    // DAR-OPS-029 U11: the import pattern needed a character between '.' and '/use', so a page's './useX' was never
+    // read (the connection wizards' wizard-next anchor sits behind './useConnectionWorkflow').
+    const entry = routeComponents()['settings-shopify-auth']
+    expect(entry).toBeTruthy()
+    expect(sourceFor(entry as string)).toContain('export function useConnectionDiagnostics')
+  })
 })
 
 /**

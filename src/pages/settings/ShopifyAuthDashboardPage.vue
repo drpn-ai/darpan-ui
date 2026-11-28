@@ -28,7 +28,7 @@
     back-aria-label="Back to Shopify Settings"
     :remove="(shopifyAuthConfigId) => settingsFacade.deleteShopifyAuthConfig({ shopifyAuthConfigId })"
     delete-failed-message="The Shopify config would not check out. Still here."
-    diagnostics-system-enum-id="SHOPIFY"
+    :diagnostics="diagnostics"
     :endpoint-list="{
       configType: SHARED_CONFIG_TYPES.shopifyAuth,
       cacheKeyPrefix: 'shopifyAuthDashboard.endpoints',
@@ -36,11 +36,20 @@
       tileTestId: 'shopify-endpoint-tile',
     }"
     :test-ids="{
-      edit: 'shopify-auth-edit-action',
-      back: 'back-shopify-auth',
-      diagnose: 'diagnose-shopify-auth',
-      delete: 'delete-shopify-auth',
+      editTestId: 'shopify-auth-edit-action',
+      backTestId: 'back-shopify-auth',
+      diagnoseTestId: 'diagnose-shopify-auth',
+      deleteTestId: 'delete-shopify-auth',
     }"
+  />
+  <ConnectionDiagnosticsPopup
+    v-if="diagnostics.open.value"
+    :running="diagnostics.running.value"
+    :available="diagnostics.available.value"
+    :connection-ok="diagnostics.connectionOk.value"
+    :checks="diagnostics.checks.value"
+    :error="diagnostics.error.value"
+    @close="diagnostics.close"
   />
 </template>
 
@@ -49,9 +58,12 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { settingsFacade } from '../../lib/api/facade'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
+import ConnectionDiagnosticsPopup from '../../components/settings/ConnectionDiagnosticsPopup.vue'
+import { useConnectionDiagnostics } from './useConnectionDiagnostics'
 import ConnectionDashboard from './ConnectionDashboard.vue'
 
 const route = useRoute()
+const diagnostics = useConnectionDiagnostics('SHOPIFY')
 const configId = computed(() => String(route.params.shopifyAuthConfigId ?? '').trim())
 const missingMessage = computed(() => `Shopify config "${configId.value}" checked out without us.`)
 </script>
