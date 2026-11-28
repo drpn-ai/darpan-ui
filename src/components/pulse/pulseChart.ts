@@ -1,5 +1,6 @@
 // DAR-BE-328. What the two Today charts on a sync pair's page share: today's pulses as one reading per clock hour of
 // the tenant's day, and the x positions both charts draw them at, so an hour sits in the same place on each.
+import { computed } from 'vue'
 import type { SyncSample } from '../../lib/api/pulseTypes'
 import { durationWords } from '../../lib/pulseWords'
 import { getDefaultDisplayTimeZone } from '../../lib/utils/date'
@@ -112,6 +113,19 @@ export function hourReadout(hour: PulseHour): string {
   return `${hour.hour}:00 · oldest ${durationWords(hour.oldestMinutes)} · ${hour.waitingCount.toLocaleString('en-US')} waiting · ${hour.pastAllowanceCount.toLocaleString('en-US')} past allowance`
 }
 
+/**
+ * The day for a screen reader, on one figure: "40 at 08:00, 1,240 at 11:00, highest 1,610 at 09:00" (the first hour, the
+ * last, and the first hour with the most). Null with no hours.
+ */
+export function daySpanWords(hours: readonly PulseHour[], value: (hour: PulseHour) => number, words: (n: number) => string): string | null {
+  const first = hours[0]
+  const last = hours[hours.length - 1]
+  if (!first || !last) return null
+  const highest = hours.reduce((top, hour) => (value(hour) > value(top) ? hour : top), first)
+  const at = (hour: PulseHour) => `${words(value(hour))} at ${hour.hour}:00`
+  return `${first === last ? at(first) : `${at(first)}, ${at(last)}`}, highest ${at(highest)}`
+}
+
 /** The next hour a key moves to on a focused chart, or null when the key is not one of ours. */
 export function steppedIndex(key: string, current: number, count: number): number | null {
   if (!count) return null
@@ -120,4 +134,25 @@ export function steppedIndex(key: string, current: number, count: number): numbe
   if (key === 'Home') return 0
   if (key === 'End') return count - 1
   return null
+}
+
+/**
+ * What both Today charts read from their props: the drawn hours, where each sits, the hour the readout names, and the
+ * keys that move it. `moveTo` is the chart's update:active emit.
+ */
+export function usePulseChart(
+  props: { samples: readonly SyncSample[]; active?: number | null; timeZone?: string },
+  moveTo: (index: number | null) => void,
+) {
+  const hours = computed(() => pulseHours(props.samples, props.timeZone))
+  const xs = computed(() => hourXs(hours.value))
+  const slot = computed(() => slotWidth(hours.value))
+  const currentIndex = computed(() => activeIndex(hours.value.length, props.active))
+  function onKey(event: KeyboardEvent): void {
+    const next = steppedIndex(event.key, currentIndex.value, hours.value.length)
+    if (next === null) return
+    event.preventDefault()
+    moveTo(next)
+  }
+  return { hours, xs, slot, currentIndex, onKey }
 }

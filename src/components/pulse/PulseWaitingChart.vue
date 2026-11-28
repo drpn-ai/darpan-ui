@@ -67,7 +67,7 @@
 import { computed } from 'vue'
 import { vExplain } from '../../directives/vExplain'
 import type { SyncSample } from '../../lib/api/pulseTypes'
-import { activeIndex, CHART, hourXs, pulseHours, slotWidth, steppedIndex, yFor } from './pulseChart'
+import { CHART, daySpanWords, usePulseChart, yFor } from './pulseChart'
 
 const props = withDefaults(defineProps<{
   samples: readonly SyncSample[]
@@ -81,11 +81,8 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ 'update:active': [index: number | null] }>()
 
-const hours = computed(() => pulseHours(props.samples, props.timeZone))
-const xs = computed(() => hourXs(hours.value))
-const slot = computed(() => slotWidth(hours.value))
+const { hours, xs, slot, currentIndex, onKey } = usePulseChart(props, (index) => emit('update:active', index))
 const barWidth = computed(() => Math.min(36, slot.value * 0.6))
-const currentIndex = computed(() => activeIndex(hours.value.length, props.active))
 
 /**
  * A round, even top for the scale, so its middle tick is a whole count too: the highest count up to the next half of
@@ -106,24 +103,9 @@ function count(value: number): string {
 const ticks = computed(() => [0, yMax.value / 2, yMax.value].map((value) => ({ text: count(value), y: yFor(value, yMax.value) })))
 
 const summary = computed(() => {
-  const list = hours.value
-  const first = list[0]
-  const last = list[list.length - 1]
-  if (!first || !last) return 'No pulses today.'
-  const words = (value: number) => value.toLocaleString('en-US')
-  const highest = list.reduce((top, hour) => (hour.waitingCount > top.waitingCount ? hour : top), first)
-  const span = first === last
-    ? `${words(first.waitingCount)} at ${first.hour}:00`
-    : `${words(first.waitingCount)} at ${first.hour}:00, ${words(last.waitingCount)} at ${last.hour}:00`
-  return `Orders waiting by hour today: ${span}, highest ${words(highest.waitingCount)} at ${highest.hour}:00.`
+  const span = daySpanWords(hours.value, (hour) => hour.waitingCount, (n) => n.toLocaleString('en-US'))
+  return span ? `Orders waiting by hour today: ${span}.` : 'No pulses today.'
 })
-
-function onKey(event: KeyboardEvent): void {
-  const next = steppedIndex(event.key, currentIndex.value, hours.value.length)
-  if (next === null) return
-  event.preventDefault()
-  emit('update:active', next)
-}
 </script>
 
 <style scoped src="./pulseChart.css"></style>

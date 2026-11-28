@@ -93,7 +93,7 @@ import { computed } from 'vue'
 import { vExplain } from '../../directives/vExplain'
 import type { SyncSample } from '../../lib/api/pulseTypes'
 import { durationWords } from '../../lib/pulseWords'
-import { activeIndex, CHART, consecutiveRuns, hourReadout, hourXs, pulseHours, slotWidth, steppedIndex, yFor } from './pulseChart'
+import { CHART, consecutiveRuns, daySpanWords, hourReadout, usePulseChart, yFor } from './pulseChart'
 
 const props = withDefaults(defineProps<{
   samples: readonly SyncSample[]
@@ -106,11 +106,8 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ 'update:active': [index: number | null] }>()
 
-const hours = computed(() => pulseHours(props.samples, props.timeZone))
-const xs = computed(() => hourXs(hours.value))
-const slot = computed(() => slotWidth(hours.value))
+const { hours, xs, slot, currentIndex, onKey } = usePulseChart(props, (index) => emit('update:active', index))
 const runs = computed(() => consecutiveRuns(hours.value))
-const currentIndex = computed(() => activeIndex(hours.value.length, props.active))
 const current = computed(() => hours.value[currentIndex.value] ?? null)
 
 /** The scale in whole hours, even so its middle tick is whole: the highest reading or the allowance, with headroom. */
@@ -132,26 +129,13 @@ function pointsOf(run: number[]): string {
 }
 
 const summary = computed(() => {
-  const list = hours.value
-  const first = list[0]
-  const last = list[list.length - 1]
-  if (!first || !last) return 'No pulses today.'
-  const highest = list.reduce((top, hour) => (hour.oldestMinutes > top.oldestMinutes ? hour : top), first)
+  const span = daySpanWords(hours.value, (hour) => hour.oldestMinutes, durationWords)
+  if (!span) return 'No pulses today.'
   // An order that has waited the whole allowance is past it (the pulse's own rule).
-  const passed = list.find((hour) => hour.oldestMinutes >= props.allowanceMinutes)
-  const span = first === last
-    ? `${durationWords(first.oldestMinutes)} at ${first.hour}:00`
-    : `${durationWords(first.oldestMinutes)} at ${first.hour}:00, ${durationWords(last.oldestMinutes)} at ${last.hour}:00`
+  const passed = hours.value.find((hour) => hour.oldestMinutes >= props.allowanceMinutes)
   const allowance = `Allowance ${durationWords(props.allowanceMinutes)}${passed ? `, passed at ${passed.hour}:00` : ''}.`
-  return `Oldest waiting order by hour today: ${span}, highest ${durationWords(highest.oldestMinutes)} at ${highest.hour}:00. ${allowance}`
+  return `Oldest waiting order by hour today: ${span}. ${allowance}`
 })
-
-function onKey(event: KeyboardEvent): void {
-  const next = steppedIndex(event.key, currentIndex.value, hours.value.length)
-  if (next === null) return
-  event.preventDefault()
-  emit('update:active', next)
-}
 </script>
 
 <style scoped src="./pulseChart.css"></style>
