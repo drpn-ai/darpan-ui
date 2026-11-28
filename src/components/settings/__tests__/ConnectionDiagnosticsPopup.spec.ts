@@ -52,7 +52,7 @@ describe('ConnectionDiagnosticsPopup', () => {
 
     expect(rows).toHaveLength(4)
     expect(credential.text()).toContain('Credential readable')
-    expect(credential.text()).toContain('✓')
+    expect(credential.find('.connection-diagnostics-node [data-icon="check"]').exists()).toBe(true)
     // The glyph is aria-hidden and the palette is monochrome, so the status must also be words.
     expect(credential.get('.sr-only').text()).toBe('Passed')
     expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Connection is valid.')
@@ -95,12 +95,13 @@ describe('ConnectionDiagnosticsPopup', () => {
     const failed = wrapper.get('[data-check-key="auth"]')
     const skipped = wrapper.get('[data-check-key="ordersRead"]')
 
-    expect(failed.text()).toContain('✗')
+    expect(failed.find('.connection-diagnostics-node [data-icon="close"]').exists()).toBe(true)
     expect(failed.get('.sr-only').text()).toBe('Failed')
     expect(failed.text()).toContain('401 — token not accepted')
     // Skipped must not read as failed: nothing was attempted.
     expect(skipped.get('.sr-only').text()).toBe('Skipped')
-    expect(skipped.text()).not.toContain('✗')
+    // Not checked, so its node is empty: no tick, no cross.
+    expect(skipped.find('.connection-diagnostics-node svg').exists()).toBe(false)
   })
 
   it('never dismisses itself, on any outcome', () => {

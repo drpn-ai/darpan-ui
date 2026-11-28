@@ -50,7 +50,11 @@
               :data-check-key="check.key"
               :data-check-status="check.status"
             >
-              <span class="connection-diagnostics-node" aria-hidden="true">{{ glyphFor(check.status) }}</span>
+              <!-- A skipped check was not checked, so its node stays empty; the status reaches a reader as words below. -->
+              <span class="connection-diagnostics-node" aria-hidden="true">
+                <AppIcon v-if="check.status === 'PASS'" name="check" />
+                <AppIcon v-else-if="check.status === 'FAIL'" name="close" />
+              </span>
               <div class="connection-diagnostics-step-body">
                 <span class="connection-diagnostics-label">{{ check.label }}</span>
                 <!-- The glyph is decorative and the palette is monochrome, so the status has to
@@ -145,12 +149,6 @@ const summary = computed(() => {
   return `${firstFailed.label} failed · ${passed} passed${skippedTally}`
 })
 
-function glyphFor(status: ConnectionCheckStatus): string {
-  if (status === 'PASS') return '✓'
-  if (status === 'FAIL') return '✗'
-  return '–'
-}
-
 function statusLabel(status: ConnectionCheckStatus): string {
   if (status === 'PASS') return 'Passed'
   if (status === 'FAIL') return 'Failed'
@@ -218,14 +216,20 @@ function statusLabel(status: ConnectionCheckStatus): string {
   top: -1px;
   width: 19px;
   height: 19px;
+  display: grid;
+  place-items: center;
   line-height: 17px;
-  text-align: center;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   /* Opaque, so the node sits on the rail rather than the rail crossing through it. */
   background: var(--surface);
   font-size: var(--type-table-head-size);
   color: var(--text-soft);
+}
+
+.connection-diagnostics-node svg {
+  width: 0.6rem;
+  height: 0.6rem;
 }
 
 .connection-diagnostics-step[data-check-status='FAIL'] .connection-diagnostics-node {
