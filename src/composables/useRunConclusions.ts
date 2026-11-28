@@ -183,10 +183,12 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
   const dirty = computed(() => loaded.value
     && (unexplained.value !== snapshot.value.unexplained || !sameList(list.value, snapshot.value.list)))
 
-  /** One line per stored conclusion the tree cannot place, naming it by its rank. */
-  const treeProblems = computed(() => list.value.flatMap((node, index) => (node.problem
-    ? [`Conclusion ${index + 1}, ${conclusionLabel(node) || 'unnamed'}, ${PROBLEM_WORDS[node.problem]}. Delete it to save.`]
+  /** One line per stored conclusion the tree cannot place, naming it by its rank (run details reads these). */
+  const treeProblemNotes = computed(() => list.value.flatMap((node, index) => (node.problem
+    ? [`Conclusion ${index + 1}, ${conclusionLabel(node) || 'unnamed'}, ${PROBLEM_WORDS[node.problem]}.`]
     : [])))
+  /** The editor's lines: the same, with what unblocks the save. */
+  const treeProblems = computed(() => treeProblemNotes.value.map((note) => `${note} Delete it to save.`))
 
   /**
    * A conclusion with no name or no line, or a line missing its field or values, cannot be saved (the service needs a
@@ -509,6 +511,7 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
     dirty,
     incomplete,
     treeProblems,
+    treeProblemNotes,
     lineContext,
     catalogOptions,
     bucketOptions,

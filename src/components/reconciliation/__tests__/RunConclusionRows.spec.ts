@@ -12,13 +12,14 @@ function draft(key: string, outcome: ConclusionDraft['outcome'], extra: Partial<
   return { uid: `c${key}`, key, conclusion: `CONC_${key}`, bucket: 'MISSING_FROM_FILE_2', question: `Question ${key}?`, fix: null, outcome, suggestsFilter: false, lines: [], ...extra }
 }
 
-function mountRows(list: ConclusionDraft[], unexplained: '' | 'EXPECTED' = '') {
+function mountRows(list: ConclusionDraft[], unexplained: '' | 'EXPECTED' = '', treeProblemNotes: string[] = []) {
   const state = {
     loading: ref(false),
     loaded: ref(true),
     errors: ref<string[]>([]),
     list: ref(list),
     unexplained: ref(unexplained),
+    treeProblemNotes: ref(treeProblemNotes),
     lineContext: ref(lineContext),
     conclusionLabel: (node: ConclusionDraft) => `Label ${node.key}`,
     describeLines: (node: ConclusionDraft) => `lines of ${node.key}`,
@@ -59,6 +60,19 @@ describe('RunConclusionRows', () => {
     expect(w.findAll('[data-testid="run-conclusions-explains"]').map((e) => e.text())).toEqual([
       'explains the rules hold', 'explains the rules hold', 'explains In NetSuite',
     ])
+  })
+
+  // S99-103: a tree broken outside the app (a data load) is flagged here as the editor flags it, above the list.
+  it('says which stored conclusions the tree cannot place, above the list', () => {
+    const w = mountRows([draft('10', ''), draft('50', '', { problem: 'ORPHAN' })], '', ['Conclusion 2, Label 50, hangs off a conclusion that is not here.'])
+    const problems = w.findAll('[data-testid="run-conclusions-tree-problem"]')
+    expect(problems.map((p) => p.text())).toEqual(['Conclusion 2, Label 50, hangs off a conclusion that is not here.'])
+    expect(w.html().indexOf('run-conclusions-tree-problem')).toBeLessThan(w.html().indexOf('run-conclusions-list'))
+  })
+
+  it('shows no problem line for a sound tree', () => {
+    const w = mountRows([draft('10', '')])
+    expect(w.find('[data-testid="run-conclusions-tree-problem"]').exists()).toBe(false)
   })
 
   it('flags a conclusion that suggests a filter', () => {

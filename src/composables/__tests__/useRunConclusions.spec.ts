@@ -395,6 +395,8 @@ describe('useRunConclusions', () => {
       ['20', null], ['10', null], ['40', null], ['50', 'ORPHAN'],
     ])
     expect(state.treeProblems.value).toEqual(['Conclusion 4, Screened out, hangs off a conclusion that is not here. Delete it to save.'])
+    // S99-103: run details reads the same problem with no editor instruction (it has nothing to save).
+    expect(state.treeProblemNotes.value).toEqual(['Conclusion 4, Screened out, hangs off a conclusion that is not here.'])
     expect(state.incomplete.value).toBe(true)
     await expect(state.save()).resolves.toBe(false)
     expect(saveConclusions).not.toHaveBeenCalled()

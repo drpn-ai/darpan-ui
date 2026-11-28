@@ -12,6 +12,13 @@
       :message="message"
       data-testid="run-conclusions-error"
     />
+    <InlineValidation
+      v-for="message in treeProblemNotes"
+      :key="message"
+      tone="error"
+      :message="message"
+      data-testid="run-conclusions-tree-problem"
+    />
 
     <ul v-if="loaded" class="run-conclusion-list static-row-list" data-testid="run-conclusions-list">
       <li
@@ -68,7 +75,7 @@ import { injectRunConclusions, outcomeLabel } from '../../composables/useRunConc
 import { vExplain } from '../../directives/vExplain'
 import { explainsLabel } from '../../lib/conclusionLines'
 
-const { loading, loaded, errors, list, unexplained, lineContext, conclusionLabel, describeLines } = injectRunConclusions()
+const { loading, loaded, errors, list, unexplained, lineContext, treeProblemNotes, conclusionLabel, describeLines } = injectRunConclusions()
 </script>
 
 <style scoped>
