@@ -105,11 +105,12 @@
 
       <!-- One copy for both surfaces: the edit form shows the window while the automation reads by
            API, the wizard on its own step. The edit form labels each field; the wizard's question
-           is the label there. -->
+           is the label there. The test id stays STATIC on both: it is a mascot hint anchor
+           (AppContentSeedData, ANCHOR_PRESENT on the edit route), and only static ids are seeded. -->
       <div
         v-if="showDateWindowFields"
         :class="['automation-date-window-fields', { 'automation-edit-date-window-fields': isEditMode }]"
-        :data-testid="isEditMode ? 'automation-edit-window-fields' : undefined"
+        data-testid="automation-edit-window-fields"
       >
         <label class="wizard-input-shell">
           <span v-if="isEditMode" class="workflow-context-label">Date Window</span>
@@ -244,7 +245,7 @@
       <div
         v-if="showScheduleFields"
         :class="['automation-schedule-helper', { 'automation-edit-schedule-helper': isEditMode }]"
-        :data-testid="isEditMode ? 'automation-edit-schedule-fields' : undefined"
+        data-testid="automation-edit-schedule-fields"
       >
         <label class="automation-schedule-field">
           <span v-explain="'automationSchedule'" class="automation-schedule-label">Run</span>
