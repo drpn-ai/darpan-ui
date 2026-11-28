@@ -1,5 +1,5 @@
-// Draft state management has moved to src/stores/reconciliationDraft.ts.
-// This file keeps types and pure utility functions for building API payloads.
+// Types and pure functions for a rule-set draft and the payloads built from it. The draft's state lives in
+// src/stores/reconciliationDraft.ts.
 
 import type { CreateRuleSetRunPayload, RuleSetRulePayload, SaveRuleSetRunPayload } from './api/facadeTypes'
 import type { SourceExtractOptions } from './api/authoringTypes'
@@ -123,6 +123,20 @@ export interface ReconciliationRuleSetDraftState {
   resumeStepId: ReconciliationRuleSetDraftStepId | null
 }
 
+export type ReconciliationDraftSide = 'file1' | 'file2'
+type SideSuffix<K, P extends string> = K extends `${P}${infer S}` ? S : never
+/** A draft field both sides carry under the same name: `SourceConfigId` is `file1SourceConfigId` and `file2SourceConfigId`. */
+export type DraftSideField = SideSuffix<keyof ReconciliationRuleSetDraft, 'file1'> & SideSuffix<keyof ReconciliationRuleSetDraft, 'file2'>
+
+/** One side's value of a field both sides carry, so a reader names the field once instead of branching on the side. */
+export function draftSideValue<F extends DraftSideField>(
+  draft: ReconciliationRuleSetDraft,
+  side: ReconciliationDraftSide,
+  field: F,
+): ReconciliationRuleSetDraft[`file1${F}`] {
+  return draft[`${side}${field}` as keyof ReconciliationRuleSetDraft] as ReconciliationRuleSetDraft[`file1${F}`]
+}
+
 function normalizePreAction(value: unknown): ReconciliationRulePreAction | null {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toUpperCase()
@@ -207,8 +221,8 @@ export function buildCreateRuleSetRunPayload(draft: ReconciliationRuleSetDraft):
 /**
  * DAR-UI-064. A side's extract options. An option left false or blank is not sent, and an empty set sends nothing.
  */
-function sideOptionPayloadFields(side: 'file1' | 'file2', draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
-  const options = Object.entries((side === 'file1' ? draft.file1ExtractOptions : draft.file2ExtractOptions) ?? {})
+function sideOptionPayloadFields(side: ReconciliationDraftSide, draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
+  const options = Object.entries(draftSideValue(draft, side, 'ExtractOptions') ?? {})
     .flatMap(([name, value]): Array<[string, boolean | string]> => {
       if (value === true) return [[name, true]]
       if (typeof value === 'string' && value.trim()) return [[name, value.trim()]]
@@ -217,43 +231,24 @@ function sideOptionPayloadFields(side: 'file1' | 'file2', draft: ReconciliationR
   return options.length ? { [`${side}ExtractOptions`]: Object.fromEntries(options) } : {}
 }
 
-function buildSideSourceFields(side: 'file1' | 'file2', draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
-  if (side === 'file1') {
-    const primaryIdFields = primaryIdExpressionPayloadFields(draft.file1PrimaryIdExpression)
-    if (draft.file1SourceTypeEnumId === RULESET_SOURCE_TYPE_API) {
-      return {
-        file1SourceTypeEnumId: RULESET_SOURCE_TYPE_API,
-        ...(draft.file1SystemMessageRemoteId?.trim() ? { file1SystemMessageRemoteId: draft.file1SystemMessageRemoteId.trim() } : {}),
-        ...(draft.file1NsRestletConfigId?.trim() ? { file1NsRestletConfigId: draft.file1NsRestletConfigId.trim() } : {}),
-        ...(draft.file1SourceConfigId?.trim() ? { file1SourceConfigId: draft.file1SourceConfigId.trim() } : {}),
-        ...(draft.file1SourceConfigType?.trim() ? { file1SourceConfigType: draft.file1SourceConfigType.trim() } : {}),
-        ...(primaryIdFields.file1PrimaryIdExpression ? { file1PrimaryIdExpression: primaryIdFields.file1PrimaryIdExpression } : {}),
-        ...(primaryIdFields.file1PrimaryIdExpressions ? { file1PrimaryIdExpressions: primaryIdFields.file1PrimaryIdExpressions } : {}),
-      }
-    }
-    return {
-      file1FileTypeEnumId: draft.file1FileTypeEnumId,
-      file1SchemaFileName: normalizeString(draft.file1SchemaFileName) ?? undefined,
-      ...primaryIdFields,
-    }
-  }
-  const primaryIdFields = primaryIdExpressionPayloadFields(draft.file2PrimaryIdExpression, 'file2')
-  if (draft.file2SourceTypeEnumId === RULESET_SOURCE_TYPE_API) {
-    return {
-      file2SourceTypeEnumId: RULESET_SOURCE_TYPE_API,
-      ...(draft.file2SystemMessageRemoteId?.trim() ? { file2SystemMessageRemoteId: draft.file2SystemMessageRemoteId.trim() } : {}),
-      ...(draft.file2NsRestletConfigId?.trim() ? { file2NsRestletConfigId: draft.file2NsRestletConfigId.trim() } : {}),
-      ...(draft.file2SourceConfigId?.trim() ? { file2SourceConfigId: draft.file2SourceConfigId.trim() } : {}),
-      ...(draft.file2SourceConfigType?.trim() ? { file2SourceConfigType: draft.file2SourceConfigType.trim() } : {}),
-      ...(primaryIdFields.file2PrimaryIdExpression ? { file2PrimaryIdExpression: primaryIdFields.file2PrimaryIdExpression } : {}),
-      ...(primaryIdFields.file2PrimaryIdExpressions ? { file2PrimaryIdExpressions: primaryIdFields.file2PrimaryIdExpressions } : {}),
-    }
+const API_SIDE_FIELDS = ['SystemMessageRemoteId', 'NsRestletConfigId', 'SourceConfigId', 'SourceConfigType'] as const
+
+function buildSideSourceFields(side: ReconciliationDraftSide, draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
+  const primaryIdFields = primaryIdExpressionPayloadFields(draftSideValue(draft, side, 'PrimaryIdExpression'), side)
+  if (draftSideValue(draft, side, 'SourceTypeEnumId') === RULESET_SOURCE_TYPE_API) {
+    // An API side sends only what it has: a blank id or an empty single key is left out.
+    const named = API_SIDE_FIELDS.flatMap((field) => {
+      const value = draftSideValue(draft, side, field)?.trim()
+      return value ? [[`${side}${field}`, value]] : []
+    })
+    const keys = Object.entries(primaryIdFields).filter(([, value]) => Boolean(value))
+    return Object.fromEntries([[`${side}SourceTypeEnumId`, RULESET_SOURCE_TYPE_API], ...named, ...keys]) as Partial<CreateRuleSetRunPayload>
   }
   return {
-    file2FileTypeEnumId: draft.file2FileTypeEnumId,
-    file2SchemaFileName: normalizeString(draft.file2SchemaFileName) ?? undefined,
+    [`${side}FileTypeEnumId`]: draftSideValue(draft, side, 'FileTypeEnumId'),
+    [`${side}SchemaFileName`]: normalizeString(draftSideValue(draft, side, 'SchemaFileName')) ?? undefined,
     ...primaryIdFields,
-  }
+  } as Partial<CreateRuleSetRunPayload>
 }
 
 /**
@@ -509,14 +504,14 @@ function escapeDrlString(value: string): string {
  */
 export function reconciliationSystemTitle(
   draftValue: ReconciliationRuleSetDraft | null,
-  side: 'file1' | 'file2',
+  side: ReconciliationDraftSide,
   fallbackNoun: 'System' | 'Source' = 'System',
 ): string {
   const fallback = side === 'file1' ? `${fallbackNoun} 1` : `${fallbackNoun} 2`
   if (!draftValue) return fallback
 
-  const parentLabel = side === 'file1' ? draftValue.file1SystemParentLabel : draftValue.file2SystemParentLabel
-  const systemLabel = side === 'file1' ? draftValue.file1SystemLabel : draftValue.file2SystemLabel
-  const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId : draftValue.file2SystemEnumId
-  return parentLabel?.trim() || systemLabel || systemEnumId || fallback
+  return draftSideValue(draftValue, side, 'SystemParentLabel')?.trim()
+    || draftSideValue(draftValue, side, 'SystemLabel')
+    || draftSideValue(draftValue, side, 'SystemEnumId')
+    || fallback
 }

@@ -317,8 +317,10 @@ import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import {
   buildSaveRuleSetRunPayload,
+  draftSideValue,
   formatReconciliationFieldKey,
   normalizeReconciliationFieldPath,
+  type ReconciliationDraftSide,
   type ReconciliationRuleSetDraft,
   type ReconciliationRuleSetDraftRule,
   reconciliationSystemTitle,
@@ -343,14 +345,13 @@ const draftStore = useReconciliationDraftStore()
 const schemaLabels = ref<Record<string, string>>({})
 const deletingSavedRun = ref(false)
 const pageError = ref<string | null>(null)
-type SourceSide = 'file1' | 'file2'
+type SourceSide = ReconciliationDraftSide
 type AuthInfoKind = 'oms' | 'shopify'
 
 interface SourceConfigSummary {
   kind: AuthInfoKind
   side: SourceSide
   configId: string
-  label: string
 }
 
 interface AuthInfoField {
@@ -577,12 +578,12 @@ interface ReadOptionRow {
 const readOptionError = ref('')
 
 function sideExtractOptions(draftValue: ReconciliationRuleSetDraft, side: SourceSide): SourceExtractOptions {
-  return (side === 'file1' ? draftValue.file1ExtractOptions : draftValue.file2ExtractOptions) ?? {}
+  return draftSideValue(draftValue, side, 'ExtractOptions') ?? {}
 }
 
 function declaredBooleanOptions(draftValue: ReconciliationRuleSetDraft, side: SourceSide): SourceExtractOption[] {
-  const configId = (side === 'file1' ? draftValue.file1SourceConfigId : draftValue.file2SourceConfigId)?.trim()
-  const systemEnumId = (side === 'file1' ? draftValue.file1SystemEnumId : draftValue.file2SystemEnumId)?.trim().toUpperCase()
+  const configId = draftSideValue(draftValue, side, 'SourceConfigId')?.trim()
+  const systemEnumId = draftSideValue(draftValue, side, 'SystemEnumId')?.trim().toUpperCase()
   if (!configId || !systemEnumId) return []
   // The endpoint itself, never its family: one Shopify config is the Orders, Order lines and Returns endpoints at once.
   const row = sourceConfigOptions.value.find((option) =>
@@ -668,17 +669,17 @@ watch(draftRunName, () => resetRunNameState(), { immediate: true })
  * so the run reads back the way it was chosen. Falls back to the id when a config carries no
  * description, or before the option list has loaded.
  */
-function systemConfigName(draftValue: ReconciliationRuleSetDraft | null, side: 'file1' | 'file2'): string {
-  if (!draftValue) return ''
+function systemConfigName(draftValue: ReconciliationRuleSetDraft | null, side: SourceSide): string {
+  if (!draftValue || !isApiSide(draftValue, side)) return ''
 
-  const sourceTypeEnumId = side === 'file1' ? draftValue.file1SourceTypeEnumId : draftValue.file2SourceTypeEnumId
-  if (sourceTypeEnumId?.trim() !== SOURCE_TYPE_API) return ''
-
-  const sourceConfigId = (side === 'file1' ? draftValue.file1SourceConfigId : draftValue.file2SourceConfigId)?.trim() ?? ''
+  const sourceConfigId = draftSideValue(draftValue, side, 'SourceConfigId')?.trim() ?? ''
   if (!sourceConfigId) return ''
 
-  const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId : draftValue.file2SystemEnumId
-  return sourceConfigDescription(sourceConfigId, systemEnumId) || sourceConfigId
+  return sourceConfigDescription(sourceConfigId, draftSideValue(draftValue, side, 'SystemEnumId')) || sourceConfigId
+}
+
+function isApiSide(draftValue: ReconciliationRuleSetDraft, side: SourceSide): boolean {
+  return draftSideValue(draftValue, side, 'SourceTypeEnumId')?.trim() === SOURCE_TYPE_API
 }
 
 /**
@@ -713,63 +714,39 @@ async function loadSourceConfigOptions(): Promise<void> {
   }
 }
 
-function summarizeSource(draftValue: ReconciliationRuleSetDraft | null, side: 'file1' | 'file2'): string {
+function summarizeSource(draftValue: ReconciliationRuleSetDraft | null, side: SourceSide): string {
   if (!draftValue) return 'Source pending'
-
-  const sourceTypeEnumId = side === 'file1' ? draftValue.file1SourceTypeEnumId : draftValue.file2SourceTypeEnumId
-  if (sourceTypeEnumId?.trim() === SOURCE_TYPE_API) return apiEndpointLabel(draftValue, side)
-
-  const fileTypeEnumId = side === 'file1' ? draftValue.file1FileTypeEnumId : draftValue.file2FileTypeEnumId
-  return fileTypeEnumId === 'DftJson'
+  if (isApiSide(draftValue, side)) return apiEndpointLabel(draftValue, side)
+  return draftSideValue(draftValue, side, 'FileTypeEnumId') === 'DftJson'
     ? resolveDraftSchemaLabel(draftValue, side)
     : 'CSV source'
 }
 
 function buildSourceConfigSummary(draftValue: ReconciliationRuleSetDraft | null, side: SourceSide): SourceConfigSummary | null {
   if (!draftValue) return null
-  if (!permissionsStore.canViewTenantSettings) return null
+  if (!permissionsStore.canViewTenantSettings || !isApiSide(draftValue, side)) return null
 
-  const sourceTypeEnumId = side === 'file1' ? draftValue.file1SourceTypeEnumId : draftValue.file2SourceTypeEnumId
-  if (sourceTypeEnumId?.trim() !== SOURCE_TYPE_API) return null
+  const configId = draftSideValue(draftValue, side, 'SourceConfigId')?.trim()
+  if (!configId) return null
 
-  const sourceConfigId = side === 'file1' ? draftValue.file1SourceConfigId?.trim() : draftValue.file2SourceConfigId?.trim()
-  if (!sourceConfigId) return null
-
-  const sourceConfigType = side === 'file1' ? draftValue.file1SourceConfigType?.trim() : draftValue.file2SourceConfigType?.trim()
-  const systemEnumId = side === 'file1' ? draftValue.file1SystemEnumId?.trim() : draftValue.file2SystemEnumId?.trim()
+  const sourceConfigType = draftSideValue(draftValue, side, 'SourceConfigType')?.trim()
+  const systemEnumId = draftSideValue(draftValue, side, 'SystemEnumId')?.trim()
 
   // Every HotWax endpoint (OMS_GQL, OMS_RETURNS_GQL, ...) reads the one OMS connection.
   if (sourceConfigType?.startsWith('HOTWAX_OMS') || systemEnumId === 'OMS' || systemEnumId?.startsWith('OMS_')) {
-    return {
-      kind: 'oms',
-      side,
-      configId: sourceConfigId,
-      label: sourceConfigId,
-    }
+    return { kind: 'oms', side, configId }
   }
-
   if (sourceConfigType === 'SHOPIFY_AUTH' || systemEnumId === 'SHOPIFY') {
-    return {
-      kind: 'shopify',
-      side,
-      configId: sourceConfigId,
-      label: sourceConfigId,
-    }
+    return { kind: 'shopify', side, configId }
   }
-
   return null
 }
 
-function apiEndpointLabel(draftValue: ReconciliationRuleSetDraft, side: 'file1' | 'file2'): string {
-  const systemMessageRemoteLabel = side === 'file1' ? draftValue.file1SystemMessageRemoteLabel : draftValue.file2SystemMessageRemoteLabel
-  const nsRestletConfigLabel = side === 'file1' ? draftValue.file1NsRestletConfigLabel : draftValue.file2NsRestletConfigLabel
-  const systemMessageRemoteId = side === 'file1' ? draftValue.file1SystemMessageRemoteId : draftValue.file2SystemMessageRemoteId
-  const nsRestletConfigId = side === 'file1' ? draftValue.file1NsRestletConfigId : draftValue.file2NsRestletConfigId
-
-  return systemMessageRemoteLabel?.trim()
-    || nsRestletConfigLabel?.trim()
-    || systemMessageRemoteId?.trim()
-    || nsRestletConfigId?.trim()
+function apiEndpointLabel(draftValue: ReconciliationRuleSetDraft, side: SourceSide): string {
+  return draftSideValue(draftValue, side, 'SystemMessageRemoteLabel')?.trim()
+    || draftSideValue(draftValue, side, 'NsRestletConfigLabel')?.trim()
+    || draftSideValue(draftValue, side, 'SystemMessageRemoteId')?.trim()
+    || draftSideValue(draftValue, side, 'NsRestletConfigId')?.trim()
     || 'API'
 }
 
@@ -789,15 +766,17 @@ function openAuthInfoPopupForSide(side: SourceSide): void {
 }
 
 async function openAuthInfoPopup(sourceConfig: SourceConfigSummary): Promise<void> {
-  authInfoPopup.value = {
+  // Until the connection loads (or if it will not), the popup names only the config id.
+  const idOnly: AuthInfoPopupState = {
     source: sourceConfig,
-    title: sourceConfig.label,
+    title: sourceConfig.configId,
     fields: [{ label: 'Config ID', value: sourceConfig.configId }],
     endpoints: [],
     dashboardRoute: buildSourceConfigDashboardRoute(sourceConfig),
     loading: true,
     error: null,
   }
+  authInfoPopup.value = idOnly
 
   try {
     const loadedState = sourceConfig.kind === 'oms'
@@ -808,13 +787,9 @@ async function openAuthInfoPopup(sourceConfig: SourceConfigSummary): Promise<voi
   } catch (error) {
     if (!isActiveAuthInfoSource(sourceConfig)) return
     authInfoPopup.value = {
-      source: sourceConfig,
-      title: sourceConfig.label,
-      fields: [{ label: 'Config ID', value: sourceConfig.configId }],
-      endpoints: [],
-      dashboardRoute: buildSourceConfigDashboardRoute(sourceConfig),
+      ...idOnly,
       loading: false,
-      error: error instanceof ApiCallError || error instanceof Error ? error.message : 'The auth info would not show its badge.',
+      error: error instanceof Error ? error.message : 'The auth info would not show its badge.',
     }
   }
 }
@@ -905,11 +880,11 @@ function buildShopifyAuthInfoPopupState(
   config: ShopifyAuthConfigRecord,
   endpoints: SourceConfigEndpoint[],
 ): AuthInfoPopupState {
-  const apiVersion = displayValue(config.apiVersion, '2026-01')
   // Every Shopify endpoint the registry can name today reads through the one GraphQL URL, so the
-  // api-version meta is genuinely shared across all of them -- unlike OMS's per-endpoint REST
-  // paths, which the registry doesn't carry and this popup no longer fabricates.
-  const graphQlMeta = `/admin/api/${apiVersion}/graphql.json`
+  // api-version meta is genuinely shared across all of them. apiVersion is a required column; a blank one
+  // shows no URL rather than a made-up version.
+  const apiVersion = config.apiVersion?.trim() ?? ''
+  const graphQlMeta = apiVersion ? `/admin/api/${apiVersion}/graphql.json` : ''
 
   return {
     source: sourceConfig,
@@ -940,21 +915,14 @@ function buildEnabledAuthInfoEndpoints(endpoints: SourceConfigEndpoint[], meta =
     }))
 }
 
-function displayValue(value: string | undefined, fallback = 'Not set'): string {
-  return value?.trim() || fallback
-}
-
 function authInfoField(label: string, value: string | undefined): AuthInfoField | null {
   const trimmedValue = value?.trim()
   return trimmedValue ? { label, value: trimmedValue } : null
 }
 
+/** Drops unset fields, and an auth type of NONE ("None"): nothing to show. */
 function compactAuthInfoFields(fields: Array<AuthInfoField | null>): AuthInfoField[] {
-  const placeholderValues = new Set(['Not set', 'None', 'Not configured'])
-  return fields.filter((field): field is AuthInfoField => {
-    if (!field) return false
-    return !placeholderValues.has(field.value)
-  })
+  return fields.filter((field): field is AuthInfoField => Boolean(field) && field?.value !== 'None')
 }
 
 function formatAuthType(authType: string | undefined): string {
@@ -969,14 +937,13 @@ function formatAuthType(authType: string | undefined): string {
     .join(' ')
 }
 
-function resolveDraftSchemaLabel(draftValue: ReconciliationRuleSetDraft, side: 'file1' | 'file2'): string {
-  const draftSchemaLabel = side === 'file1' ? draftValue.file1SchemaLabel : draftValue.file2SchemaLabel
+function resolveDraftSchemaLabel(draftValue: ReconciliationRuleSetDraft, side: SourceSide): string {
+  const draftSchemaLabel = draftSideValue(draftValue, side, 'SchemaLabel')
   const systemLabel = side === 'file1' ? file1Title.value : file2Title.value
   if (draftSchemaLabel?.trim()) return withoutSystemSuffix(draftSchemaLabel.trim(), systemLabel)
 
-  const jsonSchemaId = side === 'file1' ? draftValue.file1JsonSchemaId : draftValue.file2JsonSchemaId
-  const schemaFileName = side === 'file1' ? draftValue.file1SchemaFileName : draftValue.file2SchemaFileName
-  const lookupKey = schemaLabelLookupKey(jsonSchemaId, schemaFileName)
+  const schemaFileName = draftSideValue(draftValue, side, 'SchemaFileName')
+  const lookupKey = schemaLabelLookupKey(draftSideValue(draftValue, side, 'JsonSchemaId'), schemaFileName)
   if (lookupKey && schemaLabels.value[lookupKey]) return withoutSystemSuffix(schemaLabels.value[lookupKey], systemLabel)
 
   return schemaFileName || 'JSON schema pending'
