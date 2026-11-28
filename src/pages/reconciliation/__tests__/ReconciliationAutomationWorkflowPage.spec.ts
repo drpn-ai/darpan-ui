@@ -891,8 +891,8 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       messages: [],
       errors: [],
       chatSpaces: [
-        { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: true },
-        { chatSpaceId: 'CS2', spaceName: 'Backup', googleChatConfigured: true, isActive: 'Y', inUse: false },
+        { chatSpaceId: 'CS1', spaceName: 'Ops', webhookConfigured: true, isActive: 'Y', inUse: true },
+        { chatSpaceId: 'CS2', spaceName: 'Backup', webhookConfigured: true, isActive: 'Y', inUse: false },
       ],
     })
 
@@ -1024,7 +1024,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
       ok: true,
       messages: [],
       errors: [],
-      chatSpace: { chatSpaceId: 'CS9', spaceName: 'Ops Alerts', googleChatConfigured: true, isActive: 'Y', inUse: true },
+      chatSpace: { chatSpaceId: 'CS9', spaceName: 'Ops Alerts', webhookConfigured: true, isActive: 'Y', inUse: true },
     })
 
     const wrapper = mount(ReconciliationAutomationWorkflowPage)

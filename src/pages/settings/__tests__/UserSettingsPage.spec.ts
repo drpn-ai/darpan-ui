@@ -571,8 +571,8 @@ describe('UserSettingsPage', () => {
       messages: [],
       errors: [],
       chatSpaces: [
-        { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: false },
-        { chatSpaceId: 'CS2', spaceName: 'Finance', googleChatConfigured: true, isActive: 'Y', inUse: false },
+        { chatSpaceId: 'CS1', spaceName: 'Ops', webhookConfigured: true, isActive: 'Y', inUse: false },
+        { chatSpaceId: 'CS2', spaceName: 'Finance', webhookConfigured: true, isActive: 'Y', inUse: false },
       ],
     })
     saveUserNotificationDefault.mockResolvedValue({
@@ -609,8 +609,8 @@ describe('UserSettingsPage', () => {
       messages: [],
       errors: [],
       chatSpaces: [
-        { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: false },
-        { chatSpaceId: 'CS2', spaceName: 'Finance', googleChatConfigured: true, isActive: 'N', inUse: false },
+        { chatSpaceId: 'CS1', spaceName: 'Ops', webhookConfigured: true, isActive: 'Y', inUse: false },
+        { chatSpaceId: 'CS2', spaceName: 'Finance', webhookConfigured: true, isActive: 'N', inUse: false },
       ],
     })
     const wrapper = mountPage()
@@ -636,7 +636,7 @@ describe('UserSettingsPage', () => {
       messages: [],
       errors: [],
       chatSpaces: [
-        { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: false },
+        { chatSpaceId: 'CS1', spaceName: 'Ops', webhookConfigured: true, isActive: 'Y', inUse: false },
       ],
     })
     saveUserNotificationDefault.mockResolvedValue({
@@ -670,7 +670,7 @@ describe('UserSettingsPage', () => {
       messages: [],
       errors: [],
       chatSpaces: [
-        { chatSpaceId: 'CS1', spaceName: 'Ops', googleChatConfigured: true, isActive: 'Y', inUse: false },
+        { chatSpaceId: 'CS1', spaceName: 'Ops', webhookConfigured: true, isActive: 'Y', inUse: false },
       ],
     })
     const wrapper = mountPage()

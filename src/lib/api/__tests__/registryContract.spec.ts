@@ -118,7 +118,7 @@ async function driveAllMethods(facade: Record<string, unknown>): Promise<void> {
           baseUrl: 'https://oms.example.com',
           chatSpaceId: 'cs-x',
           spaceName: 'Ops',
-          googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/x/messages?key=k&token=t',
+          webhookUrl: 'https://chat.googleapis.com/v1/spaces/x/messages?key=k&token=t',
           reconciliationRunResultId: 'rr-x',
           mappingName: 'm',
           reconciliationMappingId: 'map-x',

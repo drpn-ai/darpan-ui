@@ -216,9 +216,7 @@ describe('TenantSettingsPage', () => {
           chatProviderEnumId: 'CHAT_PROV_GOOGLE',
           chatProviderLabel: 'Google Chat',
           webhookConfigured: true,
-          googleChatConfigured: true,
           webhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
-          googleChatWebhookUrl: 'https://chat.googleapis.com/v1/spaces/AAA111/messages?key=k&token=t',
           isActive: 'Y',
           inUse: true,
         },
@@ -228,8 +226,7 @@ describe('TenantSettingsPage', () => {
           chatProviderEnumId: 'CHAT_PROV_GOOGLE',
           chatProviderLabel: 'Google Chat',
           webhookConfigured: false,
-          googleChatConfigured: false,
-          googleChatWebhookUrl: null,
+          webhookUrl: null,
           isActive: 'Y',
           inUse: false,
         },
@@ -254,8 +251,8 @@ describe('TenantSettingsPage', () => {
       messages: [],
       errors: [],
       chatSpaces: [
-        { chatSpaceId: 'CS1', spaceName: 'Ops', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, googleChatConfigured: true, isActive: 'Y', inUse: true },
-        { chatSpaceId: 'CS2', spaceName: 'Finance', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: false, googleChatConfigured: false, isActive: 'Y', inUse: false },
+        { chatSpaceId: 'CS1', spaceName: 'Ops', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, isActive: 'Y', inUse: true },
+        { chatSpaceId: 'CS2', spaceName: 'Finance', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: false, isActive: 'Y', inUse: false },
       ],
     })
     await flushPromises()
@@ -386,7 +383,7 @@ describe('TenantSettingsPage', () => {
   it('counts one space as one', async () => {
     listTenantChatSpaces.mockResolvedValue({
       ok: true, messages: [], errors: [],
-      chatSpaces: [{ chatSpaceId: 'CS1', spaceName: 'Ops', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, googleChatConfigured: true, isActive: 'Y', inUse: true }],
+      chatSpaces: [{ chatSpaceId: 'CS1', spaceName: 'Ops', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, isActive: 'Y', inUse: true }],
     })
     const wrapper = mount(TenantSettingsPage)
     await flushPromises()

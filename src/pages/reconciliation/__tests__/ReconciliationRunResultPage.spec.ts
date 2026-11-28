@@ -1666,8 +1666,8 @@ describe('ReconciliationRunResultPage', () => {
       messages: [],
       errors: [],
       chatSpaces: [
-        { chatSpaceId: 'CS1', spaceName: 'Ops Room', googleChatConfigured: true, isActive: 'Y', inUse: true },
-        { chatSpaceId: 'CS2', spaceName: 'Archived Room', googleChatConfigured: true, isActive: 'N', inUse: false },
+        { chatSpaceId: 'CS1', spaceName: 'Ops Room', webhookConfigured: true, isActive: 'Y', inUse: true },
+        { chatSpaceId: 'CS2', spaceName: 'Archived Room', webhookConfigured: true, isActive: 'N', inUse: false },
       ],
     })
     saveUserNotificationDefault.mockResolvedValue({
@@ -1745,7 +1745,7 @@ describe('ReconciliationRunResultPage', () => {
       ok: true,
       messages: [],
       errors: [],
-      chatSpaces: [{ chatSpaceId: 'CS1', spaceName: 'Ops Room', googleChatConfigured: true, isActive: 'Y', inUse: true }],
+      chatSpaces: [{ chatSpaceId: 'CS1', spaceName: 'Ops Room', webhookConfigured: true, isActive: 'Y', inUse: true }],
     })
     saveUserNotificationDefault.mockRejectedValue(new ApiCallError('Chat space is no longer active.', 200, {
       method: 'facade.SettingsFacadeServices.save#UserNotificationDefault',

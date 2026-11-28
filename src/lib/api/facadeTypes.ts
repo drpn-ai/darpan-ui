@@ -47,8 +47,6 @@ export interface SaveTenantChatSpacePayload {
   slackChannelId?: string
   slackChannelName?: string
   webhookUrl?: string
-  /** Pre-Slack alias for webhookUrl, accepted by the backend one release. */
-  googleChatWebhookUrl?: string
   isActive?: boolean
 }
 

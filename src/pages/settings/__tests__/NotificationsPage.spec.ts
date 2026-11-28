@@ -59,7 +59,7 @@ const ROUTES = [
 ]
 
 function fullSpace(space: (typeof SPACES)[number], extra: Record<string, unknown> = {}) {
-  return { ...space, googleChatConfigured: true, inUse: true, slackChannelId: space.chatSpaceId === 'CS3' ? 'C1' : null, ...extra }
+  return { ...space, webhookConfigured: true, inUse: true, slackChannelId: space.chatSpaceId === 'CS3' ? 'C1' : null, ...extra }
 }
 
 function routesResponse() {
@@ -507,7 +507,7 @@ describe('NotificationsPage', () => {
 
   describe('Add space', () => {
     it('adds a Google Chat space: webhook, name, what moves there, then a test', async () => {
-      const added = { chatSpaceId: 'CS9', spaceName: 'Warehouse', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, googleChatConfigured: true, isActive: 'Y', inUse: false }
+      const added = { chatSpaceId: 'CS9', spaceName: 'Warehouse', chatProviderEnumId: 'CHAT_PROV_GOOGLE', chatProviderLabel: 'Google Chat', webhookConfigured: true, isActive: 'Y', inUse: false }
       saveTenantChatSpace.mockResolvedValue({ ok: true, messages: ['Saved chat space.'], errors: [], chatSpace: added })
       setNotificationRoute.mockImplementation(async (payload: { sourceType: string, sourceId?: string, chatSpaceId: string }) => ({
         ok: true, messages: ['Posts to Warehouse.'], errors: [],

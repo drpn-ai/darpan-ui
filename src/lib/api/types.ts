@@ -266,13 +266,6 @@ export interface TenantChatSpace {
   deliveryMode?: 'WEBHOOK' | 'SLACK_BOT'
   webhookConfigured: boolean
   webhookUrl?: string | null
-  /**
-   * Pre-Slack names, kept one release. The backend mirrors the resolved provider-agnostic values
-   * into these, so they are NOT Google-specific despite the name — prefer webhookConfigured /
-   * webhookUrl in new code.
-   */
-  googleChatConfigured: boolean
-  googleChatWebhookUrl?: string | null
   isActive: string
   inUse: boolean
   createdDate?: string
