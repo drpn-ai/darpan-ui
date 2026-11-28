@@ -115,14 +115,12 @@ describe('OmsRestSourceWorkflowPage', () => {
     revokeConfigTenantAccess.mockReset()
     listSourceConfigEndpoints.mockReset()
     storeSourceConfigEndpointAccess.mockReset()
-    // Default: just the Orders endpoint, enabled — mirrors the pre-registry single-checkbox
-    // reality so every pre-existing test in this file (which never asserts on the endpoint list
-    // itself) keeps seeing canReadOrders resolve to true, unmodified.
+    // Default: just the Orders endpoint, enabled.
     listSourceConfigEndpoints.mockResolvedValue({
       ok: true,
       messages: [],
       errors: [],
-      endpoints: [{ systemEnumId: 'OMS', endpointLabel: 'Orders API', isEnabled: true }],
+      endpoints: [{ systemEnumId: 'OMS_GQL', endpointLabel: 'Orders', isEnabled: true }],
     })
     storeSourceConfigEndpointAccess.mockResolvedValue({ ok: true, messages: [], errors: [], stored: true })
     // Default: an unshared config (memberCount 1, no peers) — the common case, and the shape
@@ -351,10 +349,10 @@ describe('OmsRestSourceWorkflowPage', () => {
     expect(wrapper.get('input[name="password"]').attributes('autocomplete')).toBe('off')
     expect(wrapper.find('.workflow-form-grid--hotwax-auth').exists()).toBe(true)
     expect(wrapper.get('[data-testid="oms-timezone-select"]').text()).toContain('America/Chicago')
-    const ordersEndpointCheckbox = wrapper.get('[data-testid="endpoint-OMS"]')
-    expect(ordersEndpointCheckbox.attributes('name')).toBe('endpoint-OMS')
+    const ordersEndpointCheckbox = wrapper.get('[data-testid="endpoint-OMS_GQL"]')
+    expect(ordersEndpointCheckbox.attributes('name')).toBe('endpoint-OMS_GQL')
     expect((ordersEndpointCheckbox.element as HTMLInputElement).checked).toBe(true)
-    expect(wrapper.get('[data-testid="endpoint-access-block"]').text()).toContain('Orders API')
+    expect(wrapper.get('[data-testid="endpoint-access-block"]').text()).toContain('Orders')
     expect(wrapper.find('input[name="apiToken"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="oms-is-active"]').exists()).toBe(true)
     expect(wrapper.get('input[name="isActive"]').attributes('type')).toBe('checkbox')
@@ -526,13 +524,13 @@ describe('OmsRestSourceWorkflowPage', () => {
     const wrapper = mount(OmsRestSourceWorkflowPage)
     await flushPromises()
 
-    await wrapper.get('[data-testid="endpoint-OMS"]').setValue(false)
+    await wrapper.get('[data-testid="endpoint-OMS_GQL"]').setValue(false)
     await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
     await flushPromises()
 
     expect(saveOmsRestSourceConfig).toHaveBeenCalledWith(expect.objectContaining({
       omsRestSourceConfigId: 'dev_oms',
-      canReadOrders: false,
+      canReadOrders: true,
     }))
     expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
       configTypeEnumId: 'SCFG_HOTWAX_OMS',
@@ -684,8 +682,8 @@ describe('OmsRestSourceWorkflowPage', () => {
       messages: [],
       errors: [],
       endpoints: [
-        { systemEnumId: 'OMS', endpointLabel: 'Orders API', isEnabled: true },
-        { systemEnumId: 'OMS_RETURNS', endpointLabel: 'Reconciliation Returns API', isEnabled: false },
+        { systemEnumId: 'OMS_GQL', endpointLabel: 'Orders', isEnabled: true },
+        { systemEnumId: 'OMS_RETURNS_GQL', endpointLabel: 'Returns', isEnabled: false },
       ],
     })
     saveOmsRestSourceConfig.mockResolvedValue({
@@ -706,9 +704,9 @@ describe('OmsRestSourceWorkflowPage', () => {
       expect.objectContaining({ configTypeEnumId: 'SCFG_HOTWAX_OMS', configId: 'krewe-oms' }),
       expect.anything(),
     )
-    expect(wrapper.find('input[data-testid="endpoint-OMS_RETURNS"]').exists()).toBe(true)
+    expect(wrapper.find('input[data-testid="endpoint-OMS_RETURNS_GQL"]').exists()).toBe(true)
 
-    await wrapper.find('input[data-testid="endpoint-OMS_RETURNS"]').setValue(true)
+    await wrapper.find('input[data-testid="endpoint-OMS_RETURNS_GQL"]').setValue(true)
     await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
     await flushPromises()
 
@@ -719,16 +717,15 @@ describe('OmsRestSourceWorkflowPage', () => {
     expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
       configTypeEnumId: 'SCFG_HOTWAX_OMS',
       configId: 'krewe-oms',
-      enabledSystemEnumIds: ['OMS', 'OMS_RETURNS'],
+      enabledSystemEnumIds: ['OMS_GQL', 'OMS_RETURNS_GQL'],
     })
   })
 
   // Fix round 1, CRITICAL: before this fix, applyRecord() reset enabledEndpoints to [] and nothing
   // gated the follow-up write on the panel's own load outcome, so a failed GET silently disabled
-  // every endpoint for the config (and flipped the legacy canReadOrders gate off in the same
-  // stroke). Verified failing against the pre-fix code in a scratch worktree at b04b64f before this
-  // fix landed: saveOmsRestSourceConfig was called with canReadOrders: false instead of true.
-  it('does not touch endpoint access, and preserves the loaded canReadOrders, when the endpoint read fails', async () => {
+  // every endpoint for the config. Verified failing against the pre-fix code in a scratch worktree at
+  // b04b64f before this fix landed.
+  it('does not touch endpoint access when the endpoint read fails', async () => {
     route.params = { omsRestSourceConfigId: 'krewe-oms' }
     route.name = 'settings-oms-edit'
     route.fullPath = '/settings/hotwax/edit/krewe-oms'
@@ -803,8 +800,8 @@ describe('OmsRestSourceWorkflowPage', () => {
       messages: [],
       errors: [],
       endpoints: [
-        { systemEnumId: 'OMS', endpointLabel: 'Orders API', isEnabled: true },
-        { systemEnumId: 'OMS_RETURNS', endpointLabel: 'Reconciliation Returns API', isEnabled: true },
+        { systemEnumId: 'OMS_GQL', endpointLabel: 'Orders', isEnabled: true },
+        { systemEnumId: 'OMS_RETURNS_GQL', endpointLabel: 'Returns', isEnabled: true },
       ],
     })
     saveOmsRestSourceConfig.mockResolvedValue({
@@ -818,8 +815,8 @@ describe('OmsRestSourceWorkflowPage', () => {
     // Let the endpoints fetch (already resolved) settle and seed the form BEFORE the config fetch
     // resolves -- this is the ordering that broke on gorjana_prod.
     await flushPromises()
-    expect((wrapper.get('[data-testid="endpoint-OMS"]').element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.get('[data-testid="endpoint-OMS_RETURNS"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('[data-testid="endpoint-OMS_GQL"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('[data-testid="endpoint-OMS_RETURNS_GQL"]').element as HTMLInputElement).checked).toBe(true)
 
     resolveConfigFetch({
       ok: true,
@@ -847,8 +844,8 @@ describe('OmsRestSourceWorkflowPage', () => {
     await flushPromises()
 
     // The config fetch resolving after the endpoints fetch must not wipe the already-seeded set.
-    expect((wrapper.get('[data-testid="endpoint-OMS"]').element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.get('[data-testid="endpoint-OMS_RETURNS"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('[data-testid="endpoint-OMS_GQL"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('[data-testid="endpoint-OMS_RETURNS_GQL"]').element as HTMLInputElement).checked).toBe(true)
 
     await wrapper.get('[data-testid="save-oms-rest-source"]').trigger('click')
     await flushPromises()
@@ -859,7 +856,7 @@ describe('OmsRestSourceWorkflowPage', () => {
     expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
       configTypeEnumId: 'SCFG_HOTWAX_OMS',
       configId: 'krewe-oms',
-      enabledSystemEnumIds: ['OMS', 'OMS_RETURNS'],
+      enabledSystemEnumIds: ['OMS_GQL', 'OMS_RETURNS_GQL'],
     })
   })
 })

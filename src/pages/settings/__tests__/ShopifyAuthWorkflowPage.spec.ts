@@ -115,9 +115,7 @@ describe('ShopifyAuthWorkflowPage', () => {
     revokeConfigTenantAccess.mockReset()
     listSourceConfigEndpoints.mockReset()
     storeSourceConfigEndpointAccess.mockReset()
-    // Default: just the Admin GraphQL Orders endpoint, enabled — mirrors the pre-registry
-    // single-checkbox reality so every pre-existing test in this file (which never asserts on the
-    // endpoint list itself) keeps seeing canReadOrders resolve to true, unmodified.
+    // Default: just the Admin GraphQL Orders endpoint, enabled.
     listSourceConfigEndpoints.mockResolvedValue({
       ok: true,
       messages: [],
@@ -455,7 +453,7 @@ describe('ShopifyAuthWorkflowPage', () => {
 
     expect(saveShopifyAuthConfig).toHaveBeenCalledWith(expect.objectContaining({
       shopifyAuthConfigId: 'dev_shopify',
-      canReadOrders: false,
+      canReadOrders: true,
     }))
     expect(storeSourceConfigEndpointAccess).toHaveBeenCalledWith({
       configTypeEnumId: 'SCFG_SHOPIFY_AUTH',
@@ -627,10 +625,9 @@ describe('ShopifyAuthWorkflowPage', () => {
 
   // Fix round 1, CRITICAL: before this fix, applyRecord() reset enabledEndpoints to [] and nothing
   // gated the follow-up write on the panel's own load outcome, so a failed GET silently disabled
-  // every endpoint for the config (and flipped the legacy canReadOrders gate off in the same
-  // stroke). Mirrors the OMS-page regression test verified failing against the pre-fix code
-  // (b04b64f) in a scratch worktree.
-  it('does not touch endpoint access, and preserves the loaded canReadOrders, when the endpoint read fails', async () => {
+  // every endpoint for the config. Mirrors the HotWax-page regression test verified failing against
+  // the pre-fix code (b04b64f) in a scratch worktree.
+  it('does not touch endpoint access when the endpoint read fails', async () => {
     route.params = { shopifyAuthConfigId: 'krewe-shopify' }
     route.name = 'settings-shopify-edit'
     route.fullPath = '/settings/shopify/edit/krewe-shopify'

@@ -233,10 +233,6 @@ const currentStepIndex = ref(0)
 // a Save clicked before the panel's first emit ever arrives is treated the same as an in-flight or
 // failed read -- never as an implicit "everything disabled".
 const endpointsLoadState = ref<EndpointAccessLoadState>('loading')
-// Fallback for the legacy canReadOrders column when endpointsLoadState isn't 'ready' at Save time
-// (see save()). Set from the loaded record in applyRecord(), mirroring what this page used to
-// hydrate form.canReadOrders with before the panel existed.
-const loadedCanReadOrders = ref(true)
 
 const activeShopifyConfigId = computed(() => String(route.params.shopifyAuthConfigId ?? '').trim())
 const canManageConnections = computed(() => permissionsStore.canManageConnections)
@@ -316,10 +312,6 @@ function applyRecord(record: ShopifyAuthConfigRecord): void {
   // even though the database had zero override rows (absent rows = enabled), i.e. this function's
   // reset clobbered the panel's already-correct 'ready' seed. Leaving both fields alone here removes
   // this function from the race entirely, so the outcome no longer depends on fetch ordering.
-  //
-  // Fallback used by save() only when the panel never confirms 'ready' in time -- mirrors the
-  // hydration this line used to do directly onto the (now-removed) form.canReadOrders field.
-  loadedCanReadOrders.value = record.canReadOrders !== false
 }
 
 function resetCreateForm(): void {
@@ -397,7 +389,7 @@ async function save(): Promise<void> {
   success.value = null
   try {
     // A Save clicked while the panel's read is still in flight, or after it failed, means
-    // enabledEndpoints does not reflect confirmed server truth -- see the two guards below.
+    // enabledEndpoints does not reflect confirmed server truth -- see the guard below.
     const endpointsReady = endpointsLoadState.value === 'ready'
 
     const response = await settingsFacade.saveShopifyAuthConfig({
@@ -408,19 +400,9 @@ async function save(): Promise<void> {
       timeZone: normalizeTimezoneId(form.timeZone),
       accessToken: form.accessToken.trim(),
       isActive: form.isActive,
-      // canReadOrders is being retired in favor of per-endpoint access
-      // (SourceConfigEndpointAccess), but the save service still persists this column for two
-      // releases of backward compatibility -- AutomationFacadeSupport's automation source picker
-      // still gates directly on it. Derive it from the SHOPIFY endpoint's enabled state ONLY once
-      // the panel has confirmed a real read (endpointsReady): a still-loading or failed read must
-      // never be read as "SHOPIFY disabled", so it falls back to whatever the record last
-      // reported. The create wizard never renders the panel (no config exists yet to scope
-      // endpoint rows to), so it keeps the pre-existing default of true.
-      canReadOrders: !isEditing.value
-        ? true
-        : endpointsReady
-          ? form.enabledEndpoints.includes('SHOPIFY')
-          : loadedCanReadOrders.value,
+      // Dead column (nothing reads it; endpoint access replaced it). 'Y' because the one-time ENDPOINT_ACCESS
+      // migration turns an 'N' into every endpoint disabled.
+      canReadOrders: true,
     })
 
     if (isEditing.value) {

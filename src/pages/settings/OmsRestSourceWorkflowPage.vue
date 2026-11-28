@@ -227,7 +227,6 @@ import { settingsFacade } from '../../lib/api/facade'
 import type { OmsRestSourceConfigRecord } from '../../lib/api/types'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
-import { OMS_BASE_URL_PLACEHOLDER } from '../../lib/omsSwagger'
 import { SHARED_CONFIG_TYPES } from '../../lib/sharedConfig'
 import { buildTimezoneOptions, normalizeTimezoneId } from '../../lib/timezones'
 import { filterRecordsForActiveTenant } from '../../lib/utils/tenantRecords'
@@ -307,10 +306,6 @@ const currentStepIndex = ref(0)
 // a Save clicked before the panel's first emit ever arrives is treated the same as an in-flight or
 // failed read -- never as an implicit "everything disabled".
 const endpointsLoadState = ref<EndpointAccessLoadState>('loading')
-// Fallback for the legacy canReadOrders column when endpointsLoadState isn't 'ready' at Save time
-// (see save()). Set from the loaded record in applyRecord(), mirroring what this page used to
-// hydrate form.canReadOrders with before the panel existed.
-const loadedCanReadOrders = ref(true)
 
 const activeOmsConfigId = computed(() => String(route.params.omsRestSourceConfigId ?? '').trim())
 const canManageConnections = computed(() => permissionsStore.canManageConnections)
@@ -327,7 +322,8 @@ const isBearerAuth = computed(() => form.authType === 'BEARER')
 const isApiKeyAuth = computed(() => form.authType === 'API_KEY')
 const isApiTokenAuth = computed(() => isBearerAuth.value || isApiKeyAuth.value)
 const apiTokenLabel = computed(() => (isApiKeyAuth.value ? 'API Key' : 'API Token'))
-const omsBaseUrlPlaceholder = OMS_BASE_URL_PLACEHOLDER
+// A sample host for the hint only, never a live target.
+const omsBaseUrlPlaceholder = 'https://dev-maarg.hotwax.io'
 const createSteps = computed<OmsCreateStep[]>(() => {
   const steps: OmsCreateStep[] = [
     { id: 'baseUrl', title: 'What HotWax base URL should Darpan use?', kind: 'text' },
@@ -424,10 +420,6 @@ function applyRecord(record: OmsRestSourceConfigRecord): void {
   // even though the database had zero override rows (absent rows = enabled), i.e. this function's
   // reset clobbered the panel's already-correct 'ready' seed. Leaving both fields alone here removes
   // this function from the race entirely, so the outcome no longer depends on fetch ordering.
-  //
-  // Fallback used by save() only when the panel never confirms 'ready' in time -- mirrors the
-  // hydration this line used to do directly onto the (now-removed) form.canReadOrders field.
-  loadedCanReadOrders.value = record.canReadOrders !== false
 }
 
 function resetCreateForm(): void {
@@ -514,7 +506,7 @@ async function save(): Promise<void> {
   success.value = null
   try {
     // A Save clicked while the panel's read is still in flight, or after it failed, means
-    // enabledEndpoints does not reflect confirmed server truth -- see the two guards below.
+    // enabledEndpoints does not reflect confirmed server truth -- see the guard below.
     const endpointsReady = endpointsLoadState.value === 'ready'
 
     const response = await settingsFacade.saveOmsRestSourceConfig({
@@ -530,19 +522,9 @@ async function save(): Promise<void> {
       connectTimeoutSeconds: form.connectTimeoutSeconds,
       readTimeoutSeconds: form.readTimeoutSeconds,
       isActive: form.isActive === 'Y',
-      // canReadOrders is being retired in favor of per-endpoint access
-      // (SourceConfigEndpointAccess), but the save service still persists this column for two
-      // releases of backward compatibility -- AutomationFacadeSupport's automation source picker
-      // still gates directly on it. Derive it from the OMS endpoint's enabled state ONLY once the
-      // panel has confirmed a real read (endpointsReady): a still-loading or failed read must
-      // never be read as "OMS disabled", so it falls back to whatever the record last reported.
-      // The create wizard never renders the panel (no config exists yet to scope endpoint rows
-      // to), so it keeps the pre-existing default of true.
-      canReadOrders: !isEditing.value
-        ? true
-        : endpointsReady
-          ? form.enabledEndpoints.includes('OMS')
-          : loadedCanReadOrders.value,
+      // Dead column (nothing reads it; endpoint access replaced it). 'Y' because the one-time ENDPOINT_ACCESS
+      // migration turns an 'N' into every endpoint disabled.
+      canReadOrders: true,
     })
 
     if (isEditing.value) {
