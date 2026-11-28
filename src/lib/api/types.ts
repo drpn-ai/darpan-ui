@@ -970,9 +970,8 @@ export interface ListOmsRestSourceConfigsResponse extends PaginatedResponse {
   omsRestSourceConfigs: OmsRestSourceConfigRecord[]
 }
 
-/** DAR-BE-061. archive/restore on a run or an automation; the flag is echoed back. */
+/** DAR-BE-061. archive#Automation; the flag is echoed back. */
 export interface ArchiveResponse extends ApiEnvelope {
-  savedRunId?: string
   automationId?: string
   isArchived?: boolean
 }

@@ -1,5 +1,6 @@
 // DAR-BE-328. Peak periods (facade.PeakPeriodFacadeServices): a tenant's busy windows, with the run-time moves that
 // keep automations and audits out of them. Dates are "YYYY-MM-DD" and times "HH:mm", both in the tenant's time zone.
+import type { ApiEnvelope } from './types'
 
 export type PeakPeriodState = 'upcoming' | 'on' | 'off' | 'ended'
 
@@ -62,17 +63,11 @@ export interface PeakTarget {
   label: string
 }
 
-interface PeakEnvelope {
-  ok: boolean
-  messages: string[]
-  errors: string[]
-}
-
-export interface ListPeakPeriodsResponse extends PeakEnvelope {
+export interface ListPeakPeriodsResponse extends ApiEnvelope {
   peakPeriods: PeakPeriodSummary[]
 }
 
-export interface GetPeakPeriodResponse extends PeakEnvelope {
+export interface GetPeakPeriodResponse extends ApiEnvelope {
   peakPeriod: PeakPeriod
   runTimes: PeakRunTime[]
   heldRuns: PeakHeldRun[]
@@ -95,11 +90,11 @@ export interface SavePeakPeriodPayload {
   isActive?: boolean
 }
 
-export interface SavePeakPeriodResponse extends PeakEnvelope {
+export interface SavePeakPeriodResponse extends ApiEnvelope {
   peakPeriodId: string
 }
 
-export type DeletePeakPeriodResponse = PeakEnvelope
+export type DeletePeakPeriodResponse = ApiEnvelope
 
 /** No runTimeId creates. Set automationId or auditId; a blank onDate means every day of the period. */
 export interface SavePeakRunTimePayload {
@@ -111,11 +106,11 @@ export interface SavePeakRunTimePayload {
   runTime?: string
 }
 
-export interface SavePeakRunTimeResponse extends PeakEnvelope {
+export interface SavePeakRunTimeResponse extends ApiEnvelope {
   runTimeId: string
 }
 
-export type DeletePeakRunTimeResponse = PeakEnvelope
+export type DeletePeakRunTimeResponse = ApiEnvelope
 
 /** Sets the pair's override for the period; a blank value clears that part. */
 export interface SavePeakSyncPayload {
@@ -125,5 +120,5 @@ export interface SavePeakSyncPayload {
   pulseEveryMinutes?: number | null
 }
 
-export type SavePeakSyncResponse = PeakEnvelope
-export type DeletePeakSyncResponse = PeakEnvelope
+export type SavePeakSyncResponse = ApiEnvelope
+export type DeletePeakSyncResponse = ApiEnvelope

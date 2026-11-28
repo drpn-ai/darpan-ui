@@ -1,11 +1,6 @@
 // DAR-BE-328. Sync pulse (facade.SyncPulseFacadeServices): a pair is one daily check whose upstream side (HotWax or Shopify orders, DAR-BE-377) is
 // watched for orders still waiting to reach the other system, with an allowance (minutes) before one counts as late.
-
-interface PulseEnvelope {
-  ok: boolean
-  messages: string[]
-  errors: string[]
-}
+import type { ApiEnvelope } from './types'
 
 export interface SyncPairSummary {
   syncPairId: string
@@ -76,11 +71,11 @@ export interface SyncChatSpaceOption {
   label: string
 }
 
-export interface ListSyncPairsResponse extends PulseEnvelope {
+export interface ListSyncPairsResponse extends ApiEnvelope {
   syncPairs: SyncPairSummary[]
 }
 
-export interface GetSyncPairResponse extends PulseEnvelope {
+export interface GetSyncPairResponse extends ApiEnvelope {
   /** Absent when asked without a syncPairId: then only the pickers (automations, chatSpaces) come back. */
   syncPair?: SyncPair | null
   samplesToday: SyncSample[]
@@ -101,13 +96,13 @@ export interface SaveSyncPairPayload {
   isActive?: boolean
 }
 
-export interface SaveSyncPairResponse extends PulseEnvelope {
+export interface SaveSyncPairResponse extends ApiEnvelope {
   syncPairId: string
 }
 
-export type DeleteSyncPairResponse = PulseEnvelope
+export type DeleteSyncPairResponse = ApiEnvelope
 
-export interface GetRunPulseFlagsResponse extends PulseEnvelope {
+export interface GetRunPulseFlagsResponse extends ApiEnvelope {
   syncPairId?: string | null
   /** recordKey to the ISO stamp the order first went past allowance. */
   flags: Record<string, string>
