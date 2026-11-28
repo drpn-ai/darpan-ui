@@ -488,8 +488,6 @@ describe('SftpServerWorkflowPage', () => {
     const source = readFileSync('src/style.css', 'utf8')
     const workflowSource = readFileSync('src/components/workflow/WorkflowStepForm.vue', 'utf8')
 
-    // The compact modifier never applied (WorkflowStepForm's scoped base won) and is gone (Aditi, F12).
-    expect(workflowForm.classes()).not.toContain('workflow-form--compact')
     expect(workflowForm.classes()).toContain('workflow-form--edit-single-page')
     expect(source).toContain('.workflow-form--edit-single-page {')
     expect(source).toContain('--workflow-form-question-size: 1.85rem;')

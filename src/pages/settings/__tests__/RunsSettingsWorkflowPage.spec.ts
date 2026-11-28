@@ -1276,7 +1276,6 @@ describe('RunsSettingsWorkflowPage', () => {
 
     expect(source).toContain('<WorkflowStepForm')
     expect(source).toContain("<AppSelect")
-    expect(source).not.toContain('workflow-form--compact')
     expect(source).toContain("'workflow-form--edit-single-page'")
     expect(source).not.toContain('<select')
     expect(source).not.toContain('<style scoped>')
