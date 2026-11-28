@@ -43,12 +43,6 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
   },
   {
-    path: '/roadmap/reconciliation',
-    name: 'roadmap-reconciliation',
-    component: () => import('../pages/ReconciliationPlaceholderPage.vue'),
-    meta: { requiresAuth: true, staticPageLabel: 'Reconciliation Roadmap' },
-  },
-  {
     path: '/reconciliation/diff',
     name: 'reconciliation-diff',
     component: () => import('../pages/reconciliation/ReconciliationDiffPage.vue'),

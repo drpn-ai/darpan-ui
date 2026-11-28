@@ -142,6 +142,7 @@ describe('router release scope', () => {
 
   it.each([
     'reconciliation-results',
+    'roadmap-reconciliation',
     'roadmap-reconciliation-create-ruleset',
     'connections-read-db',
   ])('does not register removed route %s', (name) => {

@@ -34,7 +34,7 @@ Command-first frontend application for Darpan.
 - `src/components/shell/` — app shell pieces (`CommandPalette`, `DarpanMascot`, `MascotDock`, `OfflineBanner`, `AppErrorBoundary`).
 - `src/components/ui/` — static-surface building blocks (`StaticPageFrame`, `StaticPageSection`, `AppSelect`, `AppSaveAction`, `AppTableFrame`, `AppListPager`, `AppToggleSwitch`, `ErrorState`, `EmptyState`, `StatusBadge`, ...).
 - `src/components/workflow/` — workflow-surface building blocks (`WorkflowPage`, `WorkflowStepForm`, `WorkflowSelect`, `WorkflowChipTextInput`, `WorkflowTimeSelect`, `WorkflowShortcutChoiceCards`, `WorkflowProgressBar`).
-- `src/pages/` — route components grouped by surface: `reconciliation/`, `jsonschema/`, `settings/`, plus `HomePage`, `LoginPage`, `AccessDeniedPage`, `NotFoundPage`, and `ReconciliationPlaceholderPage`.
+- `src/pages/` — route components grouped by surface: `reconciliation/`, `jsonschema/`, `settings/`, plus `HomePage`, `LoginPage`, `AccessDeniedPage` and `NotFoundPage`.
 
 Page-surface conventions (static vs workflow contracts, shared CSS classes, migration rules) live in `docs/ui/page-surface-playbook.md`.
 
@@ -48,11 +48,6 @@ Set environment variables in `.env` for local development:
 # VITE_DARPAN_RPC_URL=http://localhost:8080/rpc/json
 # Auth mode. false = login_key header token (per-tab sessionStorage). true = HttpOnly cookie + CSRF.
 VITE_DARPAN_COOKIE_AUTH=false
-# Optional customer-safe roadmap/request pages exposed from /roadmap/reconciliation.
-# VITE_DARPAN_LINEAR_ROADMAP_URL=https://linear.app/your-public-roadmap
-# VITE_DARPAN_LINEAR_REQUEST_URL=https://linear.app/your-request-form
-# Optional. Set false when the target should open only in a new tab.
-# VITE_DARPAN_LINEAR_EMBED_ENABLED=true
 VITE_DARPAN_AUTH_BYPASS=false
 ```
 
@@ -112,7 +107,6 @@ Core:
 
 - `/login` (public; all other routes require an authenticated session)
 - `/` (home: Sync and Lifecycle runs)
-- `/roadmap/reconciliation` (roadmap and request pages, from the configurable `VITE_DARPAN_LINEAR_*` URLs)
 - `/access-denied` (shown when a deep link names a tenant the user does not belong to)
 - Any unmatched path renders the not-found page.
 

@@ -40,7 +40,6 @@ font-src 'self' data: https://fonts.gstatic.com;
 script-src 'self' https://www.gstatic.com https://*.firebaseapp.com;
 img-src 'self' data: https:;
 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-frame-src https://linear.app;
 frame-ancestors 'none';
 form-action 'self';
 ```
@@ -53,8 +52,7 @@ form-action 'self';
 | `uat` | `'self' https://api-uat.drpn.ai` |
 | `sm-darpan` | `'self' https://sm-darpan-maarg.hotwax.io` |
 
-`frame-src https://linear.app` exists for the embedded roadmap page (`/roadmap/reconciliation`,
-`VITE_DARPAN_LINEAR_EMBED_ENABLED`). When a target changes its API host, update that target's
+When a target changes its API host, update that target's
 `connect-src` in the same change, or every RPC call is blocked by the browser.
 
 ## CSP: why `style-src` keeps `'unsafe-inline'`

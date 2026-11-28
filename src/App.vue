@@ -351,14 +351,6 @@ const staticCommandActions: CommandAction[] = [
     to: '/reconciliation/automations',
     aliases: ['automations', 'automation dashboard', 'scheduled runs', 'scheduled reconciliation', 'pause automation', 'run automation'],
   },
-  {
-    id: 'navigate-roadmap',
-    label: 'Open Requests and Roadmap',
-    description: 'Check delivery status and send product requests.',
-    group: 'Navigate',
-    to: '/roadmap/reconciliation',
-    aliases: ['roadmap', 'requests', 'feature request', 'status', 'coming soon'],
-  },
 ]
 
 let workflowEscapeHintTimer: ReturnType<typeof globalThis.setTimeout> | null = null

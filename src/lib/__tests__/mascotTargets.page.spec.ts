@@ -288,8 +288,6 @@ describe('every label in the app has an answer', () => {
     'sftp servers': 'page title over the list',
     'run editor': 'page title',
     'no matching results': 'an empty state; the next line suggests words to try',
-    'roadmap & requests': 'placeholder page heading with its own description',
-    'customer_access // linear_portal': 'decorative eyebrow on the placeholder page',
     'enabled': 'AI Configuration stores it and nothing reads it (DAR-BE-213) — any consequence would be invented',
   }
 
