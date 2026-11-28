@@ -11,6 +11,25 @@ function render(html: string): HTMLElement {
   return host
 }
 
+// S99-108: two run-result lines said what the page does not show.
+describe('run result lines', () => {
+  const textOf = (route: string, id: string) => MASCOT_HINTS[route]?.find((hint) => hint.id === id)?.text ?? ''
+
+  it('does not blame a step for a failed run: a run whose rules did not evaluate fails no step', () => {
+    for (const route of ['reconciliation-run-result', 'reconciliation-run-live']) {
+      expect(textOf(route, 'run-result-live-failed'), route).toMatch(/run failed/)
+      expect(textOf(route, 'run-result-live-failed'), route).not.toMatch(/step/i)
+    }
+  })
+
+  it('says All counts the missing records with the rest, never that they are counted apart', () => {
+    const text = textOf('reconciliation-run-result', 'differences-missing-records-counted')
+    expect(text).toMatch(/^All counts/)
+    expect(text).toMatch(/missing/)
+    expect(text).not.toMatch(/separately/)
+  })
+})
+
 describe('hint ids', () => {
   it('hintIdsAreUniqueAndStable', () => {
     for (const [route, hints] of Object.entries(MASCOT_HINTS)) {

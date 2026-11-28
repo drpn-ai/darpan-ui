@@ -196,6 +196,15 @@ const RUN_RESULT_PAGE = `
     <button type="button" class="reconciliation-diff-bucket">
       <span class="reconciliation-diff-bucket__label">Missing from Shopify</span><strong>0</strong>
     </button>
+    <button type="button" class="reconciliation-diff-bucket">
+      <span class="reconciliation-diff-bucket__label">Rule differences</span><strong>4</strong>
+    </button>
+    <button type="button" class="reconciliation-diff-bucket">
+      <span class="reconciliation-diff-bucket__label">Duplicated</span><strong>2</strong>
+    </button>
+    <div class="reconciliation-diff-bucket reconciliation-diff-bucket--active">
+      <span class="reconciliation-diff-bucket__label">Total results</span><strong>7</strong>
+    </div>
   </div>
   <table><thead><tr><th><span>Record ID</span></th><th><span>Diff Detail</span></th></tr></thead></table>
 `
@@ -226,6 +235,15 @@ describe('the run result page', () => {
 
     expect(termFor(host, 'span', 'Missing from HotWax')).toBe('missingInSource')
     expect(termFor(host, 'span', 'Missing from Shopify')).toBe('missingInSource')
+  })
+
+  // S99-108: the other bucket tiles were dead hovers (a label inside a button escapes the static sweep below).
+  it('answers every other bucket tile too', () => {
+    const host = mountRunResult()
+
+    expect(termFor(host, 'span', 'Rule differences')).toBe('ruleDifferences')
+    expect(termFor(host, 'span', 'Duplicated')).toBe('duplicateRows')
+    expect(termFor(host, 'span', 'Total results')).toBe('selectedRuleTotal')
   })
 
   it('reaches the run time in the hero, which is a paragraph rather than a cell', () => {
@@ -391,6 +409,8 @@ describe('every label in the app has an answer', () => {
       ['pages/settings/OmsRestSourceWorkflowPage.vue', 'Active', 'connectionActive', 1],
       ['pages/settings/ShopifyAuthDashboardPage.vue', 'Active', 'connectionActive', 1],
       ['pages/settings/ShopifyAuthWorkflowPage.vue', 'Active', 'connectionActive', 1],
+      // S99-108: a match rule's field is a NetSuite transaction field, not a schema field (this page has no schema).
+      ['pages/reconciliation/NetSuiteQueryWorkflowPage.vue', 'Field', 'netSuiteMatchField', 1],
     ]
     for (const [file, word, key, count] of PINNED) {
       const source = readFileSync(`src/${file}`, 'utf-8')

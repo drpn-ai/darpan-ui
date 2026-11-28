@@ -312,7 +312,7 @@ const actionColumn = {
   cellClass: 'app-table__action-cell',
 }
 const matchRuleColumns = [
-  { key: 'fieldId', label: 'Field', cellClass: 'app-table__control-cell' },
+  { key: 'fieldId', label: 'Field', explain: 'netSuiteMatchField', cellClass: 'app-table__control-cell' },
   { key: 'op', label: 'Test', colStyle: { width: '11rem' }, cellClass: 'app-table__control-cell' },
   { key: 'valuesText', label: 'Values', cellClass: 'app-table__control-cell' },
   actionColumn,

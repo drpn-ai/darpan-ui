@@ -42,14 +42,22 @@ function control(testId: string): string {
   return `[data-testid="${testId}"]`
 }
 
+// S99-108: a run whose rules did not evaluate fails with no failed step, so the line names the run, not a step.
+const RUN_FAILED_HINT: Hint = Object.freeze({
+  id: 'run-result-live-failed',
+  text: 'The run failed, so any counts below are partial, not clean. The red line above says what stopped it.',
+  when: control('run-result-live-failed'),
+})
+
 const RUN_RESULT_HINTS: readonly Hint[] = Object.freeze([
-  { id: 'run-result-live-failed', text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
+  RUN_FAILED_HINT,
   // The empty message also shows when a filter matches nothing, so it must not be read
   // as "the run found nothing".
   { id: 'diff-details-empty', text: 'Nothing here yet — a bucket or the search may be filtering it out, not the run.', when: control('diff-details-empty') },
   { id: 'diff-bucket-file-1', text: 'Click a bucket to narrow the table to just those records.', when: control('diff-bucket-file-1') },
   { id: 'rest-any-count-i', text: 'Rest on any count and I will tell you what it does and does not include.' },
-  { id: 'differences-missing-records-counted', text: 'Differences and missing records are counted separately — a zero in one says nothing about the other.' },
+  // S99-108: All counts the missing records too (it said they were counted apart). The id stays: admin edits key on it.
+  { id: 'differences-missing-records-counted', text: 'All counts every row: records missing on either side, rule failures and repeated ids. A bucket narrows the table to one kind.' },
   { id: 'run-result-source-download', text: 'The source files are the run’s own — download one to check a record it calls missing.', when: control('run-result-source-download') },
   { id: 'run-result-download', text: 'Download gives you the result exactly as the run wrote it.', when: control('run-result-download') },
 ])
@@ -91,7 +99,7 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
   // DAR-UI-157: the run's short address shows it live and, once it finishes, its result in place, so it offers the
   // result's hints too; the two that hold anywhere on a result wait for its Download, so a run still going never gets them.
   'reconciliation-run-live': Object.freeze([
-    { id: 'run-result-live-failed', text: 'A step failed — counts below it are partial rather than clean.', when: control('run-result-live-failed') },
+    RUN_FAILED_HINT,
     { id: 'run-result-notify-me', text: 'Notify me pings a chat space when this finishes, so you do not have to wait here.', when: control('run-result-notify-me') },
     { id: 'run-result-cancel', text: 'Cancel run stops it. Whatever it has done so far is discarded.', when: control('run-result-cancel') },
     { id: 'run-result-step-timeline', text: 'Run steps fills in as each stage finishes — it is the live part of this page.', when: control('run-result-step-timeline') },

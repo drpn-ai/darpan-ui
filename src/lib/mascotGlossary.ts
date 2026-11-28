@@ -37,6 +37,19 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Differences',
     body: 'records missing on either side, plus one for every rule a matched pair failed, plus duplicate ids. A record failing two rules counts twice — it is not a record count.',
   },
+  // S99-108: the run result's other bucket tiles (ReconciliationRunResultPage diffDetailBuckets), dead hovers until now.
+  ruleDifferences: {
+    title: 'Rule differences',
+    body: 'matched records that failed a rule, one row per rule failed. A record breaking two rules shows here twice.',
+  },
+  duplicateRows: {
+    title: 'Duplicated',
+    body: 'records one side sent more than once under the same key. Each repeat is a row here; the side that repeats it is the one to fix.',
+  },
+  selectedRuleTotal: {
+    title: 'Total results',
+    body: 'every row the rule you picked produced in this run. Pick All to bring back the other rules and the missing records.',
+  },
   onlyInFile1Count: {
     title: 'Only in the first source',
     body: 'records the first source turned up that the second has never heard of, inside this run’s window. Check the window before chasing them — usually that is the answer.',
@@ -987,6 +1000,12 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
   automationScheduleTime: {
     title: 'Time',
     body: 'when this fires, in the timezone beside it, for the whole tenant. Records are picked by date, so moving the hour does not change what a run reads.',
+    byDirectiveOnly: true,
+  },
+  // S99-108: NsSuiteQlOrderSupport.MATCH_COLUMNS lists the five fields; the rules are joined with AND.
+  netSuiteMatchField: {
+    title: 'Field',
+    body: 'the transaction field this rule tests: status, ship method, backordered items, total or reference number. A record must pass every rule to be read.',
     byDirectiveOnly: true,
   },
   netSuitePreviewDay: {

@@ -1791,10 +1791,10 @@ describe('ReconciliationRunResultPage', () => {
 
     expect(offered.some((text) => text.startsWith('Cancel run'))).toBe(true)
     expect(offered.some((text) => text.startsWith('Run steps'))).toBe(true)
-    // It has not failed, so the line about a failed step must not be offered.
-    expect(offered.some((text) => text.includes('step failed'))).toBe(false)
+    // It has not failed, so the line about a failed run must not be offered.
+    expect(offered.some((text) => text.includes('run failed'))).toBe(false)
     // Nor a line about the result it does not have yet.
-    expect(offered.some((text) => /bucket|Download|counted separately|Rest on any count/.test(text))).toBe(false)
+    expect(offered.some((text) => /bucket|Download|All counts|Rest on any count/.test(text))).toBe(false)
   })
 
   it('shows completed, running, and remaining steps for a run still in progress', async () => {
