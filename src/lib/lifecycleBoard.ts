@@ -34,8 +34,6 @@ export interface LifecycleBoard {
   start: { questionId: string; label: string; count: number | null } | null
   stages: LifecycleStage[]
   complete: LifecyclePlace | null
-  /** The biggest place count, for scaling each place's meter. */
-  largest: number
 }
 
 /** DAR-UI-050. The places a lifecycle says are not findings, from its stored JSON list; anything unreadable is none. */
@@ -135,11 +133,9 @@ export function lifecycleBoard(questions: FlowchartQuestion[], rows: FlowchartEx
     const stage = stages.find((st) => st.label === q.runName)
     if (stage && q.noOutcomeLabel) stage.places.push({ ...place(q, 'NO', q.noOutcomeLabel), kind: 'check' })
   }
-  const counts = stages.flatMap((s) => s.places.map((p) => p.count ?? 0))
   return {
     start: startQ ? { questionId: startQ.reconciliationRunId, label: startQ.runName ?? '', count: rowOf(startQ.reconciliationRunId)?.yesCount ?? null } : null,
     stages,
     complete,
-    largest: Math.max(0, ...counts),
   }
 }

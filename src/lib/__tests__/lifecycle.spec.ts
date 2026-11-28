@@ -71,7 +71,15 @@ describe('lifecycle board', () => {
       .toEqual([['Billed, never shipped', 1621, false], ['Never shipped, never billed', 1339, true]])
     expect(board.stages[1]!.places[0]!.count).toBe(774)
     expect(board.complete?.count).toBe(1266)
-    expect(board.largest).toBe(1621)
+  })
+
+  // Lifecycle chains read in dependency order (each stage on the previous one's "yes"), never in the order the
+  // questions happen to arrive from the API.
+  it('draws the stages in dependency order whatever order the questions arrive in', () => {
+    const board = lifecycleBoard([...tree].reverse(), [])
+    expect(board.stages.map((s) => s.label)).toEqual(['Fulfillment', 'Invoice'])
+    expect(board.stages[0]!.places.map((p) => p.label)).toEqual(['Billed, never shipped', 'Never shipped, never billed'])
+    expect(board.complete?.label).toBe('Shipped and billed')
   })
 })
 

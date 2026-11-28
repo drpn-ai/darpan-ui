@@ -12,7 +12,7 @@ type Scope = 'STAGE' | 'FINDING'
 type RuleValue = { value: string; label: string }
 
 /** Value reads at once per sweep: each is one or two SuiteQL queries, and NetSuite caps an account's concurrent calls. */
-export const VALUE_SWEEP_CONCURRENCY = 2
+const VALUE_SWEEP_CONCURRENCY = 2
 
 function valuesKey(source: LifecycleRuleSource, scope?: Scope) {
   return `lifecycle.ruleValues:${scope ?? ''}:${source.nsAuthConfigId}:${source.recordType}`
