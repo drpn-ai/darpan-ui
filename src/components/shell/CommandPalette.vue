@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="command-overlay app-popup-backdrop" @click.self="close">
+    <div class="command-overlay app-popup-backdrop" @click.self="close">
       <section
         :class="['command-panel', { 'command-panel--keyboard': interactionMode === 'keyboard' }]"
         role="dialog"
@@ -22,7 +22,7 @@
             :aria-activedescendant="activeActionDomId"
             :aria-controls="resultsListId"
             aria-describedby="command-palette-hint"
-            :aria-expanded="open ? 'true' : 'false'"
+            aria-expanded="true"
             inputmode="search"
             autocomplete="off"
             spellcheck="false"
@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUpdate, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onBeforeUpdate, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { rankCommandActions } from '../../lib/commandSearch'
 import {
   DEFAULT_SLASH_COMMANDS,
@@ -87,8 +87,8 @@ import {
 } from '../../lib/slashCommands'
 import type { CommandAction } from '../../lib/types/ux'
 
+/** The shell mounts the palette only while it is open (App.vue's v-if), so each opening starts fresh. */
 const props = defineProps<{
-  open: boolean
   /** DAR-UI-119. What the search box holds when the palette opens, e.g. '/switch-tenant '. */
   initialQuery?: string
   actions: CommandAction[]
@@ -116,7 +116,7 @@ interface PaletteRow {
 
 const EMPTY_SLASH_CONTEXT: SlashCommandContext = { availableTenants: [], activeTenantUserGroupId: null }
 
-const query = ref('')
+const query = ref(props.initialQuery ?? '')
 const activeIndex = ref(-1)
 const actionRefs = ref<HTMLButtonElement[]>([])
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -292,14 +292,12 @@ function handlePanelKeydown(event: KeyboardEvent): void {
 
   switch (event.key) {
     case 'ArrowDown':
-    case 'Down':
       if (!searchIsFocused && !actionButtonIsFocused) return
       event.preventDefault()
       moveActive(1)
       if (actionButtonIsFocused) focusActiveAction()
       return
     case 'ArrowUp':
-    case 'Up':
       if (!searchIsFocused && !actionButtonIsFocused) return
       event.preventDefault()
       moveActive(-1)
@@ -366,23 +364,7 @@ watch(activeIndex, async (nextIndex) => {
   actionRefs.value[nextIndex]?.scrollIntoView?.({ block: 'nearest' })
 })
 
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) {
-      query.value = ''
-      activeIndex.value = -1
-      interactionMode.value = 'keyboard'
-      return
-    }
-
-    interactionMode.value = 'keyboard'
-    if (props.initialQuery) query.value = props.initialQuery
-    resetActiveIndex()
-    void nextTick(() => {
-      searchInput.value?.focus()
-    })
-  },
-  { immediate: true },
-)
+onMounted(() => {
+  searchInput.value?.focus()
+})
 </script>

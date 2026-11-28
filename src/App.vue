@@ -47,7 +47,6 @@
 
   <CommandPalette
     v-if="!isShelllessRoute && isCommandPaletteOpen"
-    :open="isCommandPaletteOpen"
     :actions="commandActions"
     :recent-command-ids="recentCommandIds"
     :data-search-loading="isLoadingCommandData"
@@ -91,7 +90,7 @@ import {
   type WorkflowHintRequestDetail,
   type WorkflowHintTone,
 } from './lib/uiEvents'
-import { useUserDisplayNamePreference } from './lib/userDisplayName'
+import { resolveUserDisplayName } from './lib/userDisplayName'
 import { resolveStaticPageLabel } from './lib/workflowOrigin'
 import { formatShortDate } from './lib/utils/date'
 
@@ -110,7 +109,6 @@ const permissions = usePermissionsStore()
 const mascot = useMascotStore()
 const draftStore = useReconciliationDraftStore()
 const { setTheme } = useTheme()
-const { resolveUserDisplayName } = useUserDisplayNamePreference()
 
 const commandPalette = useCommandPalette({
   getActiveTenantUserGroupId: () => authStore.sessionInfo?.activeTenantUserGroupId ?? null,
@@ -393,12 +391,7 @@ async function handleLogout(): Promise<void> {
 async function executeCommand(action: CommandAction): Promise<void> {
   commandPalette.close()
   commandPalette.recordExecution(action.id)
-  // An action carrying run() acts in place and stops; it has nowhere to navigate.
-  if (action.run) {
-    await action.run()
-    return
-  }
-  if (!action.to || action.to === route.fullPath) return
+  if (action.to === route.fullPath) return
   const staticPageLabel = resolveStaticPageLabel(route)
   if (staticPageLabel && router.resolve(action.to).meta.surfaceMode === 'workflow') {
     draftStore.setWorkflowOrigin(staticPageLabel, route.fullPath)

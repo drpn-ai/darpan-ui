@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { settingsFacade } from '../lib/api/facade'
-import type { GeneratedOutput, SftpServerRecord } from '../lib/api/types'
+import type { GeneratedOutput } from '../lib/api/types'
 import { buildDataCommandActions } from '../lib/commandDataSearch'
 import { listRecentCommandIds, recordRecentCommand } from '../lib/commandSearch'
 import type { CommandAction } from '../lib/types/ux'
@@ -22,11 +22,6 @@ export interface UseCommandPalette {
   clearCommandData: () => void
   recordExecution: (actionId: string) => void
   loadRecentFromStorage: () => void
-  dispose: () => void
-}
-
-function isFulfilled<T>(result: PromiseSettledResult<T>): result is PromiseFulfilledResult<T> {
-  return result.status === 'fulfilled'
 }
 
 export function useCommandPalette(options: UseCommandPaletteOptions): UseCommandPalette {
@@ -36,14 +31,6 @@ export function useCommandPalette(options: UseCommandPaletteOptions): UseCommand
   const dataCommandActions = ref<CommandAction[]>([])
 
   let activeController: AbortController | null = null
-
-  function readSftpServers(result: PromiseSettledResult<{ servers?: SftpServerRecord[] } | undefined>): SftpServerRecord[] {
-    if (!isFulfilled(result)) return []
-    return filterRecordsForActiveTenant(
-      result.value?.servers ?? [],
-      options.getActiveTenantUserGroupId(),
-    )
-  }
 
   function readCachedGeneratedOutputs(): GeneratedOutput[] {
     try {
@@ -65,14 +52,14 @@ export function useCommandPalette(options: UseCommandPaletteOptions): UseCommand
       // palette only renders the top 6 anyway, which the cache fully
       // covers for typical tenants. SFTP servers still come from the
       // facade since they're not part of the prefetch graph.
-      const [sftpResult] = await Promise.allSettled([
-        settingsFacade.listSftpServers({ pageIndex: 0, pageSize: 200 }, controller.signal),
-      ])
+      // A failed read leaves the palette its pages and recent results, without SFTP rows.
+      const servers = await settingsFacade.listSftpServers({ pageIndex: 0, pageSize: 200 }, controller.signal)
+        .then((response) => response?.servers ?? [], () => [])
 
       if (controller.signal.aborted) return
 
       dataCommandActions.value = buildDataCommandActions({
-        sftpServers: readSftpServers(sftpResult),
+        sftpServers: filterRecordsForActiveTenant(servers, options.getActiveTenantUserGroupId()),
         generatedOutputs: readCachedGeneratedOutputs(),
       })
     } finally {
@@ -106,11 +93,6 @@ export function useCommandPalette(options: UseCommandPaletteOptions): UseCommand
     recentCommandIds.value = listRecentCommandIds()
   }
 
-  function dispose(): void {
-    activeController?.abort()
-    activeController = null
-  }
-
   return {
     isCommandPaletteOpen,
     isLoadingCommandData,
@@ -122,6 +104,5 @@ export function useCommandPalette(options: UseCommandPaletteOptions): UseCommand
     clearCommandData,
     recordExecution,
     loadRecentFromStorage,
-    dispose,
   }
 }

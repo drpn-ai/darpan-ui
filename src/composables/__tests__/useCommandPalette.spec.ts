@@ -4,9 +4,6 @@ vi.mock('../../lib/api/facade', () => ({
   settingsFacade: {
     listSftpServers: vi.fn(),
   },
-  reconciliationFacade: {
-    listGeneratedOutputs: vi.fn(),
-  },
 }))
 
 vi.mock('../../lib/commandDataSearch', () => ({
@@ -21,17 +18,15 @@ vi.mock('../../lib/commandSearch', () => ({
 }))
 
 import { useCommandPalette } from '../useCommandPalette'
-import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
+import { settingsFacade } from '../../lib/api/facade'
 import { buildDataCommandActions } from '../../lib/commandDataSearch'
 
 const listSftp = vi.mocked(settingsFacade.listSftpServers)
-const listOutputs = vi.mocked(reconciliationFacade.listGeneratedOutputs)
 const buildDataActions = vi.mocked(buildDataCommandActions)
 
 describe('useCommandPalette', () => {
   beforeEach(() => {
     listSftp.mockReset()
-    listOutputs.mockReset()
     buildDataActions.mockReset()
     buildDataActions.mockReturnValue([
       { id: 'data-x', label: 'X', group: 'Data', to: '/x', description: '', aliases: [] },
@@ -44,7 +39,6 @@ describe('useCommandPalette', () => {
 
   it('open() sets isCommandPaletteOpen and kicks off a load', async () => {
     listSftp.mockResolvedValue({ servers: [] } as never)
-    listOutputs.mockResolvedValue({ generatedOutputs: [] } as never)
 
     const palette = useCommandPalette({ getActiveTenantUserGroupId: () => null })
     palette.open()
@@ -64,11 +58,9 @@ describe('useCommandPalette', () => {
           resolveOld = () => resolve({ servers: [] } as never)
         }),
     )
-    listOutputs.mockResolvedValueOnce({ generatedOutputs: [] } as never)
     const oldPromise = palette.loadCommandData()
 
     listSftp.mockResolvedValueOnce({ servers: [] } as never)
-    listOutputs.mockResolvedValueOnce({ generatedOutputs: [] } as never)
     buildDataActions.mockReturnValueOnce([
       { id: 'data-new', label: 'New', group: 'Data', to: '/new', description: '', aliases: [] },
     ])
@@ -78,6 +70,17 @@ describe('useCommandPalette', () => {
     resolveOld()
     await oldPromise
     expect(palette.dataCommandActions.value[0]?.id).toBe('data-new')
+  })
+
+  it('a failed SFTP read still lists the data rows it has, with no SFTP servers', async () => {
+    listSftp.mockRejectedValueOnce(new Error('offline'))
+    const palette = useCommandPalette({ getActiveTenantUserGroupId: () => null })
+
+    await palette.loadCommandData()
+
+    expect(buildDataActions).toHaveBeenCalledWith(expect.objectContaining({ sftpServers: [] }))
+    expect(palette.dataCommandActions.value).toHaveLength(1)
+    expect(palette.isLoadingCommandData.value).toBe(false)
   })
 
   it('recordExecution updates recentCommandIds via the helper', () => {

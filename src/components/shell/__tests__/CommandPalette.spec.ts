@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import CommandPalette from '../CommandPalette.vue'
 import type { CommandAction } from '../../../lib/types/ux'
 
@@ -65,7 +66,6 @@ describe('CommandPalette', () => {
         },
       },
       props: {
-        open: true,
         actions,
       },
     })
@@ -107,7 +107,6 @@ describe('CommandPalette', () => {
         },
       },
       props: {
-        open: true,
         actions,
       },
     })
@@ -136,7 +135,6 @@ describe('CommandPalette', () => {
         },
       },
       props: {
-        open: true,
         actions,
       },
     })
@@ -166,7 +164,6 @@ describe('CommandPalette', () => {
         },
       },
       props: {
-        open: true,
         actions,
       },
     })
@@ -192,7 +189,7 @@ describe('CommandPalette', () => {
       return mount(CommandPalette, {
         attachTo: document.body,
         global: { stubs: { teleport: true } },
-        props: { open: true, actions, slashContext },
+        props: { actions, slashContext },
       })
     }
 
@@ -201,9 +198,9 @@ describe('CommandPalette', () => {
       const wrapper = mount(CommandPalette, {
         attachTo: document.body,
         global: { stubs: { teleport: true } },
-        props: { open: false, actions, slashContext, initialQuery: '/switch-tenant ' },
+        props: { actions, slashContext, initialQuery: '/switch-tenant ' },
       })
-      await wrapper.setProps({ open: true })
+      await nextTick()
 
       expect(searchValue(wrapper)).toBe('/switch-tenant ')
       expect(wrapper.findAll('.command-item')[0]?.text()).toContain('Acme Retail')
@@ -315,7 +312,6 @@ describe('CommandPalette', () => {
         attachTo: document.body,
         global: { stubs: { teleport: true } },
         props: {
-          open: true,
           actions,
           slashContext: {
             availableTenants: [
@@ -404,7 +400,7 @@ describe('CommandPalette', () => {
       return mount(CommandPalette, {
         attachTo: document.body,
         global: { stubs: { teleport: true } },
-        props: { open: true, actions: mixedActions },
+        props: { actions: mixedActions },
       })
     }
 
