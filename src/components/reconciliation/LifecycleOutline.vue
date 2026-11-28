@@ -88,39 +88,9 @@ function placesAt(stageLabel: string) { return props.places.filter((p) => p.stag
   padding-left: var(--space-4);
   font-size: var(--type-tile-size);
 }
-.lifecycle-outline-node::before {
-  content: "";
-  position: absolute;
-  left: 0.2rem;
-  top: 0.45rem;
-  width: 0.7rem;
-  height: 0.7rem;
-  border: 1.5px solid var(--text);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-}
-.lifecycle-outline-node--start::before,
-.lifecycle-outline-node--complete::before { background: var(--text); }
+/* The dot and the rule line are the shared lifecycle spine in style.css. */
 .lifecycle-outline-name { color: var(--text); }
 .lifecycle-outline-quiet { color: var(--text-dim); }
-/* The rule line runs down the left between the dots, through each part's phrases. */
-.lifecycle-outline-gap {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0);
-  padding: var(--space-1-5) 0 var(--space-2) var(--space-4);
-}
-.lifecycle-outline-gap::before,
-.lifecycle-outline-group:not(:last-child) > .lifecycle-outline-node:only-child::after {
-  content: "";
-  position: absolute;
-  left: 0.55rem;
-  top: 0;
-  bottom: 0;
-  width: 1.5px;
-  background: var(--border);
-}
 .lifecycle-outline-group:not(:last-child) > .lifecycle-outline-node:only-child { padding-bottom: var(--space-2); }
 .lifecycle-outline-group:not(:last-child) > .lifecycle-outline-node:only-child::after { top: 1.3rem; }
 .lifecycle-outline-place {

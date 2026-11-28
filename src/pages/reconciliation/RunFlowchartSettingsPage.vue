@@ -64,7 +64,7 @@
                   >
                     <AppIcon :name="row.rule ? 'edit' : 'plus'" />
                   </button>
-                  <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
+                  <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null"><AppIcon name="close" /></button>
                 </div>
                 <div v-else-if="row.rule" class="lifecycle-spine-phrase" :data-testid="`lifecycle-settings-rule-${row.index}`">
                   <button
@@ -76,14 +76,14 @@
                   >
                     <span class="lifecycle-spine-quiet">except</span> {{ row.rule.fieldLabel }} <span class="lifecycle-spine-quiet">is</span> {{ row.rule.valueLabel }}
                   </button>
-                  <button type="button" class="lifecycle-spine-remove" :aria-label="`Remove rule ${row.rule.fieldLabel} is ${row.rule.valueLabel}`" :data-testid="`lifecycle-settings-remove-${row.index}`" @click="removeRule(row.index)">×</button>
+                  <button type="button" class="lifecycle-spine-remove" :aria-label="`Remove rule ${row.rule.fieldLabel} is ${row.rule.valueLabel}`" :data-testid="`lifecycle-settings-remove-${row.index}`" @click="removeRule(row.index)"><AppIcon name="close" /></button>
                 </div>
               </template>
               <button v-if="adding?.kind !== 'filter'" type="button" class="lifecycle-spine-ghost" aria-label="Add filter" data-testid="lifecycle-settings-add-filter" @click="startAdding({ kind: 'filter' })">+ except</button>
               <!-- What each record shows beside its order, date, status, customer, total, shipping method and reference. -->
               <div v-for="(detail, index) in keptDetails" :key="detail.fieldId" class="lifecycle-spine-phrase" :data-testid="`lifecycle-settings-detail-${index}`">
                 <span><span class="lifecycle-spine-quiet">shows</span> {{ detail.label }}</span>
-                <button type="button" class="lifecycle-spine-remove" :aria-label="`Stop showing ${detail.label}`" @click="keptDetails.splice(index, 1)">×</button>
+                <button type="button" class="lifecycle-spine-remove" :aria-label="`Stop showing ${detail.label}`" @click="keptDetails.splice(index, 1)"><AppIcon name="close" /></button>
               </div>
               <div v-if="adding?.kind === 'detail'" class="lifecycle-spine-editing" data-testid="lifecycle-settings-adding-detail">
                 <span class="lifecycle-spine-quiet">shows</span>
@@ -98,7 +98,7 @@
                 <button type="button" class="app-icon-action" aria-label="Show this field" title="Show this field" :disabled="!newDetail" data-testid="lifecycle-settings-add-detail" @click="addDetail">
                   <AppIcon name="plus" />
                 </button>
-                <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
+                <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null"><AppIcon name="close" /></button>
               </div>
               <button v-else type="button" class="lifecycle-spine-ghost" aria-label="Show a field" data-testid="lifecycle-settings-show-field" @click="startAdding({ kind: 'detail' })">+ shows</button>
               <div class="lifecycle-spine-editing">
@@ -165,7 +165,7 @@
                   >
                     <AppIcon :name="row.exception ? 'edit' : 'plus'" />
                   </button>
-                  <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
+                  <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null"><AppIcon name="close" /></button>
                 </div>
                 <div v-else-if="row.exception" class="lifecycle-spine-phrase" :data-testid="`lifecycle-settings-exception-${stage.recordType}-${row.index}`">
                   <button
@@ -177,7 +177,7 @@
                   >
                     <span class="lifecycle-spine-quiet">not expected for</span> {{ row.exception.fieldLabel }} <span class="lifecycle-spine-quiet">is</span> {{ row.exception.value }}
                   </button>
-                  <button type="button" class="lifecycle-spine-remove" :aria-label="`Remove exception ${stage.label} ${row.exception.value}`" @click="removeException(row.exception)">×</button>
+                  <button type="button" class="lifecycle-spine-remove" :aria-label="`Remove exception ${stage.label} ${row.exception.value}`" @click="removeException(row.exception)"><AppIcon name="close" /></button>
                 </div>
               </template>
               <button
@@ -224,7 +224,7 @@
                 :data-testid="`lifecycle-settings-written-${stage.recordType}-${index}`"
               >
                 <span><span class="lifecycle-spine-quiet">finding when</span> {{ finding.fieldLabel }} <span class="lifecycle-spine-quiet">{{ finding.op === 'GT' ? 'more than' : 'is' }}</span> {{ finding.valueLabel }}</span>
-                <button type="button" class="lifecycle-spine-remove" :aria-label="`Remove finding ${finding.fieldLabel} ${finding.valueLabel}`" @click="removeWritten(finding)">×</button>
+                <button type="button" class="lifecycle-spine-remove" :aria-label="`Remove finding ${finding.fieldLabel} ${finding.valueLabel}`" @click="removeWritten(finding)"><AppIcon name="close" /></button>
               </div>
               <div v-if="adding?.kind === 'finding' && adding.stage === stage.recordType" class="lifecycle-spine-editing" :data-testid="`lifecycle-settings-adding-finding-${stage.recordType}`">
                 <span class="lifecycle-spine-quiet">finding when</span>
@@ -249,7 +249,7 @@
                 <button type="button" class="app-icon-action" aria-label="Add this finding" title="Add this finding" :disabled="!fdField || !fdValue" data-testid="lifecycle-settings-add-written" @click="addWritten(stage)">
                   <AppIcon name="plus" />
                 </button>
-                <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null">×</button>
+                <button type="button" class="lifecycle-spine-remove lifecycle-spine-remove--shown" aria-label="Stop editing" @click="adding = null"><AppIcon name="close" /></button>
               </div>
               <button
                 v-else
@@ -604,36 +604,10 @@ onMounted(async () => {
   gap: var(--space-2);
   padding-left: var(--space-4);
 }
-.lifecycle-spine-node::before {
-  content: "";
-  position: absolute;
-  left: 0.2rem;
-  top: 0.45rem;
-  width: 0.7rem;
-  height: 0.7rem;
-  border: 1.5px solid var(--text);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-}
-.lifecycle-spine-node--start::before { background: var(--text); }
+/* The dot and the rule line are the shared lifecycle spine in style.css. */
 .lifecycle-spine-name { font-size: var(--type-tile-size); color: var(--text); }
 .lifecycle-spine-quiet { color: var(--text-dim); }
-.lifecycle-spine-gap {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-1-5) 0 var(--space-2) var(--space-4);
-}
-.lifecycle-spine-gap::before {
-  content: "";
-  position: absolute;
-  left: 0.55rem;
-  top: 0;
-  bottom: 0;
-  width: 1.5px;
-  background: var(--border);
-}
+.lifecycle-spine-gap { gap: var(--space-1); }
 /* A rule reads as one line of text; only a row with controls lays out as a row. */
 .lifecycle-spine-phrase {
   display: grid;
@@ -689,6 +663,8 @@ onMounted(async () => {
   text-overflow: ellipsis;
 }
 .lifecycle-spine-remove {
+  display: inline-flex;
+  align-items: center;
   min-height: 0;
   margin-left: var(--space-1);
   padding: 0 var(--space-0);
@@ -697,6 +673,10 @@ onMounted(async () => {
   color: var(--text-dim);
   opacity: 0;
   transition: opacity var(--motion-base) var(--ease-out);
+}
+.lifecycle-spine-remove svg {
+  width: 0.7rem;
+  height: 0.7rem;
 }
 .lifecycle-spine-ghost {
   align-self: flex-start;

@@ -83,39 +83,9 @@ function uncounted(place: LifecyclePlace): boolean { return !isFindingPlace(plac
   text-align: left;
   font-size: var(--type-tile-size);
 }
-.lifecycle-line-node::before {
-  content: "";
-  position: absolute;
-  left: 0.2rem;
-  top: 0.45rem;
-  width: 0.7rem;
-  height: 0.7rem;
-  border: 1.5px solid var(--text);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-}
-.lifecycle-line-node--start::before,
-.lifecycle-line-node--complete::before { background: var(--text); }
+/* The dot and the rule line are the shared lifecycle spine in style.css. */
 .lifecycle-line-name { min-width: 0; }
 .lifecycle-line-count { color: var(--text); font-variant-numeric: tabular-nums; }
-/* The rule line runs down the left between the dots, through each stage's places. */
-.lifecycle-line-gap {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0);
-  padding: var(--space-1-5) 0 var(--space-2) var(--space-4);
-}
-.lifecycle-line-gap::before,
-.lifecycle-line-group:first-child::after {
-  content: "";
-  position: absolute;
-  left: 0.55rem;
-  top: 0;
-  bottom: 0;
-  width: 1.5px;
-  background: var(--border);
-}
 .lifecycle-line-group:first-child { padding-bottom: var(--space-2); }
 .lifecycle-line-group:first-child::after { top: 1.3rem; }
 .lifecycle-line-place {

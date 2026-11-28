@@ -2450,6 +2450,55 @@ label > span {
   opacity: 1;
 }
 
+/* Lifecycle spine, shared by LifecycleBoard (the run page), LifecycleOutline (the start page) and the lifecycle settings
+   page: a hollow dot per stage, filled at the start (and at a complete end), joined by one rule line down the left.
+   The three drew it value for value (U08). Each keeps its own row layout, and the settings page a wider gap. */
+.lifecycle-line-node::before,
+.lifecycle-outline-node::before,
+.lifecycle-spine-node::before {
+  content: "";
+  position: absolute;
+  left: 0.2rem;
+  top: 0.45rem;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1.5px solid var(--text);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.lifecycle-line-node--start::before,
+.lifecycle-line-node--complete::before,
+.lifecycle-outline-node--start::before,
+.lifecycle-outline-node--complete::before,
+.lifecycle-spine-node--start::before {
+  background: var(--text);
+}
+
+.lifecycle-line-gap,
+.lifecycle-outline-gap,
+.lifecycle-spine-gap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+  padding: var(--space-1-5) 0 var(--space-2) var(--space-4);
+}
+
+.lifecycle-line-gap::before,
+.lifecycle-line-group:first-child::after,
+.lifecycle-outline-gap::before,
+.lifecycle-outline-group:not(:last-child) > .lifecycle-outline-node:only-child::after,
+.lifecycle-spine-gap::before {
+  content: "";
+  position: absolute;
+  left: 0.55rem;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--border);
+}
+
 /* Select internals, shared by AppSelect and WorkflowSelect. WorkflowSelect had 12 of its 14
    rules duplicated from AppSelect - 10 of them byte for byte - because the two components look the
    same everywhere except the trigger. Those ten now live here under both selectors; the two that
