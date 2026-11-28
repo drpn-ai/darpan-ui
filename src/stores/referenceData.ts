@@ -1,24 +1,16 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ApiCallError, isAbortError } from '../lib/api/client'
+import { isAbortError } from '../lib/api/client'
 import { settingsFacade } from '../lib/api/facade'
 import type { TenantSettings } from '../lib/api/types'
 
 interface LoadState {
   loading: boolean
   error: string | null
-  loadedAt: number | null
 }
 
 function emptyLoadState(): LoadState {
-  return { loading: false, error: null, loadedAt: null }
-}
-
-function describeError(err: unknown, fallback: string): string {
-  if (isAbortError(err)) return fallback
-  if (err instanceof ApiCallError) return err.message
-  if (err instanceof Error) return err.message
-  return fallback
+  return { loading: false, error: null }
 }
 
 export const useReferenceDataStore = defineStore('referenceData', () => {
@@ -33,17 +25,16 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
   const tenantSettingsError = computed(() => _tenantSettingsState.value.error)
 
   async function _loadTenantSettings(signal: AbortSignal): Promise<void> {
-    _tenantSettingsState.value = { loading: true, error: null, loadedAt: _tenantSettingsState.value.loadedAt }
+    _tenantSettingsState.value = { loading: true, error: null }
     try {
       const response = await settingsFacade.getTenantSettings(signal)
       _tenantSettings.value = response.tenantSettings ?? null
-      _tenantSettingsState.value = { loading: false, error: null, loadedAt: Date.now() }
+      _tenantSettingsState.value = emptyLoadState()
     } catch (err) {
       if (isAbortError(err)) return
       _tenantSettingsState.value = {
         loading: false,
-        error: describeError(err, 'Tenant settings are stuck in traffic.'),
-        loadedAt: null,
+        error: err instanceof Error ? err.message : 'Tenant settings are stuck in traffic.',
       }
     }
   }
@@ -52,9 +43,9 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
     if (_hydrationPromise) return _hydrationPromise
 
     _abortController = new AbortController()
-    const signal = _abortController.signal
 
-    _hydrationPromise = Promise.allSettled([_loadTenantSettings(signal)]).then(() => undefined)
+    // _loadTenantSettings records its own failure and never rejects.
+    _hydrationPromise = _loadTenantSettings(_abortController.signal)
     return _hydrationPromise
   }
 
@@ -64,7 +55,7 @@ export const useReferenceDataStore = defineStore('referenceData', () => {
 
   function setTenantSettings(value: TenantSettings | null | undefined): void {
     _tenantSettings.value = value ?? null
-    _tenantSettingsState.value = { loading: false, error: null, loadedAt: Date.now() }
+    _tenantSettingsState.value = emptyLoadState()
   }
 
   function reset(): void {

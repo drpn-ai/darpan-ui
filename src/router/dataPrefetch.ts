@@ -2,6 +2,7 @@ import type { Router } from 'vue-router'
 import * as q from '../lib/api/queries'
 import { prefetchQuery, readQueryOnce } from '../lib/api/readCache'
 import { warmLifecycleRuleOptions } from '../lib/useLifecycleRuleOptions'
+import { whenIdle } from './prefetchRoutes'
 
 /**
  * DAR-UI-051. Warms the read cache before a page opens, so a first visit draws as fast as a revisit.
@@ -108,13 +109,6 @@ function anchorOf(target: EventTarget | null): HTMLAnchorElement | null {
   return target instanceof Element ? target.closest('a[href]') : null
 }
 
-function whenIdle(run: () => void): void {
-  const requestIdle = (globalThis as { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number })
-    .requestIdleCallback
-  if (typeof requestIdle === 'function') requestIdle(run, { timeout: IDLE_TIMEOUT_MS })
-  else setTimeout(run, 0)
-}
-
 /** Wires both triggers. `isAuthenticated` gates everything: nothing is read for a signed-out tab. */
 export function installDataPrefetch(router: Router, isAuthenticated: () => boolean): () => void {
   const prefetchAnchor = (anchor: HTMLAnchorElement | null) => {
@@ -148,7 +142,7 @@ export function installDataPrefetch(router: Router, isAuthenticated: () => boole
       if (!isAuthenticated()) return
       void prefetchQuery(q.homeSavedRuns, SESSION_PRELOAD_FRESH_MS)
       void prefetchQuery(q.homeReconciliations, SESSION_PRELOAD_FRESH_MS)
-    })
+    }, IDLE_TIMEOUT_MS, 0)
   })
 
   return () => {

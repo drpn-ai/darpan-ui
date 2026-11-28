@@ -8,6 +8,14 @@ type RouteComponentLoader = () => Promise<unknown>
 
 type IdleScheduler = (callback: () => void, opts?: { timeout?: number }) => number
 
+/** Runs `run` when the browser is idle (at the latest after `timeoutMs`), or after `fallbackDelayMs` where there is
+ *  no requestIdleCallback. Shared with the data prefetch. */
+export function whenIdle(run: () => void, timeoutMs: number, fallbackDelayMs: number): void {
+  const requestIdle = (globalThis as { requestIdleCallback?: IdleScheduler }).requestIdleCallback
+  if (typeof requestIdle === 'function') requestIdle(run, { timeout: timeoutMs })
+  else setTimeout(run, fallbackDelayMs)
+}
+
 const IDLE_TIMEOUT_MS = 5_000
 const TIMER_FALLBACK_DELAY_MS = 1_500
 
@@ -43,13 +51,5 @@ export async function prefetchLazyRouteComponents(router: Router): Promise<void>
 export function scheduleRoutePrefetch(router: Router): void {
   if (scheduled) return
   scheduled = true
-  const run = () => {
-    void prefetchLazyRouteComponents(router)
-  }
-  const requestIdle = (globalThis as { requestIdleCallback?: IdleScheduler }).requestIdleCallback
-  if (typeof requestIdle === 'function') {
-    requestIdle(run, { timeout: IDLE_TIMEOUT_MS })
-  } else {
-    setTimeout(run, TIMER_FALLBACK_DELAY_MS)
-  }
+  whenIdle(() => { void prefetchLazyRouteComponents(router) }, IDLE_TIMEOUT_MS, TIMER_FALLBACK_DELAY_MS)
 }
