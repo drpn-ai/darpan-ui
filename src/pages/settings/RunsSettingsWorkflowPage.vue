@@ -171,7 +171,6 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade } from '../../lib/api/facade'
 import type {
-  AutomationNsRestletOption,
   AutomationPrimaryIdOption,
   AutomationSourceConfigOption,
   AutomationSystemRemoteOption,
@@ -206,7 +205,6 @@ interface RunSourceForm {
   fieldPaths: string[]
   sourceConfigId: string
   sourceConfigType: string
-  nsRestletConfigId: string
   systemMessageRemoteId: string
   // An API side's endpoint system (OMS, OMS_GQL, ...): picking another endpoint can change it.
   systemEnumId: string
@@ -231,7 +229,6 @@ const SCOPE_EVALUATE = 'EVALUATE'
 
 const schemas = ref<JsonSchemaSummary[]>([])
 const sourceConfigs = ref<AutomationSourceConfigOption[]>([])
-const nsRestletConfigs = ref<AutomationNsRestletOption[]>([])
 const systemRemotes = ref<AutomationSystemRemoteOption[]>([])
 const systemOptions = ref<DarpanSystemValueOption[]>([])
 const flattenedFields = ref<Record<string, JsonSchemaField[]>>({})
@@ -251,7 +248,6 @@ function emptySourceForm(): RunSourceForm {
     fieldPaths: [],
     sourceConfigId: '',
     sourceConfigType: '',
-    nsRestletConfigId: '',
     systemMessageRemoteId: '',
     systemEnumId: '',
   }
@@ -394,22 +390,13 @@ function apiEndpointOptionsForSource(sourceKey: SourceKey): AppSelectOption[] {
   const systemEnumId = sourceSystemEnumId(sourceKey)
   if (!source.sourceConfigId) return []
 
-  return [
-    ...nsRestletConfigs.value
-      .filter((config) => darpanSystemIdsMatch(config.systemEnumId, systemEnumId))
-      .filter((config) => sourceConfigMatches(config.sourceConfigId || config.nsAuthConfigId, source.sourceConfigId))
-      .map((config) => ({
-        value: `ns:${config.nsRestletConfigId}`,
-        label: config.label || config.description || config.nsRestletConfigId,
-      })),
-    ...systemRemotes.value
-      .filter((remote) => endpointInSystemFamily(remote.systemEnumId, systemEnumId))
-      .filter((remote) => sourceConfigMatches(remote.sourceConfigId || remote.optionKey, source.sourceConfigId))
-      .map((remote) => ({
-        value: remoteSelectValue(remote),
-        label: remote.label || remote.description || remote.systemMessageRemoteId,
-      })),
-  ]
+  return systemRemotes.value
+    .filter((remote) => endpointInSystemFamily(remote.systemEnumId, systemEnumId))
+    .filter((remote) => sourceConfigMatches(remote.sourceConfigId || remote.optionKey, source.sourceConfigId))
+    .map((remote) => ({
+      value: remoteSelectValue(remote),
+      label: remote.label || remote.description || remote.systemMessageRemoteId,
+    }))
 }
 
 // Keyed by endpoint system too: sibling endpoints share one remote (HOTWAX_ORDERS_API), and OMS_GQL has none.
@@ -420,20 +407,13 @@ function remoteSelectValue(remote: AutomationSystemRemoteOption): string {
 
 function selectedApiEndpointValue(sourceKey: SourceKey): string {
   const source = sourceForm(sourceKey)
-  if (source.nsRestletConfigId) return `ns:${source.nsRestletConfigId}`
   const selectedRemote = selectedRemoteOptionForSource(sourceKey)
   if (selectedRemote) return remoteSelectValue(selectedRemote)
   return source.systemMessageRemoteId ? `remote:${source.systemMessageRemoteId}` : ''
 }
 
-function selectedApiSourceOption(sourceKey: SourceKey): AutomationNsRestletOption | AutomationSystemRemoteOption | null {
-  const selectedValue = selectedApiEndpointValue(sourceKey)
-  if (selectedValue.startsWith('ns:')) {
-    const configId = selectedValue.slice(3)
-    return nsRestletConfigs.value.find((config) => config.nsRestletConfigId === configId) ?? null
-  }
-  if (selectedValue.startsWith('remote:')) return selectedRemoteOptionForSource(sourceKey)
-  return null
+function selectedApiSourceOption(sourceKey: SourceKey): AutomationSystemRemoteOption | null {
+  return selectedApiEndpointValue(sourceKey) ? selectedRemoteOptionForSource(sourceKey) : null
 }
 
 function selectedApiSourceLabel(sourceKey: SourceKey): string {
@@ -520,17 +500,10 @@ function updateApiEndpoint(sourceKey: SourceKey, value: string): void {
   const source = sourceForm(sourceKey)
   source.fieldPaths = []
 
-  if (value.startsWith('ns:')) {
-    source.nsRestletConfigId = value.slice(3)
-    source.systemMessageRemoteId = ''
-    return
-  }
-
   // Every remote option is built from systemRemotes by remoteSelectValue, so a pick always finds its row.
   const remote = systemRemotes.value.find((candidate) => remoteSelectValue(candidate) === value)
   if (remote) {
     source.systemMessageRemoteId = remote.systemMessageRemoteId ?? ''
-    source.nsRestletConfigId = ''
     if (remote.systemEnumId) source.systemEnumId = remote.systemEnumId
     if (remote.sourceConfigType) source.sourceConfigType = remote.sourceConfigType
     return
@@ -541,7 +514,6 @@ function updateApiEndpoint(sourceKey: SourceKey, value: string): void {
 
 function clearApiEndpoint(sourceKey: SourceKey): void {
   const source = sourceForm(sourceKey)
-  source.nsRestletConfigId = ''
   source.systemMessageRemoteId = ''
   source.fieldPaths = []
 }
@@ -582,7 +554,6 @@ function buildSourceKeyFields(sourceKey: SourceKey): Partial<SaveRuleSetRunPaylo
       return {
         file1SourceTypeEnumId: SOURCE_TYPE_API,
         ...(source.systemMessageRemoteId.trim() ? { file1SystemMessageRemoteId: source.systemMessageRemoteId.trim() } : {}),
-        ...(source.nsRestletConfigId.trim() ? { file1NsRestletConfigId: source.nsRestletConfigId.trim() } : {}),
         ...(source.sourceConfigId.trim() ? { file1SourceConfigId: source.sourceConfigId.trim() } : {}),
         ...(sourceConfigType ? { file1SourceConfigType: sourceConfigType } : {}),
         ...primaryIdFields,
@@ -591,7 +562,6 @@ function buildSourceKeyFields(sourceKey: SourceKey): Partial<SaveRuleSetRunPaylo
     return {
       file2SourceTypeEnumId: SOURCE_TYPE_API,
       ...(source.systemMessageRemoteId.trim() ? { file2SystemMessageRemoteId: source.systemMessageRemoteId.trim() } : {}),
-      ...(source.nsRestletConfigId.trim() ? { file2NsRestletConfigId: source.nsRestletConfigId.trim() } : {}),
       ...(source.sourceConfigId.trim() ? { file2SourceConfigId: source.sourceConfigId.trim() } : {}),
       ...(sourceConfigType ? { file2SourceConfigType: sourceConfigType } : {}),
       ...primaryIdFields,
@@ -647,14 +617,12 @@ function hydrateRuleSetDraftForm(draft: ReconciliationRuleSetDraft): void {
   form.source1.fieldPaths = [...(draft.file1PrimaryIdExpression ?? [])]
   form.source1.sourceConfigId = draft.file1SourceConfigId ?? ''
   form.source1.sourceConfigType = draft.file1SourceConfigType ?? resolveSelectedSourceConfigType('source1')
-  form.source1.nsRestletConfigId = draft.file1NsRestletConfigId ?? ''
   form.source1.systemMessageRemoteId = draft.file1SystemMessageRemoteId ?? ''
   form.source1.systemEnumId = draft.file1SystemEnumId ?? ''
   form.source2.schemaId = sourceUsesApi('source2') ? '' : resolveSchemaId(draft.file2JsonSchemaId, draft.file2SchemaFileName)
   form.source2.fieldPaths = [...(draft.file2PrimaryIdExpression ?? [])]
   form.source2.sourceConfigId = draft.file2SourceConfigId ?? ''
   form.source2.sourceConfigType = draft.file2SourceConfigType ?? resolveSelectedSourceConfigType('source2')
-  form.source2.nsRestletConfigId = draft.file2NsRestletConfigId ?? ''
   form.source2.systemMessageRemoteId = draft.file2SystemMessageRemoteId ?? ''
   form.source2.systemEnumId = draft.file2SystemEnumId ?? ''
 }
@@ -700,8 +668,6 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
           file2SourceTypeEnumId: SOURCE_TYPE_API,
           file2SystemMessageRemoteId: form.source2.systemMessageRemoteId || undefined,
           file2SystemMessageRemoteLabel: form.source2.systemMessageRemoteId ? selectedApiSourceLabel('source2') || undefined : undefined,
-          file2NsRestletConfigId: form.source2.nsRestletConfigId || undefined,
-          file2NsRestletConfigLabel: form.source2.nsRestletConfigId ? selectedApiSourceLabel('source2') || undefined : undefined,
           file2SourceConfigId: form.source2.sourceConfigId || undefined,
           file2SourceConfigType: form.source2.sourceConfigType || resolveSelectedSourceConfigType('source2') || undefined,
           file2FileTypeEnumId: '',
@@ -730,8 +696,6 @@ function buildRuleSetDraftFromForm(savedRunName: string): ReconciliationRuleSetD
           file1SourceTypeEnumId: SOURCE_TYPE_API,
           file1SystemMessageRemoteId: form.source1.systemMessageRemoteId || undefined,
           file1SystemMessageRemoteLabel: form.source1.systemMessageRemoteId ? selectedApiSourceLabel('source1') || undefined : undefined,
-          file1NsRestletConfigId: form.source1.nsRestletConfigId || undefined,
-          file1NsRestletConfigLabel: form.source1.nsRestletConfigId ? selectedApiSourceLabel('source1') || undefined : undefined,
           file1SourceConfigId: form.source1.sourceConfigId || undefined,
           file1SourceConfigType: form.source1.sourceConfigType || resolveSelectedSourceConfigType('source1') || undefined,
           file1FileTypeEnumId: '',
@@ -874,7 +838,6 @@ async function load(): Promise<void> {
 
     schemas.value = schemasResponse.schemas ?? []
     sourceConfigs.value = automationSourceOptionsResponse?.sourceConfigs ?? []
-    nsRestletConfigs.value = automationSourceOptionsResponse?.nsRestletConfigs ?? []
     systemRemotes.value = automationSourceOptionsResponse?.systemRemotes ?? []
     systemOptions.value = deduplicateDarpanSystemOptions(automationSourceOptionsResponse?.systems ?? []).map((option) => ({
       value: option.enumId,

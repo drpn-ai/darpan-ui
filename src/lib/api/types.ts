@@ -429,27 +429,6 @@ export interface NsAuthConfigRecord {
 
 export type SaveNsAuthConfigResponse = Schemas['SaveNsAuthConfigResult']
 
-export interface NsRestletConfigRecord {
-  nsRestletConfigId: string
-  description?: string
-  companyUserGroupId?: string
-  companyLabel?: string
-  endpointUrl: string
-  httpMethod: string
-  nsAuthConfigId: string
-  authDescription?: string
-  authType?: string
-  authIsActive?: string
-  headersJson?: string
-  connectTimeoutSeconds: number
-  readTimeoutSeconds: number
-  isActive: string
-  /** DAR-BE-005: true when this row's owning tenant is not the active tenant — i.e. shared in. */
-  isShared?: boolean
-}
-
-export type SaveNsRestletConfigResponse = Schemas['SaveNsRestletConfigResult']
-
 export interface ShopifyAuthConfigRecord {
   shopifyAuthConfigId: string
   description?: string
@@ -616,8 +595,6 @@ export interface MappingSystemOption {
   sourceTypeLabel?: string
   systemMessageRemoteId?: string
   systemMessageRemoteLabel?: string
-  nsRestletConfigId?: string
-  nsRestletConfigLabel?: string
   sourceConfigId?: string
   sourceConfigType?: string
 }
@@ -722,7 +699,6 @@ export interface AutomationSourceRecord {
   primaryIdExpression?: string
   idValueNormalizer?: string
   systemMessageRemoteId?: string
-  nsRestletConfigId?: string
   sftpServerId?: string
   sftpServerLabel?: string
   remotePathTemplate?: string
@@ -791,27 +767,6 @@ export interface AutomationSftpServerOption {
   host?: string
   port?: number
   username?: string
-  label?: string
-}
-
-export interface AutomationNsRestletOption {
-  nsRestletConfigId: string
-  description?: string
-  endpointUrl?: string
-  httpMethod?: string
-  nsAuthConfigId?: string
-  sourceConfigId?: string
-  sourceConfigType?: string
-  sourceConfigLabel?: string
-  isActive?: string
-  systemEnumId?: string
-  systemLabel?: string
-  safeMetadataJson?: string
-  primaryIdOptions?: AutomationPrimaryIdOption[]
-  /** Wider field list for the rules board; absent means "fall back to primaryIdOptions". */
-  fieldOptions?: AutomationPrimaryIdOption[]
-  /** True only when this system's connector declares a filterParameterName (see supportsExclusions). */
-  supportsExcludeFilters?: boolean
   label?: string
 }
 
@@ -953,10 +908,6 @@ export interface ListNsAuthConfigsResponse extends PaginatedResponse {
   authConfigs: NsAuthConfigRecord[]
 }
 
-export interface ListNsRestletConfigsResponse extends PaginatedResponse {
-  restletConfigs: NsRestletConfigRecord[]
-}
-
 export interface ListShopifyAuthConfigsResponse extends PaginatedResponse {
   shopifyAuthConfigs: ShopifyAuthConfigRecord[]
 }
@@ -1032,7 +983,6 @@ export interface ListAutomationSourceOptionsResponse extends ApiEnvelope {
   savedRuns: SavedRunSummary[]
   sftpServers: AutomationSftpServerOption[]
   sourceConfigs?: AutomationSourceConfigOption[]
-  nsRestletConfigs: AutomationNsRestletOption[]
   systemRemotes: AutomationSystemRemoteOption[]
 }
 

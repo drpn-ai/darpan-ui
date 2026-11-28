@@ -20,7 +20,6 @@ const KIND_LABEL: Record<string, string> = {
   CONC: 'Conclusion',
   NETSUITE_SUITEQL: 'NetSuite query',
   NETSUITE_AUTH: 'Connection',
-  NETSUITE_RESTLET: 'Connection',
   SHOPIFY_AUTH: 'Connection',
   HOTWAX_OMS_REST: 'Connection',
   AUTOMATION: 'Automation',

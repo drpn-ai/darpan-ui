@@ -41,7 +41,6 @@ export type ReconciliationAutomationStepId =
 export interface ReconciliationAutomationSourceDraft {
   sourceTypeEnumId?: string
   sftpServerId?: string
-  nsRestletConfigId?: string
   systemMessageRemoteId?: string
   remotePathTemplate?: string
   fileNamePattern?: string
@@ -138,7 +137,6 @@ function buildSourcePayload(
   return removeEmpty({
     ...basePayload,
     systemMessageRemoteId: sourceDraft.systemMessageRemoteId,
-    nsRestletConfigId: sourceDraft.nsRestletConfigId,
     apiRequestTemplateJson: sourceDraft.apiRequestTemplateJson,
     apiResponsePathExpression: sourceDraft.apiResponsePathExpression,
     dateFromParameterName: sourceDraft.dateFromParameterName,

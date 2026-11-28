@@ -3,7 +3,7 @@
     "info": {
         "title": "Darpan Facade API",
         "version": "3.5.9",
-        "x-darpan-contract-version": 6,
+        "x-darpan-contract-version": 7,
         "description": "GENERATED from the facade service XML \u2014 do not edit by hand. Regenerate with ./gradlew :runtime:component:darpan:generateApiContract.\n\nTransport: JSON-RPC 2.0 over POST /rpc/json. Auth channels: browser SPA uses the HttpOnly darpan_login_key cookie + CSRF token (canonical); integration callers and no-credentialed-CORS fallbacks use the login_key header (in-memory only, never query params). HTTP status is 200 for every dispatched call; distinguish outcomes by shape. JSON-RPC error object: protocol failures (-32700 parse, -32600 invalid request, -32601 method not found, -32602 invalid params), unhandled service errors (code 500), authorization denial (code 403). Facade business validation instead returns a success envelope with result.ok=false and result.errors[]."
     },
     "servers": [
@@ -795,9 +795,6 @@
                                         "$ref": "#/components/schemas/RunAutomationNowRequest"
                                     },
                                     {
-                                        "$ref": "#/components/schemas/RunGenericDiffRequest"
-                                    },
-                                    {
                                         "$ref": "#/components/schemas/RunReconciliationRequest"
                                     },
                                     {
@@ -876,9 +873,6 @@
                                         "$ref": "#/components/schemas/DeleteTenantChatSpaceRequest"
                                     },
                                     {
-                                        "$ref": "#/components/schemas/GetLlmSettingsRequest"
-                                    },
-                                    {
                                         "$ref": "#/components/schemas/GetNotificationRoutesRequest"
                                     },
                                     {
@@ -894,22 +888,13 @@
                                         "$ref": "#/components/schemas/ListNsAuthConfigsRequest"
                                     },
                                     {
-                                        "$ref": "#/components/schemas/ListNsRestletConfigsRequest"
-                                    },
-                                    {
                                         "$ref": "#/components/schemas/ListSftpServersRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/ListTenantChatSpacesRequest"
                                     },
                                     {
-                                        "$ref": "#/components/schemas/SaveLlmSettingsRequest"
-                                    },
-                                    {
                                         "$ref": "#/components/schemas/SaveNsAuthConfigRequest"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/SaveNsRestletConfigRequest"
                                     },
                                     {
                                         "$ref": "#/components/schemas/SaveSftpServerRequest"
@@ -1298,7 +1283,6 @@
                                         "facade.ReconciliationFacadeServices.resume#Automation": "#/components/schemas/ResumeAutomationRequest",
                                         "facade.ReconciliationFacadeServices.retry#AutomationExecutionFromExtracts": "#/components/schemas/RetryAutomationExecutionFromExtractsRequest",
                                         "facade.ReconciliationFacadeServices.run#AutomationNow": "#/components/schemas/RunAutomationNowRequest",
-                                        "facade.ReconciliationFacadeServices.run#GenericDiff": "#/components/schemas/RunGenericDiffRequest",
                                         "facade.ReconciliationFacadeServices.run#Reconciliation": "#/components/schemas/RunReconciliationRequest",
                                         "facade.ReconciliationFacadeServices.run#SavedRunDiff": "#/components/schemas/RunSavedRunDiffRequest",
                                         "facade.ReconciliationFacadeServices.save#Automation": "#/components/schemas/SaveAutomationRequest",
@@ -1325,18 +1309,14 @@
                                         "facade.SearchFacadeServices.search#NavigationTargets": "#/components/schemas/SearchNavigationTargetsRequest",
                                         "facade.SettingsFacadeServices.delete#NsAuthConfig": "#/components/schemas/DeleteNsAuthConfigRequest",
                                         "facade.SettingsFacadeServices.delete#TenantChatSpace": "#/components/schemas/DeleteTenantChatSpaceRequest",
-                                        "facade.SettingsFacadeServices.get#LlmSettings": "#/components/schemas/GetLlmSettingsRequest",
                                         "facade.SettingsFacadeServices.get#NotificationRoutes": "#/components/schemas/GetNotificationRoutesRequest",
                                         "facade.SettingsFacadeServices.get#TenantSettings": "#/components/schemas/GetTenantSettingsRequest",
                                         "facade.SettingsFacadeServices.get#UserNotificationDefault": "#/components/schemas/GetUserNotificationDefaultRequest",
                                         "facade.SettingsFacadeServices.list#EnumOptions": "#/components/schemas/ListEnumOptionsRequest",
                                         "facade.SettingsFacadeServices.list#NsAuthConfigs": "#/components/schemas/ListNsAuthConfigsRequest",
-                                        "facade.SettingsFacadeServices.list#NsRestletConfigs": "#/components/schemas/ListNsRestletConfigsRequest",
                                         "facade.SettingsFacadeServices.list#SftpServers": "#/components/schemas/ListSftpServersRequest",
                                         "facade.SettingsFacadeServices.list#TenantChatSpaces": "#/components/schemas/ListTenantChatSpacesRequest",
-                                        "facade.SettingsFacadeServices.save#LlmSettings": "#/components/schemas/SaveLlmSettingsRequest",
                                         "facade.SettingsFacadeServices.save#NsAuthConfig": "#/components/schemas/SaveNsAuthConfigRequest",
-                                        "facade.SettingsFacadeServices.save#NsRestletConfig": "#/components/schemas/SaveNsRestletConfigRequest",
                                         "facade.SettingsFacadeServices.save#SftpServer": "#/components/schemas/SaveSftpServerRequest",
                                         "facade.SettingsFacadeServices.save#TenantChatSpace": "#/components/schemas/SaveTenantChatSpaceRequest",
                                         "facade.SettingsFacadeServices.save#TenantSettings": "#/components/schemas/SaveTenantSettingsRequest",
@@ -2167,9 +2147,6 @@
                                             "$ref": "#/components/schemas/RunAutomationNowResponse"
                                         },
                                         {
-                                            "$ref": "#/components/schemas/RunGenericDiffResponse"
-                                        },
-                                        {
                                             "$ref": "#/components/schemas/RunReconciliationResponse"
                                         },
                                         {
@@ -2248,9 +2225,6 @@
                                             "$ref": "#/components/schemas/DeleteTenantChatSpaceResponse"
                                         },
                                         {
-                                            "$ref": "#/components/schemas/GetLlmSettingsResponse"
-                                        },
-                                        {
                                             "$ref": "#/components/schemas/GetNotificationRoutesResponse"
                                         },
                                         {
@@ -2266,22 +2240,13 @@
                                             "$ref": "#/components/schemas/ListNsAuthConfigsResponse"
                                         },
                                         {
-                                            "$ref": "#/components/schemas/ListNsRestletConfigsResponse"
-                                        },
-                                        {
                                             "$ref": "#/components/schemas/ListSftpServersResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/ListTenantChatSpacesResponse"
                                         },
                                         {
-                                            "$ref": "#/components/schemas/SaveLlmSettingsResponse"
-                                        },
-                                        {
                                             "$ref": "#/components/schemas/SaveNsAuthConfigResponse"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/SaveNsRestletConfigResponse"
                                         },
                                         {
                                             "$ref": "#/components/schemas/SaveSftpServerResponse"
@@ -2531,7 +2496,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -2807,7 +2773,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -2887,7 +2854,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -2986,7 +2954,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3088,7 +3057,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3163,7 +3133,8 @@
                 "type": "object",
                 "properties": {
                     "config": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3243,7 +3214,8 @@
                 "type": "object",
                 "properties": {
                     "prompt": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3327,7 +3299,8 @@
                 "type": "object",
                 "properties": {
                     "reset": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3423,7 +3396,8 @@
                 "type": "object",
                 "properties": {
                     "price": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3507,7 +3481,8 @@
                 "type": "object",
                 "properties": {
                     "prompt": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3591,7 +3566,8 @@
                 "type": "object",
                 "properties": {
                     "role": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3675,7 +3651,8 @@
                 "type": "object",
                 "properties": {
                     "tenantCap": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -3759,7 +3736,8 @@
                 "type": "object",
                 "properties": {
                     "agentText": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -4220,8 +4198,8 @@
                     "routes": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "conditionKinds": {
@@ -4231,7 +4209,8 @@
                         }
                     },
                     "limits": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -4322,8 +4301,8 @@
                     "entries": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -4632,10 +4611,12 @@
                 "type": "object",
                 "properties": {
                     "request": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -4745,7 +4726,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -4829,7 +4811,8 @@
                 "type": "object",
                 "properties": {
                     "request": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -5085,7 +5068,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -5165,7 +5149,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -5260,7 +5245,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -5358,7 +5344,8 @@
                 "type": "object",
                 "properties": {
                     "grant": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -5460,8 +5447,8 @@
                     "blocks": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "[{blockId, defaultText, copyText, variables, lastChangedByUserId,\n                lastChangedDate}] by blockId. The guides block is lines of `Label|docs page path`."
                     },
@@ -5474,6 +5461,7 @@
                     },
                     "sample": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The default branch's sample parameters."
                     }
                 }
@@ -5551,8 +5539,8 @@
                     "templates": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "[{emailTemplateId, description, subject, editedBlockCount,\n                subjectEdited}] by emailTemplateId."
                     }
@@ -5630,6 +5618,7 @@
                     },
                     "blocks": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "Draft text by blockId; blocks not named render as stored."
                     },
                     "branch": {
@@ -5820,6 +5809,7 @@
                     },
                     "blocks": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "New text by blockId."
                     }
                 },
@@ -6092,6 +6082,7 @@
                 "properties": {
                     "entry": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{key, tier, systems, kind, tags, source, owner, reviewBy, supersedes,\n                title, body}, or null when neither tier holds the key."
                     }
                 }
@@ -6540,6 +6531,7 @@
                 "properties": {
                     "entry": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The stored entry, as get#KnowledgeEntry answers it."
                     },
                     "created": {
@@ -7896,14 +7888,17 @@
                             },
                             "slots": {
                                 "type": "object",
+                                "additionalProperties": true,
                                 "description": "inFlight and cap (darpan.reconciliation.automation.maxConcurrentExecutions,\n                        instance-wide), plus pending executions. DAR-BE-143, this instance's admission: queued (runs\n                        waiting for a slot), perTenantCap, heldForMemory and holdAtHeapPercent, and byTenant\n                        {tenantId: {running, queued}}."
                             },
                             "recentFailures": {
                                 "type": "object",
+                                "additionalProperties": true,
                                 "description": "windowHours, count and items: failed run results in the window, newest first."
                             },
                             "system": {
                                 "type": "object",
+                                "additionalProperties": true,
                                 "description": "Heap, heap after GC, process CPU, load average, threads, disk on the runtime\n                        volume, the Moqui worker pool and uptime. Null when unreadable."
                             },
                             "unavailable": {
@@ -7986,10 +7981,12 @@
                     },
                     "periodDays": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "Optional preview of the instance periods in days (or forever) by table key\n                (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG, SYNC_PULSE_SAMPLE), used instead of the stored ones."
                     },
                     "tenantPeriodDays": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "Optional preview of one tenant's own periods by table key (days,\n                forever or inherit); needs tenantUserGroupId and covers that tenant only."
                     }
                 },
@@ -8013,8 +8010,8 @@
                     "tables": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "One entry per table: table, property, periodDays (the instance period; blank:\n                keep forever), status (KEEP_FOREVER, DRY_RUN), cutoff, rows, dependentRows, byTenant, byTenantPeriod {tenant: days, blank\n                for forever} for tenants with a period of their own."
                     }
@@ -8095,6 +8092,7 @@
                     },
                     "retention": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "instance [{table, settingKey, periodDays, source}], tenants\n                [{tenantUserGroupId, table, periodDays, lastChangedByUserId, lastChangedDate}], generatedOutputDays, extractDays,\n                batchSize, jobName, jobPaused (Y or N)."
                     }
                 }
@@ -8168,6 +8166,7 @@
                     },
                     "periods": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "Table key to days, forever or inherit."
                     },
                     "previewedRows": {
@@ -8189,8 +8188,8 @@
                     "changed": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "The tables that changed: table, mode (days, forever, inherit), before, after (effective days)."
                     },
@@ -8200,6 +8199,7 @@
                     },
                     "retention": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "As get#RetentionPeriods, after the change."
                     }
                 }
@@ -8403,8 +8403,8 @@
                     "jobs": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -8590,6 +8590,7 @@
                 "properties": {
                     "job": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The job as get#ServiceJobs lists it, after the reset."
                     }
                 }
@@ -8670,6 +8671,7 @@
                     },
                     "parameters": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "Parameter name to its new value; each must be an in-parameter of the job's service."
                     },
                     "previewedRows": {
@@ -8687,6 +8689,7 @@
                 "properties": {
                     "job": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The job as get#ServiceJobs lists it, after the edit."
                     }
                 }
@@ -8999,6 +9002,7 @@
                     },
                     "reencryptedByEntity": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "Real run only: entity name to rows re-encrypted."
                     },
                     "totalRows": {
@@ -9188,7 +9192,8 @@
                 "type": "object",
                 "properties": {
                     "setting": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -9265,8 +9270,8 @@
                     "settings": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -9347,7 +9352,8 @@
                 "type": "object",
                 "properties": {
                     "setting": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -9435,7 +9441,8 @@
                 "type": "object",
                 "properties": {
                     "setting": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -9623,7 +9630,8 @@
                 "type": "object",
                 "properties": {
                     "shopifyApp": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -10464,6 +10472,7 @@
                 "properties": {
                     "bundle": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{bundleVersion, source, connections, queries, conclusionCodes,\n                runs, audits, statements, checks}, plus lifecycles, chatSpaces and automations with includeAutomations;\n                consumed unchanged by import#ConfigBundle."
                     }
                 }
@@ -10636,10 +10645,12 @@
                     },
                     "bundle": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The bundle export#ConfigBundle answered, unchanged."
                     },
                     "connectionMap": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{connection ref: an existing target connection id, or\n                CREATE}, one entry per bundle connection."
                     },
                     "apply": {
@@ -10666,6 +10677,7 @@
                 "properties": {
                     "plan": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{lines: [{kind, ref, label, action (CREATE | UPDATE | UNCHANGED |\n                MAPPED | NEEDS_CREDENTIALS), targetId, changes: [{field, from, to}], and on connection lines of a bundle with\n                sealed credentials secretsFilled and secretsKept (field names)}], blocking: [{code, ref, message}],\n                warnings: [{code, ref, message}], counts: {action: n, CREDENTIALS_FILLED: connections}}."
                     },
                     "planHash": {
@@ -10674,6 +10686,7 @@
                     },
                     "idMap": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "When applied: every bundle ref to its target id."
                     },
                     "applied": {
@@ -10845,7 +10858,7 @@
                     },
                     "emailAddress": {
                         "type": "string",
-                        "description": "Contact email; must be unique when provided."
+                        "description": "Contact email, required and unique: password\n                reset sends its code here (standing rule: every user creation saves an email)."
                     },
                     "tempPassword": {
                         "type": "string",
@@ -10854,6 +10867,7 @@
                 },
                 "required": [
                     "username",
+                    "emailAddress",
                     "tempPassword"
                 ],
                 "description": "Create a user with a temporary password (change forced at first login) and\n            DARPAN_USER group membership. The temporary password is kept encrypted for the user's tenant welcome\n            emails (DAR-BE-325, darpan.admin.TempPasswordKeeper) until they set their own or the keep period ends."
@@ -10942,7 +10956,7 @@
                 "required": [
                     "userId"
                 ],
-                "description": "Disable a user and revoke their live login keys. Self-disable is refused."
+                "description": "Disable a user and end every sign-in they have: browser sessions, login keys, CLI sessions and a CLI\n            sign-in they approved that their CLI has not collected yet. Self-disable is refused."
             },
             "DisableUserAccountResult": {
                 "type": "object",
@@ -11505,7 +11519,7 @@
                     "userId",
                     "tempPassword"
                 ],
-                "description": "Set a temporary password for a user (change forced at next login) and revoke\n            their live login keys. The temporary password is kept encrypted for their tenant welcome emails\n            (DAR-BE-325), replacing an earlier one."
+                "description": "Set a temporary password for a user (change forced at next login) and end every sign-in they have\n            (browser sessions, login keys, CLI sessions, a CLI sign-in approved but not yet collected), as a password\n            change does. The temporary password is kept encrypted for their tenant welcome emails (DAR-BE-325), replacing\n            an earlier one."
             },
             "ResetPasswordResult": {
                 "type": "object",
@@ -11874,7 +11888,8 @@
                 "type": "object",
                 "properties": {
                     "proposal": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -12031,7 +12046,7 @@
                         "description": "Only tickets in this status."
                     }
                 },
-                "description": "The active tenant's tickets, newest first."
+                "description": "The active tenant's tickets, newest first. Editors and admins only (OC161, Aditi 2026-11-28): a ticket\n            holds another person's words from their agent chat."
             },
             "ListBrainChangeTicketsResult": {
                 "type": "object",
@@ -12123,13 +12138,16 @@
                         "type": "string"
                     },
                     "before": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "after": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "backtest": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "status": {
                         "type": "string"
@@ -12207,10 +12225,12 @@
                         "description": "EXCLUSION_FILTER, STATEMENT_NARROWING, EXPECTED_CAUSES, FIX_TEXT, CONCLUSION_ROWS, AUDIT_SETTINGS, ADD_STATEMENT, ADD_CHECK, STATEMENT_EDIT or REASON_PRIORITY."
                     },
                     "target": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "after": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "personWords": {
                         "type": "string",
@@ -12258,7 +12278,8 @@
                         }
                     },
                     "backtest": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -12674,10 +12695,12 @@
                 "properties": {
                     "byCause": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "Count of the check's other findings by conclusion code."
                     },
                     "byState": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "Count of the check's other findings by state."
                     },
                     "sameCause": {
@@ -12772,22 +12795,27 @@
                 "properties": {
                     "audit": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "[name]."
                     },
                     "schedule": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "[active, time, timeZone]."
                     },
                     "statement": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "[code, text] of the finding's statement."
                     },
                     "check": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "[id, label] of the finding's check."
                     },
                     "run": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "[savedRunId, sides]; empty when the check has no run."
                     }
                 }
@@ -13068,10 +13096,12 @@
                     },
                     "queryProposal": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{proposal: {queryName, description, readSpecJson, scriptBody, readText}, preview} or empty."
                     },
                     "question": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{text, options, from} when the agent needs the person's answer."
                     },
                     "masked": {
@@ -13203,6 +13233,7 @@
                     },
                     "question": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{text, options, from} when the agent needs the person's answer."
                     },
                     "masked": {
@@ -13452,6 +13483,7 @@
                     },
                     "acknowledgement": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{note, by: {id, label}, at, remindOn, reminded}"
                     }
                 }
@@ -13563,6 +13595,7 @@
                     },
                     "statement": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{id, code, text, active, checks}, as get#AuditSettings lists\n                it."
                     }
                 }
@@ -13664,6 +13697,7 @@
                     },
                     "audit": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{id, name, period}, as get#Audits lists it."
                     }
                 }
@@ -13869,8 +13903,8 @@
                     "extracts": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -13966,7 +14000,8 @@
                         }
                     },
                     "options": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -14062,7 +14097,8 @@
                         }
                     },
                     "finding": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -14280,8 +14316,8 @@
                     "findings": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -14379,6 +14415,7 @@
                     },
                     "progress": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{checks: configured checks, asOf (server time of this answer), activeChecks, active: [{run,\n                checks: [check codes], state: running | queued, attempt, retryAt, stage, progressPercent, elapsedMs,\n                usualDurationMs (a past successful run over a window as long; absent when none), health: healthy | slow |\n                stuck, healthReason, steps: [{stage, status: running | done | failed, records (so far while running),\n                startedDate, completedDate, movedDate (a read's last page heartbeat; absent for reads that never heartbeat), system (extract steps: the system\n                that side reads), expectedRecords (extract steps: the page count the same read heartbeated on this automation's\n                last successful run, metricsJson.readCount)}] in run\n                order (DAR-BE-173), limits ({hotwaxSharePct, netsuiteSerial} while a peak period limits the tenant's reads;\n                DAR-BE-350)}]}"
                     }
                 }
@@ -14484,6 +14521,7 @@
                     },
                     "report": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{reportDate, period, totals, groups, flags}"
                     }
                 }
@@ -14710,7 +14748,8 @@
                         }
                     },
                     "report": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -14807,6 +14846,7 @@
                     },
                     "settings": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{audit: {id, name, period}, peakHoursUntil: ISO instant (only while now is inside the tenant's peak hours; DAR-BE-328), playableFrom: YYYY-MM-DD (the earliest\n                day play can record today), schedule: {active, time HH:mm,\n                timeZone, mixed (some check's automation is off the audit's schedule; saving puts it on), automations,\n                checksWithoutRun}, statements: [{id, code, text, active, priority (P0, P1, P2 or KNOWN; a statement with no level\n                reads P2), checks: [{id, label, savedRunId, runName}], reasons (DAR-BE-348: the conclusions its checks' runs can\n                reach, hidden ones left out, and any it holds a level for): [{conclusion (enumId), label, priority (its own level,\n                or null: the statement's), closes (all: expected on every check that reaches it, so it closes every finding and\n                takes no level; some; none), closesOn, checks (how many of the statement's checks reach it)}]}],\n                runEmail: {active, alsoSendTo: [address], members (how many accounts receive it by default: current tenant\n                members and Darpan admins), admins (how many of those are Darpan admins), chatSpaceId or null, canEdit (the caller\n                is a tenant admin; others see it read-only)} (DAR-BE-207:\n                the update emailed after each run to the members and admins, plus alsoSendTo)}"
                     }
                 }
@@ -15016,7 +15056,8 @@
                         }
                     },
                     "removedCheck": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -15252,8 +15293,8 @@
                     "runs": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "[{automationId, savedRunId, submitted, queued, error}]; queued: the\n                run waits for a free slot (DAR-BE-143) and starts on its own."
                     }
@@ -15326,7 +15367,8 @@
                         "type": "string"
                     },
                     "check": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "statements": {
                         "type": "array",
@@ -15361,7 +15403,8 @@
                         }
                     },
                     "savedCheck": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -15439,25 +15482,27 @@
                     "statements": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "[{id, text, active, priority}], only those that changed, a field\n                left out keeps its value. priority: P0, P1, P2 or KNOWN; null clears it (reads P2)."
                     },
                     "reasons": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "DAR-BE-348. [{statement (its id), conclusion (enumId), priority}]: a\n                reason's own level, P0, P1, P2 or KNOWN; null deletes it, and the reason takes the statement's. A reason that\n                closes on every check of its statement takes no level: the save is refused."
                     },
                     "schedule": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{active, time HH:mm, timeZone}; absent keeps it, a field left out\n                keeps its value."
                     },
                     "runEmail": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "DAR-BE-207. {active (false stops the run email for this audit),\n                alsoSendTo: [addresses sent to as well as the tenant's members], chatSpaceId (the tenant's chat space for a\n                summary card; blank for none)}; absent keeps it, a field left out keeps its value. Any address that is not one\n                refuses the save. Needs tenant admin rights for the active tenant (a Darpan admin has them): without them a\n                save carrying runEmail is refused whole. Every change is kept in EntityAuditLog."
                     }
                 },
@@ -15486,6 +15531,7 @@
                     },
                     "settings": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{audit: {id, name, period}, peakHoursUntil: ISO instant (only while now is inside the tenant's peak hours; DAR-BE-328), playableFrom: YYYY-MM-DD (the earliest\n                day play can record today), schedule: {active, time HH:mm,\n                timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, priority, checks: [{id, label,\n                savedRunId, runName}], reasons: [{conclusion, label, priority, closes, closesOn, checks}]}], runEmail: {active, alsoSendTo, members, admins, chatSpaceId, canEdit}}"
                     }
                 }
@@ -15587,6 +15633,7 @@
                     },
                     "feedback": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{feedbackId, note, sentAt, by: {id, label}}"
                     }
                 }
@@ -15691,6 +15738,7 @@
                     },
                     "acknowledgement": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{note, by: {id, label}, at, remindOn, reminded}"
                     }
                 }
@@ -20566,6 +20614,7 @@
                     },
                     "access": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "tenantUserGroupId, tenantLabel, state, thruDate, lifetimeDays, canUseCli (the CLI is on in some tenant: what approve#CliLogin checks), request (requestId, statusId, reason, requestedDate, decidedDate, decisionNote) or null. Null with no active tenant."
                     }
                 }
@@ -20663,6 +20712,7 @@
                     },
                     "request": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "requestId, statusId, reason, requestedDate."
                     }
                 }
@@ -21617,7 +21667,7 @@
                 "properties": {
                     "configTypeEnumId": {
                         "type": "string",
-                        "description": "SCFG_HOTWAX_OMS, SCFG_SHOPIFY_AUTH,\n                SCFG_NS_AUTH, or SCFG_NS_RESTLET."
+                        "description": "SCFG_HOTWAX_OMS, SCFG_SHOPIFY_AUTH\n                or SCFG_NS_AUTH."
                     },
                     "configId": {
                         "type": "string",
@@ -22397,7 +22447,8 @@
                         }
                     },
                     "schema": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "code": {
                         "type": "string"
@@ -22651,7 +22702,8 @@
                         "type": "string"
                     },
                     "variables": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 },
                 "required": [
@@ -22673,7 +22725,8 @@
                         }
                     },
                     "data": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "rowCount": {
                         "type": "integer",
@@ -22820,6 +22873,10 @@
                         "items": {
                             
                         }
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "DAR-OPS-029 S40c (C4): with ok false, HEADERS_NOT_CARRIED when the edit moved the base\n                URL or auth type, left the custom headers blank, and the config stores headers: nothing was saved; send the\n                headers again, or {} to remove them. Blank on every other answer."
                     },
                     "savedOmsRestSourceConfig": {
                         "type": "object",
@@ -23224,6 +23281,7 @@
                 "properties": {
                     "search": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{value, idNorm, records: [{systemCode, systemEnumId, connectionId, recordKind, recordKey, ids: [{fieldPath, idRaw, role}], foundBy, indexedAt}], capped, cappedReason}"
                     }
                 }
@@ -24433,6 +24491,7 @@
                 "properties": {
                     "lookup": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{value, records: [{systemCode, systemEnumId, connectionId, recordKind, recordKey, ids, foundBy, indexedAt}], findings, notSeen, capped, cappedReason}"
                     }
                 }
@@ -24534,15 +24593,15 @@
                     "recordTypes": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "stages": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "sampleSize": {
@@ -24661,15 +24720,15 @@
                     "fields": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "values": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -24754,7 +24813,8 @@
                         }
                     },
                     "options": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -24849,7 +24909,8 @@
                         }
                     },
                     "query": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -25232,7 +25293,8 @@
                         }
                     },
                     "preview": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -25549,7 +25611,8 @@
                         }
                     },
                     "savedQuery": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -27014,12 +27077,6 @@
                                         "systemMessageRemoteLabel": {
                                             "type": "string"
                                         },
-                                        "nsRestletConfigId": {
-                                            "type": "string"
-                                        },
-                                        "nsRestletConfigLabel": {
-                                            "type": "string"
-                                        },
                                         "sourceConfigId": {
                                             "type": "string"
                                         },
@@ -27258,7 +27315,8 @@
                         "type": "string"
                     },
                     "file1NsRestletConfigId": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Retired (DAR-BE-424): any value is refused."
                     },
                     "file1SourceConfigId": {
                         "type": "string"
@@ -27290,6 +27348,7 @@
                     },
                     "file1ExtractOptions": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "DAR-UI-064. This side's extract options, only the\n                names its connector declares (SourceSystemConnector.extractOptionsJson), e.g. {\"onlyCancelledReturns\": true}."
                     },
                     "file2SystemEnumId": {
@@ -27302,7 +27361,8 @@
                         "type": "string"
                     },
                     "file2NsRestletConfigId": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Retired (DAR-BE-424): any value is refused."
                     },
                     "file2SourceConfigId": {
                         "type": "string"
@@ -27334,6 +27394,7 @@
                     },
                     "file2ExtractOptions": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "DAR-UI-064. This side's extract options, only the\n                names its connector declares (SourceSystemConnector.extractOptionsJson), e.g. {\"onlyCancelledReturns\": true}."
                     },
                     "rules": {
@@ -27545,12 +27606,6 @@
                                             "type": "string"
                                         },
                                         "systemMessageRemoteLabel": {
-                                            "type": "string"
-                                        },
-                                        "nsRestletConfigId": {
-                                            "type": "string"
-                                        },
-                                        "nsRestletConfigLabel": {
                                             "type": "string"
                                         },
                                         "sourceConfigId": {
@@ -27984,8 +28039,8 @@
                     "findings": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -28091,8 +28146,8 @@
                     "rules": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -28202,8 +28257,8 @@
                     "exceptions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -28798,10 +28853,12 @@
                         }
                     },
                     "automation": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "syncStatus": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -29304,16 +29361,20 @@
                         }
                     },
                     "metadata": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "summary": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "bucketCounts": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "conclusionCounts": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "DAR-UI-044: whole-document count per conclusion code, ignoring the conclusion filter. Empty for a run without conclusions."
                     },
                     "ruleOptions": {
@@ -29344,7 +29405,8 @@
                         "type": "integer"
                     },
                     "outputFile": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -29449,8 +29511,8 @@
                     "questions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -29681,64 +29743,66 @@
                         }
                     },
                     "reconciliation": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "questions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "rules": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "DAR-UI-050. A lifecycle built from stages: its rules, one per field value it leaves out."
                     },
                     "stages": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "DAR-UI-050. A lifecycle built from stages: its stages in order."
                     },
                     "exceptions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "DAR-UI-050. A lifecycle built from stages: the records a stage is not expected of."
                     },
                     "lifecycle": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "DAR-UI-050. A lifecycle built from stages: the account and\n                record type its start reads, which its rule dropdowns are filled from."
                     },
                     "details": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "DAR-UI-050. A lifecycle built from stages: the custom fields its records show, [fieldId, label]."
                     },
                     "findings": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "DAR-UI-050. A lifecycle built from stages: the findings people wrote for its stages."
                     },
                     "conclusions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "DAR-UI-052. A lifecycle built from stages: its rules naming the records at its places, in\n                    order, [conclusionEnumId, label, places (empty = every place), conditions]."
                     }
@@ -29837,8 +29901,8 @@
                     "results": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -30189,8 +30253,8 @@
                     "runs": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "imported": {
@@ -30617,12 +30681,6 @@
                             
                         }
                     },
-                    "nsRestletConfigs": {
-                        "type": "array",
-                        "items": {
-                            
-                        }
-                    },
                     "systemRemotes": {
                         "type": "array",
                         "items": {
@@ -30904,10 +30962,12 @@
                                     "type": "integer"
                                 },
                                 "lastExecution": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": true
                                 },
                                 "permissions": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": true
                                 }
                             }
                         }
@@ -31449,8 +31509,8 @@
                     "executions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -31543,8 +31603,8 @@
                     "reconciliations": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -31772,12 +31832,6 @@
                                                 "type": "string"
                                             },
                                             "systemMessageRemoteLabel": {
-                                                "type": "string"
-                                            },
-                                            "nsRestletConfigId": {
-                                                "type": "string"
-                                            },
-                                            "nsRestletConfigLabel": {
                                                 "type": "string"
                                             },
                                             "sourceConfigId": {
@@ -32008,7 +32062,8 @@
                         }
                     },
                     "automation": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -32510,7 +32565,8 @@
                         }
                     },
                     "automation": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -32758,10 +32814,12 @@
                         }
                     },
                     "automation": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "runResult": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -32818,275 +32876,6 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/RunAutomationNowResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "RunGenericDiffParams": {
-                "type": "object",
-                "properties": {
-                    "reconciliationMappingId": {
-                        "type": "string"
-                    },
-                    "file1Name": {
-                        "type": "string"
-                    },
-                    "file1Text": {
-                        "type": "string"
-                    },
-                    "file2Name": {
-                        "type": "string"
-                    },
-                    "file2Text": {
-                        "type": "string"
-                    },
-                    "file1SystemEnumId": {
-                        "type": "string"
-                    },
-                    "file2SystemEnumId": {
-                        "type": "string"
-                    },
-                    "hasHeader": {
-                        "type": "boolean"
-                    },
-                    "sparkMaster": {
-                        "type": "string"
-                    },
-                    "sparkAppName": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "reconciliationMappingId"
-                ],
-                "description": "Run the generic diff flow using text-based file payloads suitable for darpan-ui JSON-RPC calls."
-            },
-            "RunGenericDiffResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "runResult": {
-                        "type": "object",
-                        "properties": {
-                            "reconciliationMappingId": {
-                                "type": "string"
-                            },
-                            "mappingName": {
-                                "type": "string"
-                            },
-                            "reconciliationRunResultId": {
-                                "type": "string"
-                            },
-                            "file1Name": {
-                                "type": "string"
-                            },
-                            "file2Name": {
-                                "type": "string"
-                            },
-                            "file1SystemEnumId": {
-                                "type": "string"
-                            },
-                            "file1SystemLabel": {
-                                "type": "string"
-                            },
-                            "file2SystemEnumId": {
-                                "type": "string"
-                            },
-                            "file2SystemLabel": {
-                                "type": "string"
-                            },
-                            "validationErrors": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
-                            },
-                            "processingWarnings": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
-                            },
-                            "generatedOutput": {
-                                "type": "object",
-                                "properties": {
-                                    "fileName": {
-                                        "type": "string"
-                                    },
-                                    "reconciliationRunResultId": {
-                                        "type": "string"
-                                    },
-                                    "sourceFormat": {
-                                        "type": "string"
-                                    },
-                                    "availableFormats": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "preferredDownloadFormat": {
-                                        "type": "string"
-                                    },
-                                    "companyUserGroupId": {
-                                        "type": "string"
-                                    },
-                                    "reconciliationMappingId": {
-                                        "type": "string"
-                                    },
-                                    "mappingName": {
-                                        "type": "string"
-                                    },
-                                    "reconciliationType": {
-                                        "type": "string"
-                                    },
-                                    "file1Label": {
-                                        "type": "string"
-                                    },
-                                    "file2Label": {
-                                        "type": "string"
-                                    },
-                                    "totalDifferences": {
-                                        "type": "integer"
-                                    },
-                                    "onlyInFile1Count": {
-                                        "type": "integer"
-                                    },
-                                    "onlyInFile2Count": {
-                                        "type": "integer"
-                                    },
-                                    "createdDate": {
-                                        "oneOf": [
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "number"
-                                            }
-                                        ],
-                                        "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds"
-                                    },
-                                    "sizeBytes": {
-                                        "type": "integer"
-                                    },
-                                    "statusEnumId": {
-                                        "type": "string"
-                                    },
-                                    "statusLabel": {
-                                        "type": "string"
-                                    },
-                                    "resultAvailable": {
-                                        "type": "boolean"
-                                    },
-                                    "startedDate": {
-                                        "oneOf": [
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "number"
-                                            }
-                                        ],
-                                        "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds"
-                                    },
-                                    "completedDate": {
-                                        "oneOf": [
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "number"
-                                            }
-                                        ],
-                                        "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds"
-                                    },
-                                    "lastUpdatedDate": {
-                                        "oneOf": [
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "number"
-                                            }
-                                        ],
-                                        "description": "Timestamp \u2014 ISO-8601 string or epoch milliseconds"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "RunGenericDiffRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.ReconciliationFacadeServices.run#GenericDiff",
-                "x-darpan-method": "facade.ReconciliationFacadeServices.run#GenericDiff",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.ReconciliationFacadeServices.run#GenericDiff"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/RunGenericDiffParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "RunGenericDiffResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.ReconciliationFacadeServices.run#GenericDiff. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/RunGenericDiffResult"
                     }
                 },
                 "required": [
@@ -33567,10 +33356,12 @@
                         "type": "string"
                     },
                     "savedRun": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "newSavedRun": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "scheduleExpr": {
                         "type": "string"
@@ -33632,7 +33423,8 @@
                         "type": "integer"
                     },
                     "windowTimeZone": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "The zone the schedule and windows run in. Omitted: the automation's own on\n                an edit, else the active tenant's (as the app sends), never UTC by default (DAR-OPS-029 OC44)."
                     },
                     "safeConfigJson": {
                         "type": "string"
@@ -33676,7 +33468,8 @@
                                     "type": "string"
                                 },
                                 "nsRestletConfigId": {
-                                    "type": "string"
+                                    "type": "string",
+                                    "description": "Retired (DAR-BE-424): any value is refused."
                                 },
                                 "sftpServerId": {
                                     "type": "string"
@@ -33769,7 +33562,8 @@
                         }
                     },
                     "automation": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -34073,8 +33867,8 @@
                                         "anyOf": {
                                             "type": "array",
                                             "items": {
-                                                "type": "string",
-                                                "description": "Moqui type Map"
+                                                "type": "object",
+                                                "additionalProperties": true
                                             },
                                             "description": "DAR-UI-052. For a composite stage (Settled): the\n                        records any one of which reaches it, each [recordType, startField, stageField], or [recordType] for a\n                        linked record, or [recordType, stageField, via: [recordType, startField, stageField]] for a record\n                        naming in stageField the internal id of the via record (a replacement order naming the credit memo)."
                                         }
@@ -34210,8 +34004,8 @@
                     "conclusions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "[conclusionEnumId, places: [place name], conditions: [field, operator (IN, NOT_IN, BLANK,\n                    NOT_BLANK), values, checkLabel]], in order."
                     }
@@ -34242,8 +34036,8 @@
                     "conclusions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -34317,8 +34111,8 @@
                     "details": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         },
                         "description": "[fieldId (custbody_...), label]; an empty list leaves the standard columns only."
                     }
@@ -34349,8 +34143,8 @@
                     "details": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -34470,8 +34264,8 @@
                     "findings": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -34582,8 +34376,8 @@
                     "rules": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -34696,8 +34490,8 @@
                     "exceptions": {
                         "type": "array",
                         "items": {
-                            "type": "string",
-                            "description": "Moqui type Map"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -34794,8 +34588,8 @@
                                         "anyOf": {
                                             "type": "array",
                                             "items": {
-                                                "type": "string",
-                                                "description": "Moqui type Map"
+                                                "type": "object",
+                                                "additionalProperties": true
                                             },
                                             "description": "DAR-UI-052. For a composite stage (Settled): the\n                        records any one of which reaches it, each [recordType, startField, stageField], or [recordType] for a\n                        linked record, or [recordType, stageField, via: [recordType, startField, stageField]] for a record\n                        naming in stageField the internal id of the via record (a replacement order naming the credit memo)."
                                         }
@@ -35096,7 +34890,8 @@
                         }
                     },
                     "reconciliation": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -35219,7 +35014,8 @@
                         }
                     },
                     "question": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -35305,7 +35101,8 @@
                         "type": "string"
                     },
                     "file1NsRestletConfigId": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Retired (DAR-BE-424): any value is refused."
                     },
                     "file1SourceConfigId": {
                         "type": "string"
@@ -35342,7 +35139,8 @@
                         "type": "string"
                     },
                     "file2NsRestletConfigId": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Retired (DAR-BE-424): any value is refused."
                     },
                     "file2SourceConfigId": {
                         "type": "string"
@@ -35370,10 +35168,12 @@
                     },
                     "file1ExtractOptions": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "DAR-UI-148. This side's extract options, only the names\n                its connector declares (SourceSystemConnector.extractOptionsJson), e.g. {\"withLineItems\": true}. Omit to leave the\n                stored options unchanged; send an empty map to clear them."
                     },
                     "file2ExtractOptions": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "DAR-UI-148. As file1ExtractOptions, for the second\n                side."
                     },
                     "rules": {
@@ -35586,12 +35386,6 @@
                                             "type": "string"
                                         },
                                         "systemMessageRemoteLabel": {
-                                            "type": "string"
-                                        },
-                                        "nsRestletConfigId": {
-                                            "type": "string"
-                                        },
-                                        "nsRestletConfigLabel": {
                                             "type": "string"
                                         },
                                         "sourceConfigId": {
@@ -35917,12 +35711,6 @@
                                         "systemMessageRemoteLabel": {
                                             "type": "string"
                                         },
-                                        "nsRestletConfigId": {
-                                            "type": "string"
-                                        },
-                                        "nsRestletConfigLabel": {
-                                            "type": "string"
-                                        },
                                         "sourceConfigId": {
                                             "type": "string"
                                         },
@@ -36128,7 +35916,8 @@
                         }
                     },
                     "automation": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "changedFields": {
                         "type": "array",
@@ -36324,7 +36113,8 @@
                         }
                     },
                     "conclusionCode": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -36419,7 +36209,8 @@
                         }
                     },
                     "conclusions": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -36532,7 +36323,8 @@
                         }
                     },
                     "savedConclusions": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -36676,10 +36468,12 @@
                                     "type": "string"
                                 },
                                 "routeParams": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": true
                                 },
                                 "routeQuery": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": true
                                 },
                                 "score": {
                                     "type": "integer"
@@ -36765,7 +36559,7 @@
                 "required": [
                     "nsAuthConfigId"
                 ],
-                "description": "Delete one tenant-owned NetSuite auth profile (DAR-BE-114). Refused, naming what is in the way,\n            while anything still signs in with it: RESTlet endpoints, NetSuite checks, saved runs. nsAuthConfigId is\n            referenced without a cascading FK, so deleting under them would surface later as a confusing \"not found\"\n            at run time. Owner-only, and never while shared with another tenant \u2014 the same rules as the Shopify and\n            HotWax deletes."
+                "description": "Delete one tenant-owned NetSuite auth profile (DAR-BE-114). Refused, naming what is in the way,\n            while anything still signs in with it: NetSuite checks, saved runs. nsAuthConfigId is\n            referenced without a cascading FK, so deleting under them would surface later as a confusing \"not found\"\n            at run time. Owner-only, and never while shared with another tenant \u2014 the same rules as the Shopify and\n            HotWax deletes."
             },
             "DeleteNsAuthConfigResult": {
                 "type": "object",
@@ -36938,127 +36732,6 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/DeleteTenantChatSpaceResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "GetLlmSettingsParams": {
-                "type": "object",
-                "properties": {
-                    "llmProvider": {
-                        "type": "string"
-                    }
-                },
-                "description": "Get LLM provider settings with stored-secret indicators."
-            },
-            "GetLlmSettingsResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "llmSettings": {
-                        "type": "object",
-                        "properties": {
-                            "activeProvider": {
-                                "type": "string"
-                            },
-                            "llmProvider": {
-                                "type": "string"
-                            },
-                            "llmModel": {
-                                "type": "string"
-                            },
-                            "llmBaseUrl": {
-                                "type": "string"
-                            },
-                            "llmTimeoutSeconds": {
-                                "type": "string"
-                            },
-                            "llmEnabled": {
-                                "type": "string"
-                            },
-                            "hasStoredLlmApiKey": {
-                                "type": "boolean"
-                            },
-                            "hasFallbackLlmApiKey": {
-                                "type": "boolean"
-                            },
-                            "fallbackLlmKeyEnvName": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "GetLlmSettingsRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.SettingsFacadeServices.get#LlmSettings",
-                "x-darpan-method": "facade.SettingsFacadeServices.get#LlmSettings",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.SettingsFacadeServices.get#LlmSettings"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/GetLlmSettingsParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "GetLlmSettingsResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.SettingsFacadeServices.get#LlmSettings. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/GetLlmSettingsResult"
                     }
                 },
                 "required": [
@@ -37731,171 +37404,6 @@
                     "result"
                 ]
             },
-            "ListNsRestletConfigsParams": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string"
-                    },
-                    "pageIndex": {
-                        "type": "integer"
-                    },
-                    "pageSize": {
-                        "type": "integer"
-                    }
-                },
-                "description": "List NetSuite endpoint configs joined with auth metadata."
-            },
-            "ListNsRestletConfigsResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "pagination": {
-                        "type": "object",
-                        "properties": {
-                            "pageIndex": {
-                                "type": "integer"
-                            },
-                            "pageSize": {
-                                "type": "integer"
-                            },
-                            "totalCount": {
-                                "type": "integer"
-                            },
-                            "pageCount": {
-                                "type": "integer"
-                            }
-                        }
-                    },
-                    "restletConfigs": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "nsRestletConfigId": {
-                                    "type": "string"
-                                },
-                                "description": {
-                                    "type": "string"
-                                },
-                                "companyUserGroupId": {
-                                    "type": "string"
-                                },
-                                "companyLabel": {
-                                    "type": "string"
-                                },
-                                "endpointUrl": {
-                                    "type": "string"
-                                },
-                                "httpMethod": {
-                                    "type": "string"
-                                },
-                                "nsAuthConfigId": {
-                                    "type": "string"
-                                },
-                                "authDescription": {
-                                    "type": "string"
-                                },
-                                "authType": {
-                                    "type": "string"
-                                },
-                                "authIsActive": {
-                                    "type": "string"
-                                },
-                                "headersJson": {
-                                    "type": "string"
-                                },
-                                "connectTimeoutSeconds": {
-                                    "type": "integer"
-                                },
-                                "readTimeoutSeconds": {
-                                    "type": "integer"
-                                },
-                                "isActive": {
-                                    "type": "string"
-                                },
-                                "isShared": {
-                                    "type": "boolean"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "ListNsRestletConfigsRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.SettingsFacadeServices.list#NsRestletConfigs",
-                "x-darpan-method": "facade.SettingsFacadeServices.list#NsRestletConfigs",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.SettingsFacadeServices.list#NsRestletConfigs"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/ListNsRestletConfigsParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "ListNsRestletConfigsResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.SettingsFacadeServices.list#NsRestletConfigs. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/ListNsRestletConfigsResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
             "ListSftpServersParams": {
                 "type": "object",
                 "properties": {
@@ -38066,7 +37574,7 @@
                 "properties": {
                     
                 },
-                "description": "List active-tenant chat spaces (Google Chat or Slack), including the webhook URL in clear text."
+                "description": "List active-tenant chat spaces (Google Chat or Slack). The webhook URL comes in clear text only to those who\n            may edit a space (edit access, as save#TenantChatSpace, or a super admin); everyone else gets it null, and\n            webhookConfigured says whether one is set (OC122)."
             },
             "ListTenantChatSpacesResult": {
                 "type": "object",
@@ -38119,12 +37627,6 @@
                                     "type": "boolean"
                                 },
                                 "webhookUrl": {
-                                    "type": "string"
-                                },
-                                "googleChatConfigured": {
-                                    "type": "boolean"
-                                },
-                                "googleChatWebhookUrl": {
                                     "type": "string"
                                 },
                                 "isActive": {
@@ -38216,139 +37718,6 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/ListTenantChatSpacesResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "SaveLlmSettingsParams": {
-                "type": "object",
-                "properties": {
-                    "llmProvider": {
-                        "type": "string"
-                    },
-                    "llmApiKey": {
-                        "type": "string"
-                    },
-                    "llmModel": {
-                        "type": "string"
-                    },
-                    "llmBaseUrl": {
-                        "type": "string"
-                    },
-                    "llmTimeoutSeconds": {
-                        "type": "string"
-                    },
-                    "llmEnabled": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "llmProvider"
-                ],
-                "description": "Save LLM provider settings while preserving existing key when blank."
-            },
-            "SaveLlmSettingsResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "llmSettings": {
-                        "type": "object",
-                        "properties": {
-                            "activeProvider": {
-                                "type": "string"
-                            },
-                            "llmProvider": {
-                                "type": "string"
-                            },
-                            "llmModel": {
-                                "type": "string"
-                            },
-                            "llmBaseUrl": {
-                                "type": "string"
-                            },
-                            "llmTimeoutSeconds": {
-                                "type": "string"
-                            },
-                            "llmEnabled": {
-                                "type": "string"
-                            },
-                            "hasStoredLlmApiKey": {
-                                "type": "boolean"
-                            }
-                        }
-                    }
-                }
-            },
-            "SaveLlmSettingsRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.SettingsFacadeServices.save#LlmSettings",
-                "x-darpan-method": "facade.SettingsFacadeServices.save#LlmSettings",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.SettingsFacadeServices.save#LlmSettings"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/SaveLlmSettingsParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "SaveLlmSettingsResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.SettingsFacadeServices.save#LlmSettings. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/SaveLlmSettingsResult"
                     }
                 },
                 "required": [
@@ -38513,156 +37882,6 @@
                     },
                     "result": {
                         "$ref": "#/components/schemas/SaveNsAuthConfigResult"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "result"
-                ]
-            },
-            "SaveNsRestletConfigParams": {
-                "type": "object",
-                "properties": {
-                    "nsRestletConfigId": {
-                        "type": "string",
-                        "description": "DAR-BE-135: names an endpoint this tenant owns or was granted, to\n                update it. Leave it out to create one; the server mints the id."
-                    },
-                    "description": {
-                        "type": "string"
-                    },
-                    "endpointUrl": {
-                        "type": "string"
-                    },
-                    "httpMethod": {
-                        "type": "string"
-                    },
-                    "nsAuthConfigId": {
-                        "type": "string"
-                    },
-                    "headersJson": {
-                        "type": "string"
-                    },
-                    "connectTimeoutSeconds": {
-                        "type": "integer"
-                    },
-                    "readTimeoutSeconds": {
-                        "type": "integer"
-                    },
-                    "isActive": {
-                        "type": "boolean"
-                    }
-                },
-                "required": [
-                    "endpointUrl",
-                    "nsAuthConfigId"
-                ],
-                "description": "Create or update a NetSuite endpoint configuration bound to an auth config."
-            },
-            "SaveNsRestletConfigResult": {
-                "type": "object",
-                "properties": {
-                    "ok": {
-                        "type": "boolean"
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "errors": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "savedRestletConfig": {
-                        "type": "object",
-                        "properties": {
-                            "nsRestletConfigId": {
-                                "type": "string"
-                            },
-                            "description": {
-                                "type": "string"
-                            },
-                            "endpointUrl": {
-                                "type": "string"
-                            },
-                            "httpMethod": {
-                                "type": "string"
-                            },
-                            "nsAuthConfigId": {
-                                "type": "string"
-                            },
-                            "headersJson": {
-                                "type": "string"
-                            },
-                            "connectTimeoutSeconds": {
-                                "type": "integer"
-                            },
-                            "readTimeoutSeconds": {
-                                "type": "integer"
-                            },
-                            "isActive": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "SaveNsRestletConfigRequest": {
-                "type": "object",
-                "description": "JSON-RPC request envelope for facade.SettingsFacadeServices.save#NsRestletConfig",
-                "x-darpan-method": "facade.SettingsFacadeServices.save#NsRestletConfig",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "method": {
-                        "type": "string",
-                        "const": "facade.SettingsFacadeServices.save#NsRestletConfig"
-                    },
-                    "params": {
-                        "$ref": "#/components/schemas/SaveNsRestletConfigParams"
-                    }
-                },
-                "required": [
-                    "jsonrpc",
-                    "id",
-                    "method"
-                ]
-            },
-            "SaveNsRestletConfigResponse": {
-                "type": "object",
-                "description": "JSON-RPC success envelope for facade.SettingsFacadeServices.save#NsRestletConfig. Check result.ok / result.errors for business failures.",
-                "properties": {
-                    "jsonrpc": {
-                        "type": "string",
-                        "const": "2.0"
-                    },
-                    "id": {
-                        "oneOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "number"
-                            }
-                        ]
-                    },
-                    "result": {
-                        "$ref": "#/components/schemas/SaveNsRestletConfigResult"
                     }
                 },
                 "required": [
@@ -38842,9 +38061,6 @@
                     "webhookUrl": {
                         "type": "string"
                     },
-                    "googleChatWebhookUrl": {
-                        "type": "string"
-                    },
                     "isActive": {
                         "type": "boolean"
                     }
@@ -38873,7 +38089,8 @@
                         }
                     },
                     "chatSpace": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -39909,7 +39126,8 @@
                         }
                     },
                     "schema": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "code": {
                         "type": "string"
@@ -40145,7 +39363,8 @@
                         "type": "string"
                     },
                     "variables": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 },
                 "required": [
@@ -40167,7 +39386,8 @@
                         }
                     },
                     "data": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "rowCount": {
                         "type": "integer",
@@ -40959,7 +40179,7 @@
                 "properties": {
                     "configTypeEnumId": {
                         "type": "string",
-                        "description": "SCFG_HOTWAX_OMS, SCFG_SHOPIFY_AUTH,\n                SCFG_NS_AUTH, or SCFG_NS_RESTLET."
+                        "description": "SCFG_HOTWAX_OMS, SCFG_SHOPIFY_AUTH\n                or SCFG_NS_AUTH."
                     },
                     "configId": {
                         "type": "string"
@@ -41300,7 +40520,8 @@
                         "type": "string"
                     },
                     "flags": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -41862,6 +41083,7 @@
                 "properties": {
                     "version": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The list's fields plus pack."
                     }
                 }
@@ -42026,10 +41248,12 @@
                 "properties": {
                     "version": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The version, as get#TenantConfigVersions lists it."
                     },
                     "plan": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{lines: [{kind, ref, label, action (CREATE | UPDATE | UNCHANGED |\n                MAPPED), targetId, changes: [{field, from, to}]}], blocking: [{code, ref, message}], warnings: [{code, ref,\n                message}], counts, switchOff: [{statementId, audit, statement}], unlink: [{statementId, checkId, audit,\n                statement, check}], kept: [{kind, label}]}"
                     },
                     "planHash": {
@@ -42124,14 +41348,17 @@
                     },
                     "before": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The version kept before the restore (the version itself when nothing\n                changed since it)."
                     },
                     "after": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The version the restore left (the same as before when the restore\n                changed nothing)."
                     },
                     "plan": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "The plan applied, as preview#TenantConfigRestore answered it."
                     }
                 }
@@ -42215,6 +41442,7 @@
                     },
                     "version": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{id, seq, parentId, hash, bundleVersion, counts: {audits, statements,\n                checks, runs, queries, conclusionCodes, connections}, changeSource, reason, createdBy, createdDate}"
                     }
                 }
@@ -42333,10 +41561,12 @@
                     },
                     "proposal": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{queryName, description, readSpecJson, scriptBody, readText}"
                     },
                     "preview": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "As run#TenantQuery's result."
                     }
                 }
@@ -42728,7 +41958,8 @@
                         }
                     },
                     "limits": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "pinnedQueryIds": {
                         "type": "array",
@@ -42931,6 +42162,7 @@
                     },
                     "result": {
                         "type": "object",
+                        "additionalProperties": true,
                         "description": "{ok, summary, files: [{name, columns, rowCount, previewRows}], data, nothing, invalid, readCounts, units, elapsedMs, logs, error, readText}"
                     }
                 }
@@ -43029,7 +42261,8 @@
                         }
                     },
                     "outcome": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -43143,7 +42376,8 @@
                         }
                     },
                     "query": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     },
                     "notes": {
                         "type": "array",
@@ -43363,7 +42597,8 @@
                         }
                     },
                     "schedule": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -43687,7 +42922,6 @@
         "facade.ReconciliationFacadeServices.resume#Automation": "ResumeAutomation",
         "facade.ReconciliationFacadeServices.retry#AutomationExecutionFromExtracts": "RetryAutomationExecutionFromExtracts",
         "facade.ReconciliationFacadeServices.run#AutomationNow": "RunAutomationNow",
-        "facade.ReconciliationFacadeServices.run#GenericDiff": "RunGenericDiff",
         "facade.ReconciliationFacadeServices.run#Reconciliation": "RunReconciliation",
         "facade.ReconciliationFacadeServices.run#SavedRunDiff": "RunSavedRunDiff",
         "facade.ReconciliationFacadeServices.save#Automation": "SaveAutomation",
@@ -43714,18 +42948,14 @@
         "facade.SearchFacadeServices.search#NavigationTargets": "SearchNavigationTargets",
         "facade.SettingsFacadeServices.delete#NsAuthConfig": "DeleteNsAuthConfig",
         "facade.SettingsFacadeServices.delete#TenantChatSpace": "DeleteTenantChatSpace",
-        "facade.SettingsFacadeServices.get#LlmSettings": "GetLlmSettings",
         "facade.SettingsFacadeServices.get#NotificationRoutes": "GetNotificationRoutes",
         "facade.SettingsFacadeServices.get#TenantSettings": "GetTenantSettings",
         "facade.SettingsFacadeServices.get#UserNotificationDefault": "GetUserNotificationDefault",
         "facade.SettingsFacadeServices.list#EnumOptions": "ListEnumOptions",
         "facade.SettingsFacadeServices.list#NsAuthConfigs": "ListNsAuthConfigs",
-        "facade.SettingsFacadeServices.list#NsRestletConfigs": "ListNsRestletConfigs",
         "facade.SettingsFacadeServices.list#SftpServers": "ListSftpServers",
         "facade.SettingsFacadeServices.list#TenantChatSpaces": "ListTenantChatSpaces",
-        "facade.SettingsFacadeServices.save#LlmSettings": "SaveLlmSettings",
         "facade.SettingsFacadeServices.save#NsAuthConfig": "SaveNsAuthConfig",
-        "facade.SettingsFacadeServices.save#NsRestletConfig": "SaveNsRestletConfig",
         "facade.SettingsFacadeServices.save#SftpServer": "SaveSftpServer",
         "facade.SettingsFacadeServices.save#TenantChatSpace": "SaveTenantChatSpace",
         "facade.SettingsFacadeServices.save#TenantSettings": "SaveTenantSettings",

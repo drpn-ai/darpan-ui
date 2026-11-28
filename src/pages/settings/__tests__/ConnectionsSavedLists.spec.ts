@@ -9,8 +9,6 @@ const listSftpServers = vi.hoisted(() => vi.fn())
 const saveSftpServer = vi.hoisted(() => vi.fn())
 const listNsAuthConfigs = vi.hoisted(() => vi.fn())
 const saveNsAuthConfig = vi.hoisted(() => vi.fn())
-const listNsRestletConfigs = vi.hoisted(() => vi.fn())
-const saveNsRestletConfig = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
   sessionInfo: {
     userId: 'john.doe',
@@ -35,8 +33,6 @@ vi.mock('../../../lib/api/facade', () => ({
     saveSftpServer,
     listNsAuthConfigs,
     saveNsAuthConfig,
-    listNsRestletConfigs,
-    saveNsRestletConfig,
   },
 }))
 
@@ -97,8 +93,6 @@ describe('connections saved-name lists', () => {
     saveSftpServer.mockReset()
     listNsAuthConfigs.mockReset()
     saveNsAuthConfig.mockReset()
-    listNsRestletConfigs.mockReset()
-    saveNsRestletConfig.mockReset()
     authState.sessionInfo = {
       userId: 'john.doe',
       isSuperAdmin: false,
@@ -148,37 +142,6 @@ describe('connections saved-name lists', () => {
     expect(wrapper.get('[data-testid="netsuite-auth-create-action"]').attributes('data-to')).toContain(
       '"name":"settings-netsuite-auth-create"',
     )
-  })
-
-  it('lists auth profiles only, leaving endpoints to each profile details page', async () => {
-    listNsAuthConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      authConfigs: [
-        {
-          nsAuthConfigId: 'auth-primary',
-          description: 'Primary Auth',
-          companyUserGroupId: 'KREWE',
-          authType: 'BASIC',
-          username: 'service-user',
-          isActive: 'Y',
-          hasPassword: true,
-          hasApiToken: false,
-          hasPrivateKeyPem: false,
-        },
-      ],
-      pagination: { pageIndex: 0, pageSize: 10, totalCount: 1, pageCount: 1 },
-    })
-
-    const wrapper = mount(NetSuiteSettingsPage)
-    await flushPromises()
-
-    // Endpoints live on each auth profile's details page now; the home page lists profiles only.
-    expect(listNsRestletConfigs).not.toHaveBeenCalled()
-    expect(wrapper.text()).not.toContain('Endpoints')
-    expect(wrapper.find('[data-testid="netsuite-endpoint-tile"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="netsuite-endpoint-create-action"]').exists()).toBe(false)
   })
 
   it('keeps NetSuite records visible but hides create affordances for view-only tenants', async () => {

@@ -159,7 +159,6 @@ import { jsonSchemaFacade, reconciliationFacade } from '../../lib/api/facade'
 import { netSuiteQueryFacade } from '../../lib/api/authoringFacade'
 import type { SourceExtractOption, SourceExtractOptions } from '../../lib/api/authoringTypes'
 import type {
-  AutomationNsRestletOption,
   AutomationPrimaryIdOption,
   AutomationSourceConfigOption,
   AutomationSystemRemoteOption,
@@ -271,7 +270,6 @@ const file1SystemParentEnumId = ref('')
 const file2SystemParentEnumId = ref('')
 const fileTypeOptions = ref<WorkflowSelectOption[]>([])
 const sourceConfigs = ref<AutomationSourceConfigOption[]>([])
-const nsRestletConfigs = ref<AutomationNsRestletOption[]>([])
 const systemRemotes = ref<AutomationSystemRemoteOption[]>([])
 const jsonSchemas = ref<JsonSchemaSummary[]>([])
 const flattenedFields = ref<Record<string, JsonSchemaField[]>>({})
@@ -284,7 +282,6 @@ const file1JsonSchemaId = ref('')
 const file1PrimaryIdExpression = ref<string[]>([])
 const file1SourceConfigId = ref('')
 const file1SourceConfigType = ref('')
-const file1NsRestletConfigId = ref('')
 const file1SystemMessageRemoteId = ref('')
 const file2SystemEnumId = ref('')
 const file2SourceMode = ref(SOURCE_MODE_FILE)
@@ -293,7 +290,6 @@ const file2JsonSchemaId = ref('')
 const file2PrimaryIdExpression = ref<string[]>([])
 const file2SourceConfigId = ref('')
 const file2SourceConfigType = ref('')
-const file2NsRestletConfigId = ref('')
 const file2SystemMessageRemoteId = ref('')
 const scopeMode = ref(readQueryValue('scope').toUpperCase() === SCOPE_EVALUATE ? SCOPE_EVALUATE : SCOPE_COMPARE)
 const isSingleSided = computed(() => scopeMode.value === SCOPE_EVALUATE)
@@ -318,7 +314,6 @@ const arms = {
     primaryIdExpression: file1PrimaryIdExpression,
     sourceConfigId: file1SourceConfigId,
     sourceConfigType: file1SourceConfigType,
-    nsRestletConfigId: file1NsRestletConfigId,
     systemMessageRemoteId: file1SystemMessageRemoteId,
     extractOptions: file1ExtractOptions,
   },
@@ -331,7 +326,6 @@ const arms = {
     primaryIdExpression: file2PrimaryIdExpression,
     sourceConfigId: file2SourceConfigId,
     sourceConfigType: file2SourceConfigType,
-    nsRestletConfigId: file2NsRestletConfigId,
     systemMessageRemoteId: file2SystemMessageRemoteId,
     extractOptions: file2ExtractOptions,
   },
@@ -435,11 +429,10 @@ function armHasEndpointStep(side: SourceSide): boolean {
  * one option -- skip the card and auto-select that option instead (see updateApiSourceConfig /
  * autoSelectSoleApiSource). Zero options still show the card: that is a real "no endpoint
  * configured" problem the operator needs to see (apiSourceSelectionError), not something to skip
- * past silently. NetSuite still offers several restlet configs per auth config, so the card stays
- * meaningful (and visible) there.
+ * past silently.
  */
 function armNeedsApiSourceStep(side: SourceSide): boolean {
-  // A SuiteQL query is read by its connector directly; no RESTlet or remote sits behind it.
+  // A SuiteQL query is read by its connector directly; no remote sits behind it.
   if (armUsesSuiteQl(side)) return false
   return apiSourceOptionsForSide(side).length !== 1
 }
@@ -607,8 +600,6 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file1SourceTypeEnumId: file1UsesApi.value ? SOURCE_TYPE_API : undefined,
   file1SystemMessageRemoteId: file1UsesApi.value ? file1SystemMessageRemoteId.value || undefined : undefined,
   file1SystemMessageRemoteLabel: file1UsesApi.value && file1SystemMessageRemoteId.value ? selectedApiSourceLabel('file1') || undefined : undefined,
-  file1NsRestletConfigId: file1UsesApi.value ? file1NsRestletConfigId.value || undefined : undefined,
-  file1NsRestletConfigLabel: file1UsesApi.value && file1NsRestletConfigId.value ? selectedApiSourceLabel('file1') || undefined : undefined,
   file1SourceConfigId: file1UsesApi.value ? file1SourceConfigId.value || undefined : undefined,
   file1SourceConfigType: file1UsesApi.value ? file1SourceConfigType.value || undefined : undefined,
   file1FileTypeEnumId: file1UsesApi.value ? '' : file1FileTypeEnumId.value,
@@ -624,8 +615,6 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file2SourceTypeEnumId: file2UsesApi.value ? SOURCE_TYPE_API : undefined,
   file2SystemMessageRemoteId: file2UsesApi.value ? file2SystemMessageRemoteId.value || undefined : undefined,
   file2SystemMessageRemoteLabel: file2UsesApi.value && file2SystemMessageRemoteId.value ? selectedApiSourceLabel('file2') || undefined : undefined,
-  file2NsRestletConfigId: file2UsesApi.value ? file2NsRestletConfigId.value || undefined : undefined,
-  file2NsRestletConfigLabel: file2UsesApi.value && file2NsRestletConfigId.value ? selectedApiSourceLabel('file2') || undefined : undefined,
   file2SourceConfigId: file2UsesApi.value ? file2SourceConfigId.value || undefined : undefined,
   file2SourceConfigType: file2UsesApi.value ? file2SourceConfigType.value || undefined : undefined,
   file2FileTypeEnumId: file2UsesApi.value ? '' : file2FileTypeEnumId.value,
@@ -1270,22 +1259,13 @@ function apiSourceOptionsForSide(side: SourceSide): WorkflowSelectOption[] {
   const sourceConfigId = selectedSourceConfigId(side)
   if (!sourceConfigId) return []
 
-  return [
-    ...nsRestletConfigs.value
-      .filter((config) => darpanSystemIdsMatch(config.systemEnumId, systemEnumId))
-      .filter((config) => sourceConfigMatches(config.sourceConfigId || config.nsAuthConfigId, sourceConfigId))
-      .map((config) => ({
-        value: `ns:${config.nsRestletConfigId}`,
-        label: config.label || config.description || config.nsRestletConfigId,
-      })),
-    ...systemRemotes.value
-      .filter((remote) => darpanSystemIdsMatch(remote.systemEnumId, systemEnumId))
-      .filter((remote) => sourceConfigMatches(remote.sourceConfigId || remote.optionKey, sourceConfigId))
-      .map((remote) => ({
-        value: remoteSelectValue(remote),
-        label: remote.label || remote.description || remote.systemMessageRemoteId,
-      })),
-  ]
+  return systemRemotes.value
+    .filter((remote) => darpanSystemIdsMatch(remote.systemEnumId, systemEnumId))
+    .filter((remote) => sourceConfigMatches(remote.sourceConfigId || remote.optionKey, sourceConfigId))
+    .map((remote) => ({
+      value: remoteSelectValue(remote),
+      label: remote.label || remote.description || remote.systemMessageRemoteId,
+    }))
 }
 
 function sourceConfigMatches(candidate: string | undefined, selected: string): boolean {
@@ -1299,12 +1279,11 @@ function remoteSelectValue(remote: AutomationSystemRemoteOption): string {
 
 function hasApiEndpoint(side: SourceSide): boolean {
   if (armUsesSuiteQl(side)) return true
-  return Boolean(arms[side].nsRestletConfigId.value || arms[side].systemMessageRemoteId.value)
+  return Boolean(arms[side].systemMessageRemoteId.value)
 }
 
 function selectedApiSourceValue(side: SourceSide): string {
   const arm = arms[side]
-  if (arm.nsRestletConfigId.value) return `ns:${arm.nsRestletConfigId.value}`
   if (!arm.systemMessageRemoteId.value) return ''
   const selectedRemote = selectedRemoteOptionForSide(side)
   return selectedRemote ? remoteSelectValue(selectedRemote) : `remote:${arm.systemMessageRemoteId.value}`
@@ -1343,16 +1322,9 @@ function updateApiSource(side: SourceSide, value: string): void {
   const arm = arms[side]
   arm.primaryIdExpression.value = []
 
-  if (value.startsWith('ns:')) {
-    arm.nsRestletConfigId.value = value.slice(3)
-    arm.systemMessageRemoteId.value = ''
-    return
-  }
-
   if (value.startsWith('remote:')) {
     const [, remoteId = ''] = value.split(':')
     arm.systemMessageRemoteId.value = remoteId
-    arm.nsRestletConfigId.value = ''
   }
 }
 
@@ -1364,7 +1336,6 @@ function clearApiSourceConfig(side: SourceSide): void {
 }
 
 function clearApiEndpoint(side: SourceSide): void {
-  arms[side].nsRestletConfigId.value = ''
   arms[side].systemMessageRemoteId.value = ''
 }
 
@@ -1381,16 +1352,8 @@ function setSourceMode(side: SourceSide, value: string): void {
   }
 }
 
-function selectedApiSourceOption(side: SourceSide): AutomationNsRestletOption | AutomationSystemRemoteOption | null {
-  const selectedValue = selectedApiSourceValue(side)
-  if (selectedValue.startsWith('ns:')) {
-    const configId = selectedValue.slice(3)
-    return nsRestletConfigs.value.find((config) => config.nsRestletConfigId === configId) ?? null
-  }
-  if (selectedValue.startsWith('remote:')) {
-    return selectedRemoteOptionForSide(side)
-  }
-  return null
+function selectedApiSourceOption(side: SourceSide): AutomationSystemRemoteOption | null {
+  return selectedRemoteOptionForSide(side)
 }
 
 function selectedRemoteOptionForSide(side: SourceSide): AutomationSystemRemoteOption | null {
@@ -1605,7 +1568,6 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   file1PrimaryIdExpression.value = draftState.draft.file1PrimaryIdExpression
   file1SourceConfigId.value = draftState.draft.file1SourceConfigId ?? ''
   file1SourceConfigType.value = draftState.draft.file1SourceConfigType ?? ''
-  file1NsRestletConfigId.value = draftState.draft.file1NsRestletConfigId ?? ''
   file1SystemMessageRemoteId.value = draftState.draft.file1SystemMessageRemoteId ?? ''
   file2SystemEnumId.value = draftState.draft.file2SystemEnumId
   file2SourceMode.value = draftState.draft.file2SourceTypeEnumId === SOURCE_TYPE_API ? SOURCE_MODE_API : SOURCE_MODE_FILE
@@ -1614,7 +1576,6 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   file2PrimaryIdExpression.value = draftState.draft.file2PrimaryIdExpression
   file2SourceConfigId.value = draftState.draft.file2SourceConfigId ?? ''
   file2SourceConfigType.value = draftState.draft.file2SourceConfigType ?? ''
-  file2NsRestletConfigId.value = draftState.draft.file2NsRestletConfigId ?? ''
   file2SystemMessageRemoteId.value = draftState.draft.file2SystemMessageRemoteId ?? ''
   file1ExtractOptions.value = { ...(draftState.draft.file1ExtractOptions ?? {}) }
   file2ExtractOptions.value = { ...(draftState.draft.file2ExtractOptions ?? {}) }
@@ -1700,7 +1661,6 @@ async function loadOptions(): Promise<void> {
     }))
     jsonSchemas.value = schemasResponse.schemas ?? []
     sourceConfigs.value = automationSourceOptionsResponse.sourceConfigs ?? []
-    nsRestletConfigs.value = automationSourceOptionsResponse.nsRestletConfigs ?? []
     systemRemotes.value = automationSourceOptionsResponse.systemRemotes ?? []
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError') return

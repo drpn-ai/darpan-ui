@@ -119,7 +119,6 @@ import type {
   ListJsonSchemasResponse,
   ListNsAuthConfigsResponse,
   ListOmsRestSourceConfigsResponse,
-  ListNsRestletConfigsResponse,
   ListShopifyAuthConfigsResponse,
   ListGeneratedOutputsResponse,
   ListSavedRunsResponse,
@@ -163,7 +162,6 @@ import type {
   CancelReconciliationRunResponse,
   VerifyOwnPasswordResponse,
   SaveMappingResponse,
-  SaveNsRestletConfigResponse,
   SaveRefinedSchemaResponse,
   SaveSftpServerResponse,
   SessionInfoResponse,
@@ -232,7 +230,6 @@ import type {
   ListGeneratedOutputsPayload,
   ListJsonSchemasPayload,
   ListNsAuthConfigsPayload,
-  ListNsRestletConfigsPayload,
   ListOmsRestSourceConfigsPayload,
   ListSavedRunsPayload,
   ListSftpServersPayload,
@@ -247,7 +244,6 @@ import type {
   SaveJsonSchemaTextPayload,
   SaveMappingPayload,
   SaveNsAuthConfigPayload,
-  SaveNsRestletConfigPayload,
   SaveOmsRestSourceConfigPayload,
   SaveRefinedSchemaPayload,
   SaveRuleSetRunPayload,
@@ -375,8 +371,6 @@ const SETTINGS = {
   listNsAuthConfigs: 'facade.SettingsFacadeServices.list#NsAuthConfigs',
   saveNsAuthConfig: 'facade.SettingsFacadeServices.save#NsAuthConfig',
   deleteNsAuthConfig: 'facade.SettingsFacadeServices.delete#NsAuthConfig',
-  listNsRestletConfigs: 'facade.SettingsFacadeServices.list#NsRestletConfigs',
-  saveNsRestletConfig: 'facade.SettingsFacadeServices.save#NsRestletConfig',
   listShopifyAuthConfigs: 'facade.ShopifyFacadeServices.list#ShopifyAuthConfigs',
   getShopifyAuthConfig: 'facade.ShopifyFacadeServices.get#ShopifyAuthConfig',
   saveShopifyAuthConfig: 'facade.ShopifyFacadeServices.save#ShopifyAuthConfig',
@@ -638,12 +632,6 @@ export const settingsFacade = {
   },
   deleteNsAuthConfig(payload: DeleteNsAuthConfigPayload, signal?: AbortSignal): Promise<DeleteNsAuthConfigResponse> {
     return callService<DeleteNsAuthConfigResponse>(SETTINGS.deleteNsAuthConfig, payload, signal)
-  },
-  listNsRestletConfigs(payload: ListNsRestletConfigsPayload, signal?: AbortSignal): Promise<ListNsRestletConfigsResponse> {
-    return callService<ListNsRestletConfigsResponse>(SETTINGS.listNsRestletConfigs, payload, signal)
-  },
-  saveNsRestletConfig(payload: SaveNsRestletConfigPayload, signal?: AbortSignal): Promise<SaveNsRestletConfigResponse> {
-    return callService<SaveNsRestletConfigResponse>(SETTINGS.saveNsRestletConfig, payload, signal)
   },
   listShopifyAuthConfigs(payload: ListShopifyAuthConfigsPayload, signal?: AbortSignal): Promise<ListShopifyAuthConfigsResponse> {
     return callService<ListShopifyAuthConfigsResponse>(SETTINGS.listShopifyAuthConfigs, payload, signal)

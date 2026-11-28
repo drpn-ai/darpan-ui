@@ -24,10 +24,10 @@ const actions: CommandAction[] = [
   {
     id: 'navigate-netsuite-settings',
     label: 'Open NetSuite Settings',
-    description: 'Manage NetSuite auth profiles and endpoint configs.',
+    description: 'Manage NetSuite auth profiles.',
     group: 'Navigate',
     to: '/settings/netsuite',
-    aliases: ['netsuite', 'endpoint', 'api url', 'restlet', 'timeout', 'settings', 'auth', 'credentials', 'oauth'],
+    aliases: ['netsuite', 'endpoint', 'api url', 'timeout', 'settings', 'auth', 'credentials', 'oauth'],
   },
   {
     id: 'navigate-runs-settings',

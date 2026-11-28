@@ -47,7 +47,6 @@
         :list-test-id="endpointList.listTestId"
         :tile-test-id="endpointList.tileTestId"
       />
-      <slot v-else name="endpoints" />
     </template>
 
     <StaticPageSection v-else>
@@ -125,8 +124,8 @@ export interface ConnectionFact {
 
 /**
  * One saved connection's page (NetSuite auth, HotWax, Shopify): its name and facts, its endpoints, and back,
- * diagnose and delete. A system's page supplies the record read, the facts and the copy; the endpoints are either
- * the shared catalog tiles (endpointList) or the page's own #endpoints slot.
+ * diagnose and delete. A system's page supplies the record read, the facts and the copy; the endpoints are the
+ * shared catalog tiles (endpointList), shown only when the page passes one.
  */
 const props = defineProps<{
   /** The system's name: the title before the record loads. */
@@ -163,8 +162,6 @@ const props = defineProps<{
   /** Named …TestId so the mascot anchor reader (mascotRouteAnchors) sees each caller's literal ids. */
   testIds: { editTestId: string; backTestId: string; diagnoseTestId: string; deleteTestId: string }
 }>()
-
-defineSlots<{ endpoints?: () => unknown }>()
 
 const route = useRoute()
 const router = useRouter()

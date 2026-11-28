@@ -255,7 +255,6 @@ facade.ReconciliationFacadeServices.restore#SavedRun
 facade.ReconciliationFacadeServices.resume#Automation
 facade.ReconciliationFacadeServices.retry#AutomationExecutionFromExtracts
 facade.ReconciliationFacadeServices.run#AutomationNow
-facade.ReconciliationFacadeServices.run#GenericDiff
 facade.ReconciliationFacadeServices.run#Reconciliation
 facade.ReconciliationFacadeServices.run#SavedRunDiff
 facade.ReconciliationFacadeServices.save#Automation
@@ -282,18 +281,14 @@ facade.RunConclusionFacadeServices.save#RunConclusions
 facade.SearchFacadeServices.search#NavigationTargets
 facade.SettingsFacadeServices.delete#NsAuthConfig
 facade.SettingsFacadeServices.delete#TenantChatSpace
-facade.SettingsFacadeServices.get#LlmSettings
 facade.SettingsFacadeServices.get#NotificationRoutes
 facade.SettingsFacadeServices.get#TenantSettings
 facade.SettingsFacadeServices.get#UserNotificationDefault
 facade.SettingsFacadeServices.list#EnumOptions
 facade.SettingsFacadeServices.list#NsAuthConfigs
-facade.SettingsFacadeServices.list#NsRestletConfigs
 facade.SettingsFacadeServices.list#SftpServers
 facade.SettingsFacadeServices.list#TenantChatSpaces
-facade.SettingsFacadeServices.save#LlmSettings
 facade.SettingsFacadeServices.save#NsAuthConfig
-facade.SettingsFacadeServices.save#NsRestletConfig
 facade.SettingsFacadeServices.save#SftpServer
 facade.SettingsFacadeServices.save#TenantChatSpace
 facade.SettingsFacadeServices.save#TenantSettings

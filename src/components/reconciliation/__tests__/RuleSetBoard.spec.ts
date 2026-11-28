@@ -50,7 +50,7 @@ describe('RuleSetBoard with CSV column lists', () => {
     listAutomationSourceOptions.mockReset()
     draftStoreState.ruleSetDraftState = null
 
-    listAutomationSourceOptions.mockResolvedValue({ ok: true, nsRestletConfigs: [], systemRemotes: [] })
+    listAutomationSourceOptions.mockResolvedValue({ ok: true, systemRemotes: [] })
   })
 
   it('populates both columns for CSV sides carrying a flat schema', async () => {
@@ -169,7 +169,6 @@ describe('RuleSetBoard with CSV column lists', () => {
   it('opens the exclusion editor pre-filled from a pending exclusion and saves nothing', async () => {
     listAutomationSourceOptions.mockResolvedValue({
       ok: true,
-      nsRestletConfigs: [],
       systemRemotes: [{
         optionKey: 'gorjana_prod',
         systemMessageRemoteId: 'HOTWAX_ORDERS_API',
@@ -206,7 +205,7 @@ describe('RuleSetBoard with CSV column lists', () => {
   })
 })
 
-// DAR-UI-064: a NetSuite SuiteQL side has no RESTlet and no remote; its query's projection is its field list.
+// DAR-UI-064: a NetSuite SuiteQL side has no remote; its query's projection is its field list.
 describe('RuleSetBoard with SuiteQL query sides', () => {
   beforeEach(() => {
     listAutomationSourceOptions.mockReset()
@@ -217,7 +216,6 @@ describe('RuleSetBoard with SuiteQL query sides', () => {
   it('lists each side from its query row', async () => {
     listAutomationSourceOptions.mockResolvedValue({
       ok: true,
-      nsRestletConfigs: [],
       systemRemotes: [],
       sourceConfigs: [
         { sourceConfigId: 'NS_WARRANTY_CLAIM', systemEnumId: 'NETSUITE_SUITEQL',
@@ -243,7 +241,7 @@ describe('RuleSetBoard with SuiteQL query sides', () => {
   })
 
   it('names the side in a pre-action field when both sides are the same system', async () => {
-    listAutomationSourceOptions.mockResolvedValue({ ok: true, nsRestletConfigs: [], systemRemotes: [], sourceConfigs: [
+    listAutomationSourceOptions.mockResolvedValue({ ok: true, systemRemotes: [], sourceConfigs: [
       { sourceConfigId: 'NS_WARRANTY_CLAIM', systemEnumId: 'NETSUITE_SUITEQL', fieldOptions: [{ fieldPath: '$.records[*].amount' }] },
       { sourceConfigId: 'NS_RETURN_MEMO', systemEnumId: 'NETSUITE_SUITEQL', fieldOptions: [{ fieldPath: '$.records[*].amount' }] },
     ] })
@@ -296,7 +294,6 @@ describe('RuleSetBoard and the workflow Escape', () => {
     listAutomationSourceOptions.mockReset()
     listAutomationSourceOptions.mockResolvedValue({
       ok: true,
-      nsRestletConfigs: [],
       systemRemotes: [{
         optionKey: 'gorjana_prod',
         systemMessageRemoteId: 'HOTWAX_ORDERS_API',
@@ -379,7 +376,7 @@ describe('RuleSetBoard rule names', () => {
 
   beforeEach(() => {
     listAutomationSourceOptions.mockReset()
-    listAutomationSourceOptions.mockResolvedValue({ ok: true, nsRestletConfigs: [], systemRemotes: [] })
+    listAutomationSourceOptions.mockResolvedValue({ ok: true, systemRemotes: [] })
     draftStoreState.pendingExclusion = null
     draftStoreState.ruleSetDraftState = { resumeStepId: null, draft: namedDraft() }
   })

@@ -129,7 +129,6 @@ async function driveAllMethods(facade: Record<string, unknown>): Promise<void> {
           isActive: 'Y',
           fileSide: 'FILE1',
           sourceTypeEnumId: 'ST1',
-          nsRestletConfigId: 'nsr-x',
         })
       } catch {
         // If both attempts fail, the method was never reached — skip.
@@ -256,8 +255,6 @@ describe('registry contract — exported wrapper presence', () => {
     expect(typeof sf.saveSftpServer).toBe('function')
     expect(typeof sf.listNsAuthConfigs).toBe('function')
     expect(typeof sf.saveNsAuthConfig).toBe('function')
-    expect(typeof sf.listNsRestletConfigs).toBe('function')
-    expect(typeof sf.saveNsRestletConfig).toBe('function')
     expect(typeof sf.listShopifyAuthConfigs).toBe('function')
     expect(typeof sf.getShopifyAuthConfig).toBe('function')
     expect(typeof sf.saveShopifyAuthConfig).toBe('function')
@@ -355,8 +352,6 @@ describe('registry contract — known method string values', () => {
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#SftpServer')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.list#NsAuthConfigs')
     expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#NsAuthConfig')
-    expect(capturedMethods).toContain('facade.SettingsFacadeServices.list#NsRestletConfigs')
-    expect(capturedMethods).toContain('facade.SettingsFacadeServices.save#NsRestletConfig')
     // Shopify uses a different service class
     expect(capturedMethods).toContain('facade.ShopifyFacadeServices.list#ShopifyAuthConfigs')
     expect(capturedMethods).toContain('facade.ShopifyFacadeServices.get#ShopifyAuthConfig')

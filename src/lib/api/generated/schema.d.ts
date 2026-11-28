@@ -58,7 +58,9 @@ export interface components {
             costCapUsd: number;
         };
         CreateAgentAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.create#AgentAccessGrant */
         CreateAgentAccessGrantRequest: {
@@ -146,7 +148,9 @@ export interface components {
             grantId: string;
         };
         PauseAgentAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.pause#AgentAccessGrant */
         PauseAgentAccessGrantRequest: {
@@ -172,7 +176,9 @@ export interface components {
             grantId: string;
         };
         RevokeAgentAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.revoke#AgentAccessGrant */
         RevokeAgentAccessGrantRequest: {
@@ -204,7 +210,9 @@ export interface components {
             days?: number;
         };
         UnpauseAgentAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.unpause#AgentAccessGrant */
         UnpauseAgentAccessGrantRequest: {
@@ -237,7 +245,9 @@ export interface components {
             clearThruDate?: boolean;
         };
         UpdateAgentAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentAccessAdminServices.update#AgentAccessGrant */
         UpdateAgentAccessGrantRequest: {
@@ -266,7 +276,9 @@ export interface components {
          */
         GetAgentConfigParams: Record<string, never>;
         GetAgentConfigResult: {
-            config?: Record<string, never>;
+            config?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.get#AgentConfig */
         GetAgentConfigRequest: {
@@ -295,7 +307,9 @@ export interface components {
             promptId: string;
         };
         GetAgentPromptResult: {
-            prompt?: Record<string, never>;
+            prompt?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.get#AgentPrompt */
         GetAgentPromptRequest: {
@@ -326,7 +340,9 @@ export interface components {
             id: string;
         };
         ResetAgentConfigItemResult: {
-            reset?: Record<string, never>;
+            reset?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.reset#AgentConfigItem */
         ResetAgentConfigItemRequest: {
@@ -359,7 +375,9 @@ export interface components {
             cacheWriteUsdPerMTok: string;
         };
         UpdateAgentModelPriceResult: {
-            price?: Record<string, never>;
+            price?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.update#AgentModelPrice */
         UpdateAgentModelPriceRequest: {
@@ -391,7 +409,9 @@ export interface components {
             promptText: string;
         };
         UpdateAgentPromptResult: {
-            prompt?: Record<string, never>;
+            prompt?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.update#AgentPrompt */
         UpdateAgentPromptRequest: {
@@ -422,7 +442,9 @@ export interface components {
             modelId: string;
         };
         UpdateAgentRoleModelResult: {
-            role?: Record<string, never>;
+            role?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.update#AgentRoleModel */
         UpdateAgentRoleModelRequest: {
@@ -453,7 +475,9 @@ export interface components {
             dailyUsdCap: string;
         };
         UpdateAgentTenantDailyCapResult: {
-            tenantCap?: Record<string, never>;
+            tenantCap?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.update#AgentTenantDailyCap */
         UpdateAgentTenantDailyCapRequest: {
@@ -483,7 +507,9 @@ export interface components {
             text: string;
         };
         UpdateAgentTextResult: {
-            agentText?: Record<string, never>;
+            agentText?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AgentConfigAdminServices.update#AgentText */
         UpdateAgentTextRequest: {
@@ -641,9 +667,13 @@ export interface components {
          */
         GetAppContentVocabularyParams: Record<string, never>;
         GetAppContentVocabularyResult: {
-            routes?: string[];
+            routes?: {
+                [key: string]: unknown;
+            }[];
             conditionKinds?: unknown[];
-            limits?: Record<string, never>;
+            limits?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.AppContentAdminServices.get#AppContentVocabulary */
         GetAppContentVocabularyRequest: {
@@ -679,7 +709,9 @@ export interface components {
             editedOnly?: boolean;
         };
         ListAppContentResult: {
-            entries?: string[];
+            entries?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for admin.AppContentAdminServices.list#AppContent */
         ListAppContentRequest: {
@@ -785,8 +817,12 @@ export interface components {
             days?: number;
         };
         ApproveCliAccessRequestResult: {
-            request?: Record<string, never>;
-            grant?: Record<string, never>;
+            request?: {
+                [key: string]: unknown;
+            };
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.approve#CliAccessRequest */
         ApproveCliAccessRequestRequest: {
@@ -819,7 +855,9 @@ export interface components {
             days?: number;
         };
         CreateCliAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.create#CliAccessGrant */
         CreateCliAccessGrantRequest: {
@@ -847,7 +885,9 @@ export interface components {
             decisionNote?: string;
         };
         DeclineCliAccessRequestResult: {
-            request?: Record<string, never>;
+            request?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.decline#CliAccessRequest */
         DeclineCliAccessRequestRequest: {
@@ -931,7 +971,9 @@ export interface components {
             grantId: string;
         };
         PauseCliAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.pause#CliAccessGrant */
         PauseCliAccessGrantRequest: {
@@ -957,7 +999,9 @@ export interface components {
             grantId: string;
         };
         RevokeCliAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.revoke#CliAccessGrant */
         RevokeCliAccessGrantRequest: {
@@ -987,7 +1031,9 @@ export interface components {
             days?: number;
         };
         UnpauseCliAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.unpause#CliAccessGrant */
         UnpauseCliAccessGrantRequest: {
@@ -1018,7 +1064,9 @@ export interface components {
             clearThruDate?: boolean;
         };
         UpdateCliAccessGrantResult: {
-            grant?: Record<string, never>;
+            grant?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.CliAccessAdminServices.update#CliAccessGrant */
         UpdateCliAccessGrantRequest: {
@@ -1058,11 +1106,15 @@ export interface components {
              * @description [{blockId, defaultText, copyText, variables, lastChangedByUserId,
              *                     lastChangedDate}] by blockId. The guides block is lines of `Label|docs page path`.
              */
-            blocks?: string[];
+            blocks?: {
+                [key: string]: unknown;
+            }[];
             /** @description Sample branches the preview takes, empty when the email has one shape. */
             branches?: unknown[];
             /** @description The default branch's sample parameters. */
-            sample?: Record<string, never>;
+            sample?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.EmailAdminServices.get#EmailTemplate */
         GetEmailTemplateRequest: {
@@ -1090,7 +1142,9 @@ export interface components {
              * @description [{emailTemplateId, description, subject, editedBlockCount,
              *                     subjectEdited}] by emailTemplateId.
              */
-            templates?: string[];
+            templates?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for admin.EmailAdminServices.get#EmailTemplates */
         GetEmailTemplatesRequest: {
@@ -1120,7 +1174,9 @@ export interface components {
             /** @description Draft subject; absent: the current one. */
             subject?: string;
             /** @description Draft text by blockId; blocks not named render as stored. */
-            blocks?: Record<string, never>;
+            blocks?: {
+                [key: string]: unknown;
+            };
             /** @description Sample branch from get#EmailTemplate branches; blank: the first. */
             branch?: string;
         };
@@ -1189,7 +1245,9 @@ export interface components {
             emailTemplateId: string;
             subject?: string;
             /** @description New text by blockId. */
-            blocks?: Record<string, never>;
+            blocks?: {
+                [key: string]: unknown;
+            };
         };
         UpdateEmailTemplateResult: {
             /** @description The block ids saved (and `subject`). */
@@ -1288,7 +1346,9 @@ export interface components {
              * @description {key, tier, systems, kind, tags, source, owner, reviewBy, supersedes,
              *                     title, body}, or null when neither tier holds the key.
              */
-            entry?: Record<string, never>;
+            entry?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.KnowledgeAdminServices.get#KnowledgeEntry */
         GetKnowledgeEntryRequest: {
@@ -1455,7 +1515,9 @@ export interface components {
         };
         StoreKnowledgeEntryResult: {
             /** @description The stored entry, as get#KnowledgeEntry answers it. */
-            entry?: Record<string, never>;
+            entry?: {
+                [key: string]: unknown;
+            };
             /** @description True when the key was new for the tenant. */
             created?: boolean;
         };
@@ -1979,14 +2041,20 @@ export interface components {
                  *                             waiting for a slot), perTenantCap, heldForMemory and holdAtHeapPercent, and byTenant
                  *                             {tenantId: {running, queued}}.
                  */
-                slots?: Record<string, never>;
+                slots?: {
+                    [key: string]: unknown;
+                };
                 /** @description windowHours, count and items: failed run results in the window, newest first. */
-                recentFailures?: Record<string, never>;
+                recentFailures?: {
+                    [key: string]: unknown;
+                };
                 /**
                  * @description Heap, heap after GC, process CPU, load average, threads, disk on the runtime
                  *                             volume, the Moqui worker pool and uptime. Null when unreadable.
                  */
-                system?: Record<string, never>;
+                system?: {
+                    [key: string]: unknown;
+                };
                 /** @description source and reason for each source that could not be read. */
                 unavailable?: unknown[];
             };
@@ -2018,12 +2086,16 @@ export interface components {
              * @description Optional preview of the instance periods in days (or forever) by table key
              *                     (AUDIT_FINDING, RUN_RESULT, AGENT_MESSAGE, AGENT_QUERY_LOG, SYNC_PULSE_SAMPLE), used instead of the stored ones.
              */
-            periodDays?: Record<string, never>;
+            periodDays?: {
+                [key: string]: unknown;
+            };
             /**
              * @description Optional preview of one tenant's own periods by table key (days,
              *                     forever or inherit); needs tenantUserGroupId and covers that tenant only.
              */
-            tenantPeriodDays?: Record<string, never>;
+            tenantPeriodDays?: {
+                [key: string]: unknown;
+            };
         };
         DryRunRetentionResult: {
             /** @description True when the preview ran. */
@@ -2037,7 +2109,9 @@ export interface components {
              *                     keep forever), status (KEEP_FOREVER, DRY_RUN), cutoff, rows, dependentRows, byTenant, byTenantPeriod {tenant: days, blank
              *                     for forever} for tenants with a period of their own.
              */
-            tables?: string[];
+            tables?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for admin.RetentionAdminServices.dryRun#Retention */
         DryRunRetentionRequest: {
@@ -2071,7 +2145,9 @@ export interface components {
              *                     [{tenantUserGroupId, table, periodDays, lastChangedByUserId, lastChangedDate}], generatedOutputDays, extractDays,
              *                     batchSize, jobName, jobPaused (Y or N).
              */
-            retention?: Record<string, never>;
+            retention?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.RetentionAdminServices.get#RetentionPeriods */
         GetRetentionPeriodsRequest: {
@@ -2110,18 +2186,24 @@ export interface components {
             /** @description The tenant to set periods for; blank sets the instance periods. */
             tenantUserGroupId?: string;
             /** @description Table key to days, forever or inherit. */
-            periods: Record<string, never>;
+            periods: {
+                [key: string]: unknown;
+            };
             /** @description Rows the preview showed; needed to shorten a period while the retention job runs. */
             previewedRows?: number;
         };
         UpdateRetentionPeriodsResult: {
             ok?: boolean;
             /** @description The tables that changed: table, mode (days, forever, inherit), before, after (effective days). */
-            changed?: string[];
+            changed?: {
+                [key: string]: unknown;
+            }[];
             /** @description What the preview guard compared, when it ran. */
             previewNote?: string;
             /** @description As get#RetentionPeriods, after the change. */
-            retention?: Record<string, never>;
+            retention?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.RetentionAdminServices.update#RetentionPeriods */
         UpdateRetentionPeriodsRequest: {
@@ -2206,7 +2288,9 @@ export interface components {
          */
         GetServiceJobsParams: Record<string, never>;
         GetServiceJobsResult: {
-            jobs?: string[];
+            jobs?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for admin.ScheduleAdminServices.get#ServiceJobs */
         GetServiceJobsRequest: {
@@ -2277,7 +2361,9 @@ export interface components {
         };
         ResetServiceJobResult: {
             /** @description The job as get#ServiceJobs lists it, after the reset. */
-            job?: Record<string, never>;
+            job?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.ScheduleAdminServices.reset#ServiceJob */
         ResetServiceJobRequest: {
@@ -2319,13 +2405,17 @@ export interface components {
             /** @description Y or N. */
             paused?: string;
             /** @description Parameter name to its new value; each must be an in-parameter of the job's service. */
-            parameters?: Record<string, never>;
+            parameters?: {
+                [key: string]: unknown;
+            };
             /** @description Rows the preview showed; needed to resume a job that deletes. */
             previewedRows?: number;
         };
         UpdateServiceJobResult: {
             /** @description The job as get#ServiceJobs lists it, after the edit. */
-            job?: Record<string, never>;
+            job?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.ScheduleAdminServices.update#ServiceJob */
         UpdateServiceJobRequest: {
@@ -2447,7 +2537,9 @@ export interface components {
                 };
             }[];
             /** @description Real run only: entity name to rows re-encrypted. */
-            reencryptedByEntity?: Record<string, never>;
+            reencryptedByEntity?: {
+                [key: string]: unknown;
+            };
             /** @description Real run only: rows re-encrypted. */
             totalRows?: number;
         };
@@ -2519,7 +2611,9 @@ export interface components {
             settingKey: string;
         };
         GetSettingResult: {
-            setting?: Record<string, never>;
+            setting?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.SettingAdminServices.get#Setting */
         GetSettingRequest: {
@@ -2547,7 +2641,9 @@ export interface components {
          */
         GetSettingsParams: Record<string, never>;
         GetSettingsResult: {
-            settings?: string[];
+            settings?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for admin.SettingAdminServices.get#Settings */
         GetSettingsRequest: {
@@ -2576,7 +2672,9 @@ export interface components {
             settingKey: string;
         };
         ResetSettingResult: {
-            setting?: Record<string, never>;
+            setting?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.SettingAdminServices.reset#Setting */
         ResetSettingRequest: {
@@ -2609,7 +2707,9 @@ export interface components {
             note?: string;
         };
         UpdateSettingResult: {
-            setting?: Record<string, never>;
+            setting?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.SettingAdminServices.update#Setting */
         UpdateSettingRequest: {
@@ -2676,7 +2776,9 @@ export interface components {
             isActive?: string;
         };
         SaveShopifyAppResult: {
-            shopifyApp?: Record<string, never>;
+            shopifyApp?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.ShopifyAppAdminServices.save#ShopifyApp */
         SaveShopifyAppRequest: {
@@ -3008,7 +3110,9 @@ export interface components {
              *                     runs, audits, statements, checks}, plus lifecycles, chatSpaces and automations with includeAutomations;
              *                     consumed unchanged by import#ConfigBundle.
              */
-            bundle?: Record<string, never>;
+            bundle?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for admin.TransferAdminServices.export#ConfigBundle */
         ExportConfigBundleRequest: {
@@ -3078,12 +3182,16 @@ export interface components {
             /** @description The target tenant. */
             tenantUserGroupId: string;
             /** @description The bundle export#ConfigBundle answered, unchanged. */
-            bundle: Record<string, never>;
+            bundle: {
+                [key: string]: unknown;
+            };
             /**
              * @description {connection ref: an existing target connection id, or
              *                     CREATE}, one entry per bundle connection.
              */
-            connectionMap?: Record<string, never>;
+            connectionMap?: {
+                [key: string]: unknown;
+            };
             /** @description True writes; false only plans. */
             apply?: boolean;
             /** @description Required with apply: the planHash of the preview being applied. */
@@ -3101,11 +3209,15 @@ export interface components {
              *                     sealed credentials secretsFilled and secretsKept (field names)}], blocking: [{code, ref, message}],
              *                     warnings: [{code, ref, message}], counts: {action: n, CREDENTIALS_FILLED: connections}}.
              */
-            plan?: Record<string, never>;
+            plan?: {
+                [key: string]: unknown;
+            };
             /** @description SHA-256 of the bundle, connection map, target tenant and plan. */
             planHash?: string;
             /** @description When applied: every bundle ref to its target id. */
-            idMap?: Record<string, never>;
+            idMap?: {
+                [key: string]: unknown;
+            };
             /** @description True when the plan was written. */
             applied?: boolean;
         };
@@ -3174,8 +3286,11 @@ export interface components {
             username: string;
             /** @description Display name. */
             userFullName?: string;
-            /** @description Contact email; must be unique when provided. */
-            emailAddress?: string;
+            /**
+             * @description Contact email, required and unique: password
+             *                     reset sends its code here (standing rule: every user creation saves an email).
+             */
+            emailAddress: string;
             /** @description Temporary password; user must change it at first login. */
             tempPassword: string;
         };
@@ -3204,7 +3319,10 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["CreateUserAccountResult"];
         };
-        /** @description Disable a user and revoke their live login keys. Self-disable is refused. */
+        /**
+         * @description Disable a user and end every sign-in they have: browser sessions, login keys, CLI sessions and a CLI
+         *                 sign-in they approved that their CLI has not collected yet. Self-disable is refused.
+         */
         DisableUserAccountParams: {
             /** @description User to disable. */
             userId: string;
@@ -3405,9 +3523,10 @@ export interface components {
             result: components["schemas"]["RemoveDarpanAdminResult"];
         };
         /**
-         * @description Set a temporary password for a user (change forced at next login) and revoke
-         *                 their live login keys. The temporary password is kept encrypted for their tenant welcome emails
-         *                 (DAR-BE-325), replacing an earlier one.
+         * @description Set a temporary password for a user (change forced at next login) and end every sign-in they have
+         *                 (browser sessions, login keys, CLI sessions, a CLI sign-in approved but not yet collected), as a password
+         *                 change does. The temporary password is kept encrypted for their tenant welcome emails (DAR-BE-325), replacing
+         *                 an earlier one.
          */
         ResetPasswordParams: {
             /** @description User whose password resets. */
@@ -3559,7 +3678,9 @@ export interface components {
             proposalId: string;
         };
         GetAuditChangeProposalResult: {
-            proposal?: Record<string, never>;
+            proposal?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AgentChangeFacadeServices.get#AuditChangeProposal */
         GetAuditChangeProposalRequest: {
@@ -3612,7 +3733,10 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListAuditChangeProposalsResult"];
         };
-        /** @description The active tenant's tickets, newest first. */
+        /**
+         * @description The active tenant's tickets, newest first. Editors and admins only (OC161, Aditi 2026-11-28): a ticket
+         *                 holds another person's words from their agent chat.
+         */
         ListBrainChangeTicketsParams: {
             /** @description Only tickets in this status. */
             status?: string;
@@ -3649,9 +3773,15 @@ export interface components {
         };
         PlanAuditChangeResult: {
             planHash?: string;
-            before?: Record<string, never>;
-            after?: Record<string, never>;
-            backtest?: Record<string, never>;
+            before?: {
+                [key: string]: unknown;
+            };
+            after?: {
+                [key: string]: unknown;
+            };
+            backtest?: {
+                [key: string]: unknown;
+            };
             status?: string;
             statusMessage?: string;
         };
@@ -3683,8 +3813,12 @@ export interface components {
         ProposeAuditChangeParams: {
             /** @description EXCLUSION_FILTER, STATEMENT_NARROWING, EXPECTED_CAUSES, FIX_TEXT, CONCLUSION_ROWS, AUDIT_SETTINGS, ADD_STATEMENT, ADD_CHECK, STATEMENT_EDIT or REASON_PRIORITY. */
             kind: string;
-            target: Record<string, never>;
-            after: Record<string, never>;
+            target: {
+                [key: string]: unknown;
+            };
+            after: {
+                [key: string]: unknown;
+            };
             /** @description What the person said, verbatim; at most 1023 characters. */
             personWords: string;
             reasonText?: string;
@@ -3699,7 +3833,9 @@ export interface components {
             statusMessage?: string;
             provenanceStatus?: string;
             unconfirmedIds?: unknown[];
-            backtest?: Record<string, never>;
+            backtest?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AgentChangeFacadeServices.propose#AuditChange */
         ProposeAuditChangeRequest: {
@@ -3842,9 +3978,13 @@ export interface components {
         };
         FindAuditFindingLookalikesResult: {
             /** @description Count of the check's other findings by conclusion code. */
-            byCause?: Record<string, never>;
+            byCause?: {
+                [key: string]: unknown;
+            };
             /** @description Count of the check's other findings by state. */
-            byState?: Record<string, never>;
+            byState?: {
+                [key: string]: unknown;
+            };
             sameCause?: unknown[];
             controls?: unknown[];
         };
@@ -3877,15 +4017,25 @@ export interface components {
         };
         GetAgentAuditScopeResult: {
             /** @description [name]. */
-            audit?: Record<string, never>;
+            audit?: {
+                [key: string]: unknown;
+            };
             /** @description [active, time, timeZone]. */
-            schedule?: Record<string, never>;
+            schedule?: {
+                [key: string]: unknown;
+            };
             /** @description [code, text] of the finding's statement. */
-            statement?: Record<string, never>;
+            statement?: {
+                [key: string]: unknown;
+            };
             /** @description [id, label] of the finding's check. */
-            check?: Record<string, never>;
+            check?: {
+                [key: string]: unknown;
+            };
             /** @description [savedRunId, sides]; empty when the check has no run. */
-            run?: Record<string, never>;
+            run?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AgentReadFacadeServices.get#AgentAuditScope */
         GetAgentAuditScopeRequest: {
@@ -3989,9 +4139,13 @@ export interface components {
             outcome?: string;
             reply?: string;
             /** @description {proposal: {queryName, description, readSpecJson, scriptBody, readText}, preview} or empty. */
-            queryProposal?: Record<string, never>;
+            queryProposal?: {
+                [key: string]: unknown;
+            };
             /** @description {text, options, from} when the agent needs the person's answer. */
-            question?: Record<string, never>;
+            question?: {
+                [key: string]: unknown;
+            };
             /** @description The kinds of secret or personal data masked in the text (never the values). */
             masked?: unknown[];
         };
@@ -4043,7 +4197,9 @@ export interface components {
             /** @description {ticketId, category, duplicate} */
             tickets?: unknown[];
             /** @description {text, options, from} when the agent needs the person's answer. */
-            question?: Record<string, never>;
+            question?: {
+                [key: string]: unknown;
+            };
             /** @description The kinds of secret or personal data masked in the text (never the values). */
             masked?: unknown[];
         };
@@ -4132,7 +4288,9 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /** @description {note, by: {id, label}, at, remindOn, reminded} */
-            acknowledgement?: Record<string, never>;
+            acknowledgement?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.acknowledge#AuditFinding */
         AcknowledgeAuditFindingRequest: {
@@ -4181,7 +4339,9 @@ export interface components {
              * @description {id, code, text, active, checks}, as get#AuditSettings lists
              *                     it.
              */
-            statement?: Record<string, never>;
+            statement?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.add#AuditStatement */
         AddAuditStatementRequest: {
@@ -4216,7 +4376,9 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /** @description {id, name, period}, as get#Audits lists it. */
-            audit?: Record<string, never>;
+            audit?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.create#Audit */
         CreateAuditRequest: {
@@ -4288,7 +4450,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            extracts?: string[];
+            extracts?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditCheckExtracts */
         GetAuditCheckExtractsRequest: {
@@ -4320,7 +4484,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            options?: Record<string, never>;
+            options?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditCheckOptions */
         GetAuditCheckOptionsRequest: {
@@ -4350,7 +4516,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            finding?: Record<string, never>;
+            finding?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditFinding */
         GetAuditFindingRequest: {
@@ -4435,7 +4603,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            findings?: string[];
+            findings?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditFindingsByOrder */
         GetAuditFindingsByOrderRequest: {
@@ -4481,7 +4651,9 @@ export interface components {
              *                     order (DAR-BE-173), limits ({hotwaxSharePct, netsuiteSerial} while a peak period limits the tenant's reads;
              *                     DAR-BE-350)}]}
              */
-            progress?: Record<string, never>;
+            progress?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditProgress */
         GetAuditProgressRequest: {
@@ -4521,7 +4693,9 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /** @description {reportDate, period, totals, groups, flags} */
-            report?: Record<string, never>;
+            report?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditReadReport */
         GetAuditReadReportRequest: {
@@ -4598,7 +4772,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            report?: Record<string, never>;
+            report?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditReport */
         GetAuditReportRequest: {
@@ -4645,7 +4821,9 @@ export interface components {
              *                     is a tenant admin; others see it read-only)} (DAR-BE-207:
              *                     the update emailed after each run to the members and admins, plus alsoSendTo)}
              */
-            settings?: Record<string, never>;
+            settings?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.get#AuditSettings */
         GetAuditSettingsRequest: {
@@ -4713,7 +4891,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            removedCheck?: Record<string, never>;
+            removedCheck?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.remove#AuditCheck */
         RemoveAuditCheckRequest: {
@@ -4811,7 +4991,9 @@ export interface components {
              * @description [{automationId, savedRunId, submitted, queued, error}]; queued: the
              *                     run waits for a free slot (DAR-BE-143) and starts on its own.
              */
-            runs?: string[];
+            runs?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.run#Audit */
         RunAuditRequest: {
@@ -4840,7 +5022,9 @@ export interface components {
          */
         SaveAuditCheckParams: {
             audit: string;
-            check: Record<string, never>;
+            check: {
+                [key: string]: unknown;
+            };
             /**
              * @description [{id: statement code, diffTypes, ruleIds}], at least one
              *                     (refused in words when empty). DAR-BE-196: no statement counts a cause the run marks expected; check.expectedCodes
@@ -4852,7 +5036,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            savedCheck?: Record<string, never>;
+            savedCheck?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.save#AuditCheck */
         SaveAuditCheckRequest: {
@@ -4887,18 +5073,24 @@ export interface components {
              * @description [{id, text, active, priority}], only those that changed, a field
              *                     left out keeps its value. priority: P0, P1, P2 or KNOWN; null clears it (reads P2).
              */
-            statements?: string[];
+            statements?: {
+                [key: string]: unknown;
+            }[];
             /**
              * @description DAR-BE-348. [{statement (its id), conclusion (enumId), priority}]: a
              *                     reason's own level, P0, P1, P2 or KNOWN; null deletes it, and the reason takes the statement's. A reason that
              *                     closes on every check of its statement takes no level: the save is refused.
              */
-            reasons?: string[];
+            reasons?: {
+                [key: string]: unknown;
+            }[];
             /**
              * @description {active, time HH:mm, timeZone}; absent keeps it, a field left out
              *                     keeps its value.
              */
-            schedule?: Record<string, never>;
+            schedule?: {
+                [key: string]: unknown;
+            };
             /**
              * @description DAR-BE-207. {active (false stops the run email for this audit),
              *                     alsoSendTo: [addresses sent to as well as the tenant's members], chatSpaceId (the tenant's chat space for a
@@ -4906,7 +5098,9 @@ export interface components {
              *                     refuses the save. Needs tenant admin rights for the active tenant (a Darpan admin has them): without them a
              *                     save carrying runEmail is refused whole. Every change is kept in EntityAuditLog.
              */
-            runEmail?: Record<string, never>;
+            runEmail?: {
+                [key: string]: unknown;
+            };
         };
         SaveAuditSettingsResult: {
             ok?: boolean;
@@ -4918,7 +5112,9 @@ export interface components {
              *                     timeZone, mixed, automations, checksWithoutRun}, statements: [{id, code, text, active, priority, checks: [{id, label,
              *                     savedRunId, runName}], reasons: [{conclusion, label, priority, closes, closesOn, checks}]}], runEmail: {active, alsoSendTo, members, admins, chatSpaceId, canEdit}}
              */
-            settings?: Record<string, never>;
+            settings?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.save#AuditSettings */
         SaveAuditSettingsRequest: {
@@ -4955,7 +5151,9 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /** @description {feedbackId, note, sentAt, by: {id, label}} */
-            feedback?: Record<string, never>;
+            feedback?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.send#AuditFindingFeedback */
         SendAuditFindingFeedbackRequest: {
@@ -4993,7 +5191,9 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /** @description {note, by: {id, label}, at, remindOn, reminded} */
-            acknowledgement?: Record<string, never>;
+            acknowledgement?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.AuditFacadeServices.update#AuditFindingAcknowledgement */
         UpdateAuditFindingAcknowledgementRequest: {
@@ -6842,7 +7042,9 @@ export interface components {
             /** @description Errors. */
             errors?: string[];
             /** @description tenantUserGroupId, tenantLabel, state, thruDate, lifetimeDays, canUseCli (the CLI is on in some tenant: what approve#CliLogin checks), request (requestId, statusId, reason, requestedDate, decidedDate, decisionNote) or null. Null with no active tenant. */
-            access?: Record<string, never>;
+            access?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.CliAccessFacadeServices.get#MyCliAccess */
         GetMyCliAccessRequest: {
@@ -6876,7 +7078,9 @@ export interface components {
             /** @description Why it was refused. */
             errors?: string[];
             /** @description requestId, statusId, reason, requestedDate. */
-            request?: Record<string, never>;
+            request?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.CliAccessFacadeServices.request#CliAccess */
         RequestCliAccessRequest: {
@@ -7227,8 +7431,8 @@ export interface components {
          */
         GrantConfigTenantAccessParams: {
             /**
-             * @description SCFG_HOTWAX_OMS, SCFG_SHOPIFY_AUTH,
-             *                     SCFG_NS_AUTH, or SCFG_NS_RESTLET.
+             * @description SCFG_HOTWAX_OMS, SCFG_SHOPIFY_AUTH
+             *                     or SCFG_NS_AUTH.
              */
             configTypeEnumId: string;
             /** @description Id of the existing config row. */
@@ -7494,7 +7698,9 @@ export interface components {
         GetOmsGraphqlSchemaResult: {
             ok?: boolean;
             errors?: string[];
-            schema?: Record<string, never>;
+            schema?: {
+                [key: string]: unknown;
+            };
             code?: string;
             retryAfterSeconds?: number;
         };
@@ -7581,12 +7787,16 @@ export interface components {
         RunOmsGraphqlAgentQueryParams: {
             omsRestSourceConfigId: string;
             document: string;
-            variables?: Record<string, never>;
+            variables?: {
+                [key: string]: unknown;
+            };
         };
         RunOmsGraphqlAgentQueryResult: {
             ok?: boolean;
             errors?: string[];
-            data?: Record<string, never>;
+            data?: {
+                [key: string]: unknown;
+            };
             /** @description The edge count when the answer is one connection, else blank. */
             rowCount?: number;
             truncated?: boolean;
@@ -7638,6 +7848,12 @@ export interface components {
             ok?: boolean;
             messages?: unknown[];
             errors?: unknown[];
+            /**
+             * @description DAR-OPS-029 S40c (C4): with ok false, HEADERS_NOT_CARRIED when the edit moved the base
+             *                     URL or auth type, left the custom headers blank, and the config stores headers: nothing was saved; send the
+             *                     headers again, or {} to remove them. Blank on every other answer.
+             */
+            reason?: string;
             savedOmsRestSourceConfig?: {
                 omsRestSourceConfigId?: string;
                 description?: string;
@@ -7780,7 +7996,9 @@ export interface components {
         };
         SearchRecordIdsResult: {
             /** @description {value, idNorm, records: [{systemCode, systemEnumId, connectionId, recordKind, recordKey, ids: [{fieldPath, idRaw, role}], foundBy, indexedAt}], capped, cappedReason} */
-            search?: Record<string, never>;
+            search?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.IdIndexFacadeServices.search#RecordIds */
         SearchRecordIdsRequest: {
@@ -8157,7 +8375,9 @@ export interface components {
         };
         LookupOrderResult: {
             /** @description {value, records: [{systemCode, systemEnumId, connectionId, recordKind, recordKey, ids, foundBy, indexedAt}], findings, notSeen, capped, cappedReason} */
-            lookup?: Record<string, never>;
+            lookup?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.LookupFacadeServices.lookup#Order */
         LookupOrderRequest: {
@@ -8192,8 +8412,12 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            recordTypes?: string[];
-            stages?: string[];
+            recordTypes?: {
+                [key: string]: unknown;
+            }[];
+            stages?: {
+                [key: string]: unknown;
+            }[];
             sampleSize?: number;
             sampleFrom?: string;
             sampleThru?: string;
@@ -8237,8 +8461,12 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            fields?: string[];
-            values?: string[];
+            fields?: {
+                [key: string]: unknown;
+            }[];
+            values?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.NetSuiteLifecycleFacadeServices.get#LifecycleRuleOptions */
         GetLifecycleRuleOptionsRequest: {
@@ -8267,7 +8495,9 @@ export interface components {
         GetNsSuiteQlQueryOptionsResult: {
             ok?: boolean;
             errors?: string[];
-            options?: Record<string, never>;
+            options?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.get#NsSuiteQlQueryOptions */
         GetNsSuiteQlQueryOptionsRequest: {
@@ -8296,7 +8526,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            query?: Record<string, never>;
+            query?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.get#NsSuiteQlSourceQuery */
         GetNsSuiteQlSourceQueryRequest: {
@@ -8429,7 +8661,9 @@ export interface components {
         PreviewNsSuiteQlSourceQueryResult: {
             ok?: boolean;
             errors?: string[];
-            preview?: Record<string, never>;
+            preview?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.preview#NsSuiteQlSourceQuery */
         PreviewNsSuiteQlSourceQueryRequest: {
@@ -8548,7 +8782,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            savedQuery?: Record<string, never>;
+            savedQuery?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery */
         SaveNsSuiteQlSourceQueryRequest: {
@@ -9020,8 +9256,6 @@ export interface components {
                     sourceTypeLabel?: string;
                     systemMessageRemoteId?: string;
                     systemMessageRemoteLabel?: string;
-                    nsRestletConfigId?: string;
-                    nsRestletConfigLabel?: string;
                     sourceConfigId?: string;
                     sourceConfigType?: string;
                 }[];
@@ -9098,6 +9332,7 @@ export interface components {
             file1SystemEnumId: string;
             file1SourceTypeEnumId?: string;
             file1SystemMessageRemoteId?: string;
+            /** @description Retired (DAR-BE-424): any value is refused. */
             file1NsRestletConfigId?: string;
             file1SourceConfigId?: string;
             file1SourceConfigType?: string;
@@ -9115,10 +9350,13 @@ export interface components {
              * @description DAR-UI-064. This side's extract options, only the
              *                     names its connector declares (SourceSystemConnector.extractOptionsJson), e.g. {"onlyCancelledReturns": true}.
              */
-            file1ExtractOptions?: Record<string, never>;
+            file1ExtractOptions?: {
+                [key: string]: unknown;
+            };
             file2SystemEnumId?: string;
             file2SourceTypeEnumId?: string;
             file2SystemMessageRemoteId?: string;
+            /** @description Retired (DAR-BE-424): any value is refused. */
             file2NsRestletConfigId?: string;
             file2SourceConfigId?: string;
             file2SourceConfigType?: string;
@@ -9136,7 +9374,9 @@ export interface components {
              * @description DAR-UI-064. This side's extract options, only the
              *                     names its connector declares (SourceSystemConnector.extractOptionsJson), e.g. {"onlyCancelledReturns": true}.
              */
-            file2ExtractOptions?: Record<string, never>;
+            file2ExtractOptions?: {
+                [key: string]: unknown;
+            };
             rules?: {
                 ruleId?: string;
                 sequenceNum?: number;
@@ -9207,8 +9447,6 @@ export interface components {
                     sourceTypeLabel?: string;
                     systemMessageRemoteId?: string;
                     systemMessageRemoteLabel?: string;
-                    nsRestletConfigId?: string;
-                    nsRestletConfigLabel?: string;
                     sourceConfigId?: string;
                     sourceConfigType?: string;
                 }[];
@@ -9341,7 +9579,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            findings?: string[];
+            findings?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.delete#LifecycleFinding */
         DeleteLifecycleFindingRequest: {
@@ -9372,7 +9612,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            rules?: string[];
+            rules?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.delete#LifecycleRule */
         DeleteLifecycleRuleRequest: {
@@ -9405,7 +9647,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            exceptions?: string[];
+            exceptions?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.delete#LifecycleStageException */
         DeleteLifecycleStageExceptionRequest: {
@@ -9610,8 +9854,12 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            automation?: Record<string, never>;
-            syncStatus?: Record<string, never>;
+            automation?: {
+                [key: string]: unknown;
+            };
+            syncStatus?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#Automation */
         GetAutomationRequest: {
@@ -9774,11 +10022,19 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            metadata?: Record<string, never>;
-            summary?: Record<string, never>;
-            bucketCounts?: Record<string, never>;
+            metadata?: {
+                [key: string]: unknown;
+            };
+            summary?: {
+                [key: string]: unknown;
+            };
+            bucketCounts?: {
+                [key: string]: unknown;
+            };
             /** @description DAR-UI-044: whole-document count per conclusion code, ignoring the conclusion filter. Empty for a run without conclusions. */
-            conclusionCounts?: Record<string, never>;
+            conclusionCounts?: {
+                [key: string]: unknown;
+            };
             ruleOptions?: unknown[];
             differences?: unknown[];
             pageIndex?: number;
@@ -9786,7 +10042,9 @@ export interface components {
             pageCount?: number;
             totalDifferences?: number;
             totalFiltered?: number;
-            outputFile?: Record<string, never>;
+            outputFile?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#GeneratedOutputDifferences */
         GetGeneratedOutputDifferencesRequest: {
@@ -9820,7 +10078,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            questions?: string[];
+            questions?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#LifecyclePlan */
         GetLifecyclePlanRequest: {
@@ -9891,28 +10151,46 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            reconciliation?: Record<string, never>;
-            questions?: string[];
+            reconciliation?: {
+                [key: string]: unknown;
+            };
+            questions?: {
+                [key: string]: unknown;
+            }[];
             /** @description DAR-UI-050. A lifecycle built from stages: its rules, one per field value it leaves out. */
-            rules?: string[];
+            rules?: {
+                [key: string]: unknown;
+            }[];
             /** @description DAR-UI-050. A lifecycle built from stages: its stages in order. */
-            stages?: string[];
+            stages?: {
+                [key: string]: unknown;
+            }[];
             /** @description DAR-UI-050. A lifecycle built from stages: the records a stage is not expected of. */
-            exceptions?: string[];
+            exceptions?: {
+                [key: string]: unknown;
+            }[];
             /**
              * @description DAR-UI-050. A lifecycle built from stages: the account and
              *                     record type its start reads, which its rule dropdowns are filled from.
              */
-            lifecycle?: Record<string, never>;
+            lifecycle?: {
+                [key: string]: unknown;
+            };
             /** @description DAR-UI-050. A lifecycle built from stages: the custom fields its records show, [fieldId, label]. */
-            details?: string[];
+            details?: {
+                [key: string]: unknown;
+            }[];
             /** @description DAR-UI-050. A lifecycle built from stages: the findings people wrote for its stages. */
-            findings?: string[];
+            findings?: {
+                [key: string]: unknown;
+            }[];
             /**
              * @description DAR-UI-052. A lifecycle built from stages: its rules naming the records at its places, in
              *                         order, [conclusionEnumId, label, places (empty = every place), conditions].
              */
-            conclusions?: string[];
+            conclusions?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#Reconciliation */
         GetReconciliationRequest: {
@@ -9941,7 +10219,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            results?: string[];
+            results?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.get#ReconciliationExecution */
         GetReconciliationExecutionRequest: {
@@ -10051,7 +10331,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            runs?: string[];
+            runs?: {
+                [key: string]: unknown;
+            }[];
             imported?: number;
             skipped?: number;
         };
@@ -10177,7 +10459,6 @@ export interface components {
             savedRuns?: unknown[];
             sftpServers?: unknown[];
             sourceConfigs?: unknown[];
-            nsRestletConfigs?: unknown[];
             systemRemotes?: unknown[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.list#AutomationSourceOptions */
@@ -10259,8 +10540,12 @@ export interface components {
                 chatSpaceName?: string;
                 chatSpaceActive?: boolean;
                 executionCount?: number;
-                lastExecution?: Record<string, never>;
-                permissions?: Record<string, never>;
+                lastExecution?: {
+                    [key: string]: unknown;
+                };
+                permissions?: {
+                    [key: string]: unknown;
+                };
             }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.list#Automations */
@@ -10423,7 +10708,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            executions?: string[];
+            executions?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.list#ReconciliationExecutions */
         ListReconciliationExecutionsRequest: {
@@ -10450,7 +10737,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            reconciliations?: string[];
+            reconciliations?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.list#Reconciliations */
         ListReconciliationsRequest: {
@@ -10522,8 +10811,6 @@ export interface components {
                     sourceTypeLabel?: string;
                     systemMessageRemoteId?: string;
                     systemMessageRemoteLabel?: string;
-                    nsRestletConfigId?: string;
-                    nsRestletConfigLabel?: string;
                     sourceConfigId?: string;
                     sourceConfigType?: string;
                     /** @description DAR-UI-064. Blank, or FINDING. */
@@ -10598,7 +10885,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            automation?: Record<string, never>;
+            automation?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.pause#Automation */
         PauseAutomationRequest: {
@@ -10778,7 +11067,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            automation?: Record<string, never>;
+            automation?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.resume#Automation */
         ResumeAutomationRequest: {
@@ -10855,8 +11146,12 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            automation?: Record<string, never>;
-            runResult?: Record<string, never>;
+            automation?: {
+                [key: string]: unknown;
+            };
+            runResult?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.run#AutomationNow */
         RunAutomationNowRequest: {
@@ -10876,84 +11171,6 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["RunAutomationNowResult"];
-        };
-        /** @description Run the generic diff flow using text-based file payloads suitable for darpan-ui JSON-RPC calls. */
-        RunGenericDiffParams: {
-            reconciliationMappingId: string;
-            file1Name?: string;
-            file1Text?: string;
-            file2Name?: string;
-            file2Text?: string;
-            file1SystemEnumId?: string;
-            file2SystemEnumId?: string;
-            hasHeader?: boolean;
-            sparkMaster?: string;
-            sparkAppName?: string;
-        };
-        RunGenericDiffResult: {
-            ok?: boolean;
-            messages?: string[];
-            errors?: string[];
-            runResult?: {
-                reconciliationMappingId?: string;
-                mappingName?: string;
-                reconciliationRunResultId?: string;
-                file1Name?: string;
-                file2Name?: string;
-                file1SystemEnumId?: string;
-                file1SystemLabel?: string;
-                file2SystemEnumId?: string;
-                file2SystemLabel?: string;
-                validationErrors?: string[];
-                processingWarnings?: string[];
-                generatedOutput?: {
-                    fileName?: string;
-                    reconciliationRunResultId?: string;
-                    sourceFormat?: string;
-                    availableFormats?: string[];
-                    preferredDownloadFormat?: string;
-                    companyUserGroupId?: string;
-                    reconciliationMappingId?: string;
-                    mappingName?: string;
-                    reconciliationType?: string;
-                    file1Label?: string;
-                    file2Label?: string;
-                    totalDifferences?: number;
-                    onlyInFile1Count?: number;
-                    onlyInFile2Count?: number;
-                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
-                    createdDate?: string | number;
-                    sizeBytes?: number;
-                    statusEnumId?: string;
-                    statusLabel?: string;
-                    resultAvailable?: boolean;
-                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
-                    startedDate?: string | number;
-                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
-                    completedDate?: string | number;
-                    /** @description Timestamp — ISO-8601 string or epoch milliseconds */
-                    lastUpdatedDate?: string | number;
-                };
-            };
-        };
-        /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.run#GenericDiff */
-        RunGenericDiffRequest: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id: string | number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            method: "facade.ReconciliationFacadeServices.run#GenericDiff";
-            params?: components["schemas"]["RunGenericDiffParams"];
-        };
-        /** @description JSON-RPC success envelope for facade.ReconciliationFacadeServices.run#GenericDiff. Check result.ok / result.errors for business failures. */
-        RunGenericDiffResponse: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id?: string | number;
-            result: components["schemas"]["RunGenericDiffResult"];
         };
         /**
          * @description DAR-UI-048. Start a run's flowchart. Returns at once with the execution id; the walk
@@ -11100,8 +11317,12 @@ export interface components {
             inputModeEnumId: string;
             savedRunId?: string;
             savedRunType?: string;
-            savedRun?: Record<string, never>;
-            newSavedRun?: Record<string, never>;
+            savedRun?: {
+                [key: string]: unknown;
+            };
+            newSavedRun?: {
+                [key: string]: unknown;
+            };
             scheduleExpr?: string;
             /** @description Timestamp — ISO-8601 string or epoch milliseconds */
             nextScheduledFireTime?: string | number;
@@ -11115,6 +11336,10 @@ export interface components {
             customWindowEndDate?: string | number;
             maxWindowDays?: number;
             splitWindowDays?: number;
+            /**
+             * @description The zone the schedule and windows run in. Omitted: the automation's own on
+             *                     an edit, else the active tenant's (as the app sends), never UTC by default (DAR-OPS-029 OC44).
+             */
             windowTimeZone?: string;
             safeConfigJson?: string;
             chatSpaceId?: string;
@@ -11129,6 +11354,7 @@ export interface components {
                 primaryIdExpression?: string;
                 idValueNormalizer?: string;
                 systemMessageRemoteId?: string;
+                /** @description Retired (DAR-BE-424): any value is refused. */
                 nsRestletConfigId?: string;
                 sftpServerId?: string;
                 remotePathTemplate?: string;
@@ -11162,7 +11388,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            automation?: Record<string, never>;
+            automation?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#Automation */
         SaveAutomationRequest: {
@@ -11271,7 +11499,9 @@ export interface components {
                      *                             linked record, or [recordType, stageField, via: [recordType, startField, stageField]] for a record
                      *                             naming in stageField the internal id of the via record (a replacement order naming the credit memo).
                      */
-                    anyOf?: string[];
+                    anyOf?: {
+                        [key: string]: unknown;
+                    }[];
                 };
             }[];
             /**
@@ -11325,13 +11555,17 @@ export interface components {
              * @description [conclusionEnumId, places: [place name], conditions: [field, operator (IN, NOT_IN, BLANK,
              *                         NOT_BLANK), values, checkLabel]], in order.
              */
-            conclusions?: string[];
+            conclusions?: {
+                [key: string]: unknown;
+            }[];
         };
         SaveLifecycleConclusionsResult: {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            conclusions?: string[];
+            conclusions?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleConclusions */
         SaveLifecycleConclusionsRequest: {
@@ -11360,13 +11594,17 @@ export interface components {
         SaveLifecycleDetailsParams: {
             reconciliationId: string;
             /** @description [fieldId (custbody_...), label]; an empty list leaves the standard columns only. */
-            details?: string[];
+            details?: {
+                [key: string]: unknown;
+            }[];
         };
         SaveLifecycleDetailsResult: {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            details?: string[];
+            details?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleDetails */
         SaveLifecycleDetailsRequest: {
@@ -11405,7 +11643,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            findings?: string[];
+            findings?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleFinding */
         SaveLifecycleFindingRequest: {
@@ -11443,7 +11683,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            rules?: string[];
+            rules?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleRule */
         SaveLifecycleRuleRequest: {
@@ -11480,7 +11722,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            exceptions?: string[];
+            exceptions?: {
+                [key: string]: unknown;
+            }[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#LifecycleStageException */
         SaveLifecycleStageExceptionRequest: {
@@ -11525,7 +11769,9 @@ export interface components {
                      *                             linked record, or [recordType, stageField, via: [recordType, startField, stageField]] for a record
                      *                             naming in stageField the internal id of the via record (a replacement order naming the credit memo).
                      */
-                    anyOf?: string[];
+                    anyOf?: {
+                        [key: string]: unknown;
+                    }[];
                 };
             }[];
         };
@@ -11619,7 +11865,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            reconciliation?: Record<string, never>;
+            reconciliation?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#Reconciliation */
         SaveReconciliationRequest: {
@@ -11660,7 +11908,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            question?: Record<string, never>;
+            question?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.save#ReconciliationQuestion */
         SaveReconciliationQuestionRequest: {
@@ -11689,6 +11939,7 @@ export interface components {
             file1SystemEnumId: string;
             file1SourceTypeEnumId?: string;
             file1SystemMessageRemoteId?: string;
+            /** @description Retired (DAR-BE-424): any value is refused. */
             file1NsRestletConfigId?: string;
             file1SourceConfigId?: string;
             file1SourceConfigType?: string;
@@ -11701,6 +11952,7 @@ export interface components {
             file2SystemEnumId?: string;
             file2SourceTypeEnumId?: string;
             file2SystemMessageRemoteId?: string;
+            /** @description Retired (DAR-BE-424): any value is refused. */
             file2NsRestletConfigId?: string;
             file2SourceConfigId?: string;
             file2SourceConfigType?: string;
@@ -11714,12 +11966,16 @@ export interface components {
              *                     its connector declares (SourceSystemConnector.extractOptionsJson), e.g. {"withLineItems": true}. Omit to leave the
              *                     stored options unchanged; send an empty map to clear them.
              */
-            file1ExtractOptions?: Record<string, never>;
+            file1ExtractOptions?: {
+                [key: string]: unknown;
+            };
             /**
              * @description DAR-UI-148. As file1ExtractOptions, for the second
              *                     side.
              */
-            file2ExtractOptions?: Record<string, never>;
+            file2ExtractOptions?: {
+                [key: string]: unknown;
+            };
             rules?: {
                 ruleId?: string;
                 sequenceNum?: number;
@@ -11790,8 +12046,6 @@ export interface components {
                     sourceTypeLabel?: string;
                     systemMessageRemoteId?: string;
                     systemMessageRemoteLabel?: string;
-                    nsRestletConfigId?: string;
-                    nsRestletConfigLabel?: string;
                     sourceConfigId?: string;
                     sourceConfigType?: string;
                 }[];
@@ -11892,8 +12146,6 @@ export interface components {
                     sourceTypeLabel?: string;
                     systemMessageRemoteId?: string;
                     systemMessageRemoteLabel?: string;
-                    nsRestletConfigId?: string;
-                    nsRestletConfigLabel?: string;
                     sourceConfigId?: string;
                     sourceConfigType?: string;
                 }[];
@@ -11969,7 +12221,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            automation?: Record<string, never>;
+            automation?: {
+                [key: string]: unknown;
+            };
             changedFields?: string[];
         };
         /** @description JSON-RPC request envelope for facade.ReconciliationFacadeServices.sync#Automation */
@@ -12037,7 +12291,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            conclusionCode?: Record<string, never>;
+            conclusionCode?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.RunConclusionFacadeServices.create#RunConclusionCode */
         CreateRunConclusionCodeRequest: {
@@ -12069,7 +12325,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            conclusions?: Record<string, never>;
+            conclusions?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.RunConclusionFacadeServices.get#RunConclusions */
         GetRunConclusionsRequest: {
@@ -12118,7 +12376,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            savedConclusions?: Record<string, never>;
+            savedConclusions?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.RunConclusionFacadeServices.save#RunConclusions */
         SaveRunConclusionsRequest: {
@@ -12163,8 +12423,12 @@ export interface components {
                 description?: string;
                 routeName?: string;
                 routePath?: string;
-                routeParams?: Record<string, never>;
-                routeQuery?: Record<string, never>;
+                routeParams?: {
+                    [key: string]: unknown;
+                };
+                routeQuery?: {
+                    [key: string]: unknown;
+                };
                 score?: number;
                 sourceId?: string;
                 sourceType?: string;
@@ -12191,7 +12455,7 @@ export interface components {
         };
         /**
          * @description Delete one tenant-owned NetSuite auth profile (DAR-BE-114). Refused, naming what is in the way,
-         *                 while anything still signs in with it: RESTlet endpoints, NetSuite checks, saved runs. nsAuthConfigId is
+         *                 while anything still signs in with it: NetSuite checks, saved runs. nsAuthConfigId is
          *                 referenced without a cascading FK, so deleting under them would surface later as a confusing "not found"
          *                 at run time. Owner-only, and never while shared with another tenant — the same rules as the Shopify and
          *                 HotWax deletes.
@@ -12252,45 +12516,6 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["DeleteTenantChatSpaceResult"];
-        };
-        /** @description Get LLM provider settings with stored-secret indicators. */
-        GetLlmSettingsParams: {
-            llmProvider?: string;
-        };
-        GetLlmSettingsResult: {
-            ok?: boolean;
-            messages?: string[];
-            errors?: string[];
-            llmSettings?: {
-                activeProvider?: string;
-                llmProvider?: string;
-                llmModel?: string;
-                llmBaseUrl?: string;
-                llmTimeoutSeconds?: string;
-                llmEnabled?: string;
-                hasStoredLlmApiKey?: boolean;
-                hasFallbackLlmApiKey?: boolean;
-                fallbackLlmKeyEnvName?: string;
-            };
-        };
-        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.get#LlmSettings */
-        GetLlmSettingsRequest: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id: string | number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            method: "facade.SettingsFacadeServices.get#LlmSettings";
-            params?: components["schemas"]["GetLlmSettingsParams"];
-        };
-        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.get#LlmSettings. Check result.ok / result.errors for business failures. */
-        GetLlmSettingsResponse: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id?: string | number;
-            result: components["schemas"]["GetLlmSettingsResult"];
         };
         /**
          * @description DAR-UI-123. The active tenant's chat spaces and, for each thing that posts to chat, the one space it
@@ -12527,59 +12752,6 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListNsAuthConfigsResult"];
         };
-        /** @description List NetSuite endpoint configs joined with auth metadata. */
-        ListNsRestletConfigsParams: {
-            query?: string;
-            pageIndex?: number;
-            pageSize?: number;
-        };
-        ListNsRestletConfigsResult: {
-            ok?: boolean;
-            messages?: string[];
-            errors?: string[];
-            pagination?: {
-                pageIndex?: number;
-                pageSize?: number;
-                totalCount?: number;
-                pageCount?: number;
-            };
-            restletConfigs?: {
-                nsRestletConfigId?: string;
-                description?: string;
-                companyUserGroupId?: string;
-                companyLabel?: string;
-                endpointUrl?: string;
-                httpMethod?: string;
-                nsAuthConfigId?: string;
-                authDescription?: string;
-                authType?: string;
-                authIsActive?: string;
-                headersJson?: string;
-                connectTimeoutSeconds?: number;
-                readTimeoutSeconds?: number;
-                isActive?: string;
-                isShared?: boolean;
-            }[];
-        };
-        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.list#NsRestletConfigs */
-        ListNsRestletConfigsRequest: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id: string | number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            method: "facade.SettingsFacadeServices.list#NsRestletConfigs";
-            params?: components["schemas"]["ListNsRestletConfigsParams"];
-        };
-        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.list#NsRestletConfigs. Check result.ok / result.errors for business failures. */
-        ListNsRestletConfigsResponse: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id?: string | number;
-            result: components["schemas"]["ListNsRestletConfigsResult"];
-        };
         /** @description List SFTP server configs with secret redaction indicators. */
         ListSftpServersParams: {
             query?: string;
@@ -12632,7 +12804,11 @@ export interface components {
             id?: string | number;
             result: components["schemas"]["ListSftpServersResult"];
         };
-        /** @description List active-tenant chat spaces (Google Chat or Slack), including the webhook URL in clear text. */
+        /**
+         * @description List active-tenant chat spaces (Google Chat or Slack). The webhook URL comes in clear text only to those who
+         *                 may edit a space (edit access, as save#TenantChatSpace, or a super admin); everyone else gets it null, and
+         *                 webhookConfigured says whether one is set (OC122).
+         */
         ListTenantChatSpacesParams: Record<string, never>;
         ListTenantChatSpacesResult: {
             ok?: boolean;
@@ -12649,8 +12825,6 @@ export interface components {
                 deliveryMode?: string;
                 webhookConfigured?: boolean;
                 webhookUrl?: string;
-                googleChatConfigured?: boolean;
-                googleChatWebhookUrl?: string;
                 isActive?: string;
                 inUse?: boolean;
                 createdByUserId?: string;
@@ -12678,48 +12852,6 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["ListTenantChatSpacesResult"];
-        };
-        /** @description Save LLM provider settings while preserving existing key when blank. */
-        SaveLlmSettingsParams: {
-            llmProvider: string;
-            llmApiKey?: string;
-            llmModel?: string;
-            llmBaseUrl?: string;
-            llmTimeoutSeconds?: string;
-            llmEnabled?: string;
-        };
-        SaveLlmSettingsResult: {
-            ok?: boolean;
-            messages?: string[];
-            errors?: string[];
-            llmSettings?: {
-                activeProvider?: string;
-                llmProvider?: string;
-                llmModel?: string;
-                llmBaseUrl?: string;
-                llmTimeoutSeconds?: string;
-                llmEnabled?: string;
-                hasStoredLlmApiKey?: boolean;
-            };
-        };
-        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.save#LlmSettings */
-        SaveLlmSettingsRequest: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id: string | number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            method: "facade.SettingsFacadeServices.save#LlmSettings";
-            params?: components["schemas"]["SaveLlmSettingsParams"];
-        };
-        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.save#LlmSettings. Check result.ok / result.errors for business failures. */
-        SaveLlmSettingsResponse: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id?: string | number;
-            result: components["schemas"]["SaveLlmSettingsResult"];
         };
         /** @description Create or update a NetSuite auth configuration. */
         SaveNsAuthConfigParams: {
@@ -12777,57 +12909,6 @@ export interface components {
             jsonrpc: "2.0";
             id?: string | number;
             result: components["schemas"]["SaveNsAuthConfigResult"];
-        };
-        /** @description Create or update a NetSuite endpoint configuration bound to an auth config. */
-        SaveNsRestletConfigParams: {
-            /**
-             * @description DAR-BE-135: names an endpoint this tenant owns or was granted, to
-             *                     update it. Leave it out to create one; the server mints the id.
-             */
-            nsRestletConfigId?: string;
-            description?: string;
-            endpointUrl: string;
-            httpMethod?: string;
-            nsAuthConfigId: string;
-            headersJson?: string;
-            connectTimeoutSeconds?: number;
-            readTimeoutSeconds?: number;
-            isActive?: boolean;
-        };
-        SaveNsRestletConfigResult: {
-            ok?: boolean;
-            messages?: string[];
-            errors?: string[];
-            savedRestletConfig?: {
-                nsRestletConfigId?: string;
-                description?: string;
-                endpointUrl?: string;
-                httpMethod?: string;
-                nsAuthConfigId?: string;
-                headersJson?: string;
-                connectTimeoutSeconds?: number;
-                readTimeoutSeconds?: number;
-                isActive?: string;
-            };
-        };
-        /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.save#NsRestletConfig */
-        SaveNsRestletConfigRequest: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id: string | number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            method: "facade.SettingsFacadeServices.save#NsRestletConfig";
-            params?: components["schemas"]["SaveNsRestletConfigParams"];
-        };
-        /** @description JSON-RPC success envelope for facade.SettingsFacadeServices.save#NsRestletConfig. Check result.ok / result.errors for business failures. */
-        SaveNsRestletConfigResponse: {
-            /** @constant */
-            jsonrpc: "2.0";
-            id?: string | number;
-            result: components["schemas"]["SaveNsRestletConfigResult"];
         };
         /** @description Create or update an SFTP server configuration. */
         SaveSftpServerParams: {
@@ -12889,14 +12970,15 @@ export interface components {
             slackChannelId?: string;
             slackChannelName?: string;
             webhookUrl?: string;
-            googleChatWebhookUrl?: string;
             isActive?: boolean;
         };
         SaveTenantChatSpaceResult: {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            chatSpace?: Record<string, never>;
+            chatSpace?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.SettingsFacadeServices.save#TenantChatSpace */
         SaveTenantChatSpaceRequest: {
@@ -13263,7 +13345,9 @@ export interface components {
         GetShopifyGraphqlSchemaResult: {
             ok?: boolean;
             errors?: string[];
-            schema?: Record<string, never>;
+            schema?: {
+                [key: string]: unknown;
+            };
             code?: string;
             retryAfterSeconds?: number;
         };
@@ -13345,12 +13429,16 @@ export interface components {
         RunShopifyGraphqlAgentQueryParams: {
             shopifyAuthConfigId: string;
             document: string;
-            variables?: Record<string, never>;
+            variables?: {
+                [key: string]: unknown;
+            };
         };
         RunShopifyGraphqlAgentQueryResult: {
             ok?: boolean;
             errors?: string[];
-            data?: Record<string, never>;
+            data?: {
+                [key: string]: unknown;
+            };
             /** @description The edge count when the answer is one connection, else blank. */
             rowCount?: number;
             truncated?: boolean;
@@ -13625,8 +13713,8 @@ export interface components {
          */
         ListSourceConfigEndpointsParams: {
             /**
-             * @description SCFG_HOTWAX_OMS, SCFG_SHOPIFY_AUTH,
-             *                     SCFG_NS_AUTH, or SCFG_NS_RESTLET.
+             * @description SCFG_HOTWAX_OMS, SCFG_SHOPIFY_AUTH
+             *                     or SCFG_NS_AUTH.
              */
             configTypeEnumId: string;
             configId: string;
@@ -13733,7 +13821,9 @@ export interface components {
             messages?: string[];
             errors?: string[];
             syncPairId?: string;
-            flags?: Record<string, never>;
+            flags?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.SyncPulseFacadeServices.get#RunPulseFlags */
         GetRunPulseFlagsRequest: {
@@ -13911,7 +14001,9 @@ export interface components {
         };
         GetTenantConfigVersionResult: {
             /** @description The list's fields plus pack. */
-            version?: Record<string, never>;
+            version?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.TenantConfigFacadeServices.get#TenantConfigVersion */
         GetTenantConfigVersionRequest: {
@@ -13974,14 +14066,18 @@ export interface components {
         };
         PreviewTenantConfigRestoreResult: {
             /** @description The version, as get#TenantConfigVersions lists it. */
-            version?: Record<string, never>;
+            version?: {
+                [key: string]: unknown;
+            };
             /**
              * @description {lines: [{kind, ref, label, action (CREATE | UPDATE | UNCHANGED |
              *                     MAPPED), targetId, changes: [{field, from, to}]}], blocking: [{code, ref, message}], warnings: [{code, ref,
              *                     message}], counts, switchOff: [{statementId, audit, statement}], unlink: [{statementId, checkId, audit,
              *                     statement, check}], kept: [{kind, label}]}
              */
-            plan?: Record<string, never>;
+            plan?: {
+                [key: string]: unknown;
+            };
             /** @description SHA-256 of the version, the importer's plan and the switch-offs and unlinks. */
             planHash?: string;
         };
@@ -14022,14 +14118,20 @@ export interface components {
              * @description The version kept before the restore (the version itself when nothing
              *                     changed since it).
              */
-            before?: Record<string, never>;
+            before?: {
+                [key: string]: unknown;
+            };
             /**
              * @description The version the restore left (the same as before when the restore
              *                     changed nothing).
              */
-            after?: Record<string, never>;
+            after?: {
+                [key: string]: unknown;
+            };
             /** @description The plan applied, as preview#TenantConfigRestore answered it. */
-            plan?: Record<string, never>;
+            plan?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.TenantConfigFacadeServices.restore#TenantConfigVersion */
         RestoreTenantConfigVersionRequest: {
@@ -14065,7 +14167,9 @@ export interface components {
              * @description {id, seq, parentId, hash, bundleVersion, counts: {audits, statements,
              *                     checks, runs, queries, conclusionCodes, connections}, changeSource, reason, createdBy, createdDate}
              */
-            version?: Record<string, never>;
+            version?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.TenantConfigFacadeServices.snapshot#TenantConfig */
         SnapshotTenantConfigRequest: {
@@ -14107,9 +14211,13 @@ export interface components {
             field?: string;
             message?: string;
             /** @description {queryName, description, readSpecJson, scriptBody, readText} */
-            proposal?: Record<string, never>;
+            proposal?: {
+                [key: string]: unknown;
+            };
             /** @description As run#TenantQuery's result. */
-            preview?: Record<string, never>;
+            preview?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.create#TenantQueryProposal */
         CreateTenantQueryProposalRequest: {
@@ -14229,7 +14337,9 @@ export interface components {
             errors?: string[];
             queries?: unknown[];
             library?: unknown[];
-            limits?: Record<string, never>;
+            limits?: {
+                [key: string]: unknown;
+            };
             pinnedQueryIds?: string[];
         };
         /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.list#TenantQueries */
@@ -14292,7 +14402,9 @@ export interface components {
             messages?: string[];
             errors?: string[];
             /** @description {ok, summary, files: [{name, columns, rowCount, previewRows}], data, nothing, invalid, readCounts, units, elapsedMs, logs, error, readText} */
-            result?: Record<string, never>;
+            result?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.run#TenantQuery */
         RunTenantQueryRequest: {
@@ -14322,7 +14434,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            outcome?: Record<string, never>;
+            outcome?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.run#TenantQuerySchedule */
         RunTenantQueryScheduleRequest: {
@@ -14357,7 +14471,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            query?: Record<string, never>;
+            query?: {
+                [key: string]: unknown;
+            };
             notes?: unknown[];
         };
         /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.save#TenantQuery */
@@ -14427,7 +14543,9 @@ export interface components {
             ok?: boolean;
             messages?: string[];
             errors?: string[];
-            schedule?: Record<string, never>;
+            schedule?: {
+                [key: string]: unknown;
+            };
         };
         /** @description JSON-RPC request envelope for facade.TenantScriptFacadeServices.save#TenantQuerySchedule */
         SaveTenantQueryScheduleRequest: {
@@ -14466,7 +14584,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateAgentAccessGrantRequest"] | components["schemas"]["GetAgentUsageRequest"] | components["schemas"]["ListAgentAccessGrantsRequest"] | components["schemas"]["PauseAgentAccessGrantRequest"] | components["schemas"]["RevokeAgentAccessGrantRequest"] | components["schemas"]["UnpauseAgentAccessGrantRequest"] | components["schemas"]["UpdateAgentAccessGrantRequest"] | components["schemas"]["GetAgentConfigRequest"] | components["schemas"]["GetAgentPromptRequest"] | components["schemas"]["ResetAgentConfigItemRequest"] | components["schemas"]["UpdateAgentModelPriceRequest"] | components["schemas"]["UpdateAgentPromptRequest"] | components["schemas"]["UpdateAgentRoleModelRequest"] | components["schemas"]["UpdateAgentTenantDailyCapRequest"] | components["schemas"]["UpdateAgentTextRequest"] | components["schemas"]["ListAllBrainChangeTicketsRequest"] | components["schemas"]["UpdateBrainChangeTicketRequest"] | components["schemas"]["CreateAppContentEntryRequest"] | components["schemas"]["DeleteAppContentEntryRequest"] | components["schemas"]["GetAppContentVocabularyRequest"] | components["schemas"]["ListAppContentRequest"] | components["schemas"]["ResetAppContentEntryRequest"] | components["schemas"]["UpdateAppContentEntryRequest"] | components["schemas"]["ApproveCliAccessRequestRequest"] | components["schemas"]["CreateCliAccessGrantRequest"] | components["schemas"]["DeclineCliAccessRequestRequest"] | components["schemas"]["ListCliAccessGrantsRequest"] | components["schemas"]["ListCliAccessRequestsRequest"] | components["schemas"]["PauseCliAccessGrantRequest"] | components["schemas"]["RevokeCliAccessGrantRequest"] | components["schemas"]["UnpauseCliAccessGrantRequest"] | components["schemas"]["UpdateCliAccessGrantRequest"] | components["schemas"]["GetEmailTemplateRequest"] | components["schemas"]["GetEmailTemplatesRequest"] | components["schemas"]["PreviewEmailTemplateRequest"] | components["schemas"]["ResetEmailTemplateRequest"] | components["schemas"]["UpdateEmailTemplateRequest"] | components["schemas"]["GetFeedbackListRequest"] | components["schemas"]["ReplyFeedbackRequest"] | components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["SendTenantWelcomeRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["DryRunRetentionRequest"] | components["schemas"]["GetRetentionPeriodsRequest"] | components["schemas"]["UpdateRetentionPeriodsRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["GetServiceJobsRequest"] | components["schemas"]["PreviewJobScheduleRequest"] | components["schemas"]["ResetServiceJobRequest"] | components["schemas"]["UpdateServiceJobRequest"] | components["schemas"]["GetTwoFactorPoliciesRequest"] | components["schemas"]["RotateEncryptedFieldsRequest"] | components["schemas"]["UpdateTwoFactorPolicyRequest"] | components["schemas"]["GetSettingRequest"] | components["schemas"]["GetSettingsRequest"] | components["schemas"]["ResetSettingRequest"] | components["schemas"]["UpdateSettingRequest"] | components["schemas"]["ListShopifyAppsRequest"] | components["schemas"]["SaveShopifyAppRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["AddDarpanAdminRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["RemoveDarpanAdminRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["ResetTwoFactorRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ApplyAuditChangeRequest"] | components["schemas"]["GetAuditChangeProposalRequest"] | components["schemas"]["ListAuditChangeProposalsRequest"] | components["schemas"]["ListBrainChangeTicketsRequest"] | components["schemas"]["PlanAuditChangeRequest"] | components["schemas"]["ProposeAuditChangeRequest"] | components["schemas"]["RejectAuditChangeRequest"] | components["schemas"]["RevertAuditChangeRequest"] | components["schemas"]["ListAgentQueryLogsRequest"] | components["schemas"]["FindAuditFindingLookalikesRequest"] | components["schemas"]["GetAgentAuditScopeRequest"] | components["schemas"]["GetAgentConversationRequest"] | components["schemas"]["GetAgentStatusRequest"] | components["schemas"]["SendAgentQueryTurnRequest"] | components["schemas"]["SendAgentTurnRequest"] | components["schemas"]["GetAppContentRequest"] | components["schemas"]["AcknowledgeAuditFindingRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["DeleteAuditFindingAcknowledgementRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingFeedbackRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReadReportRequest"] | components["schemas"]["GetAuditRecheckProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RemoveAuditCheckRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["SendAuditFindingFeedbackRequest"] | components["schemas"]["UpdateAuditFindingAcknowledgementRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["VerifyAuditFindingsRequest"] | components["schemas"]["BeginPasskeyFirstSignInRequest"] | components["schemas"]["BeginPasskeyProofRequest"] | components["schemas"]["BeginPasskeyRegistrationRequest"] | components["schemas"]["BeginPasskeySignInRequest"] | components["schemas"]["BeginTwoFactorSetupRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["ConfirmTwoFactorSetupRequest"] | components["schemas"]["CreateRecoveryCodesRequest"] | components["schemas"]["DeletePasskeyRequest"] | components["schemas"]["DisableTwoFactorRequest"] | components["schemas"]["FinishPasskeyFirstSignInRequest"] | components["schemas"]["FinishPasskeyRegistrationRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["GetTwoFactorStatusRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RenamePasskeyRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["VerifySignInCodeRequest"] | components["schemas"]["GetMyCliAccessRequest"] | components["schemas"]["RequestCliAccessRequest"] | components["schemas"]["ApproveCliLoginRequest"] | components["schemas"]["DenyCliLoginRequest"] | components["schemas"]["GetCliLoginRequestRequest"] | components["schemas"]["ListCliSessionsRequest"] | components["schemas"]["LogoutCliSessionRequest"] | components["schemas"]["PollCliLoginRequest"] | components["schemas"]["RevokeCliSessionRequest"] | components["schemas"]["StartCliLoginRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["CreateDataSourceDefinitionRequest"] | components["schemas"]["RetireDataSourceDefinitionRequest"] | components["schemas"]["ValidateDataSourceDefinitionRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["GetOmsGraphqlSchemaRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["RunOmsGraphqlAgentQueryRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteTenantIdIndexFieldRequest"] | components["schemas"]["GetIdIndexStatusRequest"] | components["schemas"]["SaveTenantIdIndexFieldRequest"] | components["schemas"]["SearchRecordIdsRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["LookupOrderRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsAgentConnectionsRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["RunNsSuiteQlAgentQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["DeletePeakPeriodRequest"] | components["schemas"]["DeletePeakPeriodRunTimeRequest"] | components["schemas"]["DeletePeakPeriodSyncRequest"] | components["schemas"]["GetPeakPeriodRequest"] | components["schemas"]["ListPeakPeriodsRequest"] | components["schemas"]["SavePeakPeriodRequest"] | components["schemas"]["SavePeakPeriodRunTimeRequest"] | components["schemas"]["SavePeakPeriodSyncRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunGenericDiffRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetLlmSettingsRequest"] | components["schemas"]["GetNotificationRoutesRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListNsRestletConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveLlmSettingsRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveNsRestletConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["SendChatSpaceTestRequest"] | components["schemas"]["SetNotificationRouteRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["BeginShopifyInstallRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyGraphqlSchemaRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["RunShopifyGraphqlAgentQueryRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["DeleteSyncPairRequest"] | components["schemas"]["GetRunPulseFlagsRequest"] | components["schemas"]["GetSyncPairRequest"] | components["schemas"]["ListSyncPairsRequest"] | components["schemas"]["SaveSyncPairRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["CreateTenantQueryProposalRequest"] | components["schemas"]["DeleteTenantQueryRequest"] | components["schemas"]["DeleteTenantQueryScheduleRequest"] | components["schemas"]["GetTenantQueryCatalogRequest"] | components["schemas"]["ListTenantQueriesRequest"] | components["schemas"]["ListTenantQuerySchedulesRequest"] | components["schemas"]["RunTenantQueryRequest"] | components["schemas"]["RunTenantQueryScheduleRequest"] | components["schemas"]["SaveTenantQueryRequest"] | components["schemas"]["SaveTenantQueryPinsRequest"] | components["schemas"]["SaveTenantQueryScheduleRequest"];
+                "application/json": components["schemas"]["CreateAgentAccessGrantRequest"] | components["schemas"]["GetAgentUsageRequest"] | components["schemas"]["ListAgentAccessGrantsRequest"] | components["schemas"]["PauseAgentAccessGrantRequest"] | components["schemas"]["RevokeAgentAccessGrantRequest"] | components["schemas"]["UnpauseAgentAccessGrantRequest"] | components["schemas"]["UpdateAgentAccessGrantRequest"] | components["schemas"]["GetAgentConfigRequest"] | components["schemas"]["GetAgentPromptRequest"] | components["schemas"]["ResetAgentConfigItemRequest"] | components["schemas"]["UpdateAgentModelPriceRequest"] | components["schemas"]["UpdateAgentPromptRequest"] | components["schemas"]["UpdateAgentRoleModelRequest"] | components["schemas"]["UpdateAgentTenantDailyCapRequest"] | components["schemas"]["UpdateAgentTextRequest"] | components["schemas"]["ListAllBrainChangeTicketsRequest"] | components["schemas"]["UpdateBrainChangeTicketRequest"] | components["schemas"]["CreateAppContentEntryRequest"] | components["schemas"]["DeleteAppContentEntryRequest"] | components["schemas"]["GetAppContentVocabularyRequest"] | components["schemas"]["ListAppContentRequest"] | components["schemas"]["ResetAppContentEntryRequest"] | components["schemas"]["UpdateAppContentEntryRequest"] | components["schemas"]["ApproveCliAccessRequestRequest"] | components["schemas"]["CreateCliAccessGrantRequest"] | components["schemas"]["DeclineCliAccessRequestRequest"] | components["schemas"]["ListCliAccessGrantsRequest"] | components["schemas"]["ListCliAccessRequestsRequest"] | components["schemas"]["PauseCliAccessGrantRequest"] | components["schemas"]["RevokeCliAccessGrantRequest"] | components["schemas"]["UnpauseCliAccessGrantRequest"] | components["schemas"]["UpdateCliAccessGrantRequest"] | components["schemas"]["GetEmailTemplateRequest"] | components["schemas"]["GetEmailTemplatesRequest"] | components["schemas"]["PreviewEmailTemplateRequest"] | components["schemas"]["ResetEmailTemplateRequest"] | components["schemas"]["UpdateEmailTemplateRequest"] | components["schemas"]["GetFeedbackListRequest"] | components["schemas"]["ReplyFeedbackRequest"] | components["schemas"]["GetKnowledgeEntryRequest"] | components["schemas"]["GetKnowledgeForReviewRequest"] | components["schemas"]["GetKnowledgeIdentifiersRequest"] | components["schemas"]["RetireKnowledgeEntryRequest"] | components["schemas"]["SearchKnowledgeRequest"] | components["schemas"]["StoreKnowledgeEntryRequest"] | components["schemas"]["AddTenantMemberRequest"] | components["schemas"]["RemoveTenantMemberRequest"] | components["schemas"]["SendTenantWelcomeRequest"] | components["schemas"]["UpdateTenantMemberRoleRequest"] | components["schemas"]["DryRunMigrationRequest"] | components["schemas"]["DryRunPendingMigrationsRequest"] | components["schemas"]["GetMigrationHistoryRequest"] | components["schemas"]["GetMigrationStatusRequest"] | components["schemas"]["RunMigrationRequest"] | components["schemas"]["RunPendingMigrationsRequest"] | components["schemas"]["SetMigrationEnabledRequest"] | components["schemas"]["GetAdminSessionInfoRequest"] | components["schemas"]["GetLiveOperationsRequest"] | components["schemas"]["DryRunRetentionRequest"] | components["schemas"]["GetRetentionPeriodsRequest"] | components["schemas"]["UpdateRetentionPeriodsRequest"] | components["schemas"]["GetScheduleBoardRequest"] | components["schemas"]["GetServiceJobsRequest"] | components["schemas"]["PreviewJobScheduleRequest"] | components["schemas"]["ResetServiceJobRequest"] | components["schemas"]["UpdateServiceJobRequest"] | components["schemas"]["GetTwoFactorPoliciesRequest"] | components["schemas"]["RotateEncryptedFieldsRequest"] | components["schemas"]["UpdateTwoFactorPolicyRequest"] | components["schemas"]["GetSettingRequest"] | components["schemas"]["GetSettingsRequest"] | components["schemas"]["ResetSettingRequest"] | components["schemas"]["UpdateSettingRequest"] | components["schemas"]["ListShopifyAppsRequest"] | components["schemas"]["SaveShopifyAppRequest"] | components["schemas"]["CreateTenantRequest"] | components["schemas"]["DeactivateTenantRequest"] | components["schemas"]["GetTenantDetailRequest"] | components["schemas"]["GetTenantListRequest"] | components["schemas"]["ReactivateTenantRequest"] | components["schemas"]["UpdateTenantRequest"] | components["schemas"]["BeginSecretHandoffRequest"] | components["schemas"]["ExportConfigBundleRequest"] | components["schemas"]["GetTransferCatalogRequest"] | components["schemas"]["ImportConfigBundleRequest"] | components["schemas"]["AddDarpanAdminRequest"] | components["schemas"]["CreateUserAccountRequest"] | components["schemas"]["DisableUserAccountRequest"] | components["schemas"]["EnableUserAccountRequest"] | components["schemas"]["GetUserDetailRequest"] | components["schemas"]["GetUserListRequest"] | components["schemas"]["RemoveDarpanAdminRequest"] | components["schemas"]["ResetPasswordRequest"] | components["schemas"]["ResetTwoFactorRequest"] | components["schemas"]["UpdateUserAccountRequest"] | components["schemas"]["ApplyAuditChangeRequest"] | components["schemas"]["GetAuditChangeProposalRequest"] | components["schemas"]["ListAuditChangeProposalsRequest"] | components["schemas"]["ListBrainChangeTicketsRequest"] | components["schemas"]["PlanAuditChangeRequest"] | components["schemas"]["ProposeAuditChangeRequest"] | components["schemas"]["RejectAuditChangeRequest"] | components["schemas"]["RevertAuditChangeRequest"] | components["schemas"]["ListAgentQueryLogsRequest"] | components["schemas"]["FindAuditFindingLookalikesRequest"] | components["schemas"]["GetAgentAuditScopeRequest"] | components["schemas"]["GetAgentConversationRequest"] | components["schemas"]["GetAgentStatusRequest"] | components["schemas"]["SendAgentQueryTurnRequest"] | components["schemas"]["SendAgentTurnRequest"] | components["schemas"]["GetAppContentRequest"] | components["schemas"]["AcknowledgeAuditFindingRequest"] | components["schemas"]["AddAuditStatementRequest"] | components["schemas"]["CreateAuditRequest"] | components["schemas"]["DeleteAuditFindingAcknowledgementRequest"] | components["schemas"]["GetAuditCheckExtractsRequest"] | components["schemas"]["GetAuditCheckOptionsRequest"] | components["schemas"]["GetAuditFindingRequest"] | components["schemas"]["GetAuditFindingFeedbackRequest"] | components["schemas"]["GetAuditFindingsByOrderRequest"] | components["schemas"]["GetAuditProgressRequest"] | components["schemas"]["GetAuditReadReportRequest"] | components["schemas"]["GetAuditRecheckProgressRequest"] | components["schemas"]["GetAuditReportRequest"] | components["schemas"]["GetAuditSettingsRequest"] | components["schemas"]["GetAuditsRequest"] | components["schemas"]["RemoveAuditCheckRequest"] | components["schemas"]["RetryAuditCheckRequest"] | components["schemas"]["RunAuditRequest"] | components["schemas"]["SaveAuditCheckRequest"] | components["schemas"]["SaveAuditSettingsRequest"] | components["schemas"]["SendAuditFindingFeedbackRequest"] | components["schemas"]["UpdateAuditFindingAcknowledgementRequest"] | components["schemas"]["VerifyAuditFindingRequest"] | components["schemas"]["VerifyAuditFindingsRequest"] | components["schemas"]["BeginPasskeyFirstSignInRequest"] | components["schemas"]["BeginPasskeyProofRequest"] | components["schemas"]["BeginPasskeyRegistrationRequest"] | components["schemas"]["BeginPasskeySignInRequest"] | components["schemas"]["BeginTwoFactorSetupRequest"] | components["schemas"]["ChangeExpiredPasswordRequest"] | components["schemas"]["ChangeOwnPasswordRequest"] | components["schemas"]["CompletePasswordResetRequest"] | components["schemas"]["ConfirmTwoFactorSetupRequest"] | components["schemas"]["CreateRecoveryCodesRequest"] | components["schemas"]["DeletePasskeyRequest"] | components["schemas"]["DisableTwoFactorRequest"] | components["schemas"]["FinishPasskeyFirstSignInRequest"] | components["schemas"]["FinishPasskeyRegistrationRequest"] | components["schemas"]["GetPasswordResetStatusRequest"] | components["schemas"]["GetSessionInfoRequest"] | components["schemas"]["GetTwoFactorStatusRequest"] | components["schemas"]["LoginSessionRequest"] | components["schemas"]["LogoutAllSessionsRequest"] | components["schemas"]["LogoutSessionRequest"] | components["schemas"]["RenamePasskeyRequest"] | components["schemas"]["RequestPasswordResetRequest"] | components["schemas"]["SaveActiveTenantRequest"] | components["schemas"]["SaveRecoveryEmailRequest"] | components["schemas"]["SaveUserSettingsRequest"] | components["schemas"]["VerifyOwnPasswordRequest"] | components["schemas"]["VerifyPasswordResetCodeRequest"] | components["schemas"]["VerifySignInCodeRequest"] | components["schemas"]["GetMyCliAccessRequest"] | components["schemas"]["RequestCliAccessRequest"] | components["schemas"]["ApproveCliLoginRequest"] | components["schemas"]["DenyCliLoginRequest"] | components["schemas"]["GetCliLoginRequestRequest"] | components["schemas"]["ListCliSessionsRequest"] | components["schemas"]["LogoutCliSessionRequest"] | components["schemas"]["PollCliLoginRequest"] | components["schemas"]["RevokeCliSessionRequest"] | components["schemas"]["StartCliLoginRequest"] | components["schemas"]["GrantConfigTenantAccessRequest"] | components["schemas"]["ListConfigTenantAccessRequest"] | components["schemas"]["RevokeConfigTenantAccessRequest"] | components["schemas"]["CreateDataSourceDefinitionRequest"] | components["schemas"]["RetireDataSourceDefinitionRequest"] | components["schemas"]["ValidateDataSourceDefinitionRequest"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["GetOmsGraphqlSchemaRequest"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsRequest"] | components["schemas"]["RunOmsGraphqlAgentQueryRequest"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigRequest"] | components["schemas"]["DeleteTenantIdIndexFieldRequest"] | components["schemas"]["GetIdIndexStatusRequest"] | components["schemas"]["SaveTenantIdIndexFieldRequest"] | components["schemas"]["SearchRecordIdsRequest"] | components["schemas"]["DeleteJsonSchemaRequest"] | components["schemas"]["FlattenJsonSchemaRequest"] | components["schemas"]["GetJsonSchemaRequest"] | components["schemas"]["InferJsonSchemaFromCsvTextRequest"] | components["schemas"]["InferJsonSchemaFromTextRequest"] | components["schemas"]["ListJsonSchemasRequest"] | components["schemas"]["SaveJsonSchemaTextRequest"] | components["schemas"]["SaveRefinedSchemaRequest"] | components["schemas"]["ValidateJsonTextAgainstSchemaRequest"] | components["schemas"]["LookupOrderRequest"] | components["schemas"]["GetLifecycleOptionsRequest"] | components["schemas"]["GetLifecycleRuleOptionsRequest"] | components["schemas"]["GetNsSuiteQlQueryOptionsRequest"] | components["schemas"]["GetNsSuiteQlSourceQueryRequest"] | components["schemas"]["ListNsAgentConnectionsRequest"] | components["schemas"]["ListNsSuiteQlSourceQueriesRequest"] | components["schemas"]["PreviewNsSuiteQlSourceQueryRequest"] | components["schemas"]["RunNsSuiteQlAgentQueryRequest"] | components["schemas"]["SaveNsSuiteQlSourceQueryRequest"] | components["schemas"]["DeletePeakPeriodRequest"] | components["schemas"]["DeletePeakPeriodRunTimeRequest"] | components["schemas"]["DeletePeakPeriodSyncRequest"] | components["schemas"]["GetPeakPeriodRequest"] | components["schemas"]["ListPeakPeriodsRequest"] | components["schemas"]["SavePeakPeriodRequest"] | components["schemas"]["SavePeakPeriodRunTimeRequest"] | components["schemas"]["SavePeakPeriodSyncRequest"] | components["schemas"]["ArchiveAutomationRequest"] | components["schemas"]["ArchiveSavedRunRequest"] | components["schemas"]["CancelReconciliationRunRequest"] | components["schemas"]["CreateCsvRunRequest"] | components["schemas"]["CreateMappingRequest"] | components["schemas"]["CreateRuleSetRunRequest"] | components["schemas"]["DeleteAutomationRequest"] | components["schemas"]["DeleteGeneratedOutputRequest"] | components["schemas"]["DeleteLifecycleFindingRequest"] | components["schemas"]["DeleteLifecycleRuleRequest"] | components["schemas"]["DeleteLifecycleStageExceptionRequest"] | components["schemas"]["DeleteReconciliationQuestionRequest"] | components["schemas"]["DeleteSavedRunRequest"] | components["schemas"]["DisableSavedRunRequest"] | components["schemas"]["EnableSavedRunRequest"] | components["schemas"]["GetActiveRunResultRequest"] | components["schemas"]["GetAutomationRequest"] | components["schemas"]["GetAutomationStreaksRequest"] | components["schemas"]["GetGeneratedOutputRequest"] | components["schemas"]["GetGeneratedOutputDifferencesRequest"] | components["schemas"]["GetLifecyclePlanRequest"] | components["schemas"]["GetMappingRequest"] | components["schemas"]["GetReconciliationRequest"] | components["schemas"]["GetReconciliationExecutionRequest"] | components["schemas"]["GetReconciliationRunStatusRequest"] | components["schemas"]["ImportNetSuiteChecksAsRunsRequest"] | components["schemas"]["ListAutomationExecutionsRequest"] | components["schemas"]["ListAutomationSourceOptionsRequest"] | components["schemas"]["ListAutomationsRequest"] | components["schemas"]["ListGeneratedOutputsRequest"] | components["schemas"]["ListMappingsRequest"] | components["schemas"]["ListReconciliationExecutionsRequest"] | components["schemas"]["ListReconciliationsRequest"] | components["schemas"]["ListSavedRunsRequest"] | components["schemas"]["PauseAutomationRequest"] | components["schemas"]["RepairConnectorRecordKeysRequest"] | components["schemas"]["ReprocessAutomationExecutionRequest"] | components["schemas"]["RestoreAutomationRequest"] | components["schemas"]["RestoreSavedRunRequest"] | components["schemas"]["ResumeAutomationRequest"] | components["schemas"]["RetryAutomationExecutionFromExtractsRequest"] | components["schemas"]["RunAutomationNowRequest"] | components["schemas"]["RunReconciliationRequest"] | components["schemas"]["RunSavedRunDiffRequest"] | components["schemas"]["SaveAutomationRequest"] | components["schemas"]["SaveDashboardPinnedMappingsRequest"] | components["schemas"]["SaveDashboardPinnedSavedRunsRequest"] | components["schemas"]["SaveLifecycleRequest"] | components["schemas"]["SaveLifecycleConclusionsRequest"] | components["schemas"]["SaveLifecycleDetailsRequest"] | components["schemas"]["SaveLifecycleFindingRequest"] | components["schemas"]["SaveLifecycleRuleRequest"] | components["schemas"]["SaveLifecycleStageExceptionRequest"] | components["schemas"]["SaveLifecycleStagesRequest"] | components["schemas"]["SaveMappingRequest"] | components["schemas"]["SaveReconciliationRequest"] | components["schemas"]["SaveReconciliationQuestionRequest"] | components["schemas"]["SaveRuleSetRunRequest"] | components["schemas"]["SaveSavedRunNameRequest"] | components["schemas"]["SubscribeRunNotificationRequest"] | components["schemas"]["SyncAutomationRequest"] | components["schemas"]["UnsubscribeRunNotificationRequest"] | components["schemas"]["CreateRunConclusionCodeRequest"] | components["schemas"]["GetRunConclusionsRequest"] | components["schemas"]["SaveRunConclusionsRequest"] | components["schemas"]["SearchNavigationTargetsRequest"] | components["schemas"]["DeleteNsAuthConfigRequest"] | components["schemas"]["DeleteTenantChatSpaceRequest"] | components["schemas"]["GetNotificationRoutesRequest"] | components["schemas"]["GetTenantSettingsRequest"] | components["schemas"]["GetUserNotificationDefaultRequest"] | components["schemas"]["ListEnumOptionsRequest"] | components["schemas"]["ListNsAuthConfigsRequest"] | components["schemas"]["ListSftpServersRequest"] | components["schemas"]["ListTenantChatSpacesRequest"] | components["schemas"]["SaveNsAuthConfigRequest"] | components["schemas"]["SaveSftpServerRequest"] | components["schemas"]["SaveTenantChatSpaceRequest"] | components["schemas"]["SaveTenantSettingsRequest"] | components["schemas"]["SaveUserNotificationDefaultRequest"] | components["schemas"]["SendChatSpaceTestRequest"] | components["schemas"]["SetNotificationRouteRequest"] | components["schemas"]["TestSourceConnectionRequest"] | components["schemas"]["BeginShopifyInstallRequest"] | components["schemas"]["DeleteShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyAuthConfigRequest"] | components["schemas"]["GetShopifyGraphqlSchemaRequest"] | components["schemas"]["ListShopifyAuthConfigsRequest"] | components["schemas"]["RunShopifyGraphqlAgentQueryRequest"] | components["schemas"]["SaveShopifyAuthConfigRequest"] | components["schemas"]["BeginSlackInstallRequest"] | components["schemas"]["DisconnectSlackWorkspaceRequest"] | components["schemas"]["GetSlackInstallRequest"] | components["schemas"]["ListSlackChannelsRequest"] | components["schemas"]["SaveSlackBotTokenRequest"] | components["schemas"]["ListSourceConfigEndpointsRequest"] | components["schemas"]["StoreSourceConfigEndpointAccessRequest"] | components["schemas"]["DeleteSyncPairRequest"] | components["schemas"]["GetRunPulseFlagsRequest"] | components["schemas"]["GetSyncPairRequest"] | components["schemas"]["ListSyncPairsRequest"] | components["schemas"]["SaveSyncPairRequest"] | components["schemas"]["GetTenantConfigVersionRequest"] | components["schemas"]["GetTenantConfigVersionsRequest"] | components["schemas"]["PreviewTenantConfigRestoreRequest"] | components["schemas"]["RestoreTenantConfigVersionRequest"] | components["schemas"]["SnapshotTenantConfigRequest"] | components["schemas"]["CreateTenantQueryProposalRequest"] | components["schemas"]["DeleteTenantQueryRequest"] | components["schemas"]["DeleteTenantQueryScheduleRequest"] | components["schemas"]["GetTenantQueryCatalogRequest"] | components["schemas"]["ListTenantQueriesRequest"] | components["schemas"]["ListTenantQuerySchedulesRequest"] | components["schemas"]["RunTenantQueryRequest"] | components["schemas"]["RunTenantQueryScheduleRequest"] | components["schemas"]["SaveTenantQueryRequest"] | components["schemas"]["SaveTenantQueryPinsRequest"] | components["schemas"]["SaveTenantQueryScheduleRequest"];
             };
         };
         responses: {
@@ -14476,7 +14594,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["CreateAgentAccessGrantResponse"] | components["schemas"]["GetAgentUsageResponse"] | components["schemas"]["ListAgentAccessGrantsResponse"] | components["schemas"]["PauseAgentAccessGrantResponse"] | components["schemas"]["RevokeAgentAccessGrantResponse"] | components["schemas"]["UnpauseAgentAccessGrantResponse"] | components["schemas"]["UpdateAgentAccessGrantResponse"] | components["schemas"]["GetAgentConfigResponse"] | components["schemas"]["GetAgentPromptResponse"] | components["schemas"]["ResetAgentConfigItemResponse"] | components["schemas"]["UpdateAgentModelPriceResponse"] | components["schemas"]["UpdateAgentPromptResponse"] | components["schemas"]["UpdateAgentRoleModelResponse"] | components["schemas"]["UpdateAgentTenantDailyCapResponse"] | components["schemas"]["UpdateAgentTextResponse"] | components["schemas"]["ListAllBrainChangeTicketsResponse"] | components["schemas"]["UpdateBrainChangeTicketResponse"] | components["schemas"]["CreateAppContentEntryResponse"] | components["schemas"]["DeleteAppContentEntryResponse"] | components["schemas"]["GetAppContentVocabularyResponse"] | components["schemas"]["ListAppContentResponse"] | components["schemas"]["ResetAppContentEntryResponse"] | components["schemas"]["UpdateAppContentEntryResponse"] | components["schemas"]["ApproveCliAccessRequestResponse"] | components["schemas"]["CreateCliAccessGrantResponse"] | components["schemas"]["DeclineCliAccessRequestResponse"] | components["schemas"]["ListCliAccessGrantsResponse"] | components["schemas"]["ListCliAccessRequestsResponse"] | components["schemas"]["PauseCliAccessGrantResponse"] | components["schemas"]["RevokeCliAccessGrantResponse"] | components["schemas"]["UnpauseCliAccessGrantResponse"] | components["schemas"]["UpdateCliAccessGrantResponse"] | components["schemas"]["GetEmailTemplateResponse"] | components["schemas"]["GetEmailTemplatesResponse"] | components["schemas"]["PreviewEmailTemplateResponse"] | components["schemas"]["ResetEmailTemplateResponse"] | components["schemas"]["UpdateEmailTemplateResponse"] | components["schemas"]["GetFeedbackListResponse"] | components["schemas"]["ReplyFeedbackResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["SendTenantWelcomeResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["DryRunRetentionResponse"] | components["schemas"]["GetRetentionPeriodsResponse"] | components["schemas"]["UpdateRetentionPeriodsResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["GetServiceJobsResponse"] | components["schemas"]["PreviewJobScheduleResponse"] | components["schemas"]["ResetServiceJobResponse"] | components["schemas"]["UpdateServiceJobResponse"] | components["schemas"]["GetTwoFactorPoliciesResponse"] | components["schemas"]["RotateEncryptedFieldsResponse"] | components["schemas"]["UpdateTwoFactorPolicyResponse"] | components["schemas"]["GetSettingResponse"] | components["schemas"]["GetSettingsResponse"] | components["schemas"]["ResetSettingResponse"] | components["schemas"]["UpdateSettingResponse"] | components["schemas"]["ListShopifyAppsResponse"] | components["schemas"]["SaveShopifyAppResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["AddDarpanAdminResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["RemoveDarpanAdminResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["ResetTwoFactorResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ApplyAuditChangeResponse"] | components["schemas"]["GetAuditChangeProposalResponse"] | components["schemas"]["ListAuditChangeProposalsResponse"] | components["schemas"]["ListBrainChangeTicketsResponse"] | components["schemas"]["PlanAuditChangeResponse"] | components["schemas"]["ProposeAuditChangeResponse"] | components["schemas"]["RejectAuditChangeResponse"] | components["schemas"]["RevertAuditChangeResponse"] | components["schemas"]["ListAgentQueryLogsResponse"] | components["schemas"]["FindAuditFindingLookalikesResponse"] | components["schemas"]["GetAgentAuditScopeResponse"] | components["schemas"]["GetAgentConversationResponse"] | components["schemas"]["GetAgentStatusResponse"] | components["schemas"]["SendAgentQueryTurnResponse"] | components["schemas"]["SendAgentTurnResponse"] | components["schemas"]["GetAppContentResponse"] | components["schemas"]["AcknowledgeAuditFindingResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["DeleteAuditFindingAcknowledgementResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingFeedbackResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReadReportResponse"] | components["schemas"]["GetAuditRecheckProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RemoveAuditCheckResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["SendAuditFindingFeedbackResponse"] | components["schemas"]["UpdateAuditFindingAcknowledgementResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["VerifyAuditFindingsResponse"] | components["schemas"]["BeginPasskeyFirstSignInResponse"] | components["schemas"]["BeginPasskeyProofResponse"] | components["schemas"]["BeginPasskeyRegistrationResponse"] | components["schemas"]["BeginPasskeySignInResponse"] | components["schemas"]["BeginTwoFactorSetupResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["ConfirmTwoFactorSetupResponse"] | components["schemas"]["CreateRecoveryCodesResponse"] | components["schemas"]["DeletePasskeyResponse"] | components["schemas"]["DisableTwoFactorResponse"] | components["schemas"]["FinishPasskeyFirstSignInResponse"] | components["schemas"]["FinishPasskeyRegistrationResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["GetTwoFactorStatusResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RenamePasskeyResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["VerifySignInCodeResponse"] | components["schemas"]["GetMyCliAccessResponse"] | components["schemas"]["RequestCliAccessResponse"] | components["schemas"]["ApproveCliLoginResponse"] | components["schemas"]["DenyCliLoginResponse"] | components["schemas"]["GetCliLoginRequestResponse"] | components["schemas"]["ListCliSessionsResponse"] | components["schemas"]["LogoutCliSessionResponse"] | components["schemas"]["PollCliLoginResponse"] | components["schemas"]["RevokeCliSessionResponse"] | components["schemas"]["StartCliLoginResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["CreateDataSourceDefinitionResponse"] | components["schemas"]["RetireDataSourceDefinitionResponse"] | components["schemas"]["ValidateDataSourceDefinitionResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["GetOmsGraphqlSchemaResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["RunOmsGraphqlAgentQueryResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteTenantIdIndexFieldResponse"] | components["schemas"]["GetIdIndexStatusResponse"] | components["schemas"]["SaveTenantIdIndexFieldResponse"] | components["schemas"]["SearchRecordIdsResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["LookupOrderResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsAgentConnectionsResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["RunNsSuiteQlAgentQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["DeletePeakPeriodResponse"] | components["schemas"]["DeletePeakPeriodRunTimeResponse"] | components["schemas"]["DeletePeakPeriodSyncResponse"] | components["schemas"]["GetPeakPeriodResponse"] | components["schemas"]["ListPeakPeriodsResponse"] | components["schemas"]["SavePeakPeriodResponse"] | components["schemas"]["SavePeakPeriodRunTimeResponse"] | components["schemas"]["SavePeakPeriodSyncResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunGenericDiffResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetLlmSettingsResponse"] | components["schemas"]["GetNotificationRoutesResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListNsRestletConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveLlmSettingsResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveNsRestletConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["SendChatSpaceTestResponse"] | components["schemas"]["SetNotificationRouteResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["BeginShopifyInstallResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyGraphqlSchemaResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["RunShopifyGraphqlAgentQueryResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["DeleteSyncPairResponse"] | components["schemas"]["GetRunPulseFlagsResponse"] | components["schemas"]["GetSyncPairResponse"] | components["schemas"]["ListSyncPairsResponse"] | components["schemas"]["SaveSyncPairResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["CreateTenantQueryProposalResponse"] | components["schemas"]["DeleteTenantQueryResponse"] | components["schemas"]["DeleteTenantQueryScheduleResponse"] | components["schemas"]["GetTenantQueryCatalogResponse"] | components["schemas"]["ListTenantQueriesResponse"] | components["schemas"]["ListTenantQuerySchedulesResponse"] | components["schemas"]["RunTenantQueryResponse"] | components["schemas"]["RunTenantQueryScheduleResponse"] | components["schemas"]["SaveTenantQueryResponse"] | components["schemas"]["SaveTenantQueryPinsResponse"] | components["schemas"]["SaveTenantQueryScheduleResponse"];
+                    "application/json": components["schemas"]["JsonRpcErrorResponse"] | components["schemas"]["CreateAgentAccessGrantResponse"] | components["schemas"]["GetAgentUsageResponse"] | components["schemas"]["ListAgentAccessGrantsResponse"] | components["schemas"]["PauseAgentAccessGrantResponse"] | components["schemas"]["RevokeAgentAccessGrantResponse"] | components["schemas"]["UnpauseAgentAccessGrantResponse"] | components["schemas"]["UpdateAgentAccessGrantResponse"] | components["schemas"]["GetAgentConfigResponse"] | components["schemas"]["GetAgentPromptResponse"] | components["schemas"]["ResetAgentConfigItemResponse"] | components["schemas"]["UpdateAgentModelPriceResponse"] | components["schemas"]["UpdateAgentPromptResponse"] | components["schemas"]["UpdateAgentRoleModelResponse"] | components["schemas"]["UpdateAgentTenantDailyCapResponse"] | components["schemas"]["UpdateAgentTextResponse"] | components["schemas"]["ListAllBrainChangeTicketsResponse"] | components["schemas"]["UpdateBrainChangeTicketResponse"] | components["schemas"]["CreateAppContentEntryResponse"] | components["schemas"]["DeleteAppContentEntryResponse"] | components["schemas"]["GetAppContentVocabularyResponse"] | components["schemas"]["ListAppContentResponse"] | components["schemas"]["ResetAppContentEntryResponse"] | components["schemas"]["UpdateAppContentEntryResponse"] | components["schemas"]["ApproveCliAccessRequestResponse"] | components["schemas"]["CreateCliAccessGrantResponse"] | components["schemas"]["DeclineCliAccessRequestResponse"] | components["schemas"]["ListCliAccessGrantsResponse"] | components["schemas"]["ListCliAccessRequestsResponse"] | components["schemas"]["PauseCliAccessGrantResponse"] | components["schemas"]["RevokeCliAccessGrantResponse"] | components["schemas"]["UnpauseCliAccessGrantResponse"] | components["schemas"]["UpdateCliAccessGrantResponse"] | components["schemas"]["GetEmailTemplateResponse"] | components["schemas"]["GetEmailTemplatesResponse"] | components["schemas"]["PreviewEmailTemplateResponse"] | components["schemas"]["ResetEmailTemplateResponse"] | components["schemas"]["UpdateEmailTemplateResponse"] | components["schemas"]["GetFeedbackListResponse"] | components["schemas"]["ReplyFeedbackResponse"] | components["schemas"]["GetKnowledgeEntryResponse"] | components["schemas"]["GetKnowledgeForReviewResponse"] | components["schemas"]["GetKnowledgeIdentifiersResponse"] | components["schemas"]["RetireKnowledgeEntryResponse"] | components["schemas"]["SearchKnowledgeResponse"] | components["schemas"]["StoreKnowledgeEntryResponse"] | components["schemas"]["AddTenantMemberResponse"] | components["schemas"]["RemoveTenantMemberResponse"] | components["schemas"]["SendTenantWelcomeResponse"] | components["schemas"]["UpdateTenantMemberRoleResponse"] | components["schemas"]["DryRunMigrationResponse"] | components["schemas"]["DryRunPendingMigrationsResponse"] | components["schemas"]["GetMigrationHistoryResponse"] | components["schemas"]["GetMigrationStatusResponse"] | components["schemas"]["RunMigrationResponse"] | components["schemas"]["RunPendingMigrationsResponse"] | components["schemas"]["SetMigrationEnabledResponse"] | components["schemas"]["GetAdminSessionInfoResponse"] | components["schemas"]["GetLiveOperationsResponse"] | components["schemas"]["DryRunRetentionResponse"] | components["schemas"]["GetRetentionPeriodsResponse"] | components["schemas"]["UpdateRetentionPeriodsResponse"] | components["schemas"]["GetScheduleBoardResponse"] | components["schemas"]["GetServiceJobsResponse"] | components["schemas"]["PreviewJobScheduleResponse"] | components["schemas"]["ResetServiceJobResponse"] | components["schemas"]["UpdateServiceJobResponse"] | components["schemas"]["GetTwoFactorPoliciesResponse"] | components["schemas"]["RotateEncryptedFieldsResponse"] | components["schemas"]["UpdateTwoFactorPolicyResponse"] | components["schemas"]["GetSettingResponse"] | components["schemas"]["GetSettingsResponse"] | components["schemas"]["ResetSettingResponse"] | components["schemas"]["UpdateSettingResponse"] | components["schemas"]["ListShopifyAppsResponse"] | components["schemas"]["SaveShopifyAppResponse"] | components["schemas"]["CreateTenantResponse"] | components["schemas"]["DeactivateTenantResponse"] | components["schemas"]["GetTenantDetailResponse"] | components["schemas"]["GetTenantListResponse"] | components["schemas"]["ReactivateTenantResponse"] | components["schemas"]["UpdateTenantResponse"] | components["schemas"]["BeginSecretHandoffResponse"] | components["schemas"]["ExportConfigBundleResponse"] | components["schemas"]["GetTransferCatalogResponse"] | components["schemas"]["ImportConfigBundleResponse"] | components["schemas"]["AddDarpanAdminResponse"] | components["schemas"]["CreateUserAccountResponse"] | components["schemas"]["DisableUserAccountResponse"] | components["schemas"]["EnableUserAccountResponse"] | components["schemas"]["GetUserDetailResponse"] | components["schemas"]["GetUserListResponse"] | components["schemas"]["RemoveDarpanAdminResponse"] | components["schemas"]["ResetPasswordResponse"] | components["schemas"]["ResetTwoFactorResponse"] | components["schemas"]["UpdateUserAccountResponse"] | components["schemas"]["ApplyAuditChangeResponse"] | components["schemas"]["GetAuditChangeProposalResponse"] | components["schemas"]["ListAuditChangeProposalsResponse"] | components["schemas"]["ListBrainChangeTicketsResponse"] | components["schemas"]["PlanAuditChangeResponse"] | components["schemas"]["ProposeAuditChangeResponse"] | components["schemas"]["RejectAuditChangeResponse"] | components["schemas"]["RevertAuditChangeResponse"] | components["schemas"]["ListAgentQueryLogsResponse"] | components["schemas"]["FindAuditFindingLookalikesResponse"] | components["schemas"]["GetAgentAuditScopeResponse"] | components["schemas"]["GetAgentConversationResponse"] | components["schemas"]["GetAgentStatusResponse"] | components["schemas"]["SendAgentQueryTurnResponse"] | components["schemas"]["SendAgentTurnResponse"] | components["schemas"]["GetAppContentResponse"] | components["schemas"]["AcknowledgeAuditFindingResponse"] | components["schemas"]["AddAuditStatementResponse"] | components["schemas"]["CreateAuditResponse"] | components["schemas"]["DeleteAuditFindingAcknowledgementResponse"] | components["schemas"]["GetAuditCheckExtractsResponse"] | components["schemas"]["GetAuditCheckOptionsResponse"] | components["schemas"]["GetAuditFindingResponse"] | components["schemas"]["GetAuditFindingFeedbackResponse"] | components["schemas"]["GetAuditFindingsByOrderResponse"] | components["schemas"]["GetAuditProgressResponse"] | components["schemas"]["GetAuditReadReportResponse"] | components["schemas"]["GetAuditRecheckProgressResponse"] | components["schemas"]["GetAuditReportResponse"] | components["schemas"]["GetAuditSettingsResponse"] | components["schemas"]["GetAuditsResponse"] | components["schemas"]["RemoveAuditCheckResponse"] | components["schemas"]["RetryAuditCheckResponse"] | components["schemas"]["RunAuditResponse"] | components["schemas"]["SaveAuditCheckResponse"] | components["schemas"]["SaveAuditSettingsResponse"] | components["schemas"]["SendAuditFindingFeedbackResponse"] | components["schemas"]["UpdateAuditFindingAcknowledgementResponse"] | components["schemas"]["VerifyAuditFindingResponse"] | components["schemas"]["VerifyAuditFindingsResponse"] | components["schemas"]["BeginPasskeyFirstSignInResponse"] | components["schemas"]["BeginPasskeyProofResponse"] | components["schemas"]["BeginPasskeyRegistrationResponse"] | components["schemas"]["BeginPasskeySignInResponse"] | components["schemas"]["BeginTwoFactorSetupResponse"] | components["schemas"]["ChangeExpiredPasswordResponse"] | components["schemas"]["ChangeOwnPasswordResponse"] | components["schemas"]["CompletePasswordResetResponse"] | components["schemas"]["ConfirmTwoFactorSetupResponse"] | components["schemas"]["CreateRecoveryCodesResponse"] | components["schemas"]["DeletePasskeyResponse"] | components["schemas"]["DisableTwoFactorResponse"] | components["schemas"]["FinishPasskeyFirstSignInResponse"] | components["schemas"]["FinishPasskeyRegistrationResponse"] | components["schemas"]["GetPasswordResetStatusResponse"] | components["schemas"]["GetSessionInfoResponse"] | components["schemas"]["GetTwoFactorStatusResponse"] | components["schemas"]["LoginSessionResponse"] | components["schemas"]["LogoutAllSessionsResponse"] | components["schemas"]["LogoutSessionResponse"] | components["schemas"]["RenamePasskeyResponse"] | components["schemas"]["RequestPasswordResetResponse"] | components["schemas"]["SaveActiveTenantResponse"] | components["schemas"]["SaveRecoveryEmailResponse"] | components["schemas"]["SaveUserSettingsResponse"] | components["schemas"]["VerifyOwnPasswordResponse"] | components["schemas"]["VerifyPasswordResetCodeResponse"] | components["schemas"]["VerifySignInCodeResponse"] | components["schemas"]["GetMyCliAccessResponse"] | components["schemas"]["RequestCliAccessResponse"] | components["schemas"]["ApproveCliLoginResponse"] | components["schemas"]["DenyCliLoginResponse"] | components["schemas"]["GetCliLoginRequestResponse"] | components["schemas"]["ListCliSessionsResponse"] | components["schemas"]["LogoutCliSessionResponse"] | components["schemas"]["PollCliLoginResponse"] | components["schemas"]["RevokeCliSessionResponse"] | components["schemas"]["StartCliLoginResponse"] | components["schemas"]["GrantConfigTenantAccessResponse"] | components["schemas"]["ListConfigTenantAccessResponse"] | components["schemas"]["RevokeConfigTenantAccessResponse"] | components["schemas"]["CreateDataSourceDefinitionResponse"] | components["schemas"]["RetireDataSourceDefinitionResponse"] | components["schemas"]["ValidateDataSourceDefinitionResponse"] | components["schemas"]["DeleteHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["GetOmsGraphqlSchemaResponse"] | components["schemas"]["ListHotWaxOmsRestSourceConfigsResponse"] | components["schemas"]["RunOmsGraphqlAgentQueryResponse"] | components["schemas"]["SaveHotWaxOmsRestSourceConfigResponse"] | components["schemas"]["DeleteTenantIdIndexFieldResponse"] | components["schemas"]["GetIdIndexStatusResponse"] | components["schemas"]["SaveTenantIdIndexFieldResponse"] | components["schemas"]["SearchRecordIdsResponse"] | components["schemas"]["DeleteJsonSchemaResponse"] | components["schemas"]["FlattenJsonSchemaResponse"] | components["schemas"]["GetJsonSchemaResponse"] | components["schemas"]["InferJsonSchemaFromCsvTextResponse"] | components["schemas"]["InferJsonSchemaFromTextResponse"] | components["schemas"]["ListJsonSchemasResponse"] | components["schemas"]["SaveJsonSchemaTextResponse"] | components["schemas"]["SaveRefinedSchemaResponse"] | components["schemas"]["ValidateJsonTextAgainstSchemaResponse"] | components["schemas"]["LookupOrderResponse"] | components["schemas"]["GetLifecycleOptionsResponse"] | components["schemas"]["GetLifecycleRuleOptionsResponse"] | components["schemas"]["GetNsSuiteQlQueryOptionsResponse"] | components["schemas"]["GetNsSuiteQlSourceQueryResponse"] | components["schemas"]["ListNsAgentConnectionsResponse"] | components["schemas"]["ListNsSuiteQlSourceQueriesResponse"] | components["schemas"]["PreviewNsSuiteQlSourceQueryResponse"] | components["schemas"]["RunNsSuiteQlAgentQueryResponse"] | components["schemas"]["SaveNsSuiteQlSourceQueryResponse"] | components["schemas"]["DeletePeakPeriodResponse"] | components["schemas"]["DeletePeakPeriodRunTimeResponse"] | components["schemas"]["DeletePeakPeriodSyncResponse"] | components["schemas"]["GetPeakPeriodResponse"] | components["schemas"]["ListPeakPeriodsResponse"] | components["schemas"]["SavePeakPeriodResponse"] | components["schemas"]["SavePeakPeriodRunTimeResponse"] | components["schemas"]["SavePeakPeriodSyncResponse"] | components["schemas"]["ArchiveAutomationResponse"] | components["schemas"]["ArchiveSavedRunResponse"] | components["schemas"]["CancelReconciliationRunResponse"] | components["schemas"]["CreateCsvRunResponse"] | components["schemas"]["CreateMappingResponse"] | components["schemas"]["CreateRuleSetRunResponse"] | components["schemas"]["DeleteAutomationResponse"] | components["schemas"]["DeleteGeneratedOutputResponse"] | components["schemas"]["DeleteLifecycleFindingResponse"] | components["schemas"]["DeleteLifecycleRuleResponse"] | components["schemas"]["DeleteLifecycleStageExceptionResponse"] | components["schemas"]["DeleteReconciliationQuestionResponse"] | components["schemas"]["DeleteSavedRunResponse"] | components["schemas"]["DisableSavedRunResponse"] | components["schemas"]["EnableSavedRunResponse"] | components["schemas"]["GetActiveRunResultResponse"] | components["schemas"]["GetAutomationResponse"] | components["schemas"]["GetAutomationStreaksResponse"] | components["schemas"]["GetGeneratedOutputResponse"] | components["schemas"]["GetGeneratedOutputDifferencesResponse"] | components["schemas"]["GetLifecyclePlanResponse"] | components["schemas"]["GetMappingResponse"] | components["schemas"]["GetReconciliationResponse"] | components["schemas"]["GetReconciliationExecutionResponse"] | components["schemas"]["GetReconciliationRunStatusResponse"] | components["schemas"]["ImportNetSuiteChecksAsRunsResponse"] | components["schemas"]["ListAutomationExecutionsResponse"] | components["schemas"]["ListAutomationSourceOptionsResponse"] | components["schemas"]["ListAutomationsResponse"] | components["schemas"]["ListGeneratedOutputsResponse"] | components["schemas"]["ListMappingsResponse"] | components["schemas"]["ListReconciliationExecutionsResponse"] | components["schemas"]["ListReconciliationsResponse"] | components["schemas"]["ListSavedRunsResponse"] | components["schemas"]["PauseAutomationResponse"] | components["schemas"]["RepairConnectorRecordKeysResponse"] | components["schemas"]["ReprocessAutomationExecutionResponse"] | components["schemas"]["RestoreAutomationResponse"] | components["schemas"]["RestoreSavedRunResponse"] | components["schemas"]["ResumeAutomationResponse"] | components["schemas"]["RetryAutomationExecutionFromExtractsResponse"] | components["schemas"]["RunAutomationNowResponse"] | components["schemas"]["RunReconciliationResponse"] | components["schemas"]["RunSavedRunDiffResponse"] | components["schemas"]["SaveAutomationResponse"] | components["schemas"]["SaveDashboardPinnedMappingsResponse"] | components["schemas"]["SaveDashboardPinnedSavedRunsResponse"] | components["schemas"]["SaveLifecycleResponse"] | components["schemas"]["SaveLifecycleConclusionsResponse"] | components["schemas"]["SaveLifecycleDetailsResponse"] | components["schemas"]["SaveLifecycleFindingResponse"] | components["schemas"]["SaveLifecycleRuleResponse"] | components["schemas"]["SaveLifecycleStageExceptionResponse"] | components["schemas"]["SaveLifecycleStagesResponse"] | components["schemas"]["SaveMappingResponse"] | components["schemas"]["SaveReconciliationResponse"] | components["schemas"]["SaveReconciliationQuestionResponse"] | components["schemas"]["SaveRuleSetRunResponse"] | components["schemas"]["SaveSavedRunNameResponse"] | components["schemas"]["SubscribeRunNotificationResponse"] | components["schemas"]["SyncAutomationResponse"] | components["schemas"]["UnsubscribeRunNotificationResponse"] | components["schemas"]["CreateRunConclusionCodeResponse"] | components["schemas"]["GetRunConclusionsResponse"] | components["schemas"]["SaveRunConclusionsResponse"] | components["schemas"]["SearchNavigationTargetsResponse"] | components["schemas"]["DeleteNsAuthConfigResponse"] | components["schemas"]["DeleteTenantChatSpaceResponse"] | components["schemas"]["GetNotificationRoutesResponse"] | components["schemas"]["GetTenantSettingsResponse"] | components["schemas"]["GetUserNotificationDefaultResponse"] | components["schemas"]["ListEnumOptionsResponse"] | components["schemas"]["ListNsAuthConfigsResponse"] | components["schemas"]["ListSftpServersResponse"] | components["schemas"]["ListTenantChatSpacesResponse"] | components["schemas"]["SaveNsAuthConfigResponse"] | components["schemas"]["SaveSftpServerResponse"] | components["schemas"]["SaveTenantChatSpaceResponse"] | components["schemas"]["SaveTenantSettingsResponse"] | components["schemas"]["SaveUserNotificationDefaultResponse"] | components["schemas"]["SendChatSpaceTestResponse"] | components["schemas"]["SetNotificationRouteResponse"] | components["schemas"]["TestSourceConnectionResponse"] | components["schemas"]["BeginShopifyInstallResponse"] | components["schemas"]["DeleteShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyAuthConfigResponse"] | components["schemas"]["GetShopifyGraphqlSchemaResponse"] | components["schemas"]["ListShopifyAuthConfigsResponse"] | components["schemas"]["RunShopifyGraphqlAgentQueryResponse"] | components["schemas"]["SaveShopifyAuthConfigResponse"] | components["schemas"]["BeginSlackInstallResponse"] | components["schemas"]["DisconnectSlackWorkspaceResponse"] | components["schemas"]["GetSlackInstallResponse"] | components["schemas"]["ListSlackChannelsResponse"] | components["schemas"]["SaveSlackBotTokenResponse"] | components["schemas"]["ListSourceConfigEndpointsResponse"] | components["schemas"]["StoreSourceConfigEndpointAccessResponse"] | components["schemas"]["DeleteSyncPairResponse"] | components["schemas"]["GetRunPulseFlagsResponse"] | components["schemas"]["GetSyncPairResponse"] | components["schemas"]["ListSyncPairsResponse"] | components["schemas"]["SaveSyncPairResponse"] | components["schemas"]["GetTenantConfigVersionResponse"] | components["schemas"]["GetTenantConfigVersionsResponse"] | components["schemas"]["PreviewTenantConfigRestoreResponse"] | components["schemas"]["RestoreTenantConfigVersionResponse"] | components["schemas"]["SnapshotTenantConfigResponse"] | components["schemas"]["CreateTenantQueryProposalResponse"] | components["schemas"]["DeleteTenantQueryResponse"] | components["schemas"]["DeleteTenantQueryScheduleResponse"] | components["schemas"]["GetTenantQueryCatalogResponse"] | components["schemas"]["ListTenantQueriesResponse"] | components["schemas"]["ListTenantQuerySchedulesResponse"] | components["schemas"]["RunTenantQueryResponse"] | components["schemas"]["RunTenantQueryScheduleResponse"] | components["schemas"]["SaveTenantQueryResponse"] | components["schemas"]["SaveTenantQueryPinsResponse"] | components["schemas"]["SaveTenantQueryScheduleResponse"];
                 };
             };
         };

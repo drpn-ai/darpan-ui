@@ -728,18 +728,6 @@ export const MASCOT_GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.f
     title: 'Private Key PEM',
     body: 'signs each sign-in request. It must be a PKCS#8 RSA or EC key matching the Cert ID’s certificate. Stored encrypted.',
   },
-  netSuiteEndpointUrl: {
-    title: 'Endpoint URL',
-    body: 'the exact address every call through this endpoint goes to. GET calls add item, location and dates to it as query values.',
-  },
-  httpMethod: {
-    title: 'HTTP Method',
-    body: 'the verb each call uses. POST and PUT carry the item list in the body; GET fits one item per call, so a bulk lookup on GET fails.',
-  },
-  netSuiteAuthConfig: {
-    title: 'Auth Config',
-    body: 'the saved NetSuite sign-in this endpoint uses. An inactive one will not save here, and one in use here cannot be deleted.',
-  },
   headersJson: {
     title: 'Headers JSON',
     body: 'extra headers added to every call, as one JSON object. Stored as plain text, unlike the sign-in’s secrets, so keep tokens out of it.',

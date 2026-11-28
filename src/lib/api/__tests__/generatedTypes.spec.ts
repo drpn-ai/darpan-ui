@@ -35,7 +35,6 @@ import type {
   ListGeneratedOutputsResponse,
   ListJsonSchemasResponse,
   ListNsAuthConfigsResponse,
-  ListNsRestletConfigsResponse,
   ListSavedRunsResponse,
   ListSftpServersResponse,
   ListShopifyAuthConfigsResponse,
@@ -82,7 +81,6 @@ import type {
   ListConfigTenantAccessPayload,
   ListGeneratedOutputsPayload,
   ListNsAuthConfigsPayload,
-  ListNsRestletConfigsPayload,
   ListSavedRunsPayload,
   ListSftpServersPayload,
   ListShopifyAuthConfigsPayload,
@@ -94,7 +92,6 @@ import type {
   SaveJsonSchemaTextPayload,
   SaveMappingPayload,
   SaveNsAuthConfigPayload,
-  SaveNsRestletConfigPayload,
   SaveRefinedSchemaPayload,
   SaveRuleSetRunPayload,
   SaveSftpServerPayload,
@@ -326,7 +323,6 @@ type HandWrittenTypes = {
   StoreSourceConfigEndpointAccessResponse: Undeclared<StoreSourceConfigEndpointAccessResponse, Schemas['StoreSourceConfigEndpointAccessResult']>
   ListSftpServersResponse: Undeclared<ListSftpServersResponse, Schemas['ListSftpServersResult']>
   ListNsAuthConfigsResponse: Undeclared<ListNsAuthConfigsResponse, Schemas['ListNsAuthConfigsResult']>
-  ListNsRestletConfigsResponse: Undeclared<ListNsRestletConfigsResponse, Schemas['ListNsRestletConfigsResult']>
   ListShopifyAuthConfigsResponse: Undeclared<ListShopifyAuthConfigsResponse, Schemas['ListShopifyAuthConfigsResult']>
   ListSavedRunsResponse: Undeclared<ListSavedRunsResponse, Schemas['ListSavedRunsResult']>
   ListAutomationsResponse: Undeclared<ListAutomationsResponse, Schemas['ListAutomationsResult']>
@@ -358,8 +354,6 @@ type HandWrittenTypes = {
   SaveSftpServerPayload: Undeclared<SaveSftpServerPayload, Schemas['SaveSftpServerParams']>
   ListNsAuthConfigsPayload: Undeclared<ListNsAuthConfigsPayload, Schemas['ListNsAuthConfigsParams']>
   SaveNsAuthConfigPayload: Undeclared<SaveNsAuthConfigPayload, Schemas['SaveNsAuthConfigParams']>
-  ListNsRestletConfigsPayload: Undeclared<ListNsRestletConfigsPayload, Schemas['ListNsRestletConfigsParams']>
-  SaveNsRestletConfigPayload: Undeclared<SaveNsRestletConfigPayload, Schemas['SaveNsRestletConfigParams']>
   ListShopifyAuthConfigsPayload: Undeclared<ListShopifyAuthConfigsPayload, Schemas['ListShopifyAuthConfigsParams']>
   SaveShopifyAuthConfigPayload: Undeclared<SaveShopifyAuthConfigPayload, Schemas['SaveShopifyAuthConfigParams']>
   ListConfigTenantAccessPayload: Undeclared<ListConfigTenantAccessPayload, Schemas['ListConfigTenantAccessParams']>

@@ -32,8 +32,6 @@ describe('router release scope', () => {
     { name: 'connections-netsuite', path: '/connections/netsuite', redirect: true },
     { name: 'settings-netsuite-auth-create', path: '/settings/netsuite/auth/create', surfaceMode: 'workflow' },
     { name: 'settings-netsuite-auth-edit', path: '/settings/netsuite/auth/edit/:nsAuthConfigId', surfaceMode: 'workflow' },
-    { name: 'settings-netsuite-endpoints-create', path: '/settings/netsuite/endpoints/create', surfaceMode: 'workflow' },
-    { name: 'settings-netsuite-endpoints-edit', path: '/settings/netsuite/endpoints/edit/:nsRestletConfigId', surfaceMode: 'workflow' },
     { name: 'reconciliation-automation-create', path: '/reconciliation/automation/create', surfaceMode: 'workflow' },
     { name: 'reconciliation-create', path: '/reconciliation/create', surfaceMode: 'workflow' },
     { name: 'reconciliation-ruleset-manager', path: '/reconciliation/ruleset-manager', surfaceMode: 'static', staticPageLabel: 'Ruleset Manager' },

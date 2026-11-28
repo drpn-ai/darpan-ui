@@ -387,7 +387,6 @@ describe('every label in the app has an answer', () => {
       ['pages/reconciliation/AuditSettingsPage.vue', 'Schedule', 'auditScheduleTime', 1],
       ['pages/settings/NetSuiteAuthDashboardPage.vue', 'Active', 'connectionActive', 1],
       ['pages/settings/NetSuiteAuthWorkflowPage.vue', 'Active', 'connectionActive', 1],
-      ['pages/settings/NetSuiteEndpointWorkflowPage.vue', 'Active', 'connectionActive', 1],
       ['pages/settings/OmsRestSourceDashboardPage.vue', 'Active', 'connectionActive', 1],
       ['pages/settings/OmsRestSourceWorkflowPage.vue', 'Active', 'connectionActive', 1],
       ['pages/settings/ShopifyAuthDashboardPage.vue', 'Active', 'connectionActive', 1],

@@ -1,6 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref, type WritableComputedRef } from 'vue'
 import type {
-  AutomationNsRestletOption,
   AutomationSftpServerOption,
   AutomationSystemRemoteOption,
   SavedRunSystemOption,
@@ -11,14 +10,12 @@ import {
   type ReconciliationAutomationFileSide,
   type ReconciliationAutomationSourceDraft,
 } from '../lib/reconciliationAutomationDraft'
-import { darpanSystemIdsMatch, darpanSystemsInOneFamily } from '../lib/utils/darpanSystems'
+import { darpanSystemIdsMatch } from '../lib/utils/darpanSystems'
 
 export interface ApiSourceSelectOption {
   value: string
   label: string
-  sourceKind: 'ns' | 'remote'
   sourceId: string
-  nsRestletConfigId?: string
   systemMessageRemoteId?: string
   safeMetadataJson?: string
 }
@@ -29,7 +26,6 @@ export interface UseAutomationSourceDraftDeps {
   selectedSavedRunSystemOptions: ComputedRef<SavedRunSystemOption[] | undefined>
   defaultFile1SystemEnumId: ComputedRef<string | undefined>
   defaultFile2SystemEnumId: ComputedRef<string | undefined>
-  nsRestletConfigs: ComputedRef<AutomationNsRestletOption[]>
   systemRemotes: ComputedRef<AutomationSystemRemoteOption[]>
   sftpServers: ComputedRef<AutomationSftpServerOption[]>
   usesApi: ComputedRef<boolean>
@@ -86,42 +82,25 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     return sideOption?.label || sideOption?.description || sideOption?.enumCode || sideOption?.enumId || systemEnumIdForSide(side) || 'source'
   }
 
-  // DAR-UI-106: NetSuite configs are kept under the system (NETSUITE), so a side on one of its endpoints (SuiteQL) finds
-  // them by the server's parent. Remote rows are one per (connection x endpoint) and siblings share a select value, so a
-  // side takes only its own endpoint's rows (systemRemoteMatchesSide); a sibling's row would store the sibling's extract.
-  function nsConfigMatchesSide(configSystemEnumId: string | undefined, side: ReconciliationAutomationFileSide): boolean {
-    return darpanSystemsInOneFamily(configSystemEnumId, systemEnumIdForSide(side), deps.selectedSavedRunSystemOptions.value ?? [])
-  }
-
+  // DAR-UI-106: remote rows are one per (connection x endpoint) and siblings share a select value, so a side takes only
+  // its own endpoint's rows; a sibling's row would store the sibling's extract.
   function systemRemoteMatchesSide(remoteSystemEnumId: string | undefined, side: ReconciliationAutomationFileSide): boolean {
     return darpanSystemIdsMatch(remoteSystemEnumId, systemEnumIdForSide(side))
   }
 
   function apiSourceOptionsForSide(side: ReconciliationAutomationFileSide): ApiSourceSelectOption[] {
-    const nsOptions: ApiSourceSelectOption[] = deps.nsRestletConfigs.value
-      .filter((config) => nsConfigMatchesSide(config.systemEnumId, side))
-      .map((config) => ({
-        value: `ns:${config.nsRestletConfigId}`,
-        sourceKind: 'ns',
-        sourceId: config.nsRestletConfigId,
-        nsRestletConfigId: config.nsRestletConfigId,
-        safeMetadataJson: config.safeMetadataJson,
-        label: config.label || config.description || config.nsRestletConfigId,
-      }))
-    const remoteOptions: ApiSourceSelectOption[] = deps.systemRemotes.value
+    return deps.systemRemotes.value
       .filter((remote) => systemRemoteMatchesSide(remote.systemEnumId, side))
       .filter((remote) => Boolean(remote.safeMetadataJson))
       .map((remote) => ({
         value: remote.optionKey
           ? `remote:${remote.systemMessageRemoteId}:${remote.optionKey}`
           : `remote:${remote.systemMessageRemoteId}`,
-        sourceKind: 'remote',
         sourceId: remote.systemMessageRemoteId,
         systemMessageRemoteId: remote.systemMessageRemoteId,
         safeMetadataJson: remote.safeMetadataJson,
         label: remote.label || remote.description || remote.systemMessageRemoteId,
       }))
-    return [...nsOptions, ...remoteOptions]
   }
 
   function apiSourceOptionForSavedRunSide(side: ReconciliationAutomationFileSide): ApiSourceSelectOption | null {
@@ -129,10 +108,6 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     if (!sideOption) return null
 
     const apiOptions = apiSourceOptionsForSide(side)
-    if (sideOption.nsRestletConfigId) {
-      return apiOptions.find((option) => option.nsRestletConfigId === sideOption.nsRestletConfigId) ?? null
-    }
-
     if (sideOption.systemMessageRemoteId) {
       const matchingRemoteOptions = apiOptions.filter((option) => option.systemMessageRemoteId === sideOption.systemMessageRemoteId)
       if (sideOption.sourceConfigId) {
@@ -159,10 +134,9 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     const source = sourceDrafts.value[side]
     const option = apiSourceOptionsForSide(side).find(
       (candidate) =>
-        (source.nsRestletConfigId && candidate.nsRestletConfigId === source.nsRestletConfigId) ||
-        (source.systemMessageRemoteId &&
-          candidate.systemMessageRemoteId === source.systemMessageRemoteId &&
-          (!source.safeMetadataJson || candidate.safeMetadataJson === source.safeMetadataJson)),
+        Boolean(source.systemMessageRemoteId) &&
+        candidate.systemMessageRemoteId === source.systemMessageRemoteId &&
+        (!source.safeMetadataJson || candidate.safeMetadataJson === source.safeMetadataJson),
     )
     return option?.value ?? ''
   }
@@ -180,17 +154,8 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
   function updateApiSource(side: ReconciliationAutomationFileSide, value: string): void {
     const selectedOption = apiSourceOptionsForSide(side).find((option) => option.value === value)
     if (!selectedOption) return
-    if (selectedOption.sourceKind === 'ns') {
-      updateSource(side, {
-        nsRestletConfigId: selectedOption.nsRestletConfigId,
-        systemMessageRemoteId: undefined,
-        safeMetadataJson: selectedOption.safeMetadataJson,
-      })
-      return
-    }
     updateSource(side, {
       systemMessageRemoteId: selectedOption.systemMessageRemoteId,
-      nsRestletConfigId: undefined,
       safeMetadataJson: selectedOption.safeMetadataJson,
     })
   }
@@ -202,12 +167,7 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
   function hasKnownApiSourceForSide(side: ReconciliationAutomationFileSide): boolean {
     const sideOption = systemOptionForSide(side)
     const draft = sourceDrafts.value[side]
-    return Boolean(
-      draft.nsRestletConfigId ||
-        draft.systemMessageRemoteId ||
-        sideOption?.nsRestletConfigId ||
-        sideOption?.systemMessageRemoteId,
-    )
+    return Boolean(draft.systemMessageRemoteId || sideOption?.systemMessageRemoteId)
   }
 
   function shouldSkipApiSourceStep(side: ReconciliationAutomationFileSide): boolean {
@@ -244,7 +204,6 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
       const apiOption = apiSourceOptionForSavedRunSide(side)
       const inferredDraft: ReconciliationAutomationSourceDraft = {
         sourceTypeEnumId: AUTOMATION_SOURCE_TYPE_API,
-        nsRestletConfigId: apiOption?.nsRestletConfigId ?? sideOption.nsRestletConfigId,
         systemMessageRemoteId: apiOption?.systemMessageRemoteId ?? sideOption.systemMessageRemoteId,
         safeMetadataJson: apiOption?.safeMetadataJson,
         optionKey: sideOption.sourceConfigId,

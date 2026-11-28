@@ -245,11 +245,6 @@ export const routes: RouteRecordRaw[] = [
     redirect: { name: 'settings-netsuite' },
   },
   {
-    path: '/connections/netsuite/endpoints',
-    name: 'connections-netsuite-endpoints',
-    redirect: { name: 'settings-netsuite' },
-  },
-  {
     path: '/connections/netsuite',
     name: 'connections-netsuite',
     redirect: { name: 'settings-netsuite' },
@@ -528,19 +523,6 @@ export const routes: RouteRecordRaw[] = [
     path: '/settings/netsuite/auth/edit/:nsAuthConfigId',
     name: 'settings-netsuite-auth-edit',
     component: () => import('../pages/settings/NetSuiteAuthWorkflowPage.vue'),
-    props: true,
-    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
-  },
-  {
-    path: '/settings/netsuite/endpoints/create',
-    name: 'settings-netsuite-endpoints-create',
-    component: () => import('../pages/settings/NetSuiteEndpointWorkflowPage.vue'),
-    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
-  },
-  {
-    path: '/settings/netsuite/endpoints/edit/:nsRestletConfigId',
-    name: 'settings-netsuite-endpoints-edit',
-    component: () => import('../pages/settings/NetSuiteEndpointWorkflowPage.vue'),
     props: true,
     meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
   },

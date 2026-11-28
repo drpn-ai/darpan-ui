@@ -743,9 +743,7 @@ function buildSourceConfigSummary(draftValue: ReconciliationRuleSetDraft | null,
 
 function apiEndpointLabel(draftValue: ReconciliationRuleSetDraft, side: SourceSide): string {
   return draftSideValue(draftValue, side, 'SystemMessageRemoteLabel')?.trim()
-    || draftSideValue(draftValue, side, 'NsRestletConfigLabel')?.trim()
     || draftSideValue(draftValue, side, 'SystemMessageRemoteId')?.trim()
-    || draftSideValue(draftValue, side, 'NsRestletConfigId')?.trim()
     || 'API'
 }
 

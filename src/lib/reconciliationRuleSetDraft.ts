@@ -86,8 +86,6 @@ export interface ReconciliationRuleSetDraft {
   file1SourceTypeEnumId?: string
   file1SystemMessageRemoteId?: string
   file1SystemMessageRemoteLabel?: string
-  file1NsRestletConfigId?: string
-  file1NsRestletConfigLabel?: string
   file1SourceConfigId?: string
   file1SourceConfigType?: string
   file1FileTypeEnumId: string
@@ -103,8 +101,6 @@ export interface ReconciliationRuleSetDraft {
   file2SourceTypeEnumId?: string
   file2SystemMessageRemoteId?: string
   file2SystemMessageRemoteLabel?: string
-  file2NsRestletConfigId?: string
-  file2NsRestletConfigLabel?: string
   file2SourceConfigId?: string
   file2SourceConfigType?: string
   file2FileTypeEnumId: string
@@ -260,7 +256,7 @@ function sideOptionPayloadFields(side: ReconciliationDraftSide, draft: Reconcili
   return options.length ? { [`${side}ExtractOptions`]: Object.fromEntries(options) } : {}
 }
 
-const API_SIDE_FIELDS = ['SystemMessageRemoteId', 'NsRestletConfigId', 'SourceConfigId', 'SourceConfigType'] as const
+const API_SIDE_FIELDS = ['SystemMessageRemoteId', 'SourceConfigId', 'SourceConfigType'] as const
 
 function buildSideSourceFields(side: ReconciliationDraftSide, draft: ReconciliationRuleSetDraft): Partial<CreateRuleSetRunPayload> {
   const primaryIdFields = primaryIdExpressionPayloadFields(draftSideValue(draft, side, 'PrimaryIdExpression'), side)

@@ -255,7 +255,6 @@ describe('RunsSettingsWorkflowPage', () => {
           systemEnumId: 'SHOPIFY',
         },
       ],
-      nsRestletConfigs: [],
       systemRemotes: [
         {
           systemMessageRemoteId: 'HOTWAX_ORDERS_API',
@@ -886,7 +885,6 @@ describe('RunsSettingsWorkflowPage', () => {
           primaryIdOptions: [{ fieldPath: '$.records[*].createdFrom', label: 'createdFrom' }],
         },
       ],
-      nsRestletConfigs: [],
       systemRemotes: [],
     }
     const storedFilters = [{ fieldExpression: '$.records[*].status', operator: 'in', values: ['Voided'] }]
@@ -1062,7 +1060,7 @@ describe('RunsSettingsWorkflowPage', () => {
       expect(wrapper.get('[data-testid="save-run-settings"]').attributes('disabled')).toBeDefined()
     })
 
-    it('keeps the endpoint control and its requirement on a RESTlet/remote side', async () => {
+    it('keeps the endpoint control and its requirement on a remote side', async () => {
       listAutomationSourceOptions.mockResolvedValue({
         ...suiteQlSourceOptions,
         sourceConfigs: [

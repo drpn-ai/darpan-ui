@@ -115,7 +115,6 @@ function apiSourceOptionsResponse() {
     messages: [],
     errors: [],
     sourceConfigs: [],
-    nsRestletConfigs: [],
     systemRemotes: [
       {
         systemMessageRemoteId: 'HOTWAX_ORDERS_API',
@@ -274,7 +273,6 @@ describe('ReconciliationRuleSetEditorPage', () => {
       messages: [],
       errors: [],
       sourceConfigs: [],
-      nsRestletConfigs: [],
       systemRemotes: [],
     })
     saveRuleSetRun.mockImplementation(async (payload: { runName?: string, description?: string, rules?: Array<Record<string, unknown>> }) => ({
@@ -388,7 +386,6 @@ describe('ReconciliationRuleSetEditorPage', () => {
       messages: [],
       errors: [],
       sourceConfigs: [],
-      nsRestletConfigs: [],
       systemRemotes: [
         {
           systemMessageRemoteId: 'HOTWAX_ORDERS_API',

@@ -17,8 +17,8 @@ describe('filterRecordsForActiveTenant', () => {
     expect(filterRecordsForActiveTenant(records, null)).toEqual(records)
   })
 
-  // DAR-BE-005: list#OmsRestSourceConfigs / list#ShopifyAuthConfigs / list#NsAuthConfigs /
-  // list#NsRestletConfigs already scope their response to owned rows plus ConfigTenantAccess
+  // DAR-BE-005: list#OmsRestSourceConfigs / list#ShopifyAuthConfigs / list#NsAuthConfigs
+  // already scope their response to owned rows plus ConfigTenantAccess
   // grants, and mark the shared-in rows isShared: true. Without this case, this same
   // tenant-ownership filter silently drops those rows again on every settings list AND on every
   // workflow page's "find the record being edited" lookup — a peer tenant could never see or open

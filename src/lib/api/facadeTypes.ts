@@ -105,23 +105,6 @@ export interface SaveNsAuthConfigPayload {
   privateKeyPem?: string
 }
 
-export interface ListNsRestletConfigsPayload {
-  pageIndex: number
-  pageSize: number
-}
-
-export interface SaveNsRestletConfigPayload {
-  nsRestletConfigId?: string
-  description?: string
-  endpointUrl: string
-  httpMethod: string
-  nsAuthConfigId: string
-  headersJson?: string
-  connectTimeoutSeconds: number
-  readTimeoutSeconds: number
-  isActive?: string
-}
-
 export interface ListShopifyAuthConfigsPayload {
   pageIndex: number
   pageSize: number
@@ -256,7 +239,6 @@ export interface CreateRuleSetRunPayload {
   file2SystemEnumId?: string
   file1SourceTypeEnumId?: string
   file1SystemMessageRemoteId?: string
-  file1NsRestletConfigId?: string
   file1SourceConfigId?: string
   file1SourceConfigType?: string
   file1FileTypeEnumId?: string
@@ -265,7 +247,6 @@ export interface CreateRuleSetRunPayload {
   file1PrimaryIdExpressions?: string[]
   file2SourceTypeEnumId?: string
   file2SystemMessageRemoteId?: string
-  file2NsRestletConfigId?: string
   file2SourceConfigId?: string
   file2SourceConfigType?: string
   file2FileTypeEnumId?: string
@@ -362,7 +343,6 @@ export interface AutomationSourcePayload {
   remotePathTemplate?: string
   fileNamePattern?: string
   systemMessageRemoteId?: string
-  nsRestletConfigId?: string
   apiRequestTemplateJson?: string
   apiResponsePathExpression?: string
   dateFromParameterName?: string

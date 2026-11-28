@@ -7,7 +7,6 @@ const listTenantChatSpaces = vi.hoisted(() => vi.fn())
 const getSlackInstall = vi.hoisted(() => vi.fn())
 const listSftpServers = vi.hoisted(() => vi.fn())
 const listNsAuthConfigs = vi.hoisted(() => vi.fn())
-const listNsRestletConfigs = vi.hoisted(() => vi.fn())
 const listShopifyAuthConfigs = vi.hoisted(() => vi.fn())
 const listOmsRestSourceConfigs = vi.hoisted(() => vi.fn())
 const listPeakPeriods = vi.hoisted(() => vi.fn())
@@ -51,7 +50,6 @@ vi.mock('../../../lib/api/facade', () => ({
     getSlackInstall,
     listSftpServers,
     listNsAuthConfigs,
-    listNsRestletConfigs,
     listShopifyAuthConfigs,
     listOmsRestSourceConfigs,
   },
@@ -142,7 +140,6 @@ describe('TenantSettingsPage', () => {
     listTenantChatSpaces.mockReset()
     listSftpServers.mockReset()
     listNsAuthConfigs.mockReset()
-    listNsRestletConfigs.mockReset()
     listShopifyAuthConfigs.mockReset()
     listOmsRestSourceConfigs.mockReset()
     listPeakPeriods.mockReset()
@@ -183,13 +180,6 @@ describe('TenantSettingsPage', () => {
       errors: [],
       pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
       authConfigs: [{ nsAuthConfigId: 'NS_AUTH', companyUserGroupId: 'KREWE' }],
-    })
-    listNsRestletConfigs.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      pagination: { pageIndex: 0, pageSize: 200, totalCount: 1, pageCount: 1 },
-      restletConfigs: [{ nsRestletConfigId: 'NS_ENDPOINT', companyUserGroupId: 'KREWE' }],
     })
     listShopifyAuthConfigs.mockResolvedValue({
       ok: true,
@@ -275,7 +265,6 @@ describe('TenantSettingsPage', () => {
     expect(listTenantChatSpaces).toHaveBeenCalledTimes(1)
     expect(listSftpServers).not.toHaveBeenCalled()
     expect(listNsAuthConfigs).not.toHaveBeenCalled()
-    expect(listNsRestletConfigs).not.toHaveBeenCalled()
     expect(listShopifyAuthConfigs).not.toHaveBeenCalled()
     expect(listOmsRestSourceConfigs).not.toHaveBeenCalled()
   })

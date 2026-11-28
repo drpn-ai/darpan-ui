@@ -157,15 +157,12 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
     { id: 'save-shopify-auth', text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-shopify-auth') },
   ]),
 
-  // Endpoints live inside the auth profile they sign in with (DAR-UI-062), so this page lists profiles only.
   'settings-netsuite': Object.freeze([
-    { id: 'netsuite-auth-tile', text: 'Auth is who NetSuite thinks you are. Its endpoints, what you ask it for, live inside it.', when: control('netsuite-auth-tile') },
+    { id: 'netsuite-auth-tile', text: 'Auth is who NetSuite thinks you are. Every NetSuite query a run reads signs in with one.', when: control('netsuite-auth-tile') },
   ]),
   'settings-netsuite-auth': Object.freeze([
-    { id: 'netsuite-endpoint-tile', text: 'Endpoints are what a run actually calls; the auth is only how it signs in.', when: control('netsuite-endpoint-tile') },
-    { id: 'netsuite-endpoint-create-action', text: 'A new endpoint made here already knows which profile it signs in with.', when: control('netsuite-endpoint-create-action') },
     { id: 'diagnose-netsuite-auth', text: 'Diagnostics mints one token and reads one id — safe to run whenever you doubt a credential.', when: control('diagnose-netsuite-auth') },
-    { id: 'delete-netsuite-auth', text: 'Delete refuses while endpoints, checks or saved runs still sign in with this profile.', when: control('delete-netsuite-auth') },
+    { id: 'delete-netsuite-auth', text: 'Delete refuses while checks or saved runs still sign in with this profile.', when: control('delete-netsuite-auth') },
   ]),
   'settings-netsuite-auth-create': Object.freeze([
     { id: 'wizard-next', text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
@@ -174,12 +171,6 @@ export const MASCOT_HINTS: Readonly<Record<string, readonly Hint[]>> = Object.fr
   'settings-netsuite-auth-edit': Object.freeze([
     { id: 'save-netsuite-auth', text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-netsuite-auth') },
     { id: 'toggle-client-id-visibility', text: 'The eye shows what you pasted, so a stray space is visible before you save it.', when: control('toggle-client-id-visibility') },
-  ]),
-  'settings-netsuite-endpoints-create': Object.freeze([
-    { id: 'wizard-next', text: 'One question per card, and nothing is written until the last one — leaving now costs you nothing.', when: control('wizard-next') },
-  ]),
-  'settings-netsuite-endpoints-edit': Object.freeze([
-    { id: 'save-netsuite-endpoint', text: 'This changes what future runs pull. Runs already finished keep whatever they compared.', when: control('save-netsuite-endpoint') },
   ]),
 
   'settings-sftp': Object.freeze([

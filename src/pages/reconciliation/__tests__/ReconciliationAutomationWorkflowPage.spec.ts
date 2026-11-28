@@ -123,9 +123,6 @@ function optionsResponse() {
       { sftpServerId: 'SFTP_OMS', label: 'OMS SFTP' },
       { sftpServerId: 'SFTP_SHOPIFY', label: 'Shopify SFTP' },
     ],
-    nsRestletConfigs: [
-      { nsRestletConfigId: 'NS_INVENTORY', label: 'NetSuite inventory', isActive: 'Y', systemEnumId: 'NETSUITE' },
-    ],
     systemRemotes: [
       {
         systemMessageRemoteId: 'OMS_REMOTE',
@@ -574,7 +571,6 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     await wrapper.get('[data-testid="automation-file2-api-select"]').trigger('click')
     expect(wrapper.text()).toContain('Shopify orders')
     expect(wrapper.text()).not.toContain('OMS orders')
-    expect(wrapper.text()).not.toContain('NetSuite inventory')
     await wrapper.get('[data-testid="workflow-select-option"][data-option-value="remote:SHOPIFY_REMOTE:SHOPIFY_ORDERS"]').trigger('click')
     await chooseWorkflowOption(wrapper, 'automation-window-select', 'AUT_WIN_PREV_WEEK')
     expect(wrapper.find('[data-testid="automation-window-count-input"]').exists()).toBe(false)

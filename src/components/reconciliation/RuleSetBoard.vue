@@ -361,7 +361,6 @@ import InlineValidation from '../ui/InlineValidation.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { jsonSchemaFacade, reconciliationFacade } from '../../lib/api/facade'
 import type {
-  AutomationNsRestletOption,
   AutomationPrimaryIdOption,
   AutomationSourceConfigOption,
   AutomationSystemRemoteOption,
@@ -500,7 +499,6 @@ const rulePopoverRef = ref<HTMLElement | null>(null)
 const exclusionPopoverRef = ref<HTMLElement | null>(null)
 const fieldNodeRefs = new Map<string, HTMLElement>()
 const loadError = ref<string | null>(null)
-const nsRestletConfigs = ref<AutomationNsRestletOption[]>([])
 const systemRemotes = ref<AutomationSystemRemoteOption[]>([])
 const sourceConfigs = ref<AutomationSourceConfigOption[]>([])
 const loadedFields = ref<Record<RuleSide, RuleField[]>>({
@@ -647,25 +645,15 @@ function sourceConfigMatches(optionConfigId: string | undefined, selectedConfigI
   return optionConfigId?.trim() === selectedConfigId.trim()
 }
 
-function selectedApiSourceOption(side: RuleSide): AutomationNsRestletOption | AutomationSystemRemoteOption | null {
+function selectedApiSourceOption(side: RuleSide): AutomationSystemRemoteOption | null {
   if (!draft.value) return null
 
-  const nsRestletConfigId = side === 'file1'
-    ? draft.value.file1NsRestletConfigId
-    : draft.value.file2NsRestletConfigId
   const systemMessageRemoteId = side === 'file1'
     ? draft.value.file1SystemMessageRemoteId
     : draft.value.file2SystemMessageRemoteId
   const sourceConfigId = side === 'file1'
     ? draft.value.file1SourceConfigId
     : draft.value.file2SourceConfigId
-
-  if (nsRestletConfigId?.trim()) {
-    return nsRestletConfigs.value.find((config) => (
-      config.nsRestletConfigId === nsRestletConfigId.trim()
-      && sourceConfigMatches(config.sourceConfigId, sourceConfigId)
-    )) ?? null
-  }
 
   if (systemMessageRemoteId?.trim()) {
     // systemMessageRemoteId is deliberately SHARED across a system family (SHOPIFY_RETURN_REFS
@@ -690,7 +678,7 @@ function selectedApiSourceOption(side: RuleSide): AutomationNsRestletOption | Au
     return systemRemotes.value.find(matchesRemoteAndConfig) ?? null
   }
 
-  // DAR-UI-064: a NetSuite SuiteQL side has no RESTlet and no remote; its query is the config row, and the query's own
+  // DAR-UI-064: a NetSuite SuiteQL side has no remote; its query is the config row, and the query's own
   // projection is its field list (fieldOptions on the row).
   if (sourceConfigId?.trim()) {
     const systemEnumId = (side === 'file1' ? draft.value.file1SystemEnumId : draft.value.file2SystemEnumId)?.trim()
@@ -708,10 +696,9 @@ const loadAbortController = new AbortController()
 
 async function ensureApiSourceOptionsLoaded(): Promise<void> {
   if (!sourceUsesApi('file1') && !sourceUsesApi('file2')) return
-  if (nsRestletConfigs.value.length || systemRemotes.value.length || sourceConfigs.value.length) return
+  if (systemRemotes.value.length || sourceConfigs.value.length) return
 
   const response = await reconciliationFacade.listAutomationSourceOptions(loadAbortController.signal)
-  nsRestletConfigs.value = response.nsRestletConfigs ?? []
   systemRemotes.value = response.systemRemotes ?? []
   sourceConfigs.value = response.sourceConfigs ?? []
 }

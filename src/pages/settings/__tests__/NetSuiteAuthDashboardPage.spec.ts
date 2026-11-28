@@ -8,7 +8,6 @@ const route = vi.hoisted(() => ({
 }))
 
 const listNsAuthConfigs = vi.hoisted(() => vi.fn())
-const listNsRestletConfigs = vi.hoisted(() => vi.fn())
 const deleteNsAuthConfig = vi.hoisted(() => vi.fn())
 const testSourceConnection = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
@@ -34,7 +33,6 @@ vi.mock('vue-router', () => ({
 vi.mock('../../../lib/api/facade', () => ({
   settingsFacade: {
     listNsAuthConfigs,
-    listNsRestletConfigs,
     deleteNsAuthConfig,
     testSourceConnection,
   },
@@ -95,38 +93,12 @@ function authConfigsResponse(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function restletConfigsResponse(restletConfigs: Record<string, unknown>[]) {
-  return {
-    ok: true,
-    messages: [],
-    errors: [],
-    restletConfigs,
-    pagination: { pageIndex: 0, pageSize: 200, totalCount: restletConfigs.length, pageCount: 1 },
-  }
-}
-
-function restlet(nsRestletConfigId: string, description: string, nsAuthConfigId: string, companyUserGroupId = 'KREWE') {
-  return {
-    nsRestletConfigId,
-    description,
-    companyUserGroupId,
-    endpointUrl: 'https://1234.restlets.api.netsuite.com/app/site/hosting/restlet.nl',
-    httpMethod: 'POST',
-    nsAuthConfigId,
-    connectTimeoutSeconds: 30,
-    readTimeoutSeconds: 60,
-    isActive: 'Y',
-  }
-}
-
 describe('NetSuiteAuthDashboardPage', () => {
   beforeEach(() => {
     invalidateReadCache()
     route.params = { nsAuthConfigId: 'auth-primary' }
     route.fullPath = '/settings/netsuite/auth/auth-primary'
     listNsAuthConfigs.mockReset()
-    listNsRestletConfigs.mockReset()
-    listNsRestletConfigs.mockResolvedValue(restletConfigsResponse([]))
     setWorkflowOrigin.mockReset()
     deleteNsAuthConfig.mockReset()
     testSourceConnection.mockReset()
@@ -140,19 +112,13 @@ describe('NetSuiteAuthDashboardPage', () => {
     }
   })
 
-  it('opens a read-only auth summary with endpoints, an edit icon, and a back action', async () => {
+  it('opens a read-only auth summary with an edit icon and a back action', async () => {
     listNsAuthConfigs.mockResolvedValue(authConfigsResponse())
-    listNsRestletConfigs.mockResolvedValue(restletConfigsResponse([
-      restlet('invoice-export', 'Invoice Export', 'auth-primary'),
-      restlet('other-auth-endpoint', 'Uses Another Profile', 'auth-other'),
-      restlet('foreign-endpoint', 'Another Tenant', 'auth-primary', 'OTHER'),
-    ]))
 
     const wrapper = mount(NetSuiteAuthDashboardPage)
     await flushPromises()
 
     expect(listNsAuthConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
-    expect(listNsRestletConfigs).toHaveBeenCalledWith({ pageIndex: 0, pageSize: 200 }, expect.any(AbortSignal))
     expect(wrapper.get('h1').text()).toBe('Rails Prod')
 
     // Every label on the rendered page has a mascot answer (the markup sweep in mascotTargets.page.spec cannot see
@@ -185,15 +151,6 @@ describe('NetSuiteAuthDashboardPage', () => {
     expect(readFileSync('src/style.css', 'utf8')).toMatch(/\.static-page-summary-card--full\s*\{\s*grid-column: 1 \/ -1;/)
     // The client ID is masked in the edit wizard; a read-only page must not print it in the clear.
     expect(wrapper.text()).not.toContain('secret-client-id')
-
-    // Only this profile's RESTlet endpoints, in this tenant; each opens its edit wizard.
-    const endpointTiles = wrapper.findAll('[data-testid="netsuite-endpoint-tile"]')
-    expect(endpointTiles.map((tile) => tile.text())).toEqual(['Invoice Export'])
-    expect(endpointTiles[0]?.attributes('data-to')).toContain('"name":"settings-netsuite-endpoints-edit"')
-    expect(endpointTiles[0]?.attributes('data-to')).toContain('"nsRestletConfigId":"invoice-export"')
-    const createEndpoint = wrapper.get('[data-testid="netsuite-endpoint-create-action"]')
-    expect(createEndpoint.attributes('data-to')).toContain('"name":"settings-netsuite-endpoints-create"')
-    expect(createEndpoint.attributes('data-to')).toContain('"query":{"nsAuthConfigId":"auth-primary"}')
 
     const editAction = wrapper.get('[data-testid="netsuite-auth-edit-action"]')
     expect(editAction.attributes('aria-label')).toBe('Edit NetSuite Auth')
@@ -265,7 +222,7 @@ describe('NetSuiteAuthDashboardPage', () => {
   it('stays put and shows why when the profile is still in use', async () => {
     listNsAuthConfigs.mockResolvedValue(authConfigsResponse())
     deleteNsAuthConfig.mockRejectedValue(new ApiCallError(
-      "NS Auth config 'auth-primary' is still used by 1 RESTlet endpoint. Move them to another auth profile or delete them first.", 200))
+      "NS Auth config 'auth-primary' is still used by 1 saved run. Move them to another auth profile or delete them first.", 200))
     vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     const wrapper = mount(NetSuiteAuthDashboardPage)
@@ -273,7 +230,7 @@ describe('NetSuiteAuthDashboardPage', () => {
     await wrapper.get('[data-testid="delete-netsuite-auth"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('is still used by 1 RESTlet endpoint')
+    expect(wrapper.text()).toContain('is still used by 1 saved run')
     expect(push).not.toHaveBeenCalled()
   })
 
@@ -324,7 +281,6 @@ describe('NetSuiteAuthDashboardPage', () => {
 
     expect(wrapper.get('h1').text()).toBe('Rails Prod')
     expect(wrapper.find('[data-testid="netsuite-auth-edit-action"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="netsuite-endpoint-create-action"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="diagnose-netsuite-auth"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="delete-netsuite-auth"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="back-netsuite-auth"]').exists()).toBe(true)

@@ -243,10 +243,10 @@ const staticCommandActions: CommandAction[] = [
   {
     id: 'navigate-netsuite',
     label: 'Open NetSuite Settings',
-    description: 'Manage NetSuite auth profiles and endpoint configs.',
+    description: 'Manage NetSuite auth profiles.',
     group: 'Navigate',
     to: '/settings/netsuite',
-    aliases: ['netsuite', 'login', 'credentials', 'token', 'oauth', 'auth', 'endpoint', 'api url', 'restlet', 'timeout', 'settings'],
+    aliases: ['netsuite', 'login', 'credentials', 'token', 'oauth', 'auth', 'endpoint', 'api url', 'timeout', 'settings'],
   },
   {
     id: 'navigate-shopify',

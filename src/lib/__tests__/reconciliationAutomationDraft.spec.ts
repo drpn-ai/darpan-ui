@@ -124,7 +124,7 @@ describe('reconciliationAutomationDraft', () => {
         },
         FILE_2: {
           sourceTypeEnumId: 'AUT_SRC_API',
-          nsRestletConfigId: 'SHOPIFY_ORDER_RESTLET',
+          systemMessageRemoteId: 'SHOPIFY_REMOTE',
           apiRequestTemplateJson: '{"status":"open"}',
           apiResponsePathExpression: '$.data.orders',
         },
@@ -161,7 +161,7 @@ describe('reconciliationAutomationDraft', () => {
           fileTypeEnumId: 'DftJson',
           schemaFileName: 'test-shopify-orders.schema.json',
           primaryIdExpression: '$.data.orders.edges[0].node.id',
-          nsRestletConfigId: 'SHOPIFY_ORDER_RESTLET',
+          systemMessageRemoteId: 'SHOPIFY_REMOTE',
           apiRequestTemplateJson: '{"status":"open"}',
           apiResponsePathExpression: '$.data.orders',
         },

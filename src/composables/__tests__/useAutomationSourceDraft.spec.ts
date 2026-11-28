@@ -2,7 +2,6 @@ import { computed, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { useAutomationSourceDraft } from '../useAutomationSourceDraft'
 import type {
-  AutomationNsRestletOption,
   AutomationSftpServerOption,
   AutomationSystemRemoteOption,
   SavedRunSystemOption,
@@ -10,7 +9,6 @@ import type {
 
 interface Harness {
   systemOptions: ReturnType<typeof ref<SavedRunSystemOption[]>>
-  nsConfigs: ReturnType<typeof ref<AutomationNsRestletOption[]>>
   remotes: ReturnType<typeof ref<AutomationSystemRemoteOption[]>>
   sftpServers: ReturnType<typeof ref<AutomationSftpServerOption[]>>
   usesApi: ReturnType<typeof ref<boolean>>
@@ -21,20 +19,18 @@ interface Harness {
 
 function createHarness(initial: Partial<Harness> = {}): Harness {
   const systemOptions = ref<SavedRunSystemOption[]>([])
-  const nsConfigs = ref<AutomationNsRestletOption[]>([])
   const remotes = ref<AutomationSystemRemoteOption[]>([])
   const sftpServers = ref<AutomationSftpServerOption[]>([])
   const usesApi = ref(false)
   const usesSftp = ref(false)
   const inputModeEnumId = ref('')
 
-  Object.assign({ systemOptions, nsConfigs, remotes, sftpServers, usesApi, usesSftp, inputModeEnumId }, initial)
+  Object.assign({ systemOptions, remotes, sftpServers, usesApi, usesSftp, inputModeEnumId }, initial)
 
   const source = useAutomationSourceDraft({
     selectedSavedRunSystemOptions: computed(() => systemOptions.value ?? undefined),
     defaultFile1SystemEnumId: computed(() => undefined),
     defaultFile2SystemEnumId: computed(() => undefined),
-    nsRestletConfigs: computed(() => nsConfigs.value ?? []),
     systemRemotes: computed(() => remotes.value ?? []),
     sftpServers: computed(() => sftpServers.value ?? []),
     usesApi: computed(() => usesApi.value === true),
@@ -44,7 +40,7 @@ function createHarness(initial: Partial<Harness> = {}): Harness {
     },
   })
 
-  return { systemOptions, nsConfigs, remotes, sftpServers, usesApi, usesSftp, inputModeEnumId, source }
+  return { systemOptions, remotes, sftpServers, usesApi, usesSftp, inputModeEnumId, source }
 }
 
 describe('useAutomationSourceDraft', () => {
@@ -88,11 +84,11 @@ describe('useAutomationSourceDraft', () => {
   })
 
   it('skips the API source step when only one API option matches the side', () => {
-    const { usesApi, systemOptions, nsConfigs, source } = createHarness()
+    const { usesApi, systemOptions, remotes, source } = createHarness()
     usesApi.value = true
-    systemOptions.value = [{ enumId: 'NS', fileSide: 'FILE_1' }]
-    nsConfigs.value = [
-      { nsRestletConfigId: 'cfg-1', systemEnumId: 'NS', label: 'Only NS' } as AutomationNsRestletOption,
+    systemOptions.value = [{ enumId: 'SHOPIFY', fileSide: 'FILE_1' }]
+    remotes.value = [
+      { systemMessageRemoteId: 'SHOPIFY_REMOTE', systemEnumId: 'SHOPIFY', label: 'Only Shopify', safeMetadataJson: '{}' } as AutomationSystemRemoteOption,
     ]
     expect(source.shouldSkipApiSourceStep('FILE_1')).toBe(true)
   })
@@ -143,24 +139,13 @@ describe('useAutomationSourceDraft', () => {
     expect(source.apiSourceOptionsForSide('FILE_1')).toEqual([])
   })
 
-  // NetSuite configs are kept under the system itself (NETSUITE), and each has its own value, so a side on a
-  // NetSuite endpoint (SuiteQL) finds them by the server's parent.
-  it('offers a NetSuite endpoint side the configs kept under NetSuite', () => {
-    const { usesApi, systemOptions, nsConfigs, source } = createHarness()
-    usesApi.value = true
-    systemOptions.value = [{ enumId: 'NETSUITE_SUITEQL', systemParentEnumId: 'NETSUITE', fileSide: 'FILE_1' }]
-    nsConfigs.value = [
-      { nsRestletConfigId: 'cfg-ns', systemEnumId: 'NETSUITE', label: 'NetSuite prod' },
-      { nsRestletConfigId: 'cfg-other', systemEnumId: 'SHOPIFY', label: 'Not NetSuite' },
-    ] as AutomationNsRestletOption[]
-    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['NetSuite prod'])
-  })
-
   it('keeps legacy system ids matching their system', () => {
-    const { usesApi, systemOptions, nsConfigs, source } = createHarness()
+    const { usesApi, systemOptions, remotes, source } = createHarness()
     usesApi.value = true
-    systemOptions.value = [{ enumId: 'NETSUITE', fileSide: 'FILE_1' }]
-    nsConfigs.value = [{ nsRestletConfigId: 'cfg-1', systemEnumId: 'DARSYSNETSUITE', label: 'Legacy NS' } as AutomationNsRestletOption]
-    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['Legacy NS'])
+    systemOptions.value = [{ enumId: 'SHOPIFY', fileSide: 'FILE_1' }]
+    remotes.value = [
+      { systemMessageRemoteId: 'SHOPIFY_REMOTE', systemEnumId: 'DARSYSSHOPIFY', label: 'Legacy Shopify', safeMetadataJson: '{}' } as AutomationSystemRemoteOption,
+    ]
+    expect(source.apiSourceOptionsForSide('FILE_1').map((o) => o.label)).toEqual(['Legacy Shopify'])
   })
 })

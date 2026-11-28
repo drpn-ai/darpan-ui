@@ -349,7 +349,6 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import AddChatSpaceFlow from '../../components/settings/AddChatSpaceFlow.vue'
 import { reconciliationFacade, settingsFacade } from '../../lib/api/facade'
 import type {
-  AutomationNsRestletOption,
   AutomationRecord,
   AutomationSourceRecord,
   AutomationSyncStatus,
@@ -398,7 +397,6 @@ interface SourceOptions {
   relativeWindows: EnumOption[]
   savedRuns: SavedRunSummary[]
   sftpServers: AutomationSftpServerOption[]
-  nsRestletConfigs: AutomationNsRestletOption[]
   systemRemotes: AutomationSystemRemoteOption[]
 }
 
@@ -489,7 +487,6 @@ const sourceOptions = ref<SourceOptions>({
   relativeWindows: [],
   savedRuns: [],
   sftpServers: [],
-  nsRestletConfigs: [],
   systemRemotes: [],
 })
 const selectedSavedRun = computed(() => {
@@ -514,7 +511,6 @@ const sources = useAutomationSourceDraft({
   selectedSavedRunSystemOptions: computed(() => selectedSavedRun.value?.systemOptions),
   defaultFile1SystemEnumId: computed(() => selectedSavedRun.value?.defaultFile1SystemEnumId ?? undefined),
   defaultFile2SystemEnumId: computed(() => selectedSavedRun.value?.defaultFile2SystemEnumId ?? undefined),
-  nsRestletConfigs: computed(() => sourceOptions.value.nsRestletConfigs),
   systemRemotes: computed(() => sourceOptions.value.systemRemotes),
   sftpServers: computed(() => sourceOptions.value.sftpServers),
   usesApi,
@@ -988,13 +984,13 @@ const canProceed = computed(() => {
     case 'file1-remote-path':
       return !!sourceDrafts.value.FILE_1.remotePathTemplate?.trim()
     case 'file1-api':
-      return (!!sourceDrafts.value.FILE_1.nsRestletConfigId || !!sourceDrafts.value.FILE_1.systemMessageRemoteId) && !activeSelectError.value
+      return !!sourceDrafts.value.FILE_1.systemMessageRemoteId && !activeSelectError.value
     case 'file2-sftp':
       return !!sourceDrafts.value.FILE_2.sftpServerId && !activeSelectError.value
     case 'file2-remote-path':
       return !!sourceDrafts.value.FILE_2.remotePathTemplate?.trim()
     case 'file2-api':
-      return (!!sourceDrafts.value.FILE_2.nsRestletConfigId || !!sourceDrafts.value.FILE_2.systemMessageRemoteId) && !activeSelectError.value
+      return !!sourceDrafts.value.FILE_2.systemMessageRemoteId && !activeSelectError.value
     case 'date-window':
       return dateWindowReady.value
     case 'schedule':
@@ -1024,8 +1020,8 @@ const canSave = computed(() => {
   }
   if (usesApi.value) {
     return dateWindowReady.value && Boolean(
-      (sourceDrafts.value.FILE_1.nsRestletConfigId || sourceDrafts.value.FILE_1.systemMessageRemoteId) &&
-      (sourceDrafts.value.FILE_2.nsRestletConfigId || sourceDrafts.value.FILE_2.systemMessageRemoteId),
+      sourceDrafts.value.FILE_1.systemMessageRemoteId &&
+      sourceDrafts.value.FILE_2.systemMessageRemoteId,
     )
   }
   return false
@@ -1289,7 +1285,9 @@ async function saveAutomationSetup(): Promise<void> {
   try {
     const response = await reconciliationFacade.saveAutomation(buildSaveAutomationPayload(activeDraft.value, selectedSavedRun.value), submitSignal)
     const origin = draftStore.workflowOrigin
-    const savedAutomationId = response.automation?.automationId || activeDraft.value.automationId
+    // The contract types the saved automation as an open map, so its id is unknown until checked.
+    const responseAutomationId = response.automation?.automationId
+    const savedAutomationId = (typeof responseAutomationId === 'string' && responseAutomationId) || activeDraft.value.automationId
     const fallbackRoute = savedAutomationId
       ? { name: 'reconciliation-automation-dashboard', params: { automationId: savedAutomationId } }
       : { name: 'hub' }
@@ -1325,7 +1323,6 @@ function sourceDraftFromRecord(source: AutomationSourceRecord): ReconciliationAu
   return {
     sourceTypeEnumId: source.sourceTypeEnumId,
     sftpServerId: source.sftpServerId,
-    nsRestletConfigId: source.nsRestletConfigId,
     systemMessageRemoteId: source.systemMessageRemoteId,
     remotePathTemplate: source.remotePathTemplate,
     fileNamePattern: source.fileNamePattern,
@@ -1595,7 +1592,6 @@ async function loadOptions(): Promise<void> {
       relativeWindows: response.relativeWindows ?? [],
       savedRuns: response.savedRuns ?? [],
       sftpServers: response.sftpServers ?? [],
-      nsRestletConfigs: response.nsRestletConfigs ?? [],
       systemRemotes: response.systemRemotes ?? [],
     }
     await chatSpaceOptionsPromise

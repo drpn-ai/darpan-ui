@@ -7,7 +7,6 @@ describe('SHARED_CONFIG_TYPES', () => {
       hotwaxOms: 'SCFG_HOTWAX_OMS',
       shopifyAuth: 'SCFG_SHOPIFY_AUTH',
       netSuiteAuth: 'SCFG_NS_AUTH',
-      netSuiteRestlet: 'SCFG_NS_RESTLET',
     })
   })
 })

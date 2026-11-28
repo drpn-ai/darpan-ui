@@ -29,8 +29,6 @@ const resolve = vi.hoisted(() =>
       '/settings/sftp/edit/',
       '/settings/netsuite/auth/create',
       '/settings/netsuite/auth/edit/',
-      '/settings/netsuite/endpoints/create',
-      '/settings/netsuite/endpoints/edit/',
       '/settings/shopify/create',
       '/settings/shopify/edit/',
       '/settings/hotwax/create',
@@ -813,7 +811,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const sftpWorkflowSource = readFileSync('src/pages/settings/SftpServerWorkflowPage.vue', 'utf8')
     const tenantSettingsSource = readFileSync('src/pages/settings/TenantSettingsPage.vue', 'utf8')
     const authSource = readFileSync('src/pages/settings/NetSuiteAuthWorkflowPage.vue', 'utf8')
-    const endpointsSource = readFileSync('src/pages/settings/NetSuiteEndpointWorkflowPage.vue', 'utf8')
     const shopifySource = readFileSync('src/pages/settings/ShopifyAuthWorkflowPage.vue', 'utf8')
     const omsSource = readFileSync('src/pages/settings/OmsRestSourceWorkflowPage.vue', 'utf8')
     const schemaEditorSource = readFileSync('src/pages/jsonschema/JsonSchemaEditorPage.vue', 'utf8')
@@ -828,8 +825,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(tenantSettingsSource).not.toContain('<select')
     expect(authSource).toContain('<AppSelect')
     expect(authSource).not.toContain('<select')
-    expect(endpointsSource).toContain('<AppSelect')
-    expect(endpointsSource).not.toContain('<select')
     expect(shopifySource).toContain('<AppSelect')
     expect(shopifySource).toContain('class="app-table__checkbox"')
     expect(shopifySource).not.toContain('<select')
@@ -846,7 +841,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const runsWorkflowSource = readFileSync('src/pages/settings/RunsSettingsWorkflowPage.vue', 'utf8')
     const tenantSettingsSource = readFileSync('src/pages/settings/TenantSettingsPage.vue', 'utf8')
     const authSource = readFileSync('src/pages/settings/NetSuiteAuthWorkflowPage.vue', 'utf8')
-    const endpointsSource = readFileSync('src/pages/settings/NetSuiteEndpointWorkflowPage.vue', 'utf8')
     const shopifySource = readFileSync('src/pages/settings/ShopifyAuthWorkflowPage.vue', 'utf8')
     const omsSource = readFileSync('src/pages/settings/OmsRestSourceWorkflowPage.vue', 'utf8')
     const schemaEditorSource = readFileSync('src/pages/jsonschema/JsonSchemaEditorPage.vue', 'utf8')
@@ -862,7 +856,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(tenantSettingsSource).toContain('<WorkflowStepForm')
     expect(tenantSettingsSource).toContain('primary-action-variant="save"')
     // The connection wizards bind one shared form contract (useConnectionWorkflow, DAR-OPS-029 U11).
-    for (const source of [authSource, endpointsSource, shopifySource, omsSource]) {
+    for (const source of [authSource, shopifySource, omsSource]) {
       expect(source).toContain('<WorkflowStepForm')
       expect(source).toContain('v-bind="formBindings"')
       expect(source).toContain('useConnectionWorkflow')
@@ -880,7 +874,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const runsWorkflowSource = readFileSync('src/pages/settings/RunsSettingsWorkflowPage.vue', 'utf8')
     const sftpWorkflowSource = readFileSync('src/pages/settings/SftpServerWorkflowPage.vue', 'utf8')
     const authSource = readFileSync('src/pages/settings/NetSuiteAuthWorkflowPage.vue', 'utf8')
-    const endpointsSource = readFileSync('src/pages/settings/NetSuiteEndpointWorkflowPage.vue', 'utf8')
     const shopifySource = readFileSync('src/pages/settings/ShopifyAuthWorkflowPage.vue', 'utf8')
     const omsSource = readFileSync('src/pages/settings/OmsRestSourceWorkflowPage.vue', 'utf8')
 
@@ -889,7 +882,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(workflowStepFormSource).toContain('<AppCancelAction')
     expect(workflowStepFormSource).toContain("showCancelAction: false")
     expect(runsWorkflowSource).toContain(':show-cancel-action="true"')
-    for (const source of [sftpWorkflowSource, authSource, endpointsSource, shopifySource, omsSource]) {
+    for (const source of [sftpWorkflowSource, authSource, shopifySource, omsSource]) {
       expect(source).toContain('v-bind="formBindings"')
     }
     expect(readFileSync('src/pages/settings/useConnectionWorkflow.ts', 'utf8')).toContain('showCancelAction: isEditing.value')
@@ -927,7 +920,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const sftpWorkflowSource = readFileSync('src/pages/settings/SftpServerWorkflowPage.vue', 'utf8')
     const tenantSettingsSource = readFileSync('src/pages/settings/TenantSettingsPage.vue', 'utf8')
     const authWorkflowSource = readFileSync('src/pages/settings/NetSuiteAuthWorkflowPage.vue', 'utf8')
-    const endpointWorkflowSource = readFileSync('src/pages/settings/NetSuiteEndpointWorkflowPage.vue', 'utf8')
     const shopifyWorkflowSource = readFileSync('src/pages/settings/ShopifyAuthWorkflowPage.vue', 'utf8')
     const omsWorkflowSource = readFileSync('src/pages/settings/OmsRestSourceWorkflowPage.vue', 'utf8')
 
@@ -945,7 +937,7 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(runsWorkflowSource).toContain('edit-surface')
     expect(runsWorkflowSource).toContain(':show-enter-hint="false"')
     expect(tenantSettingsSource).toContain('workflow-form--edit-single-page')
-    for (const source of [sftpWorkflowSource, authWorkflowSource, endpointWorkflowSource, shopifyWorkflowSource, omsWorkflowSource]) {
+    for (const source of [sftpWorkflowSource, authWorkflowSource, shopifyWorkflowSource, omsWorkflowSource]) {
       expect(source).toContain('<WorkflowPage v-bind="pageBindings"')
       expect(source).toContain('v-bind="formBindings"')
     }
