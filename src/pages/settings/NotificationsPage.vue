@@ -608,16 +608,15 @@ async function chooseSpaceMenu(value: string): Promise<void> {
     void saveSpace(space, { isActive: value === 'activate' })
     return
   }
+  // What is left is Delete: it waits for the backend, which refuses a space still in use.
   popupSaving.value = true
-  if (value === 'delete') {
-    try {
-      const response = await settingsFacade.deleteTenantChatSpace({ chatSpaceId: space.chatSpaceId }, pageAbortController.signal)
-      statusMessage.value = response.messages?.[0] ?? 'Deleted chat space.'
-      closePopup()
-      await loadAll()
-    } catch (error) {
-      if (!isAbort(error)) popupError.value = describeError(error, 'The chat space is still talking. Still here.')
-    }
+  try {
+    const response = await settingsFacade.deleteTenantChatSpace({ chatSpaceId: space.chatSpaceId }, pageAbortController.signal)
+    statusMessage.value = response.messages?.[0] ?? 'Deleted chat space.'
+    closePopup()
+    await loadAll()
+  } catch (error) {
+    if (!isAbort(error)) popupError.value = describeError(error, 'The chat space is still talking. Still here.')
   }
   popupSaving.value = false
 }

@@ -370,10 +370,6 @@ function sourceSystemEnumId(sourceKey: SourceKey): string {
     : source2Schema.value?.systemEnumId ?? ''
 }
 
-function endpointMatchesSystem(endpointSystemEnumId: string | undefined, selectedSystemEnumId: string): boolean {
-  return darpanSystemIdsMatch(endpointSystemEnumId, selectedSystemEnumId)
-}
-
 // DAR-UI-077. Endpoints are grouped under their parent system (OMS_GQL and OMS_RETURNS_GQL under OMS), as in the run
 // builder, so a side can move to a sibling endpoint and not only keep its own.
 function endpointInSystemFamily(endpointSystemEnumId: string | undefined, selectedSystemEnumId: string): boolean {
@@ -387,7 +383,7 @@ function sourceConfigMatches(candidate: string | undefined, selected: string): b
 function apiSourceConfigOptionsForSource(sourceKey: SourceKey): AppSelectOption[] {
   const systemEnumId = sourceSystemEnumId(sourceKey)
   return sourceConfigs.value
-    .filter((config) => endpointMatchesSystem(config.systemEnumId, systemEnumId))
+    .filter((config) => darpanSystemIdsMatch(config.systemEnumId, systemEnumId))
     .map((config) => ({
       value: config.sourceConfigId,
       label: config.label || config.description || config.sourceConfigId,
@@ -401,7 +397,7 @@ function apiEndpointOptionsForSource(sourceKey: SourceKey): AppSelectOption[] {
 
   return [
     ...nsRestletConfigs.value
-      .filter((config) => endpointMatchesSystem(config.systemEnumId, systemEnumId))
+      .filter((config) => darpanSystemIdsMatch(config.systemEnumId, systemEnumId))
       .filter((config) => sourceConfigMatches(config.sourceConfigId || config.nsAuthConfigId, source.sourceConfigId))
       .map((config) => ({
         value: `ns:${config.nsRestletConfigId}`,
@@ -473,7 +469,7 @@ function selectedRemoteOptionForSource(sourceKey: SourceKey): AutomationSystemRe
   const systemEnumId = sourceSystemEnumId(sourceKey)
   if (systemEnumId) {
     const endpointMatch = systemRemotes.value.find((remote) =>
-      matchesRemoteAndConfig(remote) && endpointMatchesSystem(remote.systemEnumId, systemEnumId),
+      matchesRemoteAndConfig(remote) && darpanSystemIdsMatch(remote.systemEnumId, systemEnumId),
     )
     if (endpointMatch) return endpointMatch
   }
@@ -489,7 +485,7 @@ function selectedSuiteQlQueryRow(sourceKey: SourceKey): AutomationSourceConfigOp
   if (!source.sourceConfigId) return null
   return sourceConfigs.value.find((config) =>
     sourceConfigMatches(config.sourceConfigId, source.sourceConfigId) &&
-    (!config.systemEnumId || !systemEnumId || endpointMatchesSystem(config.systemEnumId, systemEnumId)),
+    (!config.systemEnumId || !systemEnumId || darpanSystemIdsMatch(config.systemEnumId, systemEnumId)),
   ) ?? null
 }
 
@@ -811,11 +807,9 @@ function resolveOriginPath(): string {
 }
 
 const pageAbortController = new AbortController()
-let loadController: AbortController | null = null
 
 onBeforeUnmount(() => {
   pageAbortController.abort()
-  loadController?.abort()
 })
 
 async function ensureFieldsLoaded(schemaId: string, signal?: AbortSignal): Promise<void> {
@@ -829,7 +823,7 @@ async function ensureFieldsLoaded(schemaId: string, signal?: AbortSignal): Promi
   }
 }
 
-async function syncFieldOptions(sourceKey: 'source1' | 'source2', signal?: AbortSignal): Promise<void> {
+async function syncFieldOptions(sourceKey: SourceKey, signal?: AbortSignal): Promise<void> {
   if (sourceUsesApi(sourceKey)) return
 
   const source = form[sourceKey]
@@ -861,9 +855,7 @@ async function load(): Promise<void> {
   error.value = null
   success.value = null
 
-  loadController?.abort()
-  loadController = new AbortController()
-  const signal = loadController.signal
+  const signal = pageAbortController.signal
 
   try {
     const draftState = draftStore.ruleSetDraftState
@@ -1024,7 +1016,6 @@ watch(() => form.source2.schemaId, () => {
   void syncFieldOptions('source2')
 })
 
-watch(() => route.fullPath, () => {
-  void load()
-}, { immediate: true })
+// Once: a different run's URL remounts the page (App keys the RouterView on the full path).
+void load()
 </script>

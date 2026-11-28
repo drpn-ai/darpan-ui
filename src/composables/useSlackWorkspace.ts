@@ -15,7 +15,6 @@ export interface SlackActionResult {
 }
 
 export interface UseSlackWorkspace {
-  installs: Ref<SlackWorkspaceInstall[]>
   connected: ComputedRef<SlackWorkspaceInstall | null>
   oauthAvailable: Ref<boolean>
   loading: Ref<boolean>
@@ -125,7 +124,6 @@ export function useSlackWorkspace(signal?: AbortSignal): UseSlackWorkspace {
   }
 
   return {
-    installs,
     connected,
     oauthAvailable,
     loading,
