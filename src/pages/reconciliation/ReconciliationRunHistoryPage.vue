@@ -183,7 +183,7 @@ import { RUN_HISTORY_PAGE_SIZE, runHistoryPage } from '../../lib/api/queries'
 import type { PaginationMeta, GeneratedOutput } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
-import { useRunResultsStore } from '../../stores/runResults'
+import { isActiveRunStatus, useRunResultsStore } from '../../stores/runResults'
 import {
   listPendingReconciliationRuns,
   pruneAbandonedPendingReconciliationRuns,
@@ -209,7 +209,6 @@ import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
 
 const GENERATED_OUTPUT_FETCH_PAGE_SIZE = RUN_HISTORY_PAGE_SIZE
 const OTHER_RESULTS_BATCH_SIZE = 5
-const RUNNING_STATUS_IDS = new Set(['AUT_STAT_PENDING', 'AUT_STAT_RUNNING'])
 
 const FAILED_RUN_STATUS_ID = 'AUT_STAT_FAILED'
 
@@ -384,8 +383,7 @@ function generatedOutputKey(output: GeneratedOutput): string {
 }
 
 function isRunningGeneratedOutput(output: GeneratedOutput): boolean {
-  const statusEnumId = normalizeDisplayText(output.statusEnumId)
-  return RUNNING_STATUS_IDS.has(statusEnumId)
+  return isActiveRunStatus(normalizeDisplayText(output.statusEnumId))
 }
 
 function isCompletedGeneratedOutput(output: GeneratedOutput): boolean {

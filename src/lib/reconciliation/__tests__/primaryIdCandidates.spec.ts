@@ -41,6 +41,10 @@ describe('rankPrimaryIdCandidates', () => {
     expect(rankPrimaryIdCandidates(['STATUS', 'ORDER_ID'])).toEqual(['ORDER_ID', 'STATUS'])
   })
 
+  it('handles upper-case separated identifier words the same way as ids', () => {
+    expect(rankPrimaryIdCandidates(['STATUS', 'ORDER_NO', 'CUSTOMER_EMAIL'])).toEqual(['ORDER_NO', 'CUSTOMER_EMAIL', 'STATUS'])
+  })
+
   it('returns an empty list unchanged', () => {
     expect(rankPrimaryIdCandidates([])).toEqual([])
   })

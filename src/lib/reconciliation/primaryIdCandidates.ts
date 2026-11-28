@@ -14,9 +14,10 @@ function candidateRank(fieldPath: string): number {
   const trimmed = fieldPath.trim()
   if (EXACT_ID.test(trimmed)) return 0
   // Tested against the raw string for camelCase (orderId) and the lowercased one for
-  // separator forms in any case (customer_id, ORDER_ID).
-  if (ID_SUFFIX.test(trimmed) || ID_SUFFIX.test(trimmed.toLowerCase())) return 1
-  if (IDENTIFIER_WORD.test(trimmed) || IDENTIFIER_SUFFIX.test(trimmed)) return 2
+  // separator forms in any case (customer_id, ORDER_ID, ORDER_NO).
+  const lower = trimmed.toLowerCase()
+  if (ID_SUFFIX.test(trimmed) || ID_SUFFIX.test(lower)) return 1
+  if (IDENTIFIER_WORD.test(trimmed) || IDENTIFIER_SUFFIX.test(trimmed) || IDENTIFIER_SUFFIX.test(lower)) return 2
   return 3
 }
 
