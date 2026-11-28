@@ -67,7 +67,7 @@
             >
               <span class="connection-diagnostics-node" aria-hidden="true">·</span>
               <div class="connection-diagnostics-step-body">
-                <span class="connection-diagnostics-label">Checking...</span>
+                <span class="connection-diagnostics-label">Checking…</span>
               </div>
             </li>
           </ul>
@@ -114,7 +114,7 @@ onBeforeUnmount(() => {
 })
 
 const headline = computed(() => {
-  if (props.running) return 'Running diagnostics...'
+  if (props.running) return 'Running diagnostics…'
   return props.connectionOk ? 'Connection is valid.' : 'Connection is not usable.'
 })
 
@@ -130,7 +130,7 @@ function plural(count: number): string {
 const summary = computed(() => {
   const counted = props.checks.length
   if (props.running) {
-    return counted === 0 ? 'Starting...' : `${counted} ${plural(counted)} complete`
+    return counted === 0 ? 'Starting…' : `${counted} ${plural(counted)} complete`
   }
 
   const passed = props.checks.filter((check) => check.status === 'PASS').length

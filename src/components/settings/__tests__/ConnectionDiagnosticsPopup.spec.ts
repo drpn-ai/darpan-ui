@@ -152,14 +152,14 @@ describe('ConnectionDiagnosticsPopup', () => {
     expect(wrapper.find('[data-testid="connection-diagnostics-running"]').exists()).toBe(true)
     // Never claims a verdict mid-walk — an interim "not usable" would be a lie about checks
     // that have not run.
-    expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Running diagnostics...')
+    expect(wrapper.get('[data-testid="connection-diagnostics-verdict"]').text()).toBe('Running diagnostics…')
   })
 
   it('counts progress without inventing a total it cannot know', () => {
     // Stages arrive one at a time and the server never says how many are coming, so "2 of 4"
     // would mean hardcoding a per-connector stage count in the UI.
     const started = mountPopup({ running: true, checks: [] })
-    expect(started.get('[data-testid="connection-diagnostics-summary"]').text()).toBe('Starting...')
+    expect(started.get('[data-testid="connection-diagnostics-summary"]').text()).toBe('Starting…')
 
     const midway = mountPopup({ running: true, checks: passingChecks.slice(0, 2) })
     const summary = midway.get('[data-testid="connection-diagnostics-summary"]').text()

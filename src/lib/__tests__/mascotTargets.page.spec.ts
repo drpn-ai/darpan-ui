@@ -272,7 +272,7 @@ describe('every label in the app has an answer', () => {
   const SILENT: Readonly<Record<string, string>> = {
     "let's investigate": 'the home hero is a greeting, not vocabulary',
     'notify me': 'the picker\'s title repeats the button that opened it, and that button already answers',
-    'checking...': 'a loading line, gone as soon as the first step lands',
+    'checking…': 'a loading line, gone as soon as the first step lands',
     'darpan': 'the login page has no mascot dock (design system: MascotDock.prompt.md)',
     'sign in': 'the login page has no mascot dock, and the Sign In button answers once signed out pages gain one',
     'user settings': 'page title: it names the page you are on',
