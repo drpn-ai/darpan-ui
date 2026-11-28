@@ -346,6 +346,35 @@ describe('useRunConclusions', () => {
     expect(saveConclusions).not.toHaveBeenCalled()
   })
 
+  // S99-013: the server serves eight buckets; the four duplicate-key ones are named, and never offered on a one-system
+  // run, where every row is a finding.
+  it('offers the duplicate-key buckets the server serves, named, on a compare run only', async () => {
+    const compare = await setup(tree({ buckets: ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'DUPLICATE_IN_FILE_1', 'DUPLICATE_IN_FILE_2', 'DUPLICATE_IN_FILE_1_PAIRED', 'DUPLICATE_IN_FILE_2_PAIRED', 'FINDING'] }))
+    expect(compare.bucketOptions.value).toEqual([
+      { value: '', label: 'any check' },
+      { value: 'MISSING_FROM_FILE_1', label: 'In OMS' },
+      { value: 'MISSING_FROM_FILE_2', label: 'In NetSuite' },
+      { value: 'RULE', label: 'the rules hold' },
+      { value: 'DUPLICATE_IN_FILE_1', label: 'Repeated in OMS' },
+      { value: 'DUPLICATE_IN_FILE_2', label: 'Repeated in NetSuite' },
+      { value: 'DUPLICATE_IN_FILE_1_PAIRED', label: 'OMS match of a NetSuite repeat' },
+      { value: 'DUPLICATE_IN_FILE_2_PAIRED', label: 'NetSuite match of a OMS repeat' },
+      { value: 'FINDING', label: 'every finding (single-sided only)' },
+    ])
+
+    const evaluate = await setup(tree({
+      scopeMode: 'EVALUATE',
+      buckets: ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'DUPLICATE_IN_FILE_1', 'DUPLICATE_IN_FILE_2', 'DUPLICATE_IN_FILE_1_PAIRED', 'DUPLICATE_IN_FILE_2_PAIRED', 'FINDING'],
+      conclusions: [{ key: '10', parent: null, conclusion: 'CONC_SCREENED', bucket: 'FINDING', question: null, outcome: null, conditions: [STATUS_LINE] }],
+    }))
+    expect(evaluate.bucketOptions.value.map((option) => option.value)).toEqual(['', 'MISSING_FROM_FILE_1', 'RULE', 'FINDING'])
+  })
+
+  it('without a served list, offers the same eight buckets', async () => {
+    const state = await setup(tree({ buckets: [] }))
+    expect(state.bucketOptions.value.map((option) => option.value)).toEqual(['', 'MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'DUPLICATE_IN_FILE_1', 'DUPLICATE_IN_FILE_2', 'DUPLICATE_IN_FILE_1_PAIRED', 'DUPLICATE_IN_FILE_2_PAIRED', 'FINDING'])
+  })
+
   it('a compare run offers every finding only when a loaded row already uses it', async () => {
     const without = await setup(tree({ conclusions: [tree().conclusions[0]!] }))
     expect(without.bucketOptions.value.map((option) => option.value)).toEqual(['', 'MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE'])

@@ -102,6 +102,14 @@ export function explainsLabel(bucket: string | null | undefined, ctx: LineContex
       return `In ${ctx.file1}`
     case 'RULE':
       return 'the rules hold'
+    case 'DUPLICATE_IN_FILE_1':
+      return `Repeated in ${ctx.file1}`
+    case 'DUPLICATE_IN_FILE_2':
+      return `Repeated in ${ctx.file2}`
+    case 'DUPLICATE_IN_FILE_1_PAIRED':
+      return `${ctx.file1} match of a ${ctx.file2} repeat`
+    case 'DUPLICATE_IN_FILE_2_PAIRED':
+      return `${ctx.file2} match of a ${ctx.file1} repeat`
     case '':
     case null:
     case undefined:

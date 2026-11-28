@@ -69,7 +69,16 @@ interface Snapshot {
   unexplained: '' | 'EXPECTED'
 }
 
-const DEFAULT_BUCKETS: ConclusionBucket[] = ['MISSING_FROM_FILE_1', 'MISSING_FROM_FILE_2', 'RULE', 'FINDING']
+const DEFAULT_BUCKETS: ConclusionBucket[] = [
+  'MISSING_FROM_FILE_1',
+  'MISSING_FROM_FILE_2',
+  'RULE',
+  'DUPLICATE_IN_FILE_1',
+  'DUPLICATE_IN_FILE_2',
+  'DUPLICATE_IN_FILE_1_PAIRED',
+  'DUPLICATE_IN_FILE_2_PAIRED',
+  'FINDING',
+]
 const OUTCOME_LABELS: Record<string, string> = { '': 'Shown', HIDE: 'Hidden', EXPECTED: 'Expected' }
 const PROBLEM_WORDS: Record<ConclusionTreeProblem, string> = {
   ORPHAN: 'hangs off a conclusion that is not here',
@@ -203,8 +212,10 @@ export function useRunConclusions(deps: UseRunConclusionsDeps) {
 
   // A one-system run has no second side to be missing from, and FINDING never fires on a compare run; a stored
   // conclusion that says either still shows what it says.
+  // A one-system run has no second side and no duplicate-key rows (every row is a finding); a compare run has no findings.
   const offersBucket = (bucket: string): boolean => {
-    if (isEvaluate.value ? bucket !== 'MISSING_FROM_FILE_2' : bucket !== 'FINDING') return true
+    const never = isEvaluate.value ? bucket === 'MISSING_FROM_FILE_2' || bucket.startsWith('DUPLICATE_IN_FILE_') : bucket === 'FINDING'
+    if (!never) return true
     return list.value.some((node) => node.bucket === bucket)
   }
   const bucketOptions = computed<AppSelectOption[]>(() => [

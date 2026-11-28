@@ -85,7 +85,16 @@ export interface SourceExtractOption {
 export type SourceExtractOptions = Record<string, boolean | string>
 
 // S3 — a run's conclusion tree (facade.RunConclusionFacadeServices).
-export type ConclusionBucket = 'MISSING_FROM_FILE_1' | 'MISSING_FROM_FILE_2' | 'RULE' | 'FINDING'
+// RunConclusionAuthoringSupport.BUCKETS: a _PAIRED row is that side's record for a key the other side repeats.
+export type ConclusionBucket =
+  | 'MISSING_FROM_FILE_1'
+  | 'MISSING_FROM_FILE_2'
+  | 'RULE'
+  | 'DUPLICATE_IN_FILE_1'
+  | 'DUPLICATE_IN_FILE_2'
+  | 'DUPLICATE_IN_FILE_1_PAIRED'
+  | 'DUPLICATE_IN_FILE_2_PAIRED'
+  | 'FINDING'
 export type ConclusionOutcome = 'HIDE' | 'EXPECTED'
 export type ConclusionOperator =
   | 'IN'

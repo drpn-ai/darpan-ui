@@ -111,6 +111,15 @@ describe('explainsLabel', () => {
     expect(explainsLabel('FINDING', ctx)).toBe('every finding (single-sided only)')
     expect(explainsLabel('OTHER', ctx)).toBe('OTHER')
   })
+
+  // S99-013: get#RunConclusions serves the duplicate-key buckets too (RunConclusionAuthoringSupport.BUCKETS). A _PAIRED
+  // row is that side's record for a key the OTHER side repeats (RunConclusionSupport.pairedHiddenBy).
+  it('names the duplicate-key buckets', () => {
+    expect(explainsLabel('DUPLICATE_IN_FILE_1', ctx)).toBe('Repeated in HotWax')
+    expect(explainsLabel('DUPLICATE_IN_FILE_2', ctx)).toBe('Repeated in NetSuite')
+    expect(explainsLabel('DUPLICATE_IN_FILE_1_PAIRED', ctx)).toBe('HotWax match of a NetSuite repeat')
+    expect(explainsLabel('DUPLICATE_IN_FILE_2_PAIRED', ctx)).toBe('NetSuite match of a HotWax repeat')
+  })
 })
 
 describe('withCheckLabel', () => {
