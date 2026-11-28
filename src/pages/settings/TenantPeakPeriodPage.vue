@@ -24,11 +24,11 @@
     <template v-if="draft">
       <StaticFactStrip :facts="facts" test-id="peak-facts" @open="openFact" />
 
-      <StaticPageSection v-if="syncRows.length">
+      <StaticPageSection v-for="section in syncSections" :key="section.kind">
         <template #header>
-          <h2 v-explain="'peakSyncLag'" class="static-page-section-heading">Sync lag allowance</h2>
+          <h2 v-explain="section.explain" class="static-page-section-heading">{{ section.heading }}</h2>
         </template>
-        <div class="peak-rows" data-testid="peak-sync-lag">
+        <div class="peak-rows" :data-testid="section.testId">
           <div class="peak-row peak-row--head">
             <span v-explain="'peakSyncPair'" class="peak-row__head-label">Pair</span>
             <span v-explain="'peakRunNormal'" class="peak-row__head-label">Normal</span>
@@ -36,48 +36,19 @@
           </div>
           <component
             :is="canEdit ? 'button' : 'div'"
-            v-for="row in syncRows"
+            v-for="row in section.rows"
             :key="row.syncPairId"
             :type="canEdit ? 'button' : undefined"
             class="peak-row"
             :class="{ 'peak-row--button': canEdit }"
-            :aria-label="canEdit ? `${plainPairLabel(row.label)}: ${row.periodAllowanceMinutes === null ? 'Normal' : allowanceWords(row.periodAllowanceMinutes)}` : undefined"
+            :aria-label="canEdit ? `${row.label}: ${row.thisPeriod}` : undefined"
             :disabled="canEdit && busy ? true : undefined"
-            data-testid="peak-sync-lag-row"
-            @click="canEdit && openSync('allowance', row)"
+            :data-testid="section.rowTestId"
+            @click="canEdit && openSync(section.kind, row.source)"
           >
-            <span>{{ plainPairLabel(row.label) }}</span>
-            <span class="peak-row__soft">{{ allowanceWords(row.normalAllowanceMinutes) }}</span>
-            <span>{{ row.periodAllowanceMinutes === null ? 'Normal' : allowanceWords(row.periodAllowanceMinutes) }}</span>
-          </component>
-        </div>
-      </StaticPageSection>
-
-      <StaticPageSection v-if="syncRows.length">
-        <template #header>
-          <h2 v-explain="'peakSyncPulse'" class="static-page-section-heading">Sync pulse</h2>
-        </template>
-        <div class="peak-rows" data-testid="peak-sync-pulse">
-          <div class="peak-row peak-row--head">
-            <span v-explain="'peakSyncPair'" class="peak-row__head-label">Pair</span>
-            <span v-explain="'peakRunNormal'" class="peak-row__head-label">Normal</span>
-            <span v-explain="'peakRunThisPeriod'" class="peak-row__head-label">This period</span>
-          </div>
-          <component
-            :is="canEdit ? 'button' : 'div'"
-            v-for="row in syncRows"
-            :key="row.syncPairId"
-            :type="canEdit ? 'button' : undefined"
-            class="peak-row"
-            :class="{ 'peak-row--button': canEdit }"
-            :aria-label="canEdit ? `${plainPairLabel(row.label)}: ${row.periodPulseMinutes === null ? 'Normal' : pulseCadence(row.periodPulseMinutes)}` : undefined"
-            :disabled="canEdit && busy ? true : undefined"
-            data-testid="peak-sync-pulse-row"
-            @click="canEdit && openSync('pulse', row)"
-          >
-            <span>{{ plainPairLabel(row.label) }}</span>
-            <span class="peak-row__soft">{{ pulseCadence(row.normalPulseMinutes) }}</span>
-            <span>{{ row.periodPulseMinutes === null ? 'Normal' : pulseCadence(row.periodPulseMinutes) }}</span>
+            <span>{{ row.label }}</span>
+            <span class="peak-row__soft">{{ row.normal }}</span>
+            <span>{{ row.thisPeriod }}</span>
           </component>
         </div>
       </StaticPageSection>
@@ -484,7 +455,7 @@ const popupError = ref('')
 const hoursForm = ref({ start: '', end: '' })
 const hotwaxForm = ref(NORMAL)
 const netsuiteForm = ref(PARALLEL)
-const syncForm = ref<{ kind: 'allowance' | 'pulse'; syncPairId: string; label: string; value: string }>({
+const syncForm = ref<{ kind: SyncKind; syncPairId: string; label: string; value: string }>({
   kind: 'allowance', syncPairId: '', label: '', value: NORMAL,
 })
 const runForm = ref({ runTimeId: '', target: '', onDate: EVERY_DAY, runTime: '' })
@@ -526,6 +497,34 @@ const facts = computed<StaticFact[]>(() => {
       explain: 'peakNetsuiteReads', testId: 'peak-fact-netsuite', ...changeable },
   ]
 })
+
+type SyncKind = 'allowance' | 'pulse'
+
+/** A pair's two sync settings, each a section of its own: its words, and the normal and period values of a row. */
+const SYNC_KINDS: Record<SyncKind, {
+  heading: string; explain: string; testId: string; rowTestId: string
+  words: (minutes: number | null) => string
+  normal: (row: PeakSyncRow) => number | null
+  period: (row: PeakSyncRow) => number | null
+}> = {
+  allowance: { heading: 'Sync lag allowance', explain: 'peakSyncLag', testId: 'peak-sync-lag', rowTestId: 'peak-sync-lag-row',
+    words: allowanceWords, normal: (row) => row.normalAllowanceMinutes, period: (row) => row.periodAllowanceMinutes },
+  pulse: { heading: 'Sync pulse', explain: 'peakSyncPulse', testId: 'peak-sync-pulse', rowTestId: 'peak-sync-pulse-row',
+    words: pulseCadence, normal: (row) => row.normalPulseMinutes, period: (row) => row.periodPulseMinutes },
+}
+
+// Both sections show only when the tenant has sync pairs; a period value of null is no override ("Normal").
+const syncSections = computed(() => (syncRows.value.length ? (['allowance', 'pulse'] as const) : []).map((kind) => {
+  const spec = SYNC_KINDS[kind]
+  return {
+    kind, heading: spec.heading, explain: spec.explain, testId: spec.testId, rowTestId: spec.rowTestId,
+    rows: syncRows.value.map((row) => {
+      const period = spec.period(row)
+      return { syncPairId: row.syncPairId, source: row, label: plainPairLabel(row.label),
+        normal: spec.words(spec.normal(row)), thisPeriod: period === null ? 'Normal' : spec.words(period) }
+    }),
+  }
+}))
 
 function openFact(key: string): void {
   if (key === 'dates') openDates()
@@ -596,7 +595,7 @@ const popupTitle = computed(() => {
     case 'hotwax': return 'HotWax reads'
     case 'netsuite': return 'NetSuite reads'
     case 'runTime': return 'Run time'
-    case 'sync': return syncForm.value.kind === 'allowance' ? 'Sync lag allowance' : 'Sync pulse'
+    case 'sync': return SYNC_KINDS[syncForm.value.kind].heading
     case 'delete': return 'Delete peak period'
     default: return ''
   }
@@ -610,6 +609,31 @@ function messageOf(error: unknown, fallback: string): string {
 function refusalOf(response: { ok?: boolean; errors?: string[] }, fallback: string): string {
   if (response.ok !== false) return ''
   return response.errors?.length ? response.errors.join(' ') : fallback
+}
+
+/**
+ * A popup's own save or delete. A refusal, returned or thrown, stays in the popup with the server's sentences; once it
+ * is through the popup closes and `after` runs (a read of the period, or leaving the page).
+ */
+async function popupCall(call: () => Promise<{ ok?: boolean; errors?: string[] }>, fallback: string,
+  after: () => unknown): Promise<void> {
+  if (popupBusy.value) return
+  popupBusy.value = true
+  popupError.value = ''
+  try {
+    const refusal = refusalOf(await call(), fallback)
+    if (refusal) {
+      popupError.value = refusal
+      return
+    }
+    popupBusy.value = false
+    closePopup()
+    await after()
+  } catch (error) {
+    popupError.value = messageOf(error, fallback)
+  } finally {
+    popupBusy.value = false
+  }
 }
 
 // DAR-UI-161: a new period is made by its workflow (TenantPeakPeriodCreatePage), so this page always has one to read.
@@ -762,9 +786,9 @@ function openRunTime(runTime: PeakRunTime | null): void {
   openPopup('runTime')
 }
 
-function openSync(kind: 'allowance' | 'pulse', row: PeakSyncRow): void {
+function openSync(kind: SyncKind, row: PeakSyncRow): void {
   if (!draft.value?.peakPeriodId) return
-  const current = kind === 'allowance' ? row.periodAllowanceMinutes : row.periodPulseMinutes
+  const current = SYNC_KINDS[kind].period(row)
   syncForm.value = { kind, syncPairId: row.syncPairId, label: plainPairLabel(row.label), value: current === null ? NORMAL : String(current) }
   openPopup('sync')
 }
@@ -778,30 +802,14 @@ async function saveSync(): Promise<void> {
   const chosen = form.value === NORMAL ? null : Number(form.value)
   const allowance = form.kind === 'allowance' ? chosen : row.periodAllowanceMinutes
   const pulse = form.kind === 'pulse' ? chosen : row.periodPulseMinutes
-  popupBusy.value = true
-  popupError.value = ''
-  try {
-    const out = allowance === null && pulse === null
-      ? await peakFacade.deletePeakSync({ peakPeriodId, syncPairId: form.syncPairId })
-      : await peakFacade.savePeakSync({
-          peakPeriodId,
-          syncPairId: form.syncPairId,
-          ...(allowance !== null || form.kind === 'allowance' ? { allowanceMinutes: allowance } : {}),
-          ...(pulse !== null || form.kind === 'pulse' ? { pulseEveryMinutes: pulse } : {}),
-        })
-    const refusal = refusalOf(out, 'Could not save the sync setting.')
-    if (refusal) {
-      popupError.value = refusal
-      return
-    }
-    popupBusy.value = false
-    closePopup()
-    await refresh(peakPeriodId)
-  } catch (error) {
-    popupError.value = messageOf(error, 'Could not save the sync setting.')
-  } finally {
-    popupBusy.value = false
-  }
+  await popupCall(() => (allowance === null && pulse === null
+    ? peakFacade.deletePeakSync({ peakPeriodId, syncPairId: form.syncPairId })
+    : peakFacade.savePeakSync({
+        peakPeriodId,
+        syncPairId: form.syncPairId,
+        ...(allowance !== null || form.kind === 'allowance' ? { allowanceMinutes: allowance } : {}),
+        ...(pulse !== null || form.kind === 'pulse' ? { pulseEveryMinutes: pulse } : {}),
+      })), 'Could not save the sync setting.', () => refresh(peakPeriodId))
 }
 
 async function saveRunTime(): Promise<void> {
@@ -811,53 +819,21 @@ async function saveRunTime(): Promise<void> {
   const separator = form.target.indexOf(':')
   const kind = form.target.slice(0, separator)
   const targetId = form.target.slice(separator + 1)
-  popupBusy.value = true
-  popupError.value = ''
-  try {
-    const out = await peakFacade.savePeakRunTime({
-      ...(form.runTimeId ? { runTimeId: form.runTimeId } : {}),
-      peakPeriodId,
-      ...(kind === 'automation' ? { automationId: targetId } : { auditId: targetId }),
-      // Left out, the move is for every day of the period.
-      ...(form.onDate !== EVERY_DAY ? { onDate: form.onDate } : {}),
-      runTime: form.runTime,
-    })
-    const refusal = refusalOf(out, 'Could not save the run time.')
-    if (refusal) {
-      popupError.value = refusal
-      return
-    }
-    popupBusy.value = false
-    closePopup()
-    await refresh(peakPeriodId)
-  } catch (error) {
-    popupError.value = messageOf(error, 'Could not save the run time.')
-  } finally {
-    popupBusy.value = false
-  }
+  await popupCall(() => peakFacade.savePeakRunTime({
+    ...(form.runTimeId ? { runTimeId: form.runTimeId } : {}),
+    peakPeriodId,
+    ...(kind === 'automation' ? { automationId: targetId } : { auditId: targetId }),
+    // Left out, the move is for every day of the period.
+    ...(form.onDate !== EVERY_DAY ? { onDate: form.onDate } : {}),
+    runTime: form.runTime,
+  }), 'Could not save the run time.', () => refresh(peakPeriodId))
 }
 
 async function deleteRunTime(): Promise<void> {
   const peakPeriodId = draft.value?.peakPeriodId
   const runTimeId = runForm.value.runTimeId
   if (!peakPeriodId || !runTimeId || popupBusy.value) return
-  popupBusy.value = true
-  popupError.value = ''
-  try {
-    const out = await peakFacade.deletePeakRunTime({ runTimeId })
-    const refusal = refusalOf(out, 'Could not delete the run time.')
-    if (refusal) {
-      popupError.value = refusal
-      return
-    }
-    popupBusy.value = false
-    closePopup()
-    await refresh(peakPeriodId)
-  } catch (error) {
-    popupError.value = messageOf(error, 'Could not delete the run time.')
-  } finally {
-    popupBusy.value = false
-  }
+  await popupCall(() => peakFacade.deletePeakRunTime({ runTimeId }), 'Could not delete the run time.', () => refresh(peakPeriodId))
 }
 
 /** After a run-time change: its rows and the runs that wait, with this page's unsaved edits kept. */
@@ -880,23 +856,8 @@ async function refresh(peakPeriodId: string): Promise<void> {
 async function deletePeriod(): Promise<void> {
   const peakPeriodId = draft.value?.peakPeriodId
   if (!peakPeriodId || popupBusy.value) return
-  popupBusy.value = true
-  popupError.value = ''
-  try {
-    const out = await peakFacade.deletePeakPeriod({ peakPeriodId })
-    const refusal = refusalOf(out, 'Could not delete the peak period.')
-    if (refusal) {
-      popupError.value = refusal
-      return
-    }
-    popupBusy.value = false
-    closePopup()
-    void router.push({ name: 'settings-tenant-peak-periods' })
-  } catch (error) {
-    popupError.value = messageOf(error, 'Could not delete the peak period.')
-  } finally {
-    popupBusy.value = false
-  }
+  await popupCall(() => peakFacade.deletePeakPeriod({ peakPeriodId }), 'Could not delete the peak period.',
+    () => { void router.push({ name: 'settings-tenant-peak-periods' }) })
 }
 
 /** The period as the page now shows it, laid over what was read: what an edit's save stores. */

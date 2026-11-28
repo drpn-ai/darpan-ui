@@ -9,21 +9,11 @@
     <EmptyState v-else-if="periods.length === 0" title="No peak periods." />
 
     <template v-else>
-      <ul v-if="current.length" class="peak-rows" data-testid="peak-rows">
-        <li v-for="row in current" :key="row.peakPeriodId">
-          <button type="button" class="peak-row" :aria-label="`Open peak period ${row.periodName}`" data-testid="peak-row" @click="open(row.peakPeriodId)">
-            <span class="peak-row__name">{{ row.periodName }}</span>
-            <span class="peak-row__dates">{{ row.dates }}</span>
-            <span class="peak-row__when">{{ row.when }}</span>
-          </button>
-        </li>
-      </ul>
-
-      <template v-if="ended.length">
-        <h2 v-explain="'peakPeriodsEnded'" class="static-page-section-heading">Ended</h2>
-        <ul class="peak-rows peak-rows--ended" data-testid="peak-rows-ended">
-          <li v-for="row in ended" :key="row.peakPeriodId">
-            <button type="button" class="peak-row" :aria-label="`Open peak period ${row.periodName}`" data-testid="peak-row-ended" @click="open(row.peakPeriodId)">
+      <template v-for="group in groups" :key="group.key">
+        <h2 v-if="group.ended" v-explain="'peakPeriodsEnded'" class="static-page-section-heading">Ended</h2>
+        <ul class="peak-rows" :class="{ 'peak-rows--ended': group.ended }" :data-testid="group.listTestId">
+          <li v-for="row in group.rows" :key="row.peakPeriodId">
+            <button type="button" class="peak-row" :aria-label="`Open peak period ${row.periodName}`" :data-testid="group.rowTestId" @click="open(row.peakPeriodId)">
               <span class="peak-row__name">{{ row.periodName }}</span>
               <span class="peak-row__dates">{{ row.dates }}</span>
               <span class="peak-row__when">{{ row.when }}</span>
@@ -89,8 +79,13 @@ const rows = computed(() => periods.value.map((period) => ({
   when: peakWhen(period),
   state: period.state,
 })))
-const current = computed(() => rows.value.filter((row) => row.state !== 'ended'))
-const ended = computed(() => rows.value.filter((row) => row.state === 'ended'))
+// The current periods, then the ended ones under their own heading; a group with no rows is left out.
+const groups = computed(() => [
+  { key: 'current', ended: false, listTestId: 'peak-rows', rowTestId: 'peak-row',
+    rows: rows.value.filter((row) => row.state !== 'ended') },
+  { key: 'ended', ended: true, listTestId: 'peak-rows-ended', rowTestId: 'peak-row-ended',
+    rows: rows.value.filter((row) => row.state === 'ended') },
+].filter((group) => group.rows.length))
 
 function open(peakPeriodId: string): void {
   void router.push({ name: 'settings-tenant-peak-period', params: { peakPeriodId } })
