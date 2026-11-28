@@ -124,10 +124,6 @@ describe('buildRuleSetDraft', () => {
     expect(draft?.file2PrimaryIdExpression).toEqual(['shopify_order_id'])
   })
 
-  // A single-sided run (scopeMode EVALUATE, DAR-BE-049) has one source and no FILE_2. Requiring a
-  // second side made this return null, and a null draft is what sent the settings gear down
-  // buildSavedRunEditorRoute's mapping branch, where it asked for a ReconciliationMapping that has
-  // never existed and rendered "Mapping '<ruleSetId>' was not found."
   // DAR-UI-064: the draft is what a rules save sends back, so it must carry the stored name, not the display label.
   it('keeps the run name when the run also has a description', () => {
     const row = createSavedRun({
@@ -141,6 +137,10 @@ describe('buildRuleSetDraft', () => {
     expect(buildRuleSetDraft(createSavedRun({ ...row, runName: '' }))?.runName).toBe('Every NetSuite invoice carries the Shopify order id.')
   })
 
+  // A single-sided run (scopeMode EVALUATE, DAR-BE-049) has one source and no FILE_2. Requiring a
+  // second side made this return null, and a null draft is what sent the settings gear down
+  // buildSavedRunEditorRoute's mapping branch, where it asked for a ReconciliationMapping that has
+  // never existed and rendered "Mapping '<ruleSetId>' was not found."
   it('builds a one-sided draft when scopeMode is EVALUATE', () => {
     const row = createSavedRun({
       scopeMode: 'EVALUATE',

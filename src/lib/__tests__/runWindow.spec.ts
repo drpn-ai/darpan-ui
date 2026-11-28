@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { presetWindowRange, runWindowPresetOptions } from '../runWindow'
+import { isRunWindowPreset, presetWindowRange, runWindowPresetOptions } from '../runWindow'
 
 // DAR-UI-112: the third card is the month so far, through yesterday.
 describe('runWindow month to date', () => {
@@ -19,6 +19,24 @@ describe('runWindow month to date', () => {
 
   it('on the 2nd names the one day', () => {
     expect(presetWindowRange('month-to-date', new Date(2027, 0, 2)).summary).toBe('Jan 1, 2027')
+  })
+})
+
+// Callers pass todayInDisplayTimeZone(): the tenant's calendar day, so yesterday is the tenant's yesterday.
+describe('runWindow previous day', () => {
+  it('runs yesterday alone, the end exclusive today, across a month boundary', () => {
+    const range = presetWindowRange('previous-day', new Date(2026, 11, 1))
+    expect(range.startDate).toEqual(new Date(2026, 10, 30))
+    expect(range.endExclusiveDate).toEqual(new Date(2026, 11, 1))
+    expect(range.summary).toBe('Nov 30, 2026')
+  })
+})
+
+describe('isRunWindowPreset', () => {
+  it('accepts the four card values and nothing else', () => {
+    expect(runWindowPresetOptions(new Date(2026, 10, 12)).every((option) => isRunWindowPreset(option.value))).toBe(true)
+    expect(isRunWindowPreset('yesterday')).toBe(false)
+    expect(isRunWindowPreset('')).toBe(false)
   })
 })
 
