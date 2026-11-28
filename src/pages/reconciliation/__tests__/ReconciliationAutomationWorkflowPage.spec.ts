@@ -257,8 +257,8 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     getUserNotificationDefault.mockResolvedValue({ ok: true, messages: [], errors: [] })
     listTenantChatSpaces.mockResolvedValue({ ok: true, messages: [], errors: [], chatSpaces: [] })
     // No workspace connected by default, so the inline flow keeps its webhook card.
-    getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: false, installs: [] })
-    listSlackChannels.mockResolvedValue({ ok: true, channels: [], nextCursor: null })
+    getSlackInstall.mockResolvedValue({ ok: true, oauthAvailable: false, installs: [] })
+    listSlackChannels.mockResolvedValue({ ok: true, channels: [] })
   })
 
   it('starts with a single branch decision and routes new-reconciliation automation to the create flow', async () => {
@@ -951,11 +951,11 @@ describe('ReconciliationAutomationWorkflowPage', () => {
 
   it('adds a Slack space through the shared Add space flow and comes back with it selected', async () => {
     getSlackInstall.mockResolvedValue({
-      ok: true, slackConfigured: true, oauthAvailable: false,
+      ok: true, oauthAvailable: false,
       installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', isActive: 'Y' }],
     })
     listSlackChannels.mockResolvedValue({
-      ok: true, nextCursor: null,
+      ok: true,
       channels: [{ id: 'C1', name: 'darpan-test', isPrivate: false, isMember: false }],
     })
     saveTenantChatSpace.mockResolvedValue({
@@ -1001,7 +1001,7 @@ describe('ReconciliationAutomationWorkflowPage', () => {
   // DAR-UI-023: with no Slack workspace connected, Slack is not a webhook paste; the workspace comes first. Inside the
   // wizard it is a pasted token, never Slack's consent screen, which would leave the wizard and lose its answers.
   it('connects Slack by token from the wizard, never by leaving for Slack', async () => {
-    getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: true, installs: [] })
+    getSlackInstall.mockResolvedValue({ ok: true, oauthAvailable: true, installs: [] })
     const wrapper = mount(ReconciliationAutomationWorkflowPage)
     await flushPromises()
     await walkToChatSpaceStep(wrapper)

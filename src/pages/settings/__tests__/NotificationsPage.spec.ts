@@ -127,7 +127,7 @@ describe('NotificationsPage', () => {
       ok: true, messages: [], errors: [],
       chatSpaces: [fullSpace(SPACES[0]!), fullSpace(SPACES[1]!), fullSpace(SPACES[2]!, { inUse: false })],
     })
-    getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: true, installs: [] })
+    getSlackInstall.mockResolvedValue({ ok: true, oauthAvailable: true, installs: [] })
     replace.mockResolvedValue(undefined)
   })
 
@@ -565,11 +565,11 @@ describe('NotificationsPage', () => {
 
     it('picks a connected Slack workspace\'s channel from a searchable list without channels that have a space', async () => {
       getSlackInstall.mockResolvedValue({
-        ok: true, slackConfigured: true, oauthAvailable: true,
+        ok: true, oauthAvailable: true,
         installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', isActive: 'Y' }],
       })
       listSlackChannels.mockResolvedValue({
-        ok: true, nextCursor: null,
+        ok: true,
         channels: [
           { id: 'C1', name: 'alerts', isPrivate: false, isMember: true },
           { id: 'C2', name: 'ops-feed', isPrivate: false, isMember: false },
@@ -629,10 +629,10 @@ describe('NotificationsPage', () => {
       // Slack sends the browser back through /settings?slack=connected, which lands here.
       route.query = { slack: 'connected', team: 'Acme' }
       getSlackInstall.mockResolvedValue({
-        ok: true, slackConfigured: true, oauthAvailable: true,
+        ok: true, oauthAvailable: true,
         installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', isActive: 'Y' }],
       })
-      listSlackChannels.mockResolvedValue({ ok: true, nextCursor: null, channels: [{ id: 'C2', name: 'ops-feed', isPrivate: false, isMember: true }] })
+      listSlackChannels.mockResolvedValue({ ok: true, channels: [{ id: 'C2', name: 'ops-feed', isPrivate: false, isMember: true }] })
       const back = mount(NotificationsPage)
       await flushPromises()
 
@@ -648,15 +648,15 @@ describe('NotificationsPage', () => {
     })
 
     it('connects by bot token when the deployment has no OAuth, then asks for the channel', async () => {
-      getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: false, installs: [] })
+      getSlackInstall.mockResolvedValue({ ok: true, oauthAvailable: false, installs: [] })
       saveSlackBotToken.mockImplementation(async () => {
         getSlackInstall.mockResolvedValue({
-          ok: true, slackConfigured: true, oauthAvailable: false,
+          ok: true, oauthAvailable: false,
           installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', isActive: 'Y' }],
         })
         return { ok: true, messages: ['Connected to Acme as darpan.'], missingScopes: [] }
       })
-      listSlackChannels.mockResolvedValue({ ok: true, nextCursor: null, channels: [{ id: 'C2', name: 'ops-feed', isPrivate: false, isMember: true }] })
+      listSlackChannels.mockResolvedValue({ ok: true, channels: [{ id: 'C2', name: 'ops-feed', isPrivate: false, isMember: true }] })
       const wrapper = mount(NotificationsPage)
       await flushPromises()
 
@@ -698,7 +698,7 @@ describe('NotificationsPage', () => {
   describe('the Slack line', () => {
     beforeEach(() => {
       getSlackInstall.mockResolvedValue({
-        ok: true, slackConfigured: true, oauthAvailable: true,
+        ok: true, oauthAvailable: true,
         installs: [{ slackInstallId: 'SI1', teamId: 'T1', teamName: 'Acme', isActive: 'Y' }],
       })
     })
@@ -716,7 +716,7 @@ describe('NotificationsPage', () => {
       disconnectSlackWorkspace.mockResolvedValue({ ok: true, messages: ['Disconnected Acme.'], errors: [] })
       const wrapper = mount(NotificationsPage)
       await flushPromises()
-      getSlackInstall.mockResolvedValue({ ok: true, slackConfigured: true, oauthAvailable: true, installs: [] })
+      getSlackInstall.mockResolvedValue({ ok: true, oauthAvailable: true, installs: [] })
 
       await click(wrapper, 'notifications-slack-disconnect')
 

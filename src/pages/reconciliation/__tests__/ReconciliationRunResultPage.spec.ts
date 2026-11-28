@@ -350,11 +350,6 @@ function simulateDifferences(document: Rec, outputFileOverrides: Record<string, 
 
     // DAR-UI-044: mirrors DiffDetailClassifier — the conclusion filter, and facets that ignore it.
     const conclusionOf = (row: ReturnType<typeof sClassify>) => ((row.record as Rec).conclusion as Rec | undefined)?.code as string | undefined
-    const conclusionCounts: Record<string, number> = {}
-    classified.forEach((row) => {
-      const code = conclusionOf(row)
-      if (code) conclusionCounts[code] = (conclusionCounts[code] ?? 0) + 1
-    })
     const filtered = classified.filter((row) => {
       if (payload.conclusionCode && conclusionOf(row) !== payload.conclusionCode) return false
       if (!activeBuckets.includes(row.bucket)) return false
@@ -377,7 +372,7 @@ function simulateDifferences(document: Rec, outputFileOverrides: Record<string, 
       errors: [],
       metadata,
       summary: sEffectiveSummary(document, file1Label, file2Label),
-      ...(includeFacets ? { bucketCounts: Object.fromEntries(facetBuckets.map((b) => [b, sBucketCounts(classified)[b] ?? 0])), ruleOptions: sRuleOptions(classified), conclusionCounts } : {}),
+      ...(includeFacets ? { bucketCounts: Object.fromEntries(facetBuckets.map((b) => [b, sBucketCounts(classified)[b] ?? 0])), ruleOptions: sRuleOptions(classified) } : {}),
       differences: pageRows,
       pageIndex,
       pageSize,

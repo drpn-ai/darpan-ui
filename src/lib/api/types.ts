@@ -296,8 +296,6 @@ export interface SlackChannel {
 }
 
 export interface GetSlackInstallResponse extends ApiEnvelope {
-  /** Slack is usable at all — always true now that a bot token can be pasted. */
-  slackConfigured?: boolean
   /** Whether the one-click OAuth install is ALSO offered (needs a client id + redirect URI). */
   oauthAvailable?: boolean
   installs?: SlackWorkspaceInstall[]
@@ -315,7 +313,6 @@ export interface BeginSlackInstallResponse extends ApiEnvelope {
 
 export interface ListSlackChannelsResponse extends ApiEnvelope {
   channels?: SlackChannel[]
-  nextCursor?: string | null
   botUserId?: string | null
 }
 
@@ -1149,8 +1146,6 @@ export interface GetGeneratedOutputDifferencesResponse extends ApiEnvelope {
   metadata?: GeneratedOutputDifferencesMetadata
   summary?: GeneratedOutputDifferencesSummary
   bucketCounts?: Record<string, number>
-  /** Whole-document count per conclusion code, ignoring the conclusion filter itself. */
-  conclusionCounts?: Record<string, number>
   ruleOptions?: GeneratedOutputDifferencesRuleOption[]
   differences?: GeneratedOutputDifferenceRow[]
   pageIndex?: number
