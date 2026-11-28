@@ -184,6 +184,12 @@ describe('ConnectionDiagnosticsPopup', () => {
     expect(wrapper.get('[data-testid="connection-diagnostics-summary"]').text()).toBe('4 checks passed')
   })
 
+  // DAR-OPS-029 U12: a skipped check never reads as clean. With no failure, the summary still says what was not checked.
+  it('keeps the skipped count in a summary with no failure', () => {
+    const wrapper = mountPopup({ checks: [...passingChecks.slice(0, 3), { key: 'ordersRead', label: 'Orders readable', status: 'SKIP' }] })
+    expect(wrapper.get('[data-testid="connection-diagnostics-summary"]').text()).toBe('3 checks passed, 1 skipped')
+  })
+
   it('renders a service failure as an error rather than a stuck spinner', () => {
     const wrapper = mountPopup({ connectionOk: false, checks: [], error: 'The diagnostics need diagnosing. They did not run.' })
 

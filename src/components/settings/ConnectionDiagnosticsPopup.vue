@@ -137,12 +137,12 @@ const summary = computed(() => {
   const skipped = props.checks.filter((check) => check.status === 'SKIP').length
   const firstFailed = props.checks.find((check) => check.status === 'FAIL')
 
-  if (!firstFailed) return `${passed} ${plural(passed)} passed`
+  // A skipped check was not checked, so it is always counted: a clean summary never hides one.
+  const skippedTally = skipped > 0 ? `, ${skipped} skipped` : ''
+  if (!firstFailed) return `${passed} ${plural(passed)} passed${skippedTally}`
 
   // Name what broke: it is the one thing the operator has to act on.
-  const tallies = [`${passed} passed`]
-  if (skipped > 0) tallies.push(`${skipped} skipped`)
-  return `${firstFailed.label} failed · ${tallies.join(', ')}`
+  return `${firstFailed.label} failed · ${passed} passed${skippedTally}`
 })
 
 function glyphFor(status: ConnectionCheckStatus): string {

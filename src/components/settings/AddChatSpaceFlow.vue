@@ -80,7 +80,7 @@
                 test-id="add-chat-space-channel"
               />
             </label>
-            <p v-if="channelsLoading" class="section-note">Loading channels...</p>
+            <p v-if="channelsLoading" class="section-note">Loading channels…</p>
             <p v-else-if="channelNeedsInvite" class="section-note" data-testid="add-chat-space-invite-note">
               That channel is private: invite the Darpan app to it first.
             </p>

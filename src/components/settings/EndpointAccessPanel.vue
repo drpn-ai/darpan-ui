@@ -5,8 +5,7 @@
     <InlineValidation v-if="error" tone="error" :message="error" data-testid="endpoint-access-error" />
 
     <p v-else-if="loaded && endpoints.length === 0" class="section-note" data-testid="endpoint-access-empty">
-      No source endpoints are registered on this instance yet. Endpoints come from Darpan's reference
-      data — load the component's seed data, then reopen this page.
+      No source endpoints are registered on this instance yet.
     </p>
 
     <div v-else class="workflow-choice-grid">
