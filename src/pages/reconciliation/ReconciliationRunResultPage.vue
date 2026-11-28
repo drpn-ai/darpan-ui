@@ -310,7 +310,7 @@
                   aria-label="Clear record search"
                   @click="clearDiffDetailsSearch"
                 >
-                  ×
+                  <AppIcon name="close" />
                 </button>
               </div>
             </label>
@@ -1774,11 +1774,12 @@ watch(savedRunRow, () => {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
-  /* Sizes an icon glyph, not text. */
-  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
-  font-size: 1.35rem;
-  line-height: 1;
   transform: translateY(-50%);
+}
+
+.reconciliation-diff-details__search-clear svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .reconciliation-diff-details__search-clear:hover {

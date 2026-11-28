@@ -1146,6 +1146,11 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.text()).toContain('2002')
     expect(wrapper.text()).toContain('Page 1 of 1')
     expect(wrapper.find('[data-testid="diff-details-search-clear"]').exists()).toBe(true)
+    // The close icon, named and drawn once in icons.ts, never a typed ×.
+    const clear = wrapper.get('[data-testid="diff-details-search-clear"]')
+    expect(clear.find('svg').exists()).toBe(true)
+    expect(clear.text()).not.toContain('×')
+    expect(clear.attributes('aria-label')).toBe('Clear record search')
 
     await wrapper.get('[data-testid="diff-details-search-clear"]').trigger('click')
     await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_WAIT))
