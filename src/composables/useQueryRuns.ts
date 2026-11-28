@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import type { QueryError, QueryRun } from '../lib/api/scriptTypes'
 import { statusWords } from '../lib/scriptDeployment'
 import { formatClockTime } from '../lib/utils/date'
+import { countLabel } from '../lib/utils/strings'
 
 export interface QueryRunCell {
   n: number
@@ -23,7 +24,7 @@ export function queryErrorText(error: QueryError): string {
 }
 
 export function rowsWords(count: number): string {
-  return `${count.toLocaleString()} row${count === 1 ? '' : 's'}`
+  return countLabel(count, 'row')
 }
 
 export function cellText(value: unknown): string {

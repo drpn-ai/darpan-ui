@@ -1,6 +1,7 @@
 // DAR-BE-334, DAR-OPS-029 U09. A query page's ask box: the question goes to the queries agent, whose proposal has
 // already run on the tenant's data. The proposal fills the draft and saves nothing; the person can put theirs back.
 import { ref, type Ref } from 'vue'
+import { serviceErrors } from '../lib/api/client'
 import { scriptFacade } from '../lib/api/facade'
 import type { QueryRun } from '../lib/api/scriptTypes'
 
@@ -20,10 +21,6 @@ export interface QueryAskOptions {
   onRun: (label: string, run: QueryRun) => void
   /** The page's run error: cleared as the question goes, set when it fails. */
   setError: (message: string) => void
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
 }
 
 export function useQueryAsk(options: QueryAskOptions) {
@@ -60,9 +57,10 @@ export function useQueryAsk(options: QueryAskOptions) {
         askText.value = ''
       }
     } catch (error) {
+      const sentences = serviceErrors(error, 'Could not ask the agent.')
       // A conversation from another tenant or an earlier visit is not found: start a new one next time.
-      if (messageOf(error, '').includes('was not found')) conversationId = undefined
-      options.setError(messageOf(error, 'Could not ask the agent.'))
+      if (sentences.some((sentence) => sentence.includes('was not found'))) conversationId = undefined
+      options.setError(sentences.join(' '))
     } finally {
       asking.value = false
     }
