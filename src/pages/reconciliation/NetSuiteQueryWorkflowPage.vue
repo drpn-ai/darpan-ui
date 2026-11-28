@@ -234,7 +234,7 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import AppTableFrame from '../../components/ui/AppTableFrame.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
-import { ApiCallError, isAbortError } from '../../lib/api/client'
+import { ApiCallError, isAbortError, serviceErrors } from '../../lib/api/client'
 import { netSuiteQueryFacade } from '../../lib/api/authoringFacade'
 import type {
   NsMatchOp,
@@ -511,16 +511,6 @@ function removeField(index: number): void {
 function selectRecordType(value: string | string[]): void {
   form.recordType = Array.isArray(value) ? (value[0] ?? '') : value
   otherRecordType.value = ''
-}
-
-/** A service refusal carries every normalizeSpec message in `errors`; the thrown error names only the first. */
-function serviceErrors(error: unknown, fallback: string): string[] {
-  if (error instanceof ApiCallError) {
-    const result = (error.details as { result?: { errors?: unknown } } | undefined)?.result
-    const listed = Array.isArray(result?.errors) ? result.errors.map((item) => String(item)).filter(Boolean) : []
-    return listed.length ? listed : [error.message]
-  }
-  return [fallback]
 }
 
 function resetCreateForm(): void {
