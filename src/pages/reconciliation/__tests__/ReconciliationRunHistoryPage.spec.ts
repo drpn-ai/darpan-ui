@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { formatDateTime } from '../../../lib/utils/date'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { ApiCallError } from '../../../lib/api/client'
 import { installLocalStorageStub } from '../../../test/localStorage'
 
@@ -217,6 +217,11 @@ function buildSavedRunSummary() {
 }
 
 describe('ReconciliationRunHistoryPage', () => {
+  // Running and failed tiles start 5s status polls on the real clock (only Date is faked); the page
+  // stops them on unmount, so every mounted page must unmount or its polls call the shared mocks
+  // for the rest of the file.
+  enableAutoUnmount(afterEach)
+
   beforeEach(() => {
     installLocalStorageStub()
     window.localStorage.clear()
@@ -251,7 +256,6 @@ describe('ReconciliationRunHistoryPage', () => {
     })
     getReconciliationRunStatus.mockReset()
     getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_RUNNING' })
-    useRunResultsStore().stopAllRunStatusPolls()
     saveSavedRunName.mockReset()
     listSavedRuns.mockReset()
     listSavedRuns.mockResolvedValue({
@@ -913,6 +917,85 @@ describe('ReconciliationRunHistoryPage', () => {
 
     expect(wrapper.find('[data-testid="run-history-running-tile"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-history-failed-tile"]').exists()).toBe(true)
+    expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
+  })
+
+  it('shows a run that failed after writing its result as Failed, still linked to that result (D2)', async () => {
+    // A rule-failed run ends FAILED with a result file (DAR-OPS-029 D2). Its counts are not a clean
+    // answer, so the tile says Failed; it still opens the result, which carries the failure banner.
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 2, pageCount: 1 },
+      generatedOutputs: [
+        { ...buildGeneratedOutput(31), reconciliationRunResultId: 'RUN_RULE_FAILED', statusEnumId: 'AUT_STAT_FAILED', resultAvailable: true },
+        buildGeneratedOutput(30),
+      ],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_FAILED' })
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    const featured = wrapper.get('[data-testid="run-history-featured-tile"]')
+    expect(featured.get('.status-badge').text()).toBe('Failed')
+    expect(JSON.parse(featured.attributes('data-to') as string)).toMatchObject({
+      name: 'reconciliation-run-live',
+      params: { savedRunId: 'RS_ORDER_CSV', runResultId: 'RUN_RULE_FAILED' },
+    })
+    // Shown once, where its result is: not again as a Needs Attention tile.
+    expect(wrapper.find('[data-testid="run-history-failed-tile"]').exists()).toBe(false)
+    // The clean run below it carries no badge.
+    expect(wrapper.get('[data-testid="run-history-result-tile"]').find('.status-badge').exists()).toBe(false)
+  })
+
+  it('keeps an id-less failure in Needs Attention when the newest result is itself a failed one', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 3, pageCount: 1 },
+      generatedOutputs: [
+        { ...buildGeneratedOutput(31), createdDate: '2026-03-31T09:08:00.000Z', statusEnumId: 'AUT_STAT_FAILED' },
+        buildFailedGeneratedOutput(),
+        buildGeneratedOutput(30),
+      ],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_FAILED' })
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    // Only a newer SUCCESSFUL result retires a failure to history.
+    expect(wrapper.findAll('[data-testid="run-history-failed-tile"]')).toHaveLength(1)
+  })
+
+  it('clears the local pending marker when the backend run was cancelled before it wrote a result', async () => {
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 6, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{ ...buildFailedGeneratedOutput(), statusEnumId: 'AUT_STAT_CANCELLED', statusLabel: 'Cancelled' }],
+    })
+    getReconciliationRunStatus.mockResolvedValue({ ok: true, statusEnumId: 'AUT_STAT_CANCELLED' })
+    window.localStorage.setItem('darpan.pendingReconciliationRuns', JSON.stringify([
+      {
+        pendingRunId: 'pending-RS_ORDER_CSV',
+        savedRunId: 'RS_ORDER_CSV',
+        runName: 'CSV Order Compare',
+        file1SystemLabel: 'OMS',
+        file2SystemLabel: 'SHOPIFY',
+        submittedAt: '2026-03-31T09:05:00.000Z',
+      },
+    ]))
+
+    const wrapper = mount(ReconciliationRunHistoryPage)
+    await flushPromises()
+
+    // A cancelled run is finished: it must not ghost as Running for the 15-minute abandonment grace.
+    expect(wrapper.find('[data-testid="run-history-running-tile"]').exists()).toBe(false)
     expect(window.localStorage.getItem('darpan.pendingReconciliationRuns')).toBeNull()
   })
 

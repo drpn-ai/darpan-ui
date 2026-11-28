@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { RUN_STAGE_SEQUENCE, formatRunStepDuration, reconciliationStageLabel } from '../reconciliationDisplay'
+import {
+  RUN_STAGE_SEQUENCE,
+  formatRunStepDuration,
+  isSingleSidedOutput,
+  reconciliationStageLabel,
+  runStatusTone,
+  uncleanRunOutcome,
+} from '../reconciliationDisplay'
 
 describe('reconciliationStageLabel', () => {
   it('labels lifecycle stages with operator-friendly text', () => {
@@ -157,5 +164,42 @@ describe('formatRunStepDuration', () => {
     expect(formatRunStepDuration(12000, null)).toBe('')
     expect(formatRunStepDuration(20000, 10000)).toBe('')
     expect(formatRunStepDuration('not-a-date', 12000)).toBe('')
+  })
+})
+
+describe('runStatusTone', () => {
+  it('names a tone per status, never by substring', () => {
+    expect(runStatusTone('AUT_STAT_RUNNING')).toBe('warning')
+    expect(runStatusTone('AUT_STAT_PENDING')).toBe('warning')
+    expect(runStatusTone('AUT_STAT_SUCCESS')).toBe('success')
+    expect(runStatusTone('AUT_STAT_FAILED')).toBe('danger')
+    expect(runStatusTone('AUT_STAT_DEAD_LETTER')).toBe('danger')
+    expect(runStatusTone('AUT_STAT_CANCELLED')).toBe('danger')
+    // "RUN" is inside NOT_RUN: a step that never ran must not read as running.
+    expect(runStatusTone('AUT_STAT_NOT_RUN')).toBe('neutral')
+    expect(runStatusTone('AUT_STAT_SKIP_DUP')).toBe('neutral')
+    expect(runStatusTone('AUT_STAT_NO_DATA')).toBe('neutral')
+    expect(runStatusTone(undefined)).toBe('neutral')
+  })
+})
+
+describe('uncleanRunOutcome', () => {
+  it('badges a run that finished without a clean answer, and nothing else', () => {
+    expect(uncleanRunOutcome('AUT_STAT_FAILED')).toEqual({ label: 'Failed', tone: 'danger' })
+    expect(uncleanRunOutcome('AUT_STAT_DEAD_LETTER')).toEqual({ label: 'Failed', tone: 'danger' })
+    expect(uncleanRunOutcome('AUT_STAT_CANCELLED')).toEqual({ label: 'Cancelled', tone: 'danger' })
+    expect(uncleanRunOutcome('AUT_STAT_NO_DATA')).toEqual({ label: 'No data', tone: 'neutral' })
+    expect(uncleanRunOutcome('AUT_STAT_SUCCESS')).toBeNull()
+    expect(uncleanRunOutcome('AUT_STAT_RUNNING')).toBeNull()
+    // Older descriptors carry no status: a result without one is a finished, clean run.
+    expect(uncleanRunOutcome(undefined)).toBeNull()
+  })
+})
+
+describe('isSingleSidedOutput', () => {
+  it('reads one side from both counts being absent, not from zero counts', () => {
+    expect(isSingleSidedOutput({})).toBe(true)
+    expect(isSingleSidedOutput({ onlyInFile1Count: 0, onlyInFile2Count: 0 })).toBe(false)
+    expect(isSingleSidedOutput({ onlyInFile1Count: 3 })).toBe(false)
   })
 })

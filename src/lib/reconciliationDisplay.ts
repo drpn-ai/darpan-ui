@@ -1,4 +1,46 @@
+import type { GeneratedOutput } from './api/types'
 import { darpanSystemNameFromLabel, darpanSystemNamePair } from './utils/darpanSystems'
+
+export type RunStatusTone = 'neutral' | 'success' | 'warning' | 'danger'
+
+// One tone per run/execution status (AutomationSeedData AUT_STAT_*), named rather than matched by
+// substring: "RUN" inside AUT_STAT_NOT_RUN once painted a step that never ran in the running colour.
+const RUN_STATUS_TONES: Record<string, RunStatusTone> = {
+  AUT_STAT_PENDING: 'warning',
+  AUT_STAT_RUNNING: 'warning',
+  AUT_STAT_SUCCESS: 'success',
+  AUT_STAT_FAILED: 'danger',
+  AUT_STAT_DEAD_LETTER: 'danger',
+  AUT_STAT_CANCELLED: 'danger',
+}
+
+export function runStatusTone(statusEnumId: unknown): RunStatusTone {
+  return RUN_STATUS_TONES[normalizeDisplayText(statusEnumId)] ?? 'neutral'
+}
+
+// A run that finished without a clean answer. DAR-OPS-029 D2: a rule-failed run still writes its result file,
+// so a result can belong to one of these, and its counts must never read as a clean run.
+const UNCLEAN_RUN_OUTCOME_LABELS: Record<string, string> = {
+  AUT_STAT_FAILED: 'Failed',
+  AUT_STAT_DEAD_LETTER: 'Failed',
+  AUT_STAT_CANCELLED: 'Cancelled',
+  AUT_STAT_NO_DATA: 'No data',
+}
+
+/** The badge a finished run's result carries when the run did not end cleanly; null for a clean or live run. */
+export function uncleanRunOutcome(statusEnumId: unknown): { label: string, tone: RunStatusTone } | null {
+  const status = normalizeDisplayText(statusEnumId)
+  const label = UNCLEAN_RUN_OUTCOME_LABELS[status]
+  return label ? { label, tone: runStatusTone(status) } : null
+}
+
+/**
+ * A run with no second side. Read from the stored counts rather than the labels, which always fall back to
+ * something: a two-sided run writes both counts, even when they are zero, and a single-sided one writes neither.
+ */
+export function isSingleSidedOutput(output: Pick<GeneratedOutput, 'onlyInFile1Count' | 'onlyInFile2Count'>): boolean {
+  return output.onlyInFile1Count == null && output.onlyInFile2Count == null
+}
 
 export function normalizeDisplayText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''

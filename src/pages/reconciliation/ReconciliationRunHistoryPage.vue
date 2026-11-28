@@ -57,18 +57,19 @@
         data-testid="run-history-featured-tile"
         :to="buildResultRoute(featuredOutput)"
       >
-        <div class="run-history-tile__head">
+        <div :class="['run-history-tile__head', { 'run-history-tile__head--status': uncleanOutcome(featuredOutput) }]">
           <span class="static-page-tile-title">{{ formatSavedResultDateTime(featuredOutput.createdDate) }}</span>
+          <StatusBadge v-if="uncleanOutcome(featuredOutput)" v-bind="uncleanOutcome(featuredOutput)!" />
         </div>
         <dl class="run-history-metrics run-history-metrics--featured">
           <div>
-            <dt>{{ isSingleSided(featuredOutput) ? 'Findings' : 'Total differences' }}</dt>
+            <dt>{{ isSingleSidedOutput(featuredOutput) ? 'Findings' : 'Total differences' }}</dt>
             <dd>{{ featuredOutput.totalDifferences ?? 0 }}</dd>
           </div>
           <!-- A single-sided run has no second system: its findings sit in totalDifferences and BOTH
                onlyIn* counts are null, so the two "Missing from" entries rendered 0 and 0 beside a
                non-zero total. One population, one figure. -->
-          <template v-if="!isSingleSided(featuredOutput)">
+          <template v-if="!isSingleSidedOutput(featuredOutput)">
             <div>
               <dt>Missing from {{ sourceSystemNames(featuredOutput).file1 }}</dt>
               <dd>{{ featuredOutput.onlyInFile2Count ?? 0 }}</dd>
@@ -99,15 +100,16 @@
           data-testid="run-history-result-tile"
           :to="buildResultRoute(output)"
         >
-          <div class="run-history-tile__head">
+          <div :class="['run-history-tile__head', { 'run-history-tile__head--status': uncleanOutcome(output) }]">
             <span class="static-page-tile-title">{{ formatSavedResultDateTime(output.createdDate) }}</span>
+            <StatusBadge v-if="uncleanOutcome(output)" v-bind="uncleanOutcome(output)!" />
           </div>
           <dl class="run-history-metrics">
             <div>
-              <dt>{{ isSingleSided(output) ? 'Findings' : 'Total differences' }}</dt>
+              <dt>{{ isSingleSidedOutput(output) ? 'Findings' : 'Total differences' }}</dt>
               <dd>{{ output.totalDifferences ?? 0 }}</dd>
             </div>
-            <template v-if="!isSingleSided(output)">
+            <template v-if="!isSingleSidedOutput(output)">
               <div>
                 <dt>Missing from {{ sourceSystemNames(output).file1 }}</dt>
                 <dd>{{ output.onlyInFile2Count ?? 0 }}</dd>
@@ -187,7 +189,12 @@ import {
   subscribeToPendingReconciliationRunsChange,
   type PendingReconciliationRun,
 } from '../../lib/reconciliationPendingRuns'
-import { normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconciliationDisplay'
+import {
+  isSingleSidedOutput,
+  normalizeDisplayText,
+  reconciliationStageLabel,
+  uncleanRunOutcome,
+} from '../../lib/reconciliationDisplay'
 import {
   buildReconciliationDiffRoute,
   buildReconciliationRunLiveRoute,
@@ -279,12 +286,14 @@ const canOpenRunSettings = computed(() => canEditTenantSettings.value && Boolean
 const runningGeneratedOutputs = computed(() => generatedOutputs.value.filter(isRunningGeneratedOutput))
 const completedGeneratedOutputs = computed(() => generatedOutputs.value.filter(isCompletedGeneratedOutput))
 const failedGeneratedOutputs = computed(() => generatedOutputs.value.filter(isFailedGeneratedOutput))
-// Spotlight only failures newer than the newest completed result: once a newer successful run
-// exists, an old failure is history, not an alert.
+// Spotlight only failures newer than the newest successful result: once a newer successful run
+// exists, an old failure is history, not an alert. A failure that wrote its result (D2) is shown
+// once, with a Failed badge, among the results; it is not a successful run, so it retires nothing.
 const attentionFailedRuns = computed<FailedRunView[]>(() => {
-  const newestCompletedMs = outputTimestampMs(completedGeneratedOutputs.value[0])
+  const newestSuccessfulMs = outputTimestampMs(completedGeneratedOutputs.value.find((output) => !uncleanOutcome(output)))
   return failedGeneratedOutputs.value
-    .filter((output) => newestCompletedMs == null || (outputTimestampMs(output) ?? 0) > newestCompletedMs)
+    .filter((output) => !isCompletedGeneratedOutput(output))
+    .filter((output) => newestSuccessfulMs == null || (outputTimestampMs(output) ?? 0) > newestSuccessfulMs)
     .map(buildFailedRunView)
 })
 const runningRuns = computed<RunningRunView[]>(() => {
@@ -319,13 +328,8 @@ const showHistorySection = computed(() =>
 // extracted: a run's stamped labels are endpoint descriptions ("Shopify Order Return References"),
 // which read as noise above a difference count. Same-system runs keep the endpoint labels — see
 // darpanSystemNamePair.
-/**
- * A run with no second side. Read from the stored counts rather than the label: sourceSystemNames
- * below falls back to the route query for a missing file2Label, so the label is never empty and
- * cannot answer this. A two-sided run always writes both counts, even when they are zero.
- */
-function isSingleSided(output: GeneratedOutput): boolean {
-  return output.onlyInFile1Count == null && output.onlyInFile2Count == null
+function uncleanOutcome(output: GeneratedOutput) {
+  return uncleanRunOutcome(output.statusEnumId)
 }
 
 function sourceSystemNames(output: GeneratedOutput): { file1: string, file2: string } {
@@ -391,9 +395,9 @@ function isFailedGeneratedOutput(output: GeneratedOutput): boolean {
 }
 
 function isResolvableGeneratedOutput(output: GeneratedOutput): boolean {
-  // Local pending markers clear against completed AND failed backend rows — a failure is a
-  // terminal outcome too, and only resolving against successes made failed runs ghost as Running.
-  return isCompletedGeneratedOutput(output) || isFailedGeneratedOutput(output)
+  // Local pending markers clear against every finished backend row: completed, failed, cancelled or
+  // no-data. Resolving against only some outcomes left the others ghosting as Running.
+  return !isRunningGeneratedOutput(output)
 }
 
 function outputTimestampMs(output: GeneratedOutput | undefined): number | null {
