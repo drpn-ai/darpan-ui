@@ -287,11 +287,6 @@ export interface InferJsonSchemaFromCsvTextPayload {
   isCompleteFile: boolean
 }
 
-export interface ValidateJsonTextPayload {
-  jsonText?: string
-  jsonSchemaId?: string
-}
-
 export interface FlattenJsonSchemaPayload {
   jsonSchemaId: string
 }
@@ -357,7 +352,8 @@ export interface CreateRuleSetRunPayload {
   file2ExtractOptions?: SourceExtractOptions
 }
 
-export interface SaveRuleSetRunPayload extends CreateRuleSetRunPayload {
+/** save#RuleSetRun takes no scopeMode: a run's scope is fixed when it is created. */
+export interface SaveRuleSetRunPayload extends Omit<CreateRuleSetRunPayload, 'scopeMode'> {
   savedRunId?: string
 }
 
@@ -466,10 +462,6 @@ export interface AutomationSourcePayload {
   safeMetadataJson?: string
   optionKey?: string
   omsRestSourceConfigId?: string
-  // Presence-sensitive, like the rule-set payload's file{1,2}ExcludeFilters: an omitted key leaves the
-  // automation's existing rows alone, an explicit [] clears them. Declared here so buildSourcePayload
-  // no longer has to write it through an `as` cast, which is what hid its absence.
-  excludeFilters?: SourceExcludeFilter[]
 }
 
 export interface SaveAutomationPayload {
@@ -490,10 +482,6 @@ export interface SaveAutomationPayload {
   isActive?: boolean
   chatSpaceId?: string
   sources?: AutomationSourcePayload[]
-}
-
-export interface DeleteAutomationPayload {
-  automationId: string
 }
 
 export interface RunAutomationNowPayload {

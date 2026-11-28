@@ -1012,8 +1012,6 @@ export interface SyncAutomationResponse extends ApiEnvelope {
 
 export type SaveAutomationResponse = Schemas['SaveAutomationResult']
 
-export type DeleteAutomationResponse = Schemas['DeleteAutomationResult']
-
 export interface RunAutomationNowResponse extends ApiEnvelope {
   automation?: AutomationRecord | null
   runResult?: Record<string, unknown> | null
@@ -1262,8 +1260,6 @@ export interface InferJsonSchemaResponse extends ApiEnvelope {
   jsonSchemaString?: string
   fieldList?: JsonSchemaField[]
 }
-
-export type ValidateJsonResponse = Schemas['ValidateJsonTextAgainstSchemaResult']
 
 export interface FlattenJsonSchemaResponse extends ApiEnvelope {
   jsonSchemaString?: string
