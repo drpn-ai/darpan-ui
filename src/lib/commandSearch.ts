@@ -42,7 +42,8 @@ function safeParseRecentCommandIds(rawValue: string | null): string[] {
   }
 }
 
-function toSearchPhrase(value: string): string {
+/** Lower case, words only, single spaces: how the palette and the slash commands compare text. */
+export function toSearchPhrase(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
@@ -115,10 +116,6 @@ function hasFuzzyWord(text: string, token: string): boolean {
   return tokenize(text).some((word) => isWithinEditDistance(word, token, limit))
 }
 
-function tokenMatchesText(text: string, token: string): boolean {
-  return hasExactWord(text, token) || hasPrefixWord(text, token) || tokenAppears(text, token) || hasFuzzyWord(text, token)
-}
-
 function recentBoost(recentIndex: number | undefined): number {
   if (recentIndex == null) return 0
   return Math.max(0, 140 - recentIndex * 20)
@@ -137,6 +134,10 @@ function scoreField(
   if (tokenAppears(text, token)) return containsPoints
   if (hasFuzzyWord(text, token)) return fuzzyPoints
   return 0
+}
+
+function tokenMatchesText(text: string, token: string): boolean {
+  return scoreField(text, token, 1, 1, 1, 1) > 0
 }
 
 type NormalizedCommandQuery = ReturnType<typeof normalizeQuery>
@@ -218,8 +219,22 @@ export function recordRecentCommand(commandId: string): string[] {
   )
 
   if (canUseStorage()) {
-    localStorage.setItem(RECENT_COMMANDS_STORAGE_KEY, JSON.stringify(nextIds))
+    try {
+      localStorage.setItem(RECENT_COMMANDS_STORAGE_KEY, JSON.stringify(nextIds))
+    } catch {
+      // Quota or a private window: this visit keeps its order, the next one starts without it.
+    }
   }
 
   return nextIds
+}
+
+/** Recent commands are the person's own: sign-in, sign-out and a tenant switch start without them. */
+export function clearRecentCommands(): void {
+  if (!canUseStorage()) return
+  try {
+    localStorage.removeItem(RECENT_COMMANDS_STORAGE_KEY)
+  } catch {
+    // Storage unavailable: nothing was kept to clear.
+  }
 }

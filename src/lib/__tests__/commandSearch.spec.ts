@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { listRecentCommandIds, recordRecentCommand, rankCommandActions } from '../commandSearch'
+import { clearRecentCommands, listRecentCommandIds, recordRecentCommand, rankCommandActions } from '../commandSearch'
 import type { CommandAction } from '../types/ux'
 
 const storageState = vi.hoisted(() => new Map<string, string>())
@@ -124,6 +124,24 @@ describe('recent command storage', () => {
     recordRecentCommand('navigate-ai-settings')
 
     expect(listRecentCommandIds()).toEqual(['navigate-ai-settings', 'navigate-run-reconciliation'])
+  })
+
+  // App records a command before it navigates, so a throw here would leave the palette going nowhere.
+  it('a storage that refuses writes (quota, private mode) still answers the new order and never throws', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => { throw new DOMException('quota', 'QuotaExceededError') },
+      removeItem: () => {},
+      clear: () => {},
+    })
+    expect(() => recordRecentCommand('navigate-hub')).not.toThrow()
+    expect(recordRecentCommand('navigate-hub')).toEqual(['navigate-hub'])
+  })
+
+  it('clears the history on sign-out and tenant switch', () => {
+    recordRecentCommand('navigate-hub')
+    clearRecentCommands()
+    expect(listRecentCommandIds()).toEqual([])
   })
 
   it('caps the stored recent history to a small bounded list', () => {

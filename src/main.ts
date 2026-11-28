@@ -15,8 +15,8 @@ import { reportError } from './lib/observability/report'
 import { vExplain } from './directives/vExplain'
 import './style.css'
 import { clearAgentConversations } from './components/audit/AuditAgentPanel.vue'
+import { clearRecentCommands } from './lib/commandSearch'
 
-const RECENT_COMMANDS_STORAGE_KEY = 'darpan-ui-recent-commands'
 // DAR-UI-140. The audit board's remembered By choice (record type or priority) is the person's own.
 const AUDIT_BY_STORAGE_KEY = 'darpan.audit.by'
 
@@ -36,8 +36,8 @@ setApiCacheReset(() => {
   useRunSubmissionsStore(pinia).reset() // DAR-UI-156: a run still starting is the last tenant's
   useReconciliationDraftStore(pinia).resetAll() // setup-style store: explicit reset; clears its sessionStorage too
   clearAgentConversations() // DAR-UI-104: the agent panel's conversation ids are per user and tenant
+  clearRecentCommands()
   try {
-    window.localStorage.removeItem(RECENT_COMMANDS_STORAGE_KEY)
     window.localStorage.removeItem(AUDIT_BY_STORAGE_KEY)
   } catch {
     // Storage may be unavailable in some embedded contexts; the in-memory resets above

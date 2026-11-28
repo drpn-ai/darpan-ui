@@ -1,4 +1,5 @@
 import type { SessionTenantOption } from './api/types'
+import { toSearchPhrase as normalize } from './commandSearch'
 
 export interface SlashCommandContext {
   availableTenants: SessionTenantOption[]
@@ -67,14 +68,6 @@ export interface ParsedSlashInput {
 
 export const SLASH_PREFIX = '/'
 
-function normalize(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
-}
-
 function compact(value: string): string {
   return normalize(value).replace(/\s+/g, '')
 }
@@ -128,22 +121,14 @@ function matchRank(command: SlashCommand, typedName: string): number {
 function toCommandRow(command: SlashCommand): SlashResultRow {
   // A usage line that spells out an argument the command does not take would be a lie, so the
   // action shape carries its description alone.
-  if (!takesArgument(command)) {
-    return {
-      id: `slash-command-${command.name}`,
-      label: `${SLASH_PREFIX}${command.name}`,
-      description: command.description,
-      kind: 'run',
-      commandName: command.name,
-      value: null,
-    }
-  }
-
+  const argument = takesArgument(command)
   return {
     id: `slash-command-${command.name}`,
     label: `${SLASH_PREFIX}${command.name}`,
-    description: `${command.description} Usage: ${SLASH_PREFIX}${command.name} {${command.argumentLabel}}`,
-    kind: 'command',
+    description: argument
+      ? `${command.description} Usage: ${SLASH_PREFIX}${command.name} {${command.argumentLabel}}`
+      : command.description,
+    kind: argument ? 'command' : 'run',
     commandName: command.name,
     value: null,
   }
@@ -209,7 +194,7 @@ function tenantLabel(tenant: SessionTenantOption): string {
   return tenant.label?.toString().trim() || tenant.userGroupId
 }
 
-export const switchTenantCommand: SlashCommand = {
+export const switchTenantCommand: SlashArgumentCommand = {
   name: 'switch-tenant',
   aliases: ['tenant', 'company', 'switch company'],
   description: 'Change the active company for your account.',
