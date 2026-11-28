@@ -81,7 +81,7 @@
           {{ option.label }}
         </button>
         <p v-if="searchable && filteredOptions.length === 0" class="app-select-empty" data-testid="app-select-empty">
-          {{ emptySearchLabel }}
+          No matching options
         </p>
       </div>
     </div>
@@ -105,7 +105,6 @@ const props = withDefaults(
     submitOnEnter?: boolean
     searchable?: boolean
     searchPlaceholder?: string
-    emptySearchLabel?: string
   }>(),
   {
     placeholder: '',
@@ -114,7 +113,6 @@ const props = withDefaults(
     submitOnEnter: false,
     searchable: false,
     searchPlaceholder: 'Search options',
-    emptySearchLabel: 'No matching options',
   },
 )
 
@@ -255,21 +253,12 @@ async function handleTriggerEnter(): Promise<void> {
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--text) 14%, transparent);
 }
 
+/* Panel look in style.css. A column whose options shrink and scroll when the menu is held to the room on screen
+   (useScreenAwareMenu). */
 .app-select-menu {
-  position: absolute;
   top: calc(100% + 0.45rem);
-  left: 0;
-  right: 0;
-  z-index: 70;
-  /* A column whose options shrink and scroll when the menu is held to the room on screen (useScreenAwareMenu). */
   display: flex;
   flex-direction: column;
-  gap: var(--space-00);
-  padding: var(--space-1);
-  border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 94%, var(--surface));
-  box-shadow: 0 18px 48px color-mix(in oklab, var(--bg) 56%, transparent);
   overflow: hidden;
 }
 

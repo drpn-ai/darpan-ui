@@ -220,19 +220,10 @@ async function handleTriggerEnter(): Promise<void> {
 
 /* Chip role lives in style.css - shared with the other component that renders chips. */
 
+/* Panel look in style.css; this menu scrolls itself. */
 .workflow-select-menu {
-  position: absolute;
   top: calc(100% + 0.55rem);
-  left: 0;
-  right: 0;
-  z-index: 70;
   display: grid;
-  gap: var(--space-00);
-  padding: var(--space-1);
-  border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 94%, var(--surface));
-  box-shadow: 0 18px 48px color-mix(in oklab, var(--bg) 56%, transparent);
   max-height: min(18rem, 48vh);
   overflow: auto;
 }
