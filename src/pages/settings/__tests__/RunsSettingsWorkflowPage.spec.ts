@@ -10,8 +10,7 @@ const route = vi.hoisted(() => ({
 }))
 const listSchemas = vi.hoisted(() => vi.fn())
 const flatten = vi.hoisted(() => vi.fn())
-const getMapping = vi.hoisted(() => vi.fn())
-const saveMapping = vi.hoisted(() => vi.fn())
+const resolveSavedRunEditorTarget = vi.hoisted(() => vi.fn())
 const saveRuleSetRun = vi.hoisted(() => vi.fn())
 const listAutomationSourceOptions = vi.hoisted(() => vi.fn())
 const authState = vi.hoisted(() => ({
@@ -35,8 +34,6 @@ vi.mock('../../../lib/api/facade', () => ({
     flatten,
   },
   reconciliationFacade: {
-    getMapping,
-    saveMapping,
     saveRuleSetRun,
     listAutomationSourceOptions,
   },
@@ -85,6 +82,12 @@ const draftStoreState = vi.hoisted(() => ({
   clearAutomationDraft: vi.fn(),
 }))
 
+// The run's row on a direct URL; buildRuleSetDraft stays real, so the draft is the one its details page would build.
+vi.mock('../../../lib/savedRunEditorRoute', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/savedRunEditorRoute')>()),
+  resolveSavedRunEditorTarget,
+}))
+
 vi.mock('../../../stores/reconciliationDraft', () => ({
   useReconciliationDraftStore: () => draftStoreState,
 }))
@@ -129,8 +132,7 @@ describe('RunsSettingsWorkflowPage', () => {
     route.params.reconciliationMappingId = 'OrderIdMap'
     listSchemas.mockReset()
     flatten.mockReset()
-    getMapping.mockReset()
-    saveMapping.mockReset()
+    resolveSavedRunEditorTarget.mockReset().mockResolvedValue(null)
     saveRuleSetRun.mockReset()
     listAutomationSourceOptions.mockReset()
     authState.sessionInfo = {
@@ -208,50 +210,6 @@ describe('RunsSettingsWorkflowPage', () => {
           { fieldPath: '$.legacyResourceId', type: 'string', required: false },
         ],
       })
-    })
-
-    getMapping.mockResolvedValue({
-      ok: true,
-      messages: [],
-      errors: [],
-      mapping: {
-        reconciliationMappingId: 'OrderIdMap',
-        mappingName: 'Order ID',
-        members: [
-          {
-            mappingMemberId: 'OrderIdMap-1',
-            systemEnumId: 'DarSysOms',
-            systemLabel: 'OMS',
-            jsonSchemaId: '100408',
-            schemaName: 'Returns Feed',
-            fieldPath: '$.return_id',
-          },
-          {
-            mappingMemberId: 'OrderIdMap-2',
-            systemEnumId: 'DarSysShopify',
-            systemLabel: 'SHOPIFY',
-            jsonSchemaId: '100409',
-            schemaName: 'Shopify Orders',
-            fieldPath: '$.id',
-          },
-        ],
-      },
-    })
-
-    saveMapping.mockResolvedValue({
-      ok: true,
-      messages: ['Saved run Order Returns.'],
-      errors: [],
-      savedMapping: {
-        reconciliationMappingId: 'OrderIdMap',
-        mappingName: 'Order Returns',
-        file1SystemEnumId: 'DarSysOms',
-        file2SystemEnumId: 'DarSysNetsuite',
-        file1SchemaName: 'Returns Feed',
-        file2SchemaName: 'NetSuite Returns',
-        file1FieldPath: '$.return_ref',
-        file2FieldPath: '$.return.externalId',
-      },
     })
 
     saveRuleSetRun.mockResolvedValue({
@@ -357,108 +315,46 @@ describe('RunsSettingsWorkflowPage', () => {
     })
   })
 
-  it('loads an editable two-source run form and saves back to the runs settings page', async () => {
+  it('on a direct URL or a refresh, builds the draft from the run\'s row and edits it (OC21: every run is a rule set)', async () => {
+    route.params.reconciliationMappingId = 'RS_ORDER_SYNC'
+    resolveSavedRunEditorTarget.mockResolvedValue({
+      savedRunId: 'RS_ORDER_SYNC',
+      runName: 'Order Sync',
+      description: 'Compares orders across systems.',
+      runType: 'ruleset',
+      ruleSetId: 'RS_ORDER_SYNC',
+      requiresSystemSelection: false,
+      defaultFile1SystemEnumId: 'DarSysOms',
+      defaultFile2SystemEnumId: 'DarSysShopify',
+      systemOptions: [
+        { fileSide: 'FILE_1', enumId: 'DarSysOms', label: 'OMS', fileTypeEnumId: 'DftJson', schemaFileName: 'Returns Feed', idFieldExpression: '$.return_id' },
+        { fileSide: 'FILE_2', enumId: 'DarSysShopify', label: 'SHOPIFY', fileTypeEnumId: 'DftJson', schemaFileName: 'Shopify Orders', idFieldExpression: '$.id' },
+      ],
+    })
     const wrapper = mount(RunsSettingsWorkflowPage)
     await flushPromises()
 
+    expect(resolveSavedRunEditorTarget).toHaveBeenCalledWith('RS_ORDER_SYNC')
     expect(wrapper.find('.workflow-page').exists()).toBe(true)
-    expect(wrapper.find('.wizard-question-shell').classes()).toContain('workflow-form--compact')
     expect(wrapper.find('.wizard-question-shell').classes()).toContain('workflow-form--edit-single-page')
-    expect(wrapper.find('input[name="mappingName"]').element).toHaveProperty('value', 'Order ID')
-    expect(wrapper.text()).not.toContain('Source 1 system:')
-    expect(wrapper.text()).not.toContain('Source 2 system:')
-    expect(getMapping).toHaveBeenCalledWith({ reconciliationMappingId: 'OrderIdMap' }, expect.any(AbortSignal))
+    expect(wrapper.find('input[name="mappingName"]').element).toHaveProperty('value', 'Order Sync')
     expect(flatten).toHaveBeenCalledWith({ jsonSchemaId: '100408' }, expect.any(AbortSignal))
     expect(flatten).toHaveBeenCalledWith({ jsonSchemaId: '100409' }, expect.any(AbortSignal))
+    expect(wrapper.get('[data-testid="run-source-1-row"]').text()).toContain('$.return_id')
 
-    await wrapper.find('input[name="mappingName"]').setValue('Order Returns')
-    await removeWorkflowSelectChip(wrapper, 'run-source-1-row', 0)
-    await pickWorkflowSelectOption(wrapper, 'run-field-1', '$.return_ref')
-    await chooseAppSelectOption(wrapper, 'run-schema-2', '100411')
-    await flushPromises()
-    await pickWorkflowSelectOption(wrapper, 'run-field-2', '$.return.externalId')
+    await wrapper.find('input[name="mappingName"]').setValue('Order Sync Revised')
     await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
     await flushPromises()
-
-    expect(saveMapping).toHaveBeenCalledWith({
-      reconciliationMappingId: 'OrderIdMap',
-      mappingName: 'Order Returns',
-      schema1Id: '100408',
-      schema2Id: '100411',
-      schema1FieldPath: '$.return_ref',
-      schema2FieldPath: '$.return.externalId',
-    })
-    expect(push).toHaveBeenCalledWith('/settings/runs')
+    expect(saveRuleSetRun).toHaveBeenCalledWith(expect.objectContaining({ savedRunId: 'RS_ORDER_SYNC', runName: 'Order Sync Revised' }))
   })
 
-  it('blocks saving a legacy mapping run with more than one primary ID field per source', async () => {
+  it('says so, and offers no Save, when the run is not there', async () => {
     const wrapper = mount(RunsSettingsWorkflowPage)
     await flushPromises()
 
-    await pickWorkflowSelectOption(wrapper, 'run-field-1', '$.return_ref')
-    await flushPromises()
-
-    expect(wrapper.get('[data-testid="run-source-1-row"]').findAll('[data-testid="workflow-select-chip"]')).toHaveLength(2)
-    expect(wrapper.text()).toContain('HotWax supports a single ID field.')
-
-    await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
-    await flushPromises()
-    expect(saveMapping).not.toHaveBeenCalled()
-
-    await removeWorkflowSelectChip(wrapper, 'run-source-1-row', 1)
-    await flushPromises()
-    expect(wrapper.text()).not.toContain('HotWax supports a single ID field.')
-
-    await wrapper.get('[data-testid="save-run-settings"]').trigger('click')
-    await flushPromises()
-    expect(saveMapping).toHaveBeenCalledWith({
-      reconciliationMappingId: 'OrderIdMap',
-      mappingName: 'Order ID',
-      schema1Id: '100408',
-      schema2Id: '100409',
-      schema1FieldPath: '$.return_id',
-      schema2FieldPath: '$.id',
-    })
-  })
-
-  it('preselects stored source fields when the saved mapping uses legacy field expressions', async () => {
-    getMapping.mockResolvedValueOnce({
-      ok: true,
-      messages: [],
-      errors: [],
-      mapping: {
-        reconciliationMappingId: 'OrderIdMap',
-        mappingName: 'Order ID',
-        members: [
-          {
-            mappingMemberId: 'OrderIdMap-1',
-            systemEnumId: 'DarSysOms',
-            systemLabel: 'OMS',
-            jsonSchemaId: '100408',
-            schemaName: 'Returns Feed',
-            fieldPath: 'return_id',
-          },
-          {
-            mappingMemberId: 'OrderIdMap-2',
-            systemEnumId: 'DarSysShopify',
-            systemLabel: 'SHOPIFY',
-            jsonSchemaId: '100409',
-            schemaName: 'Shopify Orders',
-            fieldPath: 'id',
-          },
-        ],
-      },
-    })
-
-    const wrapper = mount(RunsSettingsWorkflowPage)
-    await flushPromises()
-
-    const source1Chips = wrapper.get('[data-testid="run-source-1-row"]').findAll('[data-testid="workflow-select-chip"]')
-    const source2Chips = wrapper.get('[data-testid="run-source-2-row"]').findAll('[data-testid="workflow-select-chip"]')
-    expect(source1Chips).toHaveLength(1)
-    expect(source1Chips[0]!.text()).toContain('$.return_id')
-    expect(source2Chips).toHaveLength(1)
-    expect(source2Chips[0]!.text()).toContain('$.id')
+    expect(resolveSavedRunEditorTarget).toHaveBeenCalledWith('OrderIdMap')
+    expect(wrapper.text()).toContain('Run "OrderIdMap" ran away. Fittingly.')
+    expect(wrapper.get('[data-testid="save-run-settings"]').attributes('disabled')).toBeDefined()
   })
 
   it('loads a ruleset run draft and saves non-rule settings back to the run details page', async () => {
@@ -489,7 +385,7 @@ describe('RunsSettingsWorkflowPage', () => {
     const wrapper = mount(RunsSettingsWorkflowPage)
     await flushPromises()
 
-    expect(getMapping).not.toHaveBeenCalled()
+    expect(resolveSavedRunEditorTarget).not.toHaveBeenCalled()
     expect(wrapper.find('input[name="mappingName"]').element).toHaveProperty('value', 'Order Sync')
     expect(wrapper.text()).not.toContain('Rules')
 
@@ -512,7 +408,6 @@ describe('RunsSettingsWorkflowPage', () => {
       file2SchemaFileName: 'Shopify Orders',
       file2PrimaryIdExpression: '$.id',
     })
-    expect(saveMapping).not.toHaveBeenCalled()
     expect(push).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
   })
 
@@ -674,7 +569,7 @@ describe('RunsSettingsWorkflowPage', () => {
     const wrapper = mount(RunsSettingsWorkflowPage)
     await flushPromises()
 
-    expect(getMapping).not.toHaveBeenCalled()
+    expect(resolveSavedRunEditorTarget).not.toHaveBeenCalled()
     expect(listAutomationSourceOptions).toHaveBeenCalled()
     // DAR-UI-053: each side is named by the system it reads, never "Source 1" / "Source 2".
     expect(wrapper.text()).toContain('HotWax API Config')
@@ -716,7 +611,6 @@ describe('RunsSettingsWorkflowPage', () => {
       file2SourceConfigType: 'SHOPIFY_AUTH',
       file2PrimaryIdExpression: '$.records[*].id',
     })
-    expect(saveMapping).not.toHaveBeenCalled()
     expect(push).toHaveBeenCalledWith({ name: 'reconciliation-ruleset-manager' })
   })
 
@@ -840,33 +734,22 @@ describe('RunsSettingsWorkflowPage', () => {
         },
       ],
     })
-    getMapping.mockResolvedValueOnce({
-      ok: true,
-      messages: [],
-      errors: [],
-      mapping: {
-        reconciliationMappingId: 'OrderIdMap',
-        mappingName: 'Order ID',
-        members: [
-          {
-            mappingMemberId: 'OrderIdMap-1',
-            systemEnumId: 'DarSysOms',
-            systemLabel: 'OMS',
-            jsonSchemaId: '100408',
-            schemaName: 'gorjana_oms_order',
-            fieldPath: '$.return_id',
-          },
-          {
-            mappingMemberId: 'OrderIdMap-2',
-            systemEnumId: 'DarSysShopify',
-            systemLabel: 'SHOPIFY',
-            jsonSchemaId: '100409',
-            schemaName: 'gorjana_shopify_order',
-            fieldPath: '$.id',
-          },
-        ],
+    route.params.reconciliationMappingId = 'RS_GORJANA'
+    draftStoreState.ruleSetDraftState = {
+      draft: {
+        savedRunId: 'RS_GORJANA',
+        runName: 'Order ID',
+        file1SystemEnumId: 'DarSysOms',
+        file1FileTypeEnumId: 'DftJson',
+        file1JsonSchemaId: '100408',
+        file1PrimaryIdExpression: ['$.return_id'],
+        file2SystemEnumId: 'DarSysShopify',
+        file2FileTypeEnumId: 'DftJson',
+        file2JsonSchemaId: '100409',
+        file2PrimaryIdExpression: ['$.id'],
       },
-    })
+      resumeStepId: 'ruleset-manager',
+    }
 
     const wrapper = mount(RunsSettingsWorkflowPage)
     await flushPromises()
@@ -1395,7 +1278,7 @@ describe('RunsSettingsWorkflowPage', () => {
 
     expect(source).toContain('<WorkflowStepForm')
     expect(source).toContain("<AppSelect")
-    expect(source).toContain("'workflow-form--compact'")
+    expect(source).not.toContain('workflow-form--compact')
     expect(source).toContain("'workflow-form--edit-single-page'")
     expect(source).not.toContain('<select')
     expect(source).not.toContain('<style scoped>')

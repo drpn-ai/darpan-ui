@@ -177,13 +177,6 @@ export function buildRuleSetDraft(row: SavedRunSummary): ReconciliationRuleSetDr
 }
 
 export function buildSavedRunEditorRoute(row: SavedRunSummary): RouteLocationRaw {
-  if (row.runType === 'mapping' && row.reconciliationMappingId) {
-    return {
-      name: 'settings-runs-edit',
-      params: { reconciliationMappingId: row.reconciliationMappingId },
-    }
-  }
-
   const ruleSetDraft = buildRuleSetDraft(row)
   if (row.runType === 'ruleset' && ruleSetDraft) {
     return {

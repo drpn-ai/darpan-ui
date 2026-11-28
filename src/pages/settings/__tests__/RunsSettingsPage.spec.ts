@@ -30,7 +30,7 @@ describe('RunsSettingsPage', () => {
     listSavedRuns.mockReset()
   })
 
-  it('renders saved runs as dashboard tiles and routes mapping and ruleset rows to editor surfaces', async () => {
+  it('renders saved runs as dashboard tiles: a run with a draft opens its details, one without opens run settings by id', async () => {
     listSavedRuns.mockResolvedValue({
       ok: true,
       messages: [],
@@ -40,8 +40,8 @@ describe('RunsSettingsPage', () => {
           savedRunId: 'OrderIdMap',
           runName: 'Order ID',
           description: 'Order ID',
-          runType: 'mapping',
-          reconciliationMappingId: 'OrderIdMap',
+          // OC21: no mapping runs any more. A rule-set row whose sides cannot build a draft opens run settings by id.
+          runType: 'ruleset',
           requiresSystemSelection: false,
           defaultFile1SystemEnumId: 'OMS',
           defaultFile2SystemEnumId: 'SHOPIFY',

@@ -2,10 +2,9 @@
   <WorkflowPage :progress-percent="'100'" aria-label="Run settings edit progress" center-stage edit-surface>
     <InlineValidation v-if="error" tone="error" :message="error" />
     <InlineValidation v-else-if="!loading && validationMessage" tone="error" :message="validationMessage" />
-    <p v-if="success" class="success-copy">{{ success }}</p>
 
     <WorkflowStepForm
-      :class="['workflow-form--compact', 'workflow-form--edit-single-page']"
+      :class="['workflow-form--edit-single-page']"
       question="Update the run configuration."
       primary-label="Save"
       primary-action-variant="save"
@@ -198,6 +197,7 @@ import {
   deduplicateDarpanSystemOptions,
   type DarpanSystemValueOption,
 } from '../../lib/utils/darpanSystems'
+import { buildRuleSetDraft, resolveSavedRunEditorTarget } from '../../lib/savedRunEditorRoute'
 import { resolveRecordLabel } from '../../lib/utils/recordLabel'
 import { resolveSchemaLabel } from '../../lib/utils/schemaLabel'
 
@@ -238,7 +238,6 @@ const flattenedFields = ref<Record<string, JsonSchemaField[]>>({})
 const ruleSetDraft = ref<ReconciliationRuleSetDraft | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
-const success = ref<string | null>(null)
 
 const form = reactive<RunForm>({
   mappingName: '',
@@ -321,7 +320,7 @@ const validationMessage = computed(() => {
   ) return 'Both sides use the same system.'
   return null
 })
-const submitDisabled = computed(() => !canEditTenantSettings.value || loading.value || !!validationMessage.value)
+const submitDisabled = computed(() => !canEditTenantSettings.value || loading.value || !ruleSetDraft.value || !!validationMessage.value)
 // Each side is named by the system it reads ("HotWax" / "Shopify"), as the rules board titles its
 // columns. Two endpoints of the same system keep their endpoint labels so the sides stay distinct.
 const sourceNames = computed<Record<SourceKey, string>>(() => {
@@ -565,11 +564,6 @@ function validateSource(sourceKey: SourceKey): string | null {
 
   if (!source.schemaId) return 'Choose schemas for both sources.'
   if (!source.fieldPaths.length) return 'Choose an ID field for both sources.'
-  // Legacy mapping runs (no rule-set draft) save through saveMapping, which only
-  // carries one field per side — block extra chips instead of silently dropping them.
-  if (!ruleSetDraft.value && source.fieldPaths.length > 1) {
-    return `${sourceNames.value[sourceKey]} supports a single ID field.`
-  }
   return null
 }
 
@@ -853,17 +847,22 @@ async function load(): Promise<void> {
 
   loading.value = true
   error.value = null
-  success.value = null
 
   const signal = pageAbortController.signal
 
   try {
+    // DAR-OPS-029 U10b (OC21): every run is a rule-set run. The draft its details page holds, or, on a direct URL or
+    // a refresh, the same draft built from its list#SavedRuns row.
     const draftState = draftStore.ruleSetDraftState
-    const historyDraft = draftState?.draft?.savedRunId === activeMappingId.value ? draftState.draft : null
-    const shouldLoadApiOptions = Boolean(historyDraft && (
-      historyDraft.file1SourceTypeEnumId?.trim() === SOURCE_TYPE_API ||
-      historyDraft.file2SourceTypeEnumId?.trim() === SOURCE_TYPE_API
-    ))
+    const storedDraft = draftState?.draft?.savedRunId === activeMappingId.value ? draftState.draft : null
+    const savedRun = storedDraft ? null : await resolveSavedRunEditorTarget(activeMappingId.value)
+    const draft = storedDraft ?? (savedRun ? buildRuleSetDraft(savedRun) : null)
+    if (!draft) {
+      error.value = `Run "${activeMappingId.value}" ran away. Fittingly.`
+      return
+    }
+    const shouldLoadApiOptions = draft.file1SourceTypeEnumId?.trim() === SOURCE_TYPE_API ||
+      draft.file2SourceTypeEnumId?.trim() === SOURCE_TYPE_API
     const schemasResponse = await jsonSchemaFacade.list({
       pageIndex: 0,
       pageSize: 200,
@@ -883,36 +882,8 @@ async function load(): Promise<void> {
       ...(option.extractable === false ? { extractable: false } : {}),
     }))
 
-    if (historyDraft) {
-      ruleSetDraft.value = historyDraft
-      hydrateRuleSetDraftForm(historyDraft)
-      await Promise.all([
-        syncFieldOptions('source1', signal),
-        syncFieldOptions('source2', signal),
-      ])
-      return
-    }
-
-    const mappingResponse = await reconciliationFacade.getMapping({
-      reconciliationMappingId: activeMappingId.value,
-    }, signal)
-
-    const mapping = mappingResponse.mapping
-    if (!mapping) {
-      error.value = `Run "${activeMappingId.value}" ran away. Fittingly.`
-      return
-    }
-    if ((mapping.members?.length ?? 0) !== 2) {
-      error.value = 'Only two-source runs can be edited in this workflow.'
-      return
-    }
-
-    form.mappingName = mapping.mappingName ?? ''
-    form.source1.schemaId = mapping.members?.[0]?.jsonSchemaId ?? ''
-    form.source1.fieldPaths = mapping.members?.[0]?.fieldPath ? [mapping.members[0].fieldPath] : []
-    form.source2.schemaId = mapping.members?.[1]?.jsonSchemaId ?? ''
-    form.source2.fieldPaths = mapping.members?.[1]?.fieldPath ? [mapping.members[1].fieldPath] : []
-
+    ruleSetDraft.value = draft
+    hydrateRuleSetDraftForm(draft)
     await Promise.all([
       syncFieldOptions('source1', signal),
       syncFieldOptions('source2', signal),
@@ -926,39 +897,25 @@ async function load(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (submitDisabled.value) return
+  const current = ruleSetDraft.value
+  if (submitDisabled.value || !current) return
 
   loading.value = true
   error.value = null
-  success.value = null
 
   try {
-    if (ruleSetDraft.value) {
-      // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). The run's id is known,
-      // so the run details open on the click, already showing the edits (they read the draft); save#RuleSetRun runs
-      // behind, tied to nothing on this page.
-      const runId = ruleSetDraft.value.savedRunId ?? activeMappingId.value
-      const storedDraft = toRaw(ruleSetDraft.value)
-      const editedDraft = buildRuleSetDraftFromForm(form.mappingName.trim())
-      const payload = buildRuleSetSavePayload()
-      const saving = draftStore.afterRuleSetSaves(() => reconciliationFacade.saveRuleSetRun(payload))
-      draftStore.setRuleSetDraft(editedDraft, 'ruleset-manager')
-      const leaving = router.push({ name: 'reconciliation-ruleset-manager' })
-      void saving.catch((saveError: unknown) => raiseRefusedSave(leaving, saveError, runId, storedDraft, editedDraft))
-      await leaving
-      return
-    }
-
-    const response = await reconciliationFacade.saveMapping({
-      reconciliationMappingId: activeMappingId.value,
-      mappingName: form.mappingName.trim(),
-      schema1Id: form.source1.schemaId,
-      schema2Id: form.source2.schemaId,
-      schema1FieldPath: form.source1.fieldPaths[0] ?? '',
-      schema2FieldPath: form.source2.fieldPaths[0] ?? '',
-    })
-    success.value = response.messages?.[0] ?? 'Saved run.'
-    await router.push(resolveOriginPath())
+    // DAR-UI-156 (Aditi: "UI changes should always be immediate.. backend can do its thing"). The run's id is known,
+    // so the run details open on the click, already showing the edits (they read the draft); save#RuleSetRun runs
+    // behind, tied to nothing on this page.
+    const runId = current.savedRunId ?? activeMappingId.value
+    const storedDraft = toRaw(current)
+    const editedDraft = buildRuleSetDraftFromForm(form.mappingName.trim())
+    const payload = buildRuleSetSavePayload()
+    const saving = draftStore.afterRuleSetSaves(() => reconciliationFacade.saveRuleSetRun(payload))
+    draftStore.setRuleSetDraft(editedDraft, 'ruleset-manager')
+    const leaving = router.push({ name: 'reconciliation-ruleset-manager' })
+    void saving.catch((saveError: unknown) => raiseRefusedSave(leaving, saveError, runId, storedDraft, editedDraft))
+    await leaving
   } catch (saveError) {
     error.value = saveError instanceof ApiCallError ? saveError.message : 'Run settings ran off before the save. Not saved.'
   } finally {
