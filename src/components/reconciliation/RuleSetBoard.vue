@@ -332,7 +332,7 @@
               class="workflow-select-chip-remove"
               :aria-label="`Remove ${value}`"
               @click="editingExclusionValues = editingExclusionValues.filter((entry) => entry !== value)"
-            >&times;</button>
+            ><AppIcon name="close" /></button>
           </span>
         </div>
         <div class="ruleset-rule-popover-actions">

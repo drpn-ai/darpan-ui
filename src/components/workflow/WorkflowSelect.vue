@@ -48,7 +48,7 @@
           class="workflow-select-chip-remove"
           :aria-label="`Remove ${labelForValue(value)}`"
           @click="removeChip(value)"
-        >&times;</button>
+        ><AppIcon name="close" /></button>
       </span>
     </div>
 
@@ -86,6 +86,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppIcon from '../ui/AppIcon.vue'
 import { useInlineSelect, type InlineSelectOption } from '../../lib/useInlineSelect'
 
 export type WorkflowSelectOption = InlineSelectOption

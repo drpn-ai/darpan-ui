@@ -24,7 +24,7 @@
           class="workflow-select-chip-remove"
           :aria-label="`Remove ${value}`"
           @click="removeChip(value)"
-        >&times;</button>
+        ><AppIcon name="close" /></button>
       </span>
     </div>
   </div>
@@ -32,6 +32,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import AppIcon from '../ui/AppIcon.vue'
 
 const props = withDefaults(
   defineProps<{

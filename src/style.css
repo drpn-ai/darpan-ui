@@ -2432,10 +2432,16 @@ label > span {
 
 .workflow-select-chip-remove {
   all: unset;
+  display: inline-flex;
   cursor: pointer;
   opacity: 0.55;
-  font-size: var(--type-meta-size);
-  line-height: 1;
+}
+
+/* A chip's remove control is the close icon, never a typed x. */
+.workflow-select-chip-remove svg,
+.shared-with-chip-action svg {
+  width: 0.7rem;
+  height: 0.7rem;
 }
 
 .workflow-select-chip-remove:hover {

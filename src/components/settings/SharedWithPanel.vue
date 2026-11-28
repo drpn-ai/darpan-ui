@@ -41,7 +41,7 @@
             :disabled="revokingTenantId === entry.tenantUserGroupId"
             @click="removePeer(entry.tenantUserGroupId, entry.label)"
           >
-            &times;
+            <AppIcon name="close" />
           </button>
         </span>
       </template>
@@ -80,6 +80,7 @@ import type { ConfigSharing, ConfigSharingMember } from '../../lib/api/types'
 import type { SharedConfigType } from '../../lib/sharedConfig'
 import { useAuthStore } from '../../stores/auth'
 import { usePermissionsStore } from '../../stores/permissions'
+import AppIcon from '../ui/AppIcon.vue'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
 
