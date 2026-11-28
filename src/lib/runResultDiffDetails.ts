@@ -2,10 +2,15 @@ import type { GeneratedOutputDifferenceRow, GeneratedOutputDifferencesRuleOption
 import { DEFAULT_LIST_PAGE_SIZE } from './listPagination'
 import { normalizeDisplayText } from './reconciliationDisplay'
 
-export type DiffBucketKey = 'file-1' | 'file-2' | 'rule'
+/**
+ * The server's row classes (DiffDetailClassifier.BUCKET_ORDER). 'duplicate' (OC52): rows a side reported under a key it
+ * already had, split out of 'rule' so each tile matches its summary count. A server without it puts them in 'rule',
+ * sends no 'duplicate' facet and ignores the unknown bucket in a request, so the tile simply stays hidden.
+ */
+export type DiffBucketKey = 'file-1' | 'file-2' | 'rule' | 'duplicate'
 
 export const DIFF_DETAILS_PAGE_SIZE = DEFAULT_LIST_PAGE_SIZE
-export const DIFF_BUCKET_ORDER: DiffBucketKey[] = ['file-1', 'file-2', 'rule']
+export const DIFF_BUCKET_ORDER: DiffBucketKey[] = ['file-1', 'file-2', 'rule', 'duplicate']
 export const ALL_RULE_FILTER_KEY = 'all'
 export const BASE_RULE_FILTER_KEY = 'base-diff'
 
@@ -75,6 +80,7 @@ export function createEmptyDiffBucketCounts(): Record<DiffBucketKey, number> {
     'file-1': 0,
     'file-2': 0,
     rule: 0,
+    duplicate: 0,
   }
 }
 

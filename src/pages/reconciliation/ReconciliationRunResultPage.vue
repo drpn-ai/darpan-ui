@@ -997,13 +997,16 @@ function toggleExpanded(row: Record<string, unknown>): void {
 }
 
 // A tile's number is the number of rows its click shows, so the clickable tiles read the server's
-// whole-document bucket facets, never the run summary: the summary's ruleDifferenceCount leaves out the
-// duplicate-id rows the rule bucket holds (DAR-BE-063), and a HIDE conclusion takes rows out of the
-// document without lowering it. "Missing from <file 1 system>" = facet file-1 (rows only the second
+// whole-document bucket facets, never the run summary: a server before OC52 holds duplicate-id rows in the
+// rule bucket that the summary's ruleDifferenceCount leaves out (DAR-BE-063), and a HIDE conclusion takes
+// rows out of the document without lowering it. "Missing from <file 1 system>" = facet file-1 (rows only the second
 // side has), "Missing from <file 2 system>" = facet file-2, "Rule differences" = facet rule (one row per
-// rule a matched pair failed, plus duplicate-id rows). Their sum is the All count (totalDifferences).
+// rule a matched pair failed), "Duplicated" = facet duplicate (rows a side reported under a key it already
+// had; OC52 — a server before it keeps them in rule and sends no duplicate facet, so the tile stays hidden).
+// Their sum is the All count (totalDifferences).
 const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
   const ruleDifferenceCount = diffDetailBucketCounts.value.rule
+  const duplicateCount = diffDetailBucketCounts.value.duplicate
 
   // One population, one tile. No "screened out" count beside it: the rows that did not survive the
   // extractor's own gate are not findings, and putting them back on screen re-opens the question the
@@ -1039,6 +1042,15 @@ const overviewDiffDetailBuckets = computed<DiffDetailBucketCard[]>(() => {
           label: 'Rule differences',
           count: ruleDifferenceCount,
           testId: 'diff-bucket-rule',
+        }]
+      : []),
+    ...(duplicateCount > 0
+      ? [{
+          key: 'duplicate',
+          bucketKey: 'duplicate' as const,
+          label: 'Duplicated',
+          count: duplicateCount,
+          testId: 'diff-bucket-duplicate',
         }]
       : []),
   ]

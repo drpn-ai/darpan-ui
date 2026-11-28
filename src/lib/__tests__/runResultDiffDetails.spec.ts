@@ -17,13 +17,13 @@ import {
 
 describe('runResultDiffDetails', () => {
   it('exposes the canonical bucket order and filter keys', () => {
-    expect(DIFF_BUCKET_ORDER).toEqual(['file-1', 'file-2', 'rule'])
+    expect(DIFF_BUCKET_ORDER).toEqual(['file-1', 'file-2', 'rule', 'duplicate'])
     expect(ALL_RULE_FILTER_KEY).toBe('all')
     expect(BASE_RULE_FILTER_KEY).toBe('base-diff')
   })
 
   it('createEmptyDiffBucketCounts returns zeroed counts for every bucket', () => {
-    expect(createEmptyDiffBucketCounts()).toEqual({ 'file-1': 0, 'file-2': 0, rule: 0 })
+    expect(createEmptyDiffBucketCounts()).toEqual({ 'file-1': 0, 'file-2': 0, rule: 0, duplicate: 0 })
   })
 
   it('normalizeDiffBucketSelection preserves canonical order regardless of input order', () => {
@@ -145,10 +145,13 @@ describe('runResultDiffDetails', () => {
   })
 
   it('normalizeServerBucketCounts keeps known buckets and zeroes bad values', () => {
-    expect(normalizeServerBucketCounts(undefined)).toEqual({ 'file-1': 0, 'file-2': 0, rule: 0 })
+    expect(normalizeServerBucketCounts(undefined)).toEqual({ 'file-1': 0, 'file-2': 0, rule: 0, duplicate: 0 })
     expect(
       normalizeServerBucketCounts({ 'file-1': 3, 'file-2': Number.NaN, rule: 2, unknown: 9 }),
-    ).toEqual({ 'file-1': 3, 'file-2': 0, rule: 2 })
+    ).toEqual({ 'file-1': 3, 'file-2': 0, rule: 2, duplicate: 0 })
+    // OC52: a server from before the duplicate class sends no duplicate facet; it reads as none, never as missing.
+    expect(normalizeServerBucketCounts({ 'file-1': 1, 'file-2': 0, rule: 4 }).duplicate).toBe(0)
+    expect(normalizeServerBucketCounts({ 'file-1': 1, 'file-2': 0, rule: 1, duplicate: 3 }).duplicate).toBe(3)
   })
 
   it('normalizeServerRuleOption drops unknown bucket keys', () => {

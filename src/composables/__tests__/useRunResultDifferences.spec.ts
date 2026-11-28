@@ -91,7 +91,7 @@ describe('useRunResultDifferences', () => {
     ])
     expect(differences.diffTotalCount.value).toBe(1)
     expect(differences.diffFilteredCount.value).toBe(1)
-    expect(differences.diffDetailBucketCounts.value).toEqual({ 'file-1': 1, 'file-2': 0, rule: 0 })
+    expect(differences.diffDetailBucketCounts.value).toEqual({ 'file-1': 1, 'file-2': 0, rule: 0, duplicate: 0 })
     expect(differences.ruleSelectorOptions.value).toHaveLength(1)
     expect(differences.ruleSelectorAllDetail.value).toBe('1 difference')
   })
@@ -106,7 +106,7 @@ describe('useRunResultDifferences', () => {
     )
 
     expect(differences.diffDetailRows.value[0]?.recordId).toBe('1002')
-    expect(differences.diffDetailBucketCounts.value).toEqual({ 'file-1': 1, 'file-2': 0, rule: 0 })
+    expect(differences.diffDetailBucketCounts.value).toEqual({ 'file-1': 1, 'file-2': 0, rule: 0, duplicate: 0 })
     expect(differences.ruleSelectorOptions.value).toHaveLength(1)
   })
 
@@ -121,7 +121,7 @@ describe('useRunResultDifferences', () => {
         fileName: 'CSV-Order-Compare-diff.json',
         pageIndex: 1,
         pageSize: expect.any(Number),
-        buckets: 'file-1,file-2,rule',
+        buckets: 'file-1,file-2,rule,duplicate',
         ruleFilterKey: 'all',
         search: '',
         includeFacets: false,
@@ -180,9 +180,9 @@ describe('useRunResultDifferences', () => {
     await nextTick()
     await flushPromises()
 
-    expect(differences.activeDiffBuckets.value).toEqual(['file-1', 'file-2'])
+    expect(differences.activeDiffBuckets.value).toEqual(['file-1', 'file-2', 'duplicate'])
     expect(getGeneratedOutputDifferences).toHaveBeenCalledWith(
-      expect.objectContaining({ pageIndex: 0, buckets: 'file-1,file-2' }),
+      expect.objectContaining({ pageIndex: 0, buckets: 'file-1,file-2,duplicate' }),
       expect.any(AbortSignal),
     )
   })
@@ -214,7 +214,7 @@ describe('useRunResultDifferences', () => {
     expect(differences.selectedRuleSelectorOption.value?.key).toBe('order_id_match')
 
     differences.selectRuleFilter('all')
-    expect(differences.activeDiffBuckets.value).toEqual(['file-1', 'file-2', 'rule'])
+    expect(differences.activeDiffBuckets.value).toEqual(['file-1', 'file-2', 'rule', 'duplicate'])
   })
 
   it('falls back to the all filter when the selected rule disappears from the facets', async () => {
@@ -311,13 +311,13 @@ describe('useRunResultDifferences', () => {
     differences.resetDifferencesState()
 
     expect(differences.diffDetailRows.value).toEqual([])
-    expect(differences.activeDiffBuckets.value).toEqual(['file-1', 'file-2', 'rule'])
+    expect(differences.activeDiffBuckets.value).toEqual(['file-1', 'file-2', 'rule', 'duplicate'])
     expect(differences.selectedRuleFilterKey.value).toBe('all')
     expect(differences.ruleSelectorCollapsed.value).toBe(false)
     expect(differences.diffDetailsSearch.value).toBe('')
     expect(differences.diffTotalCount.value).toBe(0)
     expect(differences.diffFilteredCount.value).toBe(0)
-    expect(differences.diffDetailBucketCounts.value).toEqual({ 'file-1': 0, 'file-2': 0, rule: 0 })
+    expect(differences.diffDetailBucketCounts.value).toEqual({ 'file-1': 0, 'file-2': 0, rule: 0, duplicate: 0 })
     expect(differences.ruleSelectorOptions.value).toEqual([])
     expect(differences.diffPageIndex.value).toBe(0)
     expect(differences.diffPageCount.value).toBe(1)

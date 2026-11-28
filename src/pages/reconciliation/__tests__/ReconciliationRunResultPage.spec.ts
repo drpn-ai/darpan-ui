@@ -155,7 +155,7 @@ function buildGeneratedOutputFile(contentText: string, outputFileOverrides: Reco
 // faceting, filtering, and paging from a full diff-document fixture (audit #21).
 // ---------------------------------------------------------------------------
 
-const BUCKET_ORDER = ['file-1', 'file-2', 'rule']
+const BUCKET_ORDER = ['file-1', 'file-2', 'rule', 'duplicate']
 const BASE_RULE_FILTER_KEY = 'base-diff'
 const ALL_RULE_FILTER_KEY = 'all'
 
@@ -210,7 +210,9 @@ function sIsMissing(record: Rec): boolean {
   if (typeToken.startsWith('duplicate_in_')) return false
   return Boolean(record.missingIn || record.presentIn || typeToken.startsWith('missing_in_'))
 }
-function sResolveBucket(record: Rec, file1Label: string, file2Label: string): string {
+// OC52: duplicate-key rows have their own class. `legacyDuplicates` is a server from before it, which kept them in rule.
+function sResolveBucket(record: Rec, file1Label: string, file2Label: string, legacyDuplicates = false): string {
+  if (!legacyDuplicates && sNormalizeToken(sResolveDiffType(record)).startsWith('duplicate_in_')) return 'duplicate'
   return sIsMissing(record) ? sResolveMissingBucket(record, file1Label, file2Label) : 'rule'
 }
 function sHumanize(ruleId: string): string {
@@ -235,7 +237,7 @@ function sRuleRowDetail(record: Rec, fallbackRuleId: string): string {
   )
 }
 function sRuleDescriptor(record: Rec, bucket: string, rowIndex: number) {
-  if (bucket !== 'rule') {
+  if (bucket === 'file-1' || bucket === 'file-2') {
     return { ruleFilterKey: BASE_RULE_FILTER_KEY, ruleId: BASE_RULE_FILTER_KEY, ruleLabel: 'Base comparison' }
   }
   const ruleId =
@@ -243,15 +245,15 @@ function sRuleDescriptor(record: Rec, bucket: string, rowIndex: number) {
   const ruleFilterKey = sNormalizeToken(ruleId) || `rule_${rowIndex + 1}`
   return { ruleFilterKey, ruleId, ruleLabel: sRuleRowDetail(record, ruleId) }
 }
-function sClassify(record: Rec, index: number, file1Label: string, file2Label: string) {
-  const bucket = sResolveBucket(record, file1Label, file2Label)
+function sClassify(record: Rec, index: number, file1Label: string, file2Label: string, legacyDuplicates = false) {
+  const bucket = sResolveBucket(record, file1Label, file2Label, legacyDuplicates)
   const descriptor = sRuleDescriptor(record, bucket, index)
   const withParsed = { ...record, data: sParseDiffData(record.data) }
   const recordId = sResolveDiffRecordId(withParsed, index)
   return { rowKey: `${bucket}-${recordId}-${index}`, recordId, bucket, ...descriptor, record }
 }
 function sBucketCounts(rows: ReturnType<typeof sClassify>[]) {
-  const counts: Record<string, number> = { 'file-1': 0, 'file-2': 0, rule: 0 }
+  const counts: Record<string, number> = { 'file-1': 0, 'file-2': 0, rule: 0, duplicate: 0 }
   rows.forEach((row) => {
     const current = counts[row.bucket]
     if (current != null) counts[row.bucket] = current + 1
@@ -331,16 +333,18 @@ interface DifferencesQuery {
   conclusionCode?: string
 }
 
-function simulateDifferences(document: Rec, outputFileOverrides: Record<string, unknown> = {}) {
+function simulateDifferences(document: Rec, outputFileOverrides: Record<string, unknown> = {}, options: { legacyDuplicates?: boolean } = {}) {
   return async (payload: DifferencesQuery) => {
     const metadata = (document.metadata ?? {}) as Rec
     const file1Label = sNormalizeText(metadata.file1Label) || 'File 1'
     const file2Label = sNormalizeText(metadata.file2Label) || 'File 2'
     const differences = (document.differences ?? []) as Rec[]
-    const classified = differences.map((record, index) => sClassify(record, index, file1Label, file2Label))
+    const classified = differences.map((record, index) => sClassify(record, index, file1Label, file2Label, options.legacyDuplicates))
+    const facetBuckets = options.legacyDuplicates ? BUCKET_ORDER.filter((bucket) => bucket !== 'duplicate') : BUCKET_ORDER
 
     const requestedBuckets = (payload.buckets ?? '').split(',').map((token) => token.trim()).filter(Boolean)
-    const activeBuckets = requestedBuckets.length > 0 ? BUCKET_ORDER.filter((b) => requestedBuckets.includes(b)) : [...BUCKET_ORDER]
+    // An unknown bucket in the request is ignored, as DiffDetailClassifier ignores it.
+    const activeBuckets = requestedBuckets.length > 0 ? facetBuckets.filter((b) => requestedBuckets.includes(b)) : [...facetBuckets]
     const ruleKey = sNormalizeText(payload.ruleFilterKey) || ALL_RULE_FILTER_KEY
     const search = (payload.search ?? '').trim().toLowerCase()
 
@@ -373,7 +377,7 @@ function simulateDifferences(document: Rec, outputFileOverrides: Record<string, 
       errors: [],
       metadata,
       summary: sEffectiveSummary(document, file1Label, file2Label),
-      ...(includeFacets ? { bucketCounts: sBucketCounts(classified), ruleOptions: sRuleOptions(classified), conclusionCounts } : {}),
+      ...(includeFacets ? { bucketCounts: Object.fromEntries(facetBuckets.map((b) => [b, sBucketCounts(classified)[b] ?? 0])), ruleOptions: sRuleOptions(classified), conclusionCounts } : {}),
       differences: pageRows,
       pageIndex,
       pageSize,
@@ -2355,33 +2359,52 @@ describe('ReconciliationRunResultPage', () => {
     expect(wrapper.find('[data-testid="run-result-live-note"]').exists()).toBe(false)
   })
 
-  // Every tile is the number of rows its click shows. The run summary's ruleDifferenceCount leaves out
-  // duplicate-id rows, which the rule bucket holds (DiffDetailClassifier, DAR-BE-063), so the tiles read the
-  // whole-document facets instead.
-  it('counts duplicate-id rows in the Rule differences tile the rows it filters to include', async () => {
-    getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
-      ...defaultDiffDetails,
-      summary: { totalDifferences: 4, onlyInFile1Count: 1, onlyInFile2Count: 1, ruleDifferenceCount: 1 },
-      differences: [
-        ...defaultDiffDetails.differences,
-        { type: 'RULE_TOTAL', id: '1005', ruleId: 'RS_ORDER_CSV_RULE_1', field: 'total', file1Value: 10, file2Value: 12 },
-        { type: 'DUPLICATE_IN_FILE_1', id: '1007', presentIn: 'OMS', data: '{"order_id":"1007"}' },
-      ],
-    }))
+  // Every tile is the number of rows its click shows, so the tiles read the whole-document facets, never the run summary.
+  const withDuplicates = {
+    ...defaultDiffDetails,
+    summary: { totalDifferences: 4, onlyInFile1Count: 1, onlyInFile2Count: 1, ruleDifferenceCount: 1, duplicateDifferenceCount: 1 },
+    differences: [
+      ...defaultDiffDetails.differences,
+      { type: 'RULE_TOTAL', id: '1005', ruleId: 'RS_ORDER_CSV_RULE_1', field: 'total', file1Value: 10, file2Value: 12 },
+      { type: 'DUPLICATE_IN_FILE_1', id: '1007', presentIn: 'OMS', data: '{"order_id":"1007"}' },
+    ],
+  }
+
+  // OC52: duplicate-id rows are their own class, so each tile matches its summary count.
+  it('counts duplicate-id rows in a Duplicated tile and rule failures alone in Rule differences', async () => {
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences(withDuplicates))
 
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
 
-    const ruleTile = wrapper.get('[data-testid="diff-bucket-rule"]')
-    expect(ruleTile.text()).toContain('2')
+    expect(wrapper.get('[data-testid="diff-bucket-rule"]').text()).toBe('Rule differences1')
+    expect(wrapper.get('[data-testid="diff-bucket-duplicate"]').text()).toBe('Duplicated1')
     expect(wrapper.get('[data-testid="diff-bucket-file-1"]').text()).toContain('1')
     expect(wrapper.get('[data-testid="diff-bucket-file-2"]').text()).toContain('1')
+
+    // The tile filters to exactly the rows it counts.
+    for (const bucket of ['file-1', 'file-2', 'rule']) await wrapper.get(`[data-testid="diff-bucket-${bucket}"]`).trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="diff-details-row"]').map((row) => row.text())).toEqual([expect.stringContaining('1007')])
   })
 
-  it('shows the Rule differences tile when a run\'s only non-missing rows are duplicate ids', async () => {
+  // A server from before OC52 keeps duplicates in the rule bucket and sends no duplicate facet: the rule tile counts
+  // what its click shows, and no Duplicated tile appears.
+  it('reads a server without the duplicate class: duplicates stay in Rule differences, no Duplicated tile', async () => {
+    getGeneratedOutputDifferences.mockImplementation(simulateDifferences(withDuplicates, {}, { legacyDuplicates: true }))
+
+    const wrapper = mount(ReconciliationRunResultPage)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="diff-bucket-rule"]').text()).toBe('Rule differences2')
+    expect(wrapper.find('[data-testid="diff-bucket-duplicate"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="diff-details-row"]')).toHaveLength(4)
+  })
+
+  it('a run whose only non-missing rows are duplicate ids shows Duplicated and no Rule differences', async () => {
     getGeneratedOutputDifferences.mockImplementation(simulateDifferences({
       ...defaultDiffDetails,
-      summary: { totalDifferences: 3, onlyInFile1Count: 1, onlyInFile2Count: 1, ruleDifferenceCount: 0 },
+      summary: { totalDifferences: 3, onlyInFile1Count: 1, onlyInFile2Count: 1, ruleDifferenceCount: 0, duplicateDifferenceCount: 1 },
       differences: [
         ...defaultDiffDetails.differences,
         { type: 'DUPLICATE_IN_FILE_2', id: '1009', presentIn: 'SHOPIFY', data: '{"order_id":"1009"}' },
@@ -2391,7 +2414,8 @@ describe('ReconciliationRunResultPage', () => {
     const wrapper = mount(ReconciliationRunResultPage)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="diff-bucket-rule"]').text()).toContain('1')
+    expect(wrapper.get('[data-testid="diff-bucket-duplicate"]').text()).toBe('Duplicated1')
+    expect(wrapper.find('[data-testid="diff-bucket-rule"]').exists()).toBe(false)
   })
 
   it('hides notify-me once the run is terminal', async () => {
