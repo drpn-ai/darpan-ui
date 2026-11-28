@@ -46,6 +46,28 @@ export function isOtherTenantRecordError(error: unknown): boolean {
   return error instanceof ApiCallError && /is not available in your active tenant\.?$/.test(error.message)
 }
 
+/**
+ * The completed `ok: false` reply a service refused with, or undefined. callService throws on a refusal, so the fields
+ * that came with it (every sentence in `errors`, a preview, needsDefaultChatSpace, …) are read off the thrown error.
+ * A JSON-RPC or transport error carries no reply.
+ */
+export function refusedResult<T extends object = Record<string, unknown>>(error: unknown): Partial<T> | undefined {
+  if (!(error instanceof ApiCallError)) return undefined
+  const result = (error.details as { result?: unknown } | undefined)?.result
+  return result !== null && typeof result === 'object' ? (result as Partial<T>) : undefined
+}
+
+/**
+ * Every sentence a refusal gave, where the thrown message names only the first. Anything the client did not throw (a
+ * script error) shows the caller's own line, never its raw text.
+ */
+export function serviceErrors(error: unknown, fallback: string): string[] {
+  if (!(error instanceof ApiCallError)) return [fallback]
+  const listed = refusedResult<{ errors: unknown }>(error)?.errors
+  const sentences = Array.isArray(listed) ? listed.map((item) => String(item)).filter(Boolean) : []
+  return sentences.length ? sentences : [error.message]
+}
+
 export interface AuthRequiredDetail {
   /** Raw backend text, for diagnostics only — never rendered (see AuthRequiredError). */
   message: string

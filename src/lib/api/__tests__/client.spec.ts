@@ -652,3 +652,60 @@ describe('callService read-cache invalidation (DAR-UI-051)', () => {
     expect(await readAgain()).toEqual(['cached', 'fresh'])
   })
 })
+
+// DAR-OPS-029 U13a: a refusal's reply is read through client.ts, which built it, not by casting `details` in each page.
+describe('refusedResult and serviceErrors', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+    installLocalStorageStub()
+  })
+
+  function reply(body: object): Response {
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, ...body }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  async function caughtFrom(body: object): Promise<unknown> {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => reply(body)))
+    const { callService } = await import('../client')
+    return callService('facade.NetSuiteQueryFacadeServices.save#NsSuiteQlSourceQuery', {}).catch((error: unknown) => error)
+  }
+
+  it('lists every sentence a refusal gave, where the thrown message names only the first', async () => {
+    const caught = await caughtFrom({ result: { ok: false, messages: [], errors: ['Name is required.', '', 'Pick a day.'] } })
+    const { serviceErrors } = await import('../client')
+    expect((caught as Error).message).toBe('Name is required.')
+    expect(serviceErrors(caught, 'Not saved.')).toEqual(['Name is required.', 'Pick a day.'])
+  })
+
+  it('hands back the refused reply, so a caller can read the fields that came with the refusal', async () => {
+    const caught = await caughtFrom({ result: { ok: false, messages: [], errors: ['Too many rows.'], preview: { rows: 3 } } })
+    const { refusedResult } = await import('../client')
+    expect(refusedResult<{ preview: { rows: number } }>(caught)?.preview).toEqual({ rows: 3 })
+  })
+
+  it('falls back to the thrown message when the refusal listed nothing', async () => {
+    const caught = await caughtFrom({ result: { ok: false, messages: [], errors: [] } })
+    const { serviceErrors } = await import('../client')
+    expect(serviceErrors(caught, 'Not saved.')).toEqual([(caught as Error).message])
+  })
+
+  it('a JSON-RPC error carries no refused reply; its message is the one sentence', async () => {
+    const caught = await caughtFrom({ error: { code: 400, message: 'Missing parameter query.' } })
+    const { refusedResult, serviceErrors } = await import('../client')
+    expect(refusedResult(caught)).toBeUndefined()
+    expect(serviceErrors(caught, 'Not saved.')).toEqual(['Missing parameter query.'])
+  })
+
+  it('anything not from the client shows the caller\'s line, never a raw script error', async () => {
+    const { refusedResult, serviceErrors } = await import('../client')
+    const bug = new TypeError("Cannot read properties of undefined (reading 'rows')")
+    expect(refusedResult(bug)).toBeUndefined()
+    expect(serviceErrors(bug, 'Not saved.')).toEqual(['Not saved.'])
+    expect(serviceErrors(undefined, 'Not saved.')).toEqual(['Not saved.'])
+  })
+})
