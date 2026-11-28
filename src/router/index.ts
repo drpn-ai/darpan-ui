@@ -17,7 +17,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'hub',
     component: () => import('../pages/HomePage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Dashboard' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Dashboard' },
   },
   {
     // DAR-UI-138 (DAR-BE-334, was DAR-BE-164's scripts). The active tenant's queries, a top-level page: a read over
@@ -26,7 +26,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/queries',
     name: 'settings-tenant-scripts',
     component: () => import('../pages/settings/TenantScriptsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Queries' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Queries' },
   },
   {
     // DAR-UI-124, DAR-BE-334, DAR-UI-138. One query on a page of its own: its read, its script, its schedule and
@@ -34,32 +34,32 @@ export const routes: RouteRecordRaw[] = [
     path: '/queries/new',
     name: 'settings-tenant-script-new',
     component: () => import('../pages/settings/TenantScriptPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Query' },
   },
   {
     path: '/queries/:tenantScriptId',
     name: 'settings-tenant-script',
     component: () => import('../pages/settings/TenantScriptPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Query' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Query' },
   },
   {
     path: '/reconciliation/diff',
     name: 'reconciliation-diff',
     component: () => import('../pages/reconciliation/ReconciliationDiffPage.vue'),
-    meta: { requiresAuth: true, requiresReconciliationRun: true, reconciliationRunRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresReconciliationRun: true, reconciliationRunRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     path: '/reconciliation/run-result/:savedRunId/:outputFileName',
     name: 'reconciliation-run-result',
     component: () => import('../pages/reconciliation/ReconciliationRunResultPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run Result' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Run Result' },
   },
   {
     // DAR-UI-156. Run, Retry and Run now land here on the click; it moves to the live run once the run exists.
     path: '/reconciliation/run-live/:savedRunId/starting/:pendingRunId',
     name: 'reconciliation-run-starting',
     component: () => import('../pages/reconciliation/ReconciliationRunStartingPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run Progress' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Run Progress' },
   },
   {
     // DAR-UI-157 (Aditi: make the run-result URL short). One address for a run, live and finished: the page shows the
@@ -67,7 +67,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/runs/:savedRunId/:runResultId',
     name: 'reconciliation-run-live',
     component: () => import('../pages/reconciliation/ReconciliationRunResultPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Run' },
   },
   {
     // The backend still sends this address (automation messages).
@@ -83,27 +83,27 @@ export const routes: RouteRecordRaw[] = [
     path: '/reconciliation/automation/create',
     name: 'reconciliation-automation-create',
     component: () => import('../pages/reconciliation/ReconciliationAutomationWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'reconciliation-automations', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'reconciliation-automations', surfaceMode: 'workflow' },
   },
   {
     path: '/reconciliation/create',
     name: 'reconciliation-create',
     component: () => import('../pages/reconciliation/ReconciliationCreateFlowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-064. A NetSuite run side's SuiteQL query, reached from the side picker; ?returnTo and ?side bring it back.
     path: '/reconciliation/queries/new',
     name: 'reconciliation-netsuite-query-create',
     component: () => import('../pages/reconciliation/NetSuiteQueryWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-049. One Create Run: pick Sync or Lifecycle, then the create flow for that type.
     path: '/reconciliation/new',
     name: 'run-create',
     component: () => import('../pages/reconciliation/RunCreateTypePage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-049. Lifecycle runs are listed on Home beside Sync runs; the separate list retired.
@@ -115,67 +115,67 @@ export const routes: RouteRecordRaw[] = [
     path: '/reconciliation/runs/create',
     name: 'reconciliation-run-flowchart-create',
     component: () => import('../pages/reconciliation/RunFlowchartCreatePage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-050. A lifecycle's settings (what it leaves out, when a record is late), as a Sync run's settings.
     path: '/reconciliation/runs/:reconciliationId/settings',
     name: 'reconciliation-run-flowchart-settings',
     component: () => import('../pages/reconciliation/RunFlowchartSettingsPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-050. Play opens a workflow for the run's window, as a Sync run's play does.
     path: '/reconciliation/runs/:reconciliationId/run',
     name: 'reconciliation-run-flowchart-start',
     component: () => import('../pages/reconciliation/RunFlowchartStartPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     path: '/reconciliation/runs/:reconciliationId/:reconciliationExecutionId?',
     name: 'reconciliation-run-flowchart',
     component: () => import('../pages/reconciliation/RunFlowchartPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Run' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Run' },
   },
   {
     // DAR-UI-078. Make an audit: its name, then its period; statements and checks follow on its settings. Before /audits/:audit.
     path: '/audits/new',
     name: 'audit-create',
     component: () => import('../pages/reconciliation/AuditCreatePage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-063. An audit's play: which days, then every check runs over them. Declared before /audits/:audit.
     path: '/audits/:audit/run',
     name: 'audit-run-start',
     component: () => import('../pages/reconciliation/AuditRunStartPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-063. An audit's settings gear: its name, schedule and statements. DAR-UI-127: a static settings page.
     path: '/audits/:audit/settings',
     name: 'audit-settings',
     component: () => import('../pages/reconciliation/AuditSettingsPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Audit settings' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'static', staticPageLabel: 'Audit settings' },
   },
   {
     // DAR-UI-058. An audit run's report; ?period, ?date and ?finding pick what it shows.
     path: '/audits/:audit',
     name: 'audit-report',
     component: () => import('../pages/reconciliation/AuditReportPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Audit', queryKeepsPage: true, wide: true },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Audit', queryKeepsPage: true, wide: true },
   },
   {
     path: '/reconciliation/ruleset-manager',
     name: 'reconciliation-ruleset-manager',
     component: () => import('../pages/reconciliation/ReconciliationRuleSetManagerPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Ruleset Manager' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Ruleset Manager' },
   },
   {
     path: '/reconciliation/automations',
     name: 'reconciliation-automations',
     component: () => import('../pages/reconciliation/ReconciliationAutomationsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Automations' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Automations' },
   },
   {
     path: '/reconciliation/automations/create',
@@ -185,13 +185,13 @@ export const routes: RouteRecordRaw[] = [
     path: '/reconciliation/automations/edit/:automationId',
     name: 'reconciliation-automation-edit',
     component: () => import('../pages/reconciliation/ReconciliationAutomationWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'reconciliation-automations', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'reconciliation-automations', surfaceMode: 'workflow' },
   },
   {
     path: '/reconciliation/automations/:automationId',
     name: 'reconciliation-automation-dashboard',
     component: () => import('../pages/reconciliation/ReconciliationAutomationDashboardPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Automation' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Automation' },
   },
   {
     path: '/reconciliation/automations/:automationId/history',
@@ -205,20 +205,20 @@ export const routes: RouteRecordRaw[] = [
     path: '/reconciliation/ruleset-manager/rules',
     name: 'reconciliation-ruleset-editor',
     component: () => import('../pages/reconciliation/ReconciliationRuleSetEditorPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     // DAR-UI-135: a run's conclusions get their own edit page, opened from the run page like Filters and Rules.
     path: '/reconciliation/ruleset-manager/conclusions',
     name: 'reconciliation-conclusions-editor',
     component: () => import('../pages/reconciliation/ReconciliationConclusionsEditorPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     path: '/reconciliation/run-history/:savedRunId',
     name: 'reconciliation-run-history',
     component: () => import('../pages/reconciliation/ReconciliationRunHistoryPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run History' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Run History' },
   },
   {
     path: '/connections',
@@ -285,14 +285,14 @@ export const routes: RouteRecordRaw[] = [
     path: '/settings/tenant',
     name: 'settings-tenant',
     component: () => import('../pages/settings/TenantSettingsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Tenant Settings' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Tenant Settings' },
   },
   {
     // DAR-BE-160. The active tenant's audit config versions: keep one, restore an older one.
     path: '/settings/tenant/config-history',
     name: 'settings-tenant-config-history',
     component: () => import('../pages/settings/TenantConfigHistoryPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Config history' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Config history' },
   },
   {
     // DAR-UI-138. Queries moved out of Tenant Settings to /queries; old links land on the same query.
@@ -320,47 +320,47 @@ export const routes: RouteRecordRaw[] = [
     path: '/settings/tenant/peak-periods',
     name: 'settings-tenant-peak-periods',
     component: () => import('../pages/settings/TenantPeakPeriodsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak periods' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Peak periods' },
   },
   {
     // DAR-UI-161. A new period is a workflow (name, then days); its own page opens once it is made.
     path: '/settings/tenant/peak-periods/new',
     name: 'settings-tenant-peak-period-new',
     component: () => import('../pages/settings/TenantPeakPeriodCreatePage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-tenant-peak-periods', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-tenant-peak-periods', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/tenant/peak-periods/:peakPeriodId',
     name: 'settings-tenant-peak-period',
     component: () => import('../pages/settings/TenantPeakPeriodPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Peak period' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Peak period' },
   },
   {
     // DAR-UI-154. Pulses to watch, outside Settings; Tara's Ask Darpan opens it ("Go to Pulses").
     path: '/pulses',
     name: 'pulses',
     component: () => import('../pages/pulse/PulsesPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Pulses' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Pulses' },
   },
   {
     // DAR-UI-154. One pulse's page lives under Pulses, not Tenant Settings (Aditi 2026-11-26).
     path: '/pulses/:syncPairId',
     name: 'pulse',
     component: () => import('../pages/settings/TenantSyncPairPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Pulse' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Pulse' },
   },
   {
     // DAR-BE-328. The active tenant's sync pairs: daily checks whose upstream orders are watched on a pulse.
     path: '/settings/tenant/sync-pulse',
     name: 'settings-tenant-sync-pairs',
     component: () => import('../pages/settings/TenantSyncPairsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Sync pulse' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Sync pulse' },
   },
   {
     path: '/settings/tenant/sync-pulse/new',
     name: 'settings-tenant-sync-pair-new',
     component: () => import('../pages/settings/TenantSyncPairPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Sync pair' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Sync pair' },
   },
   {
     // Old address of a pulse's page (chat links, bookmarks): opens it under Pulses.
@@ -372,40 +372,40 @@ export const routes: RouteRecordRaw[] = [
     path: '/settings/netsuite',
     name: 'settings-netsuite',
     component: () => import('../pages/settings/NetSuiteSettingsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'NetSuite' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'NetSuite' },
   },
   {
     path: '/settings/netsuite/auth/:nsAuthConfigId',
     name: 'settings-netsuite-auth',
     component: () => import('../pages/settings/NetSuiteAuthDashboardPage.vue'),
     props: true,
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'NetSuite' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'NetSuite' },
   },
   {
     path: '/settings/shopify',
     name: 'settings-shopify',
     component: () => import('../pages/settings/ShopifySettingsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Shopify' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Shopify' },
   },
   {
     path: '/settings/shopify/auth/:shopifyAuthConfigId',
     name: 'settings-shopify-auth',
     component: () => import('../pages/settings/ShopifyAuthDashboardPage.vue'),
     props: true,
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Shopify' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Shopify' },
   },
   {
     path: '/settings/shopify/create',
     name: 'settings-shopify-create',
     component: () => import('../pages/settings/ShopifyAuthWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-shopify', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-shopify', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/shopify/edit/:shopifyAuthConfigId',
     name: 'settings-shopify-edit',
     component: () => import('../pages/settings/ShopifyAuthWorkflowPage.vue'),
     props: true,
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-shopify', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-shopify', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/oms',
@@ -445,104 +445,104 @@ export const routes: RouteRecordRaw[] = [
     path: '/settings/hotwax',
     name: 'settings-oms',
     component: () => import('../pages/settings/OmsRestSettingsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'HotWax' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'HotWax' },
   },
   {
     path: '/settings/hotwax/auth/:omsRestSourceConfigId',
     name: 'settings-oms-auth',
     component: () => import('../pages/settings/OmsRestSourceDashboardPage.vue'),
     props: true,
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'HotWax' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'HotWax' },
   },
   {
     path: '/settings/hotwax/create',
     name: 'settings-oms-create',
     component: () => import('../pages/settings/OmsRestSourceWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-oms', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-oms', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/hotwax/edit/:omsRestSourceConfigId',
     name: 'settings-oms-edit',
     component: () => import('../pages/settings/OmsRestSourceWorkflowPage.vue'),
     props: true,
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-oms', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-oms', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/runs',
     name: 'settings-runs',
     component: () => import('../pages/settings/RunsSettingsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Run Editor' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Run Editor' },
   },
   {
     path: '/cli-login',
     name: 'cli-login',
     component: () => import('../pages/CliLoginPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Approve CLI' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Approve CLI' },
   },
   {
     path: '/settings/user',
     name: 'settings-user',
     component: () => import('../pages/settings/UserSettingsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'User Settings' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'User Settings' },
   },
   {
     path: '/settings/runs/edit/:reconciliationMappingId',
     name: 'settings-runs-edit',
     component: () => import('../pages/settings/RunsSettingsWorkflowPage.vue'),
     props: true,
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-runs', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/sftp',
     name: 'settings-sftp',
     component: () => import('../pages/settings/SftpServersPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'SFTP Servers' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'SFTP Servers' },
   },
   {
     // DAR-UI-123. Where each thing that posts to chat posts: the tenant's spaces as a grid, and adding one.
     path: '/settings/notifications',
     name: 'settings-notifications',
     component: () => import('../pages/settings/NotificationsPage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Notifications' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Notifications' },
   },
   {
     path: '/settings/sftp/create',
     name: 'settings-sftp-create',
     component: () => import('../pages/settings/SftpServerWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-sftp', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-sftp', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/sftp/edit/:sftpServerId',
     name: 'settings-sftp-edit',
     component: () => import('../pages/settings/SftpServerWorkflowPage.vue'),
     props: true,
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-sftp', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-sftp', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/netsuite/auth/create',
     name: 'settings-netsuite-auth-create',
     component: () => import('../pages/settings/NetSuiteAuthWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/netsuite/auth/edit/:nsAuthConfigId',
     name: 'settings-netsuite-auth-edit',
     component: () => import('../pages/settings/NetSuiteAuthWorkflowPage.vue'),
     props: true,
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/netsuite/endpoints/create',
     name: 'settings-netsuite-endpoints-create',
     component: () => import('../pages/settings/NetSuiteEndpointWorkflowPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
   },
   {
     path: '/settings/netsuite/endpoints/edit/:nsRestletConfigId',
     name: 'settings-netsuite-endpoints-edit',
     component: () => import('../pages/settings/NetSuiteEndpointWorkflowPage.vue'),
     props: true,
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'settings-netsuite', surfaceMode: 'workflow' },
   },
   {
     path: '/schemas',
@@ -552,13 +552,13 @@ export const routes: RouteRecordRaw[] = [
     path: '/schemas/library',
     name: 'schemas-library',
     component: () => import('../pages/jsonschema/JsonSchemaBrowsePage.vue'),
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Schema Library' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Schema Library' },
   },
   {
     path: '/schemas/create',
     name: 'schemas-create',
     component: () => import('../pages/jsonschema/JsonSchemaWizardPage.vue'),
-    meta: { requiresAuth: true, requiresTenantEdit: true, tenantEditRedirectName: 'schemas-library', surfaceMode: 'workflow' },
+    meta: { requiresTenantEdit: true, tenantEditRedirectName: 'schemas-library', surfaceMode: 'workflow' },
   },
   {
     path: '/schemas/infer',
@@ -569,7 +569,7 @@ export const routes: RouteRecordRaw[] = [
     name: 'schemas-editor',
     component: () => import('../pages/jsonschema/JsonSchemaEditorPage.vue'),
     props: true,
-    meta: { requiresAuth: true, surfaceMode: 'static', staticPageLabel: 'Schema Editor' },
+    meta: { surfaceMode: 'static', staticPageLabel: 'Schema Editor' },
   },
   {
     path: '/schemas/edit/:jsonSchemaId',
@@ -584,13 +584,11 @@ export const routes: RouteRecordRaw[] = [
     path: '/access-denied',
     name: 'access-denied',
     component: AccessDeniedPage,
-    meta: { requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: NotFoundPage,
-    meta: { requiresAuth: true },
   },
 ]
 
@@ -645,9 +643,9 @@ function runBackgroundSessionRevalidation(authStore: ReturnType<typeof useAuthSt
     })
 }
 
+// Every route needs a signed-in session unless it says `public`: a route added without meta is guarded, not open.
 router.beforeEach(async (to) => {
   if (to.meta.public === true) return true
-  if (to.meta.requiresAuth !== true) return true
 
   const authStore = useAuthStore()
   const nowMs = Date.now()

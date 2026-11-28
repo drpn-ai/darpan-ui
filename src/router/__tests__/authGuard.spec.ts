@@ -325,6 +325,16 @@ describe('router auth guard', () => {
     expect(router.currentRoute.value.name).toBe('settings-runs')
   })
 
+  it('guards a route that carries no meta at all: only `public` opens a page signed out', async () => {
+    router.addRoute({ path: '/no-meta-route', name: 'no-meta-route', component: { template: '<div />' } })
+    ensureAuthenticated.mockResolvedValue(false)
+    await router.push('/no-meta-route')
+
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/no-meta-route')
+    router.removeRoute('no-meta-route')
+  })
+
   it('redirects unauthenticated users to login when visiting an unknown path', async () => {
     ensureAuthenticated.mockResolvedValue(false)
     authState.status = 'unauthenticated'

@@ -16,7 +16,6 @@ declare global {
 declare module 'vue-router' {
   interface RouteMeta {
     public?: boolean
-    requiresAuth?: boolean
     requiresReconciliationRun?: boolean
     requiresTenantEdit?: boolean
     reconciliationRunRedirectName?: RouteRecordName
