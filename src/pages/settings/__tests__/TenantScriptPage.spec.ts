@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import type { QueryRun, TenantQuery, TenantQuerySchedule } from '../../../lib/api/scriptTypes'
+import { ApiCallError } from '../../../lib/api/client'
 
 const listTenantQueries = vi.hoisted(() => vi.fn())
 const saveTenantQuery = vi.hoisted(() => vi.fn())
@@ -193,7 +194,7 @@ describe('TenantScriptPage (query)', () => {
   })
 
   it('without the catalog the read shows ids and the popup says why', async () => {
-    getTenantQueryCatalog.mockRejectedValue(new Error('Catalog unavailable.'))
+    getTenantQueryCatalog.mockRejectedValue(new ApiCallError('Catalog unavailable.'))
     const wrapper = await mountPage()
     expect(text(wrapper, 'script-read-sentence').replace(/\s+/g, ' ')).toBe('Records of DS_ORDERS. Keeps id status')
     await wrapper.findAll('[data-testid="script-read-part"]')[0]!.trigger('click')
@@ -361,7 +362,7 @@ describe('TenantScriptPage (query)', () => {
     // dropped both the refusal and the staged schedule without a word.
     route.params = {}
     listTenantQuerySchedules.mockResolvedValue({ schedules: [], timeZone: 'UTC' })
-    saveTenantQuerySchedule.mockRejectedValueOnce(new Error('Chat space C1 is switched off.'))
+    saveTenantQuerySchedule.mockRejectedValueOnce(new ApiCallError('Chat space C1 is switched off.'))
     const wrapper = await mountPage()
     const title = wrapper.find('[data-testid="script-name"]')
     title.element.textContent = 'Daily findings'

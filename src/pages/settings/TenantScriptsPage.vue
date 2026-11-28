@@ -76,6 +76,7 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import { scriptFacade } from '../../lib/api/facade'
+import { errorMessage } from '../../lib/api/client'
 import type { TenantQuery } from '../../lib/api/scriptTypes'
 import { usePermissionsStore } from '../../stores/permissions'
 
@@ -155,7 +156,7 @@ async function savePins(nextPinnedQueryIds: string[], previousPinnedQueryIds: st
     pinnedQueryIds.value = response.pinnedQueryIds ?? nextPinnedQueryIds
   } catch (error) {
     pinnedQueryIds.value = previousPinnedQueryIds
-    pinError.value = messageOf(error, 'Could not save the pins.')
+    pinError.value = errorMessage(error, 'Could not save the pins.')
   }
 }
 
@@ -168,10 +169,6 @@ async function handleDrop(target: 'pinned' | 'other', event: DragEvent): Promise
   await savePins(target === 'pinned' ? [...rest, droppedId] : rest, previousPinnedQueryIds)
 }
 
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
-
 async function load(): Promise<void> {
   loading.value = true
   pageError.value = ''
@@ -180,7 +177,7 @@ async function load(): Promise<void> {
     queries.value = listed.queries ?? []
     pinnedQueryIds.value = listed.pinnedQueryIds ?? []
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not load the queries.')
+    pageError.value = errorMessage(error, 'Could not load the queries.')
   } finally {
     loading.value = false
   }

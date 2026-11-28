@@ -478,6 +478,7 @@ import { useQueryAsk } from '../../composables/useQueryAsk'
 import { cellText, queryErrorText as errorText, rowsWords, useQueryRuns } from '../../composables/useQueryRuns'
 import { useQuerySchedule } from '../../composables/useQuerySchedule'
 import { agentFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
+import { errorMessage } from '../../lib/api/client'
 import type { QueryScheduleOutcome, TenantQuery } from '../../lib/api/scriptTypes'
 import type { TenantChatSpace } from '../../lib/api/types'
 import {
@@ -628,10 +629,6 @@ const popupTitle = computed(() => {
   }
 })
 
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
-
 function resetDraft(): void {
   const query = saved.value
   draft.value = query
@@ -674,7 +671,7 @@ async function load(tenantQueryId: string): Promise<void> {
     }
     resetDraft()
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not load the query.')
+    pageError.value = errorMessage(error, 'Could not load the query.')
   } finally {
     loading.value = false
   }
@@ -687,7 +684,7 @@ async function loadChoices(): Promise<void> {
   chatSpaces.value = spaces.status === 'fulfilled' ? spaces.value.chatSpaces ?? [] : []
   agentReady.value = agent.status === 'fulfilled' && agent.value.state === 'ON' && agent.value.grantState === 'LIVE'
   catalog.value = reads.status === 'fulfilled' ? reads.value : null
-  catalogError.value = reads.status === 'fulfilled' ? '' : messageOf(reads.reason, 'Could not read what queries can read; sources show as ids.')
+  catalogError.value = reads.status === 'fulfilled' ? '' : errorMessage(reads.reason, 'Could not read what queries can read; sources show as ids.')
   fillStarterAudit()
 }
 
@@ -769,7 +766,7 @@ async function openPreview(): Promise<void> {
   try {
     preview.value = await runSaved(false)
   } catch (error) {
-    popupError.value = messageOf(error, 'Could not preview.')
+    popupError.value = errorMessage(error, 'Could not preview.')
   } finally {
     popupBusy.value = false
   }
@@ -784,7 +781,7 @@ async function sendNow(): Promise<void> {
     preview.value = await runSaved(true)
     await reread(current.tenantQueryId)
   } catch (error) {
-    popupError.value = messageOf(error, 'Could not send.')
+    popupError.value = errorMessage(error, 'Could not send.')
   } finally {
     popupBusy.value = false
   }
@@ -801,7 +798,7 @@ async function deleteQuery(): Promise<void> {
     closePopup()
     void router.push({ name: 'settings-tenant-scripts' })
   } catch (error) {
-    popupError.value = messageOf(error, 'Could not delete the query.')
+    popupError.value = errorMessage(error, 'Could not delete the query.')
   } finally {
     popupBusy.value = false
   }
@@ -821,7 +818,7 @@ async function runDraft(): Promise<void> {
     })
     addRun(nextRunLabel(), out.result)
   } catch (error) {
-    runError.value = messageOf(error, 'Could not run the query.')
+    runError.value = errorMessage(error, 'Could not run the query.')
   } finally {
     running.value = false
   }
@@ -859,8 +856,8 @@ async function save(): Promise<void> {
     baseline.value = snapshot()
   } catch (error) {
     pageError.value = savedId
-      ? `The query is saved, but its schedule step failed: ${messageOf(error, 'try Save again.')}`
-      : messageOf(error, 'Could not save the query.')
+      ? `The query is saved, but its schedule step failed: ${errorMessage(error, 'try Save again.')}`
+      : errorMessage(error, 'Could not save the query.')
   } finally {
     saving.value = false
   }

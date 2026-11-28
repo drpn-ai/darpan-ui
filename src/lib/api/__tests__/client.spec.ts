@@ -723,3 +723,29 @@ describe('refusedResult and serviceErrors', () => {
     expect(serviceErrors(undefined, 'Not saved.')).toEqual(['Not saved.'])
   })
 })
+
+// S99-105: one place turns a caught error or a returned refusal into what a page shows; a script error never reaches
+// the person as its raw text.
+describe('errorMessage and refusalText', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    installLocalStorageStub()
+  })
+
+  it('errorMessage gives a thrown refusal its every sentence, and anything else the caller\'s line', async () => {
+    const { ApiCallError, errorMessage } = await import('../client')
+    const refused = new ApiCallError('Name is required.', 200, { result: { ok: false, errors: ['Name is required.', 'Pick a day.'] } })
+    expect(errorMessage(refused, 'Not saved.')).toBe('Name is required. Pick a day.')
+    expect(errorMessage(new ApiCallError('Missing parameter query.'), 'Not saved.')).toBe('Missing parameter query.')
+    expect(errorMessage(new TypeError("Cannot read properties of undefined (reading 'then')"), 'Not saved.')).toBe('Not saved.')
+    expect(errorMessage('boom', 'Not saved.')).toBe('Not saved.')
+  })
+
+  it('refusalText reads a returned refusal: nothing when it went through, its sentences, or the caller\'s line', async () => {
+    const { refusalText } = await import('../client')
+    expect(refusalText({ ok: true, errors: [] }, 'Not saved.')).toBe('')
+    expect(refusalText({}, 'Not saved.')).toBe('')
+    expect(refusalText({ ok: false, errors: ['Name is required.', 'Pick a day.'] }, 'Not saved.')).toBe('Name is required. Pick a day.')
+    expect(refusalText({ ok: false, errors: [] }, 'Not saved.')).toBe('Not saved.')
+  })
+})

@@ -378,6 +378,7 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
 import { useCalendarWidget } from '../../composables/useCalendarWidget'
 import { peakFacade } from '../../lib/api/facade'
+import { errorMessage, refusalText } from '../../lib/api/client'
 import type { GetPeakPeriodResponse, PeakHeldRun, PeakPeriod, PeakRunTime, PeakSyncRow, PeakTarget } from '../../lib/api/peakTypes'
 import { peakDateRange, peakDay } from '../../lib/peakPeriodWords'
 import { ALLOWANCE_CHOICES, PULSE_EVERY_CHOICES, allowanceWords, pulseCadence } from '../../lib/pulseWords'
@@ -601,16 +602,6 @@ const popupTitle = computed(() => {
   }
 })
 
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
-
-/** A refusal returned rather than thrown: the server's own sentences. */
-function refusalOf(response: { ok?: boolean; errors?: string[] }, fallback: string): string {
-  if (response.ok !== false) return ''
-  return response.errors?.length ? response.errors.join(' ') : fallback
-}
-
 /**
  * A popup's own save or delete. A refusal, returned or thrown, stays in the popup with the server's sentences; once it
  * is through the popup closes and `after` runs (a read of the period, or leaving the page).
@@ -621,7 +612,7 @@ async function popupCall(call: () => Promise<{ ok?: boolean; errors?: string[] }
   popupBusy.value = true
   popupError.value = ''
   try {
-    const refusal = refusalOf(await call(), fallback)
+    const refusal = refusalText(await call(), fallback)
     if (refusal) {
       popupError.value = refusal
       return
@@ -630,7 +621,7 @@ async function popupCall(call: () => Promise<{ ok?: boolean; errors?: string[] }
     closePopup()
     await after()
   } catch (error) {
-    popupError.value = messageOf(error, fallback)
+    popupError.value = errorMessage(error, fallback)
   } finally {
     popupBusy.value = false
   }
@@ -666,7 +657,7 @@ function apply(response: GetPeakPeriodResponse): void {
 /** Reads the period again. The draft starts over from it only when asked; a run-time change keeps unsaved edits. */
 async function read(peakPeriodId: string, restartDraft: boolean, stillCurrent: () => boolean = () => true): Promise<void> {
   const response = await peakFacade.getPeakPeriod({ peakPeriodId })
-  const refusal = refusalOf(response, 'Could not load the peak period.')
+  const refusal = refusalText(response, 'Could not load the peak period.')
   if (refusal) throw new Error(refusal)
   if (!stillCurrent()) return
   apply(response)
@@ -685,7 +676,7 @@ async function load(peakPeriodId: string): Promise<void> {
   try {
     await read(peakPeriodId, true)
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not load the peak period.')
+    pageError.value = errorMessage(error, 'Could not load the peak period.')
   } finally {
     loading.value = false
   }
@@ -849,7 +840,7 @@ async function refresh(peakPeriodId: string): Promise<void> {
     if (saving.value) readOwed = peakPeriodId
     else void refresh(peakPeriodId)
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not load the peak period.')
+    pageError.value = errorMessage(error, 'Could not load the peak period.')
   }
 }
 
@@ -910,7 +901,7 @@ async function save(): Promise<void> {
       netsuiteSerial: current.netsuiteSerial,
       isActive: current.isActive,
     })
-    const refusal = refusalOf(out, 'Could not save the peak period.')
+    const refusal = refusalText(out, 'Could not save the peak period.')
     if (refusal) {
       putBack()
       pageError.value = refusal
@@ -920,7 +911,7 @@ async function save(): Promise<void> {
     if (waitsMove) void refresh(out.peakPeriodId)
   } catch (error) {
     putBack()
-    pageError.value = messageOf(error, 'Could not save the peak period.')
+    pageError.value = errorMessage(error, 'Could not save the peak period.')
   } finally {
     saving.value = false
     const owed = readOwed

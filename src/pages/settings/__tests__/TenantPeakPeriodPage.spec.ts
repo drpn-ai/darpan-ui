@@ -137,6 +137,13 @@ describe('TenantPeakPeriodPage', () => {
     expect(wrapper.find('[data-testid="peak-save"]').classes('app-icon-action--dirty')).toBe(false)
   })
 
+  // S99-105: a script error in the read showed its raw text ("Cannot read properties of undefined").
+  it('shows its own line, never a raw script error, when the read breaks', async () => {
+    getPeakPeriod.mockRejectedValueOnce(new TypeError("Cannot read properties of undefined (reading 'peakPeriod')"))
+    const wrapper = await mountPage()
+    expect(text(wrapper, 'peak-page-error')).toBe('Could not load the peak period.')
+  })
+
   it('reads None for peak hours that are not set', async () => {
     getPeakPeriod.mockResolvedValue(got({ peakPeriod: period({ peakHoursStart: null, peakHoursEnd: null }) }))
     const wrapper = await mountPage()

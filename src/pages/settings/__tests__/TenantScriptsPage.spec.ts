@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import type { TenantQuery } from '../../../lib/api/scriptTypes'
+import { ApiCallError } from '../../../lib/api/client'
 
 const listTenantQueries = vi.hoisted(() => vi.fn())
 const saveTenantQueryPins = vi.hoisted(() => vi.fn())
@@ -117,7 +118,7 @@ describe('TenantScriptsPage (/queries)', () => {
   })
 
   it('puts the pins back when the save fails, and says why rather than springing back without a word', async () => {
-    saveTenantQueryPins.mockRejectedValue(new Error('Pins are read-only right now.'))
+    saveTenantQueryPins.mockRejectedValue(new ApiCallError('Pins are read-only right now.'))
     const wrapper = await mountPage()
     await drop(wrapper, 'pinned-queries', '100')
     expect(saveTenantQueryPins).toHaveBeenCalledWith({ pinnedQueryIds: ['600', '200', '100'] })
@@ -152,7 +153,7 @@ describe('TenantScriptsPage (/queries)', () => {
   })
 
   it('shows the load error', async () => {
-    listTenantQueries.mockRejectedValue(new Error('Not allowed'))
+    listTenantQueries.mockRejectedValue(new ApiCallError('Not allowed'))
     const wrapper = await mountPage()
     expect(wrapper.text()).toContain('Not allowed')
     expect(wrapper.find('[data-testid="pinned-queries"]').exists()).toBe(false)

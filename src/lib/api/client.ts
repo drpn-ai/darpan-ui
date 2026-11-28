@@ -68,6 +68,17 @@ export function serviceErrors(error: unknown, fallback: string): string[] {
   return sentences.length ? sentences : [error.message]
 }
 
+/** S99-105: what a page shows for a caught error: every sentence of a thrown refusal, else the caller's own line. */
+export function errorMessage(error: unknown, fallback: string): string {
+  return serviceErrors(error, fallback).join(' ')
+}
+
+/** S99-105: a refusal returned rather than thrown: '' when it went through, else the server's sentences or the caller's line. */
+export function refusalText(response: { ok?: boolean; errors?: readonly string[] }, fallback: string): string {
+  if (response.ok !== false) return ''
+  return response.errors?.length ? response.errors.join(' ') : fallback
+}
+
 export interface AuthRequiredDetail {
   /** Raw backend text, for diagnostics only — never rendered (see AuthRequiredError). */
   message: string

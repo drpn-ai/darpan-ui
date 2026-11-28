@@ -476,7 +476,8 @@ describe('TenantSyncPairPage', () => {
     await flushPromises()
     await vi.advanceTimersByTimeAsync(60_000)
     await flushPromises()
-    expect(text(wrapper, 'sync-pair-page-error')).toBe('Failed to fetch')
+    // S99-105: a raw script/network error is the page's own line, never its text (the client wraps a real outage).
+    expect(text(wrapper, 'sync-pair-page-error')).toBe('Could not load the sync pair.')
 
     getSyncPair.mockResolvedValue(got({ syncPair: pair({ waitingCount: 1300 }) }))
     await vi.advanceTimersByTimeAsync(60_000)

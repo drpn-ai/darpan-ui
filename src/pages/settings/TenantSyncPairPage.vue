@@ -298,7 +298,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
-import { ApiCallError } from '../../lib/api/client'
+import { ApiCallError, errorMessage, refusalText } from '../../lib/api/client'
 import { pulseFacade } from '../../lib/api/facade'
 import type {
   GetSyncPairResponse,
@@ -539,16 +539,6 @@ const popupTitle = computed(() => {
   }
 })
 
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
-
-/** A refusal returned rather than thrown: the server's own sentences. */
-function refusalOf(response: { ok?: boolean; errors?: string[] }, fallback: string): string {
-  if (response.ok !== false) return ''
-  return response.errors?.length ? response.errors.join(' ') : fallback
-}
-
 function resetDraft(): void {
   const pair = saved.value
   draft.value = pair
@@ -580,7 +570,7 @@ function apply(response: GetSyncPairResponse): void {
 /** The pair, or on /new only the pickers (no syncPairId): its daily checks and chat spaces. */
 async function fetchPair(syncPairId: string): Promise<GetSyncPairResponse> {
   const response = await pulseFacade.getSyncPair(syncPairId ? { syncPairId } : {})
-  const refusal = refusalOf(response, 'Could not load the sync pair.')
+  const refusal = refusalText(response, 'Could not load the sync pair.')
   if (refusal) throw new ApiCallError(refusal)
   return response
 }
@@ -606,7 +596,7 @@ async function load(syncPairId: string): Promise<void> {
     apply(await fetchPair(syncPairId))
     resetDraft()
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not load the sync pair.')
+    pageError.value = errorMessage(error, 'Could not load the sync pair.')
   } finally {
     loading.value = false
   }
@@ -644,7 +634,7 @@ async function refreshTick(): Promise<void> {
         pageError.value = ''
       }
     } catch (error) {
-      if (!unmounted) pageError.value = messageOf(error, 'Could not load the sync pair.')
+      if (!unmounted) pageError.value = errorMessage(error, 'Could not load the sync pair.')
       // The page shows the no and reads no more; reopening it asks again.
       if (refusedOutright(error)) return
     }
@@ -734,7 +724,7 @@ async function deletePair(): Promise<void> {
   popupError.value = ''
   try {
     const out = await pulseFacade.deleteSyncPair({ syncPairId })
-    const refusal = refusalOf(out, 'Could not delete the sync pair.')
+    const refusal = refusalText(out, 'Could not delete the sync pair.')
     if (refusal) {
       popupError.value = refusal
       return
@@ -743,7 +733,7 @@ async function deletePair(): Promise<void> {
     closePopup()
     void router.push({ name: 'pulses' })
   } catch (error) {
-    popupError.value = messageOf(error, 'Could not delete the sync pair.')
+    popupError.value = errorMessage(error, 'Could not delete the sync pair.')
   } finally {
     popupBusy.value = false
   }
@@ -800,7 +790,7 @@ async function save(): Promise<void> {
       hourlySummary: current.hourlySummary,
       isActive: current.isActive,
     })
-    const refusal = refusalOf(out, 'Could not save the sync pair.')
+    const refusal = refusalText(out, 'Could not save the sync pair.')
     if (refusal) {
       putBack()
       pageError.value = refusal
@@ -815,11 +805,11 @@ async function save(): Promise<void> {
     } catch (error) {
       // Saved all the same: what is on the page is what was saved.
       baseline.value = snapshot()
-      pageError.value = messageOf(error, 'Could not load the sync pair.')
+      pageError.value = errorMessage(error, 'Could not load the sync pair.')
     }
   } catch (error) {
     putBack()
-    pageError.value = messageOf(error, 'Could not save the sync pair.')
+    pageError.value = errorMessage(error, 'Could not save the sync pair.')
   } finally {
     saving.value = false
   }
