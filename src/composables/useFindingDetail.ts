@@ -75,7 +75,7 @@ export interface FindingDetail {
   evidenceLine: ComputedRef<string>
   /** DAR-UI-099. The open order's lines with no finding of their own (an item set aside, a NetSuite store-credit line). */
   otherLines: ComputedRef<AuditOrderLine[]>
-  /** DAR-UI-144. The record a feedback note sent from the detail is about. */
+  /** DAR-UI-144. A sent note's record when the reply names none (pre-d5ceeff1 servers only; S99-104). */
   feedbackRecord: ComputedRef<string | null>
   /** DAR-UI-144. Acknowledge an open row with none, or one its reminder brought back. */
   canAcknowledge: ComputedRef<boolean>

@@ -44,7 +44,10 @@ import { shortDate } from '../../lib/auditReport'
 
 const props = defineProps<{
   findingId: string
-  /** The finding's record, shown on a note just sent. */
+  /**
+   * S99-104: the record a just-sent note shows only when the reply names none (a server from before darpan d5ceeff1).
+   * Delete it, and useFindingDetail's feedbackRecord, once every instance runs d5ceeff1.
+   */
   recordLabel: string | null
   /** finding.feedback.recentCount. */
   count: number
@@ -120,7 +123,7 @@ async function send(): Promise<void> {
       error.value = response.errors?.[0] || 'The note did not send. Try again.'
       return
     }
-    notes.value = [{ ...back, record: props.recordLabel }, ...notes.value]
+    notes.value = [{ ...back, record: back.record ?? props.recordLabel }, ...notes.value]
     sentCount.value = shownCount.value + 1
     draft.value = ''
   } catch (err) {

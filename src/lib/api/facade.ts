@@ -752,7 +752,8 @@ export const auditFacade = {
   reopenAcknowledgement(findingId: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[] }> {
     return callService(AUDIT.reopenAcknowledgement, { findingId }, signal)
   },
-  sendFindingFeedback(findingId: string, note: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; feedback?: Omit<AuditFeedbackNote, 'record'> }> {
+  // S99-104: darpan d5ceeff1 names the note's record in the reply; an older server leaves it out.
+  sendFindingFeedback(findingId: string, note: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; feedback?: Omit<AuditFeedbackNote, 'record'> & { record?: string | null } }> {
     return callService(AUDIT.sendFindingFeedback, { findingId, note }, signal)
   },
   getFindingFeedback(findingId: string, signal?: AbortSignal): Promise<{ ok?: boolean; errors?: string[]; notes: AuditFeedbackNote[]; shownDays: number }> {

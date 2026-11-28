@@ -119,6 +119,21 @@ describe('AuditFeedbackBubble', () => {
     expect((w.get('[data-testid="audit-feedback-input"]').element as HTMLTextAreaElement).value).toBe('')
   })
 
+  // S99-104: since darpan d5ceeff1 the reply names its record as the list does; the page's own label is only the fallback
+  // for a server from before it (the test above), never laid over the server's.
+  it('names a sent note by the record the server sends back', async () => {
+    sendFindingFeedback.mockResolvedValue({ ok: true, feedback: { feedbackId: 'N3', note: 'Looks wrong', sentAt: '2026-11-25T10:00:00Z', by: { id: 'U3', label: 'Me T.' }, record: 'SO-1003' } })
+    const w = mountBubble()
+    await w.get('[data-testid="audit-feedback"]').trigger('click')
+    await flushPromises()
+    await w.get('[data-testid="audit-feedback-input"]').setValue('Looks wrong')
+    await w.get('[data-testid="audit-feedback-form"]').trigger('submit')
+    await flushPromises()
+    const first = w.findAll('[data-testid="audit-feedback-note"]')[0]!
+    expect(first.text()).toContain('SO-1003')
+    expect(first.text()).not.toContain('#1003')
+  })
+
   it('shows the service error inline and keeps the text', async () => {
     sendFindingFeedback.mockRejectedValue(new Error('HTML not allowed'))
     const w = mountBubble()
