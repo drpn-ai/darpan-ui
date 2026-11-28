@@ -417,15 +417,32 @@ describe('TenantSettingsPage', () => {
     expect(factValue(wrapper, 'tenant-module-timezone')).toBe('Europe/London')
   })
 
-  it('opens the timezone popup from ?workflow=timezone, and ignores the old AI workflows', async () => {
-    route.query = { workflow: 'timezone' }
-    const timezone = mount(TenantSettingsPage)
+  // DAR-OPS-029 U12: a read that failed is not an answer. "None" or "No spaces" after a failed read says the tenant has
+  // none; the rows hold a neutral mark and the page says some settings did not load. A failed row still opens its page,
+  // which reads again and says why.
+  it('says some settings did not load, never None, when the peak, sync or chat-space reads fail', async () => {
+    listPeakPeriods.mockRejectedValue(new Error('down'))
+    listSyncPairs.mockRejectedValue(new Error('down'))
+    listTenantChatSpaces.mockRejectedValue(new Error('down'))
+    const wrapper = mount(TenantSettingsPage)
     await flushPromises()
-    expect(timezone.get('[role="dialog"]').text()).toContain('Set the tenant timezone.')
 
-    route.query = { workflow: 'ai-edit', llmProvider: 'OPENAI' }
-    const ai = mount(TenantSettingsPage)
+    expect(wrapper.text()).toContain('Some tenant settings could not be loaded.')
+    expect(rowValue(wrapper, 'tenant-module-peak-periods')).toBe('—')
+    expect(rowValue(wrapper, 'tenant-module-sync-pulse')).toBe('—')
+    expect(factValue(wrapper, 'tenant-module-notifications')).toBe('—')
+    expect(wrapper.get('[data-testid="tenant-module-peak-periods"]').attributes('aria-label')).toBe('Open peak periods')
+    expect(wrapper.get('[data-testid="tenant-module-sync-pulse"]').attributes('aria-label')).toBe('Open sync pulse')
+    await wrapper.get('[data-testid="tenant-module-peak-periods"]').trigger('click')
+    expect(push).toHaveBeenCalledWith({ name: 'settings-tenant-peak-periods' })
+  })
+
+  it('closes the timezone popup without touching the address', async () => {
+    const wrapper = mount(TenantSettingsPage)
     await flushPromises()
-    expect(ai.find('[role="dialog"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="tenant-module-timezone"]').trigger('click')
+    await wrapper.get('[data-testid="tenant-timezone-workflow-cancel"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(replace).not.toHaveBeenCalled()
   })
 })

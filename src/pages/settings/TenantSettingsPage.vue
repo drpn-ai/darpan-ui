@@ -23,7 +23,7 @@
           <button
             type="button"
             class="tenant-settings-row"
-            :aria-label="peakPeriods.length ? 'Open peak periods' : 'Set up peak periods'"
+            :aria-label="peakPeriods.length || peakError ? 'Open peak periods' : 'Set up peak periods'"
             :disabled="!peakLoaded"
             data-testid="tenant-module-peak-periods"
             @click="router.push({ name: 'settings-tenant-peak-periods' })"
@@ -38,7 +38,7 @@
           <button
             type="button"
             class="tenant-settings-row"
-            :aria-label="syncPairs.length ? 'Open sync pulse' : 'Set up sync pulse'"
+            :aria-label="syncPairs.length || syncError ? 'Open sync pulse' : 'Set up sync pulse'"
             :disabled="!syncLoaded"
             data-testid="tenant-module-sync-pulse"
             @click="router.push({ name: 'settings-tenant-sync-pairs' })"
@@ -100,8 +100,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
@@ -110,7 +110,7 @@ import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
-import { ApiCallError } from '../../lib/api/client'
+import { ApiCallError, isAbortError } from '../../lib/api/client'
 import { peakFacade, settingsFacade } from '../../lib/api/facade'
 import type { SyncPairSummary } from '../../lib/api/pulseTypes'
 import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
@@ -123,7 +123,6 @@ import { useReferenceDataStore } from '../../stores/referenceData'
 import { buildTimezoneOptions } from '../../lib/timezones'
 import { normalizeStringOrEmpty } from '../../lib/utils/strings'
 
-const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const permissionsStore = usePermissionsStore()
@@ -135,9 +134,10 @@ const chatSpacesError = ref<string | null>(null)
 const summaryLoading = computed(() => (
   referenceDataStore.tenantSettingsLoading || chatSpacesLoading.value
 ))
+// A read that failed is not an answer: its fact or row holds '—' and this line says so (never "None").
 const summaryError = computed(() => {
-  const errs = [referenceDataStore.tenantSettingsError, chatSpacesError.value].filter(Boolean)
-  return errs.length > 0 ? 'Some tenant settings could not be loaded.' : null
+  const failed = [referenceDataStore.tenantSettingsError, chatSpacesError.value, peakError.value, syncError.value].some(Boolean)
+  return failed ? 'Some tenant settings could not be loaded.' : null
 })
 const tenantSettings = computed<TenantSettings | null>(() => referenceDataStore.tenantSettings)
 // The effective tenant timezone, resolved through the same fallback chain the save form seeds
@@ -162,7 +162,7 @@ const timezoneWorkflowSaving = ref(false)
 // window renders a definitive claim that is simply wrong, then flips once the fetch lands — so
 // hold a neutral placeholder until there is an answer to report.
 const notificationSummary = computed(() => {
-  if (chatSpacesLoading.value) return '—'
+  if (chatSpacesLoading.value || chatSpacesError.value) return '—'
   const count = chatSpaces.value.length
   if (count === 0) return 'No spaces'
   return count === 1 ? '1 space' : `${count} spaces`
@@ -195,12 +195,7 @@ function openFact(key: string): void {
   else if (key === 'notifications') void router.push({ name: 'settings-notifications' })
 }
 
-const selectedTimeZone = computed(() => (
-  normalizeStringOrEmpty(timezoneForm.timeZone)
-  || normalizeStringOrEmpty(tenantSettings.value?.timeZone)
-  || normalizeStringOrEmpty(authStore.sessionInfo?.timeZone)
-  || 'UTC'
-))
+const selectedTimeZone = computed(() => normalizeStringOrEmpty(timezoneForm.timeZone) || resolvedTenantTimezone.value)
 const timezoneOptions = computed<AppSelectOption[]>(() => buildTimezoneOptions(selectedTimeZone.value))
 const timezoneSaveDisabled = computed(() => (
   timezoneWorkflowSaving.value ||
@@ -211,16 +206,10 @@ const timezonePrimaryLabel = computed(() => (
   timezoneWorkflowSaving.value ? 'Saving timezone' : 'Save Timezone'
 ))
 
-function applyTenantSettings(nextSettings?: TenantSettings | null): void {
-  referenceDataStore.setTenantSettings(nextSettings)
-  const nextTimeZone = normalizeStringOrEmpty(nextSettings?.timeZone) || normalizeStringOrEmpty(authStore.sessionInfo?.timeZone) || 'UTC'
-  timezoneForm.timeZone = nextTimeZone
-}
-
 function openTimezoneWorkflow(): void {
   timezoneWorkflowError.value = null
   timezoneWorkflowSuccess.value = null
-  timezoneForm.timeZone = normalizeStringOrEmpty(resolvedTenantTimezone.value) || 'UTC'
+  timezoneForm.timeZone = resolvedTenantTimezone.value
   timezoneOpen.value = true
 }
 
@@ -239,7 +228,8 @@ async function saveTimezoneSettings(): Promise<void> {
       return
     }
 
-    applyTenantSettings(response.tenantSettings)
+    // The popup closes here, and reopening it seeds the form from these settings again.
+    referenceDataStore.setTenantSettings(response.tenantSettings)
     timezoneWorkflowSuccess.value = response.messages?.[0] ?? 'Saved tenant settings.'
     timezoneOpen.value = false
   } catch (saveError) {
@@ -262,7 +252,7 @@ async function loadChatSpaces(): Promise<void> {
     const response = await settingsFacade.listTenantChatSpaces(pageAbortController.signal)
     chatSpaces.value = response.chatSpaces ?? []
   } catch (loadError) {
-    if ((loadError as { name?: string })?.name === 'AbortError') return
+    if (isAbortError(loadError)) return
     chatSpacesError.value = loadError instanceof ApiCallError ? loadError.message : 'The chat spaces drifted into outer space.'
   } finally {
     chatSpacesLoading.value = false
@@ -270,17 +260,19 @@ async function loadChatSpaces(): Promise<void> {
 }
 
 const peakPeriods = ref<PeakPeriodSummary[]>([])
-const peakValue = computed(() => peakSettingsValue(peakPeriods.value))
 // DAR-UI-154: the row reads "Loading…", and cannot be pressed, until the list arrives (it read "None · Set up" for a moment first).
 const peakLoaded = ref(false)
+const peakError = ref(false)
+const peakValue = computed(() => (peakError.value ? '—' : peakSettingsValue(peakPeriods.value)))
 
-// A failed load reads "None".
 async function loadPeakPeriods(): Promise<void> {
   try {
     const response = await peakFacade.listPeakPeriods(pageAbortController.signal)
     peakPeriods.value = response.peakPeriods ?? []
-  } catch {
+  } catch (loadError) {
+    if (isAbortError(loadError)) return
     peakPeriods.value = []
+    peakError.value = true
   } finally {
     peakLoaded.value = true
   }
@@ -289,34 +281,26 @@ async function loadPeakPeriods(): Promise<void> {
 function closePopup(): void {
   timezoneOpen.value = false
   timezoneWorkflowError.value = null
-  if (route.query.workflow) {
-    void router.replace('/settings/tenant')
-  }
 }
-
-watch(
-  () => route.query.workflow,
-  (workflow) => {
-    if (workflow === 'timezone') openTimezoneWorkflow()
-  },
-  { immediate: true },
-)
 
 const syncPairs = ref<SyncPairSummary[]>([])
 const syncView = ref<SyncPulseView>({ pulsing: [], allowanceOnly: [] })
 // DAR-UI-153: the pairs that pulse, not the allowance-only ones a peak period uses.
-const syncValue = computed(() => syncPulseSettingsValue(syncView.value))
+const syncError = ref(false)
+const syncValue = computed(() => (syncError.value ? '—' : syncPulseSettingsValue(syncView.value)))
 
-// Same as the peak row: "Loading…" and not pressable until the reads return, "None" after a failed load.
+// Same as the peak row: "Loading…" and not pressable until the reads return, '—' after a failed load.
 const syncLoaded = ref(false)
 async function loadSyncPairs(): Promise<void> {
   try {
     const loaded = await loadSyncPulseView(pageAbortController.signal)
     syncPairs.value = loaded.pairs
     syncView.value = loaded.view
-  } catch {
+  } catch (loadError) {
+    if (isAbortError(loadError)) return
     syncPairs.value = []
     syncView.value = { pulsing: [], allowanceOnly: [] }
+    syncError.value = true
   } finally {
     syncLoaded.value = true
   }
