@@ -5,7 +5,7 @@
     role="progressbar"
     aria-valuemin="0"
     aria-valuemax="100"
-    :aria-valuenow="progressValue"
+    :aria-valuenow="normalizedProgress"
   >
     <span class="wizard-progress-track">
       <span class="wizard-progress-fill" :style="{ width: normalizedWidth }"></span>
@@ -32,7 +32,6 @@ const normalizedProgress = computed(() => {
 })
 
 const normalizedWidth = computed(() => `${normalizedProgress.value}%`)
-const progressValue = computed(() => normalizedProgress.value)
 
 function normalizeProgressValue(rawValue: string): number {
   const numericValue = Number(rawValue.replace(/%$/, ''))
