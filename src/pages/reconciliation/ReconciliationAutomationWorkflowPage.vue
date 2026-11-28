@@ -12,7 +12,6 @@
       :class="[
         'workflow-step-shell',
         {
-          'workflow-form--compact': isEditMode,
           'workflow-form--edit-single-page': isEditMode,
         },
       ]"

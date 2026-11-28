@@ -13,7 +13,7 @@
     </datalist>
 
     <WorkflowStepForm
-      :class="['workflow-form--compact', { 'workflow-form--board-stage': isWideStep }]"
+      :class="{ 'workflow-form--board-stage': isWideStep }"
       :data-step-id="currentCreateStep.id"
       :question="currentQuestion"
       :primary-label="primaryLabel"

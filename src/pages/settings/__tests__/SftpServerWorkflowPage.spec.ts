@@ -457,19 +457,6 @@ describe('SftpServerWorkflowPage', () => {
     expect(source).toContain('min-height: 2.2rem;')
   })
 
-  it('uses the same compact value typography for SFTP inputs and the Remote Attributes select', () => {
-    const source = readFileSync('src/style.css', 'utf8')
-    const workflowSource = readFileSync('src/components/workflow/WorkflowStepForm.vue', 'utf8')
-    const pageSource = readFileSync('src/pages/settings/SftpServerWorkflowPage.vue', 'utf8')
-
-    expect(pageSource).toContain('v-bind="formBindings"')
-    expect(readFileSync('src/pages/settings/useConnectionWorkflow.ts', 'utf8')).toContain("'workflow-form--compact'")
-    expect(source).toContain('.workflow-form--compact {')
-    expect(source).toContain('--workflow-form-answer-size: clamp(1.18rem, 1.4vw, 1.45rem);')
-    expect(workflowSource).toContain('font-size: var(--workflow-form-answer-size);')
-    expect(workflowSource).toContain('font-size: var(--workflow-form-select-size);')
-  })
-
   it('shrinks single-page edit workflows with a smaller edit-only typography contract', async () => {
     route.params = { sftpServerId: 'sftp-primary' }
     route.name = 'settings-sftp-edit'
@@ -501,7 +488,8 @@ describe('SftpServerWorkflowPage', () => {
     const source = readFileSync('src/style.css', 'utf8')
     const workflowSource = readFileSync('src/components/workflow/WorkflowStepForm.vue', 'utf8')
 
-    expect(workflowForm.classes()).toContain('workflow-form--compact')
+    // The compact modifier never applied (WorkflowStepForm's scoped base won) and is gone (Aditi, F12).
+    expect(workflowForm.classes()).not.toContain('workflow-form--compact')
     expect(workflowForm.classes()).toContain('workflow-form--edit-single-page')
     expect(source).toContain('.workflow-form--edit-single-page {')
     expect(source).toContain('--workflow-form-question-size: 1.85rem;')
@@ -519,16 +507,4 @@ describe('SftpServerWorkflowPage', () => {
     expect(workflowSource).toContain('font-size: var(--workflow-form-question-mobile-size);')
   })
 
-  it('keeps the compact-row select underline aligned with the neighboring input underline', () => {
-    const source = readFileSync('src/style.css', 'utf8')
-    const workflowSource = readFileSync('src/components/workflow/WorkflowStepForm.vue', 'utf8')
-
-    expect(source).toContain('.workflow-form--compact {')
-    expect(source).toContain('--workflow-form-select-padding-top: 0.15rem;')
-    expect(source).toContain('--workflow-form-select-padding-bottom: 0.55rem;')
-    expect(source).toContain('--workflow-form-select-line-height: 1.2;')
-    expect(workflowSource).toContain('padding-top: var(--workflow-form-select-padding-top);')
-    expect(workflowSource).toContain('padding-bottom: var(--workflow-form-select-padding-bottom);')
-    expect(workflowSource).toContain('line-height: var(--workflow-form-select-line-height);')
-  })
 })

@@ -1033,17 +1033,6 @@ button:disabled {
   gap: var(--space-3);
 }
 
-.workflow-form--compact {
-  --workflow-form-answer-size: clamp(1.18rem, 1.4vw, 1.45rem);
-  --workflow-form-select-size: var(--workflow-form-answer-size);
-  --workflow-form-select-padding-top: 0.15rem;
-  /* An optical alignment constant, not a scale value: it exists to line this select's underline up
-     with the neighbouring input's. It equals --space-1-5 today by coincidence, and binding it to
-     the scale would let a future scale change silently break that alignment. */
-  --workflow-form-select-padding-bottom: 0.55rem;
-  --workflow-form-select-line-height: 1.2;
-}
-
 .workflow-form--edit-single-page {
   --workflow-form-question-size: 1.85rem;
   --workflow-form-question-mobile-size: 1.5rem;

@@ -455,7 +455,8 @@ describe('NetSuiteEndpointWorkflowPage', () => {
     const source = readFileSync('src/style.css', 'utf8')
     const pageSource = readFileSync('src/pages/settings/NetSuiteEndpointWorkflowPage.vue', 'utf8')
 
-    expect(workflowForm.classes()).toContain('workflow-form--compact')
+    // The compact modifier never applied (WorkflowStepForm's scoped base won) and is gone (Aditi, F12).
+    expect(workflowForm.classes()).not.toContain('workflow-form--compact')
     expect(workflowForm.classes()).toContain('workflow-form--edit-single-page')
     expect(pageSource).toContain('v-bind="formBindings"')
     expect(readFileSync('src/pages/settings/useConnectionWorkflow.ts', 'utf8')).toContain("'workflow-form--edit-single-page': isEditing.value")

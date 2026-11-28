@@ -931,7 +931,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const shopifyWorkflowSource = readFileSync('src/pages/settings/ShopifyAuthWorkflowPage.vue', 'utf8')
     const omsWorkflowSource = readFileSync('src/pages/settings/OmsRestSourceWorkflowPage.vue', 'utf8')
 
-    expect(styleSource).toContain('.workflow-form--compact {')
     expect(styleSource).toContain('.workflow-form-grid {')
     expect(styleSource).toContain('.workflow-form-grid--two {')
     expect(styleSource).toContain('.workflow-form-grid--compact {')
@@ -942,7 +941,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     expect(workflowSource).toContain('--workflow-form-select-size: var(--workflow-select-size);')
     expect(workflowSource).toContain('font-size: var(--workflow-form-answer-size);')
     expect(workflowSource).toContain('font-size: var(--workflow-form-select-size);')
-    expect(runsWorkflowSource).toContain("'workflow-form--compact'")
     expect(runsWorkflowSource).toContain("'workflow-form--edit-single-page'")
     expect(runsWorkflowSource).toContain('edit-surface')
     expect(runsWorkflowSource).toContain(':show-enter-hint="false"')
@@ -952,7 +950,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
       expect(source).toContain('v-bind="formBindings"')
     }
     const connectionWorkflow = readFileSync('src/pages/settings/useConnectionWorkflow.ts', 'utf8')
-    expect(connectionWorkflow).toContain("'workflow-form--compact'")
     expect(connectionWorkflow).toContain("'workflow-form--edit-single-page': isEditing.value")
     expect(connectionWorkflow).toContain('editSurface: isEditing.value')
     expect(connectionWorkflow).toContain('showEnterHint: !isEditing.value')

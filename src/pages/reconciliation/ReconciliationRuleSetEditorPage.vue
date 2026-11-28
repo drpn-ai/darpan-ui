@@ -10,7 +10,7 @@
 
     <WorkflowStepForm
       v-if="draft"
-      class="workflow-form--compact workflow-form--edit-single-page workflow-form--board-stage ruleset-editor-form"
+      class="workflow-form--edit-single-page workflow-form--board-stage ruleset-editor-form"
       question=""
       primary-label="Save"
       primary-action-variant="save"

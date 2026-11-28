@@ -81,7 +81,7 @@ export function useConnectionWorkflow<TStep extends WorkflowStep>(options: UseCo
     editSurface: isEditing.value,
   }))
   const formBindings = computed(() => ({
-    class: ['workflow-form--compact', { 'workflow-form--edit-single-page': isEditing.value }],
+    class: [{ 'workflow-form--edit-single-page': isEditing.value }],
     question: machine.currentQuestion.value,
     primaryLabel: machine.primaryLabel.value,
     primaryActionVariant: machine.primaryActionVariant.value,

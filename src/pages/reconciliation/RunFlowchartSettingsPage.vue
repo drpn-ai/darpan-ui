@@ -7,7 +7,7 @@
     />
 
     <WorkflowStepForm
-      :class="['workflow-form--compact', 'workflow-form--edit-single-page']"
+      class="workflow-form--edit-single-page"
       question="Update the lifecycle."
       primary-label="Save"
       primary-action-variant="save"
