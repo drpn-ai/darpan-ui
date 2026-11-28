@@ -29,7 +29,7 @@
         <label class="wizard-input-shell">
           <WorkflowSelect
             v-if="isPrimaryIdSelectStep"
-            v-model="activeSelectValues"
+            v-model="activePrimaryIdValues"
             multiple
             :test-id="activeSelectTestId"
             :disabled="loadingSelections"
@@ -117,7 +117,7 @@
       <template v-else-if="isChipTextStep">
         <WorkflowChipTextInput
           ref="chipTextInputRef"
-          v-model="activeChipTextValue"
+          v-model="activePrimaryIdValues"
           data-testid="workflow-chip-text"
           :placeholder="currentPlaceholder"
           @update:pending="chipPendingValue = $event"
@@ -303,6 +303,52 @@ const file2ExtractOptions = ref<SourceExtractOptions>({})
 const suiteQlQueryFields = ref<Record<string, string[] | null>>({})
 const pendingQueryFieldLoads = ref(0)
 
+type SourceSide = 'file1' | 'file2'
+const SIDES: readonly SourceSide[] = ['file1', 'file2']
+
+// One side's answers, by side, so each card's question, options and checks are written once. The refs stay
+// named as well: activeDraft and the draft restore read them field by field, as the save contract names them.
+const arms = {
+  file1: {
+    parentEnumId: file1SystemParentEnumId,
+    systemEnumId: file1SystemEnumId,
+    sourceMode: file1SourceMode,
+    fileTypeEnumId: file1FileTypeEnumId,
+    jsonSchemaId: file1JsonSchemaId,
+    primaryIdExpression: file1PrimaryIdExpression,
+    sourceConfigId: file1SourceConfigId,
+    sourceConfigType: file1SourceConfigType,
+    nsRestletConfigId: file1NsRestletConfigId,
+    systemMessageRemoteId: file1SystemMessageRemoteId,
+    extractOptions: file1ExtractOptions,
+  },
+  file2: {
+    parentEnumId: file2SystemParentEnumId,
+    systemEnumId: file2SystemEnumId,
+    sourceMode: file2SourceMode,
+    fileTypeEnumId: file2FileTypeEnumId,
+    jsonSchemaId: file2JsonSchemaId,
+    primaryIdExpression: file2PrimaryIdExpression,
+    sourceConfigId: file2SourceConfigId,
+    sourceConfigType: file2SourceConfigType,
+    nsRestletConfigId: file2NsRestletConfigId,
+    systemMessageRemoteId: file2SystemMessageRemoteId,
+    extractOptions: file2ExtractOptions,
+  },
+}
+
+/** The cards a source side can show; a side's step id is `<side>-<card>`. */
+type ArmCard = 'system' | 'endpoint' | 'source' | 'filetype' | 'schema' | 'primary-id' | 'api-config' | 'api' | 'options'
+
+function armStep(stepId: StepId): { side: SourceSide, card: ArmCard } | null {
+  const match = /^(file[12])-(.+)$/.exec(stepId)
+  return match ? { side: match[1] as SourceSide, card: match[2] as ArmCard } : null
+}
+
+function sourceNumberLabel(side: SourceSide): string {
+  return side === 'file1' ? 'source 1' : 'source 2'
+}
+
 // The rules board (final step) reads and writes these directly off the shared draft store — it
 // takes no props and emits nothing, so this is the only channel back to the wizard's own payload
 // build. Not modeled as scalar refs like the rest of the draft above because the board owns their
@@ -310,26 +356,16 @@ const pendingQueryFieldLoads = ref(0)
 const ruleSetDraftExtras = ref<Pick<ReconciliationRuleSetDraft, 'rules' | 'file1ExcludeFilters' | 'file2ExcludeFilters'>>({})
 
 const loadingSelections = computed(() => loadingOptions.value || loadingSchemaFields.value || pendingQueryFieldLoads.value > 0)
-const file1UsesApi = computed(() => file1SourceMode.value === SOURCE_MODE_API)
-const file2UsesApi = computed(() => file2SourceMode.value === SOURCE_MODE_API)
-const file1UsesJson = computed(() => file1FileTypeEnumId.value === FILE_TYPE_JSON)
-const file2UsesJson = computed(() => file2FileTypeEnumId.value === FILE_TYPE_JSON)
-const selectedFile1Schema = computed(() => jsonSchemas.value.find((schema) => schema.jsonSchemaId === file1JsonSchemaId.value) ?? null)
-const selectedFile2Schema = computed(() => jsonSchemas.value.find((schema) => schema.jsonSchemaId === file2JsonSchemaId.value) ?? null)
-const file1SchemaLabel = computed(() => (selectedFile1Schema.value ? formatSchemaLabel(selectedFile1Schema.value) : 'source 1'))
-const file2SchemaLabel = computed(() => (selectedFile2Schema.value ? formatSchemaLabel(selectedFile2Schema.value) : 'source 2'))
+const file1UsesApi = computed(() => armUsesApi('file1'))
+const file2UsesApi = computed(() => armUsesApi('file2'))
 
-// A source config now maps 1:1 to a single API endpoint for OMS/Shopify (option rows are one per
-// config x endpoint), so "which API endpoint" is redundant once the config narrows it to exactly
-// one option -- skip the card and auto-select that option instead (see updateApiSourceConfig /
-// autoSelectSoleApiSource). Zero options still show the card: that is a real "no endpoint
-// configured" problem the operator needs to see (apiSourceSelectionError), not something to skip
-// past silently. NetSuite still offers several restlet configs per auth config, so the card stays
-// meaningful (and visible) there.
-const file1ApiSourceOptions = computed(() => apiSourceOptionsForSide('file1'))
-const file2ApiSourceOptions = computed(() => apiSourceOptionsForSide('file2'))
-const file1ApiSourceStepNeeded = computed(() => file1ApiSourceOptions.value.length !== 1)
-const file2ApiSourceStepNeeded = computed(() => file2ApiSourceOptions.value.length !== 1)
+function armUsesJson(side: SourceSide): boolean {
+  return arms[side].fileTypeEnumId.value === FILE_TYPE_JSON
+}
+
+function schemaLabel(side: SourceSide): string {
+  return resolveSelectedSchemaLabel(arms[side].jsonSchemaId.value) ?? sourceNumberLabel(side)
+}
 
 /**
  * One source arm, built once and called twice. Order matters and is the whole point of the shape:
@@ -380,9 +416,8 @@ const steps = computed<WizardStep[]>(() => (isSingleSided.value
     ]))
 
 function armUsesApi(side: SourceSide): boolean {
-  return side === 'file1' ? file1UsesApi.value : file2UsesApi.value
+  return arms[side].sourceMode.value === SOURCE_MODE_API
 }
-
 
 /**
  * Whether this arm's endpoint card is worth showing: one answer is not a question. Same rule on
@@ -394,18 +429,31 @@ function armHasEndpointStep(side: SourceSide): boolean {
   return armEndpointOptions(side).length > 1
 }
 
+/**
+ * A source config now maps 1:1 to a single API endpoint for OMS/Shopify (option rows are one per
+ * config x endpoint), so "which API endpoint" is redundant once the config narrows it to exactly
+ * one option -- skip the card and auto-select that option instead (see updateApiSourceConfig /
+ * autoSelectSoleApiSource). Zero options still show the card: that is a real "no endpoint
+ * configured" problem the operator needs to see (apiSourceSelectionError), not something to skip
+ * past silently. NetSuite still offers several restlet configs per auth config, so the card stays
+ * meaningful (and visible) there.
+ */
 function armNeedsApiSourceStep(side: SourceSide): boolean {
   // A SuiteQL query is read by its connector directly; no RESTlet or remote sits behind it.
   if (armUsesSuiteQl(side)) return false
-  return side === 'file1' ? file1ApiSourceStepNeeded.value : file2ApiSourceStepNeeded.value
-}
-
-function selectedSourceConfigType(side: SourceSide): string {
-  return side === 'file1' ? file1SourceConfigType.value : file2SourceConfigType.value
+  return apiSourceOptionsForSide(side).length !== 1
 }
 
 function armUsesSuiteQl(side: SourceSide): boolean {
-  return armUsesApi(side) && selectedSourceConfigType(side) === SOURCE_CONFIG_TYPE_SUITEQL
+  return armUsesApi(side) && arms[side].sourceConfigType.value === SOURCE_CONFIG_TYPE_SUITEQL
+}
+
+/** The (config x endpoint) row list#AutomationSourceOptions returned for this pair; a row with no system is unscoped. */
+function findSourceConfigRow(sourceConfigId: string, endpointEnumId: string): AutomationSourceConfigOption | null {
+  return sourceConfigs.value.find((config) =>
+    sourceConfigMatches(config.sourceConfigId, sourceConfigId) &&
+    (!config.systemEnumId || darpanSystemIdsMatch(config.systemEnumId, endpointEnumId)),
+  ) ?? null
 }
 
 /** The (config x endpoint) row this API side resolved to, which is what declares its extract options. */
@@ -413,10 +461,7 @@ function selectedSourceConfigRow(side: SourceSide): AutomationSourceConfigOption
   const sourceConfigId = selectedSourceConfigId(side)
   const endpointEnumId = selectedSystemEnumId(side)
   if (!armUsesApi(side) || !sourceConfigId || !endpointEnumId) return null
-  return sourceConfigs.value.find((config) =>
-    sourceConfigMatches(config.sourceConfigId, sourceConfigId) &&
-    (!config.systemEnumId || endpointMatchesSystem(config.systemEnumId, endpointEnumId)),
-  ) ?? null
+  return findSourceConfigRow(sourceConfigId, endpointEnumId)
 }
 
 function armExtractOptions(side: SourceSide): SourceExtractOption[] {
@@ -424,13 +469,9 @@ function armExtractOptions(side: SourceSide): SourceExtractOption[] {
     .filter((option) => Boolean(option?.name?.trim()) && (option.type === 'boolean' || option.type === 'text'))
 }
 
-function armExtractOptionValues(side: SourceSide): SourceExtractOptions {
-  return side === 'file1' ? file1ExtractOptions.value : file2ExtractOptions.value
-}
-
 /** Only the names this side's row declares, and only a checked box or a non-blank text. */
 function declaredExtractOptionValues(side: SourceSide): SourceExtractOptions | undefined {
-  const values = armExtractOptionValues(side)
+  const values = arms[side].extractOptions.value
   const chosen = armExtractOptions(side).flatMap((option): Array<[string, boolean | string]> => {
     const value = values[option.name]
     if (option.type === 'boolean') return value === true ? [[option.name, true]] : []
@@ -440,16 +481,12 @@ function declaredExtractOptionValues(side: SourceSide): SourceExtractOptions | u
 }
 
 function clearExtractOptions(side: SourceSide): void {
-  if (side === 'file1') {
-    file1ExtractOptions.value = {}
-  } else {
-    file2ExtractOptions.value = {}
-  }
+  arms[side].extractOptions.value = {}
 }
 
 /** The query's fields as key options; a typed bare name gets the records root its extract returns. */
 function primaryIdExpressionForDraft(side: SourceSide): string[] {
-  const values = side === 'file1' ? file1PrimaryIdExpression.value : file2PrimaryIdExpression.value
+  const values = arms[side].primaryIdExpression.value
   if (!armUsesSuiteQl(side)) return values
   return values.map((value) => (value.trim().startsWith('$') ? value : `${SUITEQL_RECORD_ROOT}${value.trim()}`))
 }
@@ -467,7 +504,7 @@ function suiteQlKeyIsTyped(side: SourceSide): boolean {
 }
 
 function armParentEnumId(side: SourceSide): string {
-  return side === 'file1' ? file1SystemParentEnumId.value : file2SystemParentEnumId.value
+  return arms[side].parentEnumId.value
 }
 
 /**
@@ -483,24 +520,7 @@ function armEndpointOptions(side: SourceSide): WorkflowSelectOption[] {
 
   const sourceConfigId = selectedSourceConfigId(side)
   if (!sourceConfigId) return []
-  return allEndpoints.filter((option) => configCoversEndpoint(sourceConfigId, option.value))
-}
-
-/** True when list#AutomationSourceOptions returned a (config x endpoint) row for this pair. */
-function configCoversEndpoint(sourceConfigId: string, endpointEnumId: string): boolean {
-  return sourceConfigs.value.some((config) =>
-    sourceConfigMatches(config.sourceConfigId, sourceConfigId) &&
-    (!config.systemEnumId || endpointMatchesSystem(config.systemEnumId, endpointEnumId)),
-  )
-}
-
-/** The (config x endpoint) row's own config type -- the payload field that pins the extractor. */
-function resolveSourceConfigType(sourceConfigId: string, endpointEnumId: string): string {
-  const row = sourceConfigs.value.find((config) =>
-    sourceConfigMatches(config.sourceConfigId, sourceConfigId) &&
-    (!config.systemEnumId || endpointMatchesSystem(config.systemEnumId, endpointEnumId)),
-  )
-  return row?.sourceConfigType ?? ''
+  return allEndpoints.filter((option) => findSourceConfigRow(sourceConfigId, option.value) !== null)
 }
 
 // The endpoint card is skipped when the config leaves exactly one, so resolve it here or the run
@@ -527,25 +547,16 @@ function syncFileEndpointSelection(side: SourceSide): void {
   const resolvedEnumId = options.length === 1
     ? options[0]!.value
     : (options.some((option) => option.value === currentEnumId) ? currentEnumId : '')
-
-  if (side === 'file1') {
-    file1SystemEnumId.value = resolvedEnumId
-  } else {
-    file2SystemEnumId.value = resolvedEnumId
-  }
+  arms[side].systemEnumId.value = resolvedEnumId
 }
 
 function applyApiEndpointSelection(side: SourceSide, endpointEnumId: string): void {
-  const sourceConfigType = resolveSourceConfigType(selectedSourceConfigId(side), endpointEnumId)
+  // The (config x endpoint) row's own config type is the payload field that pins the extractor.
+  const sourceConfigType = findSourceConfigRow(selectedSourceConfigId(side), endpointEnumId)?.sourceConfigType ?? ''
   // Another endpoint is another connector row, with its own declared options.
   clearExtractOptions(side)
-  if (side === 'file1') {
-    file1SystemEnumId.value = endpointEnumId
-    file1SourceConfigType.value = sourceConfigType
-  } else {
-    file2SystemEnumId.value = endpointEnumId
-    file2SourceConfigType.value = sourceConfigType
-  }
+  arms[side].systemEnumId.value = endpointEnumId
+  arms[side].sourceConfigType.value = sourceConfigType
   autoSelectSoleApiSource(side)
 }
 
@@ -625,282 +636,191 @@ const activeDraft = computed<ReconciliationRuleSetDraft>(() => ({
   file2ExtractOptions: declaredExtractOptionValues('file2'),
 }))
 
+const currentArmStep = computed(() => armStep(currentStep.value.id))
+
 const currentQuestion = computed(() => {
   switch (currentStep.value.id) {
     case 'run-name':
       return 'What should this run be called?'
     case 'description':
       return 'What description should this run use?'
-    case 'file1-system':
-      return isSingleSided.value ? 'Which system should this run check?' : 'Which system provides the first source?'
-    case 'file1-endpoint':
-      // Worded for the branch the operator already chose one card earlier. "Endpoint" is
-      // API vocabulary and reads as nonsense to someone about to upload a CSV.
-      return file1UsesApi.value
-        ? `Which ${resolveSystemLabel(file1SystemParentEnumId.value)} endpoint provides the first source?`
-        : `Which ${resolveSystemLabel(file1SystemParentEnumId.value)} data is in the first source file?`
-    case 'file1-source':
-      return `How should ${sourceSystemLabel('file1')} provide data?`
-    case 'file1-filetype':
-      return `What file type does ${sourceSystemLabel('file1')} upload use?`
-    case 'file1-schema':
-      return file1UsesJson.value
-        ? `Which saved schema describes the ${sourceSystemLabel('file1')} JSON?`
-        : `Which column list describes the ${sourceSystemLabel('file1')} CSV?`
-    case 'file1-primary-id':
-      return file1UsesApi.value
-        ? `Which field identifies each record from ${apiRecordSourceLabel('file1')}?`
-        : (file1UsesJson.value
-            ? `Which field identifies each record in ${file1SchemaLabel.value}?`
-            : `What primary ID expression identifies each record in ${sourceSystemLabel('file1')}?`)
-    case 'file1-api-config':
-      return `Which ${sourceSystemLabel('file1')} config should this source use?`
-    case 'file1-api':
-      return `Which API endpoint should ${sourceSystemLabel('file1')} use?`
-    case 'file1-options':
-      return `Which options should ${apiRecordSourceLabel('file1')} use?`
-    case 'file2-system':
-      return 'Which system provides the second source?'
-    case 'file2-endpoint':
-      // Worded for the branch the operator already chose one card earlier. "Endpoint" is
-      // API vocabulary and reads as nonsense to someone about to upload a CSV.
-      return file2UsesApi.value
-        ? `Which ${resolveSystemLabel(file2SystemParentEnumId.value)} endpoint provides the second source?`
-        : `Which ${resolveSystemLabel(file2SystemParentEnumId.value)} data is in the second source file?`
-    case 'file2-source':
-      return `How should ${sourceSystemLabel('file2')} provide data?`
-    case 'file2-filetype':
-      return `What file type does ${sourceSystemLabel('file2')} upload use?`
-    case 'file2-schema':
-      return file2UsesJson.value
-        ? `Which saved schema describes the ${sourceSystemLabel('file2')} JSON?`
-        : `Which column list describes the ${sourceSystemLabel('file2')} CSV?`
-    case 'file2-primary-id':
-      return file2UsesApi.value
-        ? `Which field identifies each record from ${apiRecordSourceLabel('file2')}?`
-        : (file2UsesJson.value
-            ? `Which field identifies each record in ${file2SchemaLabel.value}?`
-            : `What primary ID expression identifies each record in ${sourceSystemLabel('file2')}?`)
-    case 'file2-api-config':
-      return `Which ${sourceSystemLabel('file2')} config should this source use?`
-    case 'file2-api':
-      return `Which API endpoint should ${sourceSystemLabel('file2')} use?`
-    case 'file2-options':
-      return `Which options should ${apiRecordSourceLabel('file2')} use?`
     case 'ruleset-rules':
       return 'How should Darpan compare these two systems?'
-    default:
-      return ''
   }
+  const step = currentArmStep.value
+  return step ? armQuestion(step.side, step.card) : ''
 })
+
+function armQuestion(side: SourceSide, card: ArmCard): string {
+  const ordinal = side === 'file1' ? 'first' : 'second'
+  const system = sourceSystemLabel(side)
+  switch (card) {
+    case 'system':
+      return side === 'file1' && isSingleSided.value
+        ? 'Which system should this run check?'
+        : `Which system provides the ${ordinal} source?`
+    case 'endpoint':
+      // Worded for the branch the operator already chose one card earlier. "Endpoint" is
+      // API vocabulary and reads as nonsense to someone about to upload a CSV.
+      return armUsesApi(side)
+        ? `Which ${resolveSystemLabel(armParentEnumId(side))} endpoint provides the ${ordinal} source?`
+        : `Which ${resolveSystemLabel(armParentEnumId(side))} data is in the ${ordinal} source file?`
+    case 'source':
+      return `How should ${system} provide data?`
+    case 'filetype':
+      return `What file type does ${system} upload use?`
+    case 'schema':
+      return armUsesJson(side)
+        ? `Which saved schema describes the ${system} JSON?`
+        : `Which column list describes the ${system} CSV?`
+    case 'primary-id':
+      if (armUsesApi(side)) return `Which field identifies each record from ${apiRecordSourceLabel(side)}?`
+      return armUsesJson(side)
+        ? `Which field identifies each record in ${schemaLabel(side)}?`
+        : `What primary ID expression identifies each record in ${system}?`
+    case 'api-config':
+      return `Which ${system} config should this source use?`
+    case 'api':
+      return `Which API endpoint should ${system} use?`
+    case 'options':
+      return `Which options should ${apiRecordSourceLabel(side)} use?`
+  }
+}
 
 const isRuleSetRulesStep = computed(() => currentStep.value.id === 'ruleset-rules')
 
+// The key is picked from a list when the side's fields are known (a JSON schema, a CSV column list, an API's
+// declared ID fields, a readable SuiteQL query); otherwise it is typed as chips.
+function keyIsPicked(side: SourceSide): boolean {
+  return (armUsesJson(side) || armUsesApi(side) || arms[side].jsonSchemaId.value.length > 0) && !suiteQlKeyIsTyped(side)
+}
+
+const SELECT_CARDS: ReadonlySet<ArmCard> = new Set<ArmCard>(['system', 'endpoint', 'filetype', 'schema', 'api-config', 'api'])
+
 const isSelectStep = computed(() => {
-  switch (currentStep.value.id) {
-    case 'file1-system':
-    case 'file1-endpoint':
-    case 'file1-filetype':
-    case 'file1-schema':
-    case 'file1-api-config':
-    case 'file1-api':
-    case 'file2-system':
-    case 'file2-endpoint':
-    case 'file2-filetype':
-    case 'file2-schema':
-    case 'file2-api-config':
-    case 'file2-api':
-      return true
-    case 'file1-primary-id':
-      return (file1UsesJson.value || file1UsesApi.value || file1JsonSchemaId.value.length > 0) && !suiteQlKeyIsTyped('file1')
-    case 'file2-primary-id':
-      return (file2UsesJson.value || file2UsesApi.value || file2JsonSchemaId.value.length > 0) && !suiteQlKeyIsTyped('file2')
-    default:
-      return false
-  }
+  const step = currentArmStep.value
+  if (!step) return false
+  return step.card === 'primary-id' ? keyIsPicked(step.side) : SELECT_CARDS.has(step.card)
 })
 
+// A CSV side that skipped the schema step still types its column names, as does a SuiteQL side whose
+// query fields could not be read.
 const isChipTextStep = computed(() => {
-  switch (currentStep.value.id) {
-    case 'file1-primary-id':
-      // A CSV side that skipped the schema step still types its column names, as does a SuiteQL
-      // side whose query fields could not be read.
-      return (!file1UsesJson.value && !file1UsesApi.value && file1JsonSchemaId.value.length === 0) || suiteQlKeyIsTyped('file1')
-    case 'file2-primary-id':
-      return (!file2UsesJson.value && !file2UsesApi.value && file2JsonSchemaId.value.length === 0) || suiteQlKeyIsTyped('file2')
-    default:
-      return false
-  }
+  const step = currentArmStep.value
+  return step?.card === 'primary-id' && !keyIsPicked(step.side)
 })
 
 const activeSelectValue = computed({
   get: () => {
-    switch (currentStep.value.id) {
-      case 'file1-system':
-        return file1SystemParentEnumId.value
-      case 'file1-endpoint':
-        return file1SystemEnumId.value
-      case 'file1-source':
-        return file1SourceMode.value
-      case 'file1-filetype':
-        return file1FileTypeEnumId.value
-      case 'file1-schema':
-        return file1JsonSchemaId.value
-      case 'file1-api-config':
-        return file1SourceConfigId.value
-      case 'file1-api':
-        return selectedApiSourceValue('file1')
-      case 'file2-system':
-        return file2SystemParentEnumId.value
-      case 'file2-endpoint':
-        return file2SystemEnumId.value
-      case 'file2-source':
-        return file2SourceMode.value
-      case 'file2-filetype':
-        return file2FileTypeEnumId.value
-      case 'file2-schema':
-        return file2JsonSchemaId.value
-      case 'file2-api-config':
-        return file2SourceConfigId.value
-      case 'file2-api':
-        return selectedApiSourceValue('file2')
+    const step = currentArmStep.value
+    if (!step) return ''
+    const arm = arms[step.side]
+    switch (step.card) {
+      case 'system':
+        return arm.parentEnumId.value
+      case 'endpoint':
+        return arm.systemEnumId.value
+      case 'source':
+        return arm.sourceMode.value
+      case 'filetype':
+        return arm.fileTypeEnumId.value
+      case 'schema':
+        return arm.jsonSchemaId.value
+      case 'api-config':
+        return arm.sourceConfigId.value
+      case 'api':
+        return selectedApiSourceValue(step.side)
       default:
         return ''
     }
   },
   set: (value: string) => {
-    switch (currentStep.value.id) {
-      case 'file1-system':
-        file1SystemParentEnumId.value = value
-        // A system with no endpoints resolves straight to its own value (no file1-endpoint step
-        // will be inserted); a system with endpoints leaves file1SystemEnumId blank until step 2
+    const step = currentArmStep.value
+    if (!step) return
+    const { side } = step
+    const arm = arms[side]
+    switch (step.card) {
+      case 'system':
+        arm.parentEnumId.value = value
+        // A system with no endpoints resolves straight to its own value (no endpoint step will be
+        // inserted); a system with endpoints leaves the side's systemEnumId blank until that card
         // answers it, so canProceed correctly blocks advancing past an unresolved endpoint.
-        file1SystemEnumId.value = darpanSystemHasEndpointOptions(value, allSystemOptions.value) ? '' : value
-        file1JsonSchemaId.value = ''
-        file1PrimaryIdExpression.value = []
-        clearApiSourceConfig('file1')
-        syncFileEndpointSelection('file1')
+        arm.systemEnumId.value = darpanSystemHasEndpointOptions(value, allSystemOptions.value) ? '' : value
+        arm.jsonSchemaId.value = ''
+        arm.primaryIdExpression.value = []
+        clearApiSourceConfig(side)
+        syncFileEndpointSelection(side)
         break
-      case 'file1-endpoint':
-        file1JsonSchemaId.value = ''
-        file1PrimaryIdExpression.value = []
+      case 'endpoint':
+        arm.jsonSchemaId.value = ''
+        arm.primaryIdExpression.value = []
         // On the API branch the config is this card's PARENT and must survive it; only
         // the endpoint-derived half of the selection is re-resolved here.
-        if (file1UsesApi.value) {
-          applyApiEndpointSelection('file1', value)
+        if (armUsesApi(side)) {
+          applyApiEndpointSelection(side, value)
         } else {
-          file1SystemEnumId.value = value
+          arm.systemEnumId.value = value
         }
         break
-      case 'file1-source':
-        setSourceMode('file1', value)
+      case 'source':
+        setSourceMode(side, value)
         break
-      case 'file1-filetype':
-        file1FileTypeEnumId.value = value
-        file1JsonSchemaId.value = ''
-        file1PrimaryIdExpression.value = []
+      case 'filetype':
+        arm.fileTypeEnumId.value = value
+        arm.jsonSchemaId.value = ''
+        arm.primaryIdExpression.value = []
         break
-      case 'file1-schema':
-        file1JsonSchemaId.value = value
-        file1PrimaryIdExpression.value = []
+      case 'schema':
+        arm.jsonSchemaId.value = value
+        arm.primaryIdExpression.value = []
         break
-      case 'file1-api-config':
-        updateApiSourceConfig('file1', value)
+      case 'api-config':
+        updateApiSourceConfig(side, value)
         break
-      case 'file1-api':
-        updateApiSource('file1', value)
-        break
-      case 'file2-system':
-        file2SystemParentEnumId.value = value
-        file2SystemEnumId.value = darpanSystemHasEndpointOptions(value, allSystemOptions.value) ? '' : value
-        file2JsonSchemaId.value = ''
-        file2PrimaryIdExpression.value = []
-        clearApiSourceConfig('file2')
-        syncFileEndpointSelection('file2')
-        break
-      case 'file2-endpoint':
-        file2JsonSchemaId.value = ''
-        file2PrimaryIdExpression.value = []
-        // On the API branch the config is this card's PARENT and must survive it; only
-        // the endpoint-derived half of the selection is re-resolved here.
-        if (file2UsesApi.value) {
-          applyApiEndpointSelection('file2', value)
-        } else {
-          file2SystemEnumId.value = value
-        }
-        break
-      case 'file2-source':
-        setSourceMode('file2', value)
-        break
-      case 'file2-filetype':
-        file2FileTypeEnumId.value = value
-        file2JsonSchemaId.value = ''
-        file2PrimaryIdExpression.value = []
-        break
-      case 'file2-schema':
-        file2JsonSchemaId.value = value
-        file2PrimaryIdExpression.value = []
-        break
-      case 'file2-api-config':
-        updateApiSourceConfig('file2', value)
-        break
-      case 'file2-api':
-        updateApiSource('file2', value)
+      case 'api':
+        updateApiSource(side, value)
         break
     }
   },
 })
 
-const activeSelectOptions = computed(() => {
-  switch (currentStep.value.id) {
-    case 'file1-system':
-    case 'file2-system':
+const activeSelectOptions = computed<WorkflowSelectOption[]>(() => {
+  const step = currentArmStep.value
+  if (!step) return []
+  const { side } = step
+  switch (step.card) {
+    case 'system':
       return systemOptions.value
-    case 'file1-endpoint':
-      return armEndpointOptions('file1')
-    case 'file2-endpoint':
-      return armEndpointOptions('file2')
-    case 'file1-filetype':
-    case 'file2-filetype':
+    case 'endpoint':
+      return armEndpointOptions(side)
+    case 'filetype':
       return fileTypeOptions.value
-    case 'file1-api-config':
-      return apiSourceConfigOptionsForSide('file1')
-    case 'file2-api-config':
-      return apiSourceConfigOptionsForSide('file2')
-    case 'file1-api':
-      return apiSourceOptionsForSide('file1')
-    case 'file2-api':
-      return apiSourceOptionsForSide('file2')
-    case 'file1-schema':
-      return buildSchemaOptions(file1SystemEnumId.value, !file1UsesJson.value)
-    case 'file1-primary-id':
-      return file1UsesApi.value
-        ? apiPrimaryIdOptions('file1')
-        : buildRankedFieldOptions(file1JsonSchemaId.value, file1UsesJson.value)
-    case 'file2-schema':
-      return buildSchemaOptions(file2SystemEnumId.value, !file2UsesJson.value)
-    case 'file2-primary-id':
-      return file2UsesApi.value
-        ? apiPrimaryIdOptions('file2')
-        : buildRankedFieldOptions(file2JsonSchemaId.value, file2UsesJson.value)
+    case 'api-config':
+      return apiSourceConfigOptionsForSide(side)
+    case 'api':
+      return apiSourceOptionsForSide(side)
+    case 'schema':
+      return buildSchemaOptions(arms[side].systemEnumId.value, !armUsesJson(side))
+    case 'primary-id':
+      return armUsesApi(side)
+        ? apiPrimaryIdOptions(side)
+        : buildRankedFieldOptions(arms[side].jsonSchemaId.value, armUsesJson(side))
     default:
       return []
   }
 })
 
-const isPrimaryIdSelectStep = computed(() =>
-  (currentStep.value.id === 'file1-primary-id' || currentStep.value.id === 'file2-primary-id') && isSelectStep.value,
-)
+const isPrimaryIdSelectStep = computed(() => currentArmStep.value?.card === 'primary-id' && isSelectStep.value)
 
-const activeSelectValues = computed<string[]>({
+// The key card's answer, whether it is picked from a list or typed as chips.
+const activePrimaryIdValues = computed<string[]>({
   get: () => {
-    if (currentStep.value.id === 'file1-primary-id') return file1PrimaryIdExpression.value
-    if (currentStep.value.id === 'file2-primary-id') return file2PrimaryIdExpression.value
-    return []
+    const step = currentArmStep.value
+    return step?.card === 'primary-id' ? arms[step.side].primaryIdExpression.value : []
   },
   set: (values: string[]) => {
-    if (currentStep.value.id === 'file1-primary-id') file1PrimaryIdExpression.value = values
-    if (currentStep.value.id === 'file2-primary-id') file2PrimaryIdExpression.value = values
+    const step = currentArmStep.value
+    if (step?.card === 'primary-id') arms[step.side].primaryIdExpression.value = values
   },
 })
 
@@ -915,8 +835,7 @@ const hasPendingChipText = computed(() => isChipTextStep.value && chipPendingVal
 // A side's key is answered once it holds a chip, or while its own key card has text typed but not Entered.
 // Both OK (canProceed) and Save (canCreateRun) read this: on a single-sided run the key card is the Save card.
 function primaryIdAnswered(side: SourceSide): boolean {
-  const committed = side === 'file1' ? file1PrimaryIdExpression.value : file2PrimaryIdExpression.value
-  return committed.length > 0 || (hasPendingChipText.value && currentStep.value.id === `${side}-primary-id`)
+  return arms[side].primaryIdExpression.value.length > 0 || (hasPendingChipText.value && currentStep.value.id === `${side}-primary-id`)
 }
 
 // The chip input is remounted per step and starts empty, but a fresh empty ref emits nothing --
@@ -924,61 +843,20 @@ function primaryIdAnswered(side: SourceSide): boolean {
 // wrongly satisfy the NEXT chip step.
 watch(currentStepIndex, () => { chipPendingValue.value = '' })
 
-const activeChipTextValue = computed<string[]>({
-  get: () => {
-    if (currentStep.value.id === 'file1-primary-id') return file1PrimaryIdExpression.value
-    if (currentStep.value.id === 'file2-primary-id') return file2PrimaryIdExpression.value
-    return []
-  },
-  set: (values: string[]) => {
-    if (currentStep.value.id === 'file1-primary-id') file1PrimaryIdExpression.value = values
-    if (currentStep.value.id === 'file2-primary-id') file2PrimaryIdExpression.value = values
-  },
-})
-
 // Once at least one field is chosen, further options are restricted to fields sharing the same
 // JSON record root — composite key fields must all resolve at the same array-explosion level so
 // the backend's shared-record-root validation (RuleSetCompareScopeAdapter) never rejects the save.
 const activePrimaryIdSelectOptions = computed(() => {
   const baseOptions = activeSelectOptions.value
-  const chosen = activeSelectValues.value
+  const chosen = activePrimaryIdValues.value
   if (!chosen.length) return baseOptions
   return baseOptions.filter((option) => fieldSharesRecordRoot(option.value, chosen[0]!))
 })
 
 const activeSelectTestId = computed(() => {
-  switch (currentStep.value.id) {
-    case 'file1-system':
-      return 'file1-system-select'
-    case 'file1-endpoint':
-      return 'file1-endpoint-select'
-    case 'file1-api-config':
-      return 'file1-api-config-select'
-    case 'file1-api':
-      return 'file1-api-select'
-    case 'file1-filetype':
-      return 'file1-filetype-select'
-    case 'file1-schema':
-      return 'file1-schema-select'
-    case 'file1-primary-id':
-      return 'file1-field-select'
-    case 'file2-system':
-      return 'file2-system-select'
-    case 'file2-endpoint':
-      return 'file2-endpoint-select'
-    case 'file2-api-config':
-      return 'file2-api-config-select'
-    case 'file2-api':
-      return 'file2-api-select'
-    case 'file2-filetype':
-      return 'file2-filetype-select'
-    case 'file2-schema':
-      return 'file2-schema-select'
-    case 'file2-primary-id':
-      return 'file2-field-select'
-    default:
-      return 'workflow-select'
-  }
+  const step = currentArmStep.value
+  if (!step || !SELECT_CARDS.has(step.card) && step.card !== 'primary-id') return 'workflow-select'
+  return step.card === 'primary-id' ? `${step.side}-field-select` : `${step.side}-${step.card}-select`
 })
 
 const activeTextValue = computed({
@@ -1004,16 +882,13 @@ const activeTextValue = computed({
   },
 })
 
+// The free-text card holds only the run's name and description; a side's key has its own chip input.
 const activeTextName = computed(() => {
   switch (currentStep.value.id) {
     case 'run-name':
       return 'runName'
     case 'description':
       return 'description'
-    case 'file1-primary-id':
-      return 'file1PrimaryIdExpression'
-    case 'file2-primary-id':
-      return 'file2PrimaryIdExpression'
     default:
       return 'workflowInput'
   }
@@ -1025,105 +900,73 @@ const currentPlaceholder = computed(() => {
       return 'Orders vs Shopify'
     case 'description':
       return 'Optional context for this run...'
-    case 'file1-system':
-    case 'file2-system':
+  }
+  const step = currentArmStep.value
+  if (!step) return ''
+  const { side } = step
+  switch (step.card) {
+    case 'system':
       return 'Select system...'
-    case 'file1-endpoint':
-      return file1UsesApi.value ? 'Select endpoint...' : 'Select data...'
-    case 'file2-endpoint':
-      return file2UsesApi.value ? 'Select endpoint...' : 'Select data...'
-    case 'file1-api':
-    case 'file2-api':
+    case 'endpoint':
+      return armUsesApi(side) ? 'Select endpoint...' : 'Select data...'
+    case 'api':
       return 'Select API endpoint...'
-    case 'file1-api-config':
-    case 'file2-api-config':
+    case 'api-config':
       return 'Select config...'
-    case 'file1-filetype':
-    case 'file2-filetype':
+    case 'filetype':
       return 'Select file type...'
-    case 'file1-schema':
-      return file1UsesJson.value ? 'Select schema...' : 'Select a column list, or continue to type them'
-    case 'file2-schema':
-      return file2UsesJson.value ? 'Select schema...' : 'Select a column list, or continue to type them'
-    case 'file1-primary-id':
-      return file1UsesJson.value
-        ? (file1JsonSchemaId.value ? 'Select ID field...' : 'Choose a schema first')
-        : file1UsesApi.value
-          ? 'Select ID field...'
-          : 'order_id'
-    case 'file2-primary-id':
-      return file2UsesJson.value
-        ? (file2JsonSchemaId.value ? 'Select ID field...' : 'Choose a schema first')
-        : file2UsesApi.value
-          ? 'Select ID field...'
-          : 'order_id'
+    case 'schema':
+      return armUsesJson(side) ? 'Select schema...' : 'Select a column list, or continue to type them'
+    case 'primary-id':
+      if (armUsesJson(side)) return arms[side].jsonSchemaId.value ? 'Select ID field...' : 'Choose a schema first'
+      return armUsesApi(side) ? 'Select ID field...' : 'order_id'
     default:
       return ''
   }
 })
 
-const showEmptyState = computed(() =>
-  ['run-name', 'file1-primary-id', 'file2-primary-id'].includes(currentStep.value.id) &&
-  !isSelectStep.value,
-)
+const showEmptyState = computed(() => currentStep.value.id === 'run-name')
 
-const isFileTypeChoiceStep = computed(() => currentStep.value.id === 'file1-filetype' || currentStep.value.id === 'file2-filetype')
-const isSourceChoiceStep = computed(() => currentStep.value.id === 'file1-source' || currentStep.value.id === 'file2-source')
+const isFileTypeChoiceStep = computed(() => currentArmStep.value?.card === 'filetype')
+const isSourceChoiceStep = computed(() => currentArmStep.value?.card === 'source')
 const isShortcutChoiceStep = computed(() => isSourceChoiceStep.value || isFileTypeChoiceStep.value)
-const isOptionsStep = computed(() => currentStep.value.id === 'file1-options' || currentStep.value.id === 'file2-options')
-const activeOptionsSide = computed<SourceSide>(() => (currentStep.value.id === 'file2-options' ? 'file2' : 'file1'))
+const isOptionsStep = computed(() => currentArmStep.value?.card === 'options')
+const activeOptionsSide = computed<SourceSide>(() => currentArmStep.value?.side ?? 'file1')
 const activeBooleanExtractOptions = computed(() =>
   (isOptionsStep.value ? armExtractOptions(activeOptionsSide.value) : []).filter((option) => option.type === 'boolean'))
 const activeTextExtractOptions = computed(() =>
   (isOptionsStep.value ? armExtractOptions(activeOptionsSide.value) : []).filter((option) => option.type === 'text'))
 
 function extractOptionChecked(name: string): boolean {
-  return armExtractOptionValues(activeOptionsSide.value)[name] === true
+  return arms[activeOptionsSide.value].extractOptions.value[name] === true
 }
 
 function extractOptionText(name: string): string {
-  const value = armExtractOptionValues(activeOptionsSide.value)[name]
+  const value = arms[activeOptionsSide.value].extractOptions.value[name]
   return typeof value === 'string' ? value : ''
 }
 
 function setExtractOption(name: string, value: boolean | string): void {
-  const side = activeOptionsSide.value
-  const next = { ...armExtractOptionValues(side), [name]: value }
-  if (side === 'file1') {
-    file1ExtractOptions.value = next
-  } else {
-    file2ExtractOptions.value = next
-  }
+  const options = arms[activeOptionsSide.value].extractOptions
+  options.value = { ...options.value, [name]: value }
 }
-const isSchemaSelectionStep = computed(() => currentStep.value.id === 'file1-schema' || currentStep.value.id === 'file2-schema')
 
-const activeShortcutChoiceTestPrefix = computed(() => {
-  switch (currentStep.value.id) {
-    case 'file1-source':
-      return 'file1-source-choice'
-    case 'file1-filetype':
-      return 'file1-filetype-choice'
-    case 'file2-source':
-      return 'file2-source-choice'
-    case 'file2-filetype':
-      return 'file2-filetype-choice'
-    default:
-      return 'workflow-choice'
-  }
-})
+const isSchemaSelectionStep = computed(() => currentArmStep.value?.card === 'schema')
+
+const activeShortcutChoiceTestPrefix = computed(() => (isShortcutChoiceStep.value ? `${currentStep.value.id}-choice` : 'workflow-choice'))
+
+const SOURCE_MODE_OPTIONS: WorkflowSelectOption[] = [
+  { value: SOURCE_MODE_FILE, label: 'File upload' },
+  { value: SOURCE_MODE_API, label: 'API' },
+]
 
 const activeShortcutChoiceOptions = computed<WorkflowShortcutChoiceOption[]>(() =>
-  (isSourceChoiceStep.value ? sourceModeOptions.value : activeSelectOptions.value).map((option, index) => ({
+  (isSourceChoiceStep.value ? SOURCE_MODE_OPTIONS : activeSelectOptions.value).map((option, index) => ({
     value: option.value,
     label: option.label,
     shortcutKey: SHORTCUT_KEYS[index] ?? String(index + 1),
   })),
 )
-
-const sourceModeOptions = computed<WorkflowSelectOption[]>(() => [
-  { value: SOURCE_MODE_FILE, label: 'File upload' },
-  { value: SOURCE_MODE_API, label: 'API' },
-])
 
 const systemSelectionError = computed(() => {
   // The "must differ" check is on the concrete resolved value: for a system with no endpoints
@@ -1138,69 +981,50 @@ const systemSelectionError = computed(() => {
 })
 
 const schemaSelectionError = computed(() => {
-  switch (currentStep.value.id) {
-    // JSON only. On a CSV side the step is optional, so "none available" is not a dead end --
-    // and raising it here would set canProceed false and trap the user on a step they are
-    // entitled to skip, with the chip-text fallback unreachable behind it.
-    case 'file1-schema':
-      return file1UsesJson.value && buildSchemaOptions(file1SystemEnumId.value).length === 0
-        ? `No saved JSON schemas are available for ${file1SystemLabel.value || 'source 1'}.`
-        : ''
-    case 'file2-schema':
-      return file2UsesJson.value && buildSchemaOptions(file2SystemEnumId.value).length === 0
-        ? `No saved JSON schemas are available for ${file2SystemLabel.value || 'source 2'}.`
-        : ''
-    default:
-      return ''
-  }
+  const step = currentArmStep.value
+  if (step?.card !== 'schema') return ''
+  const { side } = step
+  // JSON only. On a CSV side the step is optional, so "none available" is not a dead end --
+  // and raising it here would set canProceed false and trap the user on a step they are
+  // entitled to skip, with the chip-text fallback unreachable behind it.
+  return armUsesJson(side) && buildSchemaOptions(arms[side].systemEnumId.value).length === 0
+    ? `No saved JSON schemas are available for ${resolveSystemLabel(arms[side].systemEnumId.value) || sourceNumberLabel(side)}.`
+    : ''
 })
 
 const schemaFieldSelectionError = computed(() => {
-  switch (currentStep.value.id) {
-    case 'file1-primary-id':
-      if (armUsesSuiteQl('file1') && (suiteQlFieldsForSide('file1') === undefined || suiteQlKeyIsTyped('file1'))) return ''
-      if (file1UsesApi.value) {
-        return apiPrimaryIdOptions('file1').length === 0
-          ? `No ID fields are available for ${apiRecordSourceLabel('file1')}.`
-          : ''
-      }
-      if (!file1UsesJson.value) return ''
-      if (!file1JsonSchemaId.value) return 'Choose a schema first.'
-      return buildFieldOptions(file1JsonSchemaId.value).length === 0
-        ? `No comparable fields are available in ${file1SchemaLabel.value}.`
-        : ''
-    case 'file2-primary-id':
-      if (armUsesSuiteQl('file2') && (suiteQlFieldsForSide('file2') === undefined || suiteQlKeyIsTyped('file2'))) return ''
-      if (file2UsesApi.value) {
-        return apiPrimaryIdOptions('file2').length === 0
-          ? `No ID fields are available for ${apiRecordSourceLabel('file2')}.`
-          : ''
-      }
-      if (!file2UsesJson.value) return ''
-      if (!file2JsonSchemaId.value) return 'Choose a schema first.'
-      return buildFieldOptions(file2JsonSchemaId.value).length === 0
-        ? `No comparable fields are available in ${file2SchemaLabel.value}.`
-        : ''
-    default:
-      return ''
+  const step = currentArmStep.value
+  if (step?.card !== 'primary-id') return ''
+  const { side } = step
+  if (armUsesSuiteQl(side) && (suiteQlFieldsForSide(side) === undefined || suiteQlKeyIsTyped(side))) return ''
+  if (armUsesApi(side)) {
+    return apiPrimaryIdOptions(side).length === 0
+      ? `No ID fields are available for ${apiRecordSourceLabel(side)}.`
+      : ''
   }
+  if (!armUsesJson(side)) return ''
+  const schemaId = arms[side].jsonSchemaId.value
+  if (!schemaId) return 'Choose a schema first.'
+  return buildFieldOptions(schemaId).length === 0
+    ? `No comparable fields are available in ${schemaLabel(side)}.`
+    : ''
 })
 
 const apiSourceConfigSelectionError = computed(() => {
-  if (currentStep.value.id !== 'file1-api-config' && currentStep.value.id !== 'file2-api-config') return ''
-  const side = currentStep.value.id === 'file1-api-config' ? 'file1' : 'file2'
-  return apiSourceConfigOptionsForSide(side).length === 0
-    ? `No API configs are available for ${sourceSystemLabel(side)}.`
+  const step = currentArmStep.value
+  if (step?.card !== 'api-config') return ''
+  return apiSourceConfigOptionsForSide(step.side).length === 0
+    ? `No API configs are available for ${sourceSystemLabel(step.side)}.`
     : ''
 })
 
 const activeSelectError = computed(() => systemSelectionError.value || schemaSelectionError.value || schemaFieldSelectionError.value || apiSourceConfigSelectionError.value)
 
 const apiSourceSelectionError = computed(() => {
-  if (currentStep.value.id !== 'file1-api' && currentStep.value.id !== 'file2-api') return ''
-  const side = currentStep.value.id === 'file1-api' ? 'file1' : 'file2'
-  return apiSourceOptionsForSide(side).length === 0
-    ? `No API endpoints are available for ${sourceSystemLabel(side)}.`
+  const step = currentArmStep.value
+  if (step?.card !== 'api') return ''
+  return apiSourceOptionsForSide(step.side).length === 0
+    ? `No API endpoints are available for ${sourceSystemLabel(step.side)}.`
     : ''
 })
 
@@ -1209,24 +1033,18 @@ const activeStepError = computed(() => activeSelectError.value || apiSourceSelec
 // The API cards are the only ones that can strand an operator with nothing to pick and nowhere to
 // go. When one of them has an error, offer the same "Or -> go make one" exit the schema card has.
 const activeConfigCreateTarget = computed<{ path: string, label: string } | null>(() => {
-  const stepId = currentStep.value.id
-  const isApiCard = stepId === 'file1-api-config' || stepId === 'file2-api-config' ||
-    stepId === 'file1-api' || stepId === 'file2-api'
-  if (!isApiCard || !activeStepError.value) return null
-
-  const side: SourceSide = stepId.startsWith('file1') ? 'file1' : 'file2'
-  const parentEnumId = side === 'file1' ? file1SystemParentEnumId.value : file2SystemParentEnumId.value
-  return CONFIG_CREATE_TARGETS[canonicalDarpanSystemEnumId(parentEnumId)] ?? null
+  const step = currentArmStep.value
+  if ((step?.card !== 'api-config' && step?.card !== 'api') || !activeStepError.value) return null
+  return CONFIG_CREATE_TARGETS[canonicalDarpanSystemEnumId(armParentEnumId(step.side))] ?? null
 })
 
 // DAR-UI-064. A SuiteQL query is authored from the NetSuite config card; saving it comes back here with
 // newQuery=<id>&side=<side>, and the answers so far ride the draft store across the trip.
 const newQueryHref = computed(() => {
-  const stepId = currentStep.value.id
-  if (stepId !== 'file1-api-config' && stepId !== 'file2-api-config') return ''
-  const side: SourceSide = stepId === 'file1-api-config' ? 'file1' : 'file2'
-  if (canonicalDarpanSystemEnumId(armParentEnumId(side)) !== 'NETSUITE') return ''
-  const params = new URLSearchParams({ returnTo: wizardReturnPath(), side })
+  const step = currentArmStep.value
+  if (step?.card !== 'api-config') return ''
+  if (canonicalDarpanSystemEnumId(armParentEnumId(step.side)) !== 'NETSUITE') return ''
+  const params = new URLSearchParams({ returnTo: wizardReturnPath(), side: step.side })
   return `${NEW_QUERY_PATH}?${params.toString()}`
 })
 
@@ -1256,76 +1074,54 @@ const canProceed = computed(() => {
       return trimmedRunName.value.length > 0
     case 'description':
       return true
-    case 'file1-system':
-      return file1SystemParentEnumId.value.length > 0
-    case 'file1-endpoint':
-      return file1SystemEnumId.value.length > 0
-    case 'file1-source':
-      return file1SourceMode.value === SOURCE_MODE_FILE || file1SourceMode.value === SOURCE_MODE_API
-    case 'file1-filetype':
-      return file1FileTypeEnumId.value.length > 0
-    case 'file1-schema':
-      // Required for JSON, skippable for CSV -- a skipped CSV schema falls back to chip text.
-      return (file1UsesJson.value ? file1JsonSchemaId.value.length > 0 : true) && !schemaSelectionError.value
-    case 'file1-primary-id':
-      return primaryIdAnswered('file1') && !schemaFieldSelectionError.value
-    case 'file1-api-config':
-      return file1SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
-    case 'file1-api':
-      return hasApiEndpoint('file1') && !apiSourceSelectionError.value
-    case 'file2-system':
-      // When the chosen system has endpoints, file2SystemEnumId stays blank until file2-endpoint
-      // resolves it — the "must differ from source 1" check applies there instead.
-      return file2SystemParentEnumId.value.length > 0 &&
-        (armHasEndpointStep('file2') || file2SystemEnumId.value !== file1SystemEnumId.value)
-    case 'file2-endpoint':
-      return file2SystemEnumId.value.length > 0 && file2SystemEnumId.value !== file1SystemEnumId.value
-    case 'file2-source':
-      return file2SourceMode.value === SOURCE_MODE_FILE || file2SourceMode.value === SOURCE_MODE_API
-    case 'file2-filetype':
-      return file2FileTypeEnumId.value.length > 0
-    case 'file2-schema':
-      return (file2UsesJson.value ? file2JsonSchemaId.value.length > 0 : true) && !schemaSelectionError.value
-    case 'file2-primary-id':
-      return primaryIdAnswered('file2') && !schemaFieldSelectionError.value
-    case 'file2-api-config':
-      return file2SourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
-    case 'file2-api':
-      return hasApiEndpoint('file2') && !apiSourceSelectionError.value
-    case 'file1-options':
-    case 'file2-options':
-      return true
-    default:
-      return false
   }
+  const step = currentArmStep.value
+  if (!step) return false
+  const { side } = step
+  const arm = arms[side]
+  switch (step.card) {
+    case 'system':
+      // On the second side, when the chosen system has endpoints, file2SystemEnumId stays blank until
+      // file2-endpoint resolves it — the "must differ from source 1" check applies there instead.
+      return arm.parentEnumId.value.length > 0 &&
+        (side === 'file1' || armHasEndpointStep('file2') || file2SystemEnumId.value !== file1SystemEnumId.value)
+    case 'endpoint':
+      return arm.systemEnumId.value.length > 0 && (side === 'file1' || file2SystemEnumId.value !== file1SystemEnumId.value)
+    case 'source':
+      return arm.sourceMode.value === SOURCE_MODE_FILE || arm.sourceMode.value === SOURCE_MODE_API
+    case 'filetype':
+      return arm.fileTypeEnumId.value.length > 0
+    case 'schema':
+      // Required for JSON, skippable for CSV -- a skipped CSV schema falls back to chip text.
+      return (armUsesJson(side) ? arm.jsonSchemaId.value.length > 0 : true) && !schemaSelectionError.value
+    case 'primary-id':
+      return primaryIdAnswered(side) && !schemaFieldSelectionError.value
+    case 'api-config':
+      return arm.sourceConfigId.value.length > 0 && !apiSourceConfigSelectionError.value
+    case 'api':
+      return hasApiEndpoint(side) && !apiSourceSelectionError.value
+    case 'options':
+      return true
+  }
+  return false
 })
 
-const canCreateRun = computed(() => {
-  return (
-    trimmedRunName.value.length > 0 &&
-    file1SystemEnumId.value.length > 0 &&
-    (file1UsesApi.value
-      ? hasApiSourceConfig('file1') && hasApiEndpoint('file1') && primaryIdAnswered('file1')
-      : file1FileTypeEnumId.value.length > 0 &&
-        (!file1UsesJson.value || !!resolveSchemaFileName(file1JsonSchemaId.value)) &&
-        primaryIdAnswered('file1')) &&
-    (isSingleSided.value || canCreateSecondSide())
-  )
-})
+/** Every answer this side's save needs. */
+function armReadyToSave(side: SourceSide): boolean {
+  const arm = arms[side]
+  if (!arm.systemEnumId.value || !primaryIdAnswered(side)) return false
+  if (armUsesApi(side)) return Boolean(arm.sourceConfigId.value) && hasApiEndpoint(side)
+  return arm.fileTypeEnumId.value.length > 0 && (!armUsesJson(side) || !!resolveSchemaFileName(arm.jsonSchemaId.value))
+}
 
-function canCreateSecondSide(): boolean {
-  return (
-    file2SystemEnumId.value.length > 0 &&
-    (file2UsesApi.value
-      ? hasApiSourceConfig('file2') && hasApiEndpoint('file2') && primaryIdAnswered('file2')
-      : file2FileTypeEnumId.value.length > 0 &&
-        (!file2UsesJson.value || !!resolveSchemaFileName(file2JsonSchemaId.value)) &&
-        primaryIdAnswered('file2')) &&
+const canCreateRun = computed(() => trimmedRunName.value.length > 0 && armReadyToSave('file1') && (
+  isSingleSided.value || (
+    armReadyToSave('file2') &&
     // DAR-UI-064: both sides may read the same system through different configs (NetSuite warranty claims against
     // NetSuite credit memos); only the very same source twice is refused, as create#RuleSetRun refuses it.
     (file1SystemEnumId.value !== file2SystemEnumId.value || file1SourceConfigId.value.trim() !== file2SourceConfigId.value.trim())
   )
-}
+))
 
 watch(
   () => steps.value.length,
@@ -1337,7 +1133,7 @@ watch(
 )
 
 watch(
-  () => [armUsesSuiteQl('file1') ? file1SourceConfigId.value : '', armUsesSuiteQl('file2') ? file2SourceConfigId.value : ''],
+  () => SIDES.map((side) => (armUsesSuiteQl(side) ? arms[side].sourceConfigId.value : '')),
   (queryIds) => {
     queryIds.forEach((queryId) => {
       if (queryId) void ensureSuiteQlQueryFieldsLoaded(queryId)
@@ -1345,20 +1141,14 @@ watch(
   },
 )
 
-watch(file1JsonSchemaId, async (nextSchemaId) => {
-  if (!nextSchemaId) return
-  await ensureFieldsLoaded(nextSchemaId)
-  if (currentStep.value.id === 'file1-schema' && file1JsonSchemaId.value === nextSchemaId) {
-    await focusActiveSelectTrigger()
-  }
-})
-
-watch(file2JsonSchemaId, async (nextSchemaId) => {
-  if (!nextSchemaId) return
-  await ensureFieldsLoaded(nextSchemaId)
-  if (currentStep.value.id === 'file2-schema' && file2JsonSchemaId.value === nextSchemaId) {
-    await focusActiveSelectTrigger()
-  }
+SIDES.forEach((side) => {
+  watch(arms[side].jsonSchemaId, async (nextSchemaId) => {
+    if (!nextSchemaId) return
+    await ensureFieldsLoaded(nextSchemaId)
+    if (currentStep.value.id === `${side}-schema` && arms[side].jsonSchemaId.value === nextSchemaId) {
+      await focusActiveSelectTrigger()
+    }
+  })
 })
 
 function resolveSystemLabel(enumId: string): string {
@@ -1422,17 +1212,11 @@ function resolveSelectedSchemaLabel(schemaId: string): string | undefined {
   return schema ? formatSchemaLabel(schema) : undefined
 }
 
-type SourceSide = 'file1' | 'file2'
-
 // Falls back to the parent system's label before the generic "source N". The source card now runs
 // BEFORE the endpoint card, so file{n}SystemEnumId is still blank there for a system with
 // endpoints -- without this fallback that card would read "How should source 1 provide data?".
 function sourceSystemLabel(side: SourceSide): string {
-  const resolvedLabel = side === 'file1' ? file1SystemLabel.value : file2SystemLabel.value
-  if (resolvedLabel) return resolvedLabel
-
-  const parentEnumId = side === 'file1' ? file1SystemParentEnumId.value : file2SystemParentEnumId.value
-  return resolveSystemLabel(parentEnumId) || (side === 'file1' ? 'source 1' : 'source 2')
+  return resolveSystemLabel(arms[side].systemEnumId.value) || resolveSystemLabel(armParentEnumId(side)) || sourceNumberLabel(side)
 }
 
 function apiRecordSourceLabel(side: SourceSide): string {
@@ -1445,15 +1229,11 @@ function apiRecordSourceLabel(side: SourceSide): string {
 }
 
 function selectedSystemEnumId(side: SourceSide): string {
-  return side === 'file1' ? file1SystemEnumId.value : file2SystemEnumId.value
-}
-
-function endpointMatchesSystem(endpointSystemEnumId: string | undefined, selectedSystemEnumIdValue: string): boolean {
-  return darpanSystemIdsMatch(endpointSystemEnumId, selectedSystemEnumIdValue)
+  return arms[side].systemEnumId.value
 }
 
 function selectedSourceConfigId(side: SourceSide): string {
-  return side === 'file1' ? file1SourceConfigId.value : file2SourceConfigId.value
+  return arms[side].sourceConfigId.value
 }
 
 // Scoped to the PARENT system, not to a chosen endpoint: this card now runs before the endpoint
@@ -1492,14 +1272,14 @@ function apiSourceOptionsForSide(side: SourceSide): WorkflowSelectOption[] {
 
   return [
     ...nsRestletConfigs.value
-      .filter((config) => endpointMatchesSystem(config.systemEnumId, systemEnumId))
+      .filter((config) => darpanSystemIdsMatch(config.systemEnumId, systemEnumId))
       .filter((config) => sourceConfigMatches(config.sourceConfigId || config.nsAuthConfigId, sourceConfigId))
       .map((config) => ({
         value: `ns:${config.nsRestletConfigId}`,
         label: config.label || config.description || config.nsRestletConfigId,
       })),
     ...systemRemotes.value
-      .filter((remote) => endpointMatchesSystem(remote.systemEnumId, systemEnumId))
+      .filter((remote) => darpanSystemIdsMatch(remote.systemEnumId, systemEnumId))
       .filter((remote) => sourceConfigMatches(remote.sourceConfigId || remote.optionKey, sourceConfigId))
       .map((remote) => ({
         value: remoteSelectValue(remote),
@@ -1517,33 +1297,17 @@ function remoteSelectValue(remote: AutomationSystemRemoteOption): string {
   return optionKey ? `remote:${remote.systemMessageRemoteId}:${optionKey}` : `remote:${remote.systemMessageRemoteId}`
 }
 
-function hasApiSourceConfig(side: SourceSide): boolean {
-  return Boolean(selectedSourceConfigId(side))
-}
-
 function hasApiEndpoint(side: SourceSide): boolean {
   if (armUsesSuiteQl(side)) return true
-  return side === 'file1'
-    ? Boolean(file1NsRestletConfigId.value || file1SystemMessageRemoteId.value)
-    : Boolean(file2NsRestletConfigId.value || file2SystemMessageRemoteId.value)
+  return Boolean(arms[side].nsRestletConfigId.value || arms[side].systemMessageRemoteId.value)
 }
 
 function selectedApiSourceValue(side: SourceSide): string {
-  if (side === 'file1') {
-    if (file1NsRestletConfigId.value) return `ns:${file1NsRestletConfigId.value}`
-    if (file1SystemMessageRemoteId.value) {
-      const selectedRemote = selectedRemoteOptionForSide(side)
-      return selectedRemote ? remoteSelectValue(selectedRemote) : `remote:${file1SystemMessageRemoteId.value}`
-    }
-    return ''
-  }
-
-  if (file2NsRestletConfigId.value) return `ns:${file2NsRestletConfigId.value}`
-  if (file2SystemMessageRemoteId.value) {
-    const selectedRemote = selectedRemoteOptionForSide(side)
-    return selectedRemote ? remoteSelectValue(selectedRemote) : `remote:${file2SystemMessageRemoteId.value}`
-  }
-  return ''
+  const arm = arms[side]
+  if (arm.nsRestletConfigId.value) return `ns:${arm.nsRestletConfigId.value}`
+  if (!arm.systemMessageRemoteId.value) return ''
+  const selectedRemote = selectedRemoteOptionForSide(side)
+  return selectedRemote ? remoteSelectValue(selectedRemote) : `remote:${arm.systemMessageRemoteId.value}`
 }
 
 /**
@@ -1552,29 +1316,22 @@ function selectedApiSourceValue(side: SourceSide): string {
  * when the config leaves exactly one endpoint and that card is skipped.
  */
 function updateApiSourceConfig(side: SourceSide, value: string): void {
-  if (side === 'file1') {
-    file1SourceConfigId.value = value
-    file1SourceConfigType.value = ''
-    file1SystemEnumId.value = ''
-    file1PrimaryIdExpression.value = []
-    clearApiEndpoint('file1')
-  } else {
-    file2SourceConfigId.value = value
-    file2SourceConfigType.value = ''
-    file2SystemEnumId.value = ''
-    file2PrimaryIdExpression.value = []
-    clearApiEndpoint('file2')
-  }
+  const arm = arms[side]
+  arm.sourceConfigId.value = value
+  arm.sourceConfigType.value = ''
+  arm.systemEnumId.value = ''
+  arm.primaryIdExpression.value = []
+  clearApiEndpoint(side)
   clearExtractOptions(side)
 
   syncSoleApiEndpoint(side)
 }
 
 // When apiSourceOptionsForSide narrows to exactly one option, the file{n}-api card is skipped
-// (see file1ApiSourceStepNeeded/file2ApiSourceStepNeeded) -- select that option here so the
-// primary-id step and the saved payload end up in the same state they would if the operator had
-// picked it by hand. Zero and 2+ option counts leave the endpoint refs alone: the card still
-// renders for those, and updateApiSource(side, value) drives selection from there instead.
+// (see armNeedsApiSourceStep) -- select that option here so the primary-id step and the saved
+// payload end up in the same state they would if the operator had picked it by hand. Zero and 2+
+// option counts leave the endpoint refs alone: the card still renders for those, and
+// updateApiSource(side, value) drives selection from there instead.
 function autoSelectSoleApiSource(side: SourceSide): void {
   const options = apiSourceOptionsForSide(side)
   if (options.length === 1) {
@@ -1583,81 +1340,44 @@ function autoSelectSoleApiSource(side: SourceSide): void {
 }
 
 function updateApiSource(side: SourceSide, value: string): void {
-  if (side === 'file1') {
-    file1PrimaryIdExpression.value = []
-  } else {
-    file2PrimaryIdExpression.value = []
-  }
+  const arm = arms[side]
+  arm.primaryIdExpression.value = []
 
   if (value.startsWith('ns:')) {
-    if (side === 'file1') {
-      file1NsRestletConfigId.value = value.slice(3)
-      file1SystemMessageRemoteId.value = ''
-    } else {
-      file2NsRestletConfigId.value = value.slice(3)
-      file2SystemMessageRemoteId.value = ''
-    }
+    arm.nsRestletConfigId.value = value.slice(3)
+    arm.systemMessageRemoteId.value = ''
     return
   }
 
   if (value.startsWith('remote:')) {
     const [, remoteId = ''] = value.split(':')
-    if (side === 'file1') {
-      file1SystemMessageRemoteId.value = remoteId
-      file1NsRestletConfigId.value = ''
-    } else {
-      file2SystemMessageRemoteId.value = remoteId
-      file2NsRestletConfigId.value = ''
-    }
+    arm.systemMessageRemoteId.value = remoteId
+    arm.nsRestletConfigId.value = ''
   }
 }
 
 function clearApiSourceConfig(side: SourceSide): void {
   clearExtractOptions(side)
-  if (side === 'file1') {
-    file1SourceConfigId.value = ''
-    file1SourceConfigType.value = ''
-    clearApiEndpoint('file1')
-    return
-  }
-
-  file2SourceConfigId.value = ''
-  file2SourceConfigType.value = ''
-  clearApiEndpoint('file2')
+  arms[side].sourceConfigId.value = ''
+  arms[side].sourceConfigType.value = ''
+  clearApiEndpoint(side)
 }
 
 function clearApiEndpoint(side: SourceSide): void {
-  if (side === 'file1') {
-    file1NsRestletConfigId.value = ''
-    file1SystemMessageRemoteId.value = ''
-    return
-  }
-
-  file2NsRestletConfigId.value = ''
-  file2SystemMessageRemoteId.value = ''
+  arms[side].nsRestletConfigId.value = ''
+  arms[side].systemMessageRemoteId.value = ''
 }
 
 function setSourceMode(side: SourceSide, value: string): void {
+  const arm = arms[side]
   const sourceMode = value === SOURCE_MODE_API ? SOURCE_MODE_API : SOURCE_MODE_FILE
-  if (side === 'file1') {
-    file1SourceMode.value = sourceMode
-    file1PrimaryIdExpression.value = []
-    if (sourceMode === SOURCE_MODE_API) {
-      file1JsonSchemaId.value = ''
-    } else {
-      clearApiSourceConfig('file1')
-      syncFileEndpointSelection('file1')
-    }
-    return
-  }
-
-  file2SourceMode.value = sourceMode
-  file2PrimaryIdExpression.value = []
+  arm.sourceMode.value = sourceMode
+  arm.primaryIdExpression.value = []
   if (sourceMode === SOURCE_MODE_API) {
-    file2JsonSchemaId.value = ''
+    arm.jsonSchemaId.value = ''
   } else {
-    clearApiSourceConfig('file2')
-    syncFileEndpointSelection('file2')
+    clearApiSourceConfig(side)
+    syncFileEndpointSelection(side)
   }
 }
 
@@ -1674,13 +1394,13 @@ function selectedApiSourceOption(side: SourceSide): AutomationNsRestletOption | 
 }
 
 function selectedRemoteOptionForSide(side: SourceSide): AutomationSystemRemoteOption | null {
-  const remoteId = side === 'file1' ? file1SystemMessageRemoteId.value : file2SystemMessageRemoteId.value
+  const remoteId = arms[side].systemMessageRemoteId.value
   const systemEnumId = selectedSystemEnumId(side)
   const sourceConfigId = selectedSourceConfigId(side)
   if (!remoteId) return null
   return systemRemotes.value.find((remote) =>
     remote.systemMessageRemoteId === remoteId &&
-    endpointMatchesSystem(remote.systemEnumId, systemEnumId) &&
+    darpanSystemIdsMatch(remote.systemEnumId, systemEnumId) &&
     (!sourceConfigId || sourceConfigMatches(remote.sourceConfigId || remote.optionKey, sourceConfigId)),
   ) ?? null
 }
@@ -1798,7 +1518,7 @@ function advanceFromShortcutChoice(value: string): void {
   // DAR-UI-064: a choice card (a side's repeated-key handling) can now be the last card before the rules board, and
   // the board reads only the draft store, so it has to be seeded here exactly as the OK path seeds it.
   if (currentStep.value.id === 'ruleset-rules') {
-    seedRuleSetBoardDraft()
+    publishDraft('ruleset-manager')
   }
 }
 
@@ -1836,16 +1556,12 @@ function boardDraftExtras(): Pick<ReconciliationRuleSetDraft, 'rules' | 'file1Ex
 }
 
 /**
- * Publish the wizard's current answers into the shared draft store so the rules board — which
- * takes no props and reads only that store — has something to render and edit. Called once when
- * the wizard lands on the final step, whether by clicking through or by resuming a seeded draft.
+ * Publish the wizard's current answers into the shared draft store. The rules board takes no props and
+ * reads only that store, so this runs when the wizard lands on the final step (clicked through or
+ * resumed), and before a detour, so the answers survive the trip.
  */
-function publishDraftForDetour(resumeStepId: ReconciliationRuleSetDraftStepId): void {
+function publishDraft(resumeStepId: ReconciliationRuleSetDraftStepId): void {
   draftStore.setRuleSetDraft({ ...activeDraft.value, ...boardDraftExtras() }, resumeStepId)
-}
-
-function seedRuleSetBoardDraft(): void {
-  publishDraftForDetour('ruleset-manager')
 }
 
 /**
@@ -1856,7 +1572,7 @@ function seedRuleSetBoardDraft(): void {
  */
 async function openCreateDetour(path: string): Promise<void> {
   continuingFlowElsewhere = true
-  publishDraftForDetour(currentStep.value.id)
+  publishDraft(currentStep.value.id)
   draftStore.setWorkflowOrigin('Reconciliation Setup', CREATE_FLOW_PATH)
   await router.push({ path })
 }
@@ -1929,7 +1645,7 @@ async function restoreDraftFromHistoryState(): Promise<void> {
   draftStore.clearRuleSetDraft()
 
   if (currentStep.value.id === 'ruleset-rules') {
-    seedRuleSetBoardDraft()
+    publishDraft('ruleset-manager')
   }
 
   await Promise.all([
@@ -1952,6 +1668,7 @@ onBeforeUnmount(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleShortcutChoiceKeydown)
   if (continuingFlowElsewhere) return
   draftStore.clearRuleSetDraft()
   draftStore.clearAutomationDraft()
@@ -2007,7 +1724,7 @@ async function handlePrimarySubmit(): Promise<void> {
   if (!canProceed.value) return
   currentStepIndex.value = Math.min(currentStepIndex.value + 1, steps.value.length - 1)
   if (currentStep.value.id === 'ruleset-rules') {
-    seedRuleSetBoardDraft()
+    publishDraft('ruleset-manager')
   }
 }
 
@@ -2015,7 +1732,7 @@ async function openNewQueryWorkflow(): Promise<void> {
   const href = newQueryHref.value
   if (!href) return
   continuingFlowElsewhere = true
-  publishDraftForDetour(currentStep.value.id)
+  publishDraft(currentStep.value.id)
   await router.push(href)
 }
 
@@ -2104,7 +1821,7 @@ async function createRun(): Promise<void> {
       draftStore.setWorkflowOrigin(nextDraft.returnLabel, nextDraft.returnPath)
       continuingFlowElsewhere = true
       // continuingFlowElsewhere only protects the automation handoff draft from onUnmounted's
-      // cleanup — it says nothing about the ruleset draft seedRuleSetBoardDraft() published so
+      // cleanup — it says nothing about the ruleset draft publishDraft() published so
       // the board had something to read/write. That one is unrelated and must not survive a
       // completed create: left in place, a later /reconciliation/create visit would resume
       // straight onto the board with this just-created run's answers and a live "Save run",
@@ -2123,17 +1840,10 @@ async function createRun(): Promise<void> {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleShortcutChoiceKeydown)
   await loadOptions()
   await restoreDraftFromHistoryState()
   await applyReturnedQuery()
-})
-
-onMounted(() => {
-  window.addEventListener('keydown', handleShortcutChoiceKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleShortcutChoiceKeydown)
 })
 </script>
 
