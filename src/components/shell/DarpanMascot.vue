@@ -180,6 +180,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { bowtieFor, BOW_FONT_SIZE, BOW_KNOT_RADIUS, BOW_WING_FOLDS, BOW_WING_LOBE } from '../../lib/mascotBowtie'
+import { prefersReducedMotion } from '../../lib/reducedMotion'
 
 /**
  * A blink lands somewhere in a 3-6s window rather than on a beat: a metronome reads as a
@@ -222,12 +223,6 @@ const bow = computed(() => bowtieFor(props.tenantLabel))
 
 const blinking = ref(false)
 let timer: ReturnType<typeof setTimeout> | undefined
-
-/** No matchMedia (jsdom, SSR) is read as "motion is fine", matching useTheme and vExplain. */
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
 
 /**
  * Each blink schedules the next one. A single setInterval would keep firing while the tab

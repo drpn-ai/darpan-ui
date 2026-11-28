@@ -94,6 +94,7 @@ import { createIdleHintController } from '../../composables/useIdleHints'
 import { resolveExplainTarget } from '../../lib/mascotTargets'
 import { hintsFor } from '../../lib/mascotHints'
 import { placeMascotDock, type MascotSpot } from '../../lib/mascotPosition'
+import { prefersReducedMotion } from '../../lib/reducedMotion'
 
 /**
  * The route arrives as a prop rather than through useRoute(): the dock is shell furniture
@@ -135,12 +136,6 @@ const liveAnnouncement = computed(() =>
 const BURST_MS = 1600
 const bursting = ref(false)
 let burstTimer: ReturnType<typeof setTimeout> | null = null
-
-/** No matchMedia (jsdom, SSR) reads as "motion is fine", matching DarpanMascot's own blink. */
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
 
 /* Fires on the EDGE into "some warning stands", not per warning: a page raising two
    conditions at once is one event to the reader, and hopping twice reads as a stutter. */
@@ -340,17 +335,20 @@ function stopWatching(): void {
   hovered = null
 }
 
+/** The pointer left the hovered element: its answer is released (it fades), not cancelled. */
+function releaseHovered(): void {
+  controller?.leave()
+  controller = null
+  hovered = null
+}
+
 function onPointerOver(event: PointerEvent): void {
   if (event.pointerType !== 'mouse' || !hasFinePointer() || dragging.value) return
   const target = resolveExplainTarget(event.target as Element | null)
 
   if (!target) {
     // Left everything explainable: release whatever is on screen, if anything.
-    if (hovered) {
-      controller?.leave()
-      hovered = null
-      controller = null
-    }
+    if (hovered) releaseHovered()
     return
   }
 
@@ -377,9 +375,7 @@ function onPointerOut(event: PointerEvent): void {
   // relatedTarget still inside the same element is a move between its children.
   const to = event.relatedTarget as Node | null
   if (to && hovered.contains(to)) return
-  controller.leave()
-  hovered = null
-  controller = null
+  releaseHovered()
 }
 
 /* ── Unprompted hints ──────────────────────────────────────────────────────────
