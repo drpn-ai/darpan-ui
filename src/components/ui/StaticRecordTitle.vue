@@ -23,7 +23,6 @@
       :label="toggleLabel"
       :test-id="toggleTestId"
       :disabled="toggleDisabled"
-      :busy="toggleBusy"
       @update:model-value="emit('update:on', $event)"
     />
   </div>
@@ -51,8 +50,8 @@ withDefaults(defineProps<{
   toggleLabel?: string
   on?: boolean
   toggleTestId?: string
+  /** Held while the change is in flight (callers pass their saving flag). */
   toggleDisabled?: boolean
-  toggleBusy?: boolean
 }>(), {
   editable: true,
   ariaLabel: 'Name',
@@ -64,7 +63,6 @@ withDefaults(defineProps<{
   on: false,
   toggleTestId: undefined,
   toggleDisabled: false,
-  toggleBusy: false,
 })
 
 const emit = defineEmits<{

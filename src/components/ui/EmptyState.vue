@@ -42,8 +42,4 @@ const isCentered = computed(() => Boolean(props.icon || props.action))
   padding: var(--space-5);
   text-align: center;
 }
-
-
-
-
 </style>
