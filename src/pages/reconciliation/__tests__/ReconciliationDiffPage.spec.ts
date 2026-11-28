@@ -1303,11 +1303,11 @@ describe('ReconciliationDiffPage', () => {
     }
     runSavedRunDiff.mockRejectedValue(
       new ApiCallError('Schema validation failed. OMS: missing required property order_id', 400, {
+        // The lists ride inside runResult: run#SavedRunDiff declares them nowhere else.
         result: {
           ok: false,
           errors: ['Schema validation failed. OMS: missing required property order_id'],
-          validationErrors: ['OMS: missing required property order_id'],
-          processingWarnings: [],
+          runResult: { savedRunId: 'RS_ORDER_CSV', validationErrors: ['OMS: missing required property order_id'], processingWarnings: [] },
         },
       }),
     )

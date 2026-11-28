@@ -122,11 +122,14 @@ describe('useReconciliationDiff', () => {
     expect(useRunResultsStore().getByFileName('out.json')?.fileName).toBe('out.json')
   })
 
-  it('submitDiff surfaces validation feedback on ApiCallError', async () => {
+  // DAR-OPS-029 U13b: run#SavedRunDiff declares validationErrors/processingWarnings only inside runResult, and a
+  // script service sends only its declared out-parameters, so a refusal carries them there and never at the top.
+  it('submitDiff surfaces validation feedback from the refused reply\'s runResult', async () => {
     const apiError = new ApiCallError('Invalid input', 422, {
       result: {
-        validationErrors: ['Bad file'],
-        processingWarnings: ['Heads up'],
+        ok: false,
+        errors: ['Invalid input'],
+        runResult: { savedRunId: 'r-1', validationErrors: ['Bad file'], processingWarnings: ['Heads up'] },
       },
     })
     runSavedRunDiff.mockRejectedValue(apiError)

@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { ApiCallError, isAbortError } from '../lib/api/client'
+import { ApiCallError, isAbortError, refusedResult } from '../lib/api/client'
 import { reconciliationFacade } from '../lib/api/facade'
 import type { GeneratedOutput, RunSavedRunDiffResponse, SavedRunSummary } from '../lib/api/types'
 import type { RunSavedRunDiffPayload } from '../lib/api/facadeTypes'
@@ -161,21 +161,12 @@ export function useReconciliationDiff(): UseReconciliationDiff {
     }
   }
 
+  // run#SavedRunDiff declares both lists only inside runResult, which a refusal carries when the run got that far.
   function readFailedRunFeedback(error: ApiCallError): FailedRunFeedback {
-    const details = (error.details ?? {}) as {
-      result?: {
-        validationErrors?: unknown
-        processingWarnings?: unknown
-      }
-    }
-
+    const runResult = refusedResult<RunSavedRunDiffResponse>(error)?.runResult
     return {
-      validationErrors: Array.isArray(details.result?.validationErrors)
-        ? details.result.validationErrors.map((item) => String(item))
-        : [],
-      processingWarnings: Array.isArray(details.result?.processingWarnings)
-        ? details.result.processingWarnings.map((item) => String(item))
-        : [],
+      validationErrors: (runResult?.validationErrors ?? []).map(String),
+      processingWarnings: (runResult?.processingWarnings ?? []).map(String),
     }
   }
 
