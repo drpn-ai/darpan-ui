@@ -57,119 +57,61 @@
       {{ GHOST_RULE_CAPTION }}
     </p>
 
-    <section class="ruleset-field-column ruleset-field-column--left" data-testid="ruleset-field-list-file1">
+    <section
+      v-for="side in RULE_SIDES"
+      :key="side"
+      :class="['ruleset-field-column', side === 'file1' ? 'ruleset-field-column--left' : 'ruleset-field-column--right']"
+      :data-testid="`ruleset-field-list-${side}`"
+    >
       <header>
-        <span>{{ file1Title }}</span>
+        <span>{{ sideTitle(side) }}</span>
       </header>
       <div
-        v-for="(field, index) in file1Fields"
+        v-for="(field, index) in fieldsFor(side)"
         :key="field.fieldPath"
-        :ref="(element) => setFieldNodeRef('file1', field.fieldPath, element)"
+        :ref="(element) => setFieldNodeRef(side, field.fieldPath, element)"
         role="button"
         tabindex="0"
         :class="[
           'ruleset-field-item',
           {
-            'ruleset-field-item--connection-active': isConnectionFieldHighlighted('file1', field.fieldPath),
-            'ruleset-field-item--rule-active': isActiveRuleField('file1', field.fieldPath),
+            'ruleset-field-item--connection-active': isConnectionFieldHighlighted(side, field.fieldPath),
+            'ruleset-field-item--rule-active': isActiveRuleField(side, field.fieldPath),
           },
         ]"
-        :data-testid="`ruleset-field-file1-${index}`"
-        data-rule-side="file1"
+        :data-testid="`ruleset-field-${side}-${index}`"
+        :data-rule-side="side"
         :data-field-path="field.fieldPath"
-        @pointerdown="handleFieldPointerDown($event, 'file1', field.fieldPath, index)"
-        @pointerup.stop="handleFieldPointerUp($event, 'file1', field.fieldPath)"
-        @dblclick="handleFieldDoubleClick('file1', field.fieldPath)"
-        @keydown.enter.prevent.stop="handleFieldEnterKey('file1', field.fieldPath)"
+        @pointerdown="handleFieldPointerDown($event, side, field.fieldPath, index)"
+        @pointerup.stop="handleFieldPointerUp($event, side, field.fieldPath)"
+        @dblclick="handleFieldDoubleClick(side, field.fieldPath)"
+        @keydown.enter.prevent.stop="handleFieldEnterKey(side, field.fieldPath)"
         @keydown.space.prevent.stop
       >
         <span class="ruleset-field-label">{{ field.label }}</span>
-        <span class="ruleset-field-meta" :aria-label="fieldSubtitle(field)" :title="fieldSubtitle(field)">
+        <span class="ruleset-field-meta" :aria-label="field.fieldPath" :title="field.fieldPath">
           <span
-            v-for="(segment, segmentIndex) in fieldPathSegments(field)"
+            v-for="(segment, segmentIndex) in fieldPathSegments(field.fieldPath)"
             :key="`${field.fieldPath}-${segmentIndex}`"
             class="ruleset-field-path-segment"
           >{{ segment }}</span>
         </span>
-        <template v-if="supportsExclusions('file1') && hasExclusion('file1', field.fieldPath)">
+        <template v-if="supportsExclusions(side) && hasExclusion(side, field.fieldPath)">
           <span
             class="ruleset-field-exclude"
-            :data-testid="`ruleset-field-exclude-file1-${index}`"
+            :data-testid="`ruleset-field-exclude-${side}-${index}`"
             aria-hidden="true"
-          >{{ excludeFilterMark('file1', field.fieldPath) }}</span>
-          <!-- The mark above is decorative and aria-hidden, so a screen-reader user tabbing
-               through fields has no way to tell this one already carries an exclusion. This
-               sr-only span (same pattern as CommandPalette.vue's search label) restores that
-               signal by extending the pill's own accessible name, without touching the visible
-               capability gate. -->
-          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file1-${index}`">{{ excludeFilterStatusLabel('file1', field.fieldPath) }}</span>
+          >{{ excludeFilterMark(side, field.fieldPath) }}</span>
+          <!-- The mark is aria-hidden, so this sr-only span tells a screen-reader user tabbing through the fields that
+               this one already carries a filter, and which kind. -->
+          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-${side}-${index}`">{{ excludeFilterStatusLabel(side, field.fieldPath) }}</span>
         </template>
 
-        <!-- See the matching note on the file2 column below. -->
+        <!-- Why filters are not on offer here, said at the moment the operator asks for them rather than as standing
+             copy. Sits OUTSIDE its column (see .ruleset-exclusion-unavailable) so it explains the pill beside it
+             instead of covering the pills below. -->
         <p
-          v-if="exclusionUnavailable?.side === 'file1' && exclusionUnavailable.fieldPath === field.fieldPath"
-          class="ruleset-exclusion-unavailable"
-          role="status"
-          aria-live="polite"
-          data-testid="ruleset-exclusion-unavailable"
-        >
-          {{ exclusionUnavailable.message }}
-        </p>
-      </div>
-    </section>
-
-    <section class="ruleset-field-column ruleset-field-column--right" data-testid="ruleset-field-list-file2">
-      <header>
-        <span>{{ file2Title }}</span>
-      </header>
-      <div
-        v-for="(field, index) in file2Fields"
-        :key="field.fieldPath"
-        :ref="(element) => setFieldNodeRef('file2', field.fieldPath, element)"
-        role="button"
-        tabindex="0"
-        :class="[
-          'ruleset-field-item',
-          {
-            'ruleset-field-item--connection-active': isConnectionFieldHighlighted('file2', field.fieldPath),
-            'ruleset-field-item--rule-active': isActiveRuleField('file2', field.fieldPath),
-          },
-        ]"
-        :data-testid="`ruleset-field-file2-${index}`"
-        data-rule-side="file2"
-        :data-field-path="field.fieldPath"
-        @pointerdown="handleFieldPointerDown($event, 'file2', field.fieldPath, index)"
-        @pointerup.stop="handleFieldPointerUp($event, 'file2', field.fieldPath)"
-        @dblclick="handleFieldDoubleClick('file2', field.fieldPath)"
-        @keydown.enter.prevent.stop="handleFieldEnterKey('file2', field.fieldPath)"
-        @keydown.space.prevent.stop
-      >
-        <span class="ruleset-field-label">{{ field.label }}</span>
-        <span class="ruleset-field-meta" :aria-label="fieldSubtitle(field)" :title="fieldSubtitle(field)">
-          <span
-            v-for="(segment, segmentIndex) in fieldPathSegments(field)"
-            :key="`${field.fieldPath}-${segmentIndex}`"
-            class="ruleset-field-path-segment"
-          >{{ segment }}</span>
-        </span>
-        <template v-if="supportsExclusions('file2') && hasExclusion('file2', field.fieldPath)">
-          <span
-            class="ruleset-field-exclude"
-            :data-testid="`ruleset-field-exclude-file2-${index}`"
-            aria-hidden="true"
-          >{{ excludeFilterMark('file2', field.fieldPath) }}</span>
-          <!-- See the matching comment on the file1 column above. -->
-          <span class="sr-only" :data-testid="`ruleset-field-exclude-status-file2-${index}`">{{ excludeFilterStatusLabel('file2', field.fieldPath) }}</span>
-        </template>
-
-        <!--
-          Why exclusions are not on offer here, said at the moment the operator asks for them
-          rather than as standing copy on every board that will never use them. Sits OUTSIDE its
-          column (see the .ruleset-exclusion-unavailable rules) so it explains the pill beside it
-          instead of covering the pills below.
-        -->
-        <p
-          v-if="exclusionUnavailable?.side === 'file2' && exclusionUnavailable.fieldPath === field.fieldPath"
+          v-if="exclusionUnavailable?.side === side && exclusionUnavailable.fieldPath === field.fieldPath"
           class="ruleset-exclusion-unavailable"
           role="status"
           aria-live="polite"
@@ -243,7 +185,7 @@
             aria-label="Add pre-action"
             @click="addPreActionRow"
           >
-            +
+            <AppIcon name="plus" />
           </button>
         </div>
         <div
@@ -434,9 +376,9 @@ import {
 } from '../../lib/sourceExcludeFilters'
 import {
   buildReconciliationFieldPathAliases,
-  fieldsReferenceSamePath,
-  formatReconciliationFieldKey,
-  normalizeReconciliationFieldPath,
+  fieldsReferenceSamePath as sameField,
+  formatReconciliationFieldKey as formatFieldKey,
+  normalizeReconciliationFieldPath as normalizeFieldPathValue,
   normalizePreActions,
   type ReconciliationRuleSetDraft,
   type ReconciliationRuleSetDraftRule,
@@ -452,6 +394,7 @@ import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
 // page and into the create-run wizard's final step.
 
 type RuleSide = 'file1' | 'file2'
+const RULE_SIDES: readonly RuleSide[] = ['file1', 'file2']
 type RuleOperator = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'requires' | 'required by' | 'all in' | 'contains all'
 
 interface RuleField {
@@ -482,7 +425,7 @@ interface Point {
   y: number
 }
 
-interface LineLayout extends Point {
+interface LineLayout {
   x1: number
   y1: number
   x2: number
@@ -555,7 +498,6 @@ const rulePopoverRef = ref<HTMLElement | null>(null)
 const exclusionPopoverRef = ref<HTMLElement | null>(null)
 const fieldNodeRefs = new Map<string, HTMLElement>()
 const loadError = ref<string | null>(null)
-const loadingFields = ref(false)
 const nsRestletConfigs = ref<AutomationNsRestletOption[]>([])
 const systemRemotes = ref<AutomationSystemRemoteOption[]>([])
 const sourceConfigs = ref<AutomationSourceConfigOption[]>([])
@@ -654,10 +596,6 @@ function setFieldNodeRef(side: RuleSide, fieldPath: string, element: Element | C
 function normalizeOperator(value: string | undefined): RuleOperator {
   return validOperators.has(value ?? '') ? value as RuleOperator : '='
 }
-
-const normalizeFieldPathValue = normalizeReconciliationFieldPath
-const sameField = fieldsReferenceSamePath
-const formatFieldKey = formatReconciliationFieldKey
 
 function toRuleField(field: JsonSchemaField): RuleField {
   return {
@@ -802,12 +740,7 @@ function loadApiSourceFields(side: RuleSide): void {
   }
 }
 
-function fieldSubtitle(field: RuleField): string {
-  return field.fieldPath
-}
-
-function fieldPathSegments(field: RuleField): string[] {
-  const path = fieldSubtitle(field)
+function fieldPathSegments(path: string): string[] {
   if (!path) return []
 
   const segments: string[] = []
@@ -906,7 +839,6 @@ function hydrateRules(): void {
 async function loadEditorData(): Promise<void> {
   if (!draft.value) return
 
-  loadingFields.value = true
   loadError.value = null
   hydrateRules()
   try {
@@ -919,15 +851,17 @@ async function loadEditorData(): Promise<void> {
     if ((error as { name?: string })?.name === 'AbortError') return
     loadError.value = error instanceof ApiCallError ? error.message : 'The source fields are out standing in a field somewhere.'
   } finally {
-    loadingFields.value = false
     await nextTick()
     updateLineLayout()
   }
 }
 
+function fieldsFor(side: RuleSide): RuleField[] {
+  return side === 'file1' ? file1Fields.value : file2Fields.value
+}
+
 function fallbackFieldAnchor(side: RuleSide, fieldPath: string): Point {
-  const fields = side === 'file1' ? file1Fields.value : file2Fields.value
-  const fieldIndex = Math.max(0, fields.findIndex((field) => sameField(field.fieldPath, fieldPath)))
+  const fieldIndex = Math.max(0, fieldsFor(side).findIndex((field) => sameField(field.fieldPath, fieldPath)))
   return {
     x: side === 'file1' ? boardSize.value.width * 0.32 : boardSize.value.width * 0.68,
     y: FIELD_ROW_TOP + (fieldIndex * FIELD_ROW_PITCH) + 20,
@@ -983,29 +917,13 @@ function updateLineLayout(): void {
     : null
 }
 
-function fallbackRuleLayout(rule: RuleConnection): LineLayout {
-  const start = fallbackFieldAnchor('file1', rule.file1FieldPath)
-  const end = fallbackFieldAnchor('file2', rule.file2FieldPath)
-  return {
-    x: (start.x + end.x) / 2,
-    y: (start.y + end.y) / 2,
-    x1: start.x,
-    y1: start.y,
-    x2: end.x,
-    y2: end.y,
-    midX: (start.x + end.x) / 2,
-    midY: (start.y + end.y) / 2,
-  }
-}
-
 function layoutForRule(rule: RuleConnection): LineLayout {
-  return lineLayouts.value[rule.id] ?? fallbackRuleLayout(rule)
+  return lineLayouts.value[rule.id]
+    ?? joinAnchors(fallbackFieldAnchor('file1', rule.file1FieldPath), fallbackFieldAnchor('file2', rule.file2FieldPath))
 }
 
 function joinAnchors(start: Point, end: Point): LineLayout {
   return {
-    x: (start.x + end.x) / 2,
-    y: (start.y + end.y) / 2,
     x1: start.x,
     y1: start.y,
     x2: end.x,
@@ -1174,13 +1092,8 @@ function sideTitle(side: RuleSide): string {
 
 function openExclusionEditor(side: RuleSide, fieldPath: string): void {
   closeExclusionUnavailable()
-  // The two popovers share the `.ruleset-rule-popover` blur-exemption class, so if both were
-  // open at once they would render fully sharp, overlapping each other. The ⊘ mark itself has no
-  // handlers at all now — it's a plain, non-interactive <span> (see the exclude-mark comment in
-  // the style block) — so it plays no part in this. What actually keeps the popovers mutually
-  // exclusive is this explicit closeRuleEditor() call: it runs on every entry path, including the
-  // Enter-key gesture, which fires no pointerdown for the window outside-click listener
-  // (handleWindowPointerDown) to react to.
+  // The rule and filter editors are mutually exclusive. This explicit close runs on every entry path, including the
+  // Enter-key gesture, which fires no pointerdown for the outside-click listener (handleWindowPointerDown) to see.
   closeRuleEditor()
   editingExclusion.value = { side, fieldPath }
   editingExclusionValues.value = [...(excludeFilterFor(side, fieldPath)?.values ?? [])]
@@ -1189,30 +1102,17 @@ function openExclusionEditor(side: RuleSide, fieldPath: string): void {
 }
 
 /**
- * Mouse gesture for the exclusion editor: double-click on the pill itself (the ⊘ mark is now a
- * plain, non-interactive indicator — see the exclude-mark comment in the style block). A double
- * click is really two independent pointerdown/pointerup pairs, each of which is well inside
- * LONG_PRESS_MS and each of which already runs cancelPendingConnection() on pointerup — so by the
- * time this fires there is no pending connection left to disturb. cancelPendingConnection() here
- * is defense in depth, not load-bearing.
+ * Mouse gesture for the filter editor: double-click on the pill. Each click's pointerup has already cancelled any
+ * pending connection (both are well inside LONG_PRESS_MS); the cancel here is defence in depth.
  */
 function handleFieldDoubleClick(side: RuleSide, fieldPath: string): void {
-  if (!supportsExclusions(side)) {
-    cancelPendingConnection()
-    explainExclusionsUnavailable(side, fieldPath)
-    return
-  }
-
   cancelPendingConnection()
-  openExclusionEditor(side, fieldPath)
+  handleFieldEnterKey(side, fieldPath)
 }
 
 /**
- * Keyboard equivalent of the double-click gesture above: the ⊘ mark used to be a nested <button>
- * and was the only way to reach the exclusion editor from a keyboard. With it gone, Enter on the
- * focused pill takes over that job on any side that supports exclusions. The .stop modifier on
- * the template's @keydown.enter binding always fires regardless of what this function does, so
- * Enter never falls through to WorkflowStepForm's submit-on-Enter handling either way.
+ * Keyboard gesture for the filter editor: Enter on the focused pill. The template's .stop modifier keeps Enter from
+ * reaching WorkflowStepForm's submit-on-Enter either way.
  */
 function handleFieldEnterKey(side: RuleSide, fieldPath: string): void {
   if (!supportsExclusions(side)) {
@@ -1649,14 +1549,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* Field labels ("Operator", "Sequence", "Exclude on") take the small-caps label treatment. */
-/* The :not() keeps the uppercase label treatment off the term definitions, which are sentences and
-   live in the same slot. Without it this rule wins on specificity — (0,1,2) against (0,1,0) — and
-   shouts a paragraph of help in capitals. */
-/* The design system's table-head role: 0.76rem / 0.08em / --text-muted (--type-table-head-size,
-   --type-table-head-tracking). These are form labels rather than eyebrows, and the tracking and
-   colour already matched it — only the size was off, at 0.72rem, on no token at all. Both editors
-   share this rule so they cannot drift apart again. */
+/* Field labels take the design system's table-head role, shared by both editors so they cannot drift apart. The
+   :not() keeps it off the term definitions, which are sentences in the same slot: without it this rule wins on
+   specificity, (0,1,2) against (0,1,0), and shouts a paragraph of help in capitals. */
 .ruleset-rule-popover label > span:not(.ruleset-term-definition),
 .ruleset-exclusion-popup label > span,
 .ruleset-pre-action-header > span:not(.ruleset-term-definition) {
@@ -1695,21 +1590,27 @@ onBeforeUnmount(() => {
   text-decoration-color: var(--text);
 }
 
-/* Beside the card, level with the term — never over it. A definition that drops down covers the
-   exact control you opened it to fill in, which is the one thing help on this popover must not do.
-   Below the card is the fallback when there is no room for a side shelf. */
-.ruleset-term-definition {
+/* One help-plate surface for the term definitions and the "filters do not apply" note, so the board has one
+   explanatory voice. Each plate opens beside what it explains, never over it. */
+.ruleset-term-definition,
+.ruleset-exclusion-unavailable {
   position: absolute;
-  top: calc(100% + 0.5rem);
-  left: 0;
   z-index: 6;
-  width: 100%;
   box-sizing: border-box;
-  padding: var(--space-1-5) var(--space-1-5);
+  padding: var(--space-1-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text-muted);
+}
+
+/* Beside the card, level with the term — never over it. A definition that drops down covers the
+   exact control you opened it to fill in, which is the one thing help on this popover must not do.
+   Below the card is the fallback when there is no room for a side shelf. */
+.ruleset-term-definition {
+  top: calc(100% + 0.5rem);
+  left: 0;
+  width: 100%;
   /* Tracks the term it defines. Left at 0.72rem it would render smaller than its own label, which
      inverts the usual relationship between a micro label and the copy beneath it. */
   font-size: var(--type-table-head-size);
@@ -1806,7 +1707,8 @@ onBeforeUnmount(() => {
   stroke: color-mix(in oklab, var(--text) 58%, transparent);
   stroke-width: 2;
   stroke-linecap: round;
-  transition: filter var(--motion-fast) var(--ease-out), stroke var(--motion-fast) var(--ease-out), stroke-width var(--motion-fast) var(--ease-out);
+  /* The line's stroke is its border: only its colour tweens; width and glow switch (playbook: Motion). */
+  transition: stroke var(--motion-fast) var(--ease-out);
 }
 
 .ruleset-editor-line--active {
@@ -1890,15 +1792,13 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: var(--space-1-5) var(--space-2);
   border-radius: var(--radius-pill);
-  /* The pill is a div (see the exclusion-mark comment below), not a <button>, so it no longer
-     picks up the global `button { border: 1px solid var(--border); }` reset — the border must be
-     spelled out in full here or it disappears. */
+  /* The pill is a div, not a <button>, so it does not pick up the global button border: it is spelled out here. */
   border: 1px solid color-mix(in oklab, var(--border) 80%, var(--text) 20%);
   background: color-mix(in oklab, var(--surface-2) 88%, var(--surface));
   text-align: center;
   cursor: var(--ruleset-pen-cursor) !important;
   user-select: none;
-  transition: border-color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+  transition: border-color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out);
 }
 
 .ruleset-field-item *,
@@ -1985,24 +1885,13 @@ onBeforeUnmount(() => {
 .ruleset-field-column--left .ruleset-field-exclude { left: -0.775rem; }
 .ruleset-field-column--right .ruleset-field-exclude { right: -0.775rem; }
 
-/* Borrows .ruleset-term-definition's surface, border and muted eyebrow type rather than inventing
-   a second explanatory voice on the same board. Positioned beside the pill, never over it: the
-   left column's note opens leftward and the right column's rightward, so it never lands on the
-   pills below or on the rule lines between the columns. */
+/* Beside the pill, never over it (placement below). */
 .ruleset-exclusion-unavailable {
-  position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 6;
   margin: 0;
   width: max-content;
   max-width: 13rem;
-  box-sizing: border-box;
-  padding: var(--space-1-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-muted);
   font-size: var(--type-eyebrow-size);
   font-weight: 400;
   line-height: 1.4;
@@ -2032,7 +1921,7 @@ onBeforeUnmount(() => {
   background: var(--surface);
   color: var(--text);
   transform: translate(-50%, -50%);
-  transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out);
+  transition: border-color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out);
 }
 
 .ruleset-operator-box--active {
@@ -2095,10 +1984,6 @@ onBeforeUnmount(() => {
   min-width: 1.9rem;
   min-height: 1.9rem;
   padding: 0;
-  /* Sizes an icon glyph, not text. Type roles do not describe it. */
-  /* stylelint-disable-next-line scale-unlimited/declaration-strict-value */
-  font-size: 1.1rem;
-  line-height: 1;
 }
 
 .ruleset-pre-action-delete {

@@ -257,7 +257,11 @@ describe('RuleSetBoard with SuiteQL query sides', () => {
     const wrapper = mount(RuleSetBoard, { attachTo: document.body })
     await flushPromises()
     await wrapper.get('[data-testid="ruleset-rule-operator-r1"]').trigger('click')
-    await wrapper.get('[data-testid="ruleset-rule-add-pre-action"]').trigger('click')
+    // DAR-OPS-029 U08: "add" is the plus icon, never a typed "+".
+    const add = wrapper.get('[data-testid="ruleset-rule-add-pre-action"]')
+    expect(add.find('svg[data-icon="plus"]').exists()).toBe(true)
+    expect(add.text()).toBe('')
+    await add.trigger('click')
     await flushPromises()
 
     expect(wrapper.get('.ruleset-rule-popover').text()).toContain('(source 1)')
