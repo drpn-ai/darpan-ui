@@ -137,7 +137,7 @@
               :disabled="notifyBusy"
               @click="toggleNotifyMe"
             >
-              {{ notifySubscribed ? `Notifying — ${runStatus?.mySubscriptionSpaceName ?? 'chat space'}` : 'Notify me' }}
+              {{ notifyButtonLabel }}
             </button>
             <InlineValidation v-if="notifyError" tone="error" :message="notifyError" />
             <button
@@ -550,13 +550,13 @@ import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
 import StatusBadge from '../../components/ui/StatusBadge.vue'
 import RunResultConclusionEvidence from '../../components/reconciliation/RunResultConclusionEvidence.vue'
-import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
+import WorkflowShortcutChoiceCards from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import { ApiCallError, isOtherTenantRecordError } from '../../lib/api/client'
 // Imported rather than relied on from main.ts's global registration: this page's own
 // tests mount it standalone, where a globally registered directive does not exist.
 import { vExplain } from '../../directives/vExplain'
-import { pulseFacade, reconciliationFacade, settingsFacade } from '../../lib/api/facade'
+import { pulseFacade } from '../../lib/api/facade'
 import { cachedRead } from '../../lib/api/readCache'
 import { runResultFirstPage } from '../../lib/api/queries'
 import type {
@@ -568,7 +568,6 @@ import type {
   RunConclusionQuestion,
   RunConclusionSuggestedFilter,
   SavedRunSummary,
-  TenantChatSpace,
 } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { isActiveRunStatus, useRunResultsStore } from '../../stores/runResults'
@@ -595,6 +594,8 @@ import { useRunResultDifferences } from '../../composables/useRunResultDifferenc
 import { useRunResultDownloads } from '../../composables/useRunResultDownloads'
 import { useRunResultName } from '../../composables/useRunResultName'
 import { useRunResultSourceDetails } from '../../composables/useRunResultSourceDetails'
+import { useRunCancel } from '../../composables/useRunCancel'
+import { useRunNotifyMe } from '../../composables/useRunNotifyMe'
 import { useRunRetry } from '../../composables/useRunRetry'
 import { useRunStepTimeline } from '../../composables/useRunStepTimeline'
 
@@ -822,6 +823,13 @@ const {
   file2Label: diffDetailsFile2Label,
 })
 
+const { showCancelRun, cancelRequested, cancelConfirming, cancelError, cancelRun } = useRunCancel({
+  liveRunResultId,
+  runStatus,
+  liveRunActive,
+  canRun: canRunActiveTenantReconciliation,
+})
+
 // A terminal status that is not a clean finish is said in both modes; the rest is live progress.
 const TERMINAL_RUN_NOTES: Record<string, string> = {
   AUT_STAT_CANCELLED: 'Run cancelled.',
@@ -837,45 +845,12 @@ const runNote = computed(() => {
   return 'Results will appear here when this reconciliation finishes.'
 })
 
-// Cancelling is cooperative on the backend: the request is recorded and the run ends itself at
-// its next checkpoint, so the button reports "Stopping" until the poll shows a terminal status
-// rather than pretending the run stopped. DAR-UI-156: "Stopping" shows the moment the person
-// confirms (cancelSent); the status poll confirms it through cancelRequestedDate, and only a
-// refusal puts the Cancel button back, with the reason above it.
-const cancelSent = ref(false)
-const cancelConfirming = ref(false)
-const cancelError = ref<string | null>(null)
-const cancelRequested = computed(() => cancelSent.value || Boolean(runStatus.value?.cancelRequestedDate))
-watch(liveRunResultId, () => {
-  cancelSent.value = false
-  cancelConfirming.value = false
-  cancelError.value = null
-})
-const showCancelRun = computed(() =>
-  Boolean(liveRunResultId.value) && canRunActiveTenantReconciliation.value && liveRunActive.value)
-
 // DAR-BE-163: a failed run retries from the step it failed at; the steps that finished (a 17-minute
 // HotWax read) are reused, not run again.
 const { retrying, retry } = useRunRetry()
 const showRetryRun = computed(() =>
   runFailed.value && Boolean(liveRunResultId.value) && canRunActiveTenantReconciliation.value && Boolean(savedRunId.value))
 const retryLabel = computed(() => (failedStepStageLabel.value ? `Retry from ${failedStepStageLabel.value}` : 'Retry'))
-
-async function cancelRun(): Promise<void> {
-  const runId = liveRunResultId.value
-  if (!runId || cancelRequested.value) return
-
-  cancelConfirming.value = false
-  cancelSent.value = true
-  cancelError.value = null
-  try {
-    await reconciliationFacade.cancelReconciliationRun({ reconciliationRunResultId: runId })
-  } catch (error) {
-    if (liveRunResultId.value !== runId) return
-    cancelSent.value = false
-    cancelError.value = error instanceof ApiCallError ? error.message : 'This run refuses to stop. It is very committed.'
-  }
-}
 
 // `errorMessage` is capped at 255 chars server-side to fit a text-medium column, which cuts real
 // Spark/service errors off mid-sentence — routinely losing the half that names the fix (the
@@ -895,110 +870,24 @@ watch(runStatus, (status) => {
 })
 
 
-// Notify-me (Task 12): subscribe/unsubscribe the current user to chat notifications
-// for this run. Only offered while the run is still active (PENDING/RUNNING) — a terminal
-// run has already notified or never will. Mirrors the run-settings action's busy/error
-// conventions (boolean busy flag + dedicated error ref surfaced via InlineValidation), not
-// the page-load AbortController pattern used for the initial saved-result fetch.
-const notifyBusy = ref(false)
-const notifyError = ref<string | null>(null)
-const notifySubscribed = computed(() => runStatus.value?.mySubscription === true)
-const showNotifyMe = computed(() =>
-  Boolean(timelineRunResultId.value) && isActiveRunStatus(runStatus.value?.statusEnumId))
-
-const notifyPickerOpen = ref(false)
-const notifyPickerLoading = ref(false)
-const notifyPickerBusy = ref(false)
-const notifyPickerSpaces = ref<TenantChatSpace[]>([])
-const notifyPickerOptions = computed<WorkflowShortcutChoiceOption[]>(() =>
-  notifyPickerSpaces.value.map((space, index) => ({
-    value: space.chatSpaceId,
-    label: space.spaceName,
-    shortcutKey: String.fromCharCode(65 + index),
-  })),
-)
-
-// callService (client.ts) throws ApiCallError for ANY envelope with ok:false, before this
-// code ever sees the response -- so a resolved response here is always ok:true, and the
-// backend's needsDefaultChatSpace signal (sent alongside ok:false) can only be read off the
-// thrown error's details.result. Mirrors the existing per-callsite `error.details` cast
-// pattern (see useReconciliationDiff.ts readFailedRunFeedback, stores/auth.ts formatApiError).
-function readNeedsDefaultChatSpace(error: unknown): boolean {
-  if (!(error instanceof ApiCallError)) return false
-  const details = (error.details ?? {}) as { result?: { needsDefaultChatSpace?: unknown } }
-  return details.result?.needsDefaultChatSpace === true
-}
-
-// The actual subscribe/unsubscribe call, shared by the button handler and the
-// picker's "retry after saving a default" step. No busy guard here — callers own it.
-async function performNotifyToggle(runId: string): Promise<void> {
-  if (notifySubscribed.value) {
-    await reconciliationFacade.unsubscribeRunNotification({ reconciliationRunResultId: runId })
-  } else {
-    try {
-      await reconciliationFacade.subscribeRunNotification({ reconciliationRunResultId: runId })
-    } catch (error) {
-      if (readNeedsDefaultChatSpace(error)) {
-        await openNotifyPicker()
-        return
-      }
-      throw error
-    }
-  }
-  await runResultsStore.refreshRunStatus(runId)
-}
-
-async function toggleNotifyMe(): Promise<void> {
-  const runId = timelineRunResultId.value
-  if (!runId || notifyBusy.value) return
-
-  notifyBusy.value = true
-  notifyError.value = null
-  try {
-    await performNotifyToggle(runId)
-  } catch (error) {
-    notifyError.value = error instanceof ApiCallError ? error.message : 'The notification subscription missed the memo. Not updated.'
-  } finally {
-    notifyBusy.value = false
-  }
-}
-
-async function openNotifyPicker(): Promise<void> {
-  notifyPickerOpen.value = true
-  notifyPickerSpaces.value = []
-  notifyPickerLoading.value = true
-  try {
-    const response = await settingsFacade.listTenantChatSpaces()
-    notifyPickerSpaces.value = (response.chatSpaces ?? []).filter((space) => space.isActive !== 'N')
-  } catch (error) {
-    notifyPickerOpen.value = false
-    notifyError.value = error instanceof ApiCallError ? error.message : 'The chat spaces drifted into outer space.'
-  } finally {
-    notifyPickerLoading.value = false
-  }
-}
-
-function closeNotifyPicker(): void {
-  notifyPickerOpen.value = false
-  notifyPickerSpaces.value = []
-}
-
-async function pickDefaultAndSubscribe(chatSpaceId: string): Promise<void> {
-  const runId = timelineRunResultId.value
-  if (!runId || notifyPickerBusy.value) return
-
-  notifyPickerBusy.value = true
-  notifyError.value = null
-  try {
-    await settingsFacade.saveUserNotificationDefault({ chatSpaceId })
-    closeNotifyPicker()
-    await performNotifyToggle(runId)
-  } catch (error) {
-    notifyError.value = error instanceof ApiCallError ? error.message : 'The notification default did not get the memo. Not saved.'
-  } finally {
-    notifyPickerBusy.value = false
-  }
-}
+const {
+  showNotifyMe,
+  notifySubscribed,
+  notifyButtonLabel,
+  notifyBusy,
+  notifyError,
+  notifyPickerOpen,
+  notifyPickerLoading,
+  notifyPickerSpaces,
+  notifyPickerOptions,
+  toggleNotifyMe,
+  closeNotifyPicker,
+  pickDefaultAndSubscribe,
+} = useRunNotifyMe({
+  runId: timelineRunResultId,
+  runStatus,
+  refreshRunStatus: (runId) => runResultsStore.refreshRunStatus(runId),
+})
 
 watch(timelineRunResultId, (runResultId) => {
   if (!runResultId || polledTimelineRunIds.has(runResultId)) return
@@ -1503,16 +1392,20 @@ watch(savedRunRow, () => {
   gap: var(--space-3);
 }
 
+.run-result-source-details,
+.run-result-step-timeline {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface-2) 92%, white);
+}
+
 .run-result-source-details {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 92%, white);
 }
 
 .run-result-cancel {
@@ -1557,10 +1450,6 @@ watch(savedRunRow, () => {
 .run-result-step-timeline {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 92%, white);
 }
 
 .run-result-notify-me {
@@ -1578,7 +1467,8 @@ watch(savedRunRow, () => {
   font-weight: 400;
 }
 
-.run-result-notify-me:hover {
+.run-result-notify-me:hover,
+.run-result-source-file__download:hover {
   border-color: color-mix(in oklab, var(--accent) 42%, var(--border));
   background: color-mix(in oklab, var(--surface-2) 84%, var(--accent));
   color: var(--text);
@@ -1730,12 +1620,6 @@ watch(savedRunRow, () => {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
-}
-
-.run-result-source-file__download:hover {
-  border-color: color-mix(in oklab, var(--accent) 42%, var(--border));
-  background: color-mix(in oklab, var(--surface-2) 84%, var(--accent));
-  color: var(--text);
 }
 
 .run-result-source-file__download svg {

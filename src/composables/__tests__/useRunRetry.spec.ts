@@ -56,6 +56,21 @@ describe('useRunRetry', () => {
     expect(retrying.value).toBe(false)
   })
 
+  // Back from the Starting page, then Retry again: the retry still starting opens, and no second run is sent.
+  it('a second Retry while the first is still starting opens it and starts nothing', async () => {
+    runSavedRunDiff.mockReturnValue(new Promise(() => undefined))
+    getActiveRunResult.mockReturnValue(new Promise(() => undefined))
+    const { retry } = useRunRetry()
+    await retry(context, '100766')
+    const first = started().to
+
+    await retry(context, '100766')
+
+    expect(runSavedRunDiff).toHaveBeenCalledTimes(1)
+    expect(push).toHaveBeenCalledTimes(2)
+    expect(push.mock.calls[1]).toEqual([first])
+  })
+
   it('goes live once the new run is found', async () => {
     runSavedRunDiff.mockReturnValue(new Promise(() => undefined))
     getActiveRunResult.mockResolvedValue({ reconciliationRunResultId: '100767' } as never)
