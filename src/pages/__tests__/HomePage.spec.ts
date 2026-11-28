@@ -347,6 +347,28 @@ describe('HomePage', () => {
     expect(wrapper.find('[data-testid="pinned-runs"]').text()).not.toContain('Reconciliation 1')
     expect(wrapper.find('[data-testid="pinned-runs"]').text()).toContain('Reconciliation 8')
     expect(wrapper.find(GROUP).text()).toContain('Reconciliation 1')
+    // The tile went back, so the page says why rather than letting the drop look ignored.
+    expect(wrapper.get('[data-testid="pinned-runs"]').element.parentElement?.textContent).toContain('save failed')
+  })
+
+  // A failed read is not an empty tenant: no "Create Run" as if the tenant had no runs.
+  it('says the runs did not load, instead of showing an empty tenant', async () => {
+    listSavedRuns.mockRejectedValue(new Error('Darpan stepped out for chai.'))
+    const wrapper = mount(HomePage)
+    await flushPromises()
+    expect(wrapper.text()).toContain('Darpan stepped out for chai.')
+    expect(wrapper.find('[data-testid="other-runs-empty-action"]').exists()).toBe(false)
+  })
+
+  it('keeps the last visit\'s runs on screen when a revisit cannot refresh them', async () => {
+    mount(HomePage).unmount()
+    await flushPromises()
+    listSavedRuns.mockRejectedValue(new Error('Darpan stepped out for chai.'))
+    const revisit = mount(HomePage)
+    await flushPromises()
+    expect(revisit.find('[data-testid="pinned-runs"]').text()).toContain('Reconciliation 8')
+    expect(revisit.text()).toContain('OMS ↔ SHOPIFY · 7')
+    expect(revisit.text()).toContain('Darpan stepped out for chai.')
   })
 
   it('shows the pinned drop hint and in-section create action when there are no runs', async () => {

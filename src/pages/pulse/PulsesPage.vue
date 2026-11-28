@@ -69,6 +69,7 @@ import LoadingState from '../../components/ui/LoadingState.vue'
 import StaticFactStrip, { type StaticFact } from '../../components/ui/StaticFactStrip.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'
+import { isAbortError } from '../../lib/api/client'
 import { pulseFacade } from '../../lib/api/facade'
 import type { PeakPeriodSummary } from '../../lib/api/peakTypes'
 import { calendarDayWords, loadSyncPulseView, pulseAsOfWords, pulseWatchFacts, type NextPulse, type SyncPulseRow } from '../../lib/syncPulseView'
@@ -122,7 +123,7 @@ async function cardFor(row: SyncPulseRow, nextPulse: Map<string, NextPulse>): Pr
     const asOf = pulseAsOfWords(response.syncPair, response.samplesToday ?? [], (value) => formatClockTime(value))
     return { ...base, facts: facts.map((f) => ({ ...f, testId: `pulse-fact-${f.key}` })), asOf, error: '' }
   } catch (error) {
-    if ((error as { name?: string })?.name === 'AbortError') throw error
+    if (isAbortError(error)) throw error
     return { ...base, facts: [], asOf: '', error: 'Could not load this pulse.' }
   }
 }
@@ -136,7 +137,7 @@ async function load(): Promise<void> {
     pulsingPeriodIds.value = loaded.pulsingPeriodIds
     cards.value = await Promise.all(loaded.view.pulsing.map((row) => cardFor(row, loaded.nextPulse)))
   } catch (error) {
-    if ((error as { name?: string })?.name === 'AbortError') return
+    if (isAbortError(error)) return
     pageError.value = error instanceof Error && error.message ? error.message : 'Could not load the pulses.'
   } finally {
     loading.value = false

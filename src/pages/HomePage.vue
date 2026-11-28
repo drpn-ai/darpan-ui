@@ -4,6 +4,8 @@
       <h1>Let's Investigate</h1>
     </template>
 
+    <InlineValidation v-if="loadError" tone="error" :message="loadError" />
+
     <StaticPageSection title="Pinned Runs">
       <div class="static-page-drop-zone" data-testid="pinned-runs" @dragover.prevent @drop="handleDrop('pinned', $event)">
         <div v-if="pinnedFlowCards.length > 0" class="static-page-tile-grid">
@@ -22,6 +24,7 @@
         </div>
         <div v-else class="static-page-drop-hint" data-testid="pinned-empty-state">drag and drop runs to pin</div>
       </div>
+      <InlineValidation v-if="pinError" tone="error" :message="pinError" />
     </StaticPageSection>
 
     <StaticPageSection
@@ -61,7 +64,8 @@
       </div>
     </StaticPageSection>
 
-    <StaticPageSection v-if="!hasOtherRuns" title="Other Runs">
+    <!-- A read that failed is not an empty tenant, so it offers no first run. -->
+    <StaticPageSection v-if="!hasOtherRuns && !loadError" title="Other Runs">
       <div class="static-page-drop-zone static-page-drop-zone--compact" data-testid="other-runs" @dragover.prevent @drop="handleDrop('other', $event)">
         <RouterLink
           class="static-page-action-tile static-page-action-tile--inline"
@@ -112,6 +116,7 @@ import InlineValidation from '../components/ui/InlineValidation.vue'
 import { useAuthStore, buildAuthRedirect } from '../stores/auth'
 import { useReconciliationDraftStore } from '../stores/reconciliationDraft'
 import { usePermissionsStore } from '../stores/permissions'
+import { isAbortError } from '../lib/api/client'
 import { auditFacade, reconciliationFacade } from '../lib/api/facade'
 import { cachedRead } from '../lib/api/readCache'
 import { homeReconciliations, homeSavedRuns } from '../lib/api/queries'
@@ -215,6 +220,8 @@ const pinnedSavedRunIds = ref<string[]>([])
 // family, which is what a single showAllOtherRuns did once there was more than one section.
 const expandedGroupKeys = ref<Set<string>>(new Set())
 const totalRunCount = ref(0)
+const loadError = ref<string | null>(null)
+const pinError = ref<string | null>(null)
 const createFlowRoute: RouteLocationRaw = { name: 'run-create' }
 
 const pageAbortController = new AbortController()
@@ -329,13 +336,13 @@ const runGroups = computed<DashboardRunGroup[]>(() => {
     })
 })
 
+const hasOtherRuns = computed(() => otherFlowCards.value.length > 0)
+
 /**
  * How many runs the tenant has that this page did not fetch. Surfaced rather than swallowed: a
  * heading reading "NetSuite · 9" while the page holds a subset is a confidently wrong number,
  * and a wrong count is worse than an admitted partial one.
  */
-const hasOtherRuns = computed(() => otherFlowCards.value.length > 0)
-
 const truncatedRunCount = computed(() => Math.max(0, totalRunCount.value - savedRuns.value.length))
 
 function handleDragStart(flowId: string, event: DragEvent): void {
@@ -346,14 +353,17 @@ function handleDragStart(flowId: string, event: DragEvent): void {
 
 async function savePinnedRuns(nextPinnedSavedRunIds: string[], previousPinnedSavedRunIds: string[]): Promise<void> {
   pinnedSavedRunIds.value = nextPinnedSavedRunIds
+  pinError.value = null
 
   try {
     const response = await reconciliationFacade.saveDashboardPinnedSavedRuns({
       pinnedSavedRunIds: nextPinnedSavedRunIds,
     })
     pinnedSavedRunIds.value = response.pinnedSavedRunIds ?? nextPinnedSavedRunIds
-  } catch {
+  } catch (error) {
+    // The tile goes back where it was, and the page says why, so the drop does not look ignored.
     pinnedSavedRunIds.value = previousPinnedSavedRunIds
+    pinError.value = error instanceof Error && error.message ? error.message : 'The pin did not save.'
   }
 }
 
@@ -405,7 +415,7 @@ async function importNetSuiteChecks(): Promise<void> {
     importSkips.value = skipped ? (response.messages ?? []) : []
     await loadLifecycleRuns()
   } catch (error) {
-    if ((error as { name?: string })?.name === 'AbortError') return
+    if (isAbortError(error)) return
     importError.value = error instanceof Error ? error.message : String(error)
   } finally {
     importing.value = false
@@ -441,6 +451,8 @@ async function loadDashboard(): Promise<void> {
   }
 
   expandedGroupKeys.value = new Set()
+  loadError.value = null
+  pinError.value = null
   totalRunCount.value = 0
   pinnedSavedRunIds.value = []
   savedRuns.value = []
@@ -464,10 +476,9 @@ async function loadDashboard(): Promise<void> {
       },
     )
   } catch (error) {
-    if ((error as { name?: string })?.name === 'AbortError') return
-    pinnedSavedRunIds.value = []
-    savedRuns.value = []
-    totalRunCount.value = 0
+    if (isAbortError(error)) return
+    // What a revisit already drew from the last visit stays; the page says it could not refresh.
+    loadError.value = error instanceof Error && error.message ? error.message : 'The runs did not load.'
   }
 }
 
