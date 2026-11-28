@@ -433,23 +433,47 @@ describe('UserSettingsPage', () => {
 
     expect(verifyOwnPassword).toHaveBeenCalledWith('old-password')
     expect(wrapper.get('[role="dialog"]').text()).toContain('Enter your new password.')
-    await wrapper.get('input[name="newPassword"]').setValue('new-password')
+    await wrapper.get('input[name="newPassword"]').setValue('new-password-1')
     await wrapper.get('form.wizard-question-shell').trigger('submit')
 
     expect(wrapper.get('[role="dialog"]').text()).toContain('Enter your new password again.')
-    await wrapper.get('input[name="newPasswordVerify"]').setValue('new-password')
+    await wrapper.get('input[name="newPasswordVerify"]').setValue('new-password-1')
     await wrapper.get('form.wizard-question-shell').trigger('submit')
     await flushPromises()
 
     expect(changeOwnPassword).toHaveBeenCalledWith({
       currentPassword: 'old-password',
-      newPassword: 'new-password',
-      newPasswordVerify: 'new-password',
+      newPassword: 'new-password-1',
+      newPasswordVerify: 'new-password-1',
     })
     // D17: the change ended this session (the store says why on the sign-in page), so the page goes there at once
     // instead of announcing "Password changed." over a session that is gone.
     expect(routerReplace).toHaveBeenCalledWith({ name: 'login' })
     expect(wrapper.text()).not.toContain('Password changed.')
+  })
+
+  // S99-106: the policy is stated on the new-password step and checked as it is typed, as on the sign-in page, so it
+  // is never learned from a refusal; a password that misses it does not move on, by button or by Enter.
+  it('shows the live password rules on the new-password step and holds a password that misses them', async () => {
+    const wrapper = mountPage()
+    await wrapper.get('.user-settings-password-trigger').trigger('click')
+    expect(wrapper.find('[data-testid="password-rule-length"]').exists()).toBe(false)
+    await wrapper.get('input[name="currentPassword"]').setValue('old-password')
+    await wrapper.get('form.wizard-question-shell').trigger('submit')
+    await flushPromises()
+
+    await wrapper.get('input[name="newPassword"]').setValue('short1!')
+    const met = (id: string) => wrapper.get(`[data-testid="password-rule-${id}"]`).attributes('data-met')
+    expect([met('length'), met('digit'), met('other')]).toEqual(['false', 'true', 'true'])
+    expect(wrapper.get('[data-testid="password-workflow-next"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('form.wizard-question-shell').trigger('submit')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Enter your new password.')
+
+    await wrapper.get('input[name="newPassword"]').setValue('long-enough-pass1')
+    expect([met('length'), met('digit'), met('other')]).toEqual(['true', 'true', 'true'])
+    await wrapper.get('form.wizard-question-shell').trigger('submit')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Enter your new password again.')
+    expect(wrapper.find('[data-testid="password-rule-length"]').exists()).toBe(false)
   })
 
   it('keeps the current password step open and shows a five-second warning when verification fails', async () => {
@@ -493,7 +517,7 @@ describe('UserSettingsPage', () => {
       }
       await wrapper.get('.user-settings-password-trigger').trigger('click')
       await step('currentPassword', 'old-password')
-      await step('newPassword', 'new-password')
+      await step('newPassword', 'new-password-1')
       await step('newPasswordVerify', 'other-password')
       expect(changeOwnPassword).not.toHaveBeenCalled()
       expect(warnings.map((event) => event.detail.message)).toEqual(['New passwords do not match.'])
@@ -503,7 +527,7 @@ describe('UserSettingsPage', () => {
         authState.error = 'Password was used recently.'
         return false
       })
-      await step('newPasswordVerify', 'new-password')
+      await step('newPasswordVerify', 'new-password-1')
       expect(warnings.map((event) => event.detail.message)).toEqual(['New passwords do not match.', 'Password was used recently.'])
       expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
       expect(routerReplace).not.toHaveBeenCalled()

@@ -4,6 +4,7 @@
 // workflow hint on top of it: a page-level note would sit behind the popup's scrim.
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { passwordRulesFor } from '../lib/passwordPolicy'
 import { WORKFLOW_HINT_REQUEST_EVENT, type WorkflowHintRequestDetail } from '../lib/uiEvents'
 import { useAuthStore } from '../stores/auth'
 
@@ -47,7 +48,11 @@ export function usePasswordChange() {
     if (step.value.name === 'currentPassword' && isVerifying.value) return 'Checking'
     return stepIndex.value === PASSWORD_STEPS.length - 1 ? (isChanging.value ? 'Changing' : 'Change') : 'OK'
   })
-  const isStepBlocked = computed(() => isChanging.value || isVerifying.value || stepValue.value.trim().length === 0)
+  // S99-106: the new password is checked against the policy as it is typed (passwordPolicy, as on the sign-in page).
+  const rules = computed(() => passwordRulesFor(form.value.newPassword))
+  const showsRules = computed(() => step.value.name === 'newPassword')
+  const isStepBlocked = computed(() => isChanging.value || isVerifying.value || stepValue.value.trim().length === 0
+    || (showsRules.value && !rules.value.every((rule) => rule.met)))
 
   function open(): void {
     isOpen.value = true
@@ -98,6 +103,8 @@ export function usePasswordChange() {
   }
 
   async function submit(): Promise<void> {
+    // Enter submits the form whatever the button says, so the gate is checked here too.
+    if (isStepBlocked.value) return
     if (step.value.name === 'currentPassword' && !(await verifyCurrent())) return
     if (stepIndex.value < PASSWORD_STEPS.length - 1) {
       stepIndex.value += 1
@@ -106,7 +113,7 @@ export function usePasswordChange() {
     await change()
   }
 
-  return { isOpen, stepIndex, step, stepValue, primaryLabel, isStepBlocked, open, close, back, submit }
+  return { isOpen, stepIndex, step, stepValue, primaryLabel, isStepBlocked, rules, showsRules, open, close, back, submit }
 }
 
 export function useRecoveryEmail() {

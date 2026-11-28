@@ -390,6 +390,7 @@
               required
             />
           </label>
+          <PasswordRules v-if="passwordFlow.showsRules" :rules="passwordFlow.rules" />
         </WorkflowStepForm>
       </div>
     </section>
@@ -536,6 +537,7 @@
 // their own composables; the page keeps the badge, the preferences and the popups' chrome.
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import AppIcon from '../../components/ui/AppIcon.vue'
+import PasswordRules from '../../components/auth/PasswordRules.vue'
 import AppSelect, { type AppSelectOption } from '../../components/ui/AppSelect.vue'
 import StaticPageFrame from '../../components/ui/StaticPageFrame.vue'
 import StaticPageSection from '../../components/ui/StaticPageSection.vue'

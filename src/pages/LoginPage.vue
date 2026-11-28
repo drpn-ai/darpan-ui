@@ -362,6 +362,7 @@ import TwoFactorCodeSteps from '../components/auth/TwoFactorCodeSteps.vue'
 import TwoFactorEnrolSteps from '../components/auth/TwoFactorEnrolSteps.vue'
 import PasskeyAddSteps from '../components/auth/PasskeyAddSteps.vue'
 import PasswordRules from '../components/auth/PasswordRules.vue'
+import { passwordRulesFor } from '../lib/passwordPolicy'
 import { formatShortDate } from '../lib/utils/date'
 import { authFacade } from '../lib/api/facade'
 import { AUTH_REQUIRED_MESSAGE } from '../lib/api/client'
@@ -515,21 +516,7 @@ const passwordStepValue = computed({
     }
   },
 })
-// Mirrors the backend policy: darpan's MoquiConf <password min-length="12"/> (DAR-BE-268) over
-// MoquiDefaultConf's min-digits="1" min-others="1". Kept in one place so the helper text, the live
-// checks and the submit gate can never drift apart. history-limit="5" is deliberately not listed:
-// only the server can know a user's previous passwords, so it stays a server-side rejection.
-const PASSWORD_MIN_LENGTH = 12
-
 const isChoosingNewPassword = computed(() => passwordStep.value.name === 'newPassword')
-
-function passwordRulesFor(value: string) {
-  return [
-    { id: 'length', label: `At least ${PASSWORD_MIN_LENGTH} characters`, met: value.length >= PASSWORD_MIN_LENGTH },
-    { id: 'digit', label: 'At least one number', met: /\d/.test(value) },
-    { id: 'other', label: 'At least one symbol (not a letter or number)', met: /[^\p{L}\p{N}]/u.test(value) },
-  ]
-}
 
 const passwordRules = computed(() => passwordRulesFor(passwordForm.value.newPassword))
 
