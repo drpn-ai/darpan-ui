@@ -23,10 +23,13 @@ describe('RunResultConclusionEvidence', () => {
     const systems = wrapper.findAll('[data-testid="conclusion-system"]')
     expect(systems.map((s) => s.text())).toEqual(['HotWaxCompleted21701', 'NetSuitePending Fulfillment0101'])
     expect(wrapper.text()).toContain('How Darpan concluded')
-    expect(wrapper.findAll('[data-testid="conclusion-check"]').map((c) => c.text())).toEqual([
-      '✓NetSuite has the lineexcluded',
-      '✓Nothing shipped, on backorder1',
+    const checks = wrapper.findAll('[data-testid="conclusion-check"]')
+    expect(checks.map((c) => c.text())).toEqual([
+      'NetSuite has the lineexcluded',
+      'Nothing shipped, on backorder1',
     ])
+    // The tick is the named check icon, never a typed glyph.
+    expect(checks.every((c) => c.find('svg[data-icon="check"]').exists())).toBe(true)
     expect(wrapper.find('[data-testid="conclusion-decision"]').exists()).toBe(false)
   })
 

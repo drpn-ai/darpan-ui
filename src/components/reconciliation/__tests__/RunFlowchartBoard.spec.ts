@@ -75,10 +75,12 @@ describe('RunFlowchartBoard', () => {
     expect(w.get('[data-testid="flowchart-box-A"]').classes()).toContain('flowchart-node--selected')
   })
 
-  it('the "+" actions are the design system\'s icon action, named for what they add', () => {
+  it('the add actions are the plus icon action, named for what they add', () => {
     const w = mount(RunFlowchartBoard, { props: { questions, ruleNames, editable: true, narrow: true } })
     const next = w.get('[data-testid="flowchart-add-next-A"]')
     expect(next.classes()).toContain('app-icon-action')
+    expect(next.find('svg[data-icon="plus"]').exists()).toBe(true)
+    expect(next.text()).toBe('')
     expect(next.attributes('aria-label')).toBe('Add next question')
     expect(w.get('[data-testid="flowchart-add-why-A"]').attributes('aria-label')).toBe('Ask why')
   })

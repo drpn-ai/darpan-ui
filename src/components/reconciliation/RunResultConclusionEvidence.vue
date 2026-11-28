@@ -22,7 +22,7 @@
         class="conclusion-evidence__check"
         data-testid="conclusion-check"
       >
-        <span aria-hidden="true">✓</span>
+        <AppIcon name="check" class="conclusion-evidence__check-mark" />
         <span>{{ check.label }}</span>
         <span class="conclusion-evidence__check-value">{{ check.value }}</span>
       </div>
@@ -74,6 +74,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import AppIcon from '../ui/AppIcon.vue'
 import JsonCollapseViewer from '../ui/JsonCollapseViewer.vue'
 import type { RunConclusion, RunConclusionQuestion, RunConclusionSystem } from '../../lib/api/types'
 
@@ -163,6 +164,12 @@ function stateText(system: RunConclusionSystem): string {
   align-items: baseline;
   color: var(--text-soft);
   font-size: var(--type-note-size);
+}
+
+.conclusion-evidence__check-mark {
+  align-self: center;
+  width: 1em;
+  height: 1em;
 }
 
 /* Solid = attention: an open question the operator decides. */

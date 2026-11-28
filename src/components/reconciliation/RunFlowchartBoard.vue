@@ -65,7 +65,7 @@
           :data-testid="`flowchart-add-${add.kind === 'next' ? 'next' : 'why'}-${add.questionId}`"
           @click="onAdd(add)"
         >
-          +
+          <AppIcon name="plus" />
         </button>
       </template>
     </div>
@@ -74,13 +74,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppIcon from '../ui/AppIcon.vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import type { FlowchartExecutionRow, FlowchartQuestion } from '../../lib/api/flowchartTypes'
 import { layoutFlowchart, type FlowchartAffordance, type FlowchartBox, type FlowchartEdge } from '../../lib/flowchart/flowchartLayout'
 import type { QuestionRunState } from '../../lib/flowchart/flowchartRunState'
 
 // DAR-UI-048. Renders a layout from flowchartLayout; owns no geometry of its own (spec D3, top to bottom).
-// Nodes follow the rules board's field pill, findings its small operator box, "+" its app-icon-action.
+// Nodes follow the rules board's field pill, findings its small operator box, "add" its plus app-icon-action.
 const props = defineProps<{
   questions: FlowchartQuestion[]
   ruleNames: Record<string, string>
