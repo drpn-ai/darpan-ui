@@ -755,6 +755,10 @@ export const MASCOT_ACTIONS: Readonly<Record<string, ActionEntry>> = Object.free
     title: 'Close diagnostics',
     body: 'dismisses the report. The connection is left exactly as the test found it.',
   },
+  'keep them': {
+    title: 'Keep them',
+    body: 'saves nothing yet: the connection stays on its old address with its headers. Stored headers never follow a move, so the new address waits until you drop them.',
+  },
   'delete hotwax source': {
     title: 'Delete HotWax source',
     body: 'removes the connection. Runs and automations pointing at it will fail from their next run on.',
