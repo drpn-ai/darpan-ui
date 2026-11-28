@@ -784,6 +784,45 @@ describe('ReconciliationAutomationWorkflowPage', () => {
     expect(wrapper.find('[data-testid="automation-edit-active-field"]').exists()).toBe(true)
   })
 
+  // An automation keeps its own filter copy; only sync#Automation changes it (DAR-BE-338). A save
+  // that sent filters back would overwrite that copy, so the payload never carries the key.
+  it('never sends exclusion filters on save, even when the loaded automation has them', async () => {
+    route.name = 'reconciliation-automation-edit'
+    route.fullPath = '/reconciliation/automations/edit/AUT_ORDER_SYNC'
+    route.params = { automationId: 'AUT_ORDER_SYNC' }
+    const excludeFilters = [{ fieldExpression: 'salesChannelEnumId', operator: 'EXCLUDE_IN', values: ['POS_SALES_CHANNEL'] }]
+    getAutomation.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      automation: {
+        automationId: 'AUT_ORDER_SYNC',
+        automationName: 'Daily order sync',
+        savedRunId: 'RS_ORDER_SYNC',
+        savedRunType: 'ruleset',
+        savedRun: optionsResponse().savedRuns[0],
+        inputModeEnumId: 'AUT_IN_API_RANGE',
+        scheduleExpr: '0 0 6 * * ?',
+        timezone: 'UTC',
+        relativeWindowTypeEnumId: 'AUT_WIN_PREV_DAY',
+        active: true,
+        sources: [
+          { fileSide: 'FILE_1', sourceTypeEnumId: 'AUT_SRC_API', systemEnumId: 'OMS', systemMessageRemoteId: 'OMS_REMOTE', excludeFilters },
+          { fileSide: 'FILE_2', sourceTypeEnumId: 'AUT_SRC_API', systemEnumId: 'SHOPIFY', systemMessageRemoteId: 'SHOPIFY_REMOTE', excludeFilters },
+        ],
+      },
+    })
+
+    const wrapper = mount(ReconciliationAutomationWorkflowPage)
+    await flushPromises()
+    await wrapper.get('[data-testid="save-automation"]').trigger('click')
+    await flushPromises()
+
+    const sources = saveAutomation.mock.calls[0]?.[0].sources as Array<Record<string, unknown>>
+    expect(sources).toHaveLength(2)
+    for (const source of sources) expect(source).not.toHaveProperty('excludeFilters')
+  })
+
   it('walks the chat-space step using the user default', async () => {
     getUserNotificationDefault.mockResolvedValue({
       ok: true,

@@ -32,263 +32,45 @@
       @back="goBack"
       @cancel="cancelEdit"
     >
-      <template v-if="isEditMode">
-        <div
-          class="automation-edit-primary-fields"
-          data-testid="automation-edit-primary-fields"
-        >
-          <label class="wizard-input-shell">
-            <span class="workflow-context-label">Automation Name</span>
-            <input
-              v-model="automationName"
-              name="automationName"
-              class="wizard-answer-control"
-              data-testid="automation-edit-name"
-              placeholder="Daily order sync"
-              :disabled="saving || loadingOptions"
-            />
-          </label>
+      <div
+        v-if="isEditMode"
+        class="automation-edit-primary-fields"
+        data-testid="automation-edit-primary-fields"
+      >
+        <label class="wizard-input-shell">
+          <span class="workflow-context-label">Automation Name</span>
+          <input
+            v-model="automationName"
+            name="automationName"
+            class="wizard-answer-control"
+            data-testid="automation-edit-name"
+            placeholder="Daily order sync"
+            :disabled="fieldsDisabled"
+          />
+        </label>
 
-          <!-- Read-only by design: the automation holds a SNAPSHOT of this run's config, so
-               re-pointing it would leave a snapshot derived from a different run. Sync re-derives
-               from the run instead. -->
-          <div class="wizard-input-shell automation-edit-saved-run">
-            <span class="workflow-context-label">Saved Run</span>
-            <div class="automation-edit-saved-run__row">
-              <span
-                class="automation-edit-saved-run__name"
-                data-testid="automation-edit-saved-run-name"
-              >{{ selectedSavedRun?.runName ?? '—' }}</span>
-              <button
-                type="button"
-                class="automation-edit-saved-run__sync"
-                data-testid="automation-edit-sync"
-                :disabled="saving || syncing || loadingOptions || automationSyncStatus?.savedRunMissing"
-                @click="openSyncWarning"
-              >
-                {{ syncing ? 'Syncing…' : 'Sync' }}
-              </button>
-            </div>
+        <!-- Read-only by design: the automation holds a SNAPSHOT of this run's config, so
+             re-pointing it would leave a snapshot derived from a different run. Sync re-derives
+             from the run instead. -->
+        <div class="wizard-input-shell automation-edit-saved-run">
+          <span class="workflow-context-label">Saved Run</span>
+          <div class="automation-edit-saved-run__row">
+            <span
+              class="automation-edit-saved-run__name"
+              data-testid="automation-edit-saved-run-name"
+            >{{ selectedSavedRun?.runName ?? '—' }}</span>
+            <button
+              type="button"
+              class="automation-edit-saved-run__sync"
+              data-testid="automation-edit-sync"
+              :disabled="fieldsDisabled || syncing || automationSyncStatus?.savedRunMissing"
+              @click="openSyncWarning"
+            >
+              {{ syncing ? 'Syncing…' : 'Sync' }}
+            </button>
           </div>
         </div>
-
-        <template v-if="usesApi">
-          <div
-            class="automation-date-window-fields automation-edit-date-window-fields"
-            data-testid="automation-edit-window-fields"
-          >
-            <label class="wizard-input-shell">
-              <span class="workflow-context-label">Date Window</span>
-              <WorkflowSelect
-                v-model="relativeWindowTypeEnumId"
-                test-id="automation-window-select"
-                :disabled="saving || loadingOptions"
-                :options="relativeWindowOptions"
-                placeholder="Select date window..."
-              />
-            </label>
-            <label v-if="dateWindowNeedsCount" class="wizard-input-shell">
-              <span v-explain="'automationWindowCount'" class="workflow-context-label">Count</span>
-              <input
-                v-model.number="relativeWindowCount"
-                name="relativeWindowCount"
-                class="wizard-answer-control"
-                data-testid="automation-window-count-input"
-                inputmode="numeric"
-                placeholder="1"
-                :disabled="saving || loadingOptions"
-              />
-            </label>
-            <template v-if="dateWindowUsesCustomRange">
-              <label class="wizard-input-shell">
-                <span class="workflow-context-label">Start Date</span>
-                <input
-                  v-model="customWindowStartDate"
-                  name="customWindowStartDate"
-                  class="wizard-answer-control"
-                  data-testid="automation-custom-window-start"
-                  type="date"
-                  :disabled="saving || loadingOptions"
-                />
-              </label>
-              <label class="wizard-input-shell">
-                <span class="workflow-context-label">End Date</span>
-                <input
-                  v-model="customWindowEndDate"
-                  name="customWindowEndDate"
-                  class="wizard-answer-control"
-                  data-testid="automation-custom-window-end"
-                  type="date"
-                  :disabled="saving || loadingOptions"
-                />
-              </label>
-            </template>
-          </div>
-        </template>
-
-        <template v-else-if="usesSftp">
-          <div class="workflow-form-grid workflow-form-grid--two">
-            <label class="wizard-input-shell">
-              <span v-explain="'automationSftpServer'" class="workflow-context-label">{{ systemLabelForSide('FILE_1') }} SFTP Server</span>
-              <WorkflowSelect
-                v-model="editFile1SftpServerId"
-                test-id="automation-edit-file1-sftp-select"
-                :disabled="saving || loadingOptions"
-                :options="sftpServerSelectOptions"
-                placeholder="Select first SFTP server..."
-              />
-            </label>
-
-            <label class="wizard-input-shell">
-              <span v-explain="'automationRemotePath'" class="workflow-context-label">{{ systemLabelForSide('FILE_1') }} Remote Path</span>
-              <input
-                v-model="editFile1RemotePath"
-                name="file1RemotePathTemplate"
-                class="wizard-answer-control"
-                data-testid="automation-edit-file1-remote-path"
-                placeholder="/remote/source-1/orders"
-                :disabled="saving || loadingOptions"
-              />
-            </label>
-
-            <label class="wizard-input-shell">
-              <span v-explain="'automationSftpServer'" class="workflow-context-label">{{ systemLabelForSide('FILE_2') }} SFTP Server</span>
-              <WorkflowSelect
-                v-model="editFile2SftpServerId"
-                test-id="automation-edit-file2-sftp-select"
-                :disabled="saving || loadingOptions"
-                :options="sftpServerSelectOptions"
-                placeholder="Select second SFTP server..."
-              />
-            </label>
-
-            <label class="wizard-input-shell">
-              <span v-explain="'automationRemotePath'" class="workflow-context-label">{{ systemLabelForSide('FILE_2') }} Remote Path</span>
-              <input
-                v-model="editFile2RemotePath"
-                name="file2RemotePathTemplate"
-                class="wizard-answer-control"
-                data-testid="automation-edit-file2-remote-path"
-                placeholder="/remote/source-2/orders"
-                :disabled="saving || loadingOptions"
-              />
-            </label>
-          </div>
-        </template>
-
-        <div
-          class="automation-edit-chat-space-fields"
-          data-testid="automation-edit-chat-space-fields"
-        >
-          <label
-            class="wizard-input-shell automation-edit-active-field"
-            data-testid="automation-edit-active-field"
-          >
-            <span v-explain="'activeFlag'" class="workflow-context-label">Status</span>
-            <WorkflowSelect
-              v-model="editActiveStatus"
-              test-id="automation-edit-active"
-              :disabled="saving || loadingOptions"
-              :options="activeStatusOptions"
-              placeholder="Select status..."
-            />
-          </label>
-
-          <div class="automation-edit-chat-space-field">
-            <label class="wizard-input-shell">
-              <span v-explain="'automationChatSpace'" class="workflow-context-label">Chat Space</span>
-              <WorkflowSelect
-                v-model="editChatSpaceValue"
-                test-id="automation-chat-space-select"
-                :disabled="saving || loadingOptions"
-                :options="editChatSpaceSelectOptions"
-                placeholder="Select chat space..."
-              />
-            </label>
-          </div>
-        </div>
-
-        <div
-          class="automation-schedule-helper automation-edit-schedule-helper"
-          data-testid="automation-edit-schedule-fields"
-        >
-          <label class="automation-schedule-field">
-            <span v-explain="'automationSchedule'" class="automation-schedule-label">Run</span>
-            <WorkflowSelect
-              v-model="schedulePreset"
-              class="automation-schedule-select"
-              test-id="automation-schedule-preset"
-              :disabled="saving || loadingOptions"
-              :options="schedulePresetOptions"
-              placeholder="Select schedule..."
-            />
-          </label>
-
-          <label v-if="schedulePreset === 'hourly'" class="automation-schedule-field">
-            <span v-explain="'automationScheduleMinute'" class="automation-schedule-label">Minute</span>
-            <input
-              v-model.number="scheduleMinute"
-              class="automation-schedule-control"
-              data-testid="automation-schedule-minute"
-              inputmode="numeric"
-              max="59"
-              min="0"
-              type="number"
-              :disabled="saving || loadingOptions"
-            />
-          </label>
-
-          <label v-if="schedulePreset === 'weekly'" class="automation-schedule-field">
-            <span v-explain="'automationScheduleWeekday'" class="automation-schedule-label">Day</span>
-            <WorkflowSelect
-              v-model="scheduleWeekday"
-              class="automation-schedule-select"
-              test-id="automation-schedule-weekday"
-              :disabled="saving || loadingOptions"
-              :options="scheduleWeekdayOptions"
-              placeholder="Select day..."
-            />
-          </label>
-
-          <label v-if="schedulePreset === 'monthly'" class="automation-schedule-field">
-            <span v-explain="'automationScheduleMonthDay'" class="automation-schedule-label">Date</span>
-            <input
-              v-model.number="scheduleMonthDay"
-              class="automation-schedule-control"
-              data-testid="automation-schedule-month-day"
-              inputmode="numeric"
-              max="31"
-              min="1"
-              type="number"
-              :disabled="saving || loadingOptions"
-            />
-          </label>
-
-          <div v-if="scheduleUsesTime" class="automation-schedule-field">
-            <span v-explain="'automationScheduleTime'" class="automation-schedule-label">Time</span>
-            <WorkflowTimeSelect
-              v-model="scheduleTime"
-              class="automation-schedule-select"
-              test-id="automation-schedule-time"
-              aria-label="Time"
-              :disabled="saving || loadingOptions"
-            />
-          </div>
-
-          <label class="automation-schedule-field">
-            <span class="automation-schedule-label">Timezone</span>
-            <AppSelect
-              v-model="scheduleTimeZone"
-              class="automation-schedule-select"
-              test-id="automation-schedule-timezone"
-              :options="timezoneOptions"
-              :disabled="saving || loadingOptions"
-              searchable
-              search-placeholder="Search timezones"
-            />
-          </label>
-        </div>
-      </template>
+      </div>
 
       <template v-else-if="isChoiceStep">
         <WorkflowShortcutChoiceCards
@@ -312,134 +94,234 @@
         <InlineValidation v-if="activeSelectError" tone="error" :message="activeSelectError" />
       </template>
 
-      <template v-else-if="currentStep.id === 'date-window'">
-        <div class="automation-date-window-fields">
-          <label class="wizard-input-shell">
-            <WorkflowSelect
-              v-model="relativeWindowTypeEnumId"
-              test-id="automation-window-select"
-              :disabled="loadingOptions"
-              :options="relativeWindowOptions"
-              placeholder="Select date window..."
-            />
-          </label>
-          <label v-if="dateWindowNeedsCount" class="wizard-input-shell">
-            <input
-              v-model.number="relativeWindowCount"
-              name="relativeWindowCount"
-              class="wizard-answer-control"
-              data-testid="automation-window-count-input"
-              inputmode="numeric"
-              placeholder="Count"
-            />
-          </label>
-          <template v-else-if="dateWindowUsesCustomRange">
-            <label class="wizard-input-shell">
-              <input
-                v-model="customWindowStartDate"
-                name="customWindowStartDate"
-                class="wizard-answer-control"
-                data-testid="automation-custom-window-start"
-                type="date"
-              />
-            </label>
-            <label class="wizard-input-shell">
-              <input
-                v-model="customWindowEndDate"
-                name="customWindowEndDate"
-                class="wizard-answer-control"
-                data-testid="automation-custom-window-end"
-                type="date"
-              />
-            </label>
-          </template>
-        </div>
-      </template>
+      <label v-else-if="isTextStep" class="wizard-input-shell">
+        <input
+          :name="activeTextName"
+          v-model="activeTextValue"
+          :class="['wizard-answer-control', { empty: !activeTextValue.trim() }]"
+          :placeholder="currentPlaceholder"
+        />
+      </label>
 
-      <template v-else-if="currentStep.id === 'schedule'">
-        <div class="automation-schedule-helper">
-          <label class="automation-schedule-field">
-            <span v-explain="'automationSchedule'" class="automation-schedule-label">Run</span>
-            <WorkflowSelect
-              v-model="schedulePreset"
-              class="automation-schedule-select"
-              test-id="automation-schedule-preset"
-              :options="schedulePresetOptions"
-              placeholder="Select schedule..."
-            />
-          </label>
-
-          <label v-if="schedulePreset === 'hourly'" class="automation-schedule-field">
-            <span v-explain="'automationScheduleMinute'" class="automation-schedule-label">Minute</span>
-            <input
-              v-model.number="scheduleMinute"
-              class="automation-schedule-control"
-              data-testid="automation-schedule-minute"
-              inputmode="numeric"
-              max="59"
-              min="0"
-              type="number"
-            />
-          </label>
-
-          <label v-if="schedulePreset === 'weekly'" class="automation-schedule-field">
-            <span v-explain="'automationScheduleWeekday'" class="automation-schedule-label">Day</span>
-            <WorkflowSelect
-              v-model="scheduleWeekday"
-              class="automation-schedule-select"
-              test-id="automation-schedule-weekday"
-              :options="scheduleWeekdayOptions"
-              placeholder="Select day..."
-            />
-          </label>
-
-          <label v-if="schedulePreset === 'monthly'" class="automation-schedule-field">
-            <span v-explain="'automationScheduleMonthDay'" class="automation-schedule-label">Date</span>
-            <input
-              v-model.number="scheduleMonthDay"
-              class="automation-schedule-control"
-              data-testid="automation-schedule-month-day"
-              inputmode="numeric"
-              max="31"
-              min="1"
-              type="number"
-            />
-          </label>
-
-          <div v-if="scheduleUsesTime" class="automation-schedule-field">
-            <span v-explain="'automationScheduleTime'" class="automation-schedule-label">Time</span>
-            <WorkflowTimeSelect
-              v-model="scheduleTime"
-              class="automation-schedule-select"
-              test-id="automation-schedule-time"
-              aria-label="Time"
-            />
-          </div>
-
-          <label class="automation-schedule-field">
-            <span class="automation-schedule-label">Timezone</span>
-            <AppSelect
-              v-model="scheduleTimeZone"
-              class="automation-schedule-select"
-              test-id="automation-schedule-timezone"
-              :options="timezoneOptions"
-              searchable
-              search-placeholder="Search timezones"
-            />
-          </label>
-        </div>
-      </template>
-
-      <template v-else>
+      <!-- One copy for both surfaces: the edit form shows the window while the automation reads by
+           API, the wizard on its own step. The edit form labels each field; the wizard's question
+           is the label there. -->
+      <div
+        v-if="showDateWindowFields"
+        :class="['automation-date-window-fields', { 'automation-edit-date-window-fields': isEditMode }]"
+        :data-testid="isEditMode ? 'automation-edit-window-fields' : undefined"
+      >
         <label class="wizard-input-shell">
-          <input
-            :name="activeTextName"
-            v-model="activeTextValue"
-            :class="['wizard-answer-control', { empty: showEmptyState && !activeTextValue.trim() }]"
-            :placeholder="currentPlaceholder"
+          <span v-if="isEditMode" class="workflow-context-label">Date Window</span>
+          <WorkflowSelect
+            v-model="relativeWindowTypeEnumId"
+            test-id="automation-window-select"
+            :disabled="fieldsDisabled"
+            :options="relativeWindowOptions"
+            placeholder="Select date window..."
           />
         </label>
-      </template>
+        <label v-if="dateWindowNeedsCount" class="wizard-input-shell">
+          <span v-if="isEditMode" v-explain="'automationWindowCount'" class="workflow-context-label">Count</span>
+          <input
+            v-model.number="relativeWindowCount"
+            name="relativeWindowCount"
+            class="wizard-answer-control"
+            data-testid="automation-window-count-input"
+            inputmode="numeric"
+            :placeholder="isEditMode ? '1' : 'Count'"
+            :disabled="fieldsDisabled"
+          />
+        </label>
+        <template v-if="dateWindowUsesCustomRange">
+          <label class="wizard-input-shell">
+            <span v-if="isEditMode" class="workflow-context-label">Start Date</span>
+            <input
+              v-model="customWindowStartDate"
+              name="customWindowStartDate"
+              class="wizard-answer-control"
+              data-testid="automation-custom-window-start"
+              type="date"
+              :disabled="fieldsDisabled"
+            />
+          </label>
+          <label class="wizard-input-shell">
+            <span v-if="isEditMode" class="workflow-context-label">End Date</span>
+            <input
+              v-model="customWindowEndDate"
+              name="customWindowEndDate"
+              class="wizard-answer-control"
+              data-testid="automation-custom-window-end"
+              type="date"
+              :disabled="fieldsDisabled"
+            />
+          </label>
+        </template>
+      </div>
+
+      <div v-if="isEditMode && usesSftp" class="workflow-form-grid workflow-form-grid--two">
+        <label class="wizard-input-shell">
+          <span v-explain="'automationSftpServer'" class="workflow-context-label">{{ systemLabelForSide('FILE_1') }} SFTP Server</span>
+          <WorkflowSelect
+            v-model="editFile1SftpServerId"
+            test-id="automation-edit-file1-sftp-select"
+            :disabled="fieldsDisabled"
+            :options="sftpServerSelectOptions"
+            placeholder="Select first SFTP server..."
+          />
+        </label>
+
+        <label class="wizard-input-shell">
+          <span v-explain="'automationRemotePath'" class="workflow-context-label">{{ systemLabelForSide('FILE_1') }} Remote Path</span>
+          <input
+            v-model="editFile1RemotePath"
+            name="file1RemotePathTemplate"
+            class="wizard-answer-control"
+            data-testid="automation-edit-file1-remote-path"
+            placeholder="/remote/source-1/orders"
+            :disabled="fieldsDisabled"
+          />
+        </label>
+
+        <label class="wizard-input-shell">
+          <span v-explain="'automationSftpServer'" class="workflow-context-label">{{ systemLabelForSide('FILE_2') }} SFTP Server</span>
+          <WorkflowSelect
+            v-model="editFile2SftpServerId"
+            test-id="automation-edit-file2-sftp-select"
+            :disabled="fieldsDisabled"
+            :options="sftpServerSelectOptions"
+            placeholder="Select second SFTP server..."
+          />
+        </label>
+
+        <label class="wizard-input-shell">
+          <span v-explain="'automationRemotePath'" class="workflow-context-label">{{ systemLabelForSide('FILE_2') }} Remote Path</span>
+          <input
+            v-model="editFile2RemotePath"
+            name="file2RemotePathTemplate"
+            class="wizard-answer-control"
+            data-testid="automation-edit-file2-remote-path"
+            placeholder="/remote/source-2/orders"
+            :disabled="fieldsDisabled"
+          />
+        </label>
+      </div>
+
+      <div
+        v-if="isEditMode"
+        class="automation-edit-chat-space-fields"
+        data-testid="automation-edit-chat-space-fields"
+      >
+        <label
+          class="wizard-input-shell automation-edit-active-field"
+          data-testid="automation-edit-active-field"
+        >
+          <span v-explain="'activeFlag'" class="workflow-context-label">Status</span>
+          <WorkflowSelect
+            v-model="editActiveStatus"
+            test-id="automation-edit-active"
+            :disabled="fieldsDisabled"
+            :options="activeStatusOptions"
+            placeholder="Select status..."
+          />
+        </label>
+
+        <div class="automation-edit-chat-space-field">
+          <label class="wizard-input-shell">
+            <span v-explain="'automationChatSpace'" class="workflow-context-label">Chat Space</span>
+            <WorkflowSelect
+              v-model="editChatSpaceValue"
+              test-id="automation-chat-space-select"
+              :disabled="fieldsDisabled"
+              :options="editChatSpaceSelectOptions"
+              placeholder="Select chat space..."
+            />
+          </label>
+        </div>
+      </div>
+
+      <!-- One copy for both surfaces, as with the date window above. -->
+      <div
+        v-if="showScheduleFields"
+        :class="['automation-schedule-helper', { 'automation-edit-schedule-helper': isEditMode }]"
+        :data-testid="isEditMode ? 'automation-edit-schedule-fields' : undefined"
+      >
+        <label class="automation-schedule-field">
+          <span v-explain="'automationSchedule'" class="automation-schedule-label">Run</span>
+          <WorkflowSelect
+            v-model="schedulePreset"
+            class="automation-schedule-select"
+            test-id="automation-schedule-preset"
+            :disabled="fieldsDisabled"
+            :options="schedulePresetOptions"
+            placeholder="Select schedule..."
+          />
+        </label>
+
+        <label v-if="schedulePreset === 'hourly'" class="automation-schedule-field">
+          <span v-explain="'automationScheduleMinute'" class="automation-schedule-label">Minute</span>
+          <input
+            v-model.number="scheduleMinute"
+            class="automation-schedule-control"
+            data-testid="automation-schedule-minute"
+            inputmode="numeric"
+            max="59"
+            min="0"
+            type="number"
+            :disabled="fieldsDisabled"
+          />
+        </label>
+
+        <label v-if="schedulePreset === 'weekly'" class="automation-schedule-field">
+          <span v-explain="'automationScheduleWeekday'" class="automation-schedule-label">Day</span>
+          <WorkflowSelect
+            v-model="scheduleWeekday"
+            class="automation-schedule-select"
+            test-id="automation-schedule-weekday"
+            :disabled="fieldsDisabled"
+            :options="scheduleWeekdayOptions"
+            placeholder="Select day..."
+          />
+        </label>
+
+        <label v-if="schedulePreset === 'monthly'" class="automation-schedule-field">
+          <span v-explain="'automationScheduleMonthDay'" class="automation-schedule-label">Date</span>
+          <input
+            v-model.number="scheduleMonthDay"
+            class="automation-schedule-control"
+            data-testid="automation-schedule-month-day"
+            inputmode="numeric"
+            max="31"
+            min="1"
+            type="number"
+            :disabled="fieldsDisabled"
+          />
+        </label>
+
+        <div v-if="scheduleUsesTime" class="automation-schedule-field">
+          <span v-explain="'automationScheduleTime'" class="automation-schedule-label">Time</span>
+          <WorkflowTimeSelect
+            v-model="scheduleTime"
+            class="automation-schedule-select"
+            test-id="automation-schedule-time"
+            aria-label="Time"
+            :disabled="fieldsDisabled"
+          />
+        </div>
+
+        <label class="automation-schedule-field">
+          <span class="automation-schedule-label">Timezone</span>
+          <AppSelect
+            v-model="scheduleTimeZone"
+            class="automation-schedule-select"
+            test-id="automation-schedule-timezone"
+            :options="timezoneOptions"
+            :disabled="fieldsDisabled"
+            searchable
+            search-placeholder="Search timezones"
+          />
+        </label>
+      </div>
     </WorkflowStepForm>
   </WorkflowPage>
 
@@ -455,7 +337,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, { type WorkflowShortcutChoiceOption } from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
@@ -495,6 +377,7 @@ import {
   type ReconciliationAutomationChatSpaceChoice,
   type ReconciliationAutomationDraft,
   type ReconciliationAutomationFileSide,
+  type ReconciliationAutomationIntent,
   type ReconciliationAutomationSourceDraft,
   type ReconciliationAutomationStepId,
 } from '../../lib/reconciliationAutomationDraft'
@@ -532,7 +415,7 @@ const syncing = ref(false)
 const currentStepIndex = ref(0)
 const handoffSavedRun = ref<SavedRunSummary | null>(null)
 const automationId = ref('')
-const intent = ref<'existing-run' | 'new-run' | ''>('')
+const intent = ref<ReconciliationAutomationIntent | ''>('')
 const selectedSavedRunId = ref('')
 // True only when the run was decided OUTSIDE this wizard: a handoff from a run page, or an
 // automation being edited. The step list used to key off selectedSavedRunId itself, which meant
@@ -653,6 +536,7 @@ const {
   inferApiSourcesFromSavedRun,
   inferSingleApiSourcesFromOptions,
   inferSingleSftpServerFromOptions,
+  resetDrafts,
 } = sources
 const shouldAskInputMode = computed(() => !effectiveInputModeEnumId.value)
 const routeAutomationId = computed(() => (typeof route.params.automationId === 'string' ? route.params.automationId.trim() : ''))
@@ -747,6 +631,10 @@ const steps = computed<WizardStep[]>(() => {
 const currentStep = computed<WizardStep>(() => steps.value[currentStepIndex.value] ?? steps.value[0]!)
 const isSaveStep = computed(() => currentStep.value.id === 'automation-name')
 const isChoiceStep = computed(() => ['purpose', 'input-mode', 'chat-space'].includes(currentStep.value.id))
+const isTextStep = computed(() => ['automation-name', 'file1-remote-path', 'file2-remote-path'].includes(currentStep.value.id))
+const showDateWindowFields = computed(() => (isEditMode.value ? usesApi.value : currentStep.value.id === 'date-window'))
+const showScheduleFields = computed(() => isEditMode.value || currentStep.value.id === 'schedule')
+const fieldsDisabled = computed(() => saving.value || loadingOptions.value)
 const isChoiceOnlyStep = computed(() => isChoiceStep.value && !isSaveStep.value)
 const showPrimaryAction = computed(() => isEditMode.value || !isChoiceOnlyStep.value)
 const progressPercent = computed(() => ((Math.max(1, currentStepIndex.value + 1) / steps.value.length) * 100).toFixed(2))
@@ -967,8 +855,6 @@ const currentPlaceholder = computed(() => {
     case 'file1-api':
     case 'file2-api':
       return 'Select API source...'
-    case 'schedule':
-      return '0 0 6 * * ?'
     case 'file1-remote-path':
       return '/remote/source-1/orders'
     case 'file2-remote-path':
@@ -1032,8 +918,6 @@ const activeTextName = computed(() => {
       return 'file1RemotePathTemplate'
     case 'file2-remote-path':
       return 'file2RemotePathTemplate'
-    case 'schedule':
-      return 'scheduleExpr'
     default:
       return 'automationInput'
   }
@@ -1048,8 +932,6 @@ const activeTextValue = computed({
         return sourceDrafts.value.FILE_1.remotePathTemplate ?? ''
       case 'file2-remote-path':
         return sourceDrafts.value.FILE_2.remotePathTemplate ?? ''
-      case 'schedule':
-        return scheduleExpr.value
       default:
         return ''
     }
@@ -1065,9 +947,6 @@ const activeTextValue = computed({
       case 'file2-remote-path':
         updateSource('FILE_2', { remotePathTemplate: value })
         break
-      case 'schedule':
-        scheduleExpr.value = value
-        break
     }
   },
 })
@@ -1077,7 +956,6 @@ watch([schedulePreset, scheduleTime, scheduleMinute, scheduleWeekday, scheduleMo
   scheduleExpr.value = cron.buildCronExpression()
 }, { immediate: true })
 
-const showEmptyState = computed(() => ['automation-name', 'file1-remote-path', 'file2-remote-path'].includes(currentStep.value.id))
 const activeSelectError = computed(() => {
   if ((currentStep.value.id === 'file1-sftp' || currentStep.value.id === 'file2-sftp') && sourceOptions.value.sftpServers.length === 0) {
     return 'No SFTP servers are available for this tenant.'
@@ -1245,8 +1123,6 @@ function dateInputValue(value: string | undefined): string {
   return parsed.toISOString().slice(0, 10)
 }
 
-const syncScheduleHelperFromExpression = cron.syncFromExpression
-
 function ensureAutomationName(): void {
   if (automationName.value.trim() || !selectedSavedRun.value) return
   automationName.value = buildDefaultAutomationName(selectedSavedRun.value.runName)
@@ -1317,7 +1193,7 @@ async function handleChoice(value: string): Promise<void> {
 
   if (currentStep.value.id === 'input-mode') {
     inputModeEnumId.value = value
-    sourceDrafts.value = { FILE_1: {}, FILE_2: {} }
+    resetDrafts()
     applyDeterministicDefaults()
     settleOnCurrentIndex()
     return
@@ -1381,6 +1257,7 @@ const pageAbortController = new AbortController()
 let submitController: AbortController | null = null
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleChoiceKeydown)
   pageAbortController.abort()
   submitController?.abort()
   // The dock also drops on route change; this covers an unmount that is not a navigation.
@@ -1474,7 +1351,7 @@ function hydrateAutomation(automation: AutomationRecord): void {
   automationName.value = automation.automationName ?? ''
   inputModeEnumId.value = automation.inputModeEnumId ?? ''
   scheduleExpr.value = automation.scheduleExpr ?? ''
-  syncScheduleHelperFromExpression(scheduleExpr.value)
+  cron.syncFromExpression(scheduleExpr.value)
   relativeWindowTypeEnumId.value = automation.relativeWindowTypeEnumId ?? relativeWindowTypeEnumId.value
   relativeWindowCount.value = automation.relativeWindowCount ?? relativeWindowCount.value
   customWindowStartDate.value = dateInputValue(automation.customWindowStartDate)
@@ -1647,7 +1524,7 @@ function restoreDraftFromHistoryState(): ReconciliationAutomationStepId | null {
   automationName.value = draft.automationName ?? (draftState.savedRun ? buildDefaultAutomationName(draftState.savedRun.runName) : '')
   inputModeEnumId.value = draft.inputModeEnumId ?? ''
   scheduleExpr.value = draft.scheduleExpr ?? ''
-  syncScheduleHelperFromExpression(scheduleExpr.value)
+  cron.syncFromExpression(scheduleExpr.value)
   relativeWindowTypeEnumId.value = draft.relativeWindowTypeEnumId ?? relativeWindowTypeEnumId.value
   relativeWindowCount.value = draft.relativeWindowCount ?? relativeWindowCount.value
   customWindowStartDate.value = draft.customWindowStartDate?.slice(0, 10) ?? ''
@@ -1713,6 +1590,7 @@ async function loadOptions(): Promise<void> {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleChoiceKeydown)
   const resumeStepId = routeAutomationId.value ? null : restoreDraftFromHistoryState()
   await loadOptions()
   if (routeAutomationId.value) {
@@ -1720,14 +1598,6 @@ onMounted(async () => {
     return
   }
   moveToStep(resumeStepId)
-})
-
-onMounted(() => {
-  window.addEventListener('keydown', handleChoiceKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleChoiceKeydown)
 })
 </script>
 
@@ -1825,11 +1695,6 @@ onUnmounted(() => {
   opacity: 0.6;
 }
 
-.automation-edit-saved-run__confirm {
-  display: grid;
-  gap: var(--space-2);
-}
-
 .automation-edit-schedule-helper .automation-schedule-control,
 .automation-edit-schedule-helper :deep(.workflow-select-trigger),
 .automation-edit-schedule-helper :deep(.workflow-select-option) {
@@ -1858,17 +1723,6 @@ onUnmounted(() => {
   color: var(--text);
   font: inherit;
   font-size: clamp(1rem, 1.25vw, 1.2rem);
-}
-
-.automation-schedule-static {
-  display: block;
-  min-height: 2.75rem;
-  line-height: 2.75rem;
-  color: color-mix(in oklab, var(--text) 72%, transparent);
-  font-size: clamp(1rem, 1.25vw, 1.2rem);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .automation-schedule-control:focus {

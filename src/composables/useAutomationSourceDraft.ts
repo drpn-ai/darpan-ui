@@ -44,16 +44,12 @@ export interface UseAutomationSourceDraft {
   editFile1RemotePath: WritableComputedRef<string>
   editFile2RemotePath: WritableComputedRef<string>
   savedRunUsesOnlyApiSources: ComputedRef<boolean>
-  systemOptionForSide: (side: ReconciliationAutomationFileSide) => SavedRunSystemOption | null
-  systemEnumIdForSide: (side: ReconciliationAutomationFileSide) => string
   systemLabelForSide: (side: ReconciliationAutomationFileSide) => string
   apiSourceOptionsForSide: (side: ReconciliationAutomationFileSide) => ApiSourceSelectOption[]
   selectedApiSourceValue: (side: ReconciliationAutomationFileSide) => string
   updateSource: (side: ReconciliationAutomationFileSide, patch: ReconciliationAutomationSourceDraft) => void
   updateApiSource: (side: ReconciliationAutomationFileSide, value: string) => void
-  setDrafts: (next: Record<ReconciliationAutomationFileSide, ReconciliationAutomationSourceDraft>) => void
   resetDrafts: () => void
-  hasKnownApiSourceForSide: (side: ReconciliationAutomationFileSide) => boolean
   shouldSkipApiSourceStep: (side: ReconciliationAutomationFileSide) => boolean
   shouldSkipSftpServerStep: (side: ReconciliationAutomationFileSide) => boolean
   inferApiSourcesFromSavedRun: () => void
@@ -199,10 +195,6 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     })
   }
 
-  function setDrafts(next: Record<ReconciliationAutomationFileSide, ReconciliationAutomationSourceDraft>): void {
-    sourceDrafts.value = next
-  }
-
   function resetDrafts(): void {
     sourceDrafts.value = emptyDrafts()
   }
@@ -315,16 +307,12 @@ export function useAutomationSourceDraft(deps: UseAutomationSourceDraftDeps): Us
     editFile1RemotePath,
     editFile2RemotePath,
     savedRunUsesOnlyApiSources,
-    systemOptionForSide,
-    systemEnumIdForSide,
     systemLabelForSide,
     apiSourceOptionsForSide,
     selectedApiSourceValue,
     updateSource,
     updateApiSource,
-    setDrafts,
     resetDrafts,
-    hasKnownApiSourceForSide,
     shouldSkipApiSourceStep,
     shouldSkipSftpServerStep,
     inferApiSourcesFromSavedRun,
