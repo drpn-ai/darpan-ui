@@ -116,13 +116,18 @@ describe('TenantScriptsPage (/queries)', () => {
     expect(saveTenantQueryPins).not.toHaveBeenCalled()
   })
 
-  it('puts the pins back when the save fails', async () => {
-    saveTenantQueryPins.mockRejectedValue(new Error('down'))
+  it('puts the pins back when the save fails, and says why rather than springing back without a word', async () => {
+    saveTenantQueryPins.mockRejectedValue(new Error('Pins are read-only right now.'))
     const wrapper = await mountPage()
     await drop(wrapper, 'pinned-queries', '100')
     expect(saveTenantQueryPins).toHaveBeenCalledWith({ pinnedQueryIds: ['600', '200', '100'] })
     expect(tileNames(wrapper, 'pinned-queries')).toEqual(['Late payments', 'Unmatched orders'])
     expect(tileNames(wrapper, 'query-group-audit-findings')).toEqual(['Open findings'])
+    expect(wrapper.text()).toContain('Pins are read-only right now.')
+
+    saveTenantQueryPins.mockImplementation(async ({ pinnedQueryIds }: { pinnedQueryIds: string[] }) => ({ pinnedQueryIds }))
+    await drop(wrapper, 'pinned-queries', '100')
+    expect(wrapper.text()).not.toContain('Pins are read-only right now.')
   })
 
   it('offers New Query to editors only; viewers still pin', async () => {

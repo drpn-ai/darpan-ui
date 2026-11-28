@@ -9,6 +9,8 @@
     <p v-else-if="queries.length === 0" class="section-note" data-testid="queries-empty">No queries yet.</p>
 
     <template v-if="queries.length > 0">
+      <!-- No test id: one would add a mascot route anchor, and the seed with it. -->
+      <InlineValidation v-if="pinError" tone="error" :message="pinError" />
       <StaticPageSection title="Pinned Queries">
         <div class="static-page-drop-zone" data-testid="pinned-queries" @dragover.prevent @drop="handleDrop('pinned', $event)">
           <div v-if="pinnedQueries.length > 0" class="static-page-tile-grid">
@@ -85,6 +87,7 @@ const pinnedQueryIds = ref<string[]>([])
 const expandedGroupKeys = ref<Set<string>>(new Set())
 const loading = ref(false)
 const pageError = ref('')
+const pinError = ref('')
 
 // In page order. A query lands by its first input's source; no read, or one this page does not know, is script only.
 const READ_GROUPS = [
@@ -146,11 +149,13 @@ function handleDragStart(tenantQueryId: string, event: DragEvent): void {
 
 async function savePins(nextPinnedQueryIds: string[], previousPinnedQueryIds: string[]): Promise<void> {
   pinnedQueryIds.value = nextPinnedQueryIds
+  pinError.value = ''
   try {
     const response = await scriptFacade.saveTenantQueryPins({ pinnedQueryIds: nextPinnedQueryIds })
     pinnedQueryIds.value = response.pinnedQueryIds ?? nextPinnedQueryIds
-  } catch {
+  } catch (error) {
     pinnedQueryIds.value = previousPinnedQueryIds
+    pinError.value = messageOf(error, 'Could not save the pins.')
   }
 }
 

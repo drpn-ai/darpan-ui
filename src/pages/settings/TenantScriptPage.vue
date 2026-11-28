@@ -24,7 +24,7 @@
     <InlineValidation v-if="pageError" tone="error" :message="pageError" data-testid="script-page-error" />
 
     <template v-if="draft">
-      <StaticFactStrip :facts="facts" test-id="script-facts" @open="openFact" />
+      <StaticFactStrip :facts="facts" test-id="script-facts" @open="openSchedule" />
 
       <form v-if="canEdit && agentReady" class="script-ask" @submit.prevent="ask">
         <label class="script-ask__field">
@@ -460,7 +460,7 @@ import AppIcon from '../../components/ui/AppIcon.vue'
 // already run; it fills this page and saves nothing. One Save keeps the query and its schedule together; the popups
 // and the toggle only change this page until then. Scheduling needs tenant admin (it sends the tenant's data out), and
 // only the schedule's owner can send it by hand.
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import QueryDataPopup from '../../components/settings/QueryDataPopup.vue'
 import AppCancelAction from '../../components/ui/AppCancelAction.vue'
@@ -501,7 +501,7 @@ import {
   timeFromCron,
 } from '../../lib/scriptDeployment'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
-import { formatDateTime } from '../../lib/utils/date'
+import { formatClockTime, formatDateTime } from '../../lib/utils/date'
 import { hintsFor } from '../../lib/mascotHints'
 import { useAuthStore } from '../../stores/auth'
 import { useMascotStore } from '../../stores/mascot'
@@ -542,7 +542,6 @@ interface DataEdit {
 }
 
 const FUNCTIONS_DOCS_URL = 'https://developers.drpn.ai/tenant-queries/functions'
-// Stroked on the 20-unit viewBox: angle brackets (the read as JSON) and an eye (preview what it would send).
 const MAX_RUNS = 3
 /** A new query's name starts blank and shows this, muted, as its placeholder: it still has to be given. */
 const NEW_NAME = 'New query'
@@ -678,10 +677,6 @@ const facts = computed<StaticFact[]>(() => {
   ]
 })
 
-function openFact(): void {
-  openSchedule()
-}
-
 const lineCount = computed(() => Math.max((draft.value?.scriptBody ?? '').split('\n').length, 12))
 const errorLine = computed(() => runs.value[0]?.run.error?.line ?? null)
 
@@ -726,7 +721,7 @@ function runMeta(run: QueryRun): string {
 function addRun(label: string, run: QueryRun): void {
   runCount += 1
   runs.value = [
-    { n: runCount, label, time: new Date().toLocaleTimeString(), run, meta: runMeta(run) },
+    { n: runCount, label, time: formatClockTime(new Date()), run, meta: runMeta(run) },
     ...runs.value,
   ].slice(0, MAX_RUNS)
 }
@@ -764,11 +759,6 @@ function fillStarterAudit(): void {
 async function load(tenantQueryId: string): Promise<void> {
   loading.value = true
   pageError.value = ''
-  runError.value = ''
-  runs.value = []
-  runCount = 0
-  draft.value = null
-  dataEdit.value = null
   try {
     const [listed, scheduled] = await Promise.all([
       tenantQueryId ? scriptFacade.listTenantQueries() : Promise.resolve(null),
@@ -784,9 +774,6 @@ async function load(tenantQueryId: string): Promise<void> {
       saved.value = query
       // One schedule per query on this page; the backend allows more.
       savedSchedule.value = (scheduled.schedules ?? [])[0] ?? null
-    } else {
-      saved.value = null
-      savedSchedule.value = null
     }
     resetDraft()
   } catch (error) {
@@ -889,7 +876,10 @@ function saveSchedule(): void {
   }
   // A cron that is not once a day shows no time; left untouched, it is kept as it is.
   const cronExpression = form.time ? cronFromTime(form.time) : schedule.value?.cronExpression ?? null
-  if (!cronExpression) return
+  if (!cronExpression) {
+    popupError.value = 'Pick the time it runs.'
+    return
+  }
   schedule.value = { cronExpression, isActive: form.isActive, emailTo: formatRecipients(to), emailCc: formatRecipients(cc),
     chatSpaceId: form.chatSpaceId }
   closePopup()
@@ -1026,8 +1016,8 @@ async function save(): Promise<void> {
   }
   saving.value = true
   pageError.value = ''
-  const wasNew = !current.tenantQueryId
   let savedId = ''
+  let scheduleSaved = false
   try {
     const out = await scriptFacade.saveTenantQuery({
       tenantQueryId: current.tenantQueryId || undefined,
@@ -1061,22 +1051,22 @@ async function save(): Promise<void> {
       const listed = await scriptFacade.listTenantQuerySchedules({ tenantQueryId: out.query.tenantQueryId })
       savedSchedule.value = (listed.schedules ?? [])[0] ?? savedSchedule.value
     }
+    scheduleSaved = true
     baseline.value = snapshot()
   } catch (error) {
-    pageError.value = messageOf(error, 'Could not save the query.')
+    pageError.value = savedId
+      ? `The query is saved, but its schedule step failed: ${messageOf(error, 'try Save again.')}`
+      : messageOf(error, 'Could not save the query.')
   } finally {
     saving.value = false
-    // Last, even when the schedule failed: /new and /:id are two routes, so the move mounts the page afresh and it
-    // reads what was saved (a retry from /new would otherwise create the query again).
-    if (wasNew && savedId) void router.replace({ name: 'settings-tenant-script', params: { tenantScriptId: savedId } })
+  }
+  // A new query moves to its own page only once all of it saved: the move remounts the page (App keys the RouterView
+  // on the full path), which would drop a refusal and the staged schedule. Held here, a retry updates the query, since
+  // the draft now carries its id.
+  if (!routeQueryId.value && savedId && scheduleSaved) {
+    void router.replace({ name: 'settings-tenant-script', params: { tenantScriptId: savedId } })
   }
 }
-
-// Another query's URL on this same page (its own route record) loads that query.
-watch(routeQueryId, (id) => {
-  if (id && id === draft.value?.tenantQueryId) return
-  void load(id)
-})
 
 // Esc closes a popup; the delete popup has no cancel of WorkflowStepForm's own to catch it.
 function handleCancelRequest(event: Event): void {

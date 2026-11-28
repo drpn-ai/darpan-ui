@@ -356,6 +356,34 @@ describe('TenantScriptPage (query)', () => {
     expect(order).toEqual(['schedule', 'move'])
   })
 
+  it('a new query whose schedule is refused stays on /new, says so, keeps the schedule, and a retry updates rather than creates', async () => {
+    // The move to /:id remounts the page (the RouterView key is the full path), so moving after a refused schedule
+    // dropped both the refusal and the staged schedule without a word.
+    route.params = {}
+    listTenantQuerySchedules.mockResolvedValue({ schedules: [], timeZone: 'UTC' })
+    saveTenantQuerySchedule.mockRejectedValueOnce(new Error('Chat space C1 is switched off.'))
+    const wrapper = await mountPage()
+    const title = wrapper.find('[data-testid="script-name"]')
+    title.element.textContent = 'Daily findings'
+    await title.trigger('input')
+    await wrapper.find('[data-testid="script-fact-schedule"]').trigger('click')
+    await wrapper.find('[data-testid="script-schedule-email-to"]').setValue('ops@krewe.example')
+    await wrapper.find('[data-testid="script-schedule-save"]').trigger('click')
+    await wrapper.find('[data-testid="script-save"]').trigger('click')
+    await flushPromises()
+
+    expect(replace).not.toHaveBeenCalled()
+    expect(text(wrapper, 'script-page-error')).toBe('The query is saved, but its schedule step failed: Chat space C1 is switched off.')
+    expect(text(wrapper, 'script-fact-sends-to')).toContain('1 address')
+    expect(wrapper.find('[data-testid="script-save"]').classes('app-icon-action--dirty')).toBe(true)
+
+    await wrapper.find('[data-testid="script-save"]').trigger('click')
+    await flushPromises()
+    expect(saveTenantQuery).toHaveBeenLastCalledWith(expect.objectContaining({ tenantQueryId: '900' }))
+    expect(saveTenantQuerySchedule).toHaveBeenCalledTimes(2)
+    expect(replace).toHaveBeenCalledWith({ name: 'settings-tenant-script', params: { tenantScriptId: '900' } })
+  })
+
   it('a new query runs as it opens: its read starts on the first audit, not a blank one, and is not marked edited', async () => {
     route.params = {}
     listTenantQuerySchedules.mockResolvedValue({ schedules: [], timeZone: 'UTC' })
