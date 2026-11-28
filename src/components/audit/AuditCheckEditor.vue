@@ -94,7 +94,6 @@
           </div>
           <div v-if="showRules(row)" class="audit-check-link-row audit-check-link-row--detail">
             <WorkflowSelect
-              v-if="showRules(row)"
               :model-value="row.ruleIds"
               @update:model-value="row.ruleIds = asList($event)"
               :options="ruleOptions"
@@ -251,10 +250,10 @@
 </template>
 
 <script setup lang="ts">
-import AppIcon from '../../components/ui/AppIcon.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppCancelAction from '../ui/AppCancelAction.vue'
+import AppIcon from '../ui/AppIcon.vue'
 import AppSaveAction from '../ui/AppSaveAction.vue'
 import AppSelect, { type AppSelectOption } from '../ui/AppSelect.vue'
 import InlineValidation from '../ui/InlineValidation.vue'
@@ -396,7 +395,6 @@ function showRules(row: LinkRow): boolean {
   return ruleOptions.value.length > 0 && row.diffTypes.includes('FIELD_MISMATCH')
 }
 
-
 function toCode(label: string): string {
   return label
     .toLowerCase()
@@ -483,6 +481,8 @@ async function load(): Promise<void> {
   const signal = abort.signal
   loading.value = true
   errors.value = []
+  // Another audit's options (its runs, statements, checks) are never this one's form.
+  options.value = null
   Object.assign(form, emptyForm())
   idEdited.value = false
   moneyOpen.value = false
@@ -649,11 +649,6 @@ watch([form, links], () => { if (options.value && !saving.value) errors.value = 
   color: var(--text-soft);
   text-decoration: underline;
   cursor: pointer;
-}
-
-.audit-check-text-action:disabled {
-  cursor: default;
-  opacity: 0.6;
 }
 
 @media (max-width: 768px) {

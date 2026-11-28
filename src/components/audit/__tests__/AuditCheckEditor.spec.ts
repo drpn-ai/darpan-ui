@@ -149,7 +149,8 @@ describe('AuditCheckEditor', () => {
     expect(getOptions).toHaveBeenCalledWith('month-close', expect.any(AbortSignal))
     expect(w.findAll('[data-testid="audit-check-link"]')).toHaveLength(1)
     expect(trigger(w, 'audit-check-statement-0').text()).toContain('R4')
-    expect(w.find('[data-testid="audit-check-remove"]').exists()).toBe(false)
+    // One statement is the least a check tests: its remove is there but held.
+    expect(trigger(w, 'audit-check-remove-link-0').attributes('disabled')).toBeDefined()
     expect(w.find('[data-testid="audit-check-money"]').exists()).toBe(false)
   })
 
@@ -290,6 +291,17 @@ describe('AuditCheckEditor', () => {
 
     expect(saveCheck).not.toHaveBeenCalled()
     expect(w.get('[data-testid="audit-check-errors"]').text()).toContain("Check 'returns-credited' is already on this audit.")
+  })
+
+  // DAR-OPS-029 U05b. Another audit's form is never shown, or saved, while this audit's options load.
+  it('drops the previous audit\'s form while the next audit\'s options load', async () => {
+    const w = await mountEditor()
+    expect(w.find('[data-testid="audit-check-save"]').exists()).toBe(true)
+    getOptions.mockReturnValueOnce(new Promise(() => {}))
+    await w.setProps({ audit: 'daily-close' })
+    expect(getOptions).toHaveBeenLastCalledWith('daily-close', expect.any(AbortSignal))
+    expect(w.find('[data-testid="audit-check-save"]').exists()).toBe(false)
+    expect(w.find('[data-testid="audit-check-run"]').exists()).toBe(false)
   })
 
   it('emits cancel', async () => {
