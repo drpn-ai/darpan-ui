@@ -467,11 +467,10 @@ function buildHeaders(): Record<string, string> {
   return headers
 }
 
-function normalizeEnvelope(result: unknown): ApiEnvelope {
+function normalizeEnvelope(result: unknown): Pick<ApiEnvelope, 'ok' | 'errors'> {
   const payload = result as Partial<ApiEnvelope>
   return {
     ok: payload.ok !== false,
-    messages: Array.isArray(payload.messages) ? payload.messages.map((item) => String(item)) : [],
     errors: Array.isArray(payload.errors) ? payload.errors.map((item) => String(item)) : [],
   }
 }
@@ -592,9 +591,7 @@ async function dispatchService<T>(
         signal,
       })
     } catch (error) {
-      if ((error as { name?: string })?.name === 'AbortError') {
-        throw error
-      }
+      if (isAbortError(error)) throw error
       parseFailures.push({
         url: candidateUrl,
         error,
@@ -686,17 +683,10 @@ async function dispatchService<T>(
 
   const attemptedUrls = rpcCandidates
   const allUnreachable = parseFailures.length > 0 && parseFailures.every((failure) => failure.status == null)
-  const authLikeFailure = parseFailures.find((failure) => {
-    const raw = failure.raw?.toLowerCase() ?? ''
-    return (
-      failure.status === 401 ||
-      raw.includes('authentication required') ||
-      raw.includes('user must be logged in') ||
-      raw.includes('login key not valid') ||
-      raw.includes('login key expired') ||
-      looksLikeLoginHtml(raw)
-    )
-  })
+  // A body that is not JSON (an error or login page) is read with the same phrases as a JSON refusal.
+  const authLikeFailure = parseFailures.find(
+    (failure) => failure.status === 401 || isAuthRequiredMessage(failure.raw) || looksLikeLoginHtml(failure.raw),
+  )
 
   if (authLikeFailure) {
     return refusedSignedOut(
@@ -739,9 +729,7 @@ async function dispatchService<T>(
 // ApiCallError (including AuthRequiredError) means the server replied — no point retrying.
 // AbortError means the caller cancelled the request — propagate immediately, never retry.
 function isTransientNetworkError(err: unknown): boolean {
-  if (err instanceof ApiCallError) return false
-  if (err instanceof DOMException && err.name === 'AbortError') return false
-  return true
+  return !(err instanceof ApiCallError) && !isAbortError(err)
 }
 
 // Moqui gates `authenticate="true"` in ServiceCallSyncImpl BEFORE the service body runs, so a

@@ -13,17 +13,12 @@ export async function retryRead<T>(
   const attempts = Math.max(1, opts.attempts ?? 3)
   const baseDelayMs = opts.baseDelayMs ?? 200
   const shouldRetry = opts.shouldRetry ?? (() => true)
-  for (let i = 0; i < attempts; i++) {
+  for (let attempt = 0; ; attempt++) {
     try {
       return await fn()
     } catch (err) {
-      if (i < attempts - 1 && shouldRetry(err)) {
-        await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** i))
-        continue
-      }
-      throw err
+      if (attempt >= attempts - 1 || !shouldRetry(err)) throw err
+      await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** attempt))
     }
   }
-  // Unreachable: the loop always returns or throws, but TypeScript requires an explicit return type path.
-  throw new Error('retryRead: exhausted attempts without returning or throwing')
 }

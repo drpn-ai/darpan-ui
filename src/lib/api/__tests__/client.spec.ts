@@ -580,6 +580,20 @@ describe('callService auth recovery', () => {
     setAuthRequiredHandler(null)
   })
 
+  // DAR-OPS-029 U13a: a non-JSON reply is read with the same phrase list as a JSON one, so a session-token refusal sent
+  // as an error page is a signed-out session, not "answered in interpretive dance".
+  it('reads a non-JSON session-token refusal as signed out, as it reads the same words in JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('Session token does not match', { status: 403 })))
+    const { callService, setAuthRequiredHandler } = await import('../client')
+    setAuthRequiredHandler(vi.fn().mockResolvedValue(false))
+
+    await expect(callService('facade.ReconciliationFacadeServices.save#Reconciliation', {})).rejects.toMatchObject({
+      name: 'AuthRequiredError',
+      message: 'Your session has ended. Sign in again to continue.',
+    })
+    setAuthRequiredHandler(null)
+  })
+
   it('surfaces the friendly session message instead of the raw backend service name', async () => {
     const fetchMock = vi.fn().mockResolvedValue(authRejection())
     vi.stubGlobal('fetch', fetchMock)
