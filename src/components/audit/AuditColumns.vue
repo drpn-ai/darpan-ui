@@ -552,51 +552,41 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
+import InlineValidation from '../ui/InlineValidation.vue'
+import StaticFactStrip from '../ui/StaticFactStrip.vue'
 import StatusBadge from '../ui/StatusBadge.vue'
 import AuditAcknowledgePopover from './AuditAcknowledgePopover.vue'
 import AuditFeedbackBubble from './AuditFeedbackBubble.vue'
 import type { AgentFindingCard } from './AuditAgentPanel.vue'
-import InlineValidation from '../ui/InlineValidation.vue'
-import StaticFactStrip from '../ui/StaticFactStrip.vue'
-import { auditFacade } from '../../lib/api/facade'
+import { ackWho, lineFulfillments, lineLocation, lineWhy, useFindingDetail } from '../../composables/useFindingDetail'
+import { useOptimisticAck } from '../../composables/useOptimisticAck'
 import type {
   AuditAcknowledgement,
   AuditFindingDocument,
   AuditFindingListItem,
   AuditFindingSummary,
   AuditLevel,
-  AuditMoney,
   AuditProgress,
   AuditProgressRun,
   AuditReport,
   AuditWaitingFinding,
 } from '../../lib/api/auditTypes'
-import { AUDIT_LEVELS, LEVEL_LABEL } from '../../lib/api/auditTypes'
+import { AUDIT_LEVELS } from '../../lib/api/auditTypes'
 import {
-  basicFacts,
   checkStatusBadge,
   eventLabel,
-  FIX_WHERE_LABELS,
   findingStateBadge,
-  heldChain,
-  orderNameOf,
-  recordKind,
-  recordRows,
   shortDate,
   shortRange,
   sourceReadBadge,
   splitHeadline,
   systemLabel,
-  typeDetails,
-  orderLineRows,
 } from '../../lib/auditReport'
 import {
   HEALTH,
   SOURCE_CHECKS,
   SOURCE_NOT_COVERED,
   SOURCE_RUNNING,
-  acknowledgedDaysAgo,
-  pendingAcknowledgement,
   categoryItems,
   checkGroups,
   comparedBars,
@@ -607,7 +597,6 @@ import {
   narrowedCounts,
   otherLineLabel,
   otherLineWhy,
-  otherOrderLines,
   progressLine,
   progressSteps,
   peakLine,
@@ -784,14 +773,6 @@ const findings = computed(() => props.narrowed ? props.narrowed.filter((item) =>
   : statementFindings(statementDoc.value, props.more.findings, props.filter))
 // DAR-UI-098. The column's rows: every finding under its cause, an order under each of its lines' causes.
 const rows = computed(() => findingRows(findings.value, props.cause, levelOn.value ?? undefined))
-// DAR-UI-075. Why a line is in its order's finding: its own cause, or held by the line holding the order up.
-// DAR-UI-081 (Aditi: "removed 'held by' and just put item fulfillment status"): a line held by the order's stuck line reads
-// as its own item's status in HotWax (Completed); the stuck line keeps its cause (Backordered).
-function lineWhy(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
-  const itemStatus = line.records?.OMS?.orderItem?.[0]?.status
-  if (line.held && itemStatus) return itemStatus
-  return line.cause ?? findingStateBadge(line.state).label
-}
 // What the picked pill counts for the statement (DAR-UI-073), not the 50 the report lists or the pages loaded so far.
 // DAR-UI-144. A level's count is of open rows only, so under another pill the rows listed are the count.
 const findingsTotal = computed(() => {
@@ -801,9 +782,6 @@ const findingsTotal = computed(() => {
   }
   return statementDoc.value && !props.narrowed ? countFor(statementDoc.value.counts, props.filter) : findings.value.length
 })
-const records = computed(() => recordRows(props.orderUnit?.records ?? props.findingDoc?.finding.records))
-// DAR-UI-099. The open order's lines with no finding of their own (an item set aside, a NetSuite store-credit line).
-const otherLines = computed(() => otherOrderLines(props.orderUnit))
 
 // DAR-UI-108. The deepest column's own tab, named for what it shows.
 const detailTabLabel = computed(() => {
@@ -816,15 +794,8 @@ const categoryLabel = computed(() => categories.value.find((item) => item.id ===
 const secondLabel = computed(() =>
   isHealth.value ? (sources.value.find((item) => item.key === props.source)?.label ?? '') : props.statement)
 
-// DAR-UI-066. Fewer words: the record leads, what is said once is not said again, dates short.
-
 function ageShort(days: number | null | undefined): string {
   return days == null ? '' : `${days}d`
-}
-
-function sameText(a: string, b: string): boolean {
-  const norm = (text: string) => text.trim().replace(/\.$/, '').toLowerCase()
-  return norm(a) === norm(b)
 }
 
 // Findings under a statement mostly share a conclusion; findingRows puts them together, so it is said once above them.
@@ -853,144 +824,59 @@ function toggleGroup(index: number): void {
   opened.value = next
 }
 
-function moneyLabel(money: AuditMoney | null | undefined): string {
-  return money ? `${money.amount} ${money.currency}` : ''
-}
+const remindDays = computed(() => props.report.report.acknowledgeRemindDays ?? 5)
+// DAR-UI-144/155. The row's acknowledgement, shown at once and saved behind (useOptimisticAck). The board holds the saves:
+// a save still queued when the person moves on still tells the page (the mascot says a refusal they did not see).
+const ackTarget = computed(() => props.findingDoc?.finding.id ?? props.finding)
+const ack = useOptimisticAck({
+  finding: () => props.finding,
+  target: () => ackTarget.value,
+  held: () => {
+    const read = props.findingDoc?.finding.acknowledgement
+    return read !== undefined ? read : (props.orderUnit?.acknowledgement ?? null)
+  },
+  remindDays: () => remindDays.value,
+  me: () => props.me ?? { id: '', label: 'You' },
+  timeZone: () => props.report.report.tenant.timeZone,
+  on: {
+    shown: (id, next, was, seq) => emit('acknowledging', id, next, was, seq),
+    saved: (id, seq) => emit('acknowledged', id, seq),
+    refused: (id, reason, shown, held, seq) => emit('ackFailed', id, reason, shown, held, seq),
+  },
+})
+const acknowledgement = ack.acknowledgement
+const ackError = ack.error
 
-const money = computed(() => {
-  const evidence = props.findingDoc?.finding.evidence
-  if (!evidence) return []
-  return [
-    { label: evidence.expected?.source ? systemLabel(evidence.expected.source) : 'Expected', value: moneyLabel(evidence.expected) },
-    { label: evidence.actual?.source ? systemLabel(evidence.actual.source) : 'Actual', value: moneyLabel(evidence.actual) },
-    { label: 'Gap', value: moneyLabel(evidence.difference) },
-  ].filter((item) => item.value)
+// DAR-UI-065/081. What the finding detail shows (useFindingDetail); its markup stays here, where the mascot reads its anchors.
+// DAR-UI-140. The finding's row in the column gives its level while the order carries none.
+const findingRow = computed(() => findings.value.find((item) => item.id === props.finding) ?? null)
+const {
+  lead, eyebrow, levelLine, basics, money, kind, details, recordLines, chain, stuckOn, fixOwner, whyLine, sinceLine,
+  evidenceFailed, evidenceLine, otherLines, feedbackRecord, canAcknowledge, detailBadge, ackCardLine,
+} = useFindingDetail({
+  findingDoc: () => props.findingDoc,
+  orderUnit: () => props.orderUnit,
+  statement: () => props.statement,
+  statementDoc: () => statementDoc.value,
+  row: () => findingRow.value,
+  acknowledgement: () => acknowledgement.value,
+  timeZone: () => props.report.report.tenant.timeZone,
 })
-
-const fixWhere = computed(() => {
-  const where = props.findingDoc?.finding.fix.where
-  return where ? (FIX_WHERE_LABELS[where] ?? where) : ''
-})
-const fixOwner = computed(() => props.findingDoc?.finding.fix.owner || fixWhere.value)
-
-// DAR-UI-081. Verdict first. The headline's record ("Order M1168800") moves up beside the statement and the order's name,
-// so the lead says only what is wrong.
-const headline = computed(() => props.orderUnit?.headline ?? props.findingDoc?.finding.headline ?? '')
-const eyebrow = computed(() => {
-  const split = splitHeadline(headline.value)
-  return [props.statement, split.rest ? split.subject : '', orderNameOf(records.value)].filter(Boolean).join(' · ')
-})
-// DAR-UI-140. The open finding's level: the order's (never its line's), else its row's, else its document's.
-const findingLevel = computed<{ level: AuditLevel; source: 'statement' | 'reason'; reason: string | null } | null>(() => {
-  const unit = props.orderUnit?.priority ? props.orderUnit : findings.value.find((item) => item.id === props.finding)
-  if (unit?.priority) return { level: unit.priority, source: unit.prioritySource ?? 'statement', reason: unit.priorityReason ?? null }
-  return props.findingDoc?.finding.priority ?? null
-})
-const levelLine = computed(() => {
-  const at = findingLevel.value
-  if (!at) return ''
-  if (at.source === 'reason' && at.reason) return `${LEVEL_LABEL[at.level]} set on "${at.reason}"`
-  return `${LEVEL_LABEL[at.level]} from ${props.statement || props.findingDoc?.finding.statement.id || ''}`
-})
-const lead = computed(() => {
-  const rest = splitHeadline(headline.value).rest
-  return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : headline.value
-})
-const chain = computed(() => heldChain(records.value))
-const details = computed(() => typeDetails(records.value, kind.value))
-// DAR-BE-368. The order's lines across its systems, from the records that carry them.
-const recordLines = computed(() => orderLineRows(records.value, comparedSystems.value))
-// DAR-UI-139. The systems the finding's check compares (DAR-BE-371: named whether or not it ran today), so a system that
-// holds no record of it still has its cell.
-const comparedSystems = computed(() => {
-  const checkId = props.findingDoc?.finding.check.id
-  const check = statementDoc.value?.checks?.find((item) => item.id === checkId)
-  return check?.systems?.length ? check.systems : Object.keys(check?.compared ?? {})
-})
-const basics = computed(() => basicFacts(records.value, comparedSystems.value))
 // DAR-UI-145. What the Agent tab pins: the open finding's badge, lead and basics. None beside (the finding is in view).
 const agentCard = computed<AgentFindingCard | null>(() => {
   const doc = props.findingDoc
   if (!props.finding || !doc || isHealth.value) return null
   return { findingId: props.finding, badge: findingStateBadge(doc.finding.status.state), lead: lead.value, facts: basics.value }
 })
-const kind = computed(() => recordKind(props.findingDoc?.finding.category.id ?? '', records.value))
-// DAR-UI-081 (Aditi: "add location ID to the line box", "with location ID, show the location name"). An order line's
-// location, from its HotWax item: "Chicago · 58".
-function lineLocation(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
-  const item = line.records?.OMS?.orderItem?.[0]
-  if (!item?.location) return ''
-  return item.locationName ? `${item.locationName} · ${item.location}` : `Location ${item.location}`
-}
 
-// DAR-UI-081 (Aditi: "add the IF id here too"). The NetSuite item fulfillments that shipped the line.
-function lineFulfillments(line: NonNullable<AuditFindingSummary['lines']>[number]): string {
-  return (line.records?.NetSuite?.salesOrderLine?.[0]?.fulfillments ?? []).join(', ')
-}
-
-// What the finding is stuck on, only where it adds to the headline (DAR-UI-071, said once): the return holding it, or the
-// order's line holding it up and that line's cause, in the fix's system.
-const stuckOn = computed(() => {
-  const held = records.value.find((row) => row.heldBy)
-  if (held?.heldBy) return `Return ${held.heldBy.id} is still ${(held.heldBy.status || 'open').toLowerCase()} in ${held.system}.`
-  const unit = props.orderUnit
-  const lines = unit?.lines ?? []
-  // A one-line order names no line as holding it up: its line is the one.
-  const holding = unit?.stuck?.length ? unit.stuck : lines.length === 1 ? [lines[0]!.id] : []
-  return lines.filter((line) => holding.includes(line.id) && line.cause)
-    .map((line) => {
-      const where = fixWhere.value && !line.cause?.includes(fixWhere.value) ? ` in ${fixWhere.value}` : ''
-      return `${lineLabel(unit?.order ?? unit?.id ?? '', line, lines)}: ${line.cause}${where}`
-    })
-    .join('; ')
-})
-
-// DAR-UI-144. The row's acknowledgement: the finding's once it is read (the backend resolves it for the whole row, and a
-// line that broke after it gives null; it is read again on every quiet reload), else its list row's while it loads. The
-// lists can be cached copies from before the acknowledgement. What was just saved or reopened shows at once, until the
-// reload brings a different word.
-const feedbackRecord = computed(() => props.orderUnit?.order ?? props.orderUnit?.headline ?? props.findingDoc?.finding.headline ?? null)
-const ackTarget = computed(() => props.findingDoc?.finding.id ?? props.finding)
-const sourceAck = computed<AuditAcknowledgement | null>(() => {
-  const read = props.findingDoc?.finding.acknowledgement
-  if (read !== undefined) return read
-  return props.orderUnit?.acknowledgement ?? null
-})
-const ackOverride = ref<{ id: string; acknowledgement: AuditAcknowledgement | null } | null>(null)
-const acknowledgement = computed(() =>
-  ackOverride.value && ackOverride.value.id === ackTarget.value ? ackOverride.value.acknowledgement : sourceAck.value)
-const ackEditing = ref<'new' | 'edit' | null>(null)
-const ackError = ref('')
-watch(() => props.finding, () => {
-  ackOverride.value = null
-  ackEditing.value = null
-  ackError.value = ''
-})
-watch(() => JSON.stringify(sourceAck.value), () => { ackOverride.value = null })
-const remindDays = computed(() => props.report.report.acknowledgeRemindDays ?? 5)
-const findingOpen = computed(() => props.findingDoc?.finding.status.state === 'open')
-const acknowledged = computed(() => findingOpen.value && Boolean(acknowledgement.value && !acknowledgement.value.reminded))
-const canAcknowledge = computed(() => findingOpen.value && (!acknowledgement.value || acknowledgement.value.reminded))
-const detailBadge = computed(() => acknowledged.value
-  ? { label: 'Acknowledged', tone: 'neutral' as const }
-  : findingStateBadge(props.findingDoc?.finding.status.state ?? ''))
-function ackWho(ack: AuditAcknowledgement): string {
-  return ack.by.label || ack.by.id
-}
-const ackCardLine = computed(() => {
-  const ack = acknowledgement.value
-  if (!ack) return ''
-  if (!ack.reminded) return `${ackWho(ack)} · ${shortDate(ack.at.slice(0, 10))}`
-  // Counted to the tenant's today, not the report's morning (yesterday's until today's run lands).
-  const days = acknowledgedDaysAgo(ack.at, props.report.report.tenant.timeZone)
-  return `Acknowledged ${days} ${days === 1 ? 'day' : 'days'} ago by ${ackWho(ack)}, still open`
-})
 function rowAcknowledged(item: AuditFindingSummary): boolean {
   return item.state === 'open' && Boolean(item.acknowledgement && !item.acknowledgement.reminded)
 }
 function ackRowLine(ack: AuditAcknowledgement): string {
   return [ackWho(ack), shortDate(ack.at.slice(0, 10)), (ack.note ?? '').split('\n')[0]!.trim()].filter(Boolean).join(' · ')
 }
+const ackEditing = ref<'new' | 'edit' | null>(null)
+watch(() => props.finding, () => { ackEditing.value = null })
 function toggleAck(kind: 'new' | 'edit'): void {
   ackEditing.value = ackEditing.value === kind ? null : kind
 }
@@ -1001,93 +887,17 @@ const ackEdit = ref<InstanceType<typeof AuditAcknowledgePopover> | null>(null)
 function focusAfterRender(target: typeof ackNew): void {
   void nextTick(() => target.value?.focus())
 }
-// DAR-UI-155 (Aditi: "UI changes should always be immediate.. backend can do its thing"). Acknowledge, change and Reopen
-// show at once: the card here, the row and the counts on the page (acknowledging). The saves run one after another, so a
-// Reopen pressed while its acknowledge is still saving lands after it. Only a refusal changes the screen again: the
-// acknowledgement goes back to what it was and the reason shows under the head.
-type AckSave = Promise<{ ok?: boolean; errors?: string[]; acknowledgement?: AuditAcknowledgement }>
-let ackSaves: Promise<void> = Promise.resolve()
-// Which showAck is on screen (the ref holds a reactive copy, so the object itself cannot be compared).
-let ackShown = 0
-// Per finding while its saves are queued: what the backend holds (as of the last answer), and how many are queued.
-// A refusal puts that back, never the value an earlier save in the queue showed but the backend may not have kept.
-const ackServer = new Map<string, AuditAcknowledgement | null>()
-const ackQueued = new Map<string, number>()
-function showAck(id: string, next: AuditAcknowledgement | null, save: () => AckSave, refused: string): void {
-  if (!ackQueued.get(id)) ackServer.set(id, acknowledgement.value)
-  ackQueued.set(id, (ackQueued.get(id) ?? 0) + 1)
-  const was = ackServer.get(id) ?? null
-  const seq = ++ackShown
-  ackOverride.value = { id, acknowledgement: next }
-  ackEditing.value = null
-  ackError.value = ''
-  emit('acknowledging', id, next, was, seq)
-  const stillShown = () => ackShown === seq && ackOverride.value?.id === id
-  ackSaves = ackSaves.then(async () => {
-    try {
-      const response = await save()
-      if (response.ok === false) throw new Error(response.errors?.[0] || refused)
-      ackServer.set(id, next === null ? null : (response.acknowledgement ?? next))
-      if (stillShown() && response.acknowledgement) ackOverride.value = { id, acknowledgement: response.acknowledgement }
-      emit('acknowledged', id, seq)
-    } catch (err) {
-      const reason = err instanceof Error && err.message ? err.message : refused
-      const held = ackServer.get(id) ?? null
-      if (stillShown()) ackOverride.value = { id, acknowledgement: held }
-      // Said here while this finding is open; the page has the mascot say it once the person has moved on.
-      const shown = ackTarget.value === id
-      if (shown) ackError.value = reason
-      emit('ackFailed', id, reason, shown, held, seq)
-    } finally {
-      const left = (ackQueued.get(id) ?? 1) - 1
-      if (left > 0) ackQueued.set(id, left)
-      else {
-        ackQueued.delete(id)
-        ackServer.delete(id)
-      }
-    }
-  })
-}
 function submitAck(kind: 'new' | 'edit', note: string, remind: boolean): void {
-  const id = ackTarget.value
-  const next = pendingAcknowledgement({
-    note, remind, remindDays: remindDays.value, me: props.me ?? { id: '', label: 'You' },
-    timeZone: props.report.report.tenant.timeZone, initial: kind === 'edit' ? acknowledgement.value : null,
-  })
-  showAck(id, next, () => (kind === 'edit' ? auditFacade.updateAcknowledgement(id, note, remind)
-    : auditFacade.acknowledgeFinding(id, note, remind)), 'The note did not save. Try again.')
+  ackEditing.value = null
+  if (kind === 'edit') ack.change(note, remind)
+  else ack.acknowledge(note, remind)
   focusAfterRender(ackEdit)
 }
 function reopenAck(): void {
-  const id = ackTarget.value
-  showAck(id, null, () => auditFacade.reopenAcknowledgement(id), 'Reopen did not go through. Try again.')
+  ackEditing.value = null
+  ack.reopen()
   focusAfterRender(ackNew)
 }
-
-const sinceLine = computed(() => {
-  const status = props.findingDoc?.finding.status
-  if (!status) return ''
-  const next = props.findingDoc?.finding.fix.verify?.nextCheck
-  return [`since ${shortDate(status.firstFound)}`, next ? `next ${shortDate(next)}` : '']
-    .filter(Boolean).join(' · ')
-})
-
-const evidenceFailed = computed(() => (props.findingDoc?.finding.evidence.checks ?? []).some((item) => !item.passed))
-const evidenceLine = computed(() => {
-  const checks = props.findingDoc?.finding.evidence.checks ?? []
-  return `${checks.filter((item) => item.passed).length}/${checks.length}`
-})
-
-// The conclusion's label and its explanation are often the headline again; say only what is new.
-const whyLine = computed(() => {
-  const diagnosis = props.findingDoc?.finding.diagnosis
-  const headline = props.findingDoc?.finding.headline ?? ''
-  const said = [headline, splitHeadline(headline).rest]
-  const parts = [diagnosis?.conclusion?.label, diagnosis?.explanation]
-    .map((part) => (part ?? '').trim().replace(/\.$/, ''))
-    .filter((part) => part && !said.some((text) => sameText(text, part)))
-  return [...new Set(parts)].map((part) => `${part}.`).join(' ')
-})
 
 function statementText(id: string): string {
   return findStatement(props.report, id)?.statement.text ?? ''
