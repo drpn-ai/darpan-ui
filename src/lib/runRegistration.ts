@@ -6,13 +6,16 @@ import { reconciliationFacade } from './api/facade'
 const RUN_REGISTRATION_POLL_INTERVAL_MS = 250
 const RUN_REGISTRATION_POLL_ATTEMPTS = 40
 
+// Ends early on abort. The abort listener goes when the wait does, so a long poll leaves none behind on the signal.
 function delay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms)
-    signal.addEventListener('abort', () => {
+    const finish = () => {
       clearTimeout(timer)
+      signal.removeEventListener('abort', finish)
       resolve()
-    }, { once: true })
+    }
+    const timer = setTimeout(finish, ms)
+    signal.addEventListener('abort', finish, { once: true })
   })
 }
 

@@ -73,10 +73,10 @@ export function runWindowPresetOptions(today: Date): RunWindowPresetOption[] {
   ]
 }
 
-export function formatWindowDateLabel(date: Date): string {
+function formatWindowDateLabel(date: Date): string {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
 }
 
-export function formatWindowRangeLabel(startDate: Date, endDate: Date): string {
+function formatWindowRangeLabel(startDate: Date, endDate: Date): string {
   return `${formatWindowDateLabel(startDate)} to ${formatWindowDateLabel(endDate)}`
 }

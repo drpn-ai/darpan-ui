@@ -17,7 +17,7 @@ import type { IconName } from './icons'
  */
 export type RunTypeId = 'sync' | 'lifecycle' | 'audit'
 
-export interface RunTypeDefinition {
+interface RunTypeDefinition {
   id: RunTypeId
   label: string
   /** One line for the create flow's choice card. */
