@@ -15,7 +15,7 @@
         <div class="run-result-rule-selector__options">
           <button
             type="button"
-            class="run-result-rule-selector__option"
+            class="run-result-rule-selector__option app-soft-panel"
             :class="{ 'run-result-rule-selector__option--active': selectedRuleFilterKey === ALL_RULE_FILTER_KEY }"
             data-rule-filter-key="all"
             :aria-pressed="selectedRuleFilterKey === ALL_RULE_FILTER_KEY ? 'true' : 'false'"
@@ -30,7 +30,7 @@
             v-for="option in ruleSelectorOptions"
             :key="option.key"
             type="button"
-            class="run-result-rule-selector__option"
+            class="run-result-rule-selector__option app-soft-panel"
             :class="{ 'run-result-rule-selector__option--active': selectedRuleFilterKey === option.key }"
             :data-rule-filter-key="option.key"
             :aria-pressed="selectedRuleFilterKey === option.key ? 'true' : 'false'"
@@ -80,7 +80,7 @@
         <InlineValidation v-else-if="loadError" tone="error" :message="loadError" />
 
         <section v-else-if="savedOutput || liveRunResultId" class="reconciliation-diff-details">
-          <section v-if="showRunSourceDetails" class="run-result-source-details" data-testid="run-result-source-details">
+          <section v-if="showRunSourceDetails" class="run-result-source-details app-soft-panel" data-testid="run-result-source-details">
             <!-- Both halves answer the same question. The label is only a calendar day,
                  resolved in the viewer's own zone, so v-explain carries the exact pair of
                  instants behind it — the part that settles whether a record was really
@@ -125,7 +125,7 @@
 
           <section
             v-if="showStepTimeline"
-            class="run-result-step-timeline"
+            class="run-result-step-timeline app-soft-panel"
             data-testid="run-result-step-timeline"
           >
             <button
@@ -1367,9 +1367,6 @@ watch(savedRunRow, () => {
   align-items: center;
   min-height: 3.35rem;
   padding: var(--space-1-5);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 92%, white);
   color: var(--text);
   text-align: left;
 }
@@ -1407,9 +1404,6 @@ watch(savedRunRow, () => {
 .run-result-source-details,
 .run-result-step-timeline {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 92%, white);
 }
 
 .run-result-source-details {

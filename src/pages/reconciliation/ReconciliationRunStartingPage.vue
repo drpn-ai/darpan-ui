@@ -10,7 +10,7 @@
     </template>
 
     <StaticPageSection>
-      <section class="run-starting-steps" data-testid="run-starting-steps" aria-label="Run steps">
+      <section class="run-starting-steps app-soft-panel" data-testid="run-starting-steps" aria-label="Run steps">
         <span class="micro-label">Run steps</span>
         <ol class="run-starting-steps__list">
           <li v-for="step in steps" :key="step.stageCode" class="action-row">
@@ -183,9 +183,6 @@ function retry(): void {
   display: grid;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 92%, white);
 }
 
 .run-starting-steps__list {

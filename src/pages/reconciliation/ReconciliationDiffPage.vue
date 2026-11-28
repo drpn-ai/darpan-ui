@@ -99,7 +99,7 @@
           <InlineValidation v-else-if="latestSavedOutputError" tone="error" :message="latestSavedOutputError" />
           <template v-else-if="latestSavedOutput && latestSavedOutputRoute">
             <RouterLink
-              class="reconciliation-run-history-card reconciliation-run-history-card--link"
+              class="reconciliation-run-history-card app-soft-panel reconciliation-run-history-card--link"
               data-testid="latest-run-result"
               :to="latestSavedOutputRoute"
             >
@@ -964,9 +964,6 @@ onMounted(() => {
 
 .reconciliation-run-history-card {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-2) 82%, white);
 }
 
 .reconciliation-run-history-card--link {

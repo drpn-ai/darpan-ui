@@ -2293,6 +2293,15 @@ label > span {
   opacity: 1;
 }
 
+/* The run pages' soft panel: a bordered box a shade lighter than the page (S99-109). The run-starting steps, the run
+   result's rule options, source details and step timeline, and the Diff page's history card each drew it, one at 82%.
+   Each keeps its own padding and layout. */
+.app-soft-panel {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface-2) 92%, white);
+}
+
 /* A bordered list of equal rows: the settings-page rows (DAR-UI-128). RunConclusionRows, the audit's statements, the
    rule set's filters and rules, and the config history drew this frame value for value (U08). The rows keep their own
    grids; the list draws the frame and the line between rows. */
