@@ -507,6 +507,53 @@ describe('ReconciliationDiffPage', () => {
     })
   })
 
+  function mockLatestOutput(overrides: Record<string, unknown>) {
+    route.query = { savedRunId: 'RS_ORDER_CSV', runName: 'CSV Order Compare', file1SystemLabel: 'OMS', file2SystemLabel: 'SHOPIFY' }
+    listGeneratedOutputs.mockResolvedValue({
+      ok: true,
+      messages: [],
+      errors: [],
+      pagination: { pageIndex: 0, pageSize: 1, totalCount: 1, pageCount: 1 },
+      generatedOutputs: [{
+        fileName: 'CSV-Order-Compare-diff-20260330-150000.json',
+        sourceFormat: 'json',
+        availableFormats: ['json'],
+        savedRunId: 'RS_ORDER_CSV',
+        file1Label: 'OMS',
+        file2Label: 'SHOPIFY',
+        totalDifferences: 4,
+        onlyInFile1Count: 1,
+        onlyInFile2Count: 3,
+        createdDate: '2026-03-30T15:00:00.000Z',
+        ...overrides,
+      }],
+    })
+  }
+
+  it('badges a latest result whose run failed after writing it, rather than showing a clean card (D2)', async () => {
+    mockLatestOutput({ statusEnumId: 'AUT_STAT_FAILED', reconciliationRunResultId: 'RUN_RULE_FAILED' })
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    const card = wrapper.get('[data-testid="latest-run-result"]')
+    expect(card.get('.status-badge').text()).toBe('Failed')
+    expect(JSON.parse(card.attributes('data-to') ?? '{}')).toMatchObject({ params: { runResultId: 'RUN_RULE_FAILED' } })
+  })
+
+  it('shows one Findings figure on a single-sided latest result, not two zero Missing counts', async () => {
+    mockLatestOutput({ totalDifferences: 7, onlyInFile1Count: undefined, onlyInFile2Count: undefined })
+
+    const wrapper = mount(ReconciliationDiffPage)
+    await flushPromises()
+
+    const card = wrapper.get('[data-testid="latest-run-result"]')
+    expect(card.text()).toContain('Findings')
+    expect(card.text()).toContain('7')
+    expect(card.text()).not.toContain('Missing from')
+    expect(card.find('.status-badge').exists()).toBe(false)
+  })
+
   it('opens run settings for the selected run from the action bar', async () => {
     route.query = { savedRunId: 'RS_ORDER_CSV' }
 

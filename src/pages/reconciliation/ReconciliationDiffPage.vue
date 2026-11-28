@@ -105,20 +105,24 @@
             >
               <div class="reconciliation-run-history-card__head">
                 <span class="reconciliation-run-history-card__date">{{ formatSavedResultDateTime(latestSavedOutput.createdDate) }}</span>
+                <StatusBadge v-if="latestSavedOutputOutcome" v-bind="latestSavedOutputOutcome" />
               </div>
               <dl class="reconciliation-run-history-card__metrics">
                 <div>
-                  <dt>Total differences</dt>
+                  <dt>{{ latestSavedOutputSingleSided ? 'Findings' : 'Total differences' }}</dt>
                   <dd>{{ latestSavedOutput.totalDifferences ?? 0 }}</dd>
                 </div>
-                <div>
-                  <dt>Missing from {{ latestSavedOutputSystemNames.file1 }}</dt>
-                  <dd>{{ latestSavedOutput.onlyInFile2Count ?? 0 }}</dd>
-                </div>
-                <div>
-                  <dt>Missing from {{ latestSavedOutputSystemNames.file2 }}</dt>
-                  <dd>{{ latestSavedOutput.onlyInFile1Count ?? 0 }}</dd>
-                </div>
+                <!-- A single-sided run has no second system and writes neither Missing count: one population, one figure. -->
+                <template v-if="!latestSavedOutputSingleSided">
+                  <div>
+                    <dt>Missing from {{ latestSavedOutputSystemNames.file1 }}</dt>
+                    <dd>{{ latestSavedOutput.onlyInFile2Count ?? 0 }}</dd>
+                  </div>
+                  <div>
+                    <dt>Missing from {{ latestSavedOutputSystemNames.file2 }}</dt>
+                    <dd>{{ latestSavedOutput.onlyInFile1Count ?? 0 }}</dd>
+                  </div>
+                </template>
               </dl>
             </RouterLink>
           </template>
@@ -164,6 +168,7 @@ import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import LoadingState from '../../components/ui/LoadingState.vue'
+import StatusBadge from '../../components/ui/StatusBadge.vue'
 import { ApiCallError } from '../../lib/api/client'
 import { pollForRegisteredRunResultId } from '../../lib/runRegistration'
 import type { GeneratedOutput, SavedRunSummary, SavedRunSystemOption } from '../../lib/api/types'
@@ -186,6 +191,7 @@ import {
   todayInDisplayTimeZone,
 } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
+import { isSingleSidedOutput, uncleanRunOutcome } from '../../lib/reconciliationDisplay'
 import { buildRuleSetDraft, buildSavedRunEditorRoute } from '../../lib/savedRunEditorRoute'
 import { useCalendarWidget } from '../../composables/useCalendarWidget'
 import {
@@ -346,6 +352,9 @@ const activeFileAccept = computed(() => {
   return ''
 })
 const latestSavedOutputRoute = computed<RouteLocationRaw | null>(() => buildRunResultRoute(latestSavedOutput.value))
+// DAR-OPS-029 D2: a run that failed after writing its result keeps the result, and the card says it failed.
+const latestSavedOutputOutcome = computed(() => uncleanRunOutcome(latestSavedOutput.value?.statusEnumId))
+const latestSavedOutputSingleSided = computed(() => Boolean(latestSavedOutput.value && isSingleSidedOutput(latestSavedOutput.value)))
 // The saved-result card counts records per SYSTEM, so it names the system rather than the endpoint
 // the run extracted ("Shopify Order Return References"). The upload prompts keep the endpoint name:
 // there it is what tells an operator which extract to hand over.
@@ -419,7 +428,7 @@ const canContinue = computed(() => {
 const hasFeedbackMessages = computed(() => validationErrors.value.length > 0 || processingWarnings.value.length > 0)
 const shouldCenterStage = computed(() => !showEmptyState.value && !hasFeedbackMessages.value)
 const showLatestSavedOutputBoard = computed(
-  () => !!selectedSavedRun.value && (latestSavedOutputLoading.value || !!latestSavedOutputError.value || !!latestSavedOutput.value),
+  () => !!selectedSavedRun.value && (latestSavedOutputLoading.value || !!latestSavedOutputError.value || !!latestSavedOutputRoute.value),
 )
 const primaryButtonLabel = computed(() => {
   if (!isFinalStep.value) return 'Next'
