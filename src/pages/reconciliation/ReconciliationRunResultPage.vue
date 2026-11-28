@@ -563,7 +563,6 @@ import type {
   GeneratedOutput,
   GeneratedOutputDifferencesMetadata,
   GeneratedOutputDifferencesSummary,
-  ReconciliationRunStep,
   RunConclusion,
   RunConclusionCount,
   RunConclusionQuestion,
@@ -573,7 +572,7 @@ import type {
 } from '../../lib/api/types'
 import { usePermissionsStore } from '../../stores/permissions'
 import { isActiveRunStatus, useRunResultsStore } from '../../stores/runResults'
-import { RUN_STAGE_SEQUENCE, formatRunStepDuration, normalizeDisplayText, reconciliationStageLabel } from '../../lib/reconciliationDisplay'
+import { normalizeDisplayText } from '../../lib/reconciliationDisplay'
 import {
   ALL_RULE_FILTER_KEY,
   BASE_RULE_FILTER_KEY,
@@ -591,13 +590,13 @@ import {
 import { buildRuleSetDraft, buildSavedRunEditorRoute, resolveSavedRunEditorTarget, savedRunSystemLabel } from '../../lib/savedRunEditorRoute'
 import { formatClockTime, formatSavedResultDateTime } from '../../lib/utils/date'
 import { darpanSystemNamePair } from '../../lib/utils/darpanSystems'
-import { countLabel } from '../../lib/utils/strings'
 import { useReconciliationDraftStore } from '../../stores/reconciliationDraft'
 import { useRunResultDifferences } from '../../composables/useRunResultDifferences'
 import { useRunResultDownloads } from '../../composables/useRunResultDownloads'
 import { useRunResultName } from '../../composables/useRunResultName'
 import { useRunResultSourceDetails } from '../../composables/useRunResultSourceDetails'
 import { useRunRetry } from '../../composables/useRunRetry'
+import { useRunStepTimeline } from '../../composables/useRunStepTimeline'
 
 interface DiffDetailBucketCard {
   key: string
@@ -796,14 +795,6 @@ function pulseFlagFor(recordId: unknown): string {
 const runStatus = computed(() =>
   timelineRunResultId.value ? runResultsStore.getRunStatus(timelineRunResultId.value) : null,
 )
-const runStatusSteps = computed<ReconciliationRunStep[]>(() => runStatus.value?.steps ?? [])
-const showStepTimeline = computed(() => runStatus.value?.ok === true)
-// Collapsed by default on the saved-result view (a forensic detail there); expanded when the
-// page opens on a live run, where step progress IS the primary content.
-const stepTimelineCollapsed = ref(!liveRunResultId.value)
-// A run that finishes here shows its result in place: the steps fold away, as they open on a finished result.
-watch(liveRunResultId, (id, was) => { if (was && !id) stepTimelineCollapsed.value = true })
-
 const runStatusEnumId = computed(() => normalizeDisplayText(runStatus.value?.statusEnumId))
 // Read in both modes. A run whose rules did not fully evaluate ends FAILED after it wrote its result
 // (runSavedRunDiff), so the page can open on the file of a failed run: its counts must not read as clean.
@@ -813,30 +804,23 @@ const runFailed = computed(() => runStatusEnumId.value === 'AUT_STAT_FAILED')
 const liveRunActive = computed(() =>
   Boolean(liveRunResultId.value) && (runStatus.value == null || isActiveRunStatus(runStatusEnumId.value)))
 
-// Clock for the running step's elapsed time. A paged API extract is the longest stage of a run
-// and reports no record count until it ends, so without this the whole timeline sits visually
-// frozen for minutes even though the status poll is landing responses on schedule. Ticks only
-// while the run is live, and the poll interval is unrelated — this is purely a display clock.
-const liveNowMs = ref(Date.now())
-let liveClockTimer: ReturnType<typeof setInterval> | null = null
-
-function stopLiveClock(): void {
-  if (liveClockTimer == null) return
-  clearInterval(liveClockTimer)
-  liveClockTimer = null
-}
-
-watch(liveRunActive, (active) => {
-  if (!active) {
-    stopLiveClock()
-    return
-  }
-  if (liveClockTimer != null) return
-  liveNowMs.value = Date.now()
-  liveClockTimer = setInterval(() => {
-    liveNowMs.value = Date.now()
-  }, 1000)
-}, { immediate: true })
+const {
+  showStepTimeline,
+  stepTimelineCollapsed,
+  displayedRunSteps,
+  failedStepStageLabel,
+  stepStatusLabel,
+  stepStatusTone,
+  stepStageLabel,
+  stepDurationLabel,
+  stepRecordsLabel,
+} = useRunStepTimeline({
+  runStatus,
+  liveRunResultId,
+  liveRunActive,
+  file1Label: diffDetailsFile1Label,
+  file2Label: diffDetailsFile2Label,
+})
 
 // A terminal status that is not a clean finish is said in both modes; the rest is live progress.
 const TERMINAL_RUN_NOTES: Record<string, string> = {
@@ -875,10 +859,7 @@ const showCancelRun = computed(() =>
 const { retrying, retry } = useRunRetry()
 const showRetryRun = computed(() =>
   runFailed.value && Boolean(liveRunResultId.value) && canRunActiveTenantReconciliation.value && Boolean(savedRunId.value))
-const retryLabel = computed(() => {
-  const failedStep = runStatusSteps.value.find((step) => step.statusEnumId === 'AUT_STAT_FAILED')
-  return failedStep ? `Retry from ${stepStageLabel(failedStep)}` : 'Retry'
-})
+const retryLabel = computed(() => (failedStepStageLabel.value ? `Retry from ${failedStepStageLabel.value}` : 'Retry'))
 
 async function cancelRun(): Promise<void> {
   const runId = liveRunResultId.value
@@ -905,22 +886,6 @@ const runFailureText = computed(() => (
   || normalizeDisplayText(runStatus.value?.errorMessage)
   || (liveRunResultId.value ? 'Run failed before any results were produced.' : 'Run failed. These results may be incomplete.')
 ))
-
-// Timeline rows for display: the actual step rows, plus — while the run is live — a synthesized
-// "Pending" row for each canonical stage the run has not reached yet, so the operator sees
-// completed / running / remaining in one list. Conditional stages that never start simply drop
-// out once a later real stage begins (they only render while their sequence is ahead of the
-// furthest real row).
-const displayedRunSteps = computed<ReconciliationRunStep[]>(() => {
-  const actualSteps = runStatusSteps.value
-  if (!liveRunActive.value) return actualSteps
-  const maxSeenSequence = actualSteps.reduce((max, step) => Math.max(max, step.stageSequence ?? 0), 0)
-  const seenStageCodes = new Set(actualSteps.map((step) => normalizeDisplayText(step.stageCode)))
-  const pendingRemainder = RUN_STAGE_SEQUENCE
-    .map((stageCode, index) => ({ stageCode, stageSequence: index + 1, statusEnumId: 'AUT_STAT_PENDING' }))
-    .filter((step) => step.stageSequence > maxSeenSequence && !seenStageCodes.has(step.stageCode))
-  return [...actualSteps, ...pendingRemainder]
-})
 
 // Files populate as extract stages land them on the run row; the poll carries the same
 // sourceDetails shape the saved-result payload uses, so the existing section renders both.
@@ -1041,47 +1006,6 @@ watch(timelineRunResultId, (runResultId) => {
   void runResultsStore.startRunStatusPoll(runResultId)
 }, { immediate: true })
 
-
-const STEP_STATUS_LABELS: Record<string, string> = {
-  AUT_STAT_PENDING: 'Pending',
-  AUT_STAT_RUNNING: 'Running',
-  AUT_STAT_SUCCESS: 'Done',
-  AUT_STAT_FAILED: 'Failed',
-  AUT_STAT_NO_DATA: 'No data',
-  AUT_STAT_CANCELLED: 'Cancelled',
-}
-
-function stepStatusLabel(step: ReconciliationRunStep): string {
-  const statusEnumId = normalizeDisplayText(step.statusEnumId)
-  return STEP_STATUS_LABELS[statusEnumId] ?? (statusEnumId || 'Unknown')
-}
-
-function stepStatusTone(step: ReconciliationRunStep): 'neutral' | 'success' | 'warning' | 'danger' {
-  const statusEnumId = normalizeDisplayText(step.statusEnumId)
-  if (statusEnumId === 'AUT_STAT_SUCCESS') return 'success'
-  if (statusEnumId === 'AUT_STAT_FAILED') return 'danger'
-  if (statusEnumId === 'AUT_STAT_RUNNING' || statusEnumId === 'AUT_STAT_CANCELLED') return 'warning'
-  return 'neutral'
-}
-
-function stepStageLabel(step: ReconciliationRunStep): string {
-  // metricsJson carries which systems a VERIFY step rechecked -- without it, a run with two
-  // verification passes renders two rows reading exactly the same thing.
-  return reconciliationStageLabel(step.stageCode, diffDetailsFile1Label.value, diffDetailsFile2Label.value, step.metricsJson)
-}
-
-function stepDurationLabel(step: ReconciliationRunStep): string {
-  // A running step has no completedDate to measure against, so it is timed against the live
-  // clock and advances every second until the stage lands its real completion timestamp.
-  if (step.completedDate == null && normalizeDisplayText(step.statusEnumId) === 'AUT_STAT_RUNNING') {
-    return formatRunStepDuration(step.startedDate, liveNowMs.value)
-  }
-  return formatRunStepDuration(step.startedDate, step.completedDate)
-}
-
-function stepRecordsLabel(step: ReconciliationRunStep): string {
-  return step.recordCount != null ? countLabel(step.recordCount, 'record') : ''
-}
 
 const {
   runSourceDetails,
@@ -1344,7 +1268,6 @@ let loadSavedResultController: AbortController | null = null
 onBeforeUnmount(() => {
   pageAbortController.abort()
   loadSavedResultController?.abort()
-  stopLiveClock()
   for (const runResultId of polledTimelineRunIds) runResultsStore.stopRunStatusPoll(runResultId)
   polledTimelineRunIds.clear()
 })
