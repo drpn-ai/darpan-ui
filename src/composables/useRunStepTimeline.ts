@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { GetReconciliationRunStatusResponse, ReconciliationRunStep } from '../lib/api/types'
-import { RUN_STAGE_SEQUENCE, formatRunStepDuration, normalizeDisplayText, reconciliationStageLabel } from '../lib/reconciliationDisplay'
+import { RUN_STAGE_SEQUENCE, formatRunStepDuration, normalizeDisplayText, reconciliationStageLabel, type RunStatusTone } from '../lib/reconciliationDisplay'
 import { countLabel } from '../lib/utils/strings'
 
 export interface UseRunStepTimelineDeps {
@@ -20,7 +20,7 @@ export interface UseRunStepTimeline {
   /** The stage the run failed at, as the timeline names it; empty when no step failed. */
   failedStepStageLabel: ComputedRef<string>
   stepStatusLabel: (step: ReconciliationRunStep) => string
-  stepStatusTone: (step: ReconciliationRunStep) => 'neutral' | 'success' | 'warning' | 'danger'
+  stepStatusTone: (step: ReconciliationRunStep) => RunStatusTone
   stepStageLabel: (step: ReconciliationRunStep) => string
   stepDurationLabel: (step: ReconciliationRunStep) => string
   stepRecordsLabel: (step: ReconciliationRunStep) => string
@@ -91,7 +91,9 @@ export function useRunStepTimeline(deps: UseRunStepTimelineDeps): UseRunStepTime
     return STEP_STATUS_LABELS[statusEnumId] ?? (statusEnumId || 'Unknown')
   }
 
-  function stepStatusTone(step: ReconciliationRunStep): 'neutral' | 'success' | 'warning' | 'danger' {
+  // S99-112: a step's tone is its own, not runStatusTone's: a cancelled step warns where a cancelled run is danger, and a
+  // pending step is neutral where a pending run warns. Same enum, different readings, so the maps stay apart.
+  function stepStatusTone(step: ReconciliationRunStep): RunStatusTone {
     const statusEnumId = normalizeDisplayText(step.statusEnumId)
     if (statusEnumId === 'AUT_STAT_SUCCESS') return 'success'
     if (statusEnumId === 'AUT_STAT_FAILED') return 'danger'
