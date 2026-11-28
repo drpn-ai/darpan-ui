@@ -52,7 +52,6 @@ function findSavedRunEditorTarget(rows: SavedRunSummary[], targetId: string): Sa
   return rows.find((row) => savedRunMatchesEditorTarget(row, targetId)) ?? null
 }
 
-
 function normalizeLoadedExcludeFilters(
   filters: SourceExcludeFilter[] | undefined,
 ): SourceExcludeFilter[] | undefined {

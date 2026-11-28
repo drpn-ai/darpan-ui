@@ -1,11 +1,12 @@
 import type { WorkflowShortcutChoiceOption } from '../components/workflow/WorkflowShortcutChoiceCards.vue'
 import type { CalendarRange, UseCalendarWidget } from '../composables/useCalendarWidget'
-import { addDays } from './utils/date'
+import { addDays, startOfMonth } from './utils/date'
 
 // The days a run looks at, asked as a Sync run asks them: Previous Day / Previous Week / Month to Date cards, each
 // naming its dates, and Custom Dates for the calendar. DAR-UI-060 shares it with a lifecycle's start page, which
 // anchors it lateAfterDays back; a Sync run anchors it today.
-export type RunWindowPreset = 'previous-day' | 'previous-week' | 'month-to-date' | 'custom'
+const RUN_WINDOW_PRESETS = ['previous-day', 'previous-week', 'month-to-date', 'custom'] as const
+export type RunWindowPreset = (typeof RUN_WINDOW_PRESETS)[number]
 
 export interface RunWindowPresetOption extends WorkflowShortcutChoiceOption {
   value: RunWindowPreset
@@ -16,7 +17,7 @@ export interface RunWindowRange extends CalendarRange {
 }
 
 export function isRunWindowPreset(value: string): value is RunWindowPreset {
-  return ['previous-day', 'previous-week', 'month-to-date', 'custom'].includes(value)
+  return (RUN_WINDOW_PRESETS as readonly string[]).includes(value)
 }
 
 export function presetWindowRange(preset: Exclude<RunWindowPreset, 'custom'>, today: Date): RunWindowRange {
@@ -42,7 +43,7 @@ export function presetWindowRange(preset: Exclude<RunWindowPreset, 'custom'>, to
   // Month to date: the 1st of yesterday's month through yesterday, so on the 1st it is the whole month just ended
   // rather than no days at all.
   const lastDay = addDays(today, -1)
-  const monthStart = new Date(lastDay.getFullYear(), lastDay.getMonth(), 1)
+  const monthStart = startOfMonth(lastDay)
   return {
     startDate: monthStart,
     endExclusiveDate: today,

@@ -1,7 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { RunConclusionSuggestedFilter } from '../lib/api/types'
-import type { SavedRunSummary } from '../lib/api/types'
+import type { RunConclusionSuggestedFilter, SavedRunSummary } from '../lib/api/types'
 import type {
   ReconciliationAutomationDraft,
   ReconciliationAutomationDraftState,
