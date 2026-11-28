@@ -452,18 +452,17 @@
 </template>
 
 <script setup lang="ts">
-import AppIcon from '../../components/ui/AppIcon.vue'
 // DAR-BE-334 (was DAR-UI-124's script page), DAR-UI-138. One tenant query on a page of its own, read top to bottom as a
 // notebook: its name and schedule facts, the ask box, then 1 Data (each input as a sentence by name; a part opens the
 // Data popup; the raw read JSON one icon away), 2 Script, 3 Result (this visit's runs, each file with a 20-row preview).
-// The read JSON stays the one source of truth: the popup's changes are written into it. The ask box hands the question to the queries agent, whose proposal has
-// already run; it fills this page and saves nothing. One Save keeps the query and its schedule together; the popups
-// and the toggle only change this page until then. Scheduling needs tenant admin (it sends the tenant's data out), and
-// only the schedule's owner can send it by hand.
+// The read JSON stays the one source of truth: the popup's changes are written into it. One Save keeps the query and
+// its schedule together; the popups and the toggle only change this page until then. DAR-OPS-029 U09: the ask box
+// (useQueryAsk), this visit's runs (useQueryRuns) and the schedule (useQuerySchedule) live in their own composables.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import QueryDataPopup from '../../components/settings/QueryDataPopup.vue'
 import AppCancelAction from '../../components/ui/AppCancelAction.vue'
+import AppIcon from '../../components/ui/AppIcon.vue'
 import AppSaveAction from '../../components/ui/AppSaveAction.vue'
 import AppSelect from '../../components/ui/AppSelect.vue'
 import AppToggleSwitch from '../../components/ui/AppToggleSwitch.vue'
@@ -475,8 +474,11 @@ import StaticPageSection from '../../components/ui/StaticPageSection.vue'
 import StaticRecordTitle from '../../components/ui/StaticRecordTitle.vue'
 import WorkflowStepForm from '../../components/workflow/WorkflowStepForm.vue'
 import WorkflowTimeSelect from '../../components/workflow/WorkflowTimeSelect.vue'
+import { useQueryAsk } from '../../composables/useQueryAsk'
+import { cellText, queryErrorText as errorText, rowsWords, useQueryRuns } from '../../composables/useQueryRuns'
+import { useQuerySchedule } from '../../composables/useQuerySchedule'
 import { agentFacade, scriptFacade, settingsFacade } from '../../lib/api/facade'
-import type { QueryError, QueryRun, QueryScheduleOutcome, TenantQuery, TenantQuerySchedule } from '../../lib/api/scriptTypes'
+import type { QueryScheduleOutcome, TenantQuery } from '../../lib/api/scriptTypes'
 import type { TenantChatSpace } from '../../lib/api/types'
 import {
   MAX_INPUTS,
@@ -488,20 +490,9 @@ import {
   type QueryCatalog,
   type ReadInput,
 } from '../../lib/queryRead'
-import {
-  badRecipient,
-  cronFromTime,
-  formatRecipients,
-  isFailedStatus,
-  isOn,
-  parseRecipients,
-  scheduleWords,
-  sendsToWords,
-  statusWords,
-  timeFromCron,
-} from '../../lib/scriptDeployment'
+import { statusWords } from '../../lib/scriptDeployment'
 import { WORKFLOW_CANCEL_REQUEST_EVENT } from '../../lib/uiEvents'
-import { formatClockTime, formatDateTime } from '../../lib/utils/date'
+import { formatDateTime } from '../../lib/utils/date'
 import { hintsFor } from '../../lib/mascotHints'
 import { useAuthStore } from '../../stores/auth'
 import { useMascotStore } from '../../stores/mascot'
@@ -515,23 +506,6 @@ interface Draft {
   scriptBody: string
 }
 
-/** The schedule as this page holds it until Save. */
-interface Schedule {
-  cronExpression: string
-  isActive: boolean
-  emailTo: string
-  emailCc: string
-  chatSpaceId: string
-}
-
-interface RunCell {
-  n: number
-  label: string
-  time: string
-  run: QueryRun
-  meta: string
-}
-
 type Popup = 'schedule' | 'preview' | 'delete'
 
 /** The Data popup: the input it changes (null adds one) at its place in the read. */
@@ -542,7 +516,6 @@ interface DataEdit {
 }
 
 const FUNCTIONS_DOCS_URL = 'https://developers.drpn.ai/tenant-queries/functions'
-const MAX_RUNS = 3
 /** A new query's name starts blank and shows this, muted, as its placeholder: it still has to be given. */
 const NEW_NAME = 'New query'
 /** A new query reads the tenant's first audit, so the example runs as it opens; blank only when the tenant has none. */
@@ -571,14 +544,12 @@ const canSchedule = computed(() => permissionsStore.canScheduleQueries)
 const routeQueryId = computed(() => String(route.params.tenantScriptId ?? ''))
 
 const saved = ref<TenantQuery | null>(null)
-const savedSchedule = ref<TenantQuerySchedule | null>(null)
 const timeZone = ref('')
 const chatSpaces = ref<TenantChatSpace[]>([])
 const loading = ref(false)
 const pageError = ref('')
 
 const draft = ref<Draft | null>(null)
-const schedule = ref<Schedule | null>(null)
 const baseline = ref('')
 /** The read as raw JSON, for inputs the popup cannot change and for those who would rather type it. */
 const showReadJson = ref(false)
@@ -589,25 +560,27 @@ const dataEdit = ref<DataEdit | null>(null)
 
 const saving = ref(false)
 const running = ref(false)
-const asking = ref(false)
 const runError = ref('')
-const runs = ref<RunCell[]>([])
-let runCount = 0
-
-const askText = ref('')
-const askReply = ref('')
-const askOptions = ref<string[]>([])
-/** The read and script the agent's last proposal replaced, so the person can put them back. */
-const previousDraft = ref<{ readSpecJson: string; scriptBody: string } | null>(null)
 /** The ask box shows only when the agent is on and this person has live AI access here. */
 const agentReady = ref(false)
-let conversationId: string | undefined
 
 const activePopup = ref<Popup | null>(null)
 const popupBusy = ref(false)
 const popupError = ref('')
-const scheduleForm = ref({ time: '', emailTo: '', emailCc: '', chatSpaceId: '', isActive: false })
 const preview = ref<QueryScheduleOutcome | null>(null)
+
+const { runs, errorLine, addRun, nextRunLabel } = useQueryRuns()
+const {
+  savedSchedule, schedule, scheduleForm, isOwner, chatSpaceOptions, scheduleText, sendsToText, addressesText,
+  lastRunFailed, lastRunText, adopt: adoptSchedule, fillForm, stageForm, setActive, persist: persistSchedule, reread,
+  runSaved,
+} = useQuerySchedule({ timeZone, chatSpaces, userId: () => authStore.userId })
+const { askText, askReply, askOptions, asking, previousDraft, ask, answer, putBackDraft } = useQueryAsk({
+  draft,
+  isBusy: () => busy.value,
+  onRun: addRun,
+  setError: (message) => { runError.value = message },
+})
 
 const busy = computed(() => saving.value || running.value || asking.value || popupBusy.value)
 const toggleLabel = computed(() => {
@@ -615,30 +588,12 @@ const toggleLabel = computed(() => {
   if (!schedule.value) return 'On schedule: set up a schedule first'
   return 'On schedule'
 })
-/** The addresses in full, under Sends to, for everyone who can see the query (not only those who can change it). */
-const addressesText = computed(() => {
-  const current = schedule.value
-  if (!current) return ''
-  return [current.emailTo, ...(current.emailCc ? [`cc ${current.emailCc}`] : [])].filter(Boolean).join(' · ')
-})
-const isOwner = computed(() => Boolean(savedSchedule.value?.ownerUserId) && savedSchedule.value?.ownerUserId === authStore.userId)
 
 function snapshot(): string {
   return JSON.stringify({ draft: draft.value, schedule: schedule.value })
 }
 const nameMissing = computed(() => draft.value !== null && !draft.value.queryName.trim())
 const dirty = computed(() => Boolean(draft.value) && snapshot() !== baseline.value)
-
-const chatSpaceOptions = computed(() => [
-  { value: '', label: 'No chat' },
-  ...chatSpaces.value
-    .filter((space) => space.isActive !== 'N')
-    .map((space) => ({ value: space.chatSpaceId, label: `${space.spaceName} · ${space.chatProviderLabel}` })),
-])
-
-function spaceName(chatSpaceId: string): string {
-  return chatSpaces.value.find((space) => space.chatSpaceId === chatSpaceId)?.spaceName ?? chatSpaceId
-}
 
 const readParse = computed(() => parseRead(draft.value?.readSpecJson))
 const readInputs = computed(() => (readParse.value.ok ? readParse.value.read.inputs : []))
@@ -647,21 +602,6 @@ const readRows = computed(() => readInputs.value.map((input) => {
   const limits = editLimits(input)
   return { name: inputName(input), parts: describeInput(input, catalog.value), limits, editable: canEdit.value && !limits.length }
 }))
-
-const scheduleText = computed(() => {
-  if (!schedule.value) return 'Not scheduled'
-  return schedule.value.isActive ? scheduleWords(schedule.value.cronExpression) : 'Off'
-})
-const sendsToText = computed(() => (schedule.value
-  ? sendsToWords(parseRecipients(schedule.value.emailTo).length, schedule.value.chatSpaceId ? spaceName(schedule.value.chatSpaceId) : null)
-  : '—'))
-const lastRunFailed = computed(() => isFailedStatus(savedSchedule.value?.lastRunStatus))
-const lastRunText = computed(() => {
-  const current = savedSchedule.value
-  if (!current?.lastRunDate) return 'Never'
-  const when = formatDateTime(current.lastRunDate, { timeZone: timeZone.value })
-  return `${when} · ${statusWords(current.lastRunStatus).toLowerCase()}`
-})
 
 // The header strip (DAR-UI-126): the two that change open the schedule popup (tenant admins only); Sends as (the
 // schedule's owner) and Last run only read.
@@ -678,7 +618,6 @@ const facts = computed<StaticFact[]>(() => {
 })
 
 const lineCount = computed(() => Math.max((draft.value?.scriptBody ?? '').split('\n').length, 12))
-const errorLine = computed(() => runs.value[0]?.run.error?.line ?? null)
 
 const popupTitle = computed(() => {
   switch (activePopup.value) {
@@ -693,53 +632,12 @@ function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
-const READ_KINDS = new Set(['READ_ERROR', 'READ_NOT_ALLOWED', 'READ_TOO_LARGE'])
-
-function errorText(error: QueryError): string {
-  if (READ_KINDS.has(error.kind)) return `${statusWords(error.kind)}: ${error.message}`
-  return `${error.line ? `Line ${error.line}: ` : ''}${error.message}`
-}
-
-function rowsWords(count: number): string {
-  return `${count.toLocaleString()} row${count === 1 ? '' : 's'}`
-}
-
-function cellText(value: unknown): string {
-  if (value == null) return ''
-  return typeof value === 'object' ? JSON.stringify(value) : String(value)
-}
-
-function runMeta(run: QueryRun): string {
-  const reads = Object.entries(run.readCounts ?? {}).map(([name, count]) => `read ${name} ${count.toLocaleString()}`)
-  return [
-    ...(run.units != null ? [`${run.units.toLocaleString()} units`] : []),
-    ...(run.elapsedMs != null ? [`${run.elapsedMs} ms`] : []),
-    ...reads,
-  ].join(' · ')
-}
-
-function addRun(label: string, run: QueryRun): void {
-  runCount += 1
-  runs.value = [
-    { n: runCount, label, time: formatClockTime(new Date()), run, meta: runMeta(run) },
-    ...runs.value,
-  ].slice(0, MAX_RUNS)
-}
-
-function toSchedule(current: TenantQuerySchedule | null): Schedule | null {
-  return current
-    ? { cronExpression: current.cronExpression, isActive: isOn(current.isActive), emailTo: current.emailTo ?? '',
-        emailCc: current.emailCc ?? '', chatSpaceId: current.chatSpaceId ?? '' }
-    : null
-}
-
 function resetDraft(): void {
   const query = saved.value
   draft.value = query
     ? { tenantQueryId: query.tenantQueryId, queryName: query.queryName, description: query.description ?? '',
         readSpecJson: query.readSpecJson ?? '', scriptBody: query.scriptBody }
     : { tenantQueryId: '', queryName: '', description: '', readSpecJson: starterRead(firstAuditId()), scriptBody: STARTER_BODY }
-  schedule.value = toSchedule(savedSchedule.value)
   baseline.value = snapshot()
 }
 
@@ -772,8 +670,7 @@ async function load(tenantQueryId: string): Promise<void> {
         return
       }
       saved.value = query
-      // One schedule per query on this page; the backend allows more.
-      savedSchedule.value = (scheduled.schedules ?? [])[0] ?? null
+      adoptSchedule((scheduled.schedules ?? [])[0] ?? null)
     }
     resetDraft()
   } catch (error) {
@@ -835,7 +732,7 @@ function renameDraft(name: string): void {
 }
 
 function setOnSchedule(on: boolean): void {
-  if (schedule.value && canSchedule.value) schedule.value.isActive = on
+  if (canSchedule.value) setActive(on)
 }
 
 function openPopup(popup: Popup): void {
@@ -853,47 +750,24 @@ function closePopup(): void {
 
 function openSchedule(): void {
   if (!canSchedule.value) return
-  const current = schedule.value
-  scheduleForm.value = current
-    ? { time: timeFromCron(current.cronExpression) ?? '', emailTo: current.emailTo, emailCc: current.emailCc,
-        chatSpaceId: current.chatSpaceId, isActive: current.isActive }
-    : { time: '09:00', emailTo: '', emailCc: '', chatSpaceId: '', isActive: false }
+  fillForm()
   openPopup('schedule')
 }
 
 function saveSchedule(): void {
-  const form = scheduleForm.value
-  const to = parseRecipients(form.emailTo)
-  const cc = parseRecipients(form.emailCc)
-  const bad = badRecipient([...to, ...cc])
-  if (bad) {
-    popupError.value = `${bad} is not an email address.`
-    return
-  }
-  if (!to.length && !form.chatSpaceId) {
-    popupError.value = 'Send it somewhere: an email address or a chat space.'
-    return
-  }
-  // A cron that is not once a day shows no time; left untouched, it is kept as it is.
-  const cronExpression = form.time ? cronFromTime(form.time) : schedule.value?.cronExpression ?? null
-  if (!cronExpression) {
-    popupError.value = 'Pick the time it runs.'
-    return
-  }
-  schedule.value = { cronExpression, isActive: form.isActive, emailTo: formatRecipients(to), emailCc: formatRecipients(cc),
-    chatSpaceId: form.chatSpaceId }
-  closePopup()
+  const refusal = stageForm()
+  if (refusal) popupError.value = refusal
+  else closePopup()
 }
 
 async function openPreview(): Promise<void> {
-  const current = savedSchedule.value
-  if (!current) return
+  if (!savedSchedule.value) return
   openPopup('preview')
   if (activePopup.value !== 'preview') return
   popupBusy.value = true
   preview.value = null
   try {
-    preview.value = (await scriptFacade.runTenantQuerySchedule({ scheduleId: current.scheduleId, send: false })).outcome
+    preview.value = await runSaved(false)
   } catch (error) {
     popupError.value = messageOf(error, 'Could not preview.')
   } finally {
@@ -907,9 +781,8 @@ async function sendNow(): Promise<void> {
   popupBusy.value = true
   popupError.value = ''
   try {
-    preview.value = (await scriptFacade.runTenantQuerySchedule({ scheduleId: current.scheduleId, send: true })).outcome
-    const listed = await scriptFacade.listTenantQuerySchedules({ tenantQueryId: current.tenantQueryId })
-    savedSchedule.value = (listed.schedules ?? [])[0] ?? savedSchedule.value
+    preview.value = await runSaved(true)
+    await reread(current.tenantQueryId)
   } catch (error) {
     popupError.value = messageOf(error, 'Could not send.')
   } finally {
@@ -946,61 +819,12 @@ async function runDraft(): Promise<void> {
       readSpecJson: current.readSpecJson,
       scriptBody: current.scriptBody,
     })
-    addRun(`Run ${runCount + 1}`, out.result)
+    addRun(nextRunLabel(), out.result)
   } catch (error) {
     runError.value = messageOf(error, 'Could not run the query.')
   } finally {
     running.value = false
   }
-}
-
-/** The queries agent: its proposal has already run on the tenant's data; it fills the draft, nothing is saved. */
-async function ask(): Promise<void> {
-  const current = draft.value
-  const text = askText.value.trim()
-  if (!current || busy.value || !text) return
-  asking.value = true
-  askReply.value = ''
-  askOptions.value = []
-  runError.value = ''
-  try {
-    const draftNow = { readSpecJson: current.readSpecJson, scriptBody: current.scriptBody }
-    const out = await scriptFacade.sendAgentQueryTurn({ ...(conversationId ? { conversationId } : {}), text, ...draftNow })
-    conversationId = out.conversationId ?? conversationId
-    askReply.value = out.question?.text || out.reply || ''
-    askOptions.value = out.question?.options ?? []
-    const proposed = out.queryProposal
-    if (proposed) {
-      previousDraft.value = draftNow
-      current.readSpecJson = proposed.proposal.readSpecJson ?? ''
-      current.scriptBody = proposed.proposal.scriptBody
-      if (!current.queryName.trim() && proposed.proposal.queryName) current.queryName = proposed.proposal.queryName
-      if (!current.description && proposed.proposal.description) current.description = proposed.proposal.description
-      addRun("Agent's run", proposed.preview)
-      askText.value = ''
-    }
-  } catch (error) {
-    // A conversation from another tenant or an earlier visit is not found: start a new one next time.
-    if (messageOf(error, '').includes('was not found')) conversationId = undefined
-    runError.value = messageOf(error, 'Could not ask the agent.')
-  } finally {
-    asking.value = false
-  }
-}
-
-/** A choice the agent offered: sent as the person's answer. */
-function answer(option: string): void {
-  askText.value = option
-  void ask()
-}
-
-function putBackDraft(): void {
-  const current = draft.value
-  const before = previousDraft.value
-  if (!current || !before) return
-  current.readSpecJson = before.readSpecJson
-  current.scriptBody = before.scriptBody
-  previousDraft.value = null
 }
 
 /** One Save: the query, then its schedule when there is one and it changed. */
@@ -1030,27 +854,7 @@ async function save(): Promise<void> {
     savedId = out.query.tenantQueryId
     current.tenantQueryId = out.query.tenantQueryId
     current.queryName = out.query.queryName
-
-    const staged = schedule.value
-    const before = toSchedule(savedSchedule.value)
-    if (staged && canSchedule.value && JSON.stringify(staged) !== JSON.stringify(before)) {
-      const time = timeFromCron(staged.cronExpression)
-      const saveOut = await scriptFacade.saveTenantQuerySchedule({
-        scheduleId: savedSchedule.value?.scheduleId,
-        tenantQueryId: out.query.tenantQueryId,
-        ...(time ? { dailyAt: time } : { cronExpression: staged.cronExpression }),
-        isActive: staged.isActive,
-        emailTo: staged.emailTo || undefined,
-        emailCc: staged.emailCc || undefined,
-        chatSpaceId: staged.chatSpaceId || undefined,
-      })
-      savedSchedule.value = saveOut.schedule
-      schedule.value = toSchedule(saveOut.schedule)
-    } else if (savedSchedule.value) {
-      // Changing the script of a schedule makes the saver its owner: read it back so the owner line is right.
-      const listed = await scriptFacade.listTenantQuerySchedules({ tenantQueryId: out.query.tenantQueryId })
-      savedSchedule.value = (listed.schedules ?? [])[0] ?? savedSchedule.value
-    }
+    await persistSchedule(savedId, canSchedule.value)
     scheduleSaved = true
     baseline.value = snapshot()
   } catch (error) {
