@@ -89,7 +89,6 @@
   --surface-section-description-color: var(--text-soft);
   --surface-section-description-width: none;
   --bg: #090909;
-  --bg-soft: #121212;
   --surface: #101010;
   --surface-2: #161616;
   --surface-3: #1a1a1a;
@@ -208,7 +207,6 @@
 :root[data-theme='light'] {
   color-scheme: light;
   --bg: #ffffff;
-  --bg-soft: #ffffff;
   --surface: #ffffff;
   --surface-2: #f5f5f5;
   --surface-3: #ececec;
@@ -261,11 +259,6 @@ body {
 }
 
 ::selection {
-  background: var(--selection-bg);
-  color: var(--selection-text);
-}
-
-::-moz-selection {
   background: var(--selection-bg);
   color: var(--selection-text);
 }
@@ -535,6 +528,9 @@ button:disabled {
 
 .static-page-hero,
 .static-page-board {
+  --surface-shell-border: var(--static-tile-border);
+  --surface-shell-radius: var(--static-surface-radius);
+  --surface-shell-padding: var(--static-surface-padding);
   border: 1px solid var(--surface-shell-border, var(--border));
   border-radius: var(--surface-shell-radius, var(--radius-lg));
   background: var(--surface-shell-bg);
@@ -542,6 +538,7 @@ button:disabled {
 }
 
 .static-page-hero {
+  --surface-intro-title-size: clamp(1.7rem, 1.5vw + 1rem, 2.35rem);
   display: grid;
   gap: var(--surface-intro-gap);
 }
@@ -578,17 +575,6 @@ button:disabled {
   display: flex;
   justify-content: center;
   padding: 0 0 var(--static-shell-padding-y);
-}
-
-.static-page-hero,
-.static-page-board {
-  --surface-shell-border: var(--static-tile-border);
-  --surface-shell-radius: var(--static-surface-radius);
-  --surface-shell-padding: var(--static-surface-padding);
-}
-
-.static-page-hero {
-  --surface-intro-title-size: clamp(1.7rem, 1.5vw + 1rem, 2.35rem);
 }
 
 .static-page-board {
@@ -700,10 +686,6 @@ button:disabled {
   align-items: center;
   background: var(--static-action-tile-bg);
   border-color: var(--static-action-tile-border);
-}
-
-.static-page-action-tile--inline {
-  width: calc((100% - (var(--static-tile-gap) * 2)) / 3);
 }
 
 .static-page-control-tile {
@@ -1775,8 +1757,6 @@ label > span {
   background: transparent;
 }
 
-/* The warning dialog's CONTENT only. Its surface, position, wash and the page blur behind it all
-   come from .popup-workflow-overlay / .popup-workflow-modal, shared with every other popup. */
 /* The warning dialog's CONTENT only. Surface, width, border, shadow and the panel's own grid gap
    come from .popup-workflow-modal / .workflow-panel; the type scale comes from
    .wizard-question-shell.workflow-form--popup-compact, the same shell every other popup's question
@@ -2215,10 +2195,6 @@ label > span {
     width: calc((100% - var(--space-3)) / 2);
   }
 
-  .static-page-action-tile--inline {
-    width: calc((100% - var(--space-3)) / 2);
-  }
-
   .command-head {
     flex-direction: column;
     align-items: flex-start;
@@ -2256,10 +2232,6 @@ label > span {
   }
 
   .static-page-action-tile {
-    width: 100%;
-  }
-
-  .static-page-action-tile--inline {
     width: 100%;
   }
 
@@ -2498,7 +2470,6 @@ label > span {
   background: color-mix(in oklab, var(--surface-2) 94%, var(--surface));
   box-shadow: 0 18px 48px color-mix(in oklab, var(--bg) 56%, transparent);
 }
-
 
 /* State-surface roles, shared by ErrorState, EmptyState and OfflineBanner. All three drew the same
    icon-fills-its-box rule, two drew the same icon box, and the error and empty surfaces drew the

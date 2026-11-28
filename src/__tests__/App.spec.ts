@@ -1085,7 +1085,6 @@ function launcherAction(palette: { props: (name: string) => unknown }, id: strin
     const source = readFileSync('src/style.css', 'utf8')
     const grayscaleTokens = [
       '--bg',
-      '--bg-soft',
       '--surface',
       '--surface-2',
       '--surface-3',
