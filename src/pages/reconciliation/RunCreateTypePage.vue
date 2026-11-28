@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue'
+import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
 import { useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards from '../../components/workflow/WorkflowShortcutChoiceCards.vue'
@@ -40,27 +40,8 @@ function choose(value: string) {
 
 function goHome() { void router.push({ name: 'hub' }) }
 
-// DAR-UI-055. The cards only draw the A / B badges; each page wires the keys itself, as
-// ReconciliationCreateFlowPage does. Skipped while typing so the command palette keeps its letters.
-function isTypingTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement
-    && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-}
-
-function handleShortcutKeydown(event: KeyboardEvent) {
-  if (typeof event.key !== 'string' || event.key.length !== 1) return
-  if (event.defaultPrevented || event.repeat || event.isComposing) return
-  if (event.altKey || event.ctrlKey || event.metaKey) return
-  if (isTypingTarget(event.target)) return
-
-  const option = options.find((candidate) => candidate.shortcutKey === event.key.toUpperCase())
-  if (!option) return
-  event.preventDefault()
-  choose(option.value)
-}
-
-onMounted(() => window.addEventListener('keydown', handleShortcutKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', handleShortcutKeydown))
+// DAR-UI-055. The cards only draw the A / B badges; the keys are wired here.
+useChoiceShortcuts({ active: () => true, choices: () => options, choose })
 </script>
 
 <style scoped>

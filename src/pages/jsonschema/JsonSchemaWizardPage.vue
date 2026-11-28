@@ -116,7 +116,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
 import { useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, {
@@ -204,14 +205,6 @@ function buildWorkflowSteps(uploadIntent: SchemaUploadIntent | ''): WorkflowStep
 
   steps.push({ id: 'name', title: 'Name the schema' })
   return steps
-}
-
-function resolveUploadIntentByKey(key: string): SchemaUploadIntent | null {
-  const normalizedKey = key.trim().toLowerCase()
-  if (!normalizedKey) return null
-
-  const matchedOption = uploadIntentOptions.find((option) => option.shortcutKey.toLowerCase() === normalizedKey)
-  return matchedOption?.value ?? null
 }
 
 const workflowSteps = computed<WorkflowStep[]>(() => buildWorkflowSteps(selectedUploadIntent.value))
@@ -527,24 +520,13 @@ async function handlePrimarySubmit(): Promise<void> {
   currentStepIndex.value = Math.min(currentStepIndex.value + 1, workflowSteps.value.length - 1)
 }
 
-// Skipped while typing anywhere (the command palette's search too), so its letters stay letters.
-function isTypingTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement
-    && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-}
-
-function handleUploadIntentKeydown(event: KeyboardEvent): void {
-  if (currentStep.value.id !== 'upload-intent') return
-  if (event.defaultPrevented || event.repeat || event.isComposing) return
-  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-  if (isTypingTarget(event.target)) return
-
-  const matchedUploadIntent = resolveUploadIntentByKey(event.key)
-  if (!matchedUploadIntent) return
-
-  event.preventDefault()
-  advanceFromUploadIntent(matchedUploadIntent)
-}
+// The upload-intent cards' letters (Shift+letter is no choice here); skipped while typing, so the palette keeps its letters.
+useChoiceShortcuts({
+  active: () => currentStep.value.id === 'upload-intent',
+  choices: () => uploadIntentOptions,
+  choose: advanceFromUploadIntent,
+  blockShift: true,
+})
 
 function goBack(): void {
   pageError.value = null
@@ -583,12 +565,8 @@ async function loadSystemOptions(): Promise<void> {
 
 onMounted(() => {
   void loadSystemOptions()
-  window.addEventListener('keydown', handleUploadIntentKeydown)
 })
 
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleUploadIntentKeydown)
-})
 </script>
 
 <style scoped>

@@ -74,3 +74,39 @@ export function shouldAbortWorkflowOnEscape(
 
   return event.key.toLowerCase() === 'escape'
 }
+
+/**
+ * DAR-OPS-029 S99-102. True while the user is typing (an input, text area, select or editable content), where a letter
+ * key is a letter: the command palette's search keeps its letters.
+ */
+export function isTypingTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+}
+
+export interface ChoiceShortcut<T> {
+  shortcutKey: string
+  value: T
+}
+
+/**
+ * The choice a plain key press picks (its shortcutKey, either case), or null: a held, composing or Alt/Ctrl/Meta key is
+ * no choice, and neither is Shift where a page blocks it. The typing check is the caller's (it depends on the target).
+ */
+export function matchChoiceShortcut<T>(
+  event: KeyboardEvent,
+  choices: ReadonlyArray<ChoiceShortcut<T>>,
+  { blockShift = false }: { blockShift?: boolean } = {},
+): T | null {
+  if (typeof event.key !== 'string' || event.key.length !== 1) return null
+  if (event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return null
+  if (blockShift && event.shiftKey) return null
+  const key = event.key.toUpperCase()
+  return choices.find((choice) => choice.shortcutKey.toUpperCase() === key)?.value ?? null
+}
+
+/** Enter with focus outside any form: a letter picks a card but leaves focus on the page, so the form never sees it. */
+export function isEnterOutsideForm(event: KeyboardEvent): boolean {
+  return event.key === 'Enter' && !event.repeat && !event.altKey && !event.ctrlKey && !event.metaKey
+    && !(event.target instanceof Element && event.target.closest('form'))
+}

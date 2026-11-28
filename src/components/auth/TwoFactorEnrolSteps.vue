@@ -42,7 +42,8 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
 import InlineValidation from '../ui/InlineValidation.vue'
 import WorkflowShortcutChoiceCards from '../workflow/WorkflowShortcutChoiceCards.vue'
 import WorkflowStepForm from '../workflow/WorkflowStepForm.vue'
@@ -131,28 +132,17 @@ function backToChoice(): void {
   if (!passkeysOffered) emit('back')
 }
 
-// The cards draw the A and P badges; the keys are wired here, as every page with choice cards does. Skipped while
-// typing, and Enter outside the form (a letter leaves focus on the page) starts, as the hint says.
-function handleShortcut(event: KeyboardEvent): void {
-  if (setup.value || passkeyOptions.value || !passkeysOffered) return
-  if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
-  const target = event.target
-  if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
-  if (event.key === 'Enter' && !(target instanceof Element && target.closest('form'))) {
-    event.preventDefault()
-    void start()
-    return
-  }
-  const option = FACTORS.find((candidate) => candidate.shortcutKey === event.key.toUpperCase())
-  if (!option) return
-  event.preventDefault()
-  factor.value = option.value
-}
+// The cards draw the A and P badges; the keys are wired here. Enter outside the form (a letter leaves focus on the page)
+// starts, as the hint says.
+useChoiceShortcuts({
+  active: () => !setup.value && !passkeyOptions.value && passkeysOffered,
+  choices: () => FACTORS,
+  choose: (value) => { factor.value = value },
+  onEnterOutsideForm: () => { void start() },
+})
 
 onMounted(() => {
-  window.addEventListener('keydown', handleShortcut)
   // Nothing to choose: begin the app at once.
   if (!passkeysOffered) void start()
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', handleShortcut))
 </script>

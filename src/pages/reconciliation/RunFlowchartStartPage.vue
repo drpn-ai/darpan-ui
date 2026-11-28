@@ -26,7 +26,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
 import { useRoute, useRouter } from 'vue-router'
 import InlineValidation from '../../components/ui/InlineValidation.vue'
 import WorkflowDateRangeCalendar from '../../components/workflow/WorkflowDateRangeCalendar.vue'
@@ -115,28 +116,10 @@ async function start() {
   }
 }
 
-// The cards only draw the A-D badges; each page wires the keys itself, as RunCreateTypePage does. Skipped while
-// typing so the command palette keeps its letters.
-function isTypingTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement
-    && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-}
-
-function handleShortcutKeydown(event: KeyboardEvent) {
-  if (step.value !== 'window') return
-  if (typeof event.key !== 'string' || event.key.length !== 1) return
-  if (event.defaultPrevented || event.repeat || event.isComposing) return
-  if (event.altKey || event.ctrlKey || event.metaKey) return
-  if (isTypingTarget(event.target)) return
-
-  const option = options.value.find((candidate) => candidate.shortcutKey === event.key.toUpperCase())
-  if (!option) return
-  event.preventDefault()
-  choose(option.value)
-}
+// The cards only draw the A-D badges; the keys are wired here.
+useChoiceShortcuts({ active: () => step.value === 'window', choices: () => options.value, choose })
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleShortcutKeydown)
   const chart = lifecycleChart(reconciliationId.value)
   try {
     await cachedRead(chart.key, chart.fetch, ({ got }) => { run.value = got.reconciliation })
@@ -144,7 +127,6 @@ onMounted(async () => {
     error.value = caught instanceof Error ? caught.message : String(caught)
   }
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', handleShortcutKeydown))
 </script>
 
 <style scoped>

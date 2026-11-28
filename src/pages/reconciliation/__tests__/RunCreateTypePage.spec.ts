@@ -6,7 +6,10 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push }), useRoute: () => ({ q
 
 import RunCreateTypePage from '../RunCreateTypePage.vue'
 
-beforeEach(() => push.mockReset())
+// Braced (DAR-OPS-029 S99-223): an arrow that returns the mock hands vitest a function, which it then runs as teardown.
+beforeEach(() => {
+  push.mockReset()
+})
 // The page listens on window; a wrapper left mounted would answer the next test's key presses.
 enableAutoUnmount(afterEach)
 

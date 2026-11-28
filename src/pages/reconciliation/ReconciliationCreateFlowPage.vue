@@ -144,6 +144,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
 import WorkflowShortcutChoiceCards, {
@@ -1463,14 +1464,6 @@ async function focusActiveSelectTrigger(): Promise<void> {
   activeTrigger.focus()
 }
 
-function resolveActiveShortcutChoiceByKey(key: string): string | null {
-  const normalizedKey = key.trim().toLowerCase()
-  if (!normalizedKey) return null
-
-  const matchedOption = activeShortcutChoiceOptions.value.find((option) => option.shortcutKey.toLowerCase() === normalizedKey)
-  return matchedOption?.value ?? null
-}
-
 function advanceFromShortcutChoice(value: string): void {
   if (!isShortcutChoiceStep.value || loadingSelections.value) return
 
@@ -1485,17 +1478,14 @@ function advanceFromShortcutChoice(value: string): void {
   }
 }
 
-function handleShortcutChoiceKeydown(event: KeyboardEvent): void {
-  if (!isShortcutChoiceStep.value) return
-  if (event.defaultPrevented || event.repeat || event.isComposing) return
-  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-
-  const matchedChoice = resolveActiveShortcutChoiceByKey(event.key)
-  if (!matchedChoice) return
-
-  event.preventDefault()
-  advanceFromShortcutChoice(matchedChoice)
-}
+// A choice step's letters (Shift+letter is no choice here). DAR-OPS-029 S99-102: now also skipped while typing, so the
+// command palette keeps its letters over a choice step (this page alone did not skip them).
+useChoiceShortcuts({
+  active: () => isShortcutChoiceStep.value,
+  choices: () => activeShortcutChoiceOptions.value,
+  choose: advanceFromShortcutChoice,
+  blockShift: true,
+})
 
 function goBack(): void {
   pageError.value = null
@@ -1629,7 +1619,6 @@ onBeforeUnmount(() => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleShortcutChoiceKeydown)
   if (continuingFlowElsewhere) return
   draftStore.clearRuleSetDraft()
   draftStore.clearAutomationDraft()
@@ -1800,7 +1789,6 @@ async function createRun(): Promise<void> {
 }
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleShortcutChoiceKeydown)
   await loadOptions()
   await restoreDraftFromHistoryState()
   await applyReturnedQuery()

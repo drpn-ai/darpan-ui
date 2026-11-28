@@ -25,7 +25,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { useChoiceShortcuts } from '../../composables/useChoiceShortcuts'
 import { useRoute, useRouter } from 'vue-router'
 import WorkflowDateRangeCalendar from '../../components/workflow/WorkflowDateRangeCalendar.vue'
 import WorkflowPage from '../../components/workflow/WorkflowPage.vue'
@@ -136,35 +137,16 @@ async function start() {
   await landed
 }
 
-// The cards only draw the A-D badges; each page wires the keys itself. Skipped while typing so the command palette
-// keeps its letters.
-function isTypingTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement
-    && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-}
-
-function handleShortcutKeydown(event: KeyboardEvent) {
-  if (step.value !== 'window') return
-  // DAR-UI-078 (walked in Chrome): a letter picks a card but leaves focus on the page, outside the form that answers
-  // Enter, so "press Enter" did nothing. Enter there runs, as the hint says; inside the form the form answers it.
-  if (event.key === 'Enter' && !event.defaultPrevented && !event.repeat && !(event.target instanceof Element && event.target.closest('form'))) {
-    event.preventDefault()
-    void start()
-    return
-  }
-  if (typeof event.key !== 'string' || event.key.length !== 1) return
-  if (event.defaultPrevented || event.repeat || event.isComposing) return
-  if (event.altKey || event.ctrlKey || event.metaKey) return
-  if (isTypingTarget(event.target)) return
-
-  const option = options.value.find((candidate) => candidate.shortcutKey === event.key.toUpperCase())
-  if (!option) return
-  event.preventDefault()
-  choose(option.value)
-}
+// The cards only draw the A-D badges; the keys are wired here. DAR-UI-078 (walked in Chrome): a letter picks a card but
+// leaves focus on the page, outside the form that answers Enter, so Enter there runs, as the hint says.
+useChoiceShortcuts({
+  active: () => step.value === 'window',
+  choices: () => options.value,
+  choose,
+  onEnterOutsideForm: () => { void start() },
+})
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleShortcutKeydown)
   try {
     const settings = (await auditFacade.getAuditSettings({ audit: auditCode.value })).settings
     playableFrom.value = settings?.playableFrom ? parseDateInput(settings.playableFrom) : null
@@ -174,7 +156,6 @@ onMounted(async () => {
     // The run itself still refuses days it cannot record, in place.
   }
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', handleShortcutKeydown))
 </script>
 
 <style scoped>
